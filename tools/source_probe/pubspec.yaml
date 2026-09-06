@@ -1,0 +1,13 @@
+name: shiori_source_probe
+description: Isolated, opt-in SRC-003 source investigation; not a production adapter.
+publish_to: none
+version: 0.1.0
+environment:
+  sdk: '>=3.10.3 <4.0.0'
+dependencies:
+  crypto: ^3.0.6
+  html: ^0.15.6
+  image: ^4.5.4
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.26.3

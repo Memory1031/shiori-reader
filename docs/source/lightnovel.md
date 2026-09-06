@@ -1,6 +1,6 @@
 # LightNovel.fun 源站调查
 
-当前结果（2026-09-06）：**SRC-001 DONE；SRC-002 DONE（证据边界与覆盖缺口见文末）；SRC-003 / SRC-004 未执行，生产 Source Gate 未通过。** 前两节保留 SRC-001 和第三方参考的历史快照；其中 UNKNOWN / 未执行均指当时状态，以文末 SRC-002 的分层证据更新为准。
+当前结果（2026-09-07）：**SRC-001 / SRC-002 / SRC-003 DONE；独立 Dart 图文链路通过，SRC-004 未执行，生产 Source Gate 未通过。** 前文保留 SRC-001、第三方参考及 SRC-002 的历史快照；其中 UNKNOWN / 未执行均指当时状态，以文末 SRC-003 的最新证据和仍存缺口为准。
 
 ## SRC-001：访问边界与调查基线
 
@@ -195,3 +195,41 @@ book_id / volume_id / chapter_id 在独立 JSON 中为数值，页面 href 的 b
 下一步 SRC-003：以本书 31607、默认卷 44117、章 309555 为身份断言；使用已验证的搜索 0 起算 / 目录 1 起算和 POST 组合建立独立 Dart 调查包。默认离线，只在 opt-in 下低频 live；字节 / 图片解码、重定向与预算必须由该包真正验证。需要额外捕获字段时先取得最小脱敏样本，不扩大成全书采集。
 
 本次验收：网页标题 / 作者 / 四卷十章顺序人工对照；搜索两页 ID 与 HTTP 样本逐项一致；正文 p / img 计数一致；全部 JSON 可解析、manifest 文件和哈希一致、无重复章节 ID；检查 fixture 无实际会话秘密、签名 query、原文、用户链接 / 头像和外部下载口令。没有为文档任务重复跑 Flutter analyze / test / build。
+
+## SRC-003：独立 Dart 图文链路（2026-09-07）
+
+**Status：DONE。** 工具与复跑命令见 [`tools/source_probe/README.md`](../../tools/source_probe/README.md)。独立 pubspec / lockfile / 分析配置，运行于 Windows、Dart 3.10.3；没有引入生产 Source，没有改主 Flutter 依赖。新增 `html` 用于结构统计，`image` 用于纯 Dart 字节解码，`crypto` 用于哈希，版本及官方 API 依据见工具 README。
+
+### 当次实际结果
+
+首次本地时间 2026-09-07 00:05:37–00:05:58，最终复核 00:14:32–00:14:50（报告时间为 UTC）。先完成离线预检，再执行 live，不改查询、不追加其他小说。首次记录：[`live-20260907.json`](../../tools/source_probe/reports/live-20260907.json)；最终验收：[`live-final-20260907.json`](../../tools/source_probe/reports/live-final-20260907.json)。两轮下表结果和图片哈希一致。
+
+| 阶段 | 结果与身份断言 | HTTP 尝试 |
+| --- | --- | --- |
+| Search | 玩乐关系 → book_id=31607，标题与作者精确匹配；不依赖第一项位置 | 1 POST，200 |
+| Detail | 重复验证书身份，默认卷 44117 / 章 309555 一致 | 1 POST，200 |
+| Volumes | 4 卷，单页总数一致，选定卷存在且唯一 | 1 POST，200 |
+| Chapters | 所选卷 2 章，目标章与书 / 卷归属一致，locked=0 | 1 POST，200 |
+| Chapter text | body_snapshot 非空；139,470 UTF-16 code units、405,531 UTF-8 字节；4,084 个 p、4,070 个非空文本 p、14 个 img、17 个 ruby | 1 POST，200 |
+| Illustration | 正文第 1 张图：MIME=image/jpeg，310,858 字节，纯 Dart 解码 2048×829 | 1 GET，200 |
+
+每轮 6 次，SRC-003 总计 **12 / 30 次 HTTP 尝试**（第二轮预算设为剩余 24），每次后续尝试前等待至少 1 秒；没有重定向、没有自动重试。没有主动发送 Cookie / Authorization / security_key 或导入浏览器会话，每次请求使用独立 HttpClient。图片保留当次正文 URL 的 m/t 参数进行正常请求，报告不保留其值，也不记录完整图片 URL。解码尺寸与 SRC-002 浏览器 natural dimensions 一致，证明收到有效字节并解码，未把 URL 存在视为成功。
+
+图片 SHA-256：`a3d6ec3df6afbcdba871ceefb3e6902f75c8c711fde8d03803310c8a11dde2fa`。哈希仅描述当次字节，不是签名 URL 或生产 Media 的稳定主键。原图、正文和 HTML 未写入仓库；body 的长度和结构计数与 SRC-002 样本一致，但仍未与出版原版逐字核对。
+
+### 离线、预算与失败验收
+
+[`offline-20260907.json`](../../tools/source_probe/reports/offline-20260907.json) 通过全部 5 个阶段，**0 次 HTTP**：15 个文件的 manifest 哈希、身份 / 分页 / 四卷十章元数据、合成 HTML 与自制 PNG。原始 SRC-002 fixtures 保留不改，结构摘要没有伪装成完整响应输入。
+
+工具默认只执行这些离线阶段；显式 `--live` 才启用网络。预算只允许 1–30，尝试发出前计数，失败和重定向也占用；API 跳转停止，媒体最多允许 3 个经验证的同站 HTTPS 跳转；耗尽即记录 `budget_exhausted`，不发送下一请求、不继续后续阶段。受限 HTTP / 非零 code / 身份不符 / locked / preview-only / 缺正文图均终止；没有使用 WebView、认证信息、解锁或备用端点。
+
+每次请求总超时 30 秒、连接 15 秒、响应上限 16 MiB；图像 MIME 与格式必须相符，先验证单帧及 2,000 万像素上限再解码。报告按白名单输出统计和常量失败码，不输出响应体、原始异常和签名值。测试中使用内存传输与秘密哨兵验证失败报告、预算和脱敏；这些是假响应，不是新捕获的站点异常样本。
+
+边界测试发现 image 4.9.2 的 JPEG `startDecode/readInfo` 会在返回尺寸前分配系数缓冲，原保护位置过晚，导致超大合成 JPEG 测试被中止。修复为先检查 JPEG 帧头 / PNG IHDR，再进入库解码；本工具只启用 JPEG/PNG。**23 项离线测试通过，最终静态分析通过。** 新预检改变实际图片准入条件，因此在剩余预算内做第二轮 live 验证；未保留或覆盖第一轮报告。
+
+### 平台与仍存缺口
+
+- 本次实际证明 Windows 独立 Dart 请求与图像解码；不能替代 Android Flutter codec / 真机网络验证（TEST-001 / ANDROID-002），iOS 仍为 IOS-002 / DEFERRED_NO_MAC。
+- 仅解码一张正文插图；其余 13 张继续只有 SRC-002 浏览器解码证据。Header 组合有效不等于逐项必要性已知。
+- 不同客户端及本次两轮匿名成功没有证明全站匿名边界、Cookie / token 寿命、m/t 的过期语义或长期身份稳定性。没有故意制造过期、访问限制或限流。
+- catalog 多页、真实失败 schema、平台会话恢复、内容/fixture 许可及生产契约仍待后续任务。SRC-003 通过不等于 Phase 0 Go；下一步 **SRC-004** 审查现有证据和 Source 准入，不应无故重复访问源站。

@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 1,
+  "task": "SRC-003",
+  "mode": "live",
+  "startedAtUtc": "2026-09-06T16:14:32.438103Z",
+  "dartVersion": "3.10.3",
+  "platform": "windows",
+  "budget": 24,
+  "retryPolicy": "none",
+  "spacingMilliseconds": 1000,
+  "credentials": "no Cookie/Authorization/session import",
+  "productionSourceGate": "NOT_EVALUATED_SRC004",
+  "status": "PASS",
+  "stages": [
+    {
+      "stage": "fixture_integrity",
+      "status": "PASS",
+      "httpAttempts": 0,
+      "durationMilliseconds": 18,
+      "evidence": {
+        "verifiedManifestEntries": 15,
+        "provenance": "SRC-002 projections/transcriptions/synthetic, not full responses"
+      }
+    },
+    {
+      "stage": "fixture_identity",
+      "status": "PASS",
+      "httpAttempts": 0,
+      "durationMilliseconds": 1,
+      "evidence": {
+        "bookId": 31607,
+        "volumeId": 44117,
+        "chapterId": 309555,
+        "bodyEvidence": "structure statistics only; original body not retained"
+      }
+    },
+    {
+      "stage": "fixture_pagination",
+      "status": "PASS",
+      "httpAttempts": 0,
+      "durationMilliseconds": 1,
+      "evidence": {
+        "requestPageBase": 0,
+        "responsePageBase": 1,
+        "checkedPages": 3,
+        "emptyPageChecked": true
+      }
+    },
+    {
+      "stage": "fixture_catalog",
+      "status": "PASS",
+      "httpAttempts": 0,
+      "durationMilliseconds": 2,
+      "evidence": {
+        "volumes": 4,
+        "uniqueChapters": 10,
+        "sourceOrderPreserved": true
+      }
+    },
+    {
+      "stage": "synthetic_body_image",
+      "status": "PASS",
+      "httpAttempts": 0,
+      "durationMilliseconds": 24,
+      "evidence": {
+        "provenance": "SYNTHETIC, not live evidence",
+        "body": {
+          "htmlCodeUnits": 302,
+          "textCodeUnits": 9,
+          "textUtf8Bytes": 27,
+          "paragraphCount": 5,
+          "nonemptyTextParagraphCount": 4,
+          "imageCount": 1,
+          "rubyCount": 1
+        },
+        "image": {
+          "mime": "image/png",
+          "format": "png",
+          "bytes": 129,
+          "sha256": "49577f1e5a77ef1a3d85ad89159cba5f2371c189baf8a75a49c99eb99d516a5e",
+          "width": 2,
+          "height": 2,
+          "decoded": true,
+          "decoder": "package:image (pure Dart)"
+        }
+      }
+    },
+    {
+      "stage": "search",
+      "status": "PASS",
+      "httpAttempts": 1,
+      "durationMilliseconds": 3801,
+      "evidence": {
+        "query": "玩乐关系",
+        "bookId": 31607,
+        "title": "桌游咖（玩乐关系/玩玩的戀愛關係）",
+        "author": "葵关南"
+      }
+    },
+    {
+      "stage": "detail",
+      "status": "PASS",
+      "httpAttempts": 1,
+      "durationMilliseconds": 2476,
+      "evidence": {
+        "bookId": 31607,
+        "defaultVolumeId": 44117,
+        "defaultChapterId": 309555
+      }
+    },
+    {
+      "stage": "volumes",
+      "status": "PASS",
+      "httpAttempts": 1,
+      "durationMilliseconds": 2474,
+      "evidence": {
+        "volumeCount": 4,
+        "selectedVolumeId": 44117,
+        "page": 1,
+        "pageCount": 1
+      }
+    },
+    {
+      "stage": "chapters",
+      "status": "PASS",
+      "httpAttempts": 1,
+      "durationMilliseconds": 2244,
+      "evidence": {
+        "selectedChapterId": 309555,
+        "selectedVolumeChapterCount": 2,
+        "page": 1,
+        "pageCount": 1
+      }
+    },
+    {
+      "stage": "chapter_text",
+      "status": "PASS",
+      "httpAttempts": 1,
+      "durationMilliseconds": 4113,
+      "evidence": {
+        "bookId": 31607,
+        "volumeId": 44117,
+        "chapterId": 309555,
+        "bodyField": "body_snapshot",
+        "htmlCodeUnits": 256358,
+        "textCodeUnits": 139470,
+        "textUtf8Bytes": 405531,
+        "paragraphCount": 4084,
+        "nonemptyTextParagraphCount": 4070,
+        "imageCount": 14,
+        "rubyCount": 17
+      }
+    },
+    {
+      "stage": "illustration_decode",
+      "status": "PASS",
+      "httpAttempts": 1,
+      "durationMilliseconds": 2730,
+      "evidence": {
+        "mime": "image/jpeg",
+        "format": "jpg",
+        "bytes": 310858,
+        "sha256": "a3d6ec3df6afbcdba871ceefb3e6902f75c8c711fde8d03803310c8a11dde2fa",
+        "width": 2048,
+        "height": 829,
+        "decoded": true,
+        "decoder": "package:image (pure Dart)",
+        "bodyImageIndex": 0,
+        "origin": "https://api.lightnovel.fun",
+        "queryPresent": true,
+        "observedKnownQueryKeys": [
+          "m",
+          "t"
+        ],
+        "queryValuesRetained": false
+      }
+    }
+  ],
+  "httpAttempts": 6,
+  "attempts": [
+    {
+      "attempt": 1,
+      "method": "POST",
+      "kind": "api",
+      "httpStatus": 200,
+      "bytes": 3747
+    },
+    {
+      "attempt": 2,
+      "method": "POST",
+      "kind": "api",
+      "httpStatus": 200,
+      "bytes": 3426
+    },
+    {
+      "attempt": 3,
+      "method": "POST",
+      "kind": "api",
+      "httpStatus": 200,
+      "bytes": 5383
+    },
+    {
+      "attempt": 4,
+      "method": "POST",
+      "kind": "api",
+      "httpStatus": 200,
+      "bytes": 1168
+    },
+    {
+      "attempt": 5,
+      "method": "POST",
+      "kind": "api",
+      "httpStatus": 200,
+      "bytes": 3023562
+    },
+    {
+      "attempt": 6,
+      "method": "GET",
+      "kind": "body_image",
+      "httpStatus": 200,
+      "bytes": 310858
+    }
+  ],
+  "finishedAtUtc": "2026-09-06T16:14:50.330738Z"
+}

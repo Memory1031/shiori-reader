@@ -1,0 +1,59 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Shiori (Debug)",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "windows": {
+                "env": {
+                    "ANDROID_HOME": "${workspaceFolder}/.tooling/android-sdk",
+                    "ANDROID_SDK_ROOT": "${workspaceFolder}/.tooling/android-sdk",
+                    "JAVA_HOME": "${workspaceFolder}/.tooling/jdk/jdk-17.0.20.1+1",
+                    "GRADLE_USER_HOME": "${workspaceFolder}/.tooling/gradle"
+                }
+            }
+        },
+        {
+            "name": "Shiori (Profile)",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile",
+            "windows": {
+                "env": {
+                    "ANDROID_HOME": "${workspaceFolder}/.tooling/android-sdk",
+                    "ANDROID_SDK_ROOT": "${workspaceFolder}/.tooling/android-sdk",
+                    "JAVA_HOME": "${workspaceFolder}/.tooling/jdk/jdk-17.0.20.1+1",
+                    "GRADLE_USER_HOME": "${workspaceFolder}/.tooling/gradle"
+                }
+            }
+        },
+        {
+            "name": "Shiori (Release)",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/lib/main.dart",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "windows": {
+                "env": {
+                    "ANDROID_HOME": "${workspaceFolder}/.tooling/android-sdk",
+                    "ANDROID_SDK_ROOT": "${workspaceFolder}/.tooling/android-sdk",
+                    "JAVA_HOME": "${workspaceFolder}/.tooling/jdk/jdk-17.0.20.1+1",
+                    "GRADLE_USER_HOME": "${workspaceFolder}/.tooling/gradle"
+                }
+            }
+        },
+        {
+            "name": "source_probe",
+            "cwd": "tools\\source_probe",
+            "request": "launch",
+            "type": "dart"
+        }
+    ]
+}
