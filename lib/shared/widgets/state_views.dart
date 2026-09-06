@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/errors/app_failure.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 class LoadingView extends StatelessWidget {
-  const LoadingView({super.key, this.message = '正在加载…'});
-  final String message;
+  const LoadingView({super.key, this.message});
+  final String? message;
 
   @override
-  Widget build(BuildContext context) => _StateLayout(
-    children: [
-      CircularProgressIndicator(semanticsLabel: message),
-      Text(message, textAlign: TextAlign.center),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final label = message ?? AppLocalizations.of(context).loading;
+    return _StateLayout(
+      children: [
+        CircularProgressIndicator(semanticsLabel: label),
+        Text(label, textAlign: TextAlign.center),
+      ],
+    );
+  }
 }
 
 class EmptyView extends StatelessWidget {
@@ -47,6 +51,8 @@ class FailureView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (failure.isCancellation) return const SizedBox.shrink();
+    final strings = AppLocalizations.of(context);
+
     final deadline = failure.retryNotBefore;
     // Unknown cooldown has no safe immediate retry. Data policy must resolve it.
     final cooledDown =
@@ -58,7 +64,10 @@ class FailureView extends StatelessWidget {
       children: [
         Semantics(
           liveRegion: true,
-          child: Text(failureMessage(failure), textAlign: TextAlign.center),
+          child: Text(
+            failureMessage(strings, failure),
+            textAlign: TextAlign.center,
+          ),
         ),
         Wrap(
           alignment: WrapAlignment.center,
@@ -68,12 +77,15 @@ class FailureView extends StatelessWidget {
             if (mayRetry && onRetry != null)
               FilledButton(
                 onPressed: retryAvailable && cooledDown ? onRetry : null,
-                child: const Text('重试'),
+                child: Text(strings.retryAction),
               ),
             if (onReadCache != null)
-              OutlinedButton(onPressed: onReadCache, child: const Text('读取缓存')),
+              OutlinedButton(
+                onPressed: onReadCache,
+                child: Text(strings.readCacheAction),
+              ),
             if (onBack != null)
-              TextButton(onPressed: onBack, child: const Text('返回')),
+              TextButton(onPressed: onBack, child: Text(strings.backAction)),
           ],
         ),
       ],
@@ -81,20 +93,23 @@ class FailureView extends StatelessWidget {
   }
 }
 
-String failureMessage(AppFailure failure) {
-  if (failure.context == FailureContext.cacheMiss) return '暂无可用缓存，请联网后再试。';
+String failureMessage(AppLocalizations strings, AppFailure failure) {
+  if (failure.context == FailureContext.cacheMiss) {
+    return strings.cacheMissMessage;
+  }
   return switch (failure.kind) {
-    FailureKind.network || FailureKind.timeout => '无法连接，请检查网络后重试。',
-    FailureKind.sourceUnavailable => '内容服务暂时不可用，请稍后再试。',
-    FailureKind.session => '访问会话不可用，请稍后再试。',
-    FailureKind.accessRestricted => '此内容的访问受到限制。',
-    FailureKind.parse => '内容格式可能已变化，暂时无法读取。',
-    FailureKind.notFound => '未找到这项内容。',
-    FailureKind.rateLimited => '请求过于频繁，请稍后再试。',
-    FailureKind.database => '本地存储发生问题，暂时无法完成操作。',
-    FailureKind.cache => '缓存暂时不可用，内容可能尚未保存到本地。',
-    FailureKind.unsupported => '暂不支持此功能。',
-    FailureKind.tooLarge => '内容超出当前可处理的大小。',
+    FailureKind.network ||
+    FailureKind.timeout => strings.connectionFailureMessage,
+    FailureKind.sourceUnavailable => strings.sourceUnavailableMessage,
+    FailureKind.session => strings.sessionFailureMessage,
+    FailureKind.accessRestricted => strings.accessRestrictedMessage,
+    FailureKind.parse => strings.parseFailureMessage,
+    FailureKind.notFound => strings.notFoundMessage,
+    FailureKind.rateLimited => strings.rateLimitedMessage,
+    FailureKind.database => strings.databaseFailureMessage,
+    FailureKind.cache => strings.cacheFailureMessage,
+    FailureKind.unsupported => strings.unsupportedMessage,
+    FailureKind.tooLarge => strings.tooLargeMessage,
     FailureKind.cancelled => '',
   };
 }

@@ -17,6 +17,8 @@
 
 Flutter 固定为 **3.38.4**。应用和独立调查包都使用 `pub get --enforce-lockfile`；Flutter 后续检查和构建使用 `--no-pub`。
 
+应用多语言采用 gen-l10n + ARB，生成的 `lib/l10n/generated/` Dart 文件随资源一起提交。CI 在格式检查前运行 `flutter gen-l10n` 和 `git diff --exit-code -- lib/l10n/generated`，检查提交的代码与资源是否一致；修改文案后应在本地重新生成。
+
 根目录 `flutter analyze` 会扫描独立调查包，因此必须在分析前完成两份依赖安装。仅安装主应用依赖不会生成 `tools/source_probe/.dart_tool/package_config.json`；干净的 runner 会因此找不到调查包自身以及 `html`、`image` 等依赖。不要通过忽略诊断或把调查依赖加入主应用来解决。
 
 两份 `pubspec.lock` 的 hosted URL 均为 `https://pub.flutter-io.cn`，因此工作流统一设置：
@@ -40,6 +42,8 @@ flutter pub get --enforce-lockfile
 Push-Location tools/source_probe
 dart pub get --enforce-lockfile
 Pop-Location
+flutter gen-l10n
+git diff --exit-code -- lib/l10n/generated
 dart format --output=none --set-exit-if-changed lib test
 flutter analyze --no-pub
 flutter test --no-pub

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../domain/models/models.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/app_scaffold.dart';
 import '../shared/widgets/state_views.dart';
 
@@ -43,19 +44,24 @@ class AppRoutes {
 
   Widget buildHome(BuildContext context) =>
       home?.call(context) ??
-      const AppScaffold(
-        title: 'Shiori',
-        body: EmptyView(message: '阅读功能正在准备中。'),
+      AppScaffold(
+        title: AppLocalizations.of(context).appTitle,
+        body: EmptyView(
+          message: AppLocalizations.of(context).readingFeaturesPending,
+        ),
       );
 
   Route<void> route(BuildContext context, AppDestination destination) {
     Widget builder(BuildContext context) => switch (destination) {
       SearchDestination(:final sourceId) =>
-        search?.call(context, sourceId) ?? const _PendingPage(title: '搜索'),
+        search?.call(context, sourceId) ??
+            _PendingPage(title: AppLocalizations.of(context).searchTitle),
       NovelDestination(:final key) =>
-        novel?.call(context, key) ?? const _PendingPage(title: '小说详情'),
+        novel?.call(context, key) ??
+            _PendingPage(title: AppLocalizations.of(context).novelDetailsTitle),
       ReaderDestination(:final key) =>
-        reader?.call(context, key) ?? const _PendingPage(title: '阅读'),
+        reader?.call(context, key) ??
+            _PendingPage(title: AppLocalizations.of(context).readerTitle),
     };
     // Route names deliberately exclude opaque IDs and potential site locators.
     final settings = RouteSettings(name: destination.routeName);
@@ -79,6 +85,6 @@ class _PendingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AppScaffold(
     title: title,
-    body: const EmptyView(message: '此功能尚在开发中。'),
+    body: EmptyView(message: AppLocalizations.of(context).featurePending),
   );
 }

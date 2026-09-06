@@ -1,3 +1,5 @@
+import 'package:flutter/widgets.dart';
+
 import '../domain/contracts/repositories.dart';
 import 'app.dart';
 import 'app_controller.dart';
@@ -8,7 +10,9 @@ import 'routes.dart';
 ShioriApp createApp({
   SettingsStore? settings,
   AppRoutes routes = const AppRoutes(),
+  Locale? locale,
 }) => ShioriApp(
   createController: () => AppController(settingsStore: settings),
   routes: routes,
+  locale: locale,
 );

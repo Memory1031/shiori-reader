@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shiori/l10n/generated/app_localizations.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/app_controller.dart';
 import 'package:shiori/app/bootstrap.dart';
@@ -98,6 +99,9 @@ class _ChapterController extends ScopedController {
 }
 
 Widget _screen(Widget body) => MaterialApp(
+  locale: const Locale('zh'),
+  supportedLocales: AppLocalizations.supportedLocales,
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
   home: AppScaffold(title: '测试', body: body),
 );
 
@@ -158,7 +162,9 @@ void main() {
     'settings failure keeps home usable and explicit retry recovers',
     (tester) async {
       final store = _PendingSettings();
-      await tester.pumpWidget(createApp(settings: store));
+      await tester.pumpWidget(
+        createApp(settings: store, locale: const Locale('zh')),
+      );
       expect(find.text('Shiori'), findsOneWidget);
       store.requests.first.complete(
         Failure(
@@ -310,6 +316,9 @@ void main() {
     late BuildContext context;
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('zh'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Builder(
           builder: (value) {
             context = value;
@@ -431,6 +440,9 @@ void main() {
       );
       await tester.pumpWidget(
         MaterialApp(
+          locale: const Locale('zh'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: MediaQuery(
             data: const MediaQueryData(
               size: Size(320, 300),

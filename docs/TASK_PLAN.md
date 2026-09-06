@@ -1,6 +1,6 @@
 # Shiori Task Plan
 
-规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-07，按用户指定完成 CORE-003；SRC-001..004 / CORE-001..003 已完成，Phase 0 技术 Gate = GO / PASS，当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
+规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-07，按用户指定完成 CORE-004；SRC-001..004 / CORE-001..004 已完成，Phase 0 技术 Gate = GO / PASS，当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
 
 规划修订阶段（历史记录）：仅完善本文件并做 Self Review，基于完整的 41 节 / 59 Task 原计划，当时仓库为 Greenfield，未执行开发任务。后续用户已授权本次 SRC-001 / CORE-001 执行；除这两个任务的明确交付记录外，目录树、模型、配置值和测试命令仍为后续设计，不代表已实现。
 
@@ -19,6 +19,7 @@ Shiori（栞）是 Android / iOS 在线轻小说客户端。最小业务闭环�
 - 书架和进度属于本地用户数据，与源站在线状态、缓存淘汰解耦。
 - 当前用 Windows + Flutter + MuMu 快速开发，以至少一台 Android ARM64 真机验收；iOS 保持正式目标与代码兼容，运行验证延期至 macOS + Xcode + iPhone 环境可用。
 - 保持单个 Flutter 应用、少量有明确用途的契约；后续 Agent 能根据一个 Task 的输入、输出和测试完成工作。
+- 界面从当前阶段起支持中文和英文，文案集中管理并考虑不同语言的长度；默认跟随系统，未支持的语言回退英文。小说标题、正文等源内容不属于界面翻译范围。
 
 优先级：阅读体验 → Source 维护性 → 双端稳定性 → 开发效率 → 调试效率 → 可测试性 → 性能 → 架构形式。性能不能低于可读门槛，但不以提前优化牺牲前面的目标。
 
@@ -75,7 +76,7 @@ iOS **Level B — Runtime Validation** 归 IOS-001..006：Xcode / 原生依赖�
 | 技术 / 决策 | Purpose / 使用位置 / 理由 | Android | iOS | Native dependency | 长期风险及更简单替代 |
 | --- | --- | --- | --- | --- | --- |
 | Flutter + Dart：采用 | 单一移动 UI、Native Reader、领域逻辑与测试 | 官方支持；需 APK / ARM 验证 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；官方支持；需 Xcode、模拟器与签名真机 | Flutter engine 和平台工具链 | SDK 升级改变平台下限；锁 stable 工具链。替代为双端原生开发，维护成本更高，不采用 |
-| GetX：限定采用稳定 4.x；查阅为 4.7.3 | presentation Controller / 小范围状态订阅；构造器显式注入服务 | package 声明支持 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；package 声明支持 | 包本身无额外 Native 插件 | 全局依赖、隐式生命周期、5.x 预发布迁移风险。最简单替代是 ChangeNotifier / ValueNotifier；不同时引入另一套状态框架。[GetX](https://pub.dev/packages/get) |
+| GetX：限定采用稳定 4.x；当前锁定 4.7.3 | presentation Controller / 小范围状态订阅；构造器显式注入服务 | package 声明支持 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；package 声明支持 | 包本身无额外 Native 插件 | 界面国际化采用 Flutter SDK gen-l10n / ARB；不扩展为服务定位或 GetX 路由。最简单状态管理替代是 ChangeNotifier / ValueNotifier；不同时引入另一套状态框架。[GetX](https://pub.dev/packages/get) |
 | Dio：采用；查阅为 5.11.1 | data/network；超时、取消、拦截器、字节响应和受控重试 | Dart IO adapter | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；Dart IO adapter，验证 HTTPS | 默认无额外平台插件，使用系统网络 / TLS | interceptors 顺序、重试重复提交；锁版本测试。替代 `http` 更小，但需自行补齐控制能力。[Dio](https://pub.dev/packages/dio) |
 | cookie_jar：条件采用；4.0.9 | Source 私有会话存储；仅 Phase 0 证明必要才启用持久化 | Dart 文件 / IO 可用 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；Dart 文件 / IO 可用 | 本体无；目录依赖 path_provider | 明文文件、过期和损坏；内存 CookieJar 更简单。不要照抄示例的忽略过期设置。[cookie_jar](https://pub.dev/packages/cookie_jar) |
 | dio_cookie_manager：条件采用；3.5.0 | 挂到 Source 专属 Dio，不挂全局共享秘密客户端 | package 支持 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；package 支持 | 本体无 | 与 Dio / cookie_jar 版本耦合；重定向 Cookie 要单独测试。若不需 Cookie，整个依赖删除，不手写第二套 cookie 解析。[说明](https://pub.dev/packages/dio_cookie_manager) |
@@ -133,7 +134,7 @@ Domain 包含业务模型、少量稳定契约和错误类型；presentation 只
 | ADR-01 | DECIDED：Flutter Native、ContentBlock、单章垂直滚动 | 控制排版、位置与离线行为；不加载源站页面或执行脚本 |
 | ADR-02 | DECIDED：Source Adapter + sourceId / opaque ID | 未来第二源不修改 Reader / 书架 / 搜索组件；不做跨源同书合并 |
 | ADR-03 | DECIDED：保留 NovelSource、Repository、ImageRepository 等有收益边界 | 仅这些边界需要替换 / Fake；不为所有类创建接口 |
-| ADR-04 | DECIDED：GetX 仅状态管理，路由优先 Flutter Navigator 和平台 PageRoute | 降低 GetX 全家桶耦合，iOS swipe-back 和 Android back 能独立测试；DI 在 composition root 显式组装 |
+| ADR-04 | DECIDED：GetX 用于局部状态管理；界面翻译使用 Flutter gen-l10n / ARB；路由使用 Flutter Navigator 和平台 PageRoute | 2026-09-07 按用户最终选择迁移至官方 gen-l10n：中英文 ARB 生成类型安全的 AppLocalizations，Flutter Localizations 驱动语言更新，SDK delegates 负责标准控件本地化。DI 仍在 composition root 显式组装，禁止 Get.find 服务定位；细节见 [应用规范](app.md) |
 | ADR-05 | DECIDED：Drift 保存用户数据与缓存索引，偏好用简单 KV | 数据事务和迁移值得使用 Drift；业务真相不放 SharedPreferences |
 | ADR-06 | DECIDED：Reader 持久位置以 block + fraction 为主 | 像素 offset 随字体、宽度、图片变动失效；像素仅作同布局优化 |
 | ADR-07 | PROPOSED：原生 CustomScrollView / SliverList 的 anchor viewport | 懒构建和深位置恢复有实际难点，READER-001 必须先验证；不能把 ensureVisible 当作未构建块的跳转方案 |
@@ -646,7 +647,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | Deferred Track | IOS-001..006 | 全部 DEFERRED_NO_MAC；未来环境可用后才跑基础 / Source / UX / Reader / Offline / Release runtime，不影响上述完成 |
 | Optional Compile Track | CI-003 | OPTIONAL_PROPOSED；可用 macOS runner 时记录指定 target 编译结果，不产生 runtime PASS、不作为 Android required check |
 
-当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..003 DONE**：移动工程基线、纯 Dart 值模型、Source / Repository / Error / Media / cancellation 契约及测试 fake 已交付；33 项领域测试和全项目静态分析通过，CORE-003 iOS Level A PASS。下一建议 CORE-004；DEV-001、NET-001、DB-001 也满足各自前置，但尚未执行。SRC-005 仍等待 NET-002 / DB-002。iOS Runtime 全部 DEFERRED_NO_MAC，CI-003 未启用；CORE-003 无新增平台 runtime / 生产 Source / 缓存实现结果，不把测试 fake 算作 DEV-001 完成。
+当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 新包安装因模拟器文件系统只读失败，未取得本轮新包 runtime smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。下一建议 DEV-001；NET-001、DB-001 也满足各自前置，但尚未执行。SRC-005 仍等待 NET-002 / DB-002。CI-003 未启用；本轮没有生产 Source / DB / 缓存实现，不把测试 fake 算作 DEV-001 完成。
 
 示例（未来某 Phase 完成后可记录，**不是当前结果**）：Feature Status = DONE；Android Validation = PASS；iOS Compatibility Review = PASS；iOS Runtime Validation = DEFERRED_NO_MAC。这样 Phase 4 可达到 Reader Feature Complete，而 Cross-platform Mobile MVP 仍等待 iOS 验证。
 
@@ -656,7 +657,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 
 ### 领取与交付约定
 
-每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 未特别标注者为 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。按用户指定执行；本轮仅领取 CORE-003，其余任务不自动领取。
+每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 未特别标注者为 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。按用户指定执行；本轮仅领取 CORE-004，其余任务不自动领取。
 
 Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验收的模块行为；L 是风险实验或跨层集成，需要给出清楚的失败停止点，不扩展为整模块重写。执行一次只领取一个 Task。推荐分支 `codex/<task-id>-<short-name>`，先查工作区，保留他人改动；最终提交 / PR 聚焦该 Task，记录测试结果与平台待项，不自行发布。共享文件如 pubspec、composition root、schema 指定单一编辑者，不能因并行领取覆盖对方。
 
@@ -761,10 +762,12 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### CORE-004 — App 组装、导航与通用状态
 
+- Status：DONE（2026-09-07）；[应用装配与验证](app.md)。GetX 4.7.3 局部 Controller、显式 DI、类型化 Flutter 平台路由、主题/SafeArea 和通用状态组件已实现；50 项完整 Flutter 测试（含多语言补充）、静态分析及 Android Debug build PASS。新包 runtime smoke 因模拟器只读而未完成，旧版本启动不计新证据；iOS Level A PASS，Level B DEFERRED_NO_MAC。未实现真实功能页面或生产数据层。
 - Phase：1；Complexity：M。
 - Goal：建立可替换依赖的应用壳和一致 loading / empty / error。
 - Input：第 8、10、24 节；Dependencies：CORE-003。
 - Scope：GetX 局部 Controller、构造器 DI、Navigator / 平台 route、主题与安全区域；组件只接受领域错误和动作。
+- 后续补充：按用户最终选择接入 Flutter gen-l10n / ARB 中英文翻译，提取标题、状态与操作文案；语言切换和回退规则见 [应用规范](app.md)，不改变领域错误或阅读设置存储契约。
 - Files / Modules Expected：`lib/app/`、`lib/shared/`、`test/widgets/app/`。
 - Deliverables：composition root、导航参数类型、状态组件和手动 Controller dispose 规则。
 - Acceptance Criteria：无 Get.find 服务定位、无 Source 常量；route 可注入 fake；返回后取消订阅和请求；不引入真实页面大实现。
@@ -1664,7 +1667,7 @@ flowchart TD
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-**SRC-001..004、CORE-001..003 已完成，Phase 0 技术 GO**。下一建议 **CORE-004**，建立 App 组装 / 导航 / 状态壳；DEV-001、NET-001、DB-001 可按各自前置另行领取。Source 首项 SRC-005 仍等待 NET-002、DB-002。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。下一建议 **DEV-001**，建立完整离线 Fixture Source / Media / Repository 场景，再接 DEV-002 开发入口；NET-001、DB-001 可按各自前置另行领取。CORE-004 新包模拟器安装待只读文件系统问题解除后补测。CORE-005 及 Source 首项 SRC-005 仍等待 NET-002、DB-002。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
 
 ## 39. Parallelizable Work
 
@@ -1696,6 +1699,7 @@ Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都�
 - 共享 / 平台敏感代码必须完成 iOS Level A review：核心依赖文档支持及 minimum OS / native limitations、跨平台 paths / network / Drift / Reader / navigation 设计，无 Android-only 核心假设。没有 iOS runtime 证据不阻止本任务完成；不能把 review 写成 runtime verified。
 - 数据库按第 21 节区分阶段：早期 schemaVersion / snapshot / 非破坏政策与基本 CRUD；可丢 dev 数据库显式 reset；Phase 8 DB-003 完整迁移 / 损坏回归，形成受支持 RC / 正式用户库后禁止破坏性升级。
 - Source 规则变更有独立 fixture regression，live 显式 opt-in 且有预算；无秘密日志、无未知 endpoint 伪事实、无 UI → Source 实现泄漏。
+- 新增或修改界面文案同步维护中文与英文资源，避免在 Widget / Controller 写死可翻译文案；验证受影响界面的两种语言和长文本布局。领域数据、源站原文与安全诊断字段不依赖界面语言。
 - 审查前置输出，保留用户 / 他人修改；公共契约变动更新文档和必要消费者；记录实际命令 / 结果 / commit / 平台状态，不虚构未运行检查。
 - IOS-001..006 当前为 **DEFERRED_NO_MAC**，不要求现在失败或完成。未来激活后必须有对应 iOS build / simulator / device / runtime / signing 证据才可 PASS；编译 CI 不能代替。
 - CI-003 是 optional：未启用不进入 Android DoD；启用后单列编译结果和 scope。发现明确兼容缺陷应解决 Level A，runner 资源缺失不是 Android 阻塞理由。

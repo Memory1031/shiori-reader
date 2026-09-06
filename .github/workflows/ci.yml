@@ -41,6 +41,11 @@ jobs:
         working-directory: tools/source_probe
         run: dart pub get --enforce-lockfile
 
+      - name: 检查本地化生成代码
+        run: |
+          flutter gen-l10n
+          git diff --exit-code -- lib/l10n/generated
+
       - name: 格式检查
         run: dart format --output=none --set-exit-if-changed lib test
 

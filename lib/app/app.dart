@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/controller_scope.dart';
 import '../shared/widgets/state_views.dart';
 import 'app_controller.dart';
@@ -13,16 +14,23 @@ class ShioriApp extends StatelessWidget {
     super.key,
     this.createController = _defaultController,
     this.routes = const AppRoutes(),
+    this.locale,
   });
 
   final AppController Function() createController;
   final AppRoutes routes;
 
+  /// null follows system preferences. Kept in presentation, not ReaderSettings.
+  final Locale? locale;
+
   @override
   Widget build(BuildContext context) => ControllerScope<AppController>(
     create: createController,
     builder: (context, controller) => MaterialApp(
-      title: 'Shiori',
+      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: appTheme(Brightness.light),
       darkTheme: appTheme(Brightness.dark),
       themeMode: appThemeMode(controller.settings.themeMode),
@@ -31,7 +39,9 @@ class ShioriApp extends StatelessWidget {
           builder: (context, constraints) => Column(
             children: [
               if (controller.isLoadingSettings)
-                const LinearProgressIndicator(semanticsLabel: '正在读取设置'),
+                LinearProgressIndicator(
+                  semanticsLabel: AppLocalizations.of(context).loadingSettings,
+                ),
               if (controller.settingsFailure case final failure?)
                 ConstrainedBox(
                   constraints: BoxConstraints(
