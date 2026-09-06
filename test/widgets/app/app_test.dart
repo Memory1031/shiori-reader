@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
@@ -52,14 +51,18 @@ class _PendingRepository implements NovelRepository {
   CancellationToken? requestToken;
 
   @override
-  Future<Result<LoadResult<ChapterContent>>> loadChapter(ChapterKey key,
-      {required ReadMode mode, required CancellationToken cancellation}) {
+  Future<Result<LoadResult<ChapterContent>>> loadChapter(
+    ChapterKey key, {
+    required ReadMode mode,
+    required CancellationToken cancellation,
+  }) {
     requestToken = cancellation;
     return pending.future;
   }
 
   @override
-  Stream<Result<LoadResult<ChapterContent>>> chapterUpdates(ChapterKey key) => events.stream;
+  Stream<Result<LoadResult<ChapterContent>>> chapterUpdates(ChapterKey key) =>
+      events.stream;
 
   // Unused operations are errors, never accidental successful empty results.
   @override
@@ -151,12 +154,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'settings failure keeps home usable and explicit retry recovers',
+    (tester) async {
+      final store = _PendingSettings();
+      await tester.pumpWidget(createApp(settings: store));
+      expect(find.text('Shiori'), findsOneWidget);
+      store.requests.first.complete(
+        Failure(
+          AppFailure(
+            kind: FailureKind.database,
+            operation: Operation.settingsRead,
+            retryPolicy: RetryPolicy.manual,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Shiori'), findsOneWidget);
+      expect(find.text('本地存储发生问题，暂时无法完成操作。'), findsOneWidget);
+      await tester.tap(find.text('重试'));
+      await tester.pump();
+      store.requests.last.complete(
+        Success(ReaderSettings(themeMode: ReaderThemeMode.dark)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(FailureView), findsNothing);
+      expect(
+        tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+        ThemeMode.dark,
+      );
+    },
+  );
+
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     testWidgets(
       '$platform route push/pop releases page request and subscription',
       (tester) async {
-        debugDefaultTargetPlatformOverride = platform;
-        addTearDown(() => debugDefaultTargetPlatformOverride = null);
         final repository = _PendingRepository();
         addTearDown(repository.events.close);
         late _ChapterController controller;
@@ -197,12 +230,17 @@ void main() {
         expect(controller.isClosed, isTrue);
         expect(controller.cancellation.isCancelled, isTrue);
         expect(repository.requestToken!.isCancelled, isTrue);
-        await controller.resourcesReleased;
+        await tester.runAsync(() => controller.resourcesReleased);
         expect(repository.listeners, 0);
         final accepted = controller.accepted;
         final lateContent = contractContent('晚到的内容');
-        final lateResult = Success(LoadResult(value: lateContent,
-          origin: LoadOrigin.remote, fetchedAt: contractNow));
+        final lateResult = Success(
+          LoadResult(
+            value: lateContent,
+            origin: LoadOrigin.remote,
+            fetchedAt: contractNow,
+          ),
+        );
         repository.pending.complete(lateResult);
         repository.events.add(lateResult);
         await tester.pumpAndSettle();
@@ -210,6 +248,7 @@ void main() {
         expect(repository.events.isClosed, isFalse);
         expect(tester.takeException(), isNull);
       },
+      variant: TargetPlatformVariant.only(platform),
     );
   }
 
@@ -420,6 +459,3 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 }
-
-
-
