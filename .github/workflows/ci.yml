@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 必须与 .fvmrc 和 pubspec.yaml 的 Flutter 约束保持一致
+  FLUTTER_VERSION: 3.38.4
+  # 两个 pubspec.lock 都记录此镜像；源地址不同也会导致严格锁定校验失败。
+  PUB_HOSTED_URL: https://pub.flutter-io.cn
+
+jobs:
+  analyze-test:
+    name: 格式、静态分析与离线测试
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 安装依赖
+        run: flutter pub get --enforce-lockfile
+
+      # 根目录 analyze 会扫描嵌套包，必须先生成调查包自己的 package_config。
+      - name: 安装调查包依赖
+        working-directory: tools/source_probe
+        run: dart pub get --enforce-lockfile
+
+      - name: 格式检查
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: 静态分析
+        run: flutter analyze --no-pub
+
+      - name: 单元与组件测试
+        run: flutter test --no-pub
+
+      - name: 调查包格式检查
+        working-directory: tools/source_probe
+        run: dart format --output=none --set-exit-if-changed bin lib test
+
+      - name: 调查包静态分析
+        working-directory: tools/source_probe
+        run: dart --suppress-analytics analyze
+
+      - name: 调查包离线测试
+        working-directory: tools/source_probe
+        run: dart --suppress-analytics test
+
+      - name: 调查样本离线校验
+        working-directory: tools/source_probe
+        # 默认不请求源站，不传 --live。
+        run: dart bin/source_probe.dart
+
+  android-build:
+    name: Android 构建验证
+    # 仅手动运行工作流时构建 APK，并先通过离线检查。
+    if: github.event_name == 'workflow_dispatch'
+    needs: analyze-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 安装依赖
+        run: flutter pub get --enforce-lockfile
+
+      - name: 构建 debug APK
+        run: flutter build apk --debug --no-pub
+
+      - name: 上传 APK 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
