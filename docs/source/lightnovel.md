@@ -1,6 +1,6 @@
 # LightNovel.fun 源站调查
 
-当前结果（2026-09-07）：**SRC-001 / SRC-002 / SRC-003 DONE；独立 Dart 图文链路通过，SRC-004 未执行，生产 Source Gate 未通过。** 前文保留 SRC-001、第三方参考及 SRC-002 的历史快照；其中 UNKNOWN / 未执行均指当时状态，以文末 SRC-003 的最新证据和仍存缺口为准。
+当前结果（2026-09-07）：**SRC-001..004 DONE；Phase 0 技术可行性 Gate = GO / PASS，可按依赖进入生产接入开发。** 这不表示生产 Source 已实现、媒体跨重启已验证或已获内容分发许可。前文保留历史快照；其中 UNKNOWN / 未执行和 SRC-003 报告的 NOT_EVALUATED_SRC004 均指当时状态，以文末 SRC-004 的结论、责任与后续门槛为准。
 
 ## SRC-001：访问边界与调查基线
 
@@ -233,3 +233,47 @@ book_id / volume_id / chapter_id 在独立 JSON 中为数值，页面 href 的 b
 - 仅解码一张正文插图；其余 13 张继续只有 SRC-002 浏览器解码证据。Header 组合有效不等于逐项必要性已知。
 - 不同客户端及本次两轮匿名成功没有证明全站匿名边界、Cookie / token 寿命、m/t 的过期语义或长期身份稳定性。没有故意制造过期、访问限制或限流。
 - catalog 多页、真实失败 schema、平台会话恢复、内容/fixture 许可及生产契约仍待后续任务。SRC-003 通过不等于 Phase 0 Go；下一步 **SRC-004** 审查现有证据和 Source 准入，不应无故重复访问源站。
+
+## SRC-004：Source 可行性 Gate 与契约审查
+
+**审查日期：2026-09-07，Asia/Shanghai；审查者：Codex（本轮 Principal Engineer / Technical Lead）。Task Status：DONE；Gate：GO；Phase 0：PASS（当次技术可行性）。**
+
+准入范围是基于已验证普通访问路径开发 Pure Dart Source。目标查询、书籍身份、正文和真实图片解码链路均已通过；当前没有证据要求登录或平台 WebView 才能完成该样本。Domain / NovelSource / SourceMedia 草案可以承载已观察内容，无须增加站点 Header、签名或 HTML 字段。未观察的会话寿命、媒体长期定位和生产质量仍按下表设置独立完成门槛，不能由本次 GO 越过。没有证据支持全站访问承诺或内容分发许可结论。
+
+### 证据核对与 fixture secret review
+
+- 审查对象为**工作区最终文件**：SRC-001..003 分层记录、15 项 manifest 样本、manifest / README、3 份调查报告及调查包的请求、报告与测试边界；不是只审暂存区快照。SRC-003 两次 live 各 6 次 HTTP，合计 12 / 30；最终报告的逐次记录、阶段计数及汇总一致。离线报告 0 次 HTTP、5 阶段通过；最终 live 共 11 阶段通过。
+- 目标仍为玩乐关系 → 31607 / 44117 / 309555，标题、作者和归属均断言。两轮正文统计、JPEG 字节数、哈希和 2048×829 尺寸相同。四卷十章的覆盖来自 SRC-002 目录样本；SRC-003 live 只读取所选卷的两章目录及一项正文，不能说每次都抓取了全部卷正文。
+- 15 项 SHA-256 全部匹配；fixtures 与 reports 两目录共 **20 个文件：17 JSON、1 Markdown、1 HTML、1 PNG**，JSON 均可解析。PNG 是 manifest 标明的自制 2×2 资产。哈希证明本次审查输入一致，不证明网站真实性或许可。
+- 检查 JSON 字段和值、URL、正文摘要及图片资产：未发现 Cookie / Set-Cookie / Authorization / token / security_key 的实际值、签名查询值、账号 / 评论 / 用户链接、原文、原始 HTML、HAR、原图或下载口令。关键字命中是字段名、false 标记和脱敏说明；例如 `dataKeys` 内的 `poster_user` 只是结构名称，没有对应用户值。标题 / 作者 / 目录 ID 为目标识别元数据，自制 HTML 有合成标记。
+- 真实投影、人工转录、结构统计、合成场景的 provenance 明确。现有 fixture **不够直接充当完整生产 Parser 响应集**；不因哈希通过而补造真实正文样本。后续使用有标记的合成 envelope / 内容及现有真实元数据做回归，新增真实样本仍须最小化及审查保存依据。
+- 核对 SRC-003 的秘密哨兵与停止测试、默认离线入口、重定向计数和 JPEG 文件头预检；采用其已通过的 23 项离线测试记录。本任务只做只读核查和文档修改，**新增源站 HTTP = 0**，没有无故重复 Flutter build 或 live 测试。
+
+审查输入指纹（SHA-256）：最终 live 报告 `a02538a6b5fefa69a34b3440d98b9af9ed3d40c94fde048d8eb7419ee3358eac`；SRC-002 manifest `f134be6a291ba1781bb28bfe83906340c93a791e752315308d07620423297b2f`。报告和 fixture 保持原样，历史 `NOT_EVALUATED_SRC004` 不回写成新结论。
+
+### 契约决策与 Phase 2 输入
+
+| 决策 / 输入 | 已有依据与生产要求 | 责任 |
+| --- | --- | --- |
+| 稳定身份 | App 的 SourceId 固定为 `lightnovel`；远端数字书 / 章 ID 在 Source 边界转为不透明字符串，分别进入 NovelKey / ChapterKey；卷 ID 作为 Source 私有真实 groupId，不能用标题或顺序替代。fixture 中 `sourceIdForFutureAdapter=lightnovel.fun` 是调查候选标签，不是已发布领域键 | CORE-002 / CORE-003 / SRC-005 |
+| 请求基线 | 只采用 SRC-002 已验证表中的五个 POST、JSON envelope 和成功 Header 组合；不宣称 Header 逐项必要。无证据需要会话时 ensureSession 为 no-op，不添加 auth-session 请求、CookieJar 或强制初始化 | SRC-005 |
+| Search / Discover | Search 请求页 0 起算，响应页 1 起算；cursor 绑定查询和源。空结果 page_count=1，不靠单字段猜终止；生产加入重复页 / ID 保护。首页仅有资源 URL，初始 supportsDiscover=false，discover 返回 unsupported | SRC-006 |
+| 详情与目录 | 详情缺可选字段按 unknown 处理，响应 `status=1` 的业务含义未证实，不推断完结。卷章保留源 list 顺序；聚合局部失败不返回“完整目录”。probe 的固定默认 ID 和单页断言是样本验收条件，不是所有小说的生产规则 | SRC-007 / SRC-008 |
+| 正文模型 | 已见 p / img / ruby / rt / strong / a；保持段落与图片顺序。Ruby 初始降级为基字加括注，强调保留文字；暂不启用复杂 runs / 新 AST。段内未知可见文本不丢失，链接只保留文本。整卷长章不等于极长单段，切块仍只在 presentation | CORE-002 / SRC-009 / READER-001 |
+| 正文准入 | 使用已验证 body_snapshot；render_preview 或缺字段不能自动视为全文。受限响应映射标准失败，不另试端点。probe 的非空文本 + 图是本次样本条件，生产合法纯文本章 / 图片章分别有效；访问受限章不应通过删目录或反转章节顺序掩盖 | SRC-008 / SRC-009 |
+| MediaRef / SourceMedia | 继续保持 opaque mediaId + Source 私有定位；m/t、Header 和当前 URL 不进入 Domain / cache key。可调查“所属章节 + 无 secret 资产 locator → 正常重新读取章节取得当前 URL”的恢复方案，但**本次不认定该方案或 path 长期稳定**。图片哈希只描述字节 | SRC-010 |
+| 媒体资源边界 | 传输字节预算与解码内存预算分开；JPEG 的尺寸预检必须在有分配行为的 readInfo 前。调查包 image 依赖和仅 JPEG/PNG 的限制不直接成为 Flutter codec / 产品格式承诺 | NET-001 / MEDIA-001 / ANDROID-002 |
+
+### 保留问题、完成门槛与影响
+
+| OQ / 待项 | 当前结论 | 后续责任 / 未关闭的影响 |
+| --- | --- | --- |
+| OQ-01 / OQ-12：访问范围、公开规则、接入及分发依据 | 只证实样本普通访问；secret review 通过不等于授权转载。政策正文和许可仍 UNKNOWN | SRC-005 遇正常访问限制即停；RELEASE-001 在公开分发前核对规则、许可和资产。不把许可标关闭，不把本次技术 GO 当发布许可 |
+| OQ-02：未验证操作 / 失败形态 / 多页 | 五类 POST 已验证；auth-session、首页、taxonomy、get-chapter-paragraphs 不进入已验证表；真实异常 schema、catalog 多页、搜索末页仍缺 | SRC-005..009 用有标记的合成输入验证停止与分页规则；新操作须先有正常访问证据，否则保持 unsupported。阻止相应能力完成声明，不阻止已验证操作的开发 |
+| OQ-03：会话生命周期 | 干净独立 HttpClient 可读取样本；不是匿名 session 不存在的证明 | SRC-005 保持 no-op 基线，只有自然出现且能确认的过期才实现有界恢复；不凭 403 猜过期。会话实现及恢复验收不能跳过 |
+| OQ-04：MediaRef 跨重启 | 当次身份一致；稳定定位、m/t 生命周期、Referer 必要性未验证 | **SRC-010 的硬验收项**：清空内存、重新进程后能从已保存且无 secret 的 MediaRef / locator 恢复正常请求；若做不到，SRC-010 标 BLOCKED，TEST-001 及真实媒体链路不能宣告完成；Fixture / Domain 独立任务可继续 |
+| OQ-05：正文结构 / 边界 | p / img / ruby 等和整卷长正文已观察；空行、br、真实极长段、图片章和异常样本不足 | SRC-009 以合成样本验证语义保留并明确 provenance；不靠截图统计假装 Parser 已通过。READER-001 验证长章与段落布局，不改语义身份 |
+| OQ-11：验收书 / 限流 | 样本选择与图文可达问题已关闭；真实限流规则仍 UNKNOWN | NET-002 / TEST-001 使用客户端保守预算；遇自然 429 尊重限制，不压测，不宣称 30 次是站点允许值 |
+| OQ-14：WebView 与平台 | 当前观察路径无需 WebView；不推断未来永久不需要 | SRC-005 / TEST-001 若发现正常访问必须平台能力，先更新 ADR / iOS impact 并重开 Source gate，不引入 Android-only Source。Android 生产 codec 待 TEST-001 / ANDROID-002，iOS 待 IOS-002，无 Mac 不阻塞本次技术 GO |
+
+下一项可领取的 Foundation 工作是 **CORE-002**（CORE-001 已完成）。Source 侧下一项为 SRC-005，但它还依赖 **NET-002、DB-002**；按原依赖先完成相关 Foundation 任务，不能仅凭 SRC-004 DONE 跳过前置。本次不自动领取后续任务。

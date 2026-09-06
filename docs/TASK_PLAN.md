@@ -1,6 +1,6 @@
 # Shiori Task Plan
 
-规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-07，按用户指定完成 SRC-003；此前 SRC-001 / SRC-002 / CORE-001 已完成，当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
+规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-07，按用户指定完成 CORE-002；SRC-001..004 / CORE-001..002 已完成，Phase 0 技术 Gate = GO / PASS，当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
 
 规划修订阶段（历史记录）：仅完善本文件并做 Self Review，基于完整的 41 节 / 59 Task 原计划，当时仓库为 Greenfield，未执行开发任务。后续用户已授权本次 SRC-001 / CORE-001 执行；除这两个任务的明确交付记录外，目录树、模型、配置值和测试命令仍为后续设计，不代表已实现。
 
@@ -225,9 +225,11 @@ Shared code 禁止无理由 Platform.isAndroid 分叉；Domain 不假设 Android
 
 blockKey / contentRevision 的摘要由共享纯 Dart helper 按固定字段顺序、UTF-8、明确 normalization version 计算 SHA-256；同内容同版本必须跨进程相同，不使用运行时 hashCode。blockKey 排除显示字号 / 屏宽，重复内容加同章 occurrence；Image 的稳定 MediaRef 纳入摘要，session 临时参数不纳入。CORE-002 固化 helper 与 golden 输入输出；源 parser 和 fixture 复用，但站点文本清理仍留在 Source。缓存文件 checksum 可复用摘要算法，不能把文件 checksum 误当语义 contentRevision。
 
+CORE-002 已实现 [领域模型与 v1 输入规范](domain.md)：只归一 CRLF / CR 为 LF，保留 Unicode 与语义空白；固定 JSON 数组顺序，拒绝 map / 浮点摘要输入及孤立 surrogate。ChapterContent 统一分配 occurrence；contentRevision 包含标题和有序 blockKey；可后发现的图片尺寸不参与语义摘要。Catalog 拒绝重复身份 / 错误归属 / 非连续 ordinal，不代替 Source 去重。ReaderSettings 选择显式范围验证而非静默 clamp；正文和设置的序列化校验各自版本，缓存 envelope 留给存储任务。
+
 | 模型 | 最小字段与职责 | 不变量 / 取舍 |
 | --- | --- | --- |
-| SourceId | 稳定 app 内部字符串，例如 `lightnovel` | 域名变化不改 SourceId；删除 Source 不删除本地书架 |
+| SourceId | 稳定 app 内部字符串；本源固定 `lightnovel`（SRC-004） | 域名变化不改 SourceId；调查 fixture 的 `lightnovel.fun` 候选标签不是正式领域键；删除 Source 不删除本地书架 |
 | NovelKey | sourceId + opaque novelId | 组合键；不同 Source 的同名 / 同 ID 小说互不覆盖 |
 | ChapterKey | NovelKey + opaque chapterId | 不假设章节 ID 在全站唯一；URL / 数字都存字符串 |
 | NovelSummary | key、title、cover MediaRef?、authors 字符串列表 | 搜索 / 首页 / 书架快照复用；不另设重复的 Novel entity |
@@ -251,7 +253,7 @@ Quote / Center 优先用 Paragraph 样式，Caption 归 Image；Link MVP 仅保�
 
 ## 12. NovelSource Abstraction
 
-这是契约草案，不是 Dart 实现。CORE-003 固化签名；SRC-004 依据证据提出修正。Source 操作全部异步，接受与 Dio 无关的取消上下文；所有模型、失败与分页 cursor 都是纯 Dart。
+这是契约草案，不是 Dart 实现。CORE-003 固化签名；SRC-004 已确认现有模型边界可承载观察内容，具体交接见[Gate 审查](source/lightnovel.md#src-004source-可行性-gate-与契约审查)。初始 Ruby 保留基字加括注、强调保留文字，不据此新增复杂 AST 或站点字段。Source 操作全部异步，接受与 Dio 无关的取消上下文；所有模型、失败与分页 cursor 都是纯 Dart。
 
 | Operation | 输入 | 输出 / 语义 |
 | --- | --- | --- |
@@ -274,15 +276,15 @@ NovelRepository 暴露 search/discover 与 detail/catalog/chapter 加载、缓�
 
 `lightnovel/` 内预计分为 source（编排）、requests（方法 / URL / 编码）、session、identity、parser（search/detail/catalog/chapter/media）。仅按复杂度拆文件，不创建空层。
 
-**已知输入**：用户指定起始网址及业务目标，站点不是有第三方稳定性承诺的契约依赖。
+**已验证基线（SRC-004 审查，2026-09-07）**：`https://www.lightnovel.fun` 的五类 POST JSON（Search / Detail / Volumes / Chapters / Chapter），路径、输入与成功 Header 组合见[源调查已验证表](source/lightnovel.md)。样本 book 31607 / volume 44117 / chapter 309555 的纯 Dart 图文链路通过；搜索请求 0 起算 / 响应 1 起算，目录 1 起算，正文使用 body_snapshot；首张图来自 api.lightnovel.fun，当次 JPEG 可解码。站点没有因此成为带稳定性承诺的契约依赖。
 
-**UNKNOWN**：实际 Base URL / 跳转域、首页能力、所有 Endpoint / method / query / body、Novel / Chapter ID、分页、响应编码 / schema、JSON 与 HTML 路径、插图真实地址 / Referer、Cookie / token / security_key 是否存在及意义、匿名可访问范围、限流和 Session 生命周期。没有任何 Endpoint 作为已验证事实写入本文。
+**保留 UNKNOWN**：全站匿名边界、公开规则与分发许可、Header 逐项必要性、会话 / m/t 生命周期、MediaRef 跨重启恢复、真实异常 schema、catalog 多页、搜索末页、首页 / auth-session / taxonomy / get-chapter-paragraphs 的完整协议。仅观察到资源 URL 的操作不进入已验证表；初始 `supportsDiscover=false`，discover 返回 unsupported；ensureSession 采用已验证路径的 no-op 基线，不主动增加 Cookie 包或会话请求。生产 parser 不照搬 probe 的固定样本 ID、单页断言或“正文必须同时有图”条件。
 
 JSON 若在当前普通浏览器行为中稳定存在可优先使用；HTML fallback 只在 Phase 0 验证其等价内容和权限后启用。禁止盲试一串历史接口、失败后用备用入口绕过限制、把公开第三方源码当作当下事实。源站真正依赖 JS / challenge 且无法通过正常可用访问方式完成时，记录阻断；不临时把 Reader 换成 WebView 来掩盖数据获取不可行。
 
 ## 14. Phase 0 Source Investigation
 
-**SRC-001 / SRC-002 / SRC-003 已完成，SRC-004 尚未执行，Phase 0 Gate 尚未通过。** SRC-002 的浏览器工具仅提供 UI / 资源 URL，核心 payload 与 JSON 由独立无凭据 HTTP 检查验证；SRC-003 再以 6 次串行 HTTP 尝试证明独立 Dart 正文与图片字节解码链路，证据等级及缺口明确分列。此阶段目标是用低频、用户主动访问对应的请求，证明 Search → Detail → Catalog → Chapter → Text + Illustration 完整可达。不是先写生产 Source 再猜网站规则。
+**SRC-001..004 已完成，Phase 0 技术 Gate = GO / PASS（2026-09-07）。** SRC-002 的浏览器工具仅提供 UI / 资源 URL，核心 payload 与 JSON 由独立无凭据 HTTP 检查验证；SRC-003 两轮各 6 次、共 12 / 30 次串行 HTTP 尝试证明独立 Dart 正文与图片解码链路。SRC-004 复核报告、15 项 fixture 哈希与秘密字段，新增源站 HTTP 为 0。GO 允许按依赖开发生产 Source，不替代 SRC-010 的媒体跨重启、TEST-001 的生产链路或 RELEASE-001 的发布许可审查；未关闭 OQ 的责任与影响见第 34 节及[Gate 记录](source/lightnovel.md)。
 
 ### 调查流程与停止条件
 
@@ -608,20 +610,20 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 
 | ID / 状态 | 当前问题 | 验证方式 / 责任 / 阻塞范围 |
 | --- | --- | --- |
-| OQ-01 PARTIALLY_OBSERVED | 首页及样本书 31607 的访客搜索 / 详情 / 目录 / 正文 / 图片可达；SRC-003 独立 Dart 图文链路通过；全站匿名边界、浏览器完整跳转链及公开规则正文仍 UNKNOWN | [SRC-001..003 证据](source/lightnovel.md)；SRC-004 Gate 尚未执行 |
-| OQ-02 PARTIALLY_OBSERVED | 核心五类 POST / UTF-8 JSON、搜索零起算和目录一起算已获独立 HTTP 证据；Browser payload、get-chapter-paragraphs、失败 schema、catalog 多页仍未知 | SRC-002 samples 支撑 SRC-003；不能把候选字段或投影样本当完整 schema |
-| OQ-03 PARTIALLY_OBSERVED | SRC-002 的 13 次独立 HTTP 和 SRC-003 两轮共 12 次 Dart HTTP 均无显式登录凭据成功；浏览器 auth-session 调用已见。Cookie / token / security_key 的一般必要性、到期、重启策略仍 UNKNOWN | SRC-004..005 正常访问和自然失效证据；不由样本匿名成功伪造寿命或全站无会话需求 |
-| OQ-04 PARTIALLY_OBSERVED | 样本 book / volume / chapter ID 跨 UI / API / Dart 一致；图片 host 为 api.lightnovel.fun，含 m/t 查询值；当次 JPEG 字节可解码。长期稳定身份、签名语义、Referer 必要性仍未知 | SRC-004 / SRC-010 跨 session 与重启样本；临时 query 不直接进入长期身份 |
-| OQ-05 UNKNOWN | 真实正文标记（Ruby / 强调 / 空行）、代表性长章 / 插图格式与章节结构 | SRC-002 / SRC-009 最小 fixture；合成边界只证明 Domain 可表达 |
+| OQ-01 PARTIALLY_OBSERVED | 样本书 31607 普通访问及独立 Dart 图文链路通过，SRC-004 技术 GO；全站匿名边界、浏览器完整跳转链、公开规则仍 UNKNOWN | SRC-005 遇限制即停；RELEASE-001 核对规则及发布依据；技术 GO 不外推全站权限 |
+| OQ-02 PARTIALLY_OBSERVED | 核心五类 POST / UTF-8 JSON、搜索零起算和目录一起算已验证；Browser payload、辅助操作、失败 schema、catalog 多页及搜索末页仍未知 | SRC-005..009：有标记的合成回归补边界；新操作先有实证，初始 Discover unsupported；投影不是完整 schema，不得直接宣告对应 Parser 完成 |
+| OQ-03 PARTIALLY_OBSERVED | SRC-002 的 13 次 HTTP 和 SRC-003 的 12 次 Dart HTTP 均无显式凭据成功；Cookie / token / security_key 一般必要性、寿命及恢复仍 UNKNOWN | SRC-005：no-op 基线，只有证实的自然失效才有界恢复；403 不等于过期，不主动添加 auth-session 或 CookieJar，不跳过会话分支验收 |
+| OQ-04 PARTIALLY_OBSERVED | 书 / 卷 / 章 ID 跨 UI / API / Dart 一致；当次 JPEG 可解码。MediaRef 长期定位、m/t 语义、Referer 必要性仍未知，去 query 的 path 也未证实长期稳定 | SRC-010 硬门槛：清空内存并重启后由无 secret 的 MediaRef / locator 恢复；失败则阻塞 SRC-010 / TEST-001，独立 Fixture 工作可继续；不以图片哈希或签名 URL 充当已验证稳定键 |
+| OQ-05 PARTIALLY_OBSERVED | p / img / ruby / rt / strong / a、整卷长章与 JPEG 已观察；br / 空行、真实极长段 / 图片章及异常仍缺样本 | SRC-009 明确合成 provenance，验证语义顺序与 Ruby 括注；READER-001 验证长章布局。结构摘要不代替生产 Parser 测试，Domain 不拆语义段 |
 | OQ-06 NEEDS VERIFICATION | 原生 pivot viewport 恢复精度、语义顺序、高刷 / 多图性能 | READER-001 实验；不合格再评估维护中的 indexed-scroll 包，阻塞 READER-002 |
 | OQ-07 UNKNOWN | 已知当前无 Mac / Xcode / iPhone 开发环境；未来何时能取得完整环境？ | 当前无环境是 KNOWN RESOURCE CONSTRAINT；获得环境后激活 IOS-001..006。只阻塞 iOS Runtime / RC / Cross-platform Mobile MVP，不阻塞 Android MVP；不在 CORE-001 重新调查“是否有 Mac” |
 | OQ-08 NEEDS VERIFICATION | 单 DB 混合缓存的备份边界与是否拆库；iOS 实际 backup / path 行为 | DB-001 先决定 Android 实现和 iOS 文档兼容，ANDROID-002 实测 Android；IOS-005 未来补 iOS runtime，不能让该部分延期阻塞 Android；保持 Repository 契约 |
 | OQ-09 NEEDS VERIFICATION | Phase 6 自有持久图片缓存相对成熟封装的收益、真实预算 / TTL | CACHE-001 / CACHE-003 复核有限范围；Phase 4 MEDIA-001 已确定只做网络 / 内存，不等待该选择 |
 | OQ-10 NEEDS VERIFICATION | 最终 SDK / 插件版本、最低 OS、Native dependencies、iOS limitations、生成器兼容 | CORE-001 / 依赖引入任务：Android build + Level A documented review；CI-003 可选 compile；IOS-001 未来实际链接 / runtime，不阻塞 Android |
-| OQ-11 PARTIALLY_OBSERVED | 玩乐关系 → 书 31607 / 卷 44117 / 章 309555 已用于 live 验收，非空正文与首张插图 Dart 解码通过；真实限流规则仍 UNKNOWN | SRC-002 / SRC-003 低频证据；不做限流压测；30 次预算只是客户端政策 |
-| OQ-12 UNKNOWN | 接入 / fixture 使用与分发许可、Android applicationId / 发布渠道 / 签名；未来 iOS bundle ID / Signing / metadata | SRC-001、RELEASE-001..002 关闭 Android 相关问题；iOS 独有项留 IOS-006，延期不阻塞 Android 候选包；不自行注册 / 发布 |
+| OQ-11 PARTIALLY_OBSERVED | 验收书选择与图文可达子问题 CLOSED：玩乐关系 → 31607 / 44117 / 309555；真实限流规则仍 UNKNOWN | NET-002 / TEST-001 用保守预算并尊重自然 429；不压测；30 次只是客户端政策 |
+| OQ-12 PARTIALLY_OBSERVED | SRC-004 现有 fixture / report 脱敏审查通过，仅元数据、结构与自制资产；接入 / 分发许可仍 UNKNOWN。正式 Android applicationId / 渠道 / 签名及 iOS 发布身份未关闭 | RELEASE-001..002 在公开分发前核对规则、许可和正式身份；IOS-006 管 iOS 独有项。secret review 不等于内容授权；新增真实资产另审，不自行发布 |
 | OQ-13 UNKNOWN | GitHub macOS runner 的可用权限 / 额度、是否值得启用可选 iOS compile | CI-003 按第 30 节成本和触发策略决策；未启用不阻塞 Android，不把 runner 可用视为已有本地 iOS 环境 |
-| OQ-14 UNKNOWN | 若 Source 调查发现正常访问必须平台 WebView，是否仍可维持跨端合法接入？ | SRC-004 在出现实证时更新 ADR / Risk / iOS impact，再决定；禁止 Android-only WebView Source，若公开链路不可行则阻塞 Source 接入本身 |
+| OQ-14 PARTIALLY_OBSERVED | 当前独立 Dart 样本无需 WebView；未来访问方式仍可能改变，Android / iOS runtime 未由此证明 | SRC-005 / TEST-001 若出现正常访问必须平台能力的新证据，先更新 ADR / iOS impact 并重开 Gate；禁止 Android-only Source。Android codec 待 TEST-001 / ANDROID-002，iOS 待 IOS-002 |
 
 ## 35. Milestones
 
@@ -642,7 +644,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | Deferred Track | IOS-001..006 | 全部 DEFERRED_NO_MAC；未来环境可用后才跑基础 / Source / UX / Reader / Offline / Release runtime，不影响上述完成 |
 | Optional Compile Track | CI-003 | OPTIONAL_PROPOSED；可用 macOS runner 时记录指定 target 编译结果，不产生 runtime PASS、不作为 Android required check |
 
-当前执行状态（2026-09-07）：Phase 0 / Phase 1 已开始；SRC-001 DONE（访问基线），SRC-002 DONE（UI / 独立 HTTP 证据、脱敏样本及覆盖缺口），SRC-003 DONE（独立 Dart 包、默认离线、两轮共 12 次 live HTTP 与正文 / JPEG 解码），CORE-001 DONE（最小工程、Android build / MuMu smoke、iOS Level A review）；其余当前轨道 Task 未开始。iOS Runtime 全部 DEFERRED_NO_MAC；CI-003 未启用。SRC-003 不等于 SRC-004 的 Phase 0 Go，CORE-001 也不等于整个 Foundation 完成。
+当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 已开始，CORE-001 DONE（最小工程、Android build / MuMu smoke、iOS Level A review），**CORE-002 DONE**（纯 Dart 值模型、版本化 SHA-256、18 项离线测试及双进程固定摘要验证、iOS Level A review）；下一建议 CORE-003，DB-001 也已满足其 CORE-002 前置。SRC-005 仍等待 NET-002 / DB-002，不跳过 Foundation。iOS Runtime 全部 DEFERRED_NO_MAC，CI-003 未启用；本轮 Flutter 测试入口启动等待，没有新的 widget / Android runtime PASS，生产 Source / 媒体跨重启 / 发布许可仍归后续任务。
 
 示例（未来某 Phase 完成后可记录，**不是当前结果**）：Feature Status = DONE；Android Validation = PASS；iOS Compatibility Review = PASS；iOS Runtime Validation = DEFERRED_NO_MAC。这样 Phase 4 可达到 Reader Feature Complete，而 Cross-platform Mobile MVP 仍等待 iOS 验证。
 
@@ -652,7 +654,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 
 ### 领取与交付约定
 
-每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 未特别标注者为 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。按用户指定执行；本轮仅领取 SRC-003，其余任务不自动领取。
+每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 未特别标注者为 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。按用户指定执行；本轮仅领取 CORE-002，其余任务不自动领取。
 
 Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验收的模块行为；L 是风险实验或跨层集成，需要给出清楚的失败停止点，不扩展为整模块重写。执行一次只领取一个 Task。推荐分支 `codex/<task-id>-<short-name>`，先查工作区，保留他人改动；最终提交 / PR 聚焦该 Task，记录测试结果与平台待项，不自行发布。共享文件如 pubspec、composition root、schema 指定单一编辑者，不能因并行领取覆盖对方。
 
@@ -700,6 +702,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### SRC-004 — Source 可行性 Gate 与契约审查
 
+- Status：DONE（2026-09-07，审查者 Codex）；**Gate = GO，Phase 0 技术 PASS**。[审查记录、输入指纹、契约交接和待项门槛](source/lightnovel.md#src-004source-可行性-gate-与契约审查)。15 项 fixture 哈希、17 个 JSON 与脱敏检查通过，最终图文报告一致；新增源站 HTTP 为 0。OQ-04 仍是 SRC-010 / TEST-001 硬门槛，内容分发许可待 RELEASE-001；SRC-005 依赖 NET-002 / DB-002，未自动领取。
+
 - Phase：0；Complexity：S。
 - Goal：在进入生产接入前明确 Go / Blocked / No-Go。
 - Input：SRC-003 报告、第 11–12、34 节；Dependencies：SRC-003。
@@ -726,6 +730,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：工程 smoke、工具链版本记录；不为默认模板堆测试。
 
 #### CORE-002 — 领域值模型与内容规范
+
+- Status：DONE（2026-09-07）；[模型 / 不变量 / 摘要规范与验收](domain.md)、[纯 Dart 示例](../tool/domain_example.dart)。实现身份、详情 / 目录 / 正文、书架 / 进度 / 设置等不可变值模型；固定 v1 SHA-256、occurrence、正文序列化校验。18 项纯 Dart 测试通过，固定向量由独立 .NET SHA-256 计算，两个 Dart 子进程结果一致；静态分析通过。新增 crypto 3.0.7 与 dev-only test 1.26.3，未引入 Native 插件；iOS Level A PASS，runtime DEFERRED_NO_MAC。Flutter 测试入口启动等待已中止，未宣称新增 widget / Android runtime 结果。
 
 - Phase：1；Complexity：M。
 - Goal：固化可跨 Source 的 identity、目录与正文模型。
@@ -1654,7 +1660,7 @@ flowchart TD
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-**SRC-001 / SRC-002 / SRC-003 已完成**，后续 Source 首项为 SRC-004：审查现有图文链路证据、fixture 脱敏、契约和准入结论，无新疑点不重复请求网站。CORE-001 已完成，可独立推进 CORE-002；基础工程不能替代 SRC-004 的可行性审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001..004、CORE-001..002 已完成，Phase 0 技术 GO**。下一建议 **CORE-003**，以已实现值模型固定 Source / Repository / Error 契约；DB-001 的前置也已满足，但本轮不自动领取。Source 首项 SRC-005 仍等待 NET-002、DB-002。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
 
 ## 39. Parallelizable Work
 
