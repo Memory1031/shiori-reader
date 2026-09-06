@@ -1,0 +1,43 @@
+{
+  "evidenceKind": "DIRECT_HTTP_REDACTED_PROJECTION",
+  "capturedAt": "2026-09-06T23:45:47.0887887+08:00",
+  "url": "https://www.lightnovel.fun/api/pc-proxy/api/new-content-read/get-volume-chapters",
+  "method": "POST",
+  "request": {
+    "volume_id": "9919",
+    "pageSize": 50,
+    "page": 1,
+    "book_id": "31607"
+  },
+  "requestHeaders": {
+    "Content-Type": "application/json",
+    "Referer": "https://www.lightnovel.fun/",
+    "Origin": "https://www.lightnovel.fun",
+    "Accept": "application/json"
+  },
+  "explicitCredentialsSent": false,
+  "httpStatus": 200,
+  "contentType": "application/json; charset=UTF-8",
+  "response": {
+    "data": {
+      "list": [
+        {
+          "chapter_id": 208477,
+          "book_id": 31607,
+          "volume_id": 9919,
+          "title": "全卷",
+          "locked": 0,
+          "word_count": 143608
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "page_size": 50,
+        "total": 1,
+        "page_count": 1
+      }
+    },
+    "code": 0
+  },
+  "omitted": "All fields except selected catalog metadata and pagination; no response identifiers, user data, session values, body text or images retained."
+}

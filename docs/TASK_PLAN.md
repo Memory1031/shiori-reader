@@ -1,8 +1,8 @@
 # Shiori Task Plan
 
-规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。状态：Planning Revision Complete；**所有开发 Phase 尚未开始**。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
+规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-06，用户已指定执行 SRC-001，并由子 agent 并行执行 CORE-001；当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
 
-本轮边界：只完善本文件并做 Self Review。没有执行 Phase 0，没有访问源站验证业务流程，没有创建 Flutter 工程、Parser、Database、Fixture 或 Prototype，没有修改 README / pubspec。本次修订基于完整的 41 节 / 59 Task 原计划；仓库仍为 Greenfield，没有既有业务代码或 pubspec。只调整本文件，不执行任务。目录树、模型、配置值和测试命令均为后续设计，不代表已实现。
+规划修订阶段（历史记录）：仅完善本文件并做 Self Review，基于完整的 41 节 / 59 Task 原计划，当时仓库为 Greenfield，未执行开发任务。后续用户已授权本次 SRC-001 / CORE-001 执行；除这两个任务的明确交付记录外，目录树、模型、配置值和测试命令仍为后续设计，不代表已实现。
 
 证据约定：**DECIDED** 是本项目的设计决定；**PROPOSED** 是需要对应任务验证的建议；**UNKNOWN / NEEDS VERIFICATION** 表示没有实证。技术资料查阅日期为 2026-09-06，package 支持声明不等于本项目双端实测通过。所有源站事实必须由 Phase 0 的日期、请求和响应证据支持。
 
@@ -10,7 +10,7 @@
 
 Shiori（栞）是 Android / iOS 在线轻小说客户端。最小业务闭环是发现或搜索小说、查看详情及卷章节目录、原生阅读、加入本地书架、保存并恢复阅读进度、利用已有缓存离线继续阅读。
 
-首个生产 Source 是用户指定的 [LightNovel.fun](https://www.lightnovel.fun/)。该 URL 仅作为调查起点；当前站点归属、可访问内容、接口、会话及权限均未在本轮确认。未来 Source 通过同一业务边界接入；第一版不实现第二个生产 Source。
+首个生产 Source 是用户指定的 [LightNovel.fun](https://www.lightnovel.fun/)。SRC-001 已观察到访客首页可达，证据见 [源站调查](source/lightnovel.md)；站点主体归属、完整匿名阅读链路、接口、会话需求和使用许可仍未确认，生产接入 Gate 未通过。未来 Source 通过同一业务边界接入；第一版不实现第二个生产 Source。
 
 ## 2. Product Goals
 
@@ -39,13 +39,13 @@ MVP 不包含 LightNovel 账号、登录书架同步、评论及发布、论坛�
 | Windows | NO | 仅 Development Host | 宿主可用 | 不开发 Windows App | 无 |
 | macOS | NO | 未来 iOS Development Host；当前不可用 | NO | 不开发 macOS App | 无 |
 
-YES 指环境能力或计划范围，**不表示代码已实现、测试已通过或候选包已生成**；所有开发 Task 仍未执行。MuMu PASS 只证明该模拟器行为，不能替代 Android Device PASS。
+YES 指环境能力或计划范围，**不表示代码已实现、测试已通过或候选包已生成**；已执行 Task 的证据单独记录。MuMu PASS 只证明该模拟器行为，不能替代 Android Device PASS。
 
 iOS **Level A — Compatibility** 是当前共享代码 DoD：Pure Dart Domain / Source 逻辑，跨平台网络 / 路径 / Drift，Native Flutter Reader，所有核心依赖有 iOS 文档支持；无 Android-only 核心 API / Widget / back 假设，无无理由 Platform.isAndroid 分叉。平台行为封装在 presentation / platform boundary。结果只记 Design / Code Compatibility，不宣称 runtime verified。
 
 iOS **Level B — Runtime Validation** 归 IOS-001..006：Xcode / 原生依赖最终构建、Simulator、iPhone、TLS / Cookie / SQLite / filesystem、SafeArea / swipe-back、lifecycle / memory / performance、签名和安装。当前均 DEFERRED_NO_MAC。可选 macOS CI 成功时，只增加对应 commit / SDK / target 的 Compile Compatibility 证据，不改变 Level B 状态。
 
-**PROPOSED**：最低系统以 Android API 24、iOS 15 为工具链选择起点，CORE-001 根据最终 Flutter / 插件文档取交集。已有官方资料快照按 Flutter 3.47.2 描述这些下限；它不是本项目锁定或设备验证结果。[Flutter 平台支持](https://docs.flutter.dev/reference/supported-platforms)
+**DECIDED（CORE-001，2026-09-06）**：沿用并固定已安装 Flutter 3.38.4 stable / Dart 3.10.3，项目最低系统为 Android API 24、iOS 15.0；当前仅有 Flutter SDK 运行期依赖。锁定版本的 SDK 源码 / 模板证据和后续构建结果见 [开发基线](development.md)。此前 Flutter 3.47.2 官方资料只是规划快照，不代表本项目版本；每次新增插件仍须重查 OS 交集。[Flutter 平台支持](https://docs.flutter.dev/reference/supported-platforms)
 
 项目分别记录 ANDROID_MVP_DONE 与 CROSS_PLATFORM_MOBILE_MVP_DONE。后者当前为 BLOCKED_PENDING_IOS_VALIDATION_ENVIRONMENT；它不阻止前者独立达成。**Android MVP Ready 不代表 iOS Ready。**
 
@@ -282,7 +282,7 @@ JSON 若在当前普通浏览器行为中稳定存在可优先使用；HTML fall
 
 ## 14. Phase 0 Source Investigation
 
-**本轮不执行。未来推荐首先领取 SRC-001。** 此阶段目标是用低频、用户主动访问对应的请求，证明 Search → Detail → Catalog → Chapter → Text + Illustration 完整可达。不是先写生产 Source 再猜网站规则。
+**SRC-001 访问基线已完成，SRC-002..004 尚未执行。** 此阶段目标是用低频、用户主动访问对应的请求，证明 Search → Detail → Catalog → Chapter → Text + Illustration 完整可达。不是先写生产 Source 再猜网站规则。
 
 ### 调查流程与停止条件
 
@@ -608,7 +608,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 
 | ID / 状态 | 当前问题 | 验证方式 / 责任 / 阻塞范围 |
 | --- | --- | --- |
-| OQ-01 UNKNOWN | 起始网站实际 Base URL、匿名可读边界、首页可用内容及站点公开说明 | SRC-001 / SRC-002 当前浏览器观察；阻塞生产 Source 接入范围 |
+| OQ-01 PARTIALLY_OBSERVED | SRC-001 已观察起止 URL 为 `https://www.lightnovel.fun/`、访客首页可见；HTTP 跳转链、完整匿名阅读边界、首页数据协议及公开说明正文仍 UNKNOWN | [SRC-001 证据](source/lightnovel.md)；SRC-002 继续核实，生产 Source Gate 未通过 |
 | OQ-02 UNKNOWN | 全部 endpoints、method / body / query、分页、响应编码 / schema、HTML fallback | SRC-002..004 请求证据和完整链路；阻塞对应 parser / request，不阻塞 fixture |
 | OQ-03 UNKNOWN | Cookie / token / security_key 是否需要、作用、到期、重启持久策略 | SRC-001..005 干净会话、正常流程和自然失效；短期未观察到的寿命不可伪造 |
 | OQ-04 UNKNOWN | Novel / Chapter / Media 稳定身份、URL-only ID、临时图片地址 / Referer / host | SRC-002 / SRC-010 跨 session 与重启样本；阻塞实际 Source 离线身份 |
@@ -642,7 +642,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | Deferred Track | IOS-001..006 | 全部 DEFERRED_NO_MAC；未来环境可用后才跑基础 / Source / UX / Reader / Offline / Release runtime，不影响上述完成 |
 | Optional Compile Track | CI-003 | OPTIONAL_PROPOSED；可用 macOS runner 时记录指定 target 编译结果，不产生 runtime PASS、不作为 Android required check |
 
-当前状态：Android Phase 全部 NOT_STARTED；iOS Runtime 全部 DEFERRED_NO_MAC；iOS Level A 规则已纳入计划，实际代码 review 尚未开始；CI-003 未启用。没有实施任何 Task。
+当前执行状态（2026-09-06）：Phase 0 / Phase 1 已开始；SRC-001 DONE（仅访问基线），CORE-001 DONE（最小工程、Android build / MuMu smoke、iOS Level A review）；其余当前轨道 Task 未开始。iOS Runtime 全部 DEFERRED_NO_MAC；CI-003 未启用。SRC-001 不等于 Phase 0 Go，CORE-001 也不等于整个 Foundation 完成。
 
 示例（未来某 Phase 完成后可记录，**不是当前结果**）：Feature Status = DONE；Android Validation = PASS；iOS Compatibility Review = PASS；iOS Runtime Validation = DEFERRED_NO_MAC。这样 Phase 4 可达到 Reader Feature Complete，而 Cross-platform Mobile MVP 仍等待 iOS 验证。
 
@@ -652,7 +652,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 
 ### 领取与交付约定
 
-每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 状态初始 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。只有用户后续指定执行才开始，本轮不会领取任何一个。
+每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 未特别标注者为 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。按用户指定执行；本次仅领取 SRC-001 / CORE-001，共享计划由主 agent 编辑，工程文件由 CORE-001 子 agent 编辑。
 
 Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验收的模块行为；L 是风险实验或跨层集成，需要给出清楚的失败停止点，不扩展为整模块重写。执行一次只领取一个 Task。推荐分支 `codex/<task-id>-<short-name>`，先查工作区，保留他人改动；最终提交 / PR 聚焦该 Task，记录测试结果与平台待项，不自行发布。共享文件如 pubspec、composition root、schema 指定单一编辑者，不能因并行领取覆盖对方。
 
@@ -660,6 +660,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### SRC-001 — 访问边界与调查基线
 
+- Status：DONE（2026-09-06）；[调查记录与验收](source/lightnovel.md)。访客首页可达，规则正文未取得；SRC-002 可从正常访客 UI 入口继续，完整阅读链路 / 许可仍 UNKNOWN，未通过生产 Source Gate。
 - Phase：0；Complexity：S。
 - Goal：先证明调查可以通过正常匿名访问开展。
 - Input：第 13–16、32、34 节，当前普通浏览器；Dependencies：无。
@@ -674,7 +675,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 - Phase：0；Complexity：M。
 - Goal：把搜索至插图的当前实际请求协议变成可审查证据。
-- Input：SRC-001 调查基线、第 14 节；Dependencies：SRC-001。
+- Input：SRC-001 调查基线、第 14 节；用户指定的 gholts/aidoku-source 固定提交参考见 [源站调查文档](source/lightnovel.md)，仅作候选线索，不替代当前网页 / Network 证据；Dependencies：SRC-001。
 - Scope：Browser Network 观察搜索 / 翻页 / 详情 / 目录 / 正文 / 图、session、编码和身份；挑代表性多卷及异常样本，采集并立即脱敏。
 - Files / Modules Expected：`docs/source/lightnovel.md`、`test/fixtures/lightnovel/`。
 - Deliverables：请求顺序表、ID mapping、必要 Header 证据、fixture manifest 和正常 / 缺口矩阵。
@@ -710,6 +711,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### CORE-001 — 移动工程与工具链基线
 
+- Status：DONE（2026-09-06）；由用户指定的并行子 agent 完成，[开发基线与复现命令](development.md)。Flutter 3.38.4 / Dart 3.10.3；lockfile / format / analyze / 1 项 widget smoke PASS；Android debug APK 构建及标准命令复建 PASS，MuMu Android 12 / API 32 安装启动 PASS。iOS Level A review PASS，runtime DEFERRED_NO_MAC；ARM64 真机仍待后续任务。Windows 首次 Gradle 缓存重命名故障及 JDK 选择处理已记录，不能将暖缓存复建通过外推为所有干净 Windows 环境无故障。
 - Phase：1；Complexity：M。
 - Goal：建立 Android 可运行、保留 iOS target 配置与兼容设计的最小 Flutter 工程。
 - Input：第 4、6、9、26–27 节；Dependencies：无。
@@ -1649,11 +1651,11 @@ flowchart TD
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-优先执行 **SRC-001**：单生产源的正常匿名图文可达性仍是最大产品可行性风险，先识别能否继续。CORE-001 可作为独立并行路径开始，但不应以先做大量基础工程掩盖源不可行。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001 已完成访问基线**，后续 Source 首项为 SRC-002：单生产源的完整匿名图文可达性仍是最大产品可行性风险。CORE-001 已按用户指令作为独立并行路径开始，但基础工程不能替代源可行性证据。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
 
 ## 39. Parallelizable Work
 
-这是未来任务排期建议，本轮不执行或委派开发。最早可并行的是 SRC-001 与 CORE-001；个人开发可交替推进。
+以下为按依赖推进的排期建议。本次用户已授权 SRC-001 与 CORE-001 并行执行，未自动领取其后继任务；个人开发也可交替推进。
 
 | Track / 可并行工作 | 前提 | 边界 |
 | --- | --- | --- |
@@ -1712,7 +1714,7 @@ Phase 0 仍需真实正常公开 Text + Illustration 链路才能 Go；受限 / 
 
 ### Android MVP Checklist
 
-当前环境可在开发后逐项验收；本轮未执行，所以均未勾选。此列表可以独立完成，不受下方 iOS 列表未勾选影响。
+当前环境可在开发后逐项验收；目前仅开始访问基线与最小工程任务，尚未达到以下 MVP 条目，均未勾选。此列表可以独立完成，不受下方 iOS 列表未勾选影响。
 
 - [ ] Android / iOS 保留为正式目标；Windows 仅开发宿主，macOS 当前不可用且不是 App target。
 - [ ] Flutter / Dart / Android 配置锁定；核心包 Android 实测与 iOS DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED review 有证据。
@@ -1772,7 +1774,9 @@ Phase 0 仍需真实正常公开 Text + Illustration 链路才能 Go；受限 / 
 
 可选 compile 结果单列为 NOT_RUN / CI_COMPILE_PASS / CI_COMPILE_FAIL，并附 commit / toolchain / target；它不是第三份 runtime 验收列表，也不自动勾选以上任何项。
 
-### Targeted Revision Self Review
+### Targeted Revision Self Review（规划阶段历史记录）
+
+下表及自检结果记录先前仅修改计划的修订轮次，不代表本次 SRC-001 / CORE-001 执行状态；当前执行结果以第 35–36 节和相应交付文档为准。
 
 | 检查点 | 文档结论 / 依据 |
 | --- | --- |
