@@ -1,0 +1,4 @@
+# Fixtures are hashed byte-for-byte; keep identical text bytes on every OS.
+test/fixtures/lightnovel/**/*.json text eol=lf
+test/fixtures/lightnovel/**/*.html text eol=lf
+test/fixtures/lightnovel/**/*.png binary

@@ -58,14 +58,15 @@ jobs:
         working-directory: tools/source_probe
         run: dart --suppress-analytics analyze
 
-      - name: 调查包离线测试
-        working-directory: tools/source_probe
-        run: dart --suppress-analytics test
-
       - name: 调查样本离线校验
         working-directory: tools/source_probe
+        # 先输出预检报告，避免样本损坏只表现为多项测试的连带失败。
         # 默认不请求源站，不传 --live。
         run: dart bin/source_probe.dart
+
+      - name: 调查包离线测试
+        working-directory: tools/source_probe
+        run: dart --suppress-analytics test --reporter expanded
 
   android-build:
     name: Android 构建验证

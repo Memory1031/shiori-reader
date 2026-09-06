@@ -46,7 +46,7 @@
       "operation": "catalog",
       "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
       "observedOrAuthoredOn": "2026-09-06",
-      "sha256": "3eb5ad4832031f01d37bfca113c861ada24af9ccae03eec6aa2e2b11ad771d93",
+      "sha256": "a2d24c508e3376d37e65515f74c1560596ae0cbd7b3e1f2243e5299c8b6bab6b",
       "expectedUse": "Preserve IDs, volume relation, list order and locked flags",
       "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
     },
@@ -55,7 +55,7 @@
       "operation": "catalog",
       "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
       "observedOrAuthoredOn": "2026-09-06",
-      "sha256": "bb7c440ece796f5af557d473d559d27cd9ab8db739d3020913a45c6b911381ad",
+      "sha256": "8120376dc08103aad28ed174c0c02beadcf452e7320f19b33f1cac3ec1012046",
       "expectedUse": "Preserve IDs, volume relation, list order and locked flags",
       "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
     },
@@ -64,7 +64,7 @@
       "operation": "catalog",
       "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
       "observedOrAuthoredOn": "2026-09-06",
-      "sha256": "2f2afdbfc881893a7e0770c554a9d8e389f3b9dce5cd74757e927ee16a4112b6",
+      "sha256": "4846eaa3951a65c6440a811c17cc44f2c2045fd208844167e7ecf855c850b49a",
       "expectedUse": "Preserve IDs, volume relation, list order and locked flags",
       "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
     },
@@ -73,7 +73,7 @@
       "operation": "catalog",
       "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
       "observedOrAuthoredOn": "2026-09-06",
-      "sha256": "ab3ebd3b5fbd8338bf28d4b985429cf18e9ee0580f0926555e7240b9197b092a",
+      "sha256": "0888c99d12dac0d09c6f3bc3e992f5e7d3ac282d1eeafa4558faab9d072cfdce",
       "expectedUse": "Preserve IDs, volume relation, list order and locked flags",
       "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
     },
@@ -82,7 +82,7 @@
       "operation": "chapter",
       "provenance": "DIRECT_HTTP_STRUCTURE_ONLY",
       "observedOrAuthoredOn": "2026-09-06",
-      "sha256": "5bad79fb3fdfa984d082bb55d417ffd1fa1771d511c13b7846d5c970c0d171f3",
+      "sha256": "5c6748154a2b43de87dc6bba782600b8298a43791f49fb051ae44b61f6ebbc68",
       "expectedUse": "Statistics only, not a chapter API input; p=4084 and img=14 match browser",
       "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
     },
@@ -91,7 +91,7 @@
       "operation": "search",
       "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
       "observedOrAuthoredOn": "2026-09-06",
-      "sha256": "bca86f7be43c69011d02f4b8f3ae7c1213cd654be8a5994a3cf95126fddc7735",
+      "sha256": "44edd125565c51f6fee946bad2bda84b8011c443dfee62685747c80f95280d5c",
       "expectedUse": "Inspect response.pagination and data.list; request page zero-based, response page one-based",
       "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
     },
@@ -100,7 +100,7 @@
       "operation": "search",
       "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
       "observedOrAuthoredOn": "2026-09-06",
-      "sha256": "6773d1d5bb91331a91d935cf776e5e3e870f0d6564ce0388bd00c6efc3ff9bd3",
+      "sha256": "0de6a8d0c5a7fd18f042cf5c80bcd1b696d696baf8b2f2356e33a093da2ee976",
       "expectedUse": "Inspect response.pagination and data.list; request page zero-based, response page one-based",
       "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
     },
@@ -109,7 +109,7 @@
       "operation": "search",
       "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
       "observedOrAuthoredOn": "2026-09-06",
-      "sha256": "176570a8fa287f83b48fc5f54f797d62f0d57b281bcf1cbb4769df643bc282c2",
+      "sha256": "39d11aa769d5de6739d62b84d155e462189021232ee157788e836ded107a2a79",
       "expectedUse": "Inspect response.pagination and data.list; request page zero-based, response page one-based",
       "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
     },
@@ -118,7 +118,7 @@
       "operation": "search",
       "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
       "observedOrAuthoredOn": "2026-09-06",
-      "sha256": "ddf312a011e42152ee58f9eb44ed0554aacc371d842a2c18ad7d90a850535359",
+      "sha256": "6f83b54ef16bc3f8ecb26f7ad1187c3577f4e5e918080adbc9ab196de95c869a",
       "expectedUse": "Inspect response.pagination and data.list; request page zero-based, response page one-based",
       "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
     },

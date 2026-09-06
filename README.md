@@ -102,10 +102,16 @@ flutter build apk --debug --no-pub
 在仓库根目录运行应用检查：
 
 ```powershell
+flutter pub get --enforce-lockfile
+Push-Location tools/source_probe
+dart pub get --enforce-lockfile
+Pop-Location
 dart format --output=none --set-exit-if-changed lib test
 flutter analyze --no-pub
 flutter test --no-pub
 ```
+
+根目录静态分析会扫描独立调查包，因此首次检查前也需要安装其依赖。
 
 数据源调查包有独立的依赖与测试，在仓库根目录另开终端运行：
 

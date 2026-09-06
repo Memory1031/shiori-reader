@@ -10,6 +10,8 @@
 
 `manifest.json` 给出每个文件的 provenance、operation、校验哈希和预期用途。字段被省略不等于原响应没有该字段；不从 summary 文件反推完整 schema。请求 Header 见 manifest 的共享 profile，只有“组合成功”的证据，没有逐字段必要性证明。
 
+文本样本统一采用 UTF-8、LF 换行，仓库 `.gitattributes` 固定检出规则。manifest 中的 SHA-256 按文件原始字节计算；不要在校验时忽略换行或重新序列化 JSON。2026-09-07 将 9 个 `captured/*.json` 样本的 Windows CRLF 换行为 LF，并同步更新哈希；仅规范化换行，字段、内容和来源说明保持不变。历史报告描述当时的样本字节，不重写历史记录。
+
 后续可验证：搜索请求 page 0/1 映射响应 page 1/2，且分别匹配浏览器 ID 顺序；空结果 page_count=1 / has_next=0；四卷章节数量 2/1/1/6，总数 10；默认章 309555 属于卷 44117；API 和 DOM 都观察到 4084 个 p / 14 个 img。ID 在应用内应转换为带 source scope 的字符串；此处记录源返回类型。
 
 不保存正文、评论、用户信息、Cookie / token / security_key 值、图片签名 query、外部下载口令、HAR 或原图。真实正文禁止未经允许转载的提示已记入调查文档。哈希用于检查文件完整性，不证明真实性、许可或网站未来稳定性。
