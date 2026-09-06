@@ -482,12 +482,30 @@ void main() {
           r'''(?:import|export)\s+['"]([^'"]+)['"]''',
         ).allMatches(text).map((m) => m[1]!);
         for (final uri in imports) {
+          if (!uri.contains(':')) {
+            expect(
+              file.absolute.uri
+                  .resolve(uri)
+                  .toString()
+                  .startsWith(Directory('lib/domain').absolute.uri.toString()),
+              true,
+              reason: '${file.path} crosses the Domain boundary through $uri',
+            );
+          }
           expect(
             uri.startsWith('package:') && uri != 'package:crypto/crypto.dart',
             false,
             reason: '${file.path} imports $uri',
           );
-          expect(uri.startsWith('dart:') && uri != 'dart:convert', false);
+          expect(
+            uri.startsWith('dart:') &&
+                !{
+                  'dart:convert',
+                  'dart:async',
+                  'dart:typed_data',
+                }.contains(uri),
+            false,
+          );
         }
         expect(
           RegExp(
