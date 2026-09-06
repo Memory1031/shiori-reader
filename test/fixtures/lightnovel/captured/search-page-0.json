@@ -1,0 +1,101 @@
+{
+  "evidenceKind": "DIRECT_HTTP_REDACTED_PROJECTION",
+  "capturedAt": "2026-09-06T23:47:18.1574695+08:00",
+  "url": "https://www.lightnovel.fun/api/pc-proxy/api/bff/apk-search-result-v1",
+  "method": "POST",
+  "request": {
+    "source": "",
+    "q": "恋爱",
+    "work_type": "",
+    "preset": "",
+    "source_type": "",
+    "word_count_bucket": "",
+    "sort": "relevance",
+    "scope": "",
+    "pageSize": 20,
+    "status_bucket": "",
+    "channel_code": "",
+    "primary_tag": "",
+    "filters": {},
+    "page": 0
+  },
+  "httpStatus": 200,
+  "contentType": "application/json; charset=UTF-8",
+  "explicitCredentialsSent": false,
+  "response": {
+    "data": {
+      "list": [
+        {
+          "book_id": 11741
+        },
+        {
+          "book_id": 1405
+        },
+        {
+          "book_id": 31607
+        },
+        {
+          "book_id": 1076
+        },
+        {
+          "book_id": 1645
+        },
+        {
+          "book_id": 1900
+        },
+        {
+          "book_id": 1414
+        },
+        {
+          "book_id": 1256
+        },
+        {
+          "book_id": 1441
+        },
+        {
+          "book_id": 1379
+        },
+        {
+          "book_id": 31221
+        },
+        {
+          "book_id": 1080
+        },
+        {
+          "book_id": 1079
+        },
+        {
+          "book_id": 895
+        },
+        {
+          "book_id": 795
+        },
+        {
+          "book_id": 1989
+        },
+        {
+          "book_id": 12424
+        },
+        {
+          "book_id": 9137
+        },
+        {
+          "book_id": 10854
+        },
+        {
+          "book_id": 84
+        }
+      ],
+      "has_next": 1,
+      "total": 1321,
+      "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total": 1321,
+        "page_count": 67
+      }
+    },
+    "code": 0
+  },
+  "omitted": "Only book IDs and pagination retained. Other fields, session data, identifiers and image URLs omitted."
+}

@@ -1,5 +1,7 @@
 # LightNovel.fun 源站调查
 
+当前结果（2026-09-06）：**SRC-001 DONE；SRC-002 DONE（证据边界与覆盖缺口见文末）；SRC-003 / SRC-004 未执行，生产 Source Gate 未通过。** 前两节保留 SRC-001 和第三方参考的历史快照；其中 UNKNOWN / 未执行均指当时状态，以文末 SRC-002 的分层证据更新为准。
+
 ## SRC-001：访问边界与调查基线
 
 - 状态：**DONE — 2026-09-06**，仅完成访问基线；SRC-002..004 未执行，生产 Source 可行性 Gate 尚未通过。
@@ -113,3 +115,83 @@
 SRC-002 先从正常访客页面收集实际 Network 证据，再对照上述路径、分页及字段；不扫描第三方代码列出的端点。如果页面行为不同，以当前网页证据为准，并记录参考与实测差异。尤其核查搜索页码、受限章、预览与完整正文、卷章排序、图片字节及会话需求。SRC-003 在这些证据具备后才写最小 Dart 调查链路。
 
 仓库 [LICENSE](https://github.com/gholts/aidoku-source/blob/fb9d3997f4a40450ede38b560af8311e387fc38e/LICENSE) 为 Apache-2.0。本次只记录实现分析和固定链接，没有把其代码复制进 App；后续若移植代码须另行保留相应许可与归属信息。代码许可证不能代替 LightNovel 内容或 fixture 的使用许可。用户提供的 Aidoku 本体安装渠道与 star 数不影响本次 Source 技术结论，本轮未核验这些产品信息。
+
+## SRC-002：请求、身份与最小样本矩阵
+
+状态：**DONE — 2026-09-06**。已完成目标小说搜索 → 详情 → 四卷目录 → 一项长正文 / 插图的浏览器对照，并用独立、无凭据 HTTP 请求验证核心 JSON 协议；搜索首两页和无结果均有对照。尚未运行 Dart 自动化链路，不授予 Phase 0 Go。这里的 DONE 表示本次调查及缺口记录完成，不意味着未知会话寿命、所有异常样本或各平台 runtime 已验证。
+
+### 证据等级、环境与请求预算
+
+- Windows PC；普通应用内浏览器访客会话，页面显示“登入/注册”；独立 HTTP 使用 PowerShell 7.6.5 `Invoke-WebRequest`。日期 2026-09-06，时区 Asia/Shanghai；期间时钟读数 23:42:52，自动采集样本时间 23:45:41–23:48:11，浏览器动作先于该自动样本窗口开始。
+- **BROWSER_UI / RESOURCE_URL**：页面显示值、href、正文 DOM 结构、图片 naturalWidth / naturalHeight，以及 `pageAssets` 资源清单中的 `fetch` URL。工具不提供 method、body、Header、状态码、响应 JSON、完整重定向链；资源清单会聚合 URL，也可能包含 SSR / 预取影响，不能当精确请求次数或时序。
+- **DIRECT_HTTP**：只对已经正常访问的页面、或浏览器已观察到的业务资源 URL，使用 Aidoku 参数线索做独立只读检查。其输入和响应是实际 HTTP 证据，**不是截获浏览器请求**，不声称与浏览器 payload 完全相同。每次使用独立客户端，不导入浏览器 Cookie，不发送 Authorization、Cookie 或 security_key，不跟随 redirect；不是绕过访问限制。
+- 浏览器进行了 12 次成功的顶层打开 / 搜索提交 / 链接或卷切换 / 返回操作，另有 1 次不可见控件定位失败（未点击）；输入框编辑另计。独立 HTTP 实际 **13 次**：1 次页面 GET + 12 次 JSON POST；全部 200，无 redirect 跟随或失败重试。一次 PowerShell 语法错误在请求前发生，不计 HTTP 尝试。浏览器自动资源总尝试数未知，**不能把这 13 次说成整轮总请求量**。
+- 已取得所需代表样本后停止访问，没有尝试耗尽 67 页、枚举所有书籍、探测受限内容或执行参考代码的全目录遍历。未来 SRC-003 严格执行其独立的 30 次 HTTP 尝试硬预算。
+
+### 页面操作与请求对照
+
+| 顺序 | 正常页面操作 / 结果 | 观察到的业务 URL / HTTP 补充 |
+| --- | --- | --- |
+| B1 | 首页访客可见 | 浏览器资源含 auth-session-v1、book-rank-list-v1、home-recent-updates-feed-v1；未独立调用这些辅助端点 |
+| B2 | 显式搜索“玩乐关系”：1 项，标题“桌游咖（玩乐关系/玩玩的戀愛關係）”、作者“葵关南”、href `/book/31607` | 新见 apk-search-taxonomy-v1、apk-search-result-v1；独立搜索 POST 返回同一 book_id / 标题 / 作者 |
+| B3 | 点击该身份明确的结果，打开详情新标签：4 个卷选择项，总计 10 章 | 初始客户端资源中没有详情业务 fetch；独立页面 GET 为 200 `text/html; charset=utf-8`，有 Nuxt SSR JSON 标记。只推断存在 SSR，不猜测服务端请求链 |
+| B4–B5 | 切换“2 特典”，再返回“正文” | 资源清单新增 get-volume-chapters；独立目录 POST 与页面 ID / 顺序相符 |
+| B6 | 打开 `/reader/31607/309555`：长正文、后记标签、注音和 14 张正文图片可见 | 新见 get-book-detail、get-book-volumes、get-chapter-detail、**get-chapter-paragraphs**；最后一个不在参考实现的请求流程中，其 body / 作用仍 UNKNOWN |
+| B7–B9 | 搜索“恋爱”，点击第 2 页，再搜索特设无结果词 | 网页第 1 / 2 页各 20 个 ID；独立 POST 的 page=0 / 1 顺序完全一致。无结果页面明确显示“没有找到匹配作品” |
+| B10–B12 | 返回详情，检查第 3 / 4 卷；访客按钮仍在 | 第 3 卷单项“全卷”；第 4 卷含 6 项（含“彩页”），与独立目录样本全部相符 |
+
+源站页面自动加载了评论相关资源；本轮没有主动访问用户主页、发送评论或保留评论 / 用户信息。图片统计限定 `.reader-text`，排除了头像、勋章和评论图片。
+
+### 已验证核心协议（DIRECT_HTTP，不冒充 Browser Network payload）
+
+公共前缀：`https://www.lightnovel.fun/api/pc-proxy`。下表路径均追加于该前缀。全部为 POST JSON，成功响应 200、`application/json; charset=UTF-8`、`code=0`，业务值在 `data`。未验证非零 code、HTTP 拒绝或 WAF 响应格式，不能构造“真实失败样本”。
+
+| Operation / 后缀 | 成功请求的输入 | 验证结果 |
+| --- | --- | --- |
+| Search `/api/bff/apk-search-result-v1` | `q`、`page`、`pageSize=20`、`sort=relevance`；其余空 filter 字段见 fixture | 请求 page **0 起算**，响应 `pagination.page` **1 起算**。page=0/1/2 分别返回 1/2/3；前两页逐项匹配 UI，第三页只属 HTTP 样本 |
+| Detail `/api/new-content-read/get-book-detail` | `book_id="31607"`、`with_volumes=0` | 同书身份；默认 volume_id=44117、chapter_id=309555，4 卷 / 10 章 |
+| Volumes `/api/new-content-read/get-book-volumes` | book_id、`page=1`、`pageSize=50` | 有序返回 4 卷，pagination total=4 / page_count=1 |
+| Chapters `/api/new-content-read/get-volume-chapters` | book_id、volume_id、`page=1`、`pageSize=50` | 四卷分别 2 / 1 / 1 / 6 项，返回 locked 均为 0；不反转，不依赖标题提取 ID |
+| Chapter `/api/new-content-read/get-chapter-detail` | book_id、`chapter_id="309555"` | locked=0；body_snapshot 与 render_preview 均有 HTML / text，结构统计见下文 |
+
+成功组合显式发送 `Accept: application/json`、`Content-Type: application/json`、Origin / Referer 为站点根地址。**只证明这组 Header 与参数有效，未证明每个字段必需**；没有通过多次删参试错判断必要性。响应若含 Set-Cookie，本轮未记录其值或作用；不声称站点不发 Cookie。13 次独立请求的成功说明这些样本不依赖提前导入用户登录凭据，不能外推所有书籍、端点和未来时间。
+
+搜索“恋爱”当时 total=1321、page_count=67；第一页与第二页 20 个 ID 无交集。空查询结果样本（非空但不存在的关键词）是 `list=[]`、`has_next=0`、`total=0`，**page_count 仍为 1**。分页结束不能只判断 page_count=0；结合 `has_next`、响应页数、空列表、重复 ID / 页保护。第 67 页没有实际请求；catalog 多页终止尚未实测，本书各卷均只有一页。
+
+### 身份、顺序与内容证据
+
+| 网页卷标签 | volume_id | chapter_id（源顺序） | 覆盖意义 |
+| --- | --- | --- | --- |
+| 正文 | 44117 | 309555、309556 | 每项可包含整卷长文本，不能按短章估计大小 |
+| 2 特典 | 9918 | 208472 | 特典命名；只核对目录，未额外读取全文 |
+| 3 （玩乐关系/玩玩的戀愛關係）【已完本含实体特典】 | 9919 | 208477 | 章名“全卷”与卷名独立 |
+| 第4卷 | 46122 | 317939、317940、317941、317959、323103、323197 | 制作信息、彩页及拆分文本章节 |
+
+book_id / volume_id / chapter_id 在独立 JSON 中为数值，页面 href 的 book / chapter 对应相同值；请求字符串 ID 可成功。Shiori 仍应按计划在 Source 边界转换为字符串并带 source scope。当前只证明当次跨 operation 一致性；跨会话重启 / 长期稳定性未测，不能证明 ID 全站唯一。字段名是 `sort_index`（未保存取值），不是 `sort_order`；本次有序 list 与 UI 一致，禁止凭数值 ID 大小或倒序适配规则重排。
+
+章节 309555：API `body_snapshot.body_html` 256,358 字符、4,084 个 p 标签、14 个 img 标签；body_text 139,470 字符。render_preview 的上述长度与计数相同，**只验证这一项，未证明 preview 在所有章节都是全文**。网页 `.reader-text` 的 p / img 数同样为 4,084 / 14，另有 17 个 ruby；textContent 138,806 字符，与 API body_text 的计算口径不同。出现后记标签，但没有与出版原版逐字核对完整性。
+
+正文子标签观察到 P / STRONG / RUBY / RT / A / IMG。其开头出现外部下载链接、访问口令和群信息，不属于 Source 所需数据，已全部排除。网页正文的最长单个 p 为 178 字符，本轮**没有真实极长单段样本**；整项长正文与极长单段必须分开测试。
+
+14 张正文图片均 `complete=true` 且 natural dimensions > 0，证明浏览器已解码，不仅是找到 URL。代表图片 path `/upload-files/images/250524/2ffb192e695743321ebab6c443b0b652.jpg`，host `api.lightnovel.fun`，解码尺寸 2048×829。图片 URL 含 `m` / `t` 查询字段，值未写入文件；其签名 / 过期语义尚未验证，不自行计算或去掉参数访问。图片 Referer / Cookie 必要性、HTTP MIME、独立 Dart 字节解码仍 UNKNOWN；不能由扩展名断言响应 MIME。Media 的候选稳定键只能在后续验证后决定，禁止把本次临时查询串直接当长期身份。
+
+### 样本、缺口与后续输入
+
+样本清单在 [`test/fixtures/lightnovel/manifest.json`](../../test/fixtures/lightnovel/manifest.json)，使用说明见同目录 README。真实记录只保存必要身份 / 目录 / 分页元数据或结构统计；并非完整响应。人工转录、自动投影、纯合成三种 provenance 分开标注，不把结构统计文件用作生产 JSON Parser 的完整输入。
+
+正文明确有未经允许禁止转载提示。未保存小说原文、原始 HTML、完整 HAR 或原图；正文结构 fixture 和 2×2 PNG 是自行生成的合成资产。许可仍不因此关闭。没有源站代码复制、App 业务实现、生产 Parser 或独立 Dart probe。
+
+| 项目 | 状态 / 责任 |
+| --- | --- |
+| 目标书搜索 / 详情 / 四卷目录 / 一项正文 / 浏览器图片 | OBSERVED；当次身份、顺序、文本与图片结构已有证据 |
+| 搜索第一页 / 下一页 / 无结果 | OBSERVED；API 与 UI 对照，catalog 多页及搜索末页仍为覆盖缺口 |
+| 无卷 / 缺标题 / 重复编号 / locked / HTTP error / 极长单段 | 本次代表书未遇到，未枚举网站寻找；合成设计样本明确不是真实 API 返回 |
+| get-chapter-paragraphs、辅助首页接口 | 仅浏览器资源 URL；method / payload / 响应 / 必要性 UNKNOWN，不能由参考代码补造 |
+| 会话重启、自然失效、图片 m/t 生命周期 | UNKNOWN；后续 SRC-003 / SRC-005 / SRC-010 根据正常访问证据处理 |
+| Browser Network 精确 payload / Header / redirect / 全部请求计数 | 当前工具能力不足；已有独立 HTTP 证据可支撑 SRC-003 起步，后续如需声称浏览器等价，应补实际 Network 记录 |
+| 内容 / fixture 分发许可 | 未关闭；现有交付仅元数据、结构统计和自制资产，不等于授权转载原文 |
+| Android / iOS 网络、图片、存储 runtime | 未测；SRC-002 不改 TEST-001 或 IOS-002 状态 |
+
+下一步 SRC-003：以本书 31607、默认卷 44117、章 309555 为身份断言；使用已验证的搜索 0 起算 / 目录 1 起算和 POST 组合建立独立 Dart 调查包。默认离线，只在 opt-in 下低频 live；字节 / 图片解码、重定向与预算必须由该包真正验证。需要额外捕获字段时先取得最小脱敏样本，不扩大成全书采集。
+
+本次验收：网页标题 / 作者 / 四卷十章顺序人工对照；搜索两页 ID 与 HTTP 样本逐项一致；正文 p / img 计数一致；全部 JSON 可解析、manifest 文件和哈希一致、无重复章节 ID；检查 fixture 无实际会话秘密、签名 query、原文、用户链接 / 头像和外部下载口令。没有为文档任务重复跑 Flutter analyze / test / build。

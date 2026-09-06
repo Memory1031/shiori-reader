@@ -1,0 +1,38 @@
+{
+  "evidenceKind": "MANUAL_TRANSCRIPTION_OF_DIRECT_HTTP_OBSERVATIONS",
+  "observedOn": "2026-09-06",
+  "timezone": "Asia/Shanghai",
+  "requestProfile": {
+    "client": "PowerShell Invoke-WebRequest",
+    "postHeaders": {"Accept": "application/json", "Content-Type": "application/json", "Origin": "https://www.lightnovel.fun", "Referer": "https://www.lightnovel.fun/"},
+    "explicitCookieAuthorizationOrSecurityKeySent": false,
+    "browserCookieImport": false,
+    "redirectsFollowed": 0,
+    "headerNecessity": "UNKNOWN; observed successful combination, no parameter/header removal experiments"
+  },
+  "observations": [
+    {"method": "GET", "url": "https://www.lightnovel.fun/book/31607", "httpStatus": 200, "contentType": "text/html; charset=utf-8", "responseCharacters": 175618, "containsGuestLoginButton": true, "containsNuxtSsrJsonScript": true, "originalResponseRetained": false},
+    {
+      "method": "POST",
+      "url": "https://www.lightnovel.fun/api/pc-proxy/api/bff/apk-search-result-v1",
+      "request": {"q": "玩乐关系", "scope": "", "source": "", "primary_tag": "", "channel_code": "", "work_type": "", "source_type": "", "filters": {}, "word_count_bucket": "", "status_bucket": "", "page": 0, "pageSize": 20, "sort": "relevance", "preset": ""},
+      "httpStatus": 200, "contentType": "application/json; charset=UTF-8",
+      "responseProjection": {"code": 0, "data": {"list": [{"book_id": 31607, "title": "桌游咖（玩乐关系/玩玩的戀愛關係）", "author_name": "葵关南"}], "pagination": {"page": 1, "page_size": 20, "total": 1, "page_count": 1}}}
+    },
+    {
+      "method": "POST",
+      "url": "https://www.lightnovel.fun/api/pc-proxy/api/new-content-read/get-book-detail",
+      "request": {"book_id": "31607", "with_volumes": 0},
+      "httpStatus": 200, "contentType": "application/json; charset=UTF-8",
+      "responseProjection": {"code": 0, "data": {"book_id": 31607, "title": "桌游咖（玩乐关系/玩玩的戀愛關係）", "author_name": "葵关南", "default_volume_id": 44117, "default_chapter_id": 309555, "volume_count": 4, "chapter_count": 10, "status": 1}}
+    },
+    {
+      "method": "POST",
+      "url": "https://www.lightnovel.fun/api/pc-proxy/api/new-content-read/get-book-volumes",
+      "request": {"book_id": "31607", "page": 1, "pageSize": 50},
+      "httpStatus": 200, "contentType": "application/json; charset=UTF-8",
+      "responseProjection": {"code": 0, "data": {"list": [{"volume_id": 44117, "title": "正文", "chapter_count": 2}, {"volume_id": 9918, "title": "2 特典", "chapter_count": 1}, {"volume_id": 9919, "title": "3 （玩乐关系/玩玩的戀愛關係）【已完本含实体特典】", "chapter_count": 1}, {"volume_id": 46122, "title": "第4卷", "chapter_count": 6}], "pagination": {"page": 1, "page_size": 50, "total": 4, "page_count": 1}}}
+    }
+  ],
+  "redaction": "Manually transcribed selected factual metadata from tool results. Missing fields were omitted, not observed absent. No raw response, summary/body text, user data, secrets or media assets retained."
+}

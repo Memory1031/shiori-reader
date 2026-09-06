@@ -1,0 +1,89 @@
+{
+  "evidenceKind": "DIRECT_HTTP_STRUCTURE_ONLY",
+  "capturedAt": "2026-09-06T23:46:11.8218627+08:00",
+  "httpStatus": 200,
+  "contentType": "application/json; charset=UTF-8",
+  "request": {
+    "method": "POST",
+    "url": "https://www.lightnovel.fun/api/pc-proxy/api/new-content-read/get-chapter-detail",
+    "body": {
+      "book_id": "31607",
+      "chapter_id": "309555"
+    }
+  },
+  "code": 0,
+  "dataKeys": [
+    "chapter_id",
+    "book_id",
+    "book_title",
+    "volume_id",
+    "volume_title",
+    "origin_volume_title",
+    "volume_legacy_aid",
+    "volume_source_article_id",
+    "compat_legacy_aid",
+    "compat_status",
+    "compat_legacy_sid",
+    "chapter_no",
+    "title",
+    "author_outline",
+    "status",
+    "word_count",
+    "published_at",
+    "source_legacy_aid",
+    "meta_json",
+    "created_at",
+    "updated_at",
+    "poster_user",
+    "poster_users",
+    "poster_user_count",
+    "navigation",
+    "body_snapshot",
+    "legacy_resources",
+    "render_preview",
+    "access_type",
+    "coin_price",
+    "locked",
+    "unlocked",
+    "brave_required",
+    "request_id"
+  ],
+  "chapter_id": 309555,
+  "book_id": 31607,
+  "volume_id": 44117,
+  "locked": 0,
+  "payload_mode": null,
+  "bodySummaries": {
+    "body_snapshot": {
+      "keys": [
+        "body_text",
+        "body_html",
+        "char_count",
+        "checksum",
+        "body_version",
+        "updated_at",
+        "selection_text",
+        "selection_char_count",
+        "selection_body_version",
+        "indent_paragraph_nos",
+        "paragraphs"
+      ],
+      "textCharacters": 139470,
+      "htmlCharacters": 256358,
+      "imageTagCount": 14,
+      "paragraphTagCount": 4084
+    },
+    "render_preview": {
+      "keys": [
+        "source",
+        "body_text",
+        "body_html"
+      ],
+      "textCharacters": 139470,
+      "htmlCharacters": 256358,
+      "imageTagCount": 14,
+      "paragraphTagCount": 4084
+    }
+  },
+  "omitted": "All original body text, HTML, images, user/session values, response identifiers and signed URLs omitted."
+}

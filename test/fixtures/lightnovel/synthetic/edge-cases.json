@@ -1,0 +1,11 @@
+{
+  "evidenceKind": "SYNTHETIC_DESIGN_CASES_NOT_SITE_RESPONSES",
+  "cases": [
+    {"name": "missing_title", "input": {"chapterId": "synthetic-1", "title": null}, "expectation": "Display fallback without treating fallback label as durable identity"},
+    {"name": "no_volume", "input": {"chapters": [{"chapterId": "synthetic-2", "title": "合成无卷章节"}]}, "expectation": "Do not invent a remote volume ID"},
+    {"name": "duplicate_order_label", "input": {"chapters": [{"chapterId": "synthetic-3", "label": "1"}, {"chapterId": "synthetic-4", "label": "1"}]}, "expectation": "Preserve distinct IDs and source order"},
+    {"name": "locked_content", "input": {"access": "restricted"}, "expectation": "Report restriction, do not retry alternate endpoints"},
+    {"name": "missing_identity", "input": {"title": "合成标题"}, "expectation": "Reject missing identity; never silently assign remote ID zero"},
+    {"name": "extreme_semantic_paragraph", "input": {"syntheticCharacter": "测", "repeatCount": 20000}, "expectation": "One semantic paragraph; any renderer chunks remain presentation-only"}
+  ]
+}

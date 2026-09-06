@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "task": "SRC-002",
+  "recordedOn": "2026-09-06",
+  "timezone": "Asia/Shanghai",
+  "sourceIdForFutureAdapter": "lightnovel.fun",
+  "taskStatus": "DONE_WITH_DOCUMENTED_COVERAGE_GAPS",
+  "productionSourceGate": "NOT_EVALUATED_SRC004",
+  "httpAttempts": 13,
+  "browserHttpAttemptCount": null,
+  "requestProfile": {
+    "headerNecessity": "Unknown; only successful full combination tested",
+    "client": "PowerShell 7.6.5 Invoke-WebRequest",
+    "jsonPostHeaders": {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Origin": "https://www.lightnovel.fun",
+      "Referer": "https://www.lightnovel.fun/"
+    },
+    "retryAttempts": 0,
+    "credentials": "No explicit Cookie/Authorization/security_key, no browser session import",
+    "redirectsFollowed": 0
+  },
+  "redactionPolicy": "Whitelist identity/pagination/catalog metadata; body text and HTML reduced to counts, signed query values and all user/session/comment data omitted. Synthetic data never labeled captured.",
+  "entries": [
+    {
+      "path": "assets/synthetic-checker.png",
+      "operation": "media",
+      "provenance": "SYNTHETIC",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "49577f1e5a77ef1a3d85ad89159cba5f2371c189baf8a75a49c99eb99d516a5e",
+      "expectedUse": "Self-generated 2x2 PNG; not source image or media-network evidence",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "browser-observations.json",
+      "operation": "search/detail/catalog/chapter/media",
+      "provenance": "MANUAL_TRANSCRIPTION_OF_BROWSER_OBSERVATIONS",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "04d8482c112a060b2d86d4a933c0d22398cee705ebbb85764b0b03eed0ad3089",
+      "expectedUse": "Compare page1/page2 IDs, four volume lists, body counts and decoded image dimensions",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "captured/catalog-44117.json",
+      "operation": "catalog",
+      "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "3eb5ad4832031f01d37bfca113c861ada24af9ccae03eec6aa2e2b11ad771d93",
+      "expectedUse": "Preserve IDs, volume relation, list order and locked flags",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "captured/catalog-46122.json",
+      "operation": "catalog",
+      "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "bb7c440ece796f5af557d473d559d27cd9ab8db739d3020913a45c6b911381ad",
+      "expectedUse": "Preserve IDs, volume relation, list order and locked flags",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "captured/catalog-9918.json",
+      "operation": "catalog",
+      "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "2f2afdbfc881893a7e0770c554a9d8e389f3b9dce5cd74757e927ee16a4112b6",
+      "expectedUse": "Preserve IDs, volume relation, list order and locked flags",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "captured/catalog-9919.json",
+      "operation": "catalog",
+      "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "ab3ebd3b5fbd8338bf28d4b985429cf18e9ee0580f0926555e7240b9197b092a",
+      "expectedUse": "Preserve IDs, volume relation, list order and locked flags",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "captured/chapter-309555-summary.json",
+      "operation": "chapter",
+      "provenance": "DIRECT_HTTP_STRUCTURE_ONLY",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "5bad79fb3fdfa984d082bb55d417ffd1fa1771d511c13b7846d5c970c0d171f3",
+      "expectedUse": "Statistics only, not a chapter API input; p=4084 and img=14 match browser",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "captured/search-empty.json",
+      "operation": "search",
+      "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "bca86f7be43c69011d02f4b8f3ae7c1213cd654be8a5994a3cf95126fddc7735",
+      "expectedUse": "Inspect response.pagination and data.list; request page zero-based, response page one-based",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "captured/search-page-0.json",
+      "operation": "search",
+      "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "6773d1d5bb91331a91d935cf776e5e3e870f0d6564ce0388bd00c6efc3ff9bd3",
+      "expectedUse": "Inspect response.pagination and data.list; request page zero-based, response page one-based",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "captured/search-page-1.json",
+      "operation": "search",
+      "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "176570a8fa287f83b48fc5f54f797d62f0d57b281bcf1cbb4769df643bc282c2",
+      "expectedUse": "Inspect response.pagination and data.list; request page zero-based, response page one-based",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "captured/search-page-2.json",
+      "operation": "search",
+      "provenance": "DIRECT_HTTP_REDACTED_PROJECTION",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "ddf312a011e42152ee58f9eb44ed0554aacc371d842a2c18ad7d90a850535359",
+      "expectedUse": "Inspect response.pagination and data.list; request page zero-based, response page one-based",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "initial-http-observations.json",
+      "operation": "page/search/detail/volumes",
+      "provenance": "MANUAL_TRANSCRIPTION_OF_DIRECT_HTTP_OBSERVATIONS",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "d2f172a6d18776de6ed8cee9c7c8fd772e069dfa234098be8db85e4b93b843c1",
+      "expectedUse": "Four transcribed observations; responseProjection is incomplete by design",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "synthetic/chapter-shape.expected.json",
+      "operation": "parser-design",
+      "provenance": "SYNTHETIC",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "6c12b5863d5a120ff796954aa7609eca88619cc89a3753b0d009044b922c6973",
+      "expectedUse": "Authored input only; not site observation",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "synthetic/chapter-shape.html",
+      "operation": "parser-design",
+      "provenance": "SYNTHETIC",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "6c9c6a88e5ed9efe976de9b295f1cb1a378c7503c8af43ed3ec9ee5a0f90eeb6",
+      "expectedUse": "Authored input only; not site observation",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    },
+    {
+      "path": "synthetic/edge-cases.json",
+      "operation": "parser-design",
+      "provenance": "SYNTHETIC",
+      "observedOrAuthoredOn": "2026-09-06",
+      "sha256": "2a14d10c21e8a1570371e2532194dd26592b38eecc27aae37fbfaae0383cac10",
+      "expectedUse": "Authored input only; not site observation",
+      "submissionBasis": "Factual metadata/structure or self-authored test content; no original novel text, personal/session data or site image assets"
+    }
+  ],
+  "coverageGaps": [
+    "Browser methods, payloads and headers were not intercepted",
+    "Catalog multipage and search final page not visited",
+    "No observed locked/error/missing-title/no-volume/extreme-paragraph source samples",
+    "Session restart/expiry and media query lifetimes unverified",
+    "get-chapter-paragraphs request/response unknown",
+    "Independent Dart image bytes/decode pending SRC-003"
+  ]
+}

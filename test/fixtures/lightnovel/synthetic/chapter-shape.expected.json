@@ -1,0 +1,6 @@
+{
+  "evidenceKind": "SYNTHETIC_EXPECTATION",
+  "purpose": "Future parser/Domain checks, not an implemented model contract or live-source evidence",
+  "expectation": {"semanticTextParagraphCount": 4, "imageCount": 1, "rubyBaseText": "测试", "rubyAnnotation": "test", "imageBetweenTextParagraphPositions": [3, 4], "preserveParagraphContainingRuby": true},
+  "imagePath": "../assets/synthetic-checker.png"
+}

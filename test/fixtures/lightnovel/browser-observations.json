@@ -1,0 +1,62 @@
+{
+  "evidenceKind": "MANUAL_TRANSCRIPTION_OF_BROWSER_OBSERVATIONS",
+  "observedOn": "2026-09-06",
+  "timezone": "Asia/Shanghai",
+  "browser": "Codex In-app Browser",
+  "networkCaptureLimit": "Resource inventory exposes fetch URLs but not methods, bodies, headers, status codes or response JSON. This file is not a HAR or API response.",
+  "guestChecks": ["homepage: 登入/注册", "search: 登入/注册", "book detail before and after reading: 登入/注册"],
+  "targetSearch": {
+    "query": "玩乐关系",
+    "bookIdFromHref": "31607",
+    "title": "桌游咖（玩乐关系/玩玩的戀愛關係）",
+    "author": "葵关南",
+    "resultCount": 1,
+    "visiblePageNumbers": [1]
+  },
+  "paginationComparison": {
+    "query": "恋爱",
+    "page1Ids": ["11741", "1405", "31607", "1076", "1645", "1900", "1414", "1256", "1441", "1379", "31221", "1080", "1079", "895", "795", "1989", "12424", "9137", "10854", "84"],
+    "page2Ids": ["12316", "1738", "9427", "14302", "3164", "10860", "10188", "10186", "14309", "1691", "15002", "1739", "14692", "3177", "1994", "1687", "5156", "4661", "12295", "1933"],
+    "lastVisiblePageNumber": 67
+  },
+  "emptySearch": {
+    "query": "shiori_src002_no_match_20260906",
+    "message": "没有找到匹配作品"
+  },
+  "catalog": {
+    "bookIdFromHref": "31607",
+    "displayedChapterCount": 10,
+    "volumeLabelsInOrder": ["正文", "2 特典", "3 （玩乐关系/玩玩的戀愛關係）【已完本含实体特典】", "第4卷"],
+    "chapterIdsByVolumePosition": [["309555", "309556"], ["208472"], ["208477"], ["317939", "317940", "317941", "317959", "323103", "323197"]]
+  },
+  "reader": {
+    "url": "https://www.lightnovel.fun/reader/31607/309555",
+    "bodySelector": ".reader-text",
+    "textContentCharacters": 138806,
+    "paragraphCount": 4084,
+    "longestParagraphTextCharacters": 178,
+    "rubyCount": 17,
+    "tagsObserved": ["A", "IMG", "P", "RT", "RUBY", "STRONG"],
+    "imageCount": 14,
+    "allImagesCompleteAndNaturalDimensionsPositive": true,
+    "firstImage": {
+      "origin": "https://api.lightnovel.fun",
+      "path": "/upload-files/images/250524/2ffb192e695743321ebab6c443b0b652.jpg",
+      "queryKeysOnly": ["m", "t"],
+      "naturalWidth": 2048,
+      "naturalHeight": 829
+    },
+    "containsAfterwordLabel": true,
+    "hasNoReprintNotice": true,
+    "originalTextAndImagesRetained": false,
+    "completenessLimit": "Rendered body is consistent with API paragraph/image counts; not a word-for-word comparison with the publisher's original edition."
+  },
+  "fetchUrlsObserved": {
+    "homepage": ["/api/pc-proxy/api/bff/auth-session-v1", "/api/pc-proxy/api/bff/book-rank-list-v1", "/api/pc-proxy/api/bff/home-recent-updates-feed-v1"],
+    "searchNewUrls": ["/api/pc-proxy/api/bff/apk-search-taxonomy-v1", "/api/pc-proxy/api/bff/apk-search-result-v1"],
+    "bookInitialNewUrls": ["/api/pc-proxy/api/bff/report-reasons-v1"],
+    "volumeSelectionNewUrls": ["/api/pc-proxy/api/new-content-read/get-volume-chapters"],
+    "readerNewUrls": ["/api/pc-proxy/api/new-content-read/get-book-detail", "/api/pc-proxy/api/new-content-read/get-chapter-detail", "/api/pc-proxy/api/new-content-read/get-book-volumes", "/api/pc-proxy/api/new-content-read/get-chapter-paragraphs"]
+  },
+  "redaction": "No raw body text, comments, publisher/user identities, account data, external download links/passwords, signed query values, cookies, tokens or image bytes retained. Book/volume/chapter titles and IDs are minimal identification metadata."
+}

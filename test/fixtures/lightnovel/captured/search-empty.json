@@ -1,0 +1,40 @@
+{
+  "evidenceKind": "DIRECT_HTTP_REDACTED_PROJECTION",
+  "capturedAt": "2026-09-06T23:48:11.6501814+08:00",
+  "url": "https://www.lightnovel.fun/api/pc-proxy/api/bff/apk-search-result-v1",
+  "method": "POST",
+  "request": {
+    "filters": {},
+    "page": 0,
+    "work_type": "",
+    "word_count_bucket": "",
+    "channel_code": "",
+    "status_bucket": "",
+    "pageSize": 20,
+    "primary_tag": "",
+    "source": "",
+    "q": "shiori_src002_no_match_20260906",
+    "sort": "relevance",
+    "source_type": "",
+    "scope": "",
+    "preset": ""
+  },
+  "httpStatus": 200,
+  "contentType": "application/json; charset=UTF-8",
+  "explicitCredentialsSent": false,
+  "response": {
+    "code": 0,
+    "data": {
+      "has_next": 0,
+      "list": [],
+      "pagination": {
+        "page": 1,
+        "page_size": 20,
+        "total": 0,
+        "page_count": 1
+      },
+      "total": 0
+    }
+  },
+  "omitted": "Only empty list and pagination retained; other fields omitted."
+}

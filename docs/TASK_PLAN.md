@@ -10,7 +10,7 @@
 
 Shiori（栞）是 Android / iOS 在线轻小说客户端。最小业务闭环是发现或搜索小说、查看详情及卷章节目录、原生阅读、加入本地书架、保存并恢复阅读进度、利用已有缓存离线继续阅读。
 
-首个生产 Source 是用户指定的 [LightNovel.fun](https://www.lightnovel.fun/)。SRC-001 已观察到访客首页可达，证据见 [源站调查](source/lightnovel.md)；站点主体归属、完整匿名阅读链路、接口、会话需求和使用许可仍未确认，生产接入 Gate 未通过。未来 Source 通过同一业务边界接入；第一版不实现第二个生产 Source。
+首个生产 Source 是用户指定的 [LightNovel.fun](https://www.lightnovel.fun/)。SRC-001 / SRC-002 已观察访客首页，以及样本小说的搜索、详情、四卷目录、正文和浏览器图片解码，并独立验证核心 HTTP 协议，证据见 [源站调查](source/lightnovel.md)。自动化链路、会话寿命、异常覆盖和使用许可仍有待项，生产接入 Gate 未通过。未来 Source 通过同一业务边界接入；第一版不实现第二个生产 Source。
 
 ## 2. Product Goals
 
@@ -282,7 +282,7 @@ JSON 若在当前普通浏览器行为中稳定存在可优先使用；HTML fall
 
 ## 14. Phase 0 Source Investigation
 
-**SRC-001 访问基线已完成，SRC-002..004 尚未执行。** 此阶段目标是用低频、用户主动访问对应的请求，证明 Search → Detail → Catalog → Chapter → Text + Illustration 完整可达。不是先写生产 Source 再猜网站规则。
+**SRC-001 / SRC-002 已完成调查记录，SRC-003 / SRC-004 尚未执行。** SRC-002 的浏览器工具仅提供 UI / 资源 URL，核心 payload 与 JSON 由独立无凭据 HTTP 检查验证，证据等级及缺口明确分列。此阶段目标是用低频、用户主动访问对应的请求，证明 Search → Detail → Catalog → Chapter → Text + Illustration 完整可达。不是先写生产 Source 再猜网站规则。
 
 ### 调查流程与停止条件
 
@@ -608,10 +608,10 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 
 | ID / 状态 | 当前问题 | 验证方式 / 责任 / 阻塞范围 |
 | --- | --- | --- |
-| OQ-01 PARTIALLY_OBSERVED | SRC-001 已观察起止 URL 为 `https://www.lightnovel.fun/`、访客首页可见；HTTP 跳转链、完整匿名阅读边界、首页数据协议及公开说明正文仍 UNKNOWN | [SRC-001 证据](source/lightnovel.md)；SRC-002 继续核实，生产 Source Gate 未通过 |
-| OQ-02 UNKNOWN | 全部 endpoints、method / body / query、分页、响应编码 / schema、HTML fallback | SRC-002..004 请求证据和完整链路；阻塞对应 parser / request，不阻塞 fixture |
-| OQ-03 UNKNOWN | Cookie / token / security_key 是否需要、作用、到期、重启持久策略 | SRC-001..005 干净会话、正常流程和自然失效；短期未观察到的寿命不可伪造 |
-| OQ-04 UNKNOWN | Novel / Chapter / Media 稳定身份、URL-only ID、临时图片地址 / Referer / host | SRC-002 / SRC-010 跨 session 与重启样本；阻塞实际 Source 离线身份 |
+| OQ-01 PARTIALLY_OBSERVED | 首页及样本书 31607 的访客搜索 / 详情 / 目录 / 正文 / 图片可达；全站匿名边界、浏览器完整跳转链及公开规则正文仍 UNKNOWN | [SRC-001 / SRC-002 证据](source/lightnovel.md)；SRC-003 自动化与 SRC-004 Gate 尚未执行 |
+| OQ-02 PARTIALLY_OBSERVED | 核心五类 POST / UTF-8 JSON、搜索零起算和目录一起算已获独立 HTTP 证据；Browser payload、get-chapter-paragraphs、失败 schema、catalog 多页仍未知 | SRC-002 samples 支撑 SRC-003；不能把候选字段或投影样本当完整 schema |
+| OQ-03 PARTIALLY_OBSERVED | 13 次独立 HTTP 无显式登录凭据成功；浏览器 auth-session 调用已见。Cookie / token / security_key 的一般必要性、到期、重启策略仍 UNKNOWN | SRC-003..005 正常重复访问和自然失效；不由单次匿名成功伪造寿命或全站无会话需求 |
+| OQ-04 PARTIALLY_OBSERVED | 样本 book / volume / chapter ID 跨 UI / API 一致；图片 host 为 api.lightnovel.fun，含 m/t 查询值。长期稳定身份、签名语义、Referer 必要性仍未知 | SRC-003 / SRC-010 跨 session 与重启样本；临时 query 不直接进入长期身份 |
 | OQ-05 UNKNOWN | 真实正文标记（Ruby / 强调 / 空行）、代表性长章 / 插图格式与章节结构 | SRC-002 / SRC-009 最小 fixture；合成边界只证明 Domain 可表达 |
 | OQ-06 NEEDS VERIFICATION | 原生 pivot viewport 恢复精度、语义顺序、高刷 / 多图性能 | READER-001 实验；不合格再评估维护中的 indexed-scroll 包，阻塞 READER-002 |
 | OQ-07 UNKNOWN | 已知当前无 Mac / Xcode / iPhone 开发环境；未来何时能取得完整环境？ | 当前无环境是 KNOWN RESOURCE CONSTRAINT；获得环境后激活 IOS-001..006。只阻塞 iOS Runtime / RC / Cross-platform Mobile MVP，不阻塞 Android MVP；不在 CORE-001 重新调查“是否有 Mac” |
@@ -642,7 +642,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | Deferred Track | IOS-001..006 | 全部 DEFERRED_NO_MAC；未来环境可用后才跑基础 / Source / UX / Reader / Offline / Release runtime，不影响上述完成 |
 | Optional Compile Track | CI-003 | OPTIONAL_PROPOSED；可用 macOS runner 时记录指定 target 编译结果，不产生 runtime PASS、不作为 Android required check |
 
-当前执行状态（2026-09-06）：Phase 0 / Phase 1 已开始；SRC-001 DONE（仅访问基线），CORE-001 DONE（最小工程、Android build / MuMu smoke、iOS Level A review）；其余当前轨道 Task 未开始。iOS Runtime 全部 DEFERRED_NO_MAC；CI-003 未启用。SRC-001 不等于 Phase 0 Go，CORE-001 也不等于整个 Foundation 完成。
+当前执行状态（2026-09-06）：Phase 0 / Phase 1 已开始；SRC-001 DONE（访问基线），SRC-002 DONE（UI / 独立 HTTP 证据、脱敏样本及覆盖缺口），CORE-001 DONE（最小工程、Android build / MuMu smoke、iOS Level A review）；其余当前轨道 Task 未开始。iOS Runtime 全部 DEFERRED_NO_MAC；CI-003 未启用。SRC-002 不等于 Phase 0 Go，CORE-001 也不等于整个 Foundation 完成。
 
 示例（未来某 Phase 完成后可记录，**不是当前结果**）：Feature Status = DONE；Android Validation = PASS；iOS Compatibility Review = PASS；iOS Runtime Validation = DEFERRED_NO_MAC。这样 Phase 4 可达到 Reader Feature Complete，而 Cross-platform Mobile MVP 仍等待 iOS 验证。
 
@@ -673,6 +673,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### SRC-002 — 请求、身份与最小样本矩阵
 
+- Status：DONE（2026-09-06）；[分层证据与缺口](source/lightnovel.md)、[fixture manifest](../test/fixtures/lightnovel/manifest.json)。目标书搜索 / 四卷十章 / 一项正文与 14 张图浏览器解码有据；13 次独立无凭据 HTTP 检查验证核心 JSON 输入输出。浏览器 payload 未截获，目录多页、异常及会话寿命未测；真实元数据、结构统计、人工转录与合成样本明确区分。SRC-003 / SRC-004 未执行。
 - Phase：0；Complexity：M。
 - Goal：把搜索至插图的当前实际请求协议变成可审查证据。
 - Input：SRC-001 调查基线、第 14 节；用户指定的 gholts/aidoku-source 固定提交参考见 [源站调查文档](source/lightnovel.md)，仅作候选线索，不替代当前网页 / Network 证据；Dependencies：SRC-001。
@@ -1651,7 +1652,7 @@ flowchart TD
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-**SRC-001 已完成访问基线**，后续 Source 首项为 SRC-002：单生产源的完整匿名图文可达性仍是最大产品可行性风险。CORE-001 已按用户指令作为独立并行路径开始，但基础工程不能替代源可行性证据。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001 / SRC-002 已完成调查**，后续 Source 首项为 SRC-003：以已验证样本构建默认离线、显式 opt-in 的 Dart 图文调查链路，真正验证字节 / 解码 / 预算。CORE-001 已完成，可独立推进 CORE-002；基础工程不能替代 SRC-004 的可行性审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
 
 ## 39. Parallelizable Work
 

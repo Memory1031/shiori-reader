@@ -1,0 +1,101 @@
+{
+  "evidenceKind": "DIRECT_HTTP_REDACTED_PROJECTION",
+  "capturedAt": "2026-09-06T23:47:24.1643639+08:00",
+  "url": "https://www.lightnovel.fun/api/pc-proxy/api/bff/apk-search-result-v1",
+  "method": "POST",
+  "request": {
+    "source": "",
+    "q": "恋爱",
+    "work_type": "",
+    "preset": "",
+    "source_type": "",
+    "word_count_bucket": "",
+    "sort": "relevance",
+    "scope": "",
+    "pageSize": 20,
+    "status_bucket": "",
+    "channel_code": "",
+    "primary_tag": "",
+    "filters": {},
+    "page": 2
+  },
+  "httpStatus": 200,
+  "contentType": "application/json; charset=UTF-8",
+  "explicitCredentialsSent": false,
+  "response": {
+    "data": {
+      "list": [
+        {
+          "book_id": 4241
+        },
+        {
+          "book_id": 1147
+        },
+        {
+          "book_id": 1688
+        },
+        {
+          "book_id": 7620
+        },
+        {
+          "book_id": 1690
+        },
+        {
+          "book_id": 1508
+        },
+        {
+          "book_id": 9143
+        },
+        {
+          "book_id": 1155
+        },
+        {
+          "book_id": 12297
+        },
+        {
+          "book_id": 11120
+        },
+        {
+          "book_id": 4201
+        },
+        {
+          "book_id": 3954
+        },
+        {
+          "book_id": 12314
+        },
+        {
+          "book_id": 9138
+        },
+        {
+          "book_id": 9141
+        },
+        {
+          "book_id": 11055
+        },
+        {
+          "book_id": 7789
+        },
+        {
+          "book_id": 4781
+        },
+        {
+          "book_id": 4901
+        },
+        {
+          "book_id": 7791
+        }
+      ],
+      "has_next": 1,
+      "total": 1321,
+      "pagination": {
+        "page": 3,
+        "page_size": 20,
+        "total": 1321,
+        "page_count": 67
+      }
+    },
+    "code": 0
+  },
+  "omitted": "Only book IDs and pagination retained. Other fields, session data, identifiers and image URLs omitted."
+}
