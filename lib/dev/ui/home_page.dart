@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../features/home/reading_home.dart';
 import '../fixtures.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 class DevHomePage extends StatefulWidget {
   const DevHomePage({
@@ -28,6 +29,7 @@ class _DevHomePageState extends State<DevHomePage> {
 
   @override
   Widget build(BuildContext context) => ReadingHome(
+    environmentLabel: AppLocalizations.of(context).offlineEnvironment,
     repository: _env.novels,
     library: widget.library ?? _env.library,
     sources: [_env.source.descriptor],

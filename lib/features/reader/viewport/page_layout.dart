@@ -107,17 +107,16 @@ final class PageLayout {
   }) {
     if (text.isEmpty) return (text: '', count: 0, height: 16);
     measuredChunks++;
-    final painter =
-        TextPainter(
-          text: TextSpan(text: text, style: readerBlockStyle(block, style)),
-          textDirection: direction,
-          textScaler: scaler,
-          textAlign: readerBlockAlign(block),
-        )..layout(
-          maxWidth:
-              width -
-              readerBlockIndent(block, style, scaler, width, startsBlock),
-        );
+    final prefix = readerIndentPrefix(block, startsBlock, width, style, scaler);
+    final painter = TextPainter(
+      text: TextSpan(
+        text: prefix + text,
+        style: readerBlockStyle(block, style),
+      ),
+      textDirection: direction,
+      textScaler: scaler,
+      textAlign: readerBlockAlign(block),
+    )..layout(maxWidth: width);
     try {
       final lines = painter.computeLineMetrics();
       var used = paragraphSpacing;
@@ -140,7 +139,8 @@ final class PageLayout {
           boundaryLine.baseline - boundaryLine.ascent * .5,
         ),
       );
-      var boundary = painter.getLineBoundary(point).start;
+      var boundary = (painter.getLineBoundary(point).start - prefix.length)
+          .clamp(0, text.length);
       // A Flutter line break is normally grapheme-safe; snap defensively.
       var safe = 0;
       for (final grapheme in text.characters) {
@@ -193,7 +193,7 @@ final class PageLayout {
           remaining,
           backwards: false,
           block: index.content.blocks[chunk.blockIndex],
-          startsBlock: chunk.start == 0,
+          startsBlock: chunk.start == 0 && cursor.offset == 0,
         );
         if (fitted == null) break;
         fragments.add(

@@ -33,6 +33,7 @@ final class SourceServices {
       logger: diagnostics,
     );
     images = MemoryImageRepository(
+      maxIdleBytes: 32 * 1024 * 1024,
       resolve: (id) {
         final source = registry[id];
         return source is SourceMedia ? source as SourceMedia : null;

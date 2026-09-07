@@ -205,3 +205,83 @@ UI-001 已形成三页可评审样板，用户指定的后续 READER-006 也已�
 ## UI-002 实施
 
 正式应用接入 Shiori 主题；正式 Reader 已交付独立纸色、最大680单列行宽、新工具栏和排版面板，应用外观与阅读偏好分开保存。旧设置迁移、首次提示确认、低动效、无障碍操作和恢复回归见 [Reader UI-002](reader.md)。保留现有页面职责，目录与跨章导航待 READER-007；没有提前实现书架 / 搜索 / 详情业务。具体纸色已通过 ≥4.5:1 文字对比度测试。
+
+## 全应用视觉收敛（2026-09-07，用户反馈修正）
+
+用户指出安装包无法搜索真实书名、页面仍像功能测试页，并要求优化整个 App，而非只修搜索。本轮覆盖已实现的书架、发现、搜索、详情、目录、历史、应用外观与阅读排版设置；沿用暖纸 / 墨色 / 莓色方向和 Material 3，没有新增字体、依赖或虚构推荐内容。
+
+- 共用主题补齐输入框、导航、列表和次级按钮；统一表面色、圆角与标题密度，公共页面限制宽屏内容宽度。加载和空状态采用克制的图标与说明。关闭 DEBUG 角标，开发首页与搜索改用明确的本地化“离线演示 · 仅含测试书籍”说明。
+- 书架采用同一滚动容器承载标题、撤销提示与懒网格，避免英文两倍字号挤压；封面维持 2:3，移除操作收进可访问的菜单，书名保留完整横向空间。继续阅读与历史入口重新整理。
+- 发现增加显式搜索入口、书源范围及封面列表；不支持推荐的书源保持能力提示。失败时恢复区域获得可用空间，不被空推荐占位挤压。
+- 搜索提交按钮并入输入栏，保留键盘 / IME 与显式提交规则；初始、无结果和失败状态移到输入区附近。生产组合传入真实书源名与借用的 ImageRepository，结果封面按可见列表加载，不预取整份结果。
+- 详情使用浅色头部、完整封面与响应式元信息；阅读 / 收藏排在目录之前。卷目录的组标题、选中章节及历史列表统一密度。阅读设置的标签与数值分开对齐，外观选项增加语义图标；阅读正文测量与恢复算法未更改。
+
+验证：完整离线测试 **272 PASS**；最后详情头部调整后详情专项 **10 PASS**，最终 analyze **PASS**。覆盖中英、320 宽 / 2 倍文字、长标题、书架菜单移除、错误重试、懒构建和既有阅读恢复。新增测试暴露的书架大字溢出、发现错误按钮受挤压均已修复。Android debug 的开发入口与生产入口均构建成功；MuMu 已安装最终 `lib/main.dart` 生产组合包。模拟器实际核对了首页与发现；最终生产包启动成功，用户操作后只读截图还核对了真实书籍的目录页面（`.tooling/evidence/ui-production-current.png`）。未把命名为详情但实际截到桌面的图片计入验收。其余页面主要依靠 widget 验证，不能声称全页面真机视觉验收完成。iOS 保持共享 API / SafeArea / 本地化兼容审查，runtime 仍为 **DEFERRED_NO_MAC**。
+
+包纠正：上轮交付的 `main_dev.dart` 只能搜索合成 fixture，不能用来验证真实书名。此次最终包为 `.tooling/evidence/ui-polish-production.apk`，连接 LightNovel.fun；开发包仍仅用于离线回归。本轮未提交真实源站搜索，不宣称“败犬女主”已查到，也不重复使用旧的实网验收请求授权。现有导入等未实施功能不会因视觉收敛而标记完成。
+
+## 详情视觉与信息架构第二轮（2026-09-07）
+
+按用户新截图撤掉窄屏封面旁的长标题列。详情采用渐变封面展示区、完整书名和独立元信息区；未知连载状态不占据主视觉；阅读 / 收藏与分卷入口分开留白。共用空状态改用代码绘制的书籍小插画，无外部资产或加载动画。书架与发现补充双语引导文案。目录与分卷按真实语义区分，具体实现、缩进和缓存修复见 reader.md / media.md。
+
+本轮完整离线测试 276 PASS、analyze PASS，生产 APK 为 `.tooling/evidence/ui-v2-production.apk`。视觉仍需用户在实际书籍上反馈；不把离线 widget 布局验证称为全页面真机审美验收。
+
+### 分卷列表间距与滚动背景修复（2026-09-07）
+
+后续截图反馈：折叠卷标题贴合，嵌套目录滚动时 tileColor 背景越出列表并出现在说明文字后方。共用 CatalogView 为后续卷标题增加12 logical px顶部间隔；每个标题与章节行拥有本地 Material 和圆角裁剪，背景与 ink 随行滚动，不绘制到外层页面 Material。详情分卷区和独立列表同时生效。既有目录3项专项测试通过，Android正式入口debug重建成功。本轮未访问源站。
+
+章节选中态间距补正（2026-09-07）：共享 CatalogView 的章节行增加 8 logical px 顶部间距（列表首项除外），分组之间保持 12 logical px，防止标题背景与选中章节背景相贴。详情与独立分卷目录同步生效。详情专项 10 PASS。
+
+书架封面菜单透明背景修正（2026-09-07）：移除右上角更多按钮的不透明 Material 底色，网格模式采用白色图标与阴影保证封面上的辨识度，列表模式仍沿用主题颜色。书架专项 2 PASS。
+
+### 用户八项视觉反馈收敛（2026-09-07）
+
+- Reader 新默认为 18sp / 行高 1.7 / 段间距 8dp / 左右 20dp。360dp 宽约 17–18 个汉字，390–430dp 约 19–21 字，不牺牲字号或系统文字缩放强求固定字数。已保存字号不覆盖，Aa 增加恢复默认排版，仅复位四项排版参数。
+- 源文本起始已有空白时不叠加 UI 缩进；UI 首行缩进封顶 2em，标题不加缩进。源文本、块身份和持久位置不改写。共享标题识别投影用于章节标题样式，短 Day 标记 / 带 Day 的短标题作为次级排版，HTML 标题按层级展示；普通正文保留基础样式。
+- 顶部仅返回 / 当前章节标题 / 更多；底部目录 / 进度 / Aa。详情与隐藏操作进入更多菜单，跨章操作进入进度面板。滑块按既有语义章节比例恢复位置，不生成全书页数。隐藏后移除全部应用控件，中部点按或 F2 唤回；系统状态栏仍沿用平台显示。保存 / 读取失败重试进入更多菜单。
+- 首页保留搜索，其余正式工具进入更多菜单；未实现的导入占位从正式首页移除，导入规划保持。继续阅读标题贴近卡片，显示本章近似百分比；缺少卷号证据时不伪造第 X 卷。历史入口放入更多。
+- 书架默认 Grid，双态 segmented control 明示网格 / 列表选择。标题 15sp / w500 / 最多两行。详情封面舞台从约 266dp 收为 220dp（约 17%），书名降为 20sp。移除巨型目录 CTA，目录区标题旁提供全部章节链接。
+- 分组目录采用普通标题与细分隔线，保留章节间距及当前选中态，减少设置卡片感。对读者采用目录 / 分卷目录文案，移除书源分组实现说明。搜索封面宽 56dp，标题 15sp / w500，作者次级灰；书源小 badge，LightNovel.fun 中文呈现轻之国度。
+- 暖白与灰粉保持；surfaceSubtle 中性层级统一填充，普通文字及 outlined 动作采用中性墨色，品牌色集中于关键 filled 动作及当前选中态。
+
+验证：全量离线 281 PASS、analyze PASS、gen-l10n PASS；中英文 ARB 两空格缩进 / 每键一行，键集合一致。离线中文字体截图检查 Reader 隐藏 / 展开、书架、详情；截图使用合成正文及占位封面，不冒充真实书源 / Android 字体验收。未新增书源实网探针；iOS runtime 仍 DEFERRED_NO_MAC。
+
+### 书架手势与目录层次反馈（2026-09-07）
+
+书架点击统一进入 ContinueReadingScreen，有进度恢复、无进度走既有起读逻辑；网格长按显示书名及详情 / 移除菜单，去除封面常驻更多按钮。列表左滑展开详情 / 移除，右滑或点击移位书行关闭；左滑本身不删除，移除沿用撤销和失败保留机制，列表长按也可访问操作。布局切换采用紧凑中性色按钮组及当前态，去掉宽大粉色胶囊。封面增加轻阴影。目录恢复轻量分组底色及细色条，章节以序号 / 当前书签区分，紧凑字号和行距、三行长标题及完整标题 Tooltip，源标题和章节身份不改写。
+
+验证：书架手势、首页中英文大字、详情及往返导航专项 20 PASS；静态检查 PASS。未新增书源请求，iOS runtime 未执行。覆盖安装继续使用正式 main.dart，保留用户数据。
+
+更多菜单视觉修正（2026-09-07）：统一 PopupMenu 暖白 / 深色中性表面、关闭 Material surface tint、12dp 圆角细边及轻阴影，菜单文字改为 14sp 常规字重，保留默认 48dp 点击目标与系统文字缩放。菜单从按钮下方展开，首页历史 / 外观配次级色小图标；同类阅读器菜单继承主题。静态检查 PASS，首页及往返导航专项 7 PASS。
+
+### 单图标切换与启动加载页（2026-09-07）
+
+按用户最新选择恢复同位置的单图标网格 / 列表切换，图标及 tooltip 表示点击后的布局。新增 LaunchView：代码绘制书本书签标识、Shiori 字样、细进度条，中英文、深浅色和减少动画适配。仅在真实数据库或外观设置初始化期间展示，无强制停留；失败仍显示可重试错误。此处是 Flutter 应用初始化加载页，未替换平台系统原生启动画面，未添加图像生成依赖。完整既有离线回归 282 PASS；另新增启动页小横屏 / 大字 / 减少动画双语专项 2 PASS，analyze PASS。iOS runtime 未执行。
+
+原生启动屏纠正（2026-09-07）：用户截图实际是 Android 12 系统 SplashScreen 自动采用 launcher 图标的画面，上次 Flutter LaunchView 未覆盖该阶段。本轮新增独立 launch_mark 矢量书签书本，Android 12+ LaunchTheme 明确指定 windowSplashScreenAnimatedIcon / Background，旧版本 launch_background 同步，深浅色资源分别对应纸面与标识色。不改桌面图标、不人为延迟启动。Android debug 资源编译 PASS；iOS 原生启动屏本轮未调整、runtime 仍未验证。
+
+书架模式与间距补正（2026-09-07）：单图标显示当前布局（网格对应 grid、列表对应 list），tooltip 仍说明点击后的切换目标。说明文字底部 padding 从16降至8，网格顶部 padding 从16降至4，累计结构留白32dp降至12dp。书架 / 首页专项8 PASS。
+
+启动 Logo 统一（2026-09-07）：根据用户纠正，Android 系统启动屏采用现有 Shiori Logo 的 ic_launcher 密度资源，Flutter LaunchView 直接加载 assets/branding/shiori-chibi-logo-v1.png（128dp、按设备密度解码）。撤下临时书签书本标识，保留暖纸背景与真实初始化进度，无人为延迟。双语加载布局专项 2 PASS。此处两处指 Android 原生启动屏与 Flutter 初始化页；iOS 原生启动屏不在本次改动内。
+
+启动 Logo 清晰度与加载视觉（2026-09-07）：原生启动资源不再复用小尺寸 launcher PNG，改用 drawable-nodpi/shiori_launch_logo.png，直接复制品牌原图且 SHA-256 一致。Android 12+ 独立 layer-list 限定内容尺寸与安全留白，避免将桌面裁切图放大；旧版本同样指向高清原图。Flutter 原本已用品牌原图，保持按 DPR 解码，补充高质量采样、轻光晕 / 浅色边框、轻字重与短进度条。启动页双语大字 / 小横屏专项2 PASS，analyze PASS；Android资源编译验证，未改变 iOS 原生资源。
+
+### 原生品牌组合收敛（2026-09-07）
+
+按用户明确选择仅调整 Android 原生启动屏：纸白背景 #FAF8F4，112dp 高清 Logo，下方约24dp暖黑 Shiori 字标（约22sp / Semibold，静态矢量轮廓），无边框 / 阴影 / 光晕 / 进度信息 / 强制停留。组合在288dp系统图标画布内保留安全边距；Android12+受系统居中和掩模约束，不能承诺43–46%任意纵向位置。旧 Android launch_background 同步组合，深色沿用既有深色纸面。此次未改第二阶段 Flutter LaunchView。Android debug资源编译及MuMu覆盖安装成功；iOS原生资源未调整。
+
+### 原生启动屏裁切修复（2026-09-07）
+
+纠正上一轮仅以编译 / 安装成功代替视觉验收的不足。固定 dp 图层尺寸和偏移在 Android 系统先以较小尺寸预渲染、再缩放的路径下导致 Logo 裁切、字标落出画布；仅增加透明画布仍不足。最终 launch_logo 使用比例 inset，同步适配系统预渲染尺寸与旧版居中 drawable，保留完整品牌原图和 Shiori 字标。
+
+验收：Android debug 编译、MuMu API32 覆盖安装成功；从桌面图标中心实际冷启动，最终包截图 `.tooling/evidence/native-splash-final.png` 已确认 Logo 完整、字标可见、纸白背景，无强制停留。直接 adb am start 的截图仅显示系统空背景，不能用于 Logo 视觉验收。临时原生 Canvas 诊断代码已移除。该模拟器启动阶段状态栏仍显示浅色图标，未声称此项已修复；iOS 未改动 / 未运行验证。未访问生产书源。
+
+实现参考：Android AOSP `SplashscreenIconDrawableFactory` 的预渲染再缩放流程：https://android.googlesource.com/platform/prebuilts/fullsdk/sources/android-31/+/refs/heads/androidx-camera-release/com/android/wm/shell/startingsurface/SplashscreenIconDrawableFactory.java 。
+
+### iOS 原生启动屏（2026-09-07）
+
+按用户授权采用静态简化版本：LaunchScreen.storyboard 使用标准 UIView / UIImageView / UILabel + Auto Layout，128pt 完整高清 Logo（scaleAspectFit）、24pt 间隔、22pt Semibold Shiori 字标；160×184pt 品牌组中心位于屏幕高度45%，适配 iPhone / iPad 横竖屏。纸白 #FAF8F4 / 暖黑 #302D2C，Asset Catalog named colors 提供系统深色外观。品牌名无需翻译，不新增硬编码的可翻译文案。
+
+原生启动阶段不使用自定义代码、运行时动画、进度条或人为延迟；Flutter LaunchView 保持现有加载样式。原图复制到 ShioriLaunchLogo.imageset，不复用低分辨率 AppIcon；UILaunchStoryboardName 及现有 Xcode 资源引用已指向该 storyboard / asset catalog，无需改工程文件。
+
+验证：XML 可解析、ID 唯一、约束引用完整、asset JSON 与图片引用有效、1254×1254 原图 SHA-256 一致、diff whitespace 检查通过。这里只完成静态结构检查，不等同于 ibtool / actool 编译、Auto Layout 运行时或截图验证。Windows 无 Xcode，iOS 编译及冷启动（浅 / 深色、横 / 竖屏、iPhone / iPad）保持 DEFERRED_NO_MAC，不能声称实机视觉通过。Apple 启动屏约束参考：https://developer.apple.com/documentation/xcode/specifying-your-apps-launch-screen 。

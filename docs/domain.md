@@ -23,7 +23,7 @@ dart --suppress-analytics analyze
 - Summary / Detail 以字符串列表表示作者和标签；缺少信息保留 empty / null / unknown，不猜作者、完结状态或时间。Source 负责 HTML entity / 标记清理，Domain 只接收普通文本；不因文本含 `<` 等合法字符便把它当 HTML 删除。
 - Catalog 只持有不可变卷章树，flatChapters 是惰性视图；不按 ID 或标题排序。全目录 ordinal 必须从 0 连续递增；重复 groupId / ChapterKey、跨小说归属或卷归属错误直接拒绝。Source 先处理重复链接和缺名诊断，不能依赖 Domain 静默去重。无卷可用明确 isSynthetic 的分组，缺卷名为 null，由 UI 展示占位名。
 - ChapterContent 接受 Paragraph / Image / Heading / Divider，保留段落顺序和单段完整文本。可读正文至少有一个非空 Paragraph 或 Image；纯图片章有效，只有空白 / 标题 / 分隔符无效。空 Paragraph 可在有效正文中表达已确认的语义空白。
-- Paragraph 的 alignment 为 start / center，leadingIndent 为整数 0–8 em。当前不启用 text runs / 嵌套 AST；Source 的 Ruby 初始降级为基字加括注、强调保留文字，不在 Domain 处理站点标签。
+- Paragraph 的 alignment 为 start / center，leadingIndent 为整数 0–8 em，表示段落首行缩进，不是整段左内边距；展示用前缀不计入原文位置。当前不启用 text runs / 嵌套 AST；Source 的 Ruby 初始降级为基字加括注、强调保留文字，不在 Domain 处理站点标签。
 - 图片尺寸各自可未知；已知值须正数。封面和正文图片必须属于相同 Source。ImageBlock 尺寸为后续可发现的布局元数据，更新尺寸不改变 blockKey / contentRevision；mediaId、alt、caption 的改变会改变语义身份。
 - ReadingProgress 持有 NovelSummary 快照以保留离线标题 / 封面，并检查 ChapterKey 与快照属于同一本书；是否收藏由独立 BookshelfEntry 表示。lastReadAt 统一为 UTC 毫秒，写入先后仍交后续持久化 sequence 策略处理。
 
@@ -65,3 +65,5 @@ ReaderPosition 的 blockIndex 非负，blockFraction / chapterFraction 必须有
 
 
 UI-002：ReaderPaper（paper / warm）表示浅色阅读纸色，ReaderThemeMode 继续仅表示阅读明暗；controlsHintSeen 是已确认首次操作提示的阅读偏好，默认 false，恢复排版默认时保留其值。AppSettings 使用独立 schemaVersion=1，只包含 AppThemeMode（system / light / dark，默认 system），不借用或迁移 ReaderThemeMode，不含 Flutter Color / ThemeData 或语言字符串。
+
+2026-09-07 用户排版反馈：ReaderSettings 的新实例默认 fontSize=18、lineHeight=1.7、paragraphSpacing=8、horizontalPadding=20；已存合法设置不迁移覆盖，schemaVersion 维持 3。首行缩进展示封顶及空白去叠加属于 presentation，不改变 ParagraphBlock.leadingIndent 的 0..8 领域范围或源文本。

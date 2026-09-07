@@ -8,6 +8,64 @@ import 'package:shiori/features/bookshelf/bookshelf_view.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 
 void main() {
+  testWidgets(
+    'grid taps read, long press offers details; swipe reveals actions without removing',
+    (tester) async {
+      final repo = FixtureLibraryRepository();
+      final c = LibraryController(repo)..onStart();
+      final book = const FixtureData().summary(FixtureScenario.shortChapter);
+      await c.add(book);
+      var reads = 0, details = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ListenableBuilder(
+              listenable: c,
+              builder: (_, _) => BookshelfView(
+                controller: c,
+                onOpen: (_) => reads++,
+                onDetails: (_) => details++,
+                onSearch: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey(book.key)));
+      expect(reads, 1);
+      await tester.longPress(find.byKey(ValueKey(book.key)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Novel details'));
+      await tester.pumpAndSettle();
+      expect(details, 1);
+      await tester.tap(find.byTooltip('List'));
+      await tester.pumpAndSettle();
+      await tester.drag(find.byKey(ValueKey(book.key)), const Offset(-200, 0));
+      await tester.pumpAndSettle();
+      expect(c.books.length, 1);
+      await tester.tap(find.text('Details'));
+      await tester.pumpAndSettle();
+      expect(details, 2);
+      await tester.drag(find.byKey(ValueKey(book.key)), const Offset(-200, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+      expect(c.books, isEmpty);
+      await tester.tap(find.text('Undo removal'));
+      await tester.pumpAndSettle();
+      expect(c.books.length, 1);
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(() async {
+        c.onDelete();
+        await c.resourcesReleased;
+        c.dispose();
+        await repo.close();
+      });
+    },
+  );
   test(
     'add is idempotent; remove undo and failed write preserve state',
     () async {
@@ -72,10 +130,10 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(
-      find.byIcon(Icons.remove_circle_outline).evaluate().length,
-      lessThan(40),
+      find.textContaining('Book ').evaluate().length,
+      inInclusiveRange(1, 39),
     );
-    await tester.tap(find.byTooltip('Switch bookshelf layout'));
+    await tester.tap(find.byTooltip('List'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());

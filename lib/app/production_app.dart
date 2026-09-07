@@ -15,6 +15,7 @@ import 'app_controller.dart';
 import 'appearance_panel.dart';
 import 'routes.dart';
 import 'source_services.dart';
+import 'launch_view.dart';
 
 /// Process root owns databases and source services. Initial home does no HTTP.
 class ProductionApp extends StatefulWidget {
@@ -101,13 +102,13 @@ class _ProductionAppState extends State<ProductionApp> {
   Widget build(BuildContext context) => _services == null
       ? ShioriApp(
           routes: AppRoutes(
-            home: (_) => Scaffold(
-              body: SafeArea(
-                child: _failure == null
-                    ? const LoadingView()
-                    : FailureView(failure: _failure!, onRetry: _open),
-              ),
-            ),
+            home: (_) => _failure == null
+                ? const LaunchView()
+                : Scaffold(
+                    body: SafeArea(
+                      child: FailureView(failure: _failure!, onRetry: _open),
+                    ),
+                  ),
           ),
         )
       : ShioriApp(

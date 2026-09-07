@@ -9,7 +9,8 @@ import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
 import 'detail_controller.dart';
-import 'catalog_view.dart';
+
+import 'volume_preview.dart';
 
 class DetailScreen extends StatelessWidget {
   const DetailScreen({
@@ -93,21 +94,6 @@ class DetailScreen extends StatelessWidget {
                         ),
                       _Header(detail: loaded.value, images: images),
                       const SizedBox(height: ShioriSpace.section),
-                      OutlinedButton.icon(
-                        key: const ValueKey('detail-catalog'),
-                        icon: const Icon(Icons.list),
-                        label: Text(strings.catalogTitle),
-                        onPressed: () async {
-                          final key = await openCatalog(
-                            context,
-                            novel: novel,
-                            repository: repository,
-                          );
-                          if (context.mounted && key != null) {
-                            onChapter?.call(key);
-                          }
-                        },
-                      ),
                       Wrap(
                         spacing: ShioriSpace.medium,
                         runSpacing: ShioriSpace.medium,
@@ -148,6 +134,7 @@ class DetailScreen extends StatelessWidget {
                         const SizedBox(height: ShioriSpace.small),
                         Text(strings.detailActionsPending),
                       ],
+                      const SizedBox(height: 16),
                       const SizedBox(height: ShioriSpace.section),
                       Text(
                         strings.detailSynopsis,
@@ -160,6 +147,13 @@ class DetailScreen extends StatelessWidget {
                             : loaded.value.synopsis,
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
+                      const SizedBox(height: 32),
+                      VolumePreview(
+                        novel: novel,
+                        repository: repository,
+                        onChapter: onChapter,
+                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -180,8 +174,8 @@ class _Header extends StatelessWidget {
     final cover = ClipRRect(
       borderRadius: BorderRadius.circular(ShioriShape.cover),
       child: SizedBox(
-        width: 144,
-        height: 144 / ShioriShape.coverRatio,
+        width: 120,
+        height: 120 / ShioriShape.coverRatio,
         child: book.cover != null && images != null
             ? SourceImage(
                 media: book.cover!,
@@ -201,7 +195,7 @@ class _Header extends StatelessWidget {
           header: true,
           child: Text(
             book.title,
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
         ),
         if (book.authors.isNotEmpty) ...[
@@ -209,12 +203,13 @@ class _Header extends StatelessWidget {
           Text(book.authors.join(', ')),
         ],
         const SizedBox(height: ShioriSpace.medium),
-        Text(switch (detail.status) {
-          NovelStatus.unknown => strings.detailStatusUnknown,
-          NovelStatus.ongoing => strings.detailStatusOngoing,
-          NovelStatus.completed => strings.detailStatusCompleted,
-          NovelStatus.hiatus => strings.detailStatusHiatus,
-        }),
+        if (detail.status != NovelStatus.unknown)
+          Text(switch (detail.status) {
+            NovelStatus.unknown => strings.detailStatusUnknown,
+            NovelStatus.ongoing => strings.detailStatusOngoing,
+            NovelStatus.completed => strings.detailStatusCompleted,
+            NovelStatus.hiatus => strings.detailStatusHiatus,
+          }),
         if (detail.tags.isNotEmpty) ...[
           const SizedBox(height: ShioriSpace.medium),
           Wrap(
@@ -230,8 +225,14 @@ class _Header extends StatelessWidget {
                     borderRadius: BorderRadius.circular(ShioriShape.control),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(ShioriSpace.small),
-                    child: Text(tag),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    child: Text(
+                      tag,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ),
                 ),
             ],
@@ -239,24 +240,42 @@ class _Header extends StatelessWidget {
         ],
       ],
     );
-    return LayoutBuilder(
-      builder: (context, bounds) => bounds.maxWidth >= 600
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                cover,
-                const SizedBox(width: ShioriSpace.page),
-                Expanded(child: metadata),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: cover),
-                const SizedBox(height: ShioriSpace.page),
-                metadata,
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colors.primary.withValues(alpha: .22),
+                colors.surfaceContainerHighest,
+                colors.primary.withValues(alpha: .06),
               ],
             ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Center(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.shadow.withValues(alpha: .18),
+                    blurRadius: 22,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: cover,
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        metadata,
+      ],
     );
   }
 }

@@ -9,6 +9,36 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get articleContents => 'In-volume contents';
+
+  @override
+  String get articleContentsEmpty =>
+      'No recognisable section headings in this article. Use the volume list to switch articles.';
+
+  @override
+  String get articleContentsHint =>
+      'Built from content headings; plain-text detection may be incomplete.';
+
+  @override
+  String get volumesTitle => 'Volumes';
+
+  @override
+  String get volumesLoad => 'Browse volumes and chapters';
+
+  @override
+  String get volumesDescription =>
+      'Browse the source groups and choose a volume or chapter to read.';
+
+  @override
+  String get shelfTagline => 'Keep your favourite stories close.';
+
+  @override
+  String get discoverTagline => 'Find your next chapter.';
+
+  @override
+  String get offlineEnvironment => 'Offline demo · sample books only';
+
+  @override
   String get historyTitle => 'Recent reading';
 
   @override
@@ -437,4 +467,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String readerChapterProgress(int percent) {
     return 'About $percent% of this chapter';
   }
+
+  @override
+  String get moreActions => 'More';
+
+  @override
+  String get readerProgressLabel => 'Progress';
+
+  @override
+  String get shelfGrid => 'Grid';
+
+  @override
+  String get shelfList => 'List';
+
+  @override
+  String get allChapters => 'All chapters';
+
+  @override
+  String get lightNovelSource => 'LightNovel.fun';
+
+  @override
+  String get readerResetTypography => 'Reset typography';
+
+  @override
+  String get shelfDetails => 'Details';
+
+  @override
+  String get shelfRemove => 'Remove';
+
+  @override
+  String get launchTagline => 'Your story continues';
+
+  @override
+  String get launchLoading => 'Preparing your library…';
 }

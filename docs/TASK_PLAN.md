@@ -2005,3 +2005,17 @@ Phase 0 仍需真实正常公开 Text + Illustration 链路才能 Go；受限 / 
 | 范围控制 | 只修改 docs/TASK_PLAN.md，未执行任何 Task、创建 Flutter 工程或修改 README / pubspec |
 
 本轮已执行文档结构 / 依赖自检：41 个连续主章节；Task ID 唯一且引用存在；全部 Task 字段完整；完整 DAG 拓扑检查无环；Android Task 传递依赖不含 IOS-001..006 / CI-003；READER-007 传递依赖不含 CACHE-003 / DB-003；DB-003 归 Phase 8；旧 gate 只在第 27 节迁移索引保留；两份 checklist 均未勾选。本轮只做文档验证，不宣称执行 Flutter / iOS tests；Mermaid 仅文本结构检查，未冒充渲染实测。
+
+### 用户追加：全应用 UI 收敛（2026-09-07）
+
+按用户反馈执行现有页面的整体视觉优化及开发包 / 生产包环境纠正，不自动领取 CACHE-001。范围、代码变化和分层验证记录见 [UI 规划：全应用视觉收敛](UI_PLAN.md)。完整离线回归 272 PASS，最终静态检查 PASS；已生成并安装正式书源入口的 Android debug 包。iOS runtime 和全页面真机视觉验收不据此标记完成。
+
+### 用户追加：阅读与详情问题修正（2026-09-07）
+
+新增卷内目录投影及双模式 block 定位；详情区分源分组 / 整卷文章列表，重排封面与长书名；修复 leadingIndent 整段偏右；生产启用 32 MiB 闲置图片内存 LRU。以上为用户明确反馈后的局部前置增强，**不将 CACHE-001 / CACHE-003 标为完成**，持久图片缓存仍待实施。完整离线回归276 PASS，静态检查PASS；详细范围见 reader.md / media.md / UI_PLAN.md。
+
+### 用户追加：八项视觉反馈落地（2026-09-07）
+
+按用户指定 Reader 优先顺序完成排版、Chrome、首页、书架、详情、目录、搜索及中性色层级收敛；不自动推进后续编号任务。范围及验证见 UI_PLAN.md 对应记录。全量离线 281 PASS，analyze / gen-l10n PASS，iOS runtime 保留延期。
+
+用户后续书架交互修订（2026-09-07）：单击默认继续阅读；网格长按、列表左滑提供详情及移除，继续沿用可撤销移除。缩小布局切换并重排目录层级，专项 20 PASS；详情见 UI_PLAN.md。

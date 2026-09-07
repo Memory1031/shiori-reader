@@ -7,6 +7,7 @@ import 'app_controller.dart';
 import 'routes.dart';
 import 'theme.dart';
 import 'appearance_panel.dart';
+import 'launch_view.dart';
 
 AppController _defaultController() => AppController();
 
@@ -30,6 +31,7 @@ class ShioriApp extends StatelessWidget {
   Widget build(BuildContext context) => ControllerScope<AppController>(
     create: createController,
     builder: (context, controller) => MaterialApp(
+      debugShowCheckedModeBanner: false,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -40,39 +42,43 @@ class ShioriApp extends StatelessWidget {
       themeAnimationDuration: Duration.zero,
       home: Builder(
         builder: (context) => LayoutBuilder(
-          builder: (context, constraints) => Column(
-            children: [
-              if (controller.isLoadingSettings)
-                LinearProgressIndicator(
-                  semanticsLabel: AppLocalizations.of(context).loadingSettings,
-                ),
-              if (controller.settingsFailure case final failure?)
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: constraints.maxHeight * .4,
-                  ),
-                  child: Material(
-                    color: Theme.of(context).colorScheme.errorContainer,
-                    child: SafeArea(
-                      bottom: false,
-                      child: FailureView(
-                        failure: failure,
-                        onRetry: controller.retrySettings,
+          builder: (context, constraints) => controller.isLoadingSettings
+              ? const LaunchView()
+              : Column(
+                  children: [
+                    if (controller.isLoadingSettings)
+                      LinearProgressIndicator(
+                        semanticsLabel: AppLocalizations.of(
+                          context,
+                        ).loadingSettings,
                       ),
+                    if (controller.settingsFailure case final failure?)
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: constraints.maxHeight * .4,
+                        ),
+                        child: Material(
+                          color: Theme.of(context).colorScheme.errorContainer,
+                          child: SafeArea(
+                            bottom: false,
+                            child: FailureView(
+                              failure: failure,
+                              onRetry: controller.retrySettings,
+                            ),
+                          ),
+                        ),
+                      ),
+                    Expanded(
+                      child:
+                          homeBuilder?.call(context, controller) ??
+                          routes.buildHome(
+                            context,
+                            onAppearance: () =>
+                                showAppAppearance(context, controller),
+                          ),
                     ),
-                  ),
+                  ],
                 ),
-              Expanded(
-                child:
-                    homeBuilder?.call(context, controller) ??
-                    routes.buildHome(
-                      context,
-                      onAppearance: () =>
-                          showAppAppearance(context, controller),
-                    ),
-              ),
-            ],
-          ),
         ),
       ),
     ),

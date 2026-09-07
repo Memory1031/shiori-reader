@@ -415,7 +415,7 @@ void main() {
 
   test('settings validate bounds and reject unknown persistence versions', () {
     final settings = ReaderSettings();
-    expect(settings.fontSize, 20);
+    expect(settings.fontSize, 18);
     expect(settings.themeMode, ReaderThemeMode.system);
     expect(ReaderSettings.fromJson(settings.toJson()), settings);
     for (final bad in [13.0, 33.0, double.nan, double.infinity]) {

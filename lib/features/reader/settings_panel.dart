@@ -30,7 +30,21 @@ class ReaderSettingsPanel extends StatelessWidget {
           ) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('$label ${value.toStringAsFixed(1)}'),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    value.toStringAsFixed(1),
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ],
+              ),
               Slider(
                 semanticFormatterCallback: (v) =>
                     '$label ${v.toStringAsFixed(1)}',
@@ -53,6 +67,24 @@ class ReaderSettingsPanel extends StatelessWidget {
                   Text(
                     l.readerSettings,
                     style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () {
+                        final defaults = ReaderSettings();
+                        preferences.update(
+                          s.copyWith(
+                            fontSize: defaults.fontSize,
+                            lineHeight: defaults.lineHeight,
+                            paragraphSpacing: defaults.paragraphSpacing,
+                            horizontalPadding: defaults.horizontalPadding,
+                          ),
+                        );
+                        preferences.flush();
+                      },
+                      child: Text(l.readerResetTypography),
+                    ),
                   ),
                   if (preferences.failure != null)
                     TextButton(

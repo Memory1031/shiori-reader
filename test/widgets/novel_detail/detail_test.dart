@@ -54,6 +54,21 @@ class Call {
 }
 
 class Repo implements NovelRepository {
+  @override
+  Stream<Result<LoadResult<Catalog>>> catalogUpdates(NovelKey key) =>
+      const Stream.empty();
+  @override
+  Future<Result<LoadResult<Catalog>>> loadCatalog(
+    NovelKey key, {
+    required ReadMode mode,
+    required CancellationToken cancellation,
+  }) async => Failure(
+    AppFailure(
+      kind: FailureKind.cache,
+      operation: Operation.catalog,
+      context: FailureContext.cacheMiss,
+    ),
+  );
   final events = StreamController<Result<LoadResult<NovelDetail>>>.broadcast(
     sync: true,
   );
@@ -227,7 +242,6 @@ void main() {
       repo.calls.single.pending.complete(Success(detail()));
       await tester.pumpAndSettle();
       expect(find.text('Book'), findsOneWidget);
-      expect(find.text('No synopsis available.'), findsOneWidget);
       expect(
         tester
             .widget<FilledButton>(find.byKey(const ValueKey('detail-read')))
@@ -240,6 +254,12 @@ void main() {
         ),
         findsOneWidget,
       );
+      await tester.scrollUntilVisible(
+        find.text('No synopsis available.'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('No synopsis available.'), findsOneWidget);
     },
   );
 

@@ -3,6 +3,7 @@ import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/state_views.dart';
+import '../../shared/widgets/book_cover.dart';
 import '../bookshelf/library_controller.dart';
 import '../bookshelf/library_observer.dart';
 
@@ -34,10 +35,15 @@ class HistoryScreen extends StatelessWidget {
                   : library.recent.isEmpty
                   ? EmptyView(message: strings.historyEmpty)
                   : ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       itemCount: library.recent.length,
                       itemBuilder: (context, index) {
                         final item = library.recent[index];
                         return ListTile(
+                          leading: SizedBox(
+                            width: 40,
+                            child: BookCover(book: item.snapshot),
+                          ),
                           key: ValueKey(item.novelKey),
                           title: Text(item.snapshot.title),
                           subtitle: Text(

@@ -4,6 +4,7 @@ import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/state_views.dart';
+import '../../shared/widgets/book_cover.dart';
 import '../bookshelf/library_controller.dart';
 import '../bookshelf/bookshelf_view.dart';
 import '../bookshelf/library_observer.dart';
@@ -22,6 +23,7 @@ class ReadingHome extends StatefulWidget {
     this.images,
     this.settings,
     this.onAppearance,
+    this.environmentLabel,
   });
   final NovelRepository repository;
   final LibraryRepository library;
@@ -29,6 +31,7 @@ class ReadingHome extends StatefulWidget {
   final ImageRepository? images;
   final SettingsStore? settings;
   final VoidCallback? onAppearance;
+  final String? environmentLabel;
   @override
   State<ReadingHome> createState() => _ReadingHomeState();
 }
@@ -65,6 +68,11 @@ class _ReadingHomeState extends State<ReadingHome> {
     search: (_, sourceId) => SearchScreen(
       repository: widget.repository,
       sourceId: sourceId,
+      sourceName: widget.sources
+          .firstWhere((s) => s.sourceId == sourceId)
+          .displayName,
+      environmentLabel: widget.environmentLabel,
+      images: widget.images,
       supportsPaging: widget.sources
           .firstWhere((s) => s.sourceId == sourceId)
           .supportsSearchPaging,
@@ -99,6 +107,7 @@ class _ReadingHomeState extends State<ReadingHome> {
       library: widget.library,
       images: widget.images,
       settings: widget.settings,
+      onDetails: _readerDetails,
     ),
     reader: (_, key) => BookReaderScreen(
       chapter: key,
@@ -106,8 +115,19 @@ class _ReadingHomeState extends State<ReadingHome> {
       images: widget.images,
       library: widget.library,
       settings: widget.settings,
+      onDetails: _readerDetails,
     ),
   );
+  void _readerDetails(NovelKey key) {
+    Navigator.of(context).pushAndRemoveUntil<void>(
+      _routes.route(context, NovelDestination(key)),
+      (route) =>
+          route.isFirst ||
+          route is! PopupRoute &&
+              !{'/reader', '/continue', '/novel'}.contains(route.settings.name),
+    );
+  }
+
   void _continue(NovelKey key) =>
       _routes.open(context, ContinueDestination(key));
   void _search() {
@@ -165,157 +185,306 @@ class _ReadingHomeState extends State<ReadingHome> {
     final strings = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(_tab == 0 ? strings.shelfTitle : strings.discoverTitle),
+        title: const Text(
+          'Shiori',
+          style: TextStyle(letterSpacing: 1, fontWeight: FontWeight.w600),
+        ),
         actions: [
           IconButton(
             onPressed: _search,
             tooltip: strings.searchTitle,
             icon: const Icon(Icons.search),
           ),
-          IconButton(
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (context) => AlertDialog(
-                content: Text(strings.importPending),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(strings.backAction),
+          PopupMenuButton<String>(
+            tooltip: strings.moreActions,
+            onSelected: (value) {
+              if (value == 'appearance') widget.onAppearance?.call();
+              if (value == 'history') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => HistoryScreen(
+                      controller: _library,
+                      onContinue: _continue,
+                    ),
                   ),
-                ],
+                );
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'history',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.history_outlined,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(child: Text(strings.historyTitle)),
+                  ],
+                ),
               ),
-            ),
-            tooltip: strings.importTitle,
-            icon: const Icon(Icons.file_open),
+              if (widget.onAppearance != null)
+                PopupMenuItem(
+                  value: 'appearance',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.palette_outlined,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 12),
+                      Flexible(child: Text(strings.appAppearance)),
+                    ],
+                  ),
+                ),
+            ],
           ),
-          if (widget.onAppearance != null)
-            IconButton(
-              onPressed: widget.onAppearance,
-              tooltip: strings.appAppearance,
-              icon: const Icon(Icons.palette_outlined),
-            ),
         ],
       ),
       body: SafeArea(
-        child: IndexedStack(
-          index: _tab,
+        child: Column(
           children: [
-            Column(
-              children: [
-                ListTile(
-                  title: Text(strings.historyTitle),
-                  trailing: const Icon(Icons.history),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => HistoryScreen(
-                        controller: _library,
-                        onContinue: _continue,
-                      ),
-                    ),
-                  ),
+            if (widget.environmentLabel != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
                 ),
-                if (_library.recent.isNotEmpty)
-                  ListTile(
-                    title: Text(
-                      _library.recent.first.snapshot.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(strings.detailContinue),
-                    leading: const Icon(Icons.play_arrow),
-                    onTap: () => _continue(_library.recent.first.novelKey),
-                  ),
-                Expanded(
-                  child: BookshelfView(
-                    controller: _library,
-                    images: widget.images,
-                    onOpen: (key) =>
-                        _routes.open(context, NovelDestination(key)),
-                    onSearch: _search,
-                  ),
+                child: Text(
+                  widget.environmentLabel!,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-              ],
-            ),
-            Column(
-              children: [
-                if (widget.sources.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: DropdownButton<int>(
-                      isExpanded: true,
-                      value: _source,
-                      items: [
-                        for (var i = 0; i < widget.sources.length; i++)
-                          DropdownMenuItem(
-                            value: i,
-                            child: Text(widget.sources[i].displayName),
-                          ),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() {
-                          _source = value;
-                          _sections = null;
-                        });
-                        _discover();
-                      },
-                    ),
-                  ),
-                if (_loading) const LinearProgressIndicator(),
-                if (_failure != null)
-                  Flexible(
-                    child: FailureView(
-                      failure: _failure!,
-                      onRetry: _discover,
-                      retryAvailable: !_loading,
-                    ),
-                  ),
-                Expanded(
-                  flex: 3,
-                  child: _sections == null || _sections!.isEmpty
-                      ? EmptyView(
-                          message: widget.sources.isEmpty
-                              ? strings.noSources
-                              : !widget.sources[_source].supportsDiscover
-                              ? strings.discoverUnsupported
-                              : strings.discoverEmpty,
-                        )
-                      : ListView.builder(
-                          itemCount: _sections!.fold<int>(
-                            0,
-                            (sum, s) => sum + 1 + s.items.length,
-                          ),
-                          itemBuilder: (context, index) {
-                            for (final section in _sections!) {
-                              if (index == 0) {
-                                return Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Text(
-                                    section.label,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleLarge,
-                                  ),
-                                );
-                              }
-                              index--;
-                              if (index < section.items.length) {
-                                final book = section.items[index];
-                                return ListTile(
-                                  title: Text(book.title),
-                                  onTap: () => _routes.open(
+              ),
+            Expanded(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 840),
+                  child: IndexedStack(
+                    index: _tab,
+                    children: [
+                      Column(
+                        children: [
+                          if (_library.recent.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  strings.detailContinue,
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                              ),
+                            ),
+                          if (_library.recent.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 8,
+                              ),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Theme.of(
                                     context,
-                                    NovelDestination(book.key),
+                                  ).colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: ListTile(
+                                  title: Text(
+                                    _library.recent.first.snapshot.title,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                );
-                              }
-                              index -= section.items.length;
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        ),
+                                  subtitle: Text(
+                                    strings.readerChapterProgress(
+                                      (_library
+                                                  .recent
+                                                  .first
+                                                  .position
+                                                  .chapterFraction *
+                                              100)
+                                          .round(),
+                                    ),
+                                  ),
+                                  leading: SizedBox(
+                                    width: 36,
+                                    child: BookCover(
+                                      book: _library.recent.first.snapshot,
+                                      images: widget.images,
+                                    ),
+                                  ),
+                                  trailing: const Icon(Icons.arrow_forward),
+                                  onTap: () =>
+                                      _continue(_library.recent.first.novelKey),
+                                ),
+                              ),
+                            ),
+                          Expanded(
+                            child: BookshelfView(
+                              controller: _library,
+                              images: widget.images,
+                              onOpen: _continue,
+                              onDetails: (key) =>
+                                  _routes.open(context, NovelDestination(key)),
+                              onSearch: _search,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                strings.discoverTitle,
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                strings.discoverTagline,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 8,
+                            ),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: widget.sources.isEmpty
+                                    ? null
+                                    : _search,
+                                icon: const Icon(Icons.search),
+                                label: Text(strings.searchKeyword),
+                              ),
+                            ),
+                          ),
+                          if (widget.sources.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: DropdownButton<int>(
+                                isExpanded: true,
+                                value: _source,
+                                items: [
+                                  for (
+                                    var i = 0;
+                                    i < widget.sources.length;
+                                    i++
+                                  )
+                                    DropdownMenuItem(
+                                      value: i,
+                                      child: Text(
+                                        widget.sources[i].displayName,
+                                      ),
+                                    ),
+                                ],
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  setState(() {
+                                    _source = value;
+                                    _sections = null;
+                                  });
+                                  _discover();
+                                },
+                              ),
+                            ),
+                          if (_loading) const LinearProgressIndicator(),
+                          if (_failure != null)
+                            Flexible(
+                              flex: 3,
+                              child: FailureView(
+                                failure: _failure!,
+                                onRetry: _discover,
+                                retryAvailable: !_loading,
+                              ),
+                            ),
+                          if (_failure == null ||
+                              (_sections?.isNotEmpty ?? false))
+                            Expanded(
+                              flex: 3,
+                              child: _sections == null || _sections!.isEmpty
+                                  ? EmptyView(
+                                      message: widget.sources.isEmpty
+                                          ? strings.noSources
+                                          : !widget
+                                                .sources[_source]
+                                                .supportsDiscover
+                                          ? strings.discoverUnsupported
+                                          : strings.discoverEmpty,
+                                    )
+                                  : ListView.builder(
+                                      itemCount: _sections!.fold<int>(
+                                        0,
+                                        (sum, s) => sum + 1 + s.items.length,
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        for (final section in _sections!) {
+                                          if (index == 0) {
+                                            return Padding(
+                                              padding: const EdgeInsets.all(16),
+                                              child: Text(
+                                                section.label,
+                                                style: Theme.of(
+                                                  context,
+                                                ).textTheme.titleLarge,
+                                              ),
+                                            );
+                                          }
+                                          index--;
+                                          if (index < section.items.length) {
+                                            final book = section.items[index];
+                                            return ListTile(
+                                              leading: SizedBox(
+                                                width: 40,
+                                                child: BookCover(
+                                                  book: book,
+                                                  images: widget.images,
+                                                ),
+                                              ),
+                                              title: Text(book.title),
+                                              subtitle: book.authors.isEmpty
+                                                  ? null
+                                                  : Text(
+                                                      book.authors.join(', '),
+                                                    ),
+                                              trailing: const Icon(
+                                                Icons.chevron_right,
+                                              ),
+                                              onTap: () => _routes.open(
+                                                context,
+                                                NovelDestination(book.key),
+                                              ),
+                                            );
+                                          }
+                                          index -= section.items.length;
+                                        }
+                                        return const SizedBox.shrink();
+                                      },
+                                    ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
           ],
         ),

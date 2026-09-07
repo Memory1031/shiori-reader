@@ -19,6 +19,7 @@ class BookReaderScreen extends StatefulWidget {
     this.library,
     this.settings,
     this.chapterFallback = false,
+    this.onDetails,
   });
   final ChapterKey chapter;
   final NovelRepository repository;
@@ -26,6 +27,7 @@ class BookReaderScreen extends StatefulWidget {
   final LibraryRepository? library;
   final SettingsStore? settings;
   final bool chapterFallback;
+  final ValueChanged<NovelKey>? onDetails;
   @override
   State<BookReaderScreen> createState() => _BookReaderScreenState();
 }
@@ -155,6 +157,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (mounted && key != null) await _switch(key);
   }
 
+  Future<void> _details() async {
+    if (_changing || widget.onDetails == null) return;
+    setState(() => _changing = true);
+    if (!await _save()) {
+      if (mounted) setState(() => _changing = false);
+      return;
+    }
+    widget.onDetails!(widget.chapter.novelKey);
+  }
+
   @override
   Widget build(BuildContext context) {
     final chapters =
@@ -180,6 +192,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
               session: _reader,
               initialPosition: _reader.initialPosition,
               onCatalog: _changing ? null : _contents,
+              onDetails: widget.onDetails == null || _changing
+                  ? null
+                  : _details,
               onPreviousChapter: !_changing && index > 0
                   ? () => _switch(chapters[index - 1].key)
                   : null,
@@ -191,6 +206,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           : Scaffold(
               appBar: AppBar(
                 title: Text(AppLocalizations.of(context).readerTitle),
+                actions: [
+                  if (widget.onDetails != null)
+                    IconButton(
+                      tooltip: AppLocalizations.of(context).novelDetailsTitle,
+                      onPressed: _changing ? null : _details,
+                      icon: const Icon(Icons.info_outline),
+                    ),
+                ],
               ),
               body: SafeArea(
                 child: _reader.status == ReaderStatus.loading

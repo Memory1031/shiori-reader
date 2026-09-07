@@ -10,6 +10,7 @@ import '../../shared/widgets/state_views.dart';
 import 'reader_controller.dart';
 import 'reader_preferences.dart';
 import 'reader_theme.dart';
+import 'article_contents.dart';
 import 'settings_panel.dart';
 import 'reader_image.dart';
 import 'viewport/paged_reader_viewport.dart';
@@ -87,6 +88,7 @@ class ReaderContentView extends StatefulWidget {
     this.onCatalog,
     this.onPreviousChapter,
     this.onNextChapter,
+    this.onDetails,
   });
   final ImageRepository? images;
   final ChapterContent content;
@@ -94,6 +96,7 @@ class ReaderContentView extends StatefulWidget {
   final ReaderPosition? initialPosition;
   final SettingsStore? settings;
   final VoidCallback? onCatalog, onPreviousChapter, onNextChapter;
+  final VoidCallback? onDetails;
   @override
   State<ReaderContentView> createState() => _ReaderContentViewState();
 }
@@ -164,6 +167,21 @@ class _ReaderContentViewState extends State<ReaderContentView>
       ),
     );
     await _preferences.flush();
+  }
+
+  Future<void> _contents(BuildContext context) async {
+    final target = await showArticleContents(
+      context,
+      widget.content,
+      onVolumes: widget.onCatalog,
+    );
+    if (!mounted || target == null) return;
+    _position = target;
+    if (_isPaged) {
+      _paged.restore(target);
+    } else {
+      _scroll.restore(target);
+    }
   }
 
   final _paged = PagedReaderController();
@@ -285,6 +303,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
           autofocus: true,
           child: SafeArea(
             child: Stack(
+              fit: StackFit.expand,
               children: [
                 // Stable gutters keep showing/hiding controls from repaginating content.
                 Positioned.fill(
@@ -431,41 +450,87 @@ class _ReaderContentViewState extends State<ReaderContentView>
     );
   }
 
+  Future<void> _progressPanel(BuildContext context) async {
+    final l = AppLocalizations.of(context);
+    var fraction = (_readingPosition.value?.chapterFraction ?? 0).clamp(
+      0.0,
+      1.0,
+    );
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheet) => StatefulBuilder(
+        builder: (sheet, update) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l.readerChapterProgress((fraction * 100).round())),
+              Slider(
+                value: fraction,
+                onChanged: (v) => update(() => fraction = v),
+                onChangeEnd: (v) {
+                  final count = widget.content.blocks.length;
+                  if (count == 0) return;
+                  final scaled = v * count;
+                  final index = scaled.floor().clamp(0, count - 1);
+                  final target = ReaderPosition(
+                    contentRevision: widget.content.contentRevision,
+                    blockKey: widget.content.blocks[index].blockKey,
+                    blockIndex: index,
+                    blockFraction: (scaled - index).clamp(0.0, 1.0),
+                    chapterFraction: v,
+                  );
+                  _position = target;
+                  if (_isPaged) {
+                    _paged.restore(target);
+                  } else {
+                    _scroll.restore(target);
+                  }
+                },
+              ),
+              if (widget.onCatalog != null)
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: widget.onPreviousChapter == null
+                            ? null
+                            : () {
+                                Navigator.pop(sheet);
+                                widget.onPreviousChapter!();
+                              },
+                        child: Text(l.previousChapter),
+                      ),
+                    ),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: widget.onNextChapter == null
+                            ? null
+                            : () {
+                                Navigator.pop(sheet);
+                                widget.onNextChapter!();
+                              },
+                        child: Text(l.nextChapter),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _controls(BuildContext context, bool visible) {
     final l = AppLocalizations.of(context);
+    if (!visible) return const SizedBox.shrink();
     final failedRead = widget.session?.restoreFailure != null;
     final unsaved =
         widget.session?.progressFailure != null ||
-        widget.session?.progress?.unsaved == true;
-    final failedSettings = _preferences.failure != null;
-    Widget status() => IconButton(
-      onPressed: failedRead || unsaved
-          ? widget.session?.retryProgress
-          : () => _panel(context),
-      tooltip: failedRead
-          ? l.readerRestoreReadFailed
-          : unsaved
-          ? l.readerProgressUnsaved
-          : l.readerSettingsFailure,
-      icon: Icon(failedRead ? Icons.history : Icons.sync_problem),
-    );
-    if (!visible) {
-      return Align(
-        alignment: Alignment.topRight,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (failedRead || unsaved || failedSettings)
-              Semantics(liveRegion: true, child: status()),
-            IconButton(
-              onPressed: _toggle,
-              tooltip: l.showReaderControls,
-              icon: const Icon(Icons.more_horiz),
-            ),
-          ],
-        ),
-      );
-    }
+        widget.session?.progress?.unsaved == true ||
+        widget.session?.restoreFailure != null;
     return Stack(
       children: [
         Positioned(
@@ -478,12 +543,6 @@ class _ReaderContentViewState extends State<ReaderContentView>
             child: Row(
               children: [
                 const BackButton(),
-                if (widget.onCatalog != null)
-                  IconButton(
-                    onPressed: widget.onCatalog,
-                    tooltip: l.catalogTitle,
-                    icon: const Icon(Icons.list),
-                  ),
                 Expanded(
                   child: Text(
                     widget.content.title,
@@ -492,16 +551,40 @@ class _ReaderContentViewState extends State<ReaderContentView>
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
-                if (failedRead || unsaved || failedSettings) status(),
-                IconButton(
-                  onPressed: () => _panel(context),
-                  tooltip: l.readerSettings,
-                  icon: const Icon(Icons.text_fields),
-                ),
-                IconButton(
-                  onPressed: _toggle,
-                  tooltip: l.hideReaderControls,
-                  icon: const Icon(Icons.expand_less),
+                PopupMenuButton<String>(
+                  tooltip: l.moreActions,
+                  icon: const Icon(Icons.more_horiz),
+                  onSelected: (value) {
+                    if (value == 'details') widget.onDetails?.call();
+                    if (value == 'hide') _toggle();
+                    if (value == 'save') widget.session?.retryProgress();
+                    if (value == 'settings') _panel(context);
+                  },
+                  itemBuilder: (_) => [
+                    if (widget.onDetails != null)
+                      PopupMenuItem(
+                        value: 'details',
+                        child: Text(l.novelDetailsTitle),
+                      ),
+                    if (unsaved)
+                      PopupMenuItem(
+                        value: 'save',
+                        child: Text(
+                          failedRead
+                              ? l.readerRestoreReadFailed
+                              : l.readerProgressUnsaved,
+                        ),
+                      ),
+                    if (_preferences.failure != null)
+                      PopupMenuItem(
+                        value: 'settings',
+                        child: Text(l.readerSettingsFailure),
+                      ),
+                    PopupMenuItem(
+                      value: 'hide',
+                      child: Text(l.hideReaderControls),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -516,44 +599,36 @@ class _ReaderContentViewState extends State<ReaderContentView>
             color: Theme.of(context).scaffoldBackgroundColor,
             child: Row(
               children: [
-                if (widget.onCatalog != null)
-                  IconButton(
-                    onPressed: widget.onPreviousChapter,
-                    tooltip: l.previousChapter,
-                    icon: const Icon(Icons.skip_previous),
-                  ),
-                if (_isPaged)
-                  IconButton(
-                    onPressed: _paged.previous,
-                    tooltip: l.readerPreviousPage,
-                    icon: const Icon(Icons.chevron_left),
-                  ),
                 Expanded(
-                  child: ValueListenableBuilder<ReaderPosition?>(
-                    valueListenable: _readingPosition,
-                    builder: (context, position, _) => Text(
-                      l.readerChapterProgress(
-                        ((position?.chapterFraction ?? 0) * 100).round(),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall,
+                  child: Tooltip(
+                    message: l.articleContents,
+                    child: TextButton.icon(
+                      onPressed: () => _contents(context),
+                      icon: const Icon(Icons.list, size: 20),
+                      label: Text(l.catalogTitle),
                     ),
                   ),
                 ),
-                if (_isPaged)
-                  IconButton(
-                    onPressed: _paged.next,
-                    tooltip: l.readerNextPage,
-                    icon: const Icon(Icons.chevron_right),
+                Expanded(
+                  child: ValueListenableBuilder<ReaderPosition?>(
+                    valueListenable: _readingPosition,
+                    builder: (context, position, _) => TextButton(
+                      onPressed: () => _progressPanel(context),
+                      child: Text(
+                        '${l.readerProgressLabel} ${((position?.chapterFraction ?? 0) * 100).round()}%',
+                      ),
+                    ),
                   ),
-                if (widget.onCatalog != null)
-                  IconButton(
-                    onPressed: widget.onNextChapter,
-                    tooltip: l.nextChapter,
-                    icon: const Icon(Icons.skip_next),
+                ),
+                Expanded(
+                  child: Tooltip(
+                    message: l.readerSettings,
+                    child: TextButton(
+                      onPressed: () => _panel(context),
+                      child: Text('Aa', semanticsLabel: l.readerSettings),
+                    ),
                   ),
+                ),
               ],
             ),
           ),

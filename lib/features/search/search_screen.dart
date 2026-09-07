@@ -9,6 +9,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
+import '../../shared/widgets/book_cover.dart';
 import 'search_controller.dart';
 
 /// The route owns its controller; the composition root owns the repository.
@@ -19,11 +20,16 @@ class SearchScreen extends StatelessWidget {
     required this.sourceId,
     required this.routes,
     this.supportsPaging = true,
+    this.sourceName,
+    this.environmentLabel,
+    this.images,
   });
   final NovelRepository repository;
   final SourceId sourceId;
   final AppRoutes routes;
   final bool supportsPaging;
+  final String? sourceName, environmentLabel;
+  final ImageRepository? images;
 
   @override
   Widget build(BuildContext context) => ControllerScope<SearchController>(
@@ -32,15 +38,28 @@ class SearchScreen extends StatelessWidget {
       sourceId: sourceId,
       supportsPaging: supportsPaging,
     ),
-    builder: (context, controller) =>
-        _SearchBody(controller: controller, routes: routes),
+    builder: (context, controller) => _SearchBody(
+      controller: controller,
+      routes: routes,
+      sourceName: sourceName,
+      environmentLabel: environmentLabel,
+      images: images,
+    ),
   );
 }
 
 class _SearchBody extends StatelessWidget {
-  const _SearchBody({required this.controller, required this.routes});
+  const _SearchBody({
+    required this.controller,
+    required this.routes,
+    this.sourceName,
+    this.environmentLabel,
+    this.images,
+  });
   final SearchController controller;
   final AppRoutes routes;
+  final String? sourceName, environmentLabel;
+  final ImageRepository? images;
 
   @override
   Widget build(BuildContext context) {
@@ -66,23 +85,40 @@ class _SearchBody extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (sourceName != null || environmentLabel != null) ...[
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              child: Text(
+                                environmentLabel ??
+                                    (sourceName == 'LightNovel.fun'
+                                        ? strings.lightNovelSource
+                                        : sourceName!),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       _SearchInput(
                         onChanged: controller.edit,
                         onSubmit: submit,
-                      ),
-                      const SizedBox(height: ShioriSpace.medium),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: FilledButton(
-                          key: const ValueKey('search-submit'),
-                          onPressed:
-                              state.draftKeyword.trim().isEmpty ||
-                                  state.status == SearchStatus.loading ||
-                                  state.loadingMore
-                              ? null
-                              : submit,
-                          child: Text(strings.searchTitle),
-                        ),
+                        enabled:
+                            state.draftKeyword.trim().isNotEmpty &&
+                            state.status != SearchStatus.loading &&
+                            !state.loadingMore,
                       ),
                       if (state.submittedQuery != null &&
                           state.status != SearchStatus.idle) ...[
@@ -103,6 +139,7 @@ class _SearchBody extends StatelessWidget {
                     return _ResultRow(
                       key: ValueKey(book.key),
                       book: book,
+                      images: images,
                       onTap: () {
                         FocusScope.of(context).unfocus();
                         routes.open(context, NovelDestination(book.key));
@@ -139,19 +176,21 @@ class _SearchBody extends StatelessWidget {
                   ),
                 ),
               ] else
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: switch (state.status) {
-                    SearchStatus.loading => const LoadingView(),
-                    SearchStatus.error => FailureView(
-                      failure: state.failure!,
-                      onRetry: submit,
-                    ),
-                    SearchStatus.empty => EmptyView(
-                      message: strings.searchNoResults,
-                    ),
-                    _ => EmptyView(message: strings.searchInitial),
-                  },
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 32),
+                    child: switch (state.status) {
+                      SearchStatus.loading => const LoadingView(),
+                      SearchStatus.error => FailureView(
+                        failure: state.failure!,
+                        onRetry: submit,
+                      ),
+                      SearchStatus.empty => EmptyView(
+                        message: strings.searchNoResults,
+                      ),
+                      _ => EmptyView(message: strings.searchInitial),
+                    },
+                  ),
                 ),
             ],
           ),
@@ -162,7 +201,12 @@ class _SearchBody extends StatelessWidget {
 }
 
 class _SearchInput extends StatefulWidget {
-  const _SearchInput({required this.onChanged, required this.onSubmit});
+  const _SearchInput({
+    required this.onChanged,
+    required this.onSubmit,
+    required this.enabled,
+  });
+  final bool enabled;
   final ValueChanged<String> onChanged;
   final VoidCallback onSubmit;
   @override
@@ -193,21 +237,38 @@ class _SearchInputState extends State<_SearchInput> {
     },
     child: TextField(
       key: const ValueKey('search-input'),
+      // Keep the keyword prompt available to assistive technology after entry.
       controller: _text,
       textInputAction: TextInputAction.search,
       onChanged: widget.onChanged,
       onSubmitted: (_) => widget.onSubmit(),
       decoration: InputDecoration(
+        hintText: AppLocalizations.of(context).searchKeyword,
+        floatingLabelBehavior: FloatingLabelBehavior.never,
         labelText: AppLocalizations.of(context).searchKeyword,
         prefixIcon: const Icon(Icons.search),
-        border: const OutlineInputBorder(),
+        suffixIcon: Padding(
+          padding: const EdgeInsets.all(4),
+          child: IconButton.filled(
+            key: const ValueKey('search-submit'),
+            tooltip: AppLocalizations.of(context).searchTitle,
+            onPressed: widget.enabled ? widget.onSubmit : null,
+            icon: const Icon(Icons.arrow_forward),
+          ),
+        ),
       ),
     ),
   );
 }
 
 class _ResultRow extends StatelessWidget {
-  const _ResultRow({super.key, required this.book, required this.onTap});
+  const _ResultRow({
+    super.key,
+    required this.book,
+    required this.onTap,
+    this.images,
+  });
+  final ImageRepository? images;
   final NovelSummary book;
   final VoidCallback onTap;
 
@@ -227,15 +288,9 @@ class _ResultRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Stable 2:3 placeholder. Media loading remains independently owned.
-            Container(
-              width: 64,
-              height: 64 / ShioriShape.coverRatio,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(ShioriShape.cover),
-              ),
-              child: const Icon(Icons.bookmark_outline),
+            SizedBox(
+              width: 56,
+              child: BookCover(book: book, images: images),
             ),
             const SizedBox(width: ShioriSpace.item),
             Expanded(
@@ -246,11 +301,16 @@ class _ResultRow extends StatelessWidget {
                     book.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   if (book.authors.isNotEmpty) ...[
                     const SizedBox(height: ShioriSpace.small),
-                    Text(book.authors.join(', ')),
+                    Text(
+                      book.authors.join(', '),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                 ],
               ),

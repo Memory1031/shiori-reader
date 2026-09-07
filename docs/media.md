@@ -30,3 +30,11 @@ flutter run --target test/support/network_media_probe.dart -d 127.0.0.1:16384
 MuMu 新包日志：`NETWORK_MEDIA_PASS attempts=2 sharedLeases=2 retainedBytes=0 codec=64x64`；截图在忽略目录 `.tooling/evidence/network-media.png`。没有访问小说网站，未宣称全部图片格式 / 大图 / ARM64 性能已经实测。Android 运行不等于 iOS 运行；iOS 的 ImageCodec / 内存 / 退出路径仍归 IOS-004。
 
 READER-003 已将本仓库接入正式 Reader 的 SourceImage，按宽度 × DPR 与 400 万像素限制解码，并在卸载时释放引用。详见 [Reader 图片验收](reader.md)。未知尺寸重排或切换模式可能重新挂载并重新获取媒体；本轮没有增加常驻图片缓存或离线持久化。
+
+## 近期图片复用（2026-09-07，用户反馈追加）
+
+MemoryImageRepository 新增可选 maxIdleBytes，默认 0 保持旧租约即释放行为；生产 SourceServices 配置 **32 MiB 编码图片闲置 LRU**，与活动租约、进行中读取预留共用原 **64 MiB 总预算**。最后租约关闭后，当前版本可留在闲置队列；cacheOnly/cacheFirst 命中重新取得独立租约并提升最近使用位置。压力下先淘汰无人持有的旧图，不回收活动租约；refresh 替换时清除旧闲置版本，close 释放所有闲置数据。
+
+SourceImage 的转圈指示延后 180ms，只在请求仍进行时显示，避免快速内存命中时闪过转圈。已有图在同一挂载实例的重新解码期间继续显示；切换视口后的重新挂载仍可能出现短暂占位。本轮不缓存 Flutter 解码图，不预取整章图片，不增加并发或请求重试。
+
+新增 LRU 测试验证近期复用零新增 Source 请求、淘汰顺序、活动租约不可淘汰及 close 后独立释放。完整回归 276 PASS。该缓存仅驻留当前进程，不是磁盘缓存，不保证首次网络加载更快，不保证跨进程 / 重启离线。持久图片及配额、原子落盘仍由 CACHE-003 实施。

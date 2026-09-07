@@ -12,6 +12,7 @@ class ShioriPalette extends ThemeExtension<ShioriPalette> {
     required this.separator,
   });
   final Color paper, surface, ink, secondary, accent, separator;
+  Color get surfaceSubtle => Color.lerp(paper, separator, .22)!;
   static const light = ShioriPalette(
     paper: Color(0xfffaf8f4),
     surface: Color(0xfffffcf8),
@@ -86,6 +87,7 @@ ThemeData shioriTheme(Brightness brightness) {
         primary: p.accent,
         onPrimary: brightness == Brightness.light ? Colors.white : p.paper,
         surface: p.surface,
+        surfaceContainerHighest: p.surfaceSubtle,
         onSurface: p.ink,
         onSurfaceVariant: p.secondary,
         outline: p.secondary,
@@ -109,6 +111,26 @@ ThemeData shioriTheme(Brightness brightness) {
     scaffoldBackgroundColor: p.paper,
     extensions: [p],
     dividerColor: p.separator,
+    popupMenuTheme: PopupMenuThemeData(
+      color: p.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 6,
+      shadowColor: p.ink.withValues(alpha: .14),
+      menuPadding: const EdgeInsets.symmetric(vertical: 4),
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: p.separator.withValues(alpha: .65), width: .5),
+      ),
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => text(
+          14,
+          color: states.contains(WidgetState.disabled)
+              ? p.secondary.withValues(alpha: .5)
+              : p.ink,
+        ),
+      ),
+    ),
     textTheme: TextTheme(
       headlineSmall: text(24, weight: FontWeight.w600),
       titleLarge: text(20, weight: FontWeight.w600),
@@ -122,10 +144,45 @@ ThemeData shioriTheme(Brightness brightness) {
       labelSmall: text(12),
     ),
     appBarTheme: AppBarTheme(
+      centerTitle: false,
+      titleSpacing: 20,
+      titleTextStyle: text(20, weight: FontWeight.w600),
       backgroundColor: p.paper,
       foregroundColor: p.ink,
       elevation: 0,
       scrolledUnderElevation: 0,
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      height: 72,
+      backgroundColor: p.paper,
+      indicatorColor: p.accent.withValues(alpha: .12),
+      elevation: 0,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: Color.lerp(p.paper, p.separator, .22),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(ShioriShape.control),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(ShioriShape.control),
+        borderSide: BorderSide(color: p.accent),
+      ),
+    ),
+    listTileTheme: ListTileThemeData(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      iconColor: p.secondary,
+      selectedTileColor: p.accent.withValues(alpha: .08),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: p.ink,
+        minimumSize: const Size(48, 48),
+        side: BorderSide(color: p.separator),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
@@ -136,7 +193,10 @@ ThemeData shioriTheme(Brightness brightness) {
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+      style: TextButton.styleFrom(
+        foregroundColor: p.ink,
+        minimumSize: const Size(48, 48),
+      ),
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(minimumSize: const Size(48, 48)),

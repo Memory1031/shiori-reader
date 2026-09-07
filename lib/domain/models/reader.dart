@@ -11,9 +11,9 @@ enum ReaderPaper { paper, warm }
 final class ReaderSettings extends ValueModel {
   static const schemaVersion = 3;
   ReaderSettings({
-    double fontSize = 20,
+    double fontSize = 18,
     double lineHeight = 1.7,
-    double paragraphSpacing = 12,
+    double paragraphSpacing = 8,
     double horizontalPadding = 20,
     this.mode = ReaderMode.paged,
     this.themeMode = ReaderThemeMode.system,

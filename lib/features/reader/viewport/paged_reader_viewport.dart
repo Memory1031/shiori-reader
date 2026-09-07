@@ -243,19 +243,24 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
                             padding: EdgeInsets.only(
                               top: widget.paragraphSpacing / 2,
                               bottom: widget.paragraphSpacing / 2,
-                              left: readerBlockIndent(
-                                widget.content.blocks[_layout!
-                                    .index
-                                    .chunks[fragment.unit]
-                                    .blockIndex],
-                                widget.textStyle,
-                                scaler,
-                                constraints.maxWidth,
-                                _layout!.index.chunks[fragment.unit].start == 0,
-                              ),
                             ),
                             child: Text(
-                              fragment.text!,
+                              readerIndentPrefix(
+                                    widget.content.blocks[_layout!
+                                        .index
+                                        .chunks[fragment.unit]
+                                        .blockIndex],
+                                    _layout!
+                                                .index
+                                                .chunks[fragment.unit]
+                                                .start ==
+                                            0 &&
+                                        fragment.start == 0,
+                                    constraints.maxWidth,
+                                    widget.textStyle,
+                                    scaler,
+                                  ) +
+                                  fragment.text!,
                               style: readerBlockStyle(
                                 widget.content.blocks[_layout!
                                     .index

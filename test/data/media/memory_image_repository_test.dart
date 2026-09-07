@@ -63,6 +63,47 @@ MediaLease lease(Result<LoadResult<MediaLease>> result) =>
 
 void main() {
   test(
+    'idle LRU reuses bytes, evicts oldest and never evicts active leases',
+    () async {
+      final source = Source(() async => Success(Body()));
+      final repo = MemoryImageRepository(
+        resolve: (_) => source,
+        maxBytes: 8,
+        maxRetainedBytes: 32,
+        maxIdleBytes: 16,
+      );
+      Future<MediaLease> get(
+        int i, [
+        ReadMode mode = ReadMode.cacheFirst,
+      ]) async => lease(
+        await repo.load(
+          fixtureMediaRef(i),
+          mode: mode,
+          cancellation: CancellationSource().token,
+        ),
+      );
+      final active = await get(0);
+      await (await get(1)).close();
+      await (await get(2)).close();
+      await (await get(1, ReadMode.cacheOnly)).close();
+      await (await get(3)).close();
+      expect(source.calls, 4);
+      expect(active.isClosed, isFalse);
+      final miss = await repo.load(
+        fixtureMediaRef(2),
+        mode: ReadMode.cacheOnly,
+        cancellation: CancellationSource().token,
+      );
+      expect(miss, isA<Failure>());
+      await (await get(1)).close();
+      expect(source.calls, 4);
+      repo.close();
+      expect(repo.retainedBytes, 8);
+      await active.close();
+      expect(repo.retainedBytes, 0);
+    },
+  );
+  test(
     'shared loads have independent leases; cacheOnly never resolves source; last close frees RAM',
     () async {
       final env = FixtureEnvironment();

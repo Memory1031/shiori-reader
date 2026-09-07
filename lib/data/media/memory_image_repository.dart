@@ -6,7 +6,7 @@ import '../../domain/models/models.dart';
 import '../../shared/app_logger.dart';
 import '../network/network_types.dart';
 
-/// Encoded RAM data, retained only while leased. No disk/offline guarantee.
+/// Encoded RAM data with optional bounded idle LRU. No disk/offline guarantee.
 /// Real SourceMedia adapters must use the shared NetworkClient scheduler.
 class MemoryImageRepository implements ImageRepository {
   MemoryImageRepository({
@@ -15,12 +15,15 @@ class MemoryImageRepository implements ImageRepository {
     DateTime Function()? now,
     this.maxBytes = 20 * 1024 * 1024,
     this.maxRetainedBytes = 64 * 1024 * 1024,
+    this.maxIdleBytes = 0,
     this.deadline = const Duration(seconds: 45),
   }) : logger = logger ?? AppLogger(),
        now = now ?? DateTime.now {
     if (maxBytes < 1 ||
         maxBytes > 20 * 1024 * 1024 ||
         maxRetainedBytes < maxBytes ||
+        maxIdleBytes < 0 ||
+        maxIdleBytes > maxRetainedBytes ||
         deadline <= Duration.zero ||
         deadline > const Duration(seconds: 45)) {
       throw ArgumentError('Invalid media budget');
@@ -31,6 +34,8 @@ class MemoryImageRepository implements ImageRepository {
   final DateTime Function() now;
   final int maxBytes;
   final int maxRetainedBytes;
+  final int maxIdleBytes;
+  final _idle = <MediaRef, _Entry>{};
   final Duration deadline;
   final _entries = <MediaRef, _Entry>{};
   final _retained = <_Entry>{};
@@ -102,11 +107,12 @@ class MemoryImageRepository implements ImageRepository {
   void _pump() {
     if (_closed) return;
     for (final flight in _flights.values.toList()) {
+      if (flight.started || flight.cancel.token.isCancelled) continue;
+      _trimIdle(maxRetainedBytes - _reserved - maxBytes);
       if (_running >= 2 ||
           retainedBytes + _reserved + maxBytes > maxRetainedBytes) {
         break;
       }
-      if (flight.started || flight.cancel.token.isCancelled) continue;
       flight.started = true;
       _running++;
       _reserved += maxBytes;
@@ -262,6 +268,10 @@ class MemoryImageRepository implements ImageRepository {
     final old = _entries[flight.ref];
     _Entry? entry;
     if (result case Success(:final value)) {
+      if (old != null && old.references == 0) {
+        _idle.remove(flight.ref);
+        _retained.remove(old);
+      }
       entry = _Entry(value, now());
       _entries[flight.ref] = entry;
       _retained.add(entry);
@@ -295,6 +305,7 @@ class MemoryImageRepository implements ImageRepository {
     LoadOrigin origin, {
     AppFailure? failure,
   }) {
+    _idle.remove(ref);
     entry.references++;
     final observedFailure = failure ?? entry.refreshFailure;
     return LoadResult(
@@ -309,9 +320,32 @@ class MemoryImageRepository implements ImageRepository {
   void _release(MediaRef ref, _Entry entry) {
     if (entry.references > 0) entry.references--;
     if (entry.references != 0) return;
+    if (!_closed && _entries[ref] == entry && maxIdleBytes > 0) {
+      _idle.remove(ref);
+      _idle[ref] = entry;
+      while (_idle.values.fold<int>(0, (sum, e) => sum + e.data.bytes.length) >
+          maxIdleBytes) {
+        _evictOldest();
+      }
+      _pump();
+      return;
+    }
     if (_entries[ref] == entry) _entries.remove(ref);
     _retained.remove(entry);
     _pump();
+  }
+
+  void _evictOldest() {
+    final key = _idle.keys.first;
+    final entry = _idle.remove(key)!;
+    if (_entries[key] == entry) _entries.remove(key);
+    _retained.remove(entry);
+  }
+
+  void _trimIdle(int target) {
+    while (_idle.isNotEmpty && retainedBytes > target) {
+      _evictOldest();
+    }
   }
 
   void close() {
@@ -321,6 +355,8 @@ class MemoryImageRepository implements ImageRepository {
       _abort(flight, AppFailure.cancelled(Operation.media));
     }
     _entries.clear();
+    _idle.clear();
+    _retained.removeWhere((entry) => entry.references == 0);
     // Outstanding leases still own their data until they independently close.
   }
 }

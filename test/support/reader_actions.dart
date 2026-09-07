@@ -13,8 +13,8 @@ Future<void> openReaderSettings(WidgetTester tester) async {
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump();
   }
-  if (find.byTooltip(l.showReaderControls).evaluate().isNotEmpty) {
-    await tester.tap(find.byTooltip(l.showReaderControls));
+  if (find.byTooltip(l.readerSettings).evaluate().isEmpty) {
+    await tester.tapAt(tester.getCenter(find.byType(ReaderContentView)));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump();

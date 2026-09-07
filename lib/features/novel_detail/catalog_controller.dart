@@ -6,7 +6,12 @@ import '../../shared/controllers/scoped_controller.dart';
 
 /// One opaque novel identity per scope. Repository and update stream are borrowed.
 class CatalogController extends ScopedController {
-  CatalogController({required this.repository, required this.novel});
+  CatalogController({
+    required this.repository,
+    required this.novel,
+    this.initialMode = ReadMode.cacheFirst,
+  });
+  final ReadMode initialMode;
   final NovelRepository repository;
   final NovelKey novel;
   LoadResult<Catalog>? loaded;
@@ -19,6 +24,7 @@ class CatalogController extends ScopedController {
       !isClosed &&
       !loading &&
       (failure == null ||
+          failure!.context == FailureContext.cacheMiss ||
           failure!.retryPolicy != RetryPolicy.never &&
               (failure!.kind != FailureKind.rateLimited ||
                   failure!.retryNotBefore != null &&
@@ -35,7 +41,7 @@ class CatalogController extends ScopedController {
       _accept(result);
       update();
     });
-    unawaited(load());
+    unawaited(load(mode: initialMode));
   }
 
   Future<void> load({ReadMode mode = ReadMode.cacheFirst}) async {

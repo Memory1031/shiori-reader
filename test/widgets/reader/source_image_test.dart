@@ -157,6 +157,8 @@ void main() {
       ),
     );
     await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await tester.pump(const Duration(milliseconds: 200));
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     await tester.pump();

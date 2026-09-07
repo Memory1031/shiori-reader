@@ -119,6 +119,8 @@ class _SourceImageState extends State<SourceImage> {
   ui.Image? _image;
   AppFailure? _failure;
   Timer? _cooldown;
+  Timer? _loadingDelay;
+  bool _showLoading = false;
   bool _loading = true;
   int _generation = 0;
   int? _width;
@@ -151,6 +153,7 @@ class _SourceImageState extends State<SourceImage> {
     _generation++;
     _request?.cancel();
     _cooldown?.cancel();
+    _loadingDelay?.cancel();
     _release();
     super.dispose();
   }
@@ -161,6 +164,11 @@ class _SourceImageState extends State<SourceImage> {
     _request?.cancel();
     final request = _request = CancellationSource();
     final generation = ++_generation;
+    _loadingDelay?.cancel();
+    _showLoading = false;
+    _loadingDelay = Timer(const Duration(milliseconds: 180), () {
+      if (_current(generation) && _loading) setState(() => _showLoading = true);
+    });
     _cooldown?.cancel();
     setState(() {
       _loading = true;
@@ -317,7 +325,7 @@ class _SourceImageState extends State<SourceImage> {
         body = Center(
           child: SizedBox.square(
             dimension: 24,
-            child: _loading
+            child: _loading && _showLoading
                 ? CircularProgressIndicator(
                     strokeWidth: 2,
                     semanticsLabel: strings.loading,

@@ -15,6 +15,14 @@ class AppScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(title), actions: actions),
-    body: SafeArea(child: body),
+    body: SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 840),
+          child: body,
+        ),
+      ),
+    ),
   );
 }

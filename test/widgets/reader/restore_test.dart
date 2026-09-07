@@ -351,7 +351,9 @@ void main() {
       expect(library.writes, isEmpty);
       expect(library.sessions, 0);
       library.failRead = false;
-      await tester.tap(find.byIcon(Icons.history));
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Could not read saved progress'));
       await tester.pumpAndSettle();
       await tester.pump(const Duration(milliseconds: 400));
       expect(library.writes, isNotEmpty);

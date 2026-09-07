@@ -82,7 +82,7 @@ void main() {
       final content = ChapterContent(
         key: fixtureChapterKey(FixtureScenario.typography),
         title: 'Pages',
-        blocks: [ParagraphBlock(text: text)],
+        blocks: [ParagraphBlock(text: text, leadingIndent: 2)],
       );
       final engine = PageLayout(
         index: ChunkIndex(content, maxCodePoints: 80),

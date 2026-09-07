@@ -10,6 +10,7 @@ import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/reader_theme.dart';
 import 'package:shiori/features/reader/settings_panel.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
+import 'package:shiori/features/reader/viewport/reader_viewport.dart';
 import '../../support/reader_actions.dart';
 import 'settings_test.dart' show Store;
 
@@ -25,6 +26,45 @@ Widget app(Store store, {AppController? controller}) => ShioriApp(
 );
 
 void main() {
+  for (final mode in ReaderMode.values) {
+    testWidgets(
+      'progress sheet seeks and center restores fully hidden chrome: $mode',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final store = Store()
+          ..value = ReaderSettings(mode: mode, controlsHintSeen: true);
+        await tester.pumpWidget(app(store));
+        await tester.pumpAndSettle();
+        expect(find.byType(IconButton), findsNothing);
+        await tester.tapAt(tester.getCenter(find.byType(ReaderContentView)));
+        await tester.pumpAndSettle();
+        await tester.tap(find.textContaining('Progress '));
+        await tester.pumpAndSettle();
+        await tester.drag(find.byType(Slider), const Offset(140, 0));
+        await tester.pumpAndSettle();
+        Navigator.of(tester.element(find.byType(Slider))).pop();
+        await tester.pumpAndSettle();
+        final position = mode == ReaderMode.paged
+            ? tester
+                  .widget<PagedReaderViewport>(find.byType(PagedReaderViewport))
+                  .controller
+                  .capture()!
+            : tester
+                  .widget<ReaderViewport>(find.byType(ReaderViewport))
+                  .controller
+                  .capture()!;
+        expect(position.chapterFraction, greaterThan(.25));
+        await tester.tapAt(tester.getCenter(find.byType(ReaderContentView)));
+        await tester.pumpAndSettle();
+        expect(find.byType(IconButton), findsNothing);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
   testWidgets(
     'reduced motion removes sheet transition without moving the reading anchor',
     (tester) async {
@@ -138,7 +178,7 @@ void main() {
         Brightness.light,
       );
       expect(find.text('Scroll'), findsNothing);
-      expect(find.byTooltip('Show reading controls'), findsOneWidget);
+      expect(find.byType(IconButton), findsNothing);
       final viewport = tester.widget<PagedReaderViewport>(
         find.byType(PagedReaderViewport),
       );
@@ -207,7 +247,7 @@ void main() {
       await tester.pumpWidget(app(store));
       await tester.pumpAndSettle();
       expect(find.text('Got it'), findsNothing);
-      expect(find.byTooltip('Show reading controls'), findsOneWidget);
+      expect(find.byType(IconButton), findsNothing);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
     },
@@ -242,10 +282,12 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       Navigator.of(tester.element(find.byType(ReaderSettingsPanel))).pop();
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Hide reading controls'));
+      await tester.tap(find.byTooltip('More'));
       await tester.pumpAndSettle();
-      expect(find.byIcon(Icons.sync_problem), findsOneWidget);
-      expect(find.byTooltip('Show reading controls'), findsOneWidget);
+      await tester.tap(find.text('Hide reading controls'));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.sync_problem), findsNothing);
+      expect(find.byType(IconButton), findsNothing);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
     },

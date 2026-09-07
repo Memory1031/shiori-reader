@@ -197,7 +197,7 @@ void main() {
         greaterThan(first.chapterFraction),
       );
       expect(find.text('Scroll'), findsNothing);
-      await tester.tap(find.byTooltip('Show reading controls'));
+      await tester.tapAt(tester.getCenter(find.byType(PagedReaderViewport)));
       await tester.pumpAndSettle();
       final anchor = viewport.controller.capture()!;
       await chooseReaderMode(tester, 'Scroll');
@@ -207,7 +207,7 @@ void main() {
       expect(scroll.controller.mountedCount, lessThan(30));
       await tester.drag(find.byType(ReaderViewport), const Offset(0, -200));
       await tester.pumpAndSettle();
-      expect(find.byTooltip('Hide reading controls'), findsOneWidget);
+      expect(find.byTooltip('More'), findsOneWidget);
       await tester.tapAt(tester.getCenter(find.byType(ReaderViewport)));
       await tester.pumpAndSettle();
       expect(find.text('Scroll'), findsNothing);

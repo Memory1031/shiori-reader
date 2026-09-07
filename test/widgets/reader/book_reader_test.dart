@@ -27,16 +27,6 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<IconButton>(
-              find.byWidgetPredicate(
-                (w) => w is IconButton && w.tooltip == 'Previous chapter',
-              ),
-            )
-            .onPressed,
-        isNull,
-      );
       if (find.text('Got it').evaluate().isNotEmpty) {
         await tester.tap(find.text('Got it'));
         await tester.pumpAndSettle();
@@ -48,7 +38,17 @@ void main() {
           retryPolicy: RetryPolicy.manual,
         ),
       );
-      await tester.tap(find.byTooltip('Next chapter'));
+      await tester.tap(find.textContaining('Progress '));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextButton>(
+              find.widgetWithText(TextButton, 'Previous chapter'),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.text('Next chapter'));
       await tester.pumpAndSettle();
       final saved =
           (await env.library.getProgress(
@@ -68,11 +68,13 @@ void main() {
             .key,
         fixtureChapterKey(FixtureScenario.multiVolume, 1),
       );
-      if (find.byTooltip('Contents').evaluate().isEmpty) {
-        await tester.tap(find.byTooltip('Show reading controls'));
+      if (find.byTooltip('In-volume contents').evaluate().isEmpty) {
+        await tester.tapAt(tester.getCenter(find.byType(ReaderContentView)));
         await tester.pumpAndSettle();
       }
-      await tester.tap(find.byTooltip('Contents'));
+      await tester.tap(find.byTooltip('In-volume contents'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Volumes'));
       await tester.pumpAndSettle();
       final target = fixtureChapterKey(FixtureScenario.multiVolume, 2);
       await tester.scrollUntilVisible(find.byKey(ValueKey(target)), 200);

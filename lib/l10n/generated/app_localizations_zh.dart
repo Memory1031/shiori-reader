@@ -9,6 +9,33 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get articleContents => '卷内目录';
+
+  @override
+  String get articleContentsEmpty => '这篇正文没有可识别的章节标题。仍可通过分卷列表切换文章。';
+
+  @override
+  String get articleContentsHint => '从正文标题生成；纯文本标题识别可能不完整。';
+
+  @override
+  String get volumesTitle => '分卷目录';
+
+  @override
+  String get volumesLoad => '加载目录';
+
+  @override
+  String get volumesDescription => '选择卷册或章节开始阅读。';
+
+  @override
+  String get shelfTagline => '把喜欢的故事，留在手边。';
+
+  @override
+  String get discoverTagline => '下一本，读什么？';
+
+  @override
+  String get offlineEnvironment => '离线演示 · 仅含测试书籍';
+
+  @override
   String get historyTitle => '最近阅读';
 
   @override
@@ -416,4 +443,37 @@ class AppLocalizationsZh extends AppLocalizations {
   String readerChapterProgress(int percent) {
     return '本章约 $percent%';
   }
+
+  @override
+  String get moreActions => '更多';
+
+  @override
+  String get readerProgressLabel => '进度';
+
+  @override
+  String get shelfGrid => '网格';
+
+  @override
+  String get shelfList => '列表';
+
+  @override
+  String get allChapters => '全部章节';
+
+  @override
+  String get lightNovelSource => '轻之国度';
+
+  @override
+  String get readerResetTypography => '恢复默认排版';
+
+  @override
+  String get shelfDetails => '详情';
+
+  @override
+  String get shelfRemove => '移除';
+
+  @override
+  String get launchTagline => '故事，即将继续';
+
+  @override
+  String get launchLoading => '正在准备书架…';
 }

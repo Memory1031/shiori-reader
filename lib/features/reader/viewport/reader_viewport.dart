@@ -164,12 +164,12 @@ class _ReaderViewportState extends State<ReaderViewport> {
     return null;
   }
 
-  double _indent(RenderChunk chunk, double width) => readerBlockIndent(
+  String _prefix(RenderChunk chunk, double width) => readerIndentPrefix(
     widget.content.blocks[chunk.blockIndex],
+    chunk.start == 0,
+    width,
     widget.textStyle,
     _scaler,
-    width,
-    chunk.start == 0,
   );
   TextStyle _style(RenderChunk chunk) => readerBlockStyle(
     widget.content.blocks[chunk.blockIndex],
@@ -177,15 +177,15 @@ class _ReaderViewportState extends State<ReaderViewport> {
   );
   TextAlign _align(RenderChunk chunk) =>
       readerBlockAlign(widget.content.blocks[chunk.blockIndex]);
-  TextPainter _painter(RenderChunk chunk, double width) =>
-      TextPainter(
-        text: TextSpan(text: chunk.text, style: _style(chunk)),
-        textDirection: _direction,
-        textScaler: _scaler,
-        textAlign: _align(chunk),
-      )..layout(
-        maxWidth: (width - _indent(chunk, width)).clamp(1, double.infinity),
-      );
+  TextPainter _painter(RenderChunk chunk, double width) => TextPainter(
+    text: TextSpan(
+      text: _prefix(chunk, width) + (chunk.text ?? ''),
+      style: _style(chunk),
+    ),
+    textDirection: _direction,
+    textScaler: _scaler,
+    textAlign: _align(chunk),
+  )..layout(maxWidth: width.clamp(1, double.infinity));
   ReaderPosition? _capture() {
     if (_restoring) return _target;
     final visible = _visible();
@@ -210,7 +210,16 @@ class _ReaderViewportState extends State<ReaderViewport> {
           ),
         );
         final line = painter.getLineBoundary(position);
-        final codePoints = chunk.text!.substring(0, line.start).runes.length;
+        final codePoints = chunk.text!
+            .substring(
+              0,
+              (line.start - _prefix(chunk, box.size.width).length).clamp(
+                0,
+                chunk.text!.length,
+              ),
+            )
+            .runes
+            .length;
         fraction = (chunk.start + codePoints) / chunk.total;
       } finally {
         painter.dispose();
@@ -266,7 +275,12 @@ class _ReaderViewportState extends State<ReaderViewport> {
             within =
                 widget.paragraphSpacing / 2 +
                 painter
-                    .getOffsetForCaret(TextPosition(offset: utf16), Rect.zero)
+                    .getOffsetForCaret(
+                      TextPosition(
+                        offset: utf16 + _prefix(chunk, box.size.width).length,
+                      ),
+                      Rect.zero,
+                    )
                     .dy;
           } finally {
             painter.dispose();
@@ -308,11 +322,10 @@ class _ReaderViewportState extends State<ReaderViewport> {
         padding: EdgeInsets.only(
           top: widget.paragraphSpacing / 2,
           bottom: widget.paragraphSpacing / 2,
-          left: _indent(chunk, _width),
         ),
         child: Text(
           key: ValueKey('reader-text-$unit'),
-          chunk.text!,
+          _prefix(chunk, _width) + chunk.text!,
           style: _style(chunk),
           textAlign: _align(chunk),
           textScaler: _scaler,

@@ -98,6 +98,60 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @articleContents.
+  ///
+  /// In en, this message translates to:
+  /// **'In-volume contents'**
+  String get articleContents;
+
+  /// No description provided for @articleContentsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No recognisable section headings in this article. Use the volume list to switch articles.'**
+  String get articleContentsEmpty;
+
+  /// No description provided for @articleContentsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Built from content headings; plain-text detection may be incomplete.'**
+  String get articleContentsHint;
+
+  /// No description provided for @volumesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Volumes'**
+  String get volumesTitle;
+
+  /// No description provided for @volumesLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse volumes and chapters'**
+  String get volumesLoad;
+
+  /// No description provided for @volumesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse the source groups and choose a volume or chapter to read.'**
+  String get volumesDescription;
+
+  /// No description provided for @shelfTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep your favourite stories close.'**
+  String get shelfTagline;
+
+  /// No description provided for @discoverTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Find your next chapter.'**
+  String get discoverTagline;
+
+  /// No description provided for @offlineEnvironment.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline demo · sample books only'**
+  String get offlineEnvironment;
+
   /// No description provided for @historyTitle.
   ///
   /// In en, this message translates to:
@@ -901,6 +955,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'About {percent}% of this chapter'**
   String readerChapterProgress(int percent);
+
+  /// No description provided for @moreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get moreActions;
+
+  /// No description provided for @readerProgressLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get readerProgressLabel;
+
+  /// No description provided for @shelfGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid'**
+  String get shelfGrid;
+
+  /// No description provided for @shelfList.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get shelfList;
+
+  /// No description provided for @allChapters.
+  ///
+  /// In en, this message translates to:
+  /// **'All chapters'**
+  String get allChapters;
+
+  /// No description provided for @lightNovelSource.
+  ///
+  /// In en, this message translates to:
+  /// **'LightNovel.fun'**
+  String get lightNovelSource;
+
+  /// No description provided for @readerResetTypography.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset typography'**
+  String get readerResetTypography;
+
+  /// No description provided for @shelfDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get shelfDetails;
+
+  /// No description provided for @shelfRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get shelfRemove;
+
+  /// No description provided for @launchTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Your story continues'**
+  String get launchTagline;
+
+  /// No description provided for @launchLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing your library…'**
+  String get launchLoading;
 }
 
 class _AppLocalizationsDelegate

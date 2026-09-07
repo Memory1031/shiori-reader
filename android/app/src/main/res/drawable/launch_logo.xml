@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fractional insets preserve composition when Android rasterizes the icon at a different size. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:paddingMode="stack">
+    <item>
+        <shape android:shape="rectangle">
+            <size android:width="288dp" android:height="288dp" />
+            <solid android:color="@android:color/transparent" />
+        </shape>
+    </item>
+    <item>
+        <inset android:insetLeft="30.555556%" android:insetRight="30.555556%"
+            android:insetTop="23.611111%" android:insetBottom="37.5%">
+            <bitmap android:src="@drawable/shiori_launch_logo"
+                android:gravity="fill" android:filter="true" />
+        </inset>
+    </item>
+    <item>
+        <inset android:insetLeft="38.888889%" android:insetRight="38.888889%"
+            android:insetTop="68.402778%" android:insetBottom="21.875%"
+            android:drawable="@drawable/launch_wordmark" />
+    </item>
+</layer-list>

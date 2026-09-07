@@ -1,4 +1,13 @@
 {
+  "articleContents": "In-volume contents",
+  "articleContentsEmpty": "No recognisable section headings in this article. Use the volume list to switch articles.",
+  "articleContentsHint": "Built from content headings; plain-text detection may be incomplete.",
+  "volumesTitle": "Volumes",
+  "volumesLoad": "Browse volumes and chapters",
+  "volumesDescription": "Browse the source groups and choose a volume or chapter to read.",
+  "shelfTagline": "Keep your favourite stories close.",
+  "discoverTagline": "Find your next chapter.",
+  "offlineEnvironment": "Offline demo · sample books only",
   "historyTitle": "Recent reading",
   "historyClear": "Clear this reading history",
   "chapterFallback": "The saved chapter is no longer listed. Opened a nearby chapter.",
@@ -38,7 +47,13 @@
   "searchNoMore": "All results shown",
   "searchDraftNotice": "These are previous results. Submit your edited keyword to search again.",
   "searchResultsFor": "Results for “{query}”",
-  "@searchResultsFor": {"placeholders": {"query": {"type": "String"}}},
+  "@searchResultsFor": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
   "devSearchTitle": "Offline search",
   "devSearchHint": "Search “a” to try pagination and view offline novel details.",
   "readerImagePlaceholder": "Illustration",
@@ -141,5 +156,16 @@
         "type": "int"
       }
     }
-  }
+  },
+  "moreActions": "More",
+  "readerProgressLabel": "Progress",
+  "shelfGrid": "Grid",
+  "shelfList": "List",
+  "allChapters": "All chapters",
+  "lightNovelSource": "LightNovel.fun",
+  "readerResetTypography": "Reset typography",
+  "shelfDetails": "Details",
+  "shelfRemove": "Remove",
+  "launchTagline": "Your story continues",
+  "launchLoading": "Preparing your library…"
 }

@@ -1,4 +1,13 @@
 {
+  "articleContents": "卷内目录",
+  "articleContentsEmpty": "这篇正文没有可识别的章节标题。仍可通过分卷列表切换文章。",
+  "articleContentsHint": "从正文标题生成；纯文本标题识别可能不完整。",
+  "volumesTitle": "分卷目录",
+  "volumesLoad": "加载目录",
+  "volumesDescription": "选择卷册或章节开始阅读。",
+  "shelfTagline": "把喜欢的故事，留在手边。",
+  "discoverTagline": "下一本，读什么？",
+  "offlineEnvironment": "离线演示 · 仅含测试书籍",
   "historyTitle": "最近阅读",
   "historyClear": "清除此书阅读记录",
   "chapterFallback": "原章节已不在目录中，已打开相邻章节。",
@@ -38,7 +47,13 @@
   "searchNoMore": "已显示全部结果",
   "searchDraftNotice": "当前为上次搜索结果，请提交修改后的关键词重新搜索。",
   "searchResultsFor": "“{query}”的搜索结果",
-  "@searchResultsFor": {"placeholders": {"query": {"type": "String"}}},
+  "@searchResultsFor": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
   "devSearchTitle": "离线搜索",
   "devSearchHint": "搜索“a”可体验分页并查看离线小说详情。",
   "readerImagePlaceholder": "插图",
@@ -141,5 +156,16 @@
         "type": "int"
       }
     }
-  }
+  },
+  "moreActions": "更多",
+  "readerProgressLabel": "进度",
+  "shelfGrid": "网格",
+  "shelfList": "列表",
+  "allChapters": "全部章节",
+  "lightNovelSource": "轻之国度",
+  "readerResetTypography": "恢复默认排版",
+  "shelfDetails": "详情",
+  "shelfRemove": "移除",
+  "launchTagline": "故事，即将继续",
+  "launchLoading": "正在准备书架…"
 }

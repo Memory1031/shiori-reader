@@ -63,6 +63,11 @@ class _AppearancePanelState extends State<_AppearancePanel> {
               children: [
                 for (final mode in AppThemeMode.values)
                   ChoiceChip(
+                    avatar: Icon(switch (mode) {
+                      AppThemeMode.system => Icons.brightness_auto_outlined,
+                      AppThemeMode.light => Icons.light_mode_outlined,
+                      AppThemeMode.dark => Icons.dark_mode_outlined,
+                    }, size: 18),
                     label: Text(switch (mode) {
                       AppThemeMode.system => l.readerThemeSystem,
                       AppThemeMode.light => l.readerThemeLight,

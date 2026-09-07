@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="launch_paper">#FAF8F4</color>
+    <color name="launch_surface">#FFFCF8</color>
+    <color name="launch_accent">#95506D</color>
+    <color name="launch_line">#DED8D5</color>
+    <color name="launch_ink">#302D2C</color>
+</resources>

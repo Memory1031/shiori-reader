@@ -127,6 +127,11 @@ class _CatalogViewState extends State<CatalogView> {
       return EmptyView(message: strings.catalogEmpty);
     }
     final rows = <Object>[];
+    final ordinals = <ChapterKey, int>{};
+    var ordinal = 0;
+    for (final chapter in widget.catalog.flatChapters) {
+      ordinals[chapter.key] = ++ordinal;
+    }
     for (final volume in widget.catalog.volumes) {
       if (!volume.isSynthetic) rows.add(volume);
       if (volume.isSynthetic || !_collapsed.contains(volume.groupId)) {
@@ -134,34 +139,107 @@ class _CatalogViewState extends State<CatalogView> {
       }
     }
     return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: rows.length,
       itemBuilder: (context, index) {
         final row = rows[index];
         if (row is Volume) {
-          return ListTile(
-            key: ValueKey(('volume', row.groupId)),
-            title: Text(row.title ?? strings.catalogUnnamedVolume),
-            trailing: Icon(
-              _collapsed.contains(row.groupId)
-                  ? Icons.expand_more
-                  : Icons.expand_less,
+          return Padding(
+            padding: EdgeInsets.only(top: index == 0 ? 0 : 12),
+            child: Material(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                minTileHeight: 44,
+                dense: true,
+                leading: Container(
+                  width: 3,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: .5),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                minLeadingWidth: 3,
+                horizontalTitleGap: 10,
+                titleTextStyle: Theme.of(context).textTheme.titleSmall,
+                key: ValueKey(('volume', row.groupId)),
+                title: Text(row.title ?? strings.catalogUnnamedVolume),
+                trailing: Icon(
+                  _collapsed.contains(row.groupId)
+                      ? Icons.expand_more
+                      : Icons.expand_less,
+                ),
+                onTap: () => setState(() {
+                  if (!_collapsed.add(row.groupId)) {
+                    _collapsed.remove(row.groupId);
+                  }
+                }),
+              ),
             ),
-            onTap: () => setState(() {
-              if (!_collapsed.add(row.groupId)) _collapsed.remove(row.groupId);
-            }),
           );
         }
         final chapter = row as Chapter;
         final selected = chapter.key == (_selected ?? widget.current);
-        return ListTile(
-          key: ValueKey(chapter.key),
-          selected: selected,
-          leading: selected ? const Icon(Icons.bookmark) : null,
-          title: Text(chapter.title),
-          onTap: () {
-            setState(() => _selected = chapter.key);
-            widget.onSelect(chapter.key);
-          },
+        return Padding(
+          padding: EdgeInsets.only(top: index == 0 ? 0 : 4),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 2,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              key: ValueKey(chapter.key),
+              selected: selected,
+              minLeadingWidth: 28,
+              horizontalTitleGap: 12,
+              leading: Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: selected
+                    ? Icon(
+                        Icons.bookmark,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.primary,
+                      )
+                    : Text(
+                        '${ordinals[chapter.key]}'.padLeft(2, '0'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+              ),
+              title: Tooltip(
+                message: chapter.title,
+                child: Text(
+                  chapter.title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(height: 1.5),
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 16),
+              onTap: () {
+                setState(() => _selected = chapter.key);
+                widget.onSelect(chapter.key);
+              },
+            ),
+          ),
         );
       },
     );

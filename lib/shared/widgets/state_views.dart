@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/errors/app_failure.dart';
 import '../../l10n/generated/app_localizations.dart';
+import 'empty_books.dart';
 
 class LoadingView extends StatelessWidget {
   const LoadingView({super.key, this.message});
@@ -12,7 +13,13 @@ class LoadingView extends StatelessWidget {
     final label = message ?? AppLocalizations.of(context).loading;
     return _StateLayout(
       children: [
-        CircularProgressIndicator(semanticsLabel: label),
+        SizedBox.square(
+          dimension: 28,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            semanticsLabel: label,
+          ),
+        ),
         Text(label, textAlign: TextAlign.center),
       ],
     );
@@ -24,8 +31,16 @@ class EmptyView extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) =>
-      _StateLayout(children: [Text(message, textAlign: TextAlign.center)]);
+  Widget build(BuildContext context) => _StateLayout(
+    children: [
+      const EmptyBooks(),
+      Text(
+        message,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+    ],
+  );
 }
 
 /// Actions are capabilities supplied by the owner, never inferred services.

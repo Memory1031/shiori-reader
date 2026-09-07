@@ -7,6 +7,7 @@ import '../../features/search/search_screen.dart';
 import '../../features/novel_detail/detail_screen.dart';
 import '../../features/reader/book_reader_screen.dart';
 import '../fixtures.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 /// Offline route composition; none of these fixtures are imported by release.
 class DevSearchPage extends StatefulWidget {
@@ -27,6 +28,7 @@ class _DevSearchPageState extends State<DevSearchPage> {
 
   @override
   Widget build(BuildContext context) => SearchScreen(
+    environmentLabel: AppLocalizations.of(context).offlineEnvironment,
     repository: _environment.novels,
     sourceId: fixtureSourceId,
     routes: _routes,

@@ -123,3 +123,25 @@ READER-005 Android 补验：用户切换到新的 MuMu 实例，ADB 为 127.0.0.
 - iOS Level A：复用 Flutter 3.38.4 内已有 SafeArea、system text scaling、AnnotatedRegion 和 sheetAnimationStyle；保持平台返回与既有 shared_preferences。iOS runtime、VoiceOver / TalkBack 人工验收、ARM64 真机性能仍单列，不把 widget 或 Android 模拟器结果视为完成。
 - Android UI-002：普通开发 APK 构建、安装及 MuMu API 32 冷启动通过。暖纸正文、工具栏及系统栏已截图核对；强制停止后重新进入同一 fixture，暖纸及已确认提示状态保留。应用深色已通过选择后、冷启动后两份 UI hierarchy 的 selected=true 验证，分别记录在本机 `.tooling/evidence/ui002-dark-selected.xml` / `ui002-dark-restart.xml`。本轮夜间阅读配色与滚动模式的设备人工视觉检查尚未完成，自动测试覆盖不等同设备检查。
 - Android 恢复补验 **PARTIAL / 待补**：UI-002 隔离临时 fixture 数据库探针首轮分页 SQLite 重开误差 0、窗口变化误差 0；随后第三次数据库打开失败。两次新进程重试均在首次数据库打开失败，本轮没有完整 READER_RESTORE_PASS，不沿用 READER-006 历史 PASS 冒充新包通过。失败是 LocalDatabases.open 返回 Failure，底层原因未确认，不宣称 MuMu 文件系统问题已解决；滚动 SQLite 重开待环境排查后补验。未修改生产数据库逻辑或导出用户数据。已恢复普通开发包，未停留在探针入口。
+
+## 用户反馈修正：目录语义、首行缩进与图片回翻（2026-09-07）
+
+- 阅读器“卷内目录”基于当前 ChapterContent 的 HeadingBlock，辅以独立短段落的严格标题识别（第 N 话 / 章 / 节、序章、后记等）。列表点击用 blockKey + blockIndex / blockFraction=0 调用既有双模式 restore，不能用字符串标题当身份。重复标题保留不同 occurrence。推断只生成导航投影，不改源正文、contentRevision 或数据库位置。
+- 识别说明明确标注纯文本可能不完整；没有明确标题时显示空状态。仅靠当前已加载正文，不发起额外请求。独立卷内目录接口未取得证据；已有 HTML h1–h6 会由 Source 解析保留。现存代表样本标签统计以 p / strong 等为主，不能承诺每一本源内容都能生成完整目录。
+- 源站书籍 Catalog 是文章 / 分组列表，放在详情“分卷与特典”，阅读器也提供该次级入口。详情先只读本地目录，缺失时显式“查看分卷与章节”再调用常规缓存优先流程；源站“正文”内可能有多个整卷文章，不按 groupId 擅自改写出版卷号。
+- 修复 leadingIndent 被实现成整段 left padding 的错误。现在仅段落起点插入 presentation-only em 空格；换行恢复完整行宽，分页续片不再次缩进。分页与滚动的测量、UTF-16 / code point 映射同步扣除展示前缀，源 blockKey、文本和保存位置格式不变。两种模式均新增文字几何及定位测试，既有前后分页 Unicode 全覆盖测试加入缩进场景。
+- 图片近期回翻复用有界闲置缓存，见 media.md；不声明跨重启图片可离线。
+
+本轮完整离线回归 **276 PASS**，analyze **PASS**，正式入口 Android debug 构建成功。未执行源站自动化实网请求或速度对比；iOS runtime 仍 DEFERRED_NO_MAC。
+
+### 括号章节标题兼容（2026-09-07）
+
+用户截图显示 `【第一话】 掷骰子问题` 与 `【尾声】` 被严格起始规则漏掉。本轮增加成对【】/[]/「」/『』/（）/()标题标记，并兼容同一块中独立的 `(Day176)` 短元信息行。保持原始显示标题及 block 身份；不匹配括号不成对、正文中间引用标题、标题后同块混入普通正文的情况。截图短标题转录与合成边界样本用于回归，无新增源站请求。卷内目录、双模式定位、跨章及分卷目录合计8项专项测试PASS。
+
+### 继续阅读后的详情入口（2026-09-07）
+
+阅读工具栏新增显式“小说详情”入口，继续阅读及直接选章两条路径均由 ReadingHome 注入导航回调。跳转前保存当前阅读进度；保存失败留在正文并提示重试。打开详情时移除连续的旧阅读 / 详情路由，保留书架、历史或搜索来源，避免反复往返堆叠阅读会话。离线导航 / 继续阅读 / 跨章专项 7 PASS，analyze PASS，生产入口 Android debug 构建及 MuMu 安装 PASS。未新增源站实网验证；iOS runtime 仍 DEFERRED_NO_MAC。
+
+### 排版与工具栏收敛（2026-09-07）
+
+新默认排版 18sp、1.7 行高、8dp 段距、20dp 左右边距；已有设置保留，Aa 内可恢复默认排版。源起始空白阻止额外首行缩进，UI 缩进上限 2em；文本及位置身份不变。章节 / 次级标题识别与测量渲染共享，保持两种阅读模式定位一致。顶部简化为返回、章节标题、更多；底部目录、进度、Aa。详情及重试进入更多菜单，上一章 / 下一章进入进度 Sheet。隐藏时无残留应用按钮，中部点按或 F2 唤回；系统状态栏仍保留。进度滑块按 block index / fraction 恢复，不将其描述为精确页码。修复从菜单打开详情时 PopupRoute 退场造成的旧 Reader 残留。全量离线 281 PASS；细节与视觉边界见 UI_PLAN.md。
