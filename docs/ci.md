@@ -1,6 +1,6 @@
 # 持续集成
 
-工作流：[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)。当前是提前引入的基础质量检查，不代表任务计划中的 CI-001 / CI-002 已完成全部验收。
+工作流：[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)。当前是提前引入的基础质量检查，不代表任务计划中的 CI-001 / CI-002 已完成全部验收。tag 触发的发布工作流见[发布工作流](#发布工作流)一节（[`.github/workflows/release.yml`](../.github/workflows/release.yml)）。
 
 ## 触发方式
 
@@ -11,7 +11,37 @@
 
 仅修改文档时也运行基础检查。普通推送和 PR 不构建 APK。
 
-手动构建入口为 GitHub **Actions → CI → Run workflow**；工作流进入默认分支后可使用该入口。产物名为 `app-debug-apk`，保留 7 天，仅用于开发验证。工作流没有发布、签名密钥或 iOS 构建步骤。
+手动构建入口为 GitHub **Actions → CI → Run workflow**；工作流进入默认分支后可使用该入口。产物名为 `app-debug-apk`，保留 7 天，仅用于开发验证。本工作流（ci.yml）自身没有发布、签名密钥或 iOS 构建步骤。
+
+## 发布工作流
+
+工作流：[`.github/workflows/release.yml`](../.github/workflows/release.yml)，**仅在推送 `v*` 标签时触发**；普通推送、PR 和手动入口都不产出发布包。结构校验已并入 `.tooling/check-ci-yaml.dart`（tag-only 触发、发布任务依赖检查）。
+
+| 任务 | 行为 |
+| --- | --- |
+| `checks` | 应用级复核：两份严格锁定安装、gen-l10n、analyze、test；不重复调查包检查 |
+| `android-release` | 依赖 `checks`；从仓库 secrets 还原签名密钥，构建 release APK，以 `shiori-reader-<tag>-android.apk` 为名创建 GitHub Release 并附上产物。重跑时若 Release 已存在则覆盖上传同一资产 |
+
+发版步骤：把 `pubspec.yaml` 的 `version` 与标签对齐（如 `0.2.0+3` 对应 `v0.2.0`，`+3` 为递增的 versionCode）→ 提交并推送 → `git tag v0.2.0 && git push origin v0.2.0`。产物名取自标签，与 `pubspec.yaml` 的 versionName 由人工保持一致。
+
+签名需要一次性配置 4 个仓库 secrets（GitHub **Settings → Secrets and variables → Actions**）：
+
+| Secret | 内容 |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | 上传密钥库文件的 base64（Git Bash：`base64 -w 0 release-keystore.jks`） |
+| `ANDROID_STORE_PASSWORD` | 密钥库口令 |
+| `ANDROID_KEY_ALIAS` | 密钥别名 |
+| `ANDROID_KEY_PASSWORD` | 密钥口令 |
+
+密钥库用项目固定 JDK 生成，口令与 `.jks` 文件自行离线备份——密钥丢失后无法以同一签名身份发布更新：
+
+```powershell
+& ".tooling/jdk/jdk-17.0.20.1+1/bin/keytool.exe" -genkey -v -keystore release-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias shiori-upload
+```
+
+`android/key.properties` 与 `*.jks` 已被 `android/.gitignore` 忽略，不会进入版本库。`build.gradle.kts` 在缺失 `key.properties` 时回退 debug 签名，本地 `flutter run --release` 不需要任何配置；要在本地复验发布签名，可手工放置 `android/key.properties` 与密钥库后执行 `flutter build apk --release --no-pub`。
+
+工作流缺 secrets 时会在写入签名配置前失败，不产出无法安装或签名不一致的包。当前应用尚未执行 TASK_PLAN 的 RELEASE-001 渠道 / 许可审查，**对外公开分发（真实发版）前先完成该任务**；打测试标签验证流水线不受此限制，验证后删除对应 Release 与标签即可。
 
 ## 依赖锁定
 
@@ -57,6 +87,13 @@ dart bin/source_probe.dart
 
 SDK / 依赖安装需要网络；上述测试和样本检查不启用 `--live`，不访问源站。
 
+工作流结构校验（`.tooling/check-ci-yaml.dart`，依赖由 Git 忽略的临时包 `.tooling/ci-yaml-run/` 提供；首次使用先在其中 `dart pub get`）：
+
+```bash
+PUB_HOSTED_URL=https://pub.flutter-io.cn dart pub get --directory=.tooling/ci-yaml-run
+dart run --packages=.tooling/ci-yaml-run/.dart_tool/package_config.json .tooling/check-ci-yaml.dart
+```
+
 ## 样本完整性与换行符
 
 调查包先按原始字节校验 fixture SHA-256，失败时不会进入任何模拟 / 真实 HTTP 阶段。因此多个网络测试同时出现 `Expected: 1, Actual: 0` 时，应先查看 `fixture_integrity` 报告。CI 现在先运行默认离线检查，再用 `--reporter expanded` 执行测试，以保留明确的失败原因。
@@ -72,3 +109,9 @@ SDK / 依赖安装需要网络；上述测试和样本检查不启用 `--live`�
 - 用户提供的首次 GitHub 运行在依赖源不一致时安装失败；统一源后，后续运行因调查包依赖安装晚于根目录分析而失败。现已将两份依赖安装都提前到分析前。
 - 调整顺序后，本地两份严格锁定安装及根目录 `dart --suppress-analytics analyze` 通过（No issues found）。这是 Dart 分析器验证，修正后的 GitHub `flutter analyze --no-pub` 仍待新提交运行；重新运行旧提交不会包含本次修正。
 - 后续调查包测试失败已定位为 CRLF / LF 哈希差异：通过 `git -c core.autocrlf=false archive` 导出仓库内容，复现 9 个样本哈希不符。将样本固定为 LF 并修正 manifest 后，在独立 LF 导出目录执行 23 项测试全部通过，15 项样本哈希及默认离线检查通过，HTTP 请求数为 0。验证宿主仍为 Windows，未冒称实际 Linux runner 已通过。
+
+## 本次验证记录 — 发布工作流（2026-09-07）
+
+- 扩展 `.tooling/check-ci-yaml.dart` 校验 release.yml：两份 YAML 解析、tag-only 触发、`android-release` 依赖 `checks`、工作目录检查通过。
+- `build.gradle.kts` 签名改造后本地复验：无 `key.properties` 时 debug 构建 PASS（29.1s，回退 debug 签名路径）；用临时测试密钥库走 CI 同款路径（`key.properties` + `release-keystore.jks`）构建 release APK PASS（53.8s），`apksigner verify --print-certs` 确认签名者为测试证书 `CN=Shiori Local Test`。测试密钥库与 `key.properties` 验证后已删除，未提交；正式密钥库尚未生成，4 个仓库 secrets 尚未配置。
+- 未验证：GitHub Actions 上的实际运行（需提交并推送标签后观察）；iOS 发布链路不在本工作流范围。runner 上的 `gh release create` / base64 解码步骤仅为源码审查通过，无本机等价执行。

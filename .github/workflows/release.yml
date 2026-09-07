@@ -1,0 +1,117 @@
+name: Release
+
+# 正式发布工作流：仅在推送 v* 标签时触发。日常质量检查由 ci.yml 负责，
+# 这里只复核应用级检查并产出签名 APK；调查包检查不在发布关键路径上。
+# 对外公开分发前需完成 TASK_PLAN 的 RELEASE-001 渠道 / 许可审查。
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  # 同一标签的多次运行不互相取消，避免 Release 写一半被中断。
+  cancel-in-progress: false
+
+env:
+  # 必须与 .fvmrc 和 pubspec.yaml 的 Flutter 约束保持一致
+  FLUTTER_VERSION: 3.38.4
+  # 两个 pubspec.lock 都记录此镜像；源地址不同也会导致严格锁定校验失败。
+  PUB_HOSTED_URL: https://pub.flutter-io.cn
+
+jobs:
+  checks:
+    name: 发布前应用检查
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 安装依赖
+        run: flutter pub get --enforce-lockfile
+
+      # 根目录 analyze 会扫描嵌套包，必须先生成调查包自己的 package_config。
+      - name: 安装调查包依赖
+        working-directory: tools/source_probe
+        run: dart pub get --enforce-lockfile
+
+      - name: 生成本地化代码
+        run: flutter gen-l10n
+
+      - name: 静态分析
+        run: flutter analyze --no-pub
+
+      - name: 单元与组件测试
+        run: flutter test --no-pub
+
+  android-release:
+    name: Android 签名发布构建
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 安装依赖
+        run: flutter pub get --enforce-lockfile
+
+      - name: 生成本地化代码
+        run: flutter gen-l10n
+
+      - name: 检查签名密钥
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        # 缺 secrets 时立即失败，不产出无法安装或签名不一致的包。
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::未配置 ANDROID_KEYSTORE_BASE64 / ANDROID_STORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD；发布流程见 docs/ci.md。"
+            exit 1
+          fi
+
+      - name: 写入签名配置
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/release-keystore.jks
+          {
+            echo "storeFile=release-keystore.jks"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+
+      - name: 构建 release APK
+        run: flutter build apk --release --no-pub
+
+      - name: 创建 GitHub Release 并附上 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          APK="shiori-reader-${GITHUB_REF_NAME}-android.apk"
+          mv build/app/outputs/flutter-apk/app-release.apk "$APK"
+          # 重跑时 Release 已存在，改为覆盖上传同一资产。
+          gh release create "$GITHUB_REF_NAME" "$APK" \
+            --title "$GITHUB_REF_NAME" --generate-notes --verify-tag \
+            || gh release upload "$GITHUB_REF_NAME" "$APK" --clobber
