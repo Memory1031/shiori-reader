@@ -1,6 +1,6 @@
 # Shiori Task Plan
 
-规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-07，按用户指定完成 READER-001 / READER-002，默认左右翻页并保留上下滚动，双模式实验与正式单章 Reader 已交付；SRC-001..004 / CORE-001..004 已完成，Phase 0 技术 Gate = GO / PASS，当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
+规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-07，NET-001 / NET-002 / MEDIA-001 已按顺序完成，完整 112 项测试与 Android 组合探针 PASS；按用户指定完成 READER-001 / READER-002，默认左右翻页并保留上下滚动，双模式实验与正式单章 Reader 已交付；SRC-001..004 / CORE-001..004 已完成，Phase 0 技术 Gate = GO / PASS，当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
 
 规划修订阶段（历史记录）：仅完善本文件并做 Self Review，基于完整的 41 节 / 59 Task 原计划，当时仓库为 Greenfield，未执行开发任务。后续用户已授权本次 SRC-001 / CORE-001 执行；除这两个任务的明确交付记录外，目录树、模型、配置值和测试命令仍为后续设计，不代表已实现。
 
@@ -319,7 +319,7 @@ JSON 若在当前普通浏览器行为中稳定存在可优先使用；HTML fall
 
 统一的是 Transport 配置和策略实现，不是所有 Source 共用一个带 Cookie 的 Dio 单例。每个 Source 由工厂创建客户端，Source 提供私有域名 / Header policy；请求限制器跨元数据和图片共享。Fixture 不经过真实 transport。
 
-**PROPOSED 初始客户端预算**（均为本项目保守值，不是网站限制事实）：connect 10s、send 10s、receive 20s；图片 receive 30s；前台逻辑操作总 deadline 45s。重试、队列等待、重定向和会话恢复共享 deadline，超过即给可操作失败。HTML / JSON 响应解压后上限 8 MiB，单图传输上限 20 MiB；超限不截断成“成功正文”，需报 unsupported / tooLarge 并在实证后调整。
+**DECIDED 初始客户端预算（NET-001 / NET-002 已实现并以离线测试验证）**（均为本项目保守值，不是网站限制事实）：connect 10s、send 10s、receive 20s；图片 receive 30s；前台逻辑操作总 deadline 45s。重试、队列等待、重定向和会话恢复共享 deadline，超过即给可操作失败。HTML / JSON 响应解压后上限 8 MiB，单图传输上限 20 MiB；超限不截断成“成功正文”，需报 unsupported / tooLarge 并在实证后调整。
 
 - 全局最多 2 个在途 HTTP 请求；每 Source 同时最多 2 个；后台预取最多 1 个且给前台让位。请求启动间隔初值每 Source 500ms；多个 image host 也共享该 Source 预算，不以分域规避。取消过期查询 / 离屏未开始请求；排队上限 20，丢弃过期后台请求。
 - 超时、临时连接错误、502 / 503 / 504：仅明确可安全重复的读操作，最多额外重试 1 次（通常总计 2 次）。backoff 500ms + 0..250ms jitter，注入 clock / random 测试。语义未知的 POST 即使是搜索也不自动重放，等 Phase 0 确认。
@@ -654,7 +654,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | Deferred Track | IOS-001..006 | 全部 DEFERRED_NO_MAC；未来环境可用后才跑基础 / Source / UX / Reader / Offline / Release runtime，不影响上述完成 |
 | Optional Compile Track | CI-003 | OPTIONAL_PROPOSED；可用 macOS runner 时记录指定 target 编译结果，不产生 runtime PASS、不作为 Android required check |
 
-当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 的安装阻塞已在 DEV-002 解除：复用同一应用壳的新开发包已完成 MuMu 安装、冷启动及返回导航 smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001..002 DONE：17 个离线场景、内存仓库、开发菜单和指定场景入口已交付；当前 73 项测试、Android 编译和 MuMu 开发入口运行通过，20 图设备解码已补齐，见 [Fixture 验证](fixtures.md) / [开发入口](dev-entry.md)。READER-001 已通过双模式视口实验，当前 85 项测试及 Android 探针 PASS，见 [ADR-07](decisions/reader-viewport.md)。READER-002 已完成正式单章状态 / 块样式 / Chrome，当前完整测试 91 项通过，见 [Reader 验收](reader.md)。下一建议 NET-001 → NET-002 → MEDIA-001，再执行 READER-003；DB-001 也可独立领取，尚未执行。SRC-005 仍等待 NET-002 / DB-002。CI-003 未启用；本轮没有生产 Source / DB / 缓存实现；DEV-001 使用独立开发替身，不把它作为生产实现验收。
+当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 的安装阻塞已在 DEV-002 解除：复用同一应用壳的新开发包已完成 MuMu 安装、冷启动及返回导航 smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001..002 DONE：17 个离线场景、内存仓库、开发菜单和指定场景入口已交付；当前 73 项测试、Android 编译和 MuMu 开发入口运行通过，20 图设备解码已补齐，见 [Fixture 验证](fixtures.md) / [开发入口](dev-entry.md)。READER-001 已通过双模式视口实验，当前 85 项测试及 Android 探针 PASS，见 [ADR-07](decisions/reader-viewport.md)。READER-002 已完成正式单章状态 / 块样式 / Chrome，当前完整测试 91 项通过，见 [Reader 验收](reader.md)。NET-001 / NET-002 / MEDIA-001 已顺序完成，完整测试更新为 112 项及 Android 组合探针 PASS，见 [网络](network.md) / [媒体](media.md)。下一建议 READER-003；DB-001 也可独立领取，尚未执行。SRC-005 仍等待 DB-002（NET-002 已完成）。CI-003 未启用；本轮没有生产 Source / DB / 缓存实现；DEV-001 使用独立开发替身，不把它作为生产实现验收。
 
 示例（未来某 Phase 完成后可记录，**不是当前结果**）：Feature Status = DONE；Android Validation = PASS；iOS Compatibility Review = PASS；iOS Runtime Validation = DEFERRED_NO_MAC。这样 Phase 4 可达到 Reader Feature Complete，而 Cross-platform Mobile MVP 仍等待 iOS 验证。
 
@@ -783,6 +783,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### NET-001 — Transport 基础与安全诊断
 
+- Status：DONE（2026-09-07）；[网络实现与验收](network.md)。Dio 5.11.1、Source 私有 policy、字节 / deadline / 取消 / 类型化日志已交付；与 NET-002 / MEDIA-001 合计完整测试 112 项通过，Android 组合探针 PASS；未访问真实 Source，iOS runtime DEFERRED_NO_MAC。
+
 - Phase：1；Complexity：M。
 - Goal：统一受限网络请求配置及可安全诊断的失败。
 - Input：第 15、24–25 节；Dependencies：CORE-003。
@@ -794,6 +796,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：超时、取消、MIME / 长度上限、异常映射、秘密哨兵日志测试。
 
 #### NET-002 — 调度、重试与重定向预算
+
+- Status：DONE（2026-09-07）；[预算与验收](network.md)。共享 2 在途 / 1 后台、500ms 同源间隔、有界优先队列、一次 safe-read retry、429 冷却、5 跳 redirect 及总 deadline 已验证；未实现或启用 Source 会话恢复。
 
 - Phase：1；Complexity：M。
 - Goal：避免并发、重试与会话恢复造成请求放大。
@@ -1044,7 +1048,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 #### MEDIA-001 — 最小网络 / 内存 ImageRepository
 
 - Phase：4；Complexity：M。
-- Status：TODO。
+- Status：DONE（2026-09-07）；[媒体所有权与验收](media.md)。请求合并、独立租约、内存 / 队列 / deadline 限额与取消释放已交付；完整 112 项测试、Android 组合探针自制 PNG codec PASS；无持久缓存或 Reader 图片 UI 接入，iOS runtime DEFERRED_NO_MAC。
 - Goal：在不建设持久图片缓存的前提下，提供可取消、有界的正式取图实现。
 - Input：第 12、15、18.3 节、SourceMedia / ImageRepository contracts；Dependencies：CORE-003、NET-002。
 - Scope：注入 SourceMedia resolver，MediaRef → 受限字节流 → 短期 memory media；合并在途请求、取消订阅、MIME / byte limit / 错误映射、无引用释放。Flutter decode 和按屏宽限制在 READER-003，两个组件协同限制内存。
@@ -1767,7 +1771,7 @@ flowchart TD
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。下一建议 **NET-001**，经 NET-002 → MEDIA-001 解除 READER-003 前置；DB-001 也可按其前置另行领取。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。CORE-005 及 Source 首项 SRC-005 仍等待 NET-002、DB-002。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。**NET-001 / NET-002 / MEDIA-001 DONE**，已解除图片任务前置；下一建议 **READER-003**。DB-001 也可按其前置另行领取。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。CORE-005 及 Source 首项 SRC-005 仍等待 DB-002（NET-002 已完成）。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
 
 ## 39. Parallelizable Work
 

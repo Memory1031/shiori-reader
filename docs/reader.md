@@ -33,4 +33,4 @@ flutter build apk --debug --no-pub --target lib/main.dart
 - 普通 `lib/main.dart` APK 最终重新构建通过，未覆盖安装；模拟器仍为本次开发包。MuMu 不代表 ARM64 真机性能或 iOS runtime。
 - iOS Level A：共享 Flutter Widget / SafeArea / Navigator，保留已有 Cupertino 路由装配；无平台分支、系统栏全局修改、插件或最低系统变化。真实 swipe-back、状态栏、安全区域与生命周期归 IOS-003 / IOS-004，尚未实测。
 
-下一可执行建议 NET-001 → NET-002 → MEDIA-001，再进入 READER-003；DB-001 → DB-002 可为设置、进度和本地导入解除前置。此次未自动领取后续任务。
+后续 NET-001 → NET-002 → MEDIA-001 已完成，见 [网络](network.md) / [媒体](media.md)，下一可执行建议 READER-003；DB-001 → DB-002 可为设置、进度和本地导入解除前置。此次未自动领取后续任务。
