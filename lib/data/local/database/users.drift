@@ -1,0 +1,27 @@
+CREATE TABLE bookshelf (
+ source_id TEXT NOT NULL, novel_id TEXT NOT NULL, summary_json TEXT NOT NULL,
+ added_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+ PRIMARY KEY(source_id, novel_id)
+);
+CREATE INDEX bookshelf_added ON bookshelf(added_at DESC);
+CREATE TABLE progress_sessions (
+ source_id TEXT NOT NULL, novel_id TEXT NOT NULL,
+ generation INTEGER NOT NULL CHECK(generation >= 1),
+ sequence INTEGER NOT NULL DEFAULT -1 CHECK(sequence >= -1),
+ PRIMARY KEY(source_id, novel_id)
+);
+CREATE TABLE reading_progress (
+ source_id TEXT NOT NULL, novel_id TEXT NOT NULL, chapter_id TEXT NOT NULL,
+ summary_json TEXT NOT NULL, chapter_ordinal INTEGER NOT NULL CHECK(chapter_ordinal >= 0),
+ catalog_revision TEXT NOT NULL, content_revision TEXT NOT NULL, block_key TEXT NOT NULL,
+ block_index INTEGER NOT NULL CHECK(block_index >= 0),
+ block_fraction REAL NOT NULL CHECK(block_fraction >= 0 AND block_fraction <= 1),
+ chapter_fraction REAL NOT NULL CHECK(chapter_fraction >= 0 AND chapter_fraction <= 1),
+ completed INTEGER NOT NULL CHECK(completed IN (0, 1)),
+ pixel_offset REAL CHECK(pixel_offset >= 0), layout_key TEXT,
+ position_version INTEGER NOT NULL CHECK(position_version >= 1),
+ last_read_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+ CHECK((pixel_offset IS NULL) = (layout_key IS NULL)),
+ PRIMARY KEY(source_id, novel_id)
+);
+CREATE INDEX progress_recent ON reading_progress(last_read_at DESC);

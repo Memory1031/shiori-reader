@@ -11,6 +11,11 @@ dependencies:
   characters: 1.4.0
   crypto: 3.0.7
   dio: 5.11.1
+  drift: 2.32.1
+  sqlite3: 3.5.2
+  path: 1.9.1
+  path_provider: 2.1.5
+  shared_preferences: 2.5.5
   flutter:
     sdk: flutter
   get: 4.7.3

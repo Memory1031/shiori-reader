@@ -95,3 +95,7 @@ flutter build apk --debug --no-pub
 CORE-001 结果：**DONE（2026-09-06，working tree，未提交 commit）**。Android build / MuMu startup PASS；iOS Level A PASS，Level B DEFERRED_NO_MAC。Windows 全新 Gradle transform 缓存需要停止 daemon 重试的限制仍须在 ANDROID-001 复核，不阻止当前已实际构建并启动的最小工程交给后续任务。当前没有执行 CORE-002。
 
 本次 `.tooling/` 工具、下载归档和构建缓存合计约 **7.61 GB**（7608807846 字节快照）；全部被 Git 忽略。APK / 测试产物在单独忽略的 `build/`。不把这些路径或宿主绝对路径写入应用配置。
+
+## DB-001 / DB-002 存储与代码生成
+
+数据库路径、双库备份边界、固定依赖、隔离生成器和验证记录见 [本地存储](database.md)。首次代码生成前进入 `tool/db_codegen` 执行 `dart pub get`，返回根目录运行 `./tool/generate_database.ps1`；所有命令仍使用固定 Dart 3.10.3。不要在主工程加入生成器的 analyzer 约束或强制依赖覆盖。数据库 schema 快照属于源码，工具包工作目录和原生下载缓存不属于源码。

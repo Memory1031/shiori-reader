@@ -28,6 +28,7 @@ class PagedReaderViewport extends StatefulWidget {
     this.textStyle = const TextStyle(fontSize: 20, height: 1.7),
     this.maxChunkCodePoints = 800,
     this.imageHeights = const {},
+    this.imageExtent,
     this.imageBuilder,
     this.onCenterTap,
   });
@@ -37,6 +38,7 @@ class PagedReaderViewport extends StatefulWidget {
   final TextStyle textStyle;
   final int maxChunkCodePoints;
   final Map<MediaRef, double> imageHeights;
+  final double Function(ImageBlock)? imageExtent;
   final Widget Function(BuildContext, ImageBlock)? imageBuilder;
   final VoidCallback? onCenterTap;
   @override
@@ -176,6 +178,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
           scaler: scaler,
           direction: direction,
           imageHeights: widget.imageHeights,
+          imageExtent: widget.imageExtent,
         );
         final first = _layout!.forward(_layout!.cursor(_position));
         // No clipping a text line into a viewport shorter than that line.

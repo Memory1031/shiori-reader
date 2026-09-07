@@ -87,8 +87,8 @@ iOS **Level B — Runtime Validation** 归 IOS-001..006：Xcode / 原生依赖�
 | Dio：采用；查阅为 5.11.1 | data/network；超时、取消、拦截器、字节响应和受控重试 | Dart IO adapter | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；Dart IO adapter，验证 HTTPS | 默认无额外平台插件，使用系统网络 / TLS | interceptors 顺序、重试重复提交；锁版本测试。替代 `http` 更小，但需自行补齐控制能力。[Dio](https://pub.dev/packages/dio) |
 | cookie_jar：条件采用；4.0.9 | Source 私有会话存储；仅 Phase 0 证明必要才启用持久化 | Dart 文件 / IO 可用 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；Dart 文件 / IO 可用 | 本体无；目录依赖 path_provider | 明文文件、过期和损坏；内存 CookieJar 更简单。不要照抄示例的忽略过期设置。[cookie_jar](https://pub.dev/packages/cookie_jar) |
 | dio_cookie_manager：条件采用；3.5.0 | 挂到 Source 专属 Dio，不挂全局共享秘密客户端 | package 支持 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；package 支持 | 本体无 | 与 Dio / cookie_jar 版本耦合；重定向 Cookie 要单独测试。若不需 Cookie，整个依赖删除，不手写第二套 cookie 解析。[说明](https://pub.dev/packages/dio_cookie_manager) |
-| Drift + sqlite3：采用；2.34.4 / 3.5.2 | 本地用户数据、事务、缓存索引、迁移；后台 isolate | native SQLite，真机与 MuMu ABI 验证 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；device / simulator ABI 均须验证 | FFI SQLite 二进制与 build hooks | 代码生成、迁移、原生打包；替代 sqflite 较直接但类型 / 迁移需自己维护。Drift 的收益符合本项目，不再加通用 ORM 层。[Drift](https://pub.dev/packages/drift)、[sqlite3](https://pub.dev/packages/sqlite3) |
-| drift_dev + build_runner：采用 dev-only | schema 和类型生成、迁移测试资产 | 宿主构建工具，不进运行期 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；同左，Mac 复现生成 | 不额外引入手机 Native runtime | 生成器 / analyzer 版本耦合；替代手写 SQL，反而增加本地模型维护量。[drift_dev](https://pub.dev/packages/drift_dev)、[build_runner](https://pub.dev/packages/build_runner) |
+| Drift + sqlite3：采用；2.32.1 / 3.5.2（DB-001 兼容锁定） | 本地用户数据、事务、缓存索引、迁移；后台 isolate | native SQLite，真机与 MuMu ABI 验证 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；device / simulator ABI 均须验证 | FFI SQLite 二进制与 build hooks | 代码生成、迁移、原生打包；替代 sqflite 较直接但类型 / 迁移需自己维护。Drift 的收益符合本项目，不再加通用 ORM 层。[Drift](https://pub.dev/packages/drift)、[sqlite3](https://pub.dev/packages/sqlite3) |
+| drift_dev + build_runner：采用独立 dev-only 工具包（2.32.1 / 2.10.5） | schema 和类型生成、迁移测试资产 | 宿主构建工具，不进运行期 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；同左，Mac 复现生成 | 不额外引入手机 Native runtime | 生成器 / analyzer 版本耦合；替代手写 SQL，反而增加本地模型维护量。[drift_dev](https://pub.dev/packages/drift_dev)、[build_runner](https://pub.dev/packages/build_runner) |
 | SharedPreferencesAsync：采用；包 2.5.5 | ReaderSettings 和简单 UI 偏好，通过 SettingsStore 包装 | 原生 preferences / DataStore 实现 | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；原生 UserDefaults 实现 | 有平台实现 | 不是关键数据的持久保证，不能保存书架 / 进度 / Session；较简单替代是已有 Drift 的一行 settings。[官方说明](https://pub.dev/packages/shared_preferences) |
 | html：采用；0.15.7 | lightnovel/parser；HTML5 DOM 分析，不执行 JS | 纯 Dart | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；纯 Dart | 无 | 容错解析不代表语义正确；JSON 接口稳定时直接用 dart:convert，不能用正则替代整页 HTML Parser。[html](https://pub.dev/packages/html) |
 | crypto：采用，限内容摘要用途 | blockKey / contentRevision / 缓存文件 checksum 的稳定 SHA-256 | 纯 Dart | DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED；纯 Dart | 无 | 正规化输入变更会使摘要变化，须版本化；不用于破解源站签名。替代远端 revision 仅在可靠可用时采用；Dart hashCode 不作为持久身份。[crypto](https://pub.dev/packages/crypto) |
@@ -411,7 +411,7 @@ ReaderPosition 始终锚定首个可见语义 ContentBlock，blockIndex 是语�
 
 ## 21. Local Persistence
 
-使用一个 App DB、一个后台连接管理器。结构化用户数据与可淘汰缓存可在同一数据库，但操作和保留策略分离。以下是终态 schema 草案，不生成数据库；DB-001 只固化当前用户数据 / 基本小说记录 v1 与扩展政策。image_cache 的 metadata / 文件生命周期由 Phase 6 CACHE-003 才实现，DB-001 不提前生成完整图片缓存 DAO。
+DB-001 已决定分为 users.sqlite 与 cache.sqlite，由一个 LocalDatabases 所有者管理各自后台连接。结构化用户数据与可淘汰缓存可在同一数据库，但操作和保留策略分离。以下是终态 schema 草案，不生成数据库；DB-001 已固化当前用户数据 / 基本小说记录 v1 与扩展政策，实际实现见 [本地存储](database.md)。image_cache 的 metadata / 文件生命周期由 Phase 6 CACHE-003 才实现，DB-001 不提前生成完整图片缓存 DAO。
 
 | 表 | Primary key / 约束 | 核心列 | 生命周期 |
 | --- | --- | --- | --- |
@@ -627,7 +627,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | OQ-05 PARTIALLY_OBSERVED | p / img / ruby / rt / strong / a、整卷长章与 JPEG 已观察；br / 空行、真实极长段 / 图片章及异常仍缺样本 | SRC-009 明确合成 provenance，验证语义顺序与 Ruby 括注；READER-001 验证长章布局。结构摘要不代替生产 Parser 测试，Domain 不拆语义段 |
 | OQ-06 NEEDS VERIFICATION | 原生 pivot viewport 恢复精度、语义顺序、高刷 / 多图性能 | READER-001 实验；不合格再评估维护中的 indexed-scroll 包，阻塞 READER-002 |
 | OQ-07 UNKNOWN | 已知当前无 Mac / Xcode / iPhone 开发环境；未来何时能取得完整环境？ | 当前无环境是 KNOWN RESOURCE CONSTRAINT；获得环境后激活 IOS-001..006。只阻塞 iOS Runtime / RC / Cross-platform Mobile MVP，不阻塞 Android MVP；不在 CORE-001 重新调查“是否有 Mac” |
-| OQ-08 NEEDS VERIFICATION | 单 DB 混合缓存的备份边界与是否拆库；iOS 实际 backup / path 行为 | DB-001 先决定 Android 实现和 iOS 文档兼容，ANDROID-002 实测 Android；IOS-005 未来补 iOS runtime，不能让该部分延期阻塞 Android；保持 Repository 契约 |
+| OQ-08 PARTIALLY_RESOLVED | DB-001 决定拆分用户 / 缓存库，Android 两代备份 XML 排除 disposable 和开发目录；iOS 文档兼容路径已记录 | Android 完整 backup / restore 留 ANDROID-002；iOS 排除属性接入与实测留 IOS-005，仍 DEFERRED_NO_MAC；见 [存储决定](database.md) |
 | OQ-09 NEEDS VERIFICATION | Phase 6 自有持久图片缓存相对成熟封装的收益、真实预算 / TTL | CACHE-001 / CACHE-003 复核有限范围；Phase 4 MEDIA-001 已确定只做网络 / 内存，不等待该选择 |
 | OQ-10 NEEDS VERIFICATION | 最终 SDK / 插件版本、最低 OS、Native dependencies、iOS limitations、生成器兼容 | CORE-001 / 依赖引入任务：Android build + Level A documented review；CI-003 可选 compile；IOS-001 未来实际链接 / runtime，不阻塞 Android |
 | OQ-11 PARTIALLY_OBSERVED | 验收书选择与图文可达子问题 CLOSED：玩乐关系 → 31607 / 44117 / 309555；真实限流规则仍 UNKNOWN | NET-002 / TEST-001 用保守预算并尊重自然 429；不压测；30 次只是客户端政策 |
@@ -654,7 +654,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | Deferred Track | IOS-001..006 | 全部 DEFERRED_NO_MAC；未来环境可用后才跑基础 / Source / UX / Reader / Offline / Release runtime，不影响上述完成 |
 | Optional Compile Track | CI-003 | OPTIONAL_PROPOSED；可用 macOS runner 时记录指定 target 编译结果，不产生 runtime PASS、不作为 Android required check |
 
-当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 的安装阻塞已在 DEV-002 解除：复用同一应用壳的新开发包已完成 MuMu 安装、冷启动及返回导航 smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001..002 DONE：17 个离线场景、内存仓库、开发菜单和指定场景入口已交付；当前 73 项测试、Android 编译和 MuMu 开发入口运行通过，20 图设备解码已补齐，见 [Fixture 验证](fixtures.md) / [开发入口](dev-entry.md)。READER-001 已通过双模式视口实验，当前 85 项测试及 Android 探针 PASS，见 [ADR-07](decisions/reader-viewport.md)。READER-002 已完成正式单章状态 / 块样式 / Chrome，当前完整测试 91 项通过，见 [Reader 验收](reader.md)。NET-001 / NET-002 / MEDIA-001 已顺序完成，完整测试更新为 112 项及 Android 组合探针 PASS，见 [网络](network.md) / [媒体](media.md)。下一建议 READER-003；DB-001 也可独立领取，尚未执行。SRC-005 仍等待 DB-002（NET-002 已完成）。CI-003 未启用；本轮没有生产 Source / DB / 缓存实现；DEV-001 使用独立开发替身，不把它作为生产实现验收。
+当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 的安装阻塞已在 DEV-002 解除：复用同一应用壳的新开发包已完成 MuMu 安装、冷启动及返回导航 smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001..002 DONE：17 个离线场景、内存仓库、开发菜单和指定场景入口已交付；当前 73 项测试、Android 编译和 MuMu 开发入口运行通过，20 图设备解码已补齐，见 [Fixture 验证](fixtures.md) / [开发入口](dev-entry.md)。READER-001 已通过双模式视口实验，当前 85 项测试及 Android 探针 PASS，见 [ADR-07](decisions/reader-viewport.md)。READER-002 已完成正式单章状态 / 块样式 / Chrome，当前完整测试 91 项通过，见 [Reader 验收](reader.md)。NET-001 / NET-002 / MEDIA-001 已顺序完成，完整测试更新为 112 项及 Android 组合探针 PASS，见 [网络](network.md) / [媒体](media.md)。READER-003 已完成图片展示与局部失败，完整测试 120 项及 Android 图片探针 PASS，见 [Reader](reader.md)。DB-001 / DB-002 已完成，完整测试 127 项及 Android 持久化探针 PASS；下一建议 READER-004，尚未执行。SRC-005 的 DB-002 / NET-002 前置已解除，尚未执行。CI-003 未启用；本轮没有生产 Source / DB / 缓存实现；DEV-001 使用独立开发替身，不把它作为生产实现验收。
 
 示例（未来某 Phase 完成后可记录，**不是当前结果**）：Feature Status = DONE；Android Validation = PASS；iOS Compatibility Review = PASS；iOS Runtime Validation = DEFERRED_NO_MAC。这样 Phase 4 可达到 Reader Feature Complete，而 Cross-platform Mobile MVP 仍等待 iOS 验证。
 
@@ -811,6 +811,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### DB-001 — Schema、目录与迁移基线
 
+- Status：**DONE（2026-09-07）**；v1 双库 / 背景连接 / snapshots 与本地 Repository / 设置实现已交付；127 项测试、静态分析、Android SQLite / preferences 重开探针 PASS，iOS Runtime DEFERRED_NO_MAC。详见 [存储验收](database.md)。
+
 - Phase：1；Complexity：M。
 - Goal：把持久化身份、版本及备份边界定下来。
 - Input：第 21、34 节；Dependencies：CORE-002。
@@ -822,6 +824,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：内存建表、临时目录重开、约束 / 索引、坏目录 / 不可写错误；不得拿真实用户目录做破坏测试。
 
 #### DB-002 — 本地存取与设置实现
+
+- Status：**DONE（2026-09-07）**；v1 双库 / 背景连接 / snapshots 与本地 Repository / 设置实现已交付；127 项测试、静态分析、Android SQLite / preferences 重开探针 PASS，iOS Runtime DEFERRED_NO_MAC。详见 [存储验收](database.md)。
 
 - Phase：1；Complexity：M。
 - Goal：提供用户数据与缓存记录的最小可靠读写能力。
@@ -1087,6 +1091,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：短 / 长 / 空白 / 图片章占位、超长标题、error / retry、Chrome 手势和 rebuild 检查。
 
 #### READER-003 — 图片块与局部失败
+
+- Status：**DONE（2026-09-07）**；共享图片组件、正式内存仓库接入、双模式 caption / 尺寸更新 / 局部重试 / 资源释放已完成。120 项测试、静态分析及 Android 图片探针 PASS；iOS Runtime DEFERRED_NO_MAC，见 [验收](reader.md)。
 
 - Phase：4；Complexity：M。
 - Goal：图片慢或失败时仍能稳定阅读文字。
@@ -1771,7 +1777,7 @@ flowchart TD
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。**NET-001 / NET-002 / MEDIA-001 DONE**，已解除图片任务前置；下一建议 **READER-003**。DB-001 也可按其前置另行领取。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。CORE-005 及 Source 首项 SRC-005 仍等待 DB-002（NET-002 已完成）。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。**NET-001 / NET-002 / MEDIA-001 DONE**，**READER-003 DONE**，双模式图片与局部重试已交付，完整测试 120 项及 Android 图片探针 PASS。**DB-001 / DB-002 DONE**，127 项测试及 Android 持久化探针 PASS，见 [本地存储](database.md)。下一建议 **READER-004**，尚未执行。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。CORE-005 及 Source 首项 SRC-005 的 DB-002 / NET-002 前置已解除，尚未执行。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
 
 ## 39. Parallelizable Work
 

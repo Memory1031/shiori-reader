@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import '../../app/routes.dart';
+import '../../data/media/memory_image_repository.dart';
 import 'viewport_experiment.dart';
 import '../../features/reader/reader_screen.dart';
 
@@ -30,6 +31,7 @@ class DevScenarioPage extends StatefulWidget {
 
 class _DevScenarioPageState extends State<DevScenarioPage> {
   late final FixtureEnvironment _env;
+  late final MemoryImageRepository _readerImages;
   late NovelKey _novel;
   late ChapterKey _chapter;
   final _query = TextEditingController();
@@ -52,6 +54,9 @@ class _DevScenarioPageState extends State<DevScenarioPage> {
     _env =
         widget.createEnvironment?.call(widget.scenario) ??
         FixtureEnvironment(scenario: widget.scenario);
+    _readerImages = MemoryImageRepository(
+      resolve: (id) => id == fixtureSourceId ? _env.source : null,
+    );
     _novel = fixtureNovelKey(widget.scenario);
     _chapter = fixtureChapterKey(widget.scenario);
     unawaited(_loadChapter());
@@ -61,6 +66,7 @@ class _DevScenarioPageState extends State<DevScenarioPage> {
   void dispose() {
     _request?.cancel();
     _query.dispose();
+    _readerImages.close();
     unawaited(_env.close());
     super.dispose();
   }
@@ -214,8 +220,11 @@ class _DevScenarioPageState extends State<DevScenarioPage> {
               ),
               FilledButton(
                 onPressed: () => AppRoutes(
-                  reader: (_, key) =>
-                      ReaderScreen(chapter: key, repository: _env.novels),
+                  reader: (_, key) => ReaderScreen(
+                    chapter: key,
+                    repository: _env.novels,
+                    images: _readerImages,
+                  ),
                 ).open(context, ReaderDestination(_chapter)),
                 child: Text(strings.openReaderAction),
               ),

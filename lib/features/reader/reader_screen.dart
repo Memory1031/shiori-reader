@@ -6,6 +6,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
 import 'reader_controller.dart';
+import 'reader_image.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'viewport/reader_viewport.dart';
 
@@ -14,9 +15,11 @@ class ReaderScreen extends StatelessWidget {
     super.key,
     required this.chapter,
     required this.repository,
+    this.images,
   });
   final ChapterKey chapter;
   final NovelRepository repository;
+  final ImageRepository? images;
 
   @override
   Widget build(BuildContext context) => ControllerScope<ReaderController>(
@@ -25,7 +28,7 @@ class ReaderScreen extends StatelessWidget {
     builder: (context, controller) {
       final strings = AppLocalizations.of(context);
       if (controller.status == ReaderStatus.ready) {
-        return ReaderContentView(content: controller.content!);
+        return ReaderContentView(content: controller.content!, images: images);
       }
       return Scaffold(
         appBar: AppBar(title: Text(strings.readerTitle)),
@@ -54,7 +57,8 @@ class ReaderScreen extends StatelessWidget {
 /// The body never observes per-frame progress or Chrome visibility changes.
 /// Session-only mode selection; durable settings arrive in READER-004.
 class ReaderContentView extends StatefulWidget {
-  const ReaderContentView({super.key, required this.content});
+  const ReaderContentView({super.key, required this.content, this.images});
+  final ImageRepository? images;
   final ChapterContent content;
   @override
   State<ReaderContentView> createState() => _ReaderContentViewState();
@@ -66,6 +70,35 @@ class _ReaderContentViewState extends State<ReaderContentView> {
   final _chrome = ValueNotifier(true);
   bool _isPaged = true;
   ReaderPosition? _position;
+  final _sizes = <MediaRef, Size>{};
+  final _pendingSizes = <MediaRef, Size>{};
+  bool _dragging = false;
+  void _dimensions(MediaRef ref, Size size) {
+    if (_sizes[ref] == size) return;
+    _pendingSizes[ref] = size;
+    if (!_dragging) _applySizes();
+  }
+
+  void _applySizes() {
+    if (!mounted || _pendingSizes.isEmpty) return;
+    _position = _isPaged ? _paged.capture() : _scroll.capture();
+    setState(() {
+      _sizes.addAll(_pendingSizes);
+      _pendingSizes.clear();
+    });
+  }
+
+  bool _notification(ScrollNotification event) {
+    if (event is ScrollStartNotification && event.dragDetails != null) {
+      _dragging = true;
+    }
+    if (event is ScrollEndNotification) {
+      _dragging = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applySizes());
+    }
+    return false;
+  }
+
   void _toggle() => _chrome.value = !_chrome.value;
   void _mode(bool paged) {
     if (paged == _isPaged) return;
@@ -118,29 +151,66 @@ class _ReaderContentViewState extends State<ReaderContentView> {
             Positioned.fill(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 56, 20, 64),
-                child: _isPaged
-                    ? PagedReaderViewport(
-                        content: widget.content,
-                        controller: _paged,
-                        initialPosition: _position,
-                        textStyle: style,
-                        onCenterTap: _toggle,
-                        imageBuilder: _image,
-                      )
-                    : GestureDetector(
-                        behavior: HitTestBehavior.translucent,
-                        onTap: _toggle,
-                        child: ReaderViewport(
-                          content: widget.content,
-                          controller: _scroll,
-                          initialPosition: _position,
-                          textStyle: style,
-                          imageBuilder: (context, image) => SizedBox(
-                            height: 180,
-                            child: _image(context, image),
-                          ),
-                        ),
-                      ),
+                child: LayoutBuilder(
+                  builder: (context, bounds) {
+                    final maxHeight = bounds.maxHeight * (_isPaged ? 1 : 2);
+                    ({double height, double caption}) extent(
+                      ImageBlock block,
+                    ) => readerImageExtent(
+                      block,
+                      width: bounds.maxWidth,
+                      maxHeight: maxHeight,
+                      scaler: MediaQuery.textScalerOf(context),
+                      direction: Directionality.of(context),
+                      knownSize: _sizes[block.media],
+                    );
+                    Widget image(BuildContext context, ImageBlock block) {
+                      final geometry = extent(block);
+                      return SizedBox(
+                        height: geometry.height,
+                        child: widget.images == null
+                            ? _image(context, block)
+                            : ReaderImage(
+                                block: block,
+                                repository: widget.images!,
+                                captionHeight: geometry.caption,
+                                onIntrinsicSize: (size) {
+                                  if (block.width == size.width &&
+                                      block.height == size.height) {
+                                    return;
+                                  }
+                                  _dimensions(block.media, size);
+                                },
+                              ),
+                      );
+                    }
+
+                    return NotificationListener<ScrollNotification>(
+                      onNotification: _notification,
+                      child: _isPaged
+                          ? PagedReaderViewport(
+                              content: widget.content,
+                              controller: _paged,
+                              initialPosition: _position,
+                              textStyle: style,
+                              onCenterTap: _toggle,
+                              imageBuilder: image,
+                              imageExtent: (block) => extent(block).height,
+                            )
+                          : GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onTap: _toggle,
+                              child: ReaderViewport(
+                                content: widget.content,
+                                controller: _scroll,
+                                initialPosition: _position,
+                                textStyle: style,
+                                imageBuilder: image,
+                              ),
+                            ),
+                    );
+                  },
+                ),
               ),
             ),
             ValueListenableBuilder<bool>(

@@ -1,0 +1,27 @@
+CREATE TABLE novel_cache (
+ source_id TEXT NOT NULL, novel_id TEXT NOT NULL, 
+ payload TEXT NOT NULL, codec_version INTEGER NOT NULL CHECK(codec_version >= 1),
+ parser_version INTEGER NOT NULL CHECK(parser_version >= 1),
+ fetched_at INTEGER NOT NULL, expires_at INTEGER, last_access_at INTEGER NOT NULL,
+ byte_size INTEGER NOT NULL CHECK(byte_size >= 0),
+ PRIMARY KEY(source_id, novel_id)
+);
+CREATE INDEX novel_access ON novel_cache(last_access_at);
+CREATE TABLE catalog_cache (
+ source_id TEXT NOT NULL, novel_id TEXT NOT NULL, 
+ payload TEXT NOT NULL, codec_version INTEGER NOT NULL CHECK(codec_version >= 1),
+ parser_version INTEGER NOT NULL CHECK(parser_version >= 1),
+ fetched_at INTEGER NOT NULL, expires_at INTEGER, last_access_at INTEGER NOT NULL,
+ byte_size INTEGER NOT NULL CHECK(byte_size >= 0),
+ PRIMARY KEY(source_id, novel_id)
+);
+CREATE INDEX catalog_access ON catalog_cache(last_access_at);
+CREATE TABLE chapter_cache (
+ source_id TEXT NOT NULL, novel_id TEXT NOT NULL, chapter_id TEXT NOT NULL,
+ payload TEXT NOT NULL, codec_version INTEGER NOT NULL CHECK(codec_version >= 1),
+ parser_version INTEGER NOT NULL CHECK(parser_version >= 1),
+ fetched_at INTEGER NOT NULL, expires_at INTEGER, last_access_at INTEGER NOT NULL,
+ byte_size INTEGER NOT NULL CHECK(byte_size >= 0),
+ PRIMARY KEY(source_id, novel_id, chapter_id)
+);
+CREATE INDEX chapter_access ON chapter_cache(last_access_at);

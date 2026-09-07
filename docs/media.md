@@ -28,3 +28,5 @@ flutter run --target test/support/network_media_probe.dart -d 127.0.0.1:16384
 测试覆盖共享进行中请求、独立租约、cacheOnly 零 Source、单消费者 / 最后消费者取消、迟到 body 关闭、未知格式 / 空数据 / 长度 / 超限 / terminal Failure / raw error、旧图刷新失败保留、RAM 预算 / 有界队列、Source 永不返回时截止和仓库销毁。组合测试用真实 Dio + fake adapter 模拟一次 503 后成功，证明仅两次尝试、共享媒体、codec 成功及引用归零。
 
 MuMu 新包日志：`NETWORK_MEDIA_PASS attempts=2 sharedLeases=2 retainedBytes=0 codec=64x64`；截图在忽略目录 `.tooling/evidence/network-media.png`。没有访问小说网站，未宣称全部图片格式 / 大图 / ARM64 性能已经实测。Android 运行不等于 iOS 运行；iOS 的 ImageCodec / 内存 / 退出路径仍归 IOS-004。
+
+READER-003 已将本仓库接入正式 Reader 的 SourceImage，按宽度 × DPR 与 400 万像素限制解码，并在卸载时释放引用。详见 [Reader 图片验收](reader.md)。未知尺寸重排或切换模式可能重新挂载并重新获取媒体；本轮没有增加常驻图片缓存或离线持久化。

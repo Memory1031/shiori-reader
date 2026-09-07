@@ -73,3 +73,5 @@ SettingsStore.load/save 使用 ReaderSettings；取消前提交规则同上。DB
 iOS Level A：PASS，纯 Dart 标准库扩展，无 Native 插件、平台分支或最低 OS 变化。未运行 Flutter / Android / iOS runtime；本任务使用纯 Dart fake 验证，不把它当真实缓存、平台解码或 Source 准入的新证据。
 
 交接建议：下一项 CORE-004 建立应用组装和导航壳；DEV-001、NET-001、DB-001 也已满足各自前置，后续按计划领取，不把本次 fake 当正式 DEV-001 完成。
+
+DB-001 / DB-002 后续实现已完成：生产本地 LibraryRepository、进度持久代次、记录 stores 和 SharedPreferencesAsync 设置适配已落地，契约签名不变，见 [存储验收](database.md)。

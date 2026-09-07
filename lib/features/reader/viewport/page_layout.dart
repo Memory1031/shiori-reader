@@ -39,6 +39,7 @@ final class PageLayout {
     required this.scaler,
     required this.direction,
     this.imageHeights = const {},
+    this.imageExtent,
   }) {
     if (width < 1 || height < 1) {
       throw ArgumentError('Page needs positive dimensions');
@@ -51,6 +52,7 @@ final class PageLayout {
   final TextScaler scaler;
   final TextDirection direction;
   final Map<MediaRef, double> imageHeights;
+  final double Function(ImageBlock)? imageExtent;
   int measuredChunks = 0;
   int _length(int unit) =>
       (index.chunks[unit].text?.runes.length ?? 1).clamp(1, 1000000000);
@@ -156,6 +158,7 @@ final class PageLayout {
     final block = index.content.blocks[index.chunks[unit].blockIndex];
     if (block is ImageBlock) {
       final known =
+          imageExtent?.call(block) ??
           imageHeights[block.media] ??
           (block.width != null && block.height != null
               ? width * block.height! / block.width!

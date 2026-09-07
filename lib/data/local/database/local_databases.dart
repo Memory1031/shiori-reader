@@ -1,0 +1,44 @@
+import 'package:drift/native.dart';
+import '../../../domain/contracts/contracts.dart';
+import '../files/app_paths.dart';
+import 'user_database.dart';
+import 'cache_database.dart';
+
+/// One owner, one background connection per lifetime. No cross-file transactions.
+class LocalDatabases {
+  LocalDatabases._(this.users, this.cache);
+  final UserDatabase users;
+  final CacheDatabase cache;
+  static Future<Result<LocalDatabases>> open(AppPaths paths) async {
+    UserDatabase? users;
+    CacheDatabase? cache;
+    try {
+      await paths.prepare();
+      users = UserDatabase(
+        NativeDatabase.createInBackground(paths.userDatabase),
+      );
+      // Finish native opening before spawning the second connection.
+      await users.customSelect('SELECT 1').get();
+      cache = CacheDatabase(
+        NativeDatabase.createInBackground(paths.cacheDatabase),
+      );
+      await cache.customSelect('SELECT 1').get();
+      return Success(LocalDatabases._(users, cache));
+    } catch (_) {
+      await users?.close();
+      await cache?.close();
+      // Preserve every file, including corrupt or future-version databases.
+      return Failure(
+        AppFailure(
+          kind: FailureKind.database,
+          operation: Operation.libraryRead,
+        ),
+      );
+    }
+  }
+
+  Future<void> close() async {
+    await users.close();
+    await cache.close();
+  }
+}

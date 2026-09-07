@@ -33,6 +33,26 @@ class AppLogger {
   final _events = Queue<DiagnosticEvent>();
   List<DiagnosticEvent> get events => List.unmodifiable(_events);
   final _random = Random.secure();
+
+  /// Local storage diagnostics contain no paths, SQL or serialized user data.
+  void local(AppFailure failure) {
+    if (failure.isCancellation) return;
+    _events.add(
+      DiagnosticEvent._(
+        Map.unmodifiable({
+          'timestamp': now().toUtc().toIso8601String(),
+          'level': DiagnosticLevel.warning.name,
+          'operation': failure.operation.name,
+          'failureKind': failure.kind.name,
+          'context': failure.context.name,
+        }),
+      ),
+    );
+    while (_events.length > capacity) {
+      _events.removeFirst();
+    }
+  }
+
   String newRequestId() => List.generate(
     16,
     (_) => _random.nextInt(256).toRadixString(16).padLeft(2, '0'),
