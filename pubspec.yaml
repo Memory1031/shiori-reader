@@ -8,6 +8,7 @@ environment:
   flutter: '>=3.38.4 <3.39.0'
 
 dependencies:
+  characters: 1.4.0
   crypto: 3.0.7
   flutter:
     sdk: flutter

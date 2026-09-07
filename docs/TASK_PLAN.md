@@ -1,6 +1,6 @@
 # Shiori Task Plan
 
-规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-07，按用户指定完成 DEV-002，并补齐 DEV-001 Android 解码验收；SRC-001..004 / CORE-001..004 已完成，Phase 0 技术 Gate = GO / PASS，当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
+规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-07，按用户指定完成 READER-001 / READER-002，默认左右翻页并保留上下滚动，双模式实验与正式单章 Reader 已交付；SRC-001..004 / CORE-001..004 已完成，Phase 0 技术 Gate = GO / PASS，当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
 
 规划修订阶段（历史记录）：仅完善本文件并做 Self Review，基于完整的 41 节 / 59 Task 原计划，当时仓库为 Greenfield，未执行开发任务。后续用户已授权本次 SRC-001 / CORE-001 执行；除这两个任务的明确交付记录外，目录树、模型、配置值和测试命令仍为后续设计，不代表已实现。
 
@@ -8,7 +8,9 @@
 
 ## 1. Project Overview
 
-Shiori（栞）是 Android / iOS 在线轻小说客户端。最小业务闭环是发现或搜索小说、查看详情及卷章节目录、原生阅读、加入本地书架、保存并恢复阅读进度、利用已有缓存离线继续阅读。
+Shiori（栞）是 Android / iOS 轻小说客户端，支持在线阅读和本地 TXT / EPUB 导入。最小业务闭环是发现或搜索小说，或导入本地书籍，查看详情及卷章节目录、原生阅读、加入本地书架、保存并恢复阅读进度；在线书籍利用已有缓存离线继续阅读，本地导入书籍通过应用托管文件完整离线阅读。
+
+**范围更新（2026-09-07，用户授权纳入规划）**：本地 TXT 与无 DRM 的流式 EPUB 纳入 MVP，新增 LOCAL-001..005；均为 PLANNED，未执行。复用现有双模式阅读器、目录、书架和进度，不依赖生产网站可用。本次仅修订规划，不改变已完成任务状态，也不自动开始后续实现。
 
 首个生产 Source 是用户指定的 [LightNovel.fun](https://www.lightnovel.fun/)。SRC-001 / SRC-002 已观察访客首页，以及样本小说的搜索、详情、四卷目录、正文和浏览器图片解码，并独立验证核心 HTTP 协议，证据见 [源站调查](source/lightnovel.md)。自动化链路、会话寿命、异常覆盖和使用许可仍有待项，生产接入 Gate 未通过。未来 Source 通过同一业务边界接入；第一版不实现第二个生产 Source。
 
@@ -25,7 +27,7 @@ Shiori（栞）是 Android / iOS 在线轻小说客户端。最小业务闭环�
 
 ## 3. Non-Goals
 
-MVP 不包含 LightNovel 账号、登录书架同步、评论及发布、论坛、点赞、社交、Shiori 账号、云同步、后端服务、推荐算法、AI 推荐、TTS、EPUB / PDF / Manga 阅读器、真实分页、Flutter Web、Windows / macOS Desktop、多生产 Source、全站抓取、镜像、大规模下载、复杂下载任务中心。
+MVP 不包含 LightNovel 账号、登录书架同步、评论及发布、论坛、点赞、社交、Shiori 账号、云同步、后端服务、推荐算法、AI 推荐、TTS、PDF / Manga 阅读器、DRM 解密、固定版式 EPUB、EPUB 脚本 / 音视频播放及复杂样式完整还原、纸张卷曲翻页动画、Flutter Web、Windows / macOS Desktop、多生产在线 Source、全站抓取、镜像、大规模下载、复杂下载任务中心。
 
 下载当前卷、图片全屏查看、自定义字体、Ruby 精细排版、应用内亮度调节可作为后续需求，不能隐含进入 MVP。系统亮度继续由系统控制。没有源站首页数据时不补造排行榜或推荐算法；没有公开访问权限时不补造登录或绕过机制。
 
@@ -58,14 +60,19 @@ iOS **Level B — Runtime Validation** 归 IOS-001..006：Xcode / 原生依赖�
 | Search | 输入 keyword 后点击 Search 或键盘 Search / Enter 才请求；支持时加载更多；Loading / Empty / Error | 输入与停止输入均不自动请求；取消 / generation 防旧响应；分页失败保留已加载结果 |
 | Detail | 标题、封面、作者、简介、标签、连载状态等有证据字段；加入书架、开始 / 继续阅读 | 缺失字段隐藏或标“未知”；封面失败不阻止正文 |
 | Catalog | 卷及章节、卷折叠、当前章标识、章节跳转 | 保留源顺序；无卷、无标题、番外、重复编号均可表达 |
-| Reader | Native ContentBlock 渲染、垂直滚动、插图、标题、前后章、目录、进度及恢复 | 单章滚动；切章独立加载；图片失败只影响该图；章节失败可重试 / 返回 / 读缓存 |
-| Reader Settings | 字号、行高、段间距、左右边距、亮 / 暗 / 跟随系统、Chrome 显隐 | 设置改变尽量保留语义位置；无分页、系统亮度插件 |
+| Reader | Native ContentBlock 渲染、默认左右翻页 / 可选上下滚动、插图、标题、前后章、目录、进度及恢复 | 切章独立加载；图片失败只影响该图；章节失败可重试 / 返回 / 读缓存 |
+| Local Import | 应用内选文件，或其他应用通过“打开方式 / 分享至 Shiori”导入 TXT / 无 DRM 流式 EPUB；托管副本、元数据、目录、插图、书架与继续阅读 | TXT 编码预览与选择；EPUB 基础语义排版；导入取消 / 失败不留半本书；本地书不受在线缓存清理影响 |
+| Reader Settings | 默认左右翻页 / 可选上下滚动、字号、行高、段间距、左右边距、亮 / 暗 / 跟随系统、Chrome 显隐 | 设置或模式改变保留原文语义位置；不加系统亮度插件 |
 | Bookshelf | 添加、移除、本地列表、封面标题、最近阅读、继续阅读 | 加入书架不下载全书；移除只移除书架项，不隐式清除进度和缓存 |
 | History / Progress | 每本书最后章节、顺序快照、阅读位置、最后时间；最近阅读入口 | 不是事件日志；未加入书架的小说也保存进度 |
 | Cache / Offline | 详情、目录、正文、已成功加载插图的本地复用；缓存状态与清理 | 缓存仍在时可离线读；未下载图显示占位；容量淘汰不承诺永久离线 |
 | Diagnostics | 可定位失败阶段、请求数量、缓存命中、脱敏 debug 信息 | 默认不上传日志；Release 无调试入口 |
 
 本节是最终移动端产品范围；当前可验收交付为 Android，同一功能的 iOS runtime 证据延期。Phase 4 图片仅保证在线 / memory 显示，Phase 6 才承诺仍在磁盘的图文冷启动离线。
+
+本地导入使用独立于在线缓存的持久文件所有权：选择文件 → 复制到应用私有暂存区 → 解析 / 校验 → 提交托管书籍与索引 → 加入书架。不得只持久化外部路径或临时 URI；导入成功后移动原文件不影响阅读。应用内只记录可重定位的相对资源路径。本地文件不进入在线 TTL / LRU，不因“清除缓存”被删除；“移出书架”与“删除本地书籍文件”是两个明确动作，删除需说明进度保留策略，不能影响其他书籍。卸载应用会移除托管数据，首版不承诺云备份或恢复。
+
+本地适配器输出同一 Catalog / ChapterContent，并通过 Repository 和 ImageRepository 边界提供内容；文件、ZIP、编码、HTML 解析不进入 Reader。LOCAL-001 先审查身份、媒体与存储契约；需要变更时同步 domain / contracts 文档、codec、迁移及消费者，不能假称现有 SourceMedia 已覆盖本地图片。相同文件重复导入应复用已有书籍；同名不同文件不覆盖旧进度。EPUB 阅读顺序取 spine，目录取 nav / NCX，目录片段定位到语义块；TXT 无可识别章节时保留整篇，不能按页号制造章节身份。
 
 不把没有更多结果、接口未提供首页能力、受限内容和 Parser 失败混成同一 Empty State。
 
@@ -137,7 +144,7 @@ Domain 包含业务模型、少量稳定契约和错误类型；presentation 只
 | ADR-04 | DECIDED：GetX 用于局部状态管理；界面翻译使用 Flutter gen-l10n / ARB；路由使用 Flutter Navigator 和平台 PageRoute | 2026-09-07 按用户最终选择迁移至官方 gen-l10n：中英文 ARB 生成类型安全的 AppLocalizations，Flutter Localizations 驱动语言更新，SDK delegates 负责标准控件本地化。DI 仍在 composition root 显式组装，禁止 Get.find 服务定位；细节见 [应用规范](app.md) |
 | ADR-05 | DECIDED：Drift 保存用户数据与缓存索引，偏好用简单 KV | 数据事务和迁移值得使用 Drift；业务真相不放 SharedPreferences |
 | ADR-06 | DECIDED：Reader 持久位置以 block + fraction 为主 | 像素 offset 随字体、宽度、图片变动失效；像素仅作同布局优化 |
-| ADR-07 | PROPOSED：原生 CustomScrollView / SliverList 的 anchor viewport | 懒构建和深位置恢复有实际难点，READER-001 必须先验证；不能把 ensureVisible 当作未构建块的跳转方案 |
+| ADR-07 | DECIDED：原生 pivot 双模式视口；默认左右翻页，可选上下滚动 | 2026-09-07 按用户选择调整；READER-001 的原生 Sliver + 局部 TextPainter 分页实验通过，共享语义锚点，不预排前文、不存页码；见 [实验与验收](decisions/reader-viewport.md) |
 | ADR-08 | DECIDED：Source 内部惰性 ensureSession，不要求 App 启动联网 | 离线启动不被 Session 初始化阻塞；具体会话规则等 Phase 0 |
 | ADR-09 | DECIDED：图片通过 opaque MediaRef 和私有请求解析 | UI 不应为 Image.network 拼 Referer；Source 变更不能拖着 Reader 改动 |
 | ADR-10 | DECIDED：Phase 4 最小 network / memory ImageRepository；Phase 6 才加持久缓存 | MEDIA-001 不依赖 CACHE-003；Reader 永远消费同一契约，Phase 6 不要求修改其业务代码 |
@@ -349,13 +356,13 @@ Source 改版修复流程：阶段化 live 报告定位 → 获取最小合规�
 
 `ChapterKey → NovelRepository → ChapterContent → immutable ContentBlock[] → viewport / block widgets`。章级状态是 loading / ready / error，ready 可有 stale / refreshFailure / image 局部失败；正文和 Chrome 分开订阅。scroll event 不修改整章 Rx，不让整屏 Obx rebuild。ReaderController 负责加载 / 取消 / 章切换，布局位置由 viewport 管理，进度策略是纯 Dart tracker，落盘由 LibraryRepository 编排；不再另造一个同职责的 ProgressRepository。
 
-默认用 `CustomScrollView + SliverList.builder` 逐块构建；ListView.builder 适合普通页面，但同样没有免费提供任意未知高度 index 跳转。禁止 SingleChildScrollView + 整章 Column、一个巨型 Text 或为全部块创建 GlobalKey。字体设置改变可重建当前布局；已读 cache / progress 对象不随每帧重新序列化。Flutter 官方建议懒构建和局部控制 rebuild。[性能指南](https://docs.flutter.dev/perf/best-practices)
+用户已确认默认左右翻页，同时保留上下滚动。分页采用横向 pivot SliverFixedExtentList + PageScrollPhysics，只排版当前位置及邻页，不计算全章总页数；上下滚动用 `CustomScrollView + SliverList.builder` 逐块构建；ListView.builder 适合普通页面，但同样没有免费提供任意未知高度 index 跳转。禁止 SingleChildScrollView + 整章 Column、一个巨型 Text 或为全部块创建 GlobalKey。字体设置改变可重建当前布局；已读 cache / progress 对象不随每帧重新序列化。Flutter 官方建议懒构建和局部控制 rebuild。[性能指南](https://docs.flutter.dev/perf/best-practices)
 
 **语义与渲染分离**：ParagraphBlock 保留完整语义段落。性能需要时，presentation 使用 RenderChunk（semanticBlockKey、该段内字符区间、临时布局信息）懒构建；它不进入 Domain、不持久化、不进入 ChapterContent serialization、不参与 contentRevision、不改变 semantic blockKey，也不能作为 ReadingProgress 长期 anchor。更改字体 / 屏宽 / chunk 算法只能使布局失效，正文与缓存 revision 必须不变。READER-001 验证极长单段的 chunk→语义位置映射及可访问顺序，READER-002 集成渲染；未测出收益时普通段落无需 chunk。
 
 ### 18.2 深位置恢复的可执行方案与验证门槛
 
-纯像素 offset 不稳定，`ensureVisible` 也只能针对已构建元素。**READER-001 必须先验证**以目标块为 pivot 的原生 viewport：前半部分 SliverList 逆向生长，后半从目标块正向生长，用 CustomScrollView.center 让目标无需先布局全部前文即可进入视口；数据的语义顺序不改变。文本先按语义段的字符比例映射到当前 RenderChunk / 文本行，图像在测到高度后应用高度比例；前后内容仍能连续滚动，并测试首尾边界和 accessibility 顺序。官方 center 示例证明可有双向增长列表，**不能据此声称本项目恢复算法已验证**。[CustomScrollView](https://api.flutter.dev/flutter/widgets/CustomScrollView-class.html)
+纯像素 offset 不稳定，`ensureVisible` 也只能针对已构建元素。**READER-001 已通过 fixture 验证**以目标块为 pivot 的原生 viewport（[验收记录](decisions/reader-viewport.md)）：前半部分 SliverList 逆向生长，后半从目标块正向生长，用 CustomScrollView.center 让目标无需先布局全部前文即可进入视口；数据的语义顺序不改变。文本先按语义段的字符比例映射到当前 RenderChunk / 文本行，图像在测到高度后应用高度比例；前后内容仍能连续滚动，并测试首尾边界和 accessibility 顺序。官方 center 示例仅提供双向增长机制；本项目恢复结论另以 READER-001 实测为依据。[CustomScrollView](https://api.flutter.dev/flutter/widgets/CustomScrollView-class.html)
 
 RenderChunk 仅保留所属 semanticBlockKey 与段内字符起止；可按安全 Unicode / 标点边界在 presentation 切分。持久 fraction 来自完整语义段字符偏移，恢复时由同段字符偏移定位当前 chunk，字号 / 切分变化重新生成映射；不要求先测出整段总高度。只观察视口及少量缓冲内渲染单元的 geometry，转换后记录首个可见语义正文块；不扫描全部 RenderObject。更改字号 / 横竖屏 / 图片布局前捕获 anchor，下一稳定帧恢复。若原生方案在固定 fixture 验收中失败，READER-001 比较一个仍维护、双端支持的 indexed-scroll 依赖并更新 ADR-07 / dependency 表；不得扩展成自制排版引擎，也不得退回“只保存 offset”冒充完整恢复。后续 Reader 定位任务依赖该 gate。
 
@@ -369,7 +376,7 @@ Phase 4 通过 MEDIA-001 实现 MediaRef → SourceMedia → ImageRepository →
 
 ### 18.4 设置与移动交互
 
-建议初值：字号 20 logical px（范围 14..32），行高倍数 1.7（1.2..2.4），段间距 12（0..32），左右边距 20（12..48），跟随系统主题。具体默认视觉值由 fixture 评审调整，不属于 API 事实。用 slider 结束或短 debounce 提交持久化；拖动时即时更新可见布局但不每帧写偏好。保留系统文字缩放的可用性，较大字号下控件不溢出。
+阅读模式默认左右翻页，可选上下滚动；模式改变保留原文字符锚点，READER-004 增加持久偏好及 codec 迁移，当前 ReaderSettings v1 不变。建议初值：字号 20 logical px（范围 14..32），行高倍数 1.7（1.2..2.4），段间距 12（0..32），左右边距 20（12..48），跟随系统主题。具体默认视觉值由 fixture 评审调整，不属于 API 事实。用 slider 结束或短 debounce 提交持久化；拖动时即时更新可见布局但不每帧写偏好。保留系统文字缩放的可用性，较大字号下控件不溢出。
 
 Reader Chrome 默认可见，点正文空白切换，不拦截垂直拖动；目录 / 设置打开不意外触发下一章。当前验证 Android SafeArea、状态栏、edge-to-edge / back、横竖屏、大小屏和设备支持的刷新率；iOS swipe-back / scroll physics / SafeArea 等仅做兼容设计，实际测试归 IOS-003 / IOS-004。MVP 不锁死横屏、不抢全屏手势；系统栏状态离开 Reader 要恢复。brightness 指主题明暗，不自动调整硬件亮度。
 
@@ -639,7 +646,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | 2 | LightNovel Source Core；SRC-005..010、CORE-005、TEST-001 | 各 parser 离线回归、Android 生产 Source / media 链路和诊断；iOS 文档 / 代码兼容 |
 | 3 | Search / Detail / Catalog；HOME-001、SEARCH-001..002、DETAIL-001..002 | Android 显式搜索、分页 / 错误、详情 / 目录、稳定首页降级；真实 Repository 接通，书架 / Reader 动作按后续任务接通 |
 | 4 | Reader MVP；MEDIA-001、READER-001..007 | Android + Fixture 与真实文字 / 图片在线阅读；viewport / 语义定位、设置、Chrome、导航、restore；无持久图片缓存前置 |
-| 5 | Bookshelf / Progress / Continue Reading；SHELF-001..002、PROGRESS-001 | Android 本地书架、未收藏历史、继续阅读、后台 / 终止后的进度恢复闭环 |
+| 5 | Bookshelf / Progress / Local Import；SHELF-001..002、PROGRESS-001、LOCAL-001..005（001 可提前） | Android 本地书架、TXT / EPUB 导入及目录导航、完整本地离线阅读、继续阅读与进度恢复闭环 |
 | 6 | Cache / Offline；CACHE-001..005 | TTL / stale、文件图片持久化、LRU / quota / 清理、飞行模式冷启动、N+1 有界预取 |
 | 7 | Android Hardening；ANDROID-002、UX-001 | 至少一台 Android ARM64 手机的网络 / TLS / SQLite / filesystem / lifecycle / kill / cache / 图片 / 导航验证；官方模拟器交叉 |
 | 8 | Stability / Performance / Regression；DB-003、TEST-002..004、CI-002 | 完整迁移 / corruption harness、竞态故障、Android 真机 profile / 内存 / 长章、默认离线回归、Android 构建通过 |
@@ -647,7 +654,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | Deferred Track | IOS-001..006 | 全部 DEFERRED_NO_MAC；未来环境可用后才跑基础 / Source / UX / Reader / Offline / Release runtime，不影响上述完成 |
 | Optional Compile Track | CI-003 | OPTIONAL_PROPOSED；可用 macOS runner 时记录指定 target 编译结果，不产生 runtime PASS、不作为 Android required check |
 
-当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 的安装阻塞已在 DEV-002 解除：复用同一应用壳的新开发包已完成 MuMu 安装、冷启动及返回导航 smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001..002 DONE：17 个离线场景、内存仓库、开发菜单和指定场景入口已交付；当前 73 项测试、Android 编译和 MuMu 开发入口运行通过，20 图设备解码已补齐，见 [Fixture 验证](fixtures.md) / [开发入口](dev-entry.md)。下一建议 READER-001；NET-001、DB-001 也满足各自前置，但尚未执行。SRC-005 仍等待 NET-002 / DB-002。CI-003 未启用；本轮没有生产 Source / DB / 缓存实现；DEV-001 使用独立开发替身，不把它作为生产实现验收。
+当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 的安装阻塞已在 DEV-002 解除：复用同一应用壳的新开发包已完成 MuMu 安装、冷启动及返回导航 smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001..002 DONE：17 个离线场景、内存仓库、开发菜单和指定场景入口已交付；当前 73 项测试、Android 编译和 MuMu 开发入口运行通过，20 图设备解码已补齐，见 [Fixture 验证](fixtures.md) / [开发入口](dev-entry.md)。READER-001 已通过双模式视口实验，当前 85 项测试及 Android 探针 PASS，见 [ADR-07](decisions/reader-viewport.md)。READER-002 已完成正式单章状态 / 块样式 / Chrome，当前完整测试 91 项通过，见 [Reader 验收](reader.md)。下一建议 NET-001 → NET-002 → MEDIA-001，再执行 READER-003；DB-001 也可独立领取，尚未执行。SRC-005 仍等待 NET-002 / DB-002。CI-003 未启用；本轮没有生产 Source / DB / 缓存实现；DEV-001 使用独立开发替身，不把它作为生产实现验收。
 
 示例（未来某 Phase 完成后可记录，**不是当前结果**）：Feature Status = DONE；Android Validation = PASS；iOS Compatibility Review = PASS；iOS Runtime Validation = DEFERRED_NO_MAC。这样 Phase 4 可达到 Reader Feature Complete，而 Cross-platform Mobile MVP 仍等待 iOS 验证。
 
@@ -657,7 +664,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 
 ### 领取与交付约定
 
-每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 未特别标注者为 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。按用户指定执行；本轮仅领取 DEV-002 并补验其前置 DEV-001，其余任务不自动领取。
+每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 未特别标注者为 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。按用户指定执行；本轮仅领取 READER-001，按用户要求扩展为默认左右翻页及可选上下滚动实验，其余任务不自动领取。
 
 Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验收的模块行为；L 是风险实验或跨层集成，需要给出清楚的失败停止点，不扩展为整模块重写。执行一次只领取一个 Task。推荐分支 `codex/<task-id>-<short-name>`，先查工作区，保留他人改动；最终提交 / PR 聚焦该 Task，记录测试结果与平台待项，不自行发布。共享文件如 pubspec、composition root、schema 指定单一编辑者，不能因并行领取覆盖对方。
 
@@ -1049,22 +1056,26 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### READER-001 — 懒布局与深位置恢复实验
 
+- Status：DONE / Gate PASS（2026-09-07）；按用户最终选择实现默认左右翻页和可选上下滚动的原生 pivot 实验；85 项完整测试、静态分析及 Android 探针 PASS。iOS Level A PASS，runtime DEFERRED_NO_MAC。证据与限制见 [ADR-07](decisions/reader-viewport.md)。
+
 - Phase：4；Complexity：L。
 - Goal：尽早验证最难的 Reader 布局 / anchor 假设。
 - Input：第 18、20、29、31 节；Dependencies：DEV-002。
-- Scope：fixture pivot Sliver viewport、深语义索引进入、未知图尺寸及极长单 Paragraph 的瞬态 RenderChunk；验证 chunk→语义字符偏移映射、重建 chunk 后恢复与可访问顺序。备选 indexed-scroll 包当前核对双端文档 + Android 实测，不能要求先有 iOS runtime。
+- Scope：默认横向分页 + 可选纵向滚动的 fixture pivot Sliver viewport、共享深语义锚点、局部文字行分页、未知图尺寸及极长单 Paragraph 的瞬态 RenderChunk；验证 chunk→语义字符偏移映射、重建 chunk 后恢复与可访问顺序。备选 indexed-scroll 包当前核对双端文档 + Android 实测，不能要求先有 iOS runtime。
 - Files / Modules Expected：`lib/features/reader/viewport/`、`test/widgets/reader/viewport_test.dart`、`docs/decisions/reader-viewport.md`。
-- Deliverables：保留可复用 viewport 核心、实验记录与明确选择；不开发真实分页。
+- Deliverables：保留可复用双模式 viewport 核心、实验记录与明确选择；用户已明确授权局部分页，不扩展为纸张卷曲动画或完整 Reader。
 - Acceptance Criteria：无需布局所有前文即可进入第 1,500 / 2,000 块；可向前后连续滚动；第 20 节恢复阈值和语义顺序通过；失败时停止依赖任务并写替代决策，不把原型当完成。
 - Platform Notes：当前 Android + fixture 实验、iOS Level A review；IOS-004 未来验证字体 / scroll 及性能差异，不阻塞本任务。
 - Test Requirements：深语义块 / 极长单段 / 首尾 / 动态高度 / rotation / text scale / semantics；限制构建数量，禁止全量 GlobalKey；chunk 数量改变不影响 semantic key / revision / 进度身份。
 
 #### READER-002 — Reader 状态、块渲染与 Chrome
 
+- Status：DONE（2026-09-07）；[实现与验收](reader.md)。91 项完整离线测试、静态分析、普通 / dev Android 构建及 MuMu 新包操作栏 / 滚动 / 返回 smoke 通过；图片占位、会话内模式切换，未接目录 / 持久进度 / 本地导入。iOS Level A PASS，runtime DEFERRED_NO_MAC。
+
 - Phase：4；Complexity：M。
 - Goal：用已验证 viewport 呈现可读、可失败恢复的单章。
 - Input：第 18 节、viewport、NovelRepository contract；Dependencies：READER-001。
-- Scope：ReaderController、loading / ready / error、Paragraph / Heading / Divider、标题 / Chrome、dev 接入；需要时消费 presentation RenderChunk，但 Domain 段落不变；图先占位，READER-003 接图。
+- Scope：ReaderController、默认分页 / 可选滚动的现有视口接入、loading / ready / error、Paragraph / Heading / Divider、标题 / Chrome、dev 接入；需要时消费 presentation RenderChunk，但 Domain 段落不变；图先占位，READER-003 接图。
 - Files / Modules Expected：`lib/features/reader/`、`test/widgets/reader/`、`lib/dev/` 入口接入。
 - Deliverables：可独立打开任一 fixture 的文字 Reader。
 - Acceptance Criteria：长章懒构建、滚动不整屏 Obx、空白语义正确、点击不抢拖动；dispose 取消；不使用 WebView / 巨型整章 Text。
@@ -1088,7 +1099,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Phase：4；Complexity：M。
 - Goal：调整排版与主题，尽量保留当前位置。
 - Input：第 18.4、20–21 节、SettingsStore；Dependencies：READER-002、DB-002。
-- Scope：字号、行高、段间距、横向边距、亮 / 暗 / 系统模式、设置面板和版本默认值；设置变动前后调用 anchor capture / restore。
+- Scope：默认左右翻页 / 可选上下滚动的持久偏好与 ReaderSettings codec 迁移、字号、行高、段间距、横向边距、亮 / 暗 / 系统模式、设置面板和版本默认值；设置变动前后调用 anchor capture / restore。
 - Files / Modules Expected：`lib/features/reader/` settings / theme、`test/widgets/reader/settings_test.dart`。
 - Deliverables：持久偏好与受控重布局，不加系统亮度插件。
 - Acceptance Criteria：重启偏好保留；数值安全 clamp；设置可实时预览而不每帧写偏好；变更后目标块仍可见。
@@ -1130,6 +1141,68 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Acceptance Criteria：快速连续切章不混正文；失败保留上一章进度；首末章不会越界；所有图和 Header 仍在 Source / ImageRepository 内处理。
 - Platform Notes：Android 导航 / lifecycle 当前在 PROGRESS-001 验证；iOS runtime 延期 IOS-004，不作为 Phase 4 Hard Gate。
 - Test Requirements：fixture 跨卷 / 失败 / 快速切章集成、有界真实图文 smoke；明确用 MEDIA-001 运行且无 persistent cache 模块，Phase 6 更换实现后 renderer tests 不改业务预期。
+
+### Local Import tasks（新增 MVP 范围，均未执行）
+
+#### LOCAL-001 — 本地书籍身份、托管存储与契约
+
+- Status：PLANNED；Phase：1 扩展；Complexity：M。
+- Goal：建立独立于在线缓存的本地书籍所有权及可复用内容边界。
+- Input：第 5、20–21 节、domain / contracts；Dependencies：CORE-003、DB-002。
+- Scope：本地身份 namespace、文件摘要去重、格式 / 导入记录、稳定 ChapterKey / blockKey、托管相对路径、暂存与提交 / 回滚、取消及重启残留回收；审查 Repository / Media 类型扩展和 DB 迁移。
+- Files / Modules Expected：`lib/domain/`、`lib/data/local/`、数据库 schema、domain / contracts 文档及测试。
+- Deliverables：可供 TXT / EPUB 解析结果提交的本地存储与读取契约；明确文件与 DB 非同时提交时的恢复协议。
+- Acceptance Criteria：同文件重复导入不重复书籍；同名不同文件不覆盖；失败 / 磁盘满 / 中断无可见半成品；缓存清理不删除本地文件；移出书架不等于删除文件；进度身份不依赖外部路径或渲染分页。
+- Platform Notes：使用应用私有目录和可重定位资源引用；Android 实测重开，iOS Level A 审查，runtime 延期 IOS-005。
+- Test Requirements：事务失败、提交中断、重复导入、重启恢复、路径重定位、删除隔离及 schema 迁移；自建离线数据。
+
+#### LOCAL-002 — 文件选择、外部打开 / 分享与导入流程
+
+- Status：PLANNED；Phase：5 扩展；Complexity：M。
+- Goal：应用内选文件和其他应用“打开方式 / 分享至 Shiori”均进入可取消、可重试的中英文导入流程。
+- Input：第 5 节、本地导入契约；Dependencies：LOCAL-001、CORE-004。
+- Scope：书架 / 首页可复用入口、单文件 TXT / EPUB 选择；Android 外部打开及分享接收；iOS 文件类型关联与 Share Extension 接收；统一流式复制、进度 / 取消 / 错误 UI、格式校验及解析器注入。支持 App 冷启动和已运行时接收，不强行覆盖当前阅读会话；暂不做文件夹扫描和批量导入队列，多文件请求明确提示首版仅支持单文件，不能静默丢弃。
+- Files / Modules Expected：`lib/features/import/`、平台文件接收边界、`lib/app/` 启动 / 路由、`android/` 注册配置、`ios/` 文件关联 / 分享扩展及共享暂存配置、ARB、导入流程测试。
+- Deliverables：应用内选择 / 外部打开 / 分享三类入口共用暂存 → 解析 → 去重 → 提交服务；本任务用 fake parser 验证，实际格式在 LOCAL-003 / 004 接入。iOS 分享扩展先接收并暂存到可交接区域，由主应用消费；不得把“扩展可直接拉起主应用”作为流程成立的前提。
+- Acceptance Criteria：取消选择不报错；无权限 / 文件失效 / 空间不足可恢复；在临时授权有效期间取得托管副本，复制完成后不依赖原 URI；冷启动等待应用装配后只消费一次，运行中接收不丢事件，重复投递 / 重启交接不重复提交书籍；导入取消或失败可返回原阅读位置；大文件处理不阻塞 UI；在实现时确定并记录输入大小 / 暂存空间限制，超限明确提示。外部扩展名 / 类型声明只用于入口筛选，实际文件仍校验；纯链接、非支持格式有明确反馈。
+- Platform Notes：选插件 / 原生接收方案时核验锁定 Flutter / Android / iOS 兼容性；Android 用实际文件 provider 验证打开与分享、临时 URI 权限，不索取全盘权限。iOS 明确文档类型、临时文件访问、扩展与主应用共享暂存 / 完成交接 / 回收、签名及 entitlement 配置；当前做 Level A 设计 / 代码审查，实际构建、Files 打开、分享面板和生命周期验证延期 IOS-001 / IOS-005，不宣称已可运行。
+- Test Requirements：选择取消、读取中断、超限、导入取消后晚结果、失败重试 widget tests；冷 / 热启动文件事件、重复投递、失效权限、错误类型、多文件反馈、分享交接中断回收；Android 分别从文件管理器“打开方式”和其他应用“分享”导入 TXT / EPUB，并验证原文件移走后读取。LOCAL-005 用实际解析器补完整阅读闭环，iOS 同类运行证据独立延期。
+
+#### LOCAL-003 — TXT 解码与章节解析
+
+- Status：PLANNED；Phase：5 扩展；Complexity：M。
+- Goal：把常见中文 TXT 转成可导航的原生正文。
+- Input：本地存储与导入流程；Dependencies：LOCAL-001、LOCAL-002。
+- Scope：UTF-8 / BOM、UTF-16 BOM、GB18030（含常见 GBK 文件）解码；不确定编码提供预览与手动选择；统一换行、保留段落 / 空白语义、保守识别章标题，无匹配时作为整篇；解析器依赖与性能限额在实现时验证。
+- Files / Modules Expected：`lib/data/local/txt/`、编码选择 UI / ARB、自写 TXT fixtures。
+- Deliverables：Novel 元数据、Catalog、ChapterContent 及稳定身份；无标题使用文件名作为可编辑前的默认标题。
+- Acceptance Criteria：不能静默用替换字符提交乱码；非标准编号、重复章名不覆盖；无章节书可读；长单段不因渲染 chunk 改写；标题识别不丢失原文；首版不提供复杂规则编辑器。
+- Platform Notes：解析在适当后台执行单元运行，避免主 isolate 长时间阻塞；共享 Dart 逻辑，iOS runtime 延期。
+- Test Requirements：各支持编码、非法字节、CRLF / LF、空文件、无标题、多章 / 重复标题、长单段、大文件取消及原文完整性。
+
+#### LOCAL-004 — EPUB 包、目录与图文解析
+
+- Status：PLANNED；Phase：5 扩展；Complexity：L。
+- Goal：支持无 DRM 的普通流式 EPUB 2 / 3，以原生阅读器显示基础图文。
+- Input：本地存储与导入流程、ContentBlock / Media 契约；Dependencies：LOCAL-001、LOCAL-002。
+- Scope：container / OPF 元数据、spine 阅读顺序、nav / NCX 目录与 fragment 映射、封面 / 内嵌图片、相对路径解析；XHTML 转 Heading / Paragraph / Divider / Image，基础强调等按现有模型能力保留或明确降级；不引入 WebView 执行正文。
+- Files / Modules Expected：`lib/data/local/epub/`、本地媒体适配、自建 EPUB fixtures、解析测试与支持范围文档。
+- Deliverables：有序 Catalog、正文、目录语义锚点与本地图片读取；不支持格式的明确错误 / 降级说明。
+- Acceptance Criteria：spine 与目录顺序不同仍按 spine 阅读；嵌套目录及同章多个 fragment 可定位，缺 fragment 降级章首；无目录时按 spine 生成；图片缺失只影响该图；不执行脚本或自动请求外部资源；DRM / 固定版式明确拒绝；限制条目数 / 解压总量 / 单项大小，拒绝越界路径和畸形包，具体限额实现时记录。
+- Platform Notes：ZIP / XML / HTML 库选择核验 SDK 与许可；本地媒体遵循统一解码 / lease 生命周期，不能把路径伪装成网络 URL；iOS runtime 延期 IOS-005。
+- Test Requirements：EPUB 2 NCX、EPUB 3 nav、跨卷 / 嵌套目录、fragment、spine 顺序、封面 / 相对图片路径、缺资源、损坏包、路径穿越 / 超限、自写中日文及长章。
+
+#### LOCAL-005 — 本地书架、目录跳转与离线阅读闭环
+
+- Status：PLANNED；Phase：5 扩展；Complexity：M。
+- Goal：TXT / EPUB 导入后可以立即阅读，并在重启后继续。
+- Input：本地解析结果、目录 / Reader / 书架；Dependencies：LOCAL-003、LOCAL-004、DETAIL-002、READER-003、READER-006、SHELF-001。
+- Scope：生产装配接入本地 Repository / Media、导入后加入书架、目录与当前章高亮、章 / EPUB fragment 跳转、跨章导航、进度保存恢复、删除本地书籍操作；提取复用 READER-007 的通用导航能力，不依赖真实 Source 集成完成。
+- Files / Modules Expected：import / bookshelf / reader、`lib/app/`、本地导入集成测试及使用文档。
+- Deliverables：默认左右翻页 / 可选上下滚动下的 TXT 与 EPUB 完整离线阅读；后续 READER-007 复用相同导航，不复制控制器。
+- Acceptance Criteria：目录跳转和快速切章不混正文；切章先保存，失败不覆写进度；EPUB 片段锚点适用于两种模式；原文件移动后可读；飞行模式冷启动文字 / 内嵌图片 / 设置 / 进度恢复可用；在线缓存清理无影响；删除明确提示文件和进度处理范围；不因在线源不可用阻止本地书打开。
+- Platform Notes：Android 模拟器验证系统选择和流程，ARM64 真机补大文件 / 内存 / kill / 冷启动；iOS 兼容审查，真实 Files 导入与离线流程延期 IOS-005。
+- Test Requirements：两种格式端到端、重导入、目录 / 前后章 / fragment、切模式恢复、取消 / 失败、原文件移走、缓存清理隔离、移出书架 / 删除、离线冷启动；加入 TEST-004 最终回归。
 
 ### Library tasks
 
@@ -1297,7 +1370,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 - Phase：8；Complexity：M。
 - Goal：证明功能整合与 Source 改版诊断流程可执行。
-- Input：第 28、40–41 节及 Android 阶段证据；Dependencies：TEST-002、TEST-003、HOME-001、SEARCH-002、DETAIL-002、PROGRESS-001。
+- Input：第 28、40–41 节及 Android 阶段证据；Dependencies：TEST-002、TEST-003、HOME-001、SEARCH-002、DETAIL-002、PROGRESS-001、LOCAL-005。
 - Scope：fixture 搜索到离线冷启动全流程；用破坏 Search / Detail / Catalog / Chapter 的 fixture 演练阶段定位、修复及缓存保留；复核真实源证据是否仍适用。
 - Files / Modules Expected：`integration_test/mvp_test.dart`、parser regression suite、`docs/validation/mvp.md`。
 - Deliverables：MVP 功能回归报告、Source 故障定位步骤、未关闭缺陷清单。
@@ -1507,6 +1580,11 @@ flowchart TD
     DB003["DB-003 迁移和损坏恢复保护"]
     TEST002["TEST-002 存储、缓存与竞态故障回归"]
     TEST003["TEST-003 Android Reader 与启动性能验收"]
+    LOCAL001["LOCAL-001 本地身份与存储"]
+    LOCAL002["LOCAL-002 文件选择及外部打开分享"]
+    LOCAL003["LOCAL-003 TXT 解析"]
+    LOCAL004["LOCAL-004 EPUB 解析"]
+    LOCAL005["LOCAL-005 本地阅读闭环"]
     TEST004["TEST-004 Android MVP 回归与 Source 维修演练"]
     CI002["CI-002 Android 构建检查"]
     RELEASE001["RELEASE-001 Android 发布边界、依赖与资产审计"]
@@ -1621,6 +1699,22 @@ flowchart TD
   DB003 --> TEST002
   ANDROID002 --> TEST003
   UX001 --> TEST003
+  CORE003 --> LOCAL001
+  DB002 --> LOCAL001
+  LOCAL001 --> LOCAL002
+  CORE004 --> LOCAL002
+  LOCAL001 --> LOCAL003
+  LOCAL002 --> LOCAL003
+  LOCAL001 --> LOCAL004
+  LOCAL002 --> LOCAL004
+  LOCAL003 --> LOCAL005
+  LOCAL004 --> LOCAL005
+  DETAIL002 --> LOCAL005
+  READER003 --> LOCAL005
+  READER006 --> LOCAL005
+  SHELF001 --> LOCAL005
+  LOCAL005 --> TEST004
+  LOCAL005 -.-> IOS005
   TEST002 --> TEST004
   TEST003 --> TEST004
   HOME001 --> TEST004
@@ -1667,11 +1761,13 @@ flowchart TD
 
 **Track B — 阅读能力**：CORE-001 → CORE-002 → CORE-003 → CORE-004 + DEV-001 → DEV-002 → READER-001 → READER-002 → READER-003 / READER-004 / READER-005 → READER-006。NET-002 + CORE-003 → MEDIA-001 提供最小在线图片；目录 UI 与 Reader 可在真实 Source 完成前用 fixture 开发。
 
-两条路径在 **READER-007** 与 DETAIL-002、MEDIA-001 合流；此时无需 CACHE-003 或 DB-003 → SHELF-002 + PROGRESS-001 → Phase 6 CACHE-001..005（现在才补持久图片）→ ANDROID-002 的 ARM64 真机验证 + UX-001 → Phase 8 DB-003 / TEST-002 / TEST-003 → TEST-004 → CI-002 合流 → RELEASE-001 → RELEASE-002 Android 签名候选 → RELEASE-003 / ANDROID_MVP_DONE。
+**Track C — 本地导入**：CORE-003 + DB-002 → LOCAL-001 → LOCAL-002（另需 CORE-004）→ LOCAL-003 / LOCAL-004 → LOCAL-005，与 DETAIL-002、READER-003 / 006、SHELF-001 合流，最终为 TEST-004 的硬前置。本轨不依赖生产 Source 可用；共享导航可在 LOCAL-005 实现并由 READER-007 复用，目录任务编号及原前置不在本次自动调整。READER-002 已完成；新增任务仍需另行领取。
+
+两条在线路径在 **READER-007** 与 DETAIL-002、MEDIA-001 合流；此时无需 CACHE-003 或 DB-003 → SHELF-002 + PROGRESS-001 → Phase 6 CACHE-001..005（现在才补持久图片）→ ANDROID-002 的 ARM64 真机验证 + UX-001 → Phase 8 DB-003 / TEST-002 / TEST-003 → TEST-004 → CI-002 合流 → RELEASE-001 → RELEASE-002 Android 签名候选 → RELEASE-003 / ANDROID_MVP_DONE。
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。下一建议 **READER-001**，开展懒布局与深位置恢复实验；NET-001、DB-001 可按各自前置另行领取。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。CORE-005 及 Source 首项 SRC-005 仍等待 NET-002、DB-002。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。下一建议 **NET-001**，经 NET-002 → MEDIA-001 解除 READER-003 前置；DB-001 也可按其前置另行领取。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。CORE-005 及 Source 首项 SRC-005 仍等待 NET-002、DB-002。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
 
 ## 39. Parallelizable Work
 
@@ -1745,7 +1841,8 @@ Phase 0 仍需真实正常公开 Text + Illustration 链路才能 Go；受限 / 
 - [ ] 首页只用稳定能力或降级入口；搜索输入 / 停顿零请求，按钮 / Search / Enter 才提交。
 - [ ] 搜索取消、旧响应 / generation、分页、重复 cursor / Load More race、Loading / Empty / Error / Retry 全部正确。
 - [ ] 详情缺字段可展示，收藏 / 开始 / 继续阅读已接通；非标准卷章结构和顺序正确。
-- [ ] Native Reader 垂直滚动，无 WebView 正文 / 真实分页 / EPUB 功能。
+- [ ] Native Reader 默认左右翻页、保留上下滚动，无 WebView 正文；本地 TXT / 无 DRM 流式 EPUB 共用阅读器。
+- [ ] LOCAL-001..005 完成：文件选择、Android 外部打开 / 分享（冷 / 热启动）、编码 / 格式提示、取消 / 回滚、重复投递 / 导入、目录 / fragment 跳转、书架 / 进度、托管图片和飞行模式冷启动通过；本地文件不被在线缓存淘汰或清理。
 - [ ] 长语义 Paragraph 不因性能改写；RenderChunk 不入 Domain / serialization / revision / blockKey / 长期 Progress。
 - [ ] Phase 4 MEDIA-001 能独立完成在线图片显示 / cancel / limit / decode / memory / error / retry，Reader 无 CACHE-003 硬前置。
 - [ ] 长章文字 / 插图 / caption / 特殊字符可读，图片慢 / 失败不拖垮正文。
@@ -1768,7 +1865,7 @@ Phase 0 仍需真实正常公开 Text + Illustration 链路才能 Go；受限 / 
 - [ ] CI-001 静态 / tests、CI-002 Android build 通过；CI-003 未启用不影响此项。
 - [ ] Android 内容接入 / 渠道 / 依赖 LICENSE / 权限 / backup / 签名待项关闭。
 - [ ] Android release candidate 真机安装 / 升级 smoke 通过，书架进度保留，无 debug / fixture / secret。
-- [ ] Android Track 55 Task 的验收 / 状态可追溯，RELEASE-003 独立交接；未错误宣称 iOS Ready。
+- [ ] Android Track 全部任务（含新增 LOCAL-001..005）的验收 / 状态可追溯，RELEASE-003 独立交接；未错误宣称 iOS Ready。
 
 ### Deferred iOS Checklist
 
@@ -1780,6 +1877,7 @@ Phase 0 仍需真实正常公开 Text + Illustration 链路才能 Go；受限 / 
 - [ ] iPhone development signing / install / launch 完成。
 - [ ] Drift / SQLite 与 preferences 的 iOS runtime CRUD / 重开通过。
 - [ ] AppPaths / filesystem 的真实容器路径、读写与重启通过。
+- [ ] IOS-005：Files 选择 / 打开 TXT / EPUB、其他应用分享至 Shiori、扩展暂存与主应用冷 / 热启动交接、重复事件 / 取消 / 失效权限、临时访问结束后的托管读取、目录 / fragment 跳转、本地插图、离线冷启动及删除隔离通过；IOS-001 补主应用与分享扩展实际构建 / 签名配置验证。
 - [ ] IOS-002：iOS TLS / redirect / Cookie / session restart 与真实 Source 图文链路通过。
 - [ ] IOS-003：keyboard Search / Enter、SafeArea、swipe-back、navigation / state UI 真机通过。
 - [ ] IOS-004：Reader scroll / typography / Chrome / rotation / 大字通过。

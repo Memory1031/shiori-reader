@@ -1,6 +1,6 @@
 # DEV-002：离线开发入口与生产隔离
 
-2026-09-07。DEV-002 DONE。73 项完整 Flutter 测试、静态分析、Android Debug 编译及 MuMu 新包启动通过。当前入口是场景数据检查页；真实 Reader 由 READER-001 / READER-002 实现。
+2026-09-07。DEV-002 DONE。73 项完整 Flutter 测试、静态分析、Android Debug 编译及 MuMu 新包启动通过。当前入口保留场景数据检查页；READER-002 已将「打开阅读器」接入正式单章 Reader 状态与操作栏，见 [Reader 验收](reader.md)；READER-001 实验视口改由「视口实验」进入，见 [ADR-07](decisions/reader-viewport.md)。
 
 ## 日常启动
 
@@ -55,4 +55,4 @@ flutter build apk --release --target lib/main.dart
 - 利用当前设备补验 DEV-001：安装原 codec 探针后，新进程日志输出 `FIXTURE_CODEC_PASS count=20`。该探针没有 runApp/首帧，`am start -W` 随后等待首帧超时，不计 UI 启动成功；20 图解码结果来自探针自身日志。随后已恢复开发入口。
 - 设备报告 V2366GA / PD2366，本次为 MuMu，不是 ARM64 真机性能证据。iOS 使用 CupertinoPageRoute、无平台插件或最低系统版本变化，Level A compatibility review PASS；实际 iOS runtime 仍 DEFERRED_NO_MAC。
 
-下一建议 READER-001：使用已有离线长章和图文场景开展懒布局与深位置恢复实验。本轮未自动领取。
+后续 READER-001 / READER-002 已完成，当前 91 项测试及新 Reader 包证据见 [Reader 验收](reader.md)；本节 DEV-002 原始验证记录保留。

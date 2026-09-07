@@ -98,6 +98,30 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @readerImagePlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Illustration'**
+  String get readerImagePlaceholder;
+
+  /// No description provided for @hideReaderControls.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide reading controls'**
+  String get hideReaderControls;
+
+  /// No description provided for @showReaderControls.
+  ///
+  /// In en, this message translates to:
+  /// **'Show reading controls'**
+  String get showReaderControls;
+
+  /// No description provided for @readerExperimentAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewport experiment'**
+  String get readerExperimentAction;
+
   /// No description provided for @accessRestrictedMessage.
   ///
   /// In en, this message translates to:
@@ -115,6 +139,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Load more'**
   String get loadMoreAction;
+
+  /// No description provided for @openReaderAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open reader'**
+  String get openReaderAction;
+
+  /// No description provided for @pagedReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Paged'**
+  String get pagedReading;
+
+  /// No description provided for @scrollReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Scroll'**
+  String get scrollReading;
 
   /// No description provided for @appTitle.
   ///

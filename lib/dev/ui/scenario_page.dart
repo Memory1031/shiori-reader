@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import '../../app/routes.dart';
+import 'viewport_experiment.dart';
+import '../../features/reader/reader_screen.dart';
 
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -35,6 +38,7 @@ class _DevScenarioPageState extends State<DevScenarioPage> {
   bool _loading = false;
   AppFailure? _failure;
   Object? _report;
+  ChapterContent? _content;
   List<NovelSummary> _books = [];
   List<Chapter> _chapters = [];
   List<ImageBlock> _images = [];
@@ -73,6 +77,7 @@ class _DevScenarioPageState extends State<DevScenarioPage> {
       _loading = true;
       _failure = null;
       _report = null;
+      _content = null;
       _books = [];
       _chapters = [];
       _images = [];
@@ -102,6 +107,7 @@ class _DevScenarioPageState extends State<DevScenarioPage> {
     ),
     (loaded) {
       final content = loaded.value;
+      _content = content;
       final text = content.blocks.whereType<ParagraphBlock>();
       _images = content.blocks.whereType<ImageBlock>().toList();
       _report = {
@@ -206,6 +212,23 @@ class _DevScenarioPageState extends State<DevScenarioPage> {
                 onPressed: _loadChapter,
                 child: Text(strings.readerTitle),
               ),
+              FilledButton(
+                onPressed: () => AppRoutes(
+                  reader: (_, key) =>
+                      ReaderScreen(chapter: key, repository: _env.novels),
+                ).open(context, ReaderDestination(_chapter)),
+                child: Text(strings.openReaderAction),
+              ),
+              if (_content case final content?)
+                FilledButton(
+                  onPressed: () => AppRoutes(
+                    reader: (_, key) => ViewportExperiment(
+                      content: content,
+                      images: _env.images,
+                    ),
+                  ).open(context, ReaderDestination(content.key)),
+                  child: Text(strings.readerExperimentAction),
+                ),
               if (widget.scenario == FixtureScenario.revisedContent)
                 DropdownButton<int>(
                   value: _env.source.controls.revision,

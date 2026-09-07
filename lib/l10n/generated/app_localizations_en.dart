@@ -9,6 +9,18 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get readerImagePlaceholder => 'Illustration';
+
+  @override
+  String get hideReaderControls => 'Hide reading controls';
+
+  @override
+  String get showReaderControls => 'Show reading controls';
+
+  @override
+  String get readerExperimentAction => 'Viewport experiment';
+
+  @override
   String get accessRestrictedMessage => 'Access to this content is restricted.';
 
   @override
@@ -16,6 +28,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get loadMoreAction => 'Load more';
+
+  @override
+  String get openReaderAction => 'Open reader';
+
+  @override
+  String get pagedReading => 'Paged';
+
+  @override
+  String get scrollReading => 'Scroll';
 
   @override
   String get appTitle => 'Shiori';

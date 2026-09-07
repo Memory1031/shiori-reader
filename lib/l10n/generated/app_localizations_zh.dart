@@ -9,6 +9,18 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get readerImagePlaceholder => '插图';
+
+  @override
+  String get hideReaderControls => '隐藏阅读操作栏';
+
+  @override
+  String get showReaderControls => '显示阅读操作栏';
+
+  @override
+  String get readerExperimentAction => '视口实验';
+
+  @override
   String get accessRestrictedMessage => '此内容的访问受到限制。';
 
   @override
@@ -16,6 +28,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get loadMoreAction => '加载更多';
+
+  @override
+  String get openReaderAction => '打开阅读器';
+
+  @override
+  String get pagedReading => '左右翻页';
+
+  @override
+  String get scrollReading => '上下滚动';
 
   @override
   String get appTitle => 'Shiori';
