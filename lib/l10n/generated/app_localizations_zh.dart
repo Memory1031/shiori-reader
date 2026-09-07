@@ -9,6 +9,131 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get historyTitle => '最近阅读';
+
+  @override
+  String get historyClear => '清除此书阅读记录';
+
+  @override
+  String get chapterFallback => '原章节已不在目录中，已打开相邻章节。';
+
+  @override
+  String get historyEmpty => '暂无阅读记录。';
+
+  @override
+  String get shelfTitle => '书架';
+
+  @override
+  String get noSources => '暂无可用书源，已保存书籍仍保留在书架。';
+
+  @override
+  String get discoverEmpty => '暂无推荐内容。';
+
+  @override
+  String get importTitle => '导入';
+
+  @override
+  String get importPending => 'TXT / EPUB 导入及通过其他应用打开已纳入规划，仍在开发中。';
+
+  @override
+  String get discoverUnsupported => '该书源不提供推荐，请使用搜索查找小说。';
+
+  @override
+  String get discoverTitle => '发现';
+
+  @override
+  String get shelfEmpty => '书架暂无书籍。';
+
+  @override
+  String get shelfUndo => '撤销移除';
+
+  @override
+  String get shelfLayout => '切换书架布局';
+
+  @override
+  String get nextChapter => '下一章';
+
+  @override
+  String get previousChapter => '上一章';
+
+  @override
+  String get catalogUnnamedVolume => '未命名卷';
+
+  @override
+  String get catalogStale => '已保存的目录可能不是最新内容。';
+
+  @override
+  String get catalogEmpty => '暂无章节。';
+
+  @override
+  String get detailRefresh => '刷新详情';
+
+  @override
+  String get detailStale => '已保存的详情可能不是最新信息。';
+
+  @override
+  String get detailStart => '开始阅读';
+
+  @override
+  String get detailContinue => '继续阅读';
+
+  @override
+  String get detailAddShelf => '加入书架';
+
+  @override
+  String get detailRemoveShelf => '移出书架';
+
+  @override
+  String get detailActionsPending => '暂不可用的阅读和书架操作仍在开发中。';
+
+  @override
+  String get detailSynopsis => '简介';
+
+  @override
+  String get detailNoSynopsis => '暂无简介。';
+
+  @override
+  String get detailCover => '书籍封面';
+
+  @override
+  String get detailStatusUnknown => '连载状态未知';
+
+  @override
+  String get detailStatusOngoing => '连载中';
+
+  @override
+  String get detailStatusCompleted => '已完结';
+
+  @override
+  String get detailStatusHiatus => '暂停连载';
+
+  @override
+  String get searchKeyword => '书名或关键词';
+
+  @override
+  String get searchInitial => '输入关键词后，点击搜索。';
+
+  @override
+  String get searchNoResults => '没有找到小说，试试其他关键词。';
+
+  @override
+  String get searchNoMore => '已显示全部结果';
+
+  @override
+  String get searchDraftNotice => '当前为上次搜索结果，请提交修改后的关键词重新搜索。';
+
+  @override
+  String searchResultsFor(String query) {
+    return '“$query”的搜索结果';
+  }
+
+  @override
+  String get devSearchTitle => '离线搜索';
+
+  @override
+  String get devSearchHint => '搜索“a”可体验分页并查看离线小说详情。';
+
+  @override
   String get readerImagePlaceholder => '插图';
 
   @override

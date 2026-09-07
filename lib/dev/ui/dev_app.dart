@@ -6,9 +6,12 @@ import '../../app/routes.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../fixture_scenarios.dart';
 import 'scenario_page.dart';
+import 'search_page.dart';
+import 'home_page.dart';
 import 'theme_lab/theme_lab.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../domain/contracts/contracts.dart';
+import '../../domain/models/models.dart';
 import '../../app/app_controller.dart';
 import '../../app/appearance_panel.dart';
 
@@ -35,6 +38,17 @@ ShioriApp createDevApp({
     return ShioriApp(
       locale: locale,
       routes: AppRoutes(home: (_) => const ThemeLab()),
+    );
+  }
+  if (scenarioId == 'home') {
+    return ShioriApp(
+      locale: locale,
+      createController: () => AppController(settingsStore: appSettings),
+      homeBuilder: (context, controller) => DevHomePage(
+        library: library,
+        settings: settings,
+        onAppearance: () => showAppAppearance(context, controller),
+      ),
     );
   }
   final initial = parseDevScenario(scenarioId);
@@ -109,6 +123,28 @@ class _DevMenuState extends State<DevMenu> {
     body: ListView(
       children: [
         ListTile(
+          title: Text(AppLocalizations.of(context).shelfTitle),
+          leading: const Icon(Icons.home_outlined),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => DevHomePage(
+                library: widget.library,
+                settings: widget.preferences,
+                onAppearance: widget.onAppearance,
+              ),
+            ),
+          ),
+        ),
+        ListTile(
+          key: const ValueKey('dev-search'),
+          title: Text(AppLocalizations.of(context).devSearchTitle),
+          subtitle: Text(AppLocalizations.of(context).devSearchHint),
+          trailing: const Icon(Icons.search),
+          onTap: () => const AppRoutes(
+            search: _buildSearch,
+          ).open(context, SearchDestination(fixtureSourceId)),
+        ),
+        ListTile(
           title: Text(AppLocalizations.of(context).labTitle),
           trailing: const Icon(Icons.palette_outlined),
           onTap: () => Navigator.of(
@@ -127,3 +163,6 @@ class _DevMenuState extends State<DevMenu> {
     ),
   );
 }
+
+Widget _buildSearch(BuildContext context, SourceId sourceId) =>
+    const DevSearchPage();

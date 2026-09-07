@@ -98,6 +98,252 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @historyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent reading'**
+  String get historyTitle;
+
+  /// No description provided for @historyClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear this reading history'**
+  String get historyClear;
+
+  /// No description provided for @chapterFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'The saved chapter is no longer listed. Opened a nearby chapter.'**
+  String get chapterFallback;
+
+  /// No description provided for @historyEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No reading history yet.'**
+  String get historyEmpty;
+
+  /// No description provided for @shelfTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookshelf'**
+  String get shelfTitle;
+
+  /// No description provided for @noSources.
+  ///
+  /// In en, this message translates to:
+  /// **'No sources available. Saved books remain on your bookshelf.'**
+  String get noSources;
+
+  /// No description provided for @discoverEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No recommendations available.'**
+  String get discoverEmpty;
+
+  /// No description provided for @importTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get importTitle;
+
+  /// No description provided for @importPending.
+  ///
+  /// In en, this message translates to:
+  /// **'TXT / EPUB import and Open with Shiori are planned and still in development.'**
+  String get importPending;
+
+  /// No description provided for @discoverUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This source has no recommendations. Use Search to find a novel.'**
+  String get discoverUnsupported;
+
+  /// No description provided for @discoverTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discover'**
+  String get discoverTitle;
+
+  /// No description provided for @shelfEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Your bookshelf is empty.'**
+  String get shelfEmpty;
+
+  /// No description provided for @shelfUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo removal'**
+  String get shelfUndo;
+
+  /// No description provided for @shelfLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch bookshelf layout'**
+  String get shelfLayout;
+
+  /// No description provided for @nextChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Next chapter'**
+  String get nextChapter;
+
+  /// No description provided for @previousChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous chapter'**
+  String get previousChapter;
+
+  /// No description provided for @catalogUnnamedVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled volume'**
+  String get catalogUnnamedVolume;
+
+  /// No description provided for @catalogStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved contents may be out of date.'**
+  String get catalogStale;
+
+  /// No description provided for @catalogEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No chapters available.'**
+  String get catalogEmpty;
+
+  /// No description provided for @detailRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh details'**
+  String get detailRefresh;
+
+  /// No description provided for @detailStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved details may be out of date.'**
+  String get detailStale;
+
+  /// No description provided for @detailStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start reading'**
+  String get detailStart;
+
+  /// No description provided for @detailContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue reading'**
+  String get detailContinue;
+
+  /// No description provided for @detailAddShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to bookshelf'**
+  String get detailAddShelf;
+
+  /// No description provided for @detailRemoveShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from bookshelf'**
+  String get detailRemoveShelf;
+
+  /// No description provided for @detailActionsPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable reading and bookshelf actions are still in development.'**
+  String get detailActionsPending;
+
+  /// No description provided for @detailSynopsis.
+  ///
+  /// In en, this message translates to:
+  /// **'Synopsis'**
+  String get detailSynopsis;
+
+  /// No description provided for @detailNoSynopsis.
+  ///
+  /// In en, this message translates to:
+  /// **'No synopsis available.'**
+  String get detailNoSynopsis;
+
+  /// No description provided for @detailCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Book cover'**
+  String get detailCover;
+
+  /// No description provided for @detailStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Publication status unavailable'**
+  String get detailStatusUnknown;
+
+  /// No description provided for @detailStatusOngoing.
+  ///
+  /// In en, this message translates to:
+  /// **'Ongoing'**
+  String get detailStatusOngoing;
+
+  /// No description provided for @detailStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get detailStatusCompleted;
+
+  /// No description provided for @detailStatusHiatus.
+  ///
+  /// In en, this message translates to:
+  /// **'On hiatus'**
+  String get detailStatusHiatus;
+
+  /// No description provided for @searchKeyword.
+  ///
+  /// In en, this message translates to:
+  /// **'Title or keyword'**
+  String get searchKeyword;
+
+  /// No description provided for @searchInitial.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a keyword, then choose Search.'**
+  String get searchInitial;
+
+  /// No description provided for @searchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No novels found. Try another keyword.'**
+  String get searchNoResults;
+
+  /// No description provided for @searchNoMore.
+  ///
+  /// In en, this message translates to:
+  /// **'All results shown'**
+  String get searchNoMore;
+
+  /// No description provided for @searchDraftNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'These are previous results. Submit your edited keyword to search again.'**
+  String get searchDraftNotice;
+
+  /// No description provided for @searchResultsFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Results for “{query}”'**
+  String searchResultsFor(String query);
+
+  /// No description provided for @devSearchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline search'**
+  String get devSearchTitle;
+
+  /// No description provided for @devSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search “a” to try pagination and view offline novel details.'**
+  String get devSearchHint;
+
   /// No description provided for @readerImagePlaceholder.
   ///
   /// In en, this message translates to:

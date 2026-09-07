@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shiori/data/local/database/user_database.dart' show UserDatabase;
+import 'package:shiori/data/local/database/user_database.dart'
+    show UserDatabase;
 import 'package:shiori/data/repositories/library_repository.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';

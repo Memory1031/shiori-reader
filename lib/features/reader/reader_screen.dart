@@ -84,12 +84,16 @@ class ReaderContentView extends StatefulWidget {
     this.settings,
     this.session,
     this.initialPosition,
+    this.onCatalog,
+    this.onPreviousChapter,
+    this.onNextChapter,
   });
   final ImageRepository? images;
   final ChapterContent content;
   final ReaderController? session;
   final ReaderPosition? initialPosition;
   final SettingsStore? settings;
+  final VoidCallback? onCatalog, onPreviousChapter, onNextChapter;
   @override
   State<ReaderContentView> createState() => _ReaderContentViewState();
 }
@@ -474,6 +478,12 @@ class _ReaderContentViewState extends State<ReaderContentView>
             child: Row(
               children: [
                 const BackButton(),
+                if (widget.onCatalog != null)
+                  IconButton(
+                    onPressed: widget.onCatalog,
+                    tooltip: l.catalogTitle,
+                    icon: const Icon(Icons.list),
+                  ),
                 Expanded(
                   child: Text(
                     widget.content.title,
@@ -506,6 +516,12 @@ class _ReaderContentViewState extends State<ReaderContentView>
             color: Theme.of(context).scaffoldBackgroundColor,
             child: Row(
               children: [
+                if (widget.onCatalog != null)
+                  IconButton(
+                    onPressed: widget.onPreviousChapter,
+                    tooltip: l.previousChapter,
+                    icon: const Icon(Icons.skip_previous),
+                  ),
                 if (_isPaged)
                   IconButton(
                     onPressed: _paged.previous,
@@ -531,6 +547,12 @@ class _ReaderContentViewState extends State<ReaderContentView>
                     onPressed: _paged.next,
                     tooltip: l.readerNextPage,
                     icon: const Icon(Icons.chevron_right),
+                  ),
+                if (widget.onCatalog != null)
+                  IconButton(
+                    onPressed: widget.onNextChapter,
+                    tooltip: l.nextChapter,
+                    icon: const Icon(Icons.skip_next),
                   ),
               ],
             ),

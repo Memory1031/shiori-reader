@@ -101,3 +101,5 @@ UI-001 已交付开发菜单中的“视觉样板”：三页共享候选 tokens
 UI-002 的应用外观按钮位于当前首页 / 开发菜单右上方，打开独立 Sheet。ShioriApp 的 homeBuilder 显式把 AppController 传入页面工厂，再传递操作回调；无 Get.find 或新的全局服务。应用主题变更不做颜色补间；阅读 Sheet 在系统减少动态效果时关闭过渡。主入口仅新增应用偏好装配，不代表完整设置页 / 生产 Source 已完成。
 
 TEST-001：新增 SourceServices 作为显式在线数据装配，Source注册、NovelRepository和ImageRepository共用预算与生命周期；构造不联网。普通App页面/开发菜单尚未自动切换到此装配，Android独立验证入口已使用该工厂完成真实生产链路。验收见 [Source报告](source/lightnovel.md)，页面接线仍按后续任务执行。
+
+2026-09-07 HOME-001 / SHELF-002 / PROGRESS-001 后续接线：普通 main 现通过 ProductionApp 打开正式数据库、SourceServices 和独立应用/阅读偏好，默认展示本地书架，搜索/详情/目录/跨章阅读/收藏/历史/继续阅读均已接通。ContinueDestination 使用固定 `/continue` 路由名，不记录身份。开发首页使用相同页面但仅注入 Fixture 数据；此前“普通页面尚未装配”的段落为历史记录。资源边界、Android runtime 与剩余范围见 [六项闭环验收](reading-flow.md)。

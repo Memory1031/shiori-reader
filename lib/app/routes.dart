@@ -32,15 +32,29 @@ final class ReaderDestination extends AppDestination {
   String get routeName => '/reader';
 }
 
+final class ContinueDestination extends AppDestination {
+  const ContinueDestination(this.key);
+  final NovelKey key;
+  @override
+  String get routeName => '/continue';
+}
+
 /// Factories capture explicitly injected contracts at the composition root.
 /// Missing features stay honest placeholders until their own implementation task.
 class AppRoutes {
-  const AppRoutes({this.home, this.search, this.novel, this.reader});
+  const AppRoutes({
+    this.home,
+    this.search,
+    this.novel,
+    this.reader,
+    this.continueReader,
+  });
 
   final WidgetBuilder? home;
   final Widget Function(BuildContext, SourceId)? search;
   final Widget Function(BuildContext, NovelKey)? novel;
   final Widget Function(BuildContext, ChapterKey)? reader;
+  final Widget Function(BuildContext, NovelKey)? continueReader;
 
   Widget buildHome(BuildContext context, {VoidCallback? onAppearance}) =>
       home?.call(context) ??
@@ -69,6 +83,9 @@ class AppRoutes {
             _PendingPage(title: AppLocalizations.of(context).novelDetailsTitle),
       ReaderDestination(:final key) =>
         reader?.call(context, key) ??
+            _PendingPage(title: AppLocalizations.of(context).readerTitle),
+      ContinueDestination(:final key) =>
+        continueReader?.call(context, key) ??
             _PendingPage(title: AppLocalizations.of(context).readerTitle),
     };
     // Route names deliberately exclude opaque IDs and potential site locators.

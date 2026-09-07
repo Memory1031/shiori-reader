@@ -9,6 +9,138 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get historyTitle => 'Recent reading';
+
+  @override
+  String get historyClear => 'Clear this reading history';
+
+  @override
+  String get chapterFallback =>
+      'The saved chapter is no longer listed. Opened a nearby chapter.';
+
+  @override
+  String get historyEmpty => 'No reading history yet.';
+
+  @override
+  String get shelfTitle => 'Bookshelf';
+
+  @override
+  String get noSources =>
+      'No sources available. Saved books remain on your bookshelf.';
+
+  @override
+  String get discoverEmpty => 'No recommendations available.';
+
+  @override
+  String get importTitle => 'Import';
+
+  @override
+  String get importPending =>
+      'TXT / EPUB import and Open with Shiori are planned and still in development.';
+
+  @override
+  String get discoverUnsupported =>
+      'This source has no recommendations. Use Search to find a novel.';
+
+  @override
+  String get discoverTitle => 'Discover';
+
+  @override
+  String get shelfEmpty => 'Your bookshelf is empty.';
+
+  @override
+  String get shelfUndo => 'Undo removal';
+
+  @override
+  String get shelfLayout => 'Switch bookshelf layout';
+
+  @override
+  String get nextChapter => 'Next chapter';
+
+  @override
+  String get previousChapter => 'Previous chapter';
+
+  @override
+  String get catalogUnnamedVolume => 'Untitled volume';
+
+  @override
+  String get catalogStale => 'Saved contents may be out of date.';
+
+  @override
+  String get catalogEmpty => 'No chapters available.';
+
+  @override
+  String get detailRefresh => 'Refresh details';
+
+  @override
+  String get detailStale => 'Saved details may be out of date.';
+
+  @override
+  String get detailStart => 'Start reading';
+
+  @override
+  String get detailContinue => 'Continue reading';
+
+  @override
+  String get detailAddShelf => 'Add to bookshelf';
+
+  @override
+  String get detailRemoveShelf => 'Remove from bookshelf';
+
+  @override
+  String get detailActionsPending =>
+      'Unavailable reading and bookshelf actions are still in development.';
+
+  @override
+  String get detailSynopsis => 'Synopsis';
+
+  @override
+  String get detailNoSynopsis => 'No synopsis available.';
+
+  @override
+  String get detailCover => 'Book cover';
+
+  @override
+  String get detailStatusUnknown => 'Publication status unavailable';
+
+  @override
+  String get detailStatusOngoing => 'Ongoing';
+
+  @override
+  String get detailStatusCompleted => 'Completed';
+
+  @override
+  String get detailStatusHiatus => 'On hiatus';
+
+  @override
+  String get searchKeyword => 'Title or keyword';
+
+  @override
+  String get searchInitial => 'Enter a keyword, then choose Search.';
+
+  @override
+  String get searchNoResults => 'No novels found. Try another keyword.';
+
+  @override
+  String get searchNoMore => 'All results shown';
+
+  @override
+  String get searchDraftNotice =>
+      'These are previous results. Submit your edited keyword to search again.';
+
+  @override
+  String searchResultsFor(String query) {
+    return 'Results for “$query”';
+  }
+
+  @override
+  String get devSearchTitle => 'Offline search';
+
+  @override
+  String get devSearchHint =>
+      'Search “a” to try pagination and view offline novel details.';
+
+  @override
   String get readerImagePlaceholder => 'Illustration';
 
   @override
