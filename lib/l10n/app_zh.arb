@@ -1,6 +1,8 @@
 {
   "@@locale": "zh",
   "accessRestrictedMessage": "此内容的访问受到限制。",
+  "catalogTitle": "目录",
+  "loadMoreAction": "加载更多",
   "appTitle": "Shiori",
   "backAction": "返回",
   "cacheFailureMessage": "缓存暂时不可用，内容可能尚未保存到本地。",

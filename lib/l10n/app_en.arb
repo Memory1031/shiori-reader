@@ -1,6 +1,8 @@
 {
   "@@locale": "en",
   "accessRestrictedMessage": "Access to this content is restricted.",
+  "catalogTitle": "Contents",
+  "loadMoreAction": "Load more",
   "appTitle": "Shiori",
   "backAction": "Back",
   "cacheFailureMessage": "The cache is unavailable. Content may not have been saved locally.",

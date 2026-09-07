@@ -104,6 +104,18 @@ abstract class AppLocalizations {
   /// **'Access to this content is restricted.'**
   String get accessRestrictedMessage;
 
+  /// No description provided for @catalogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Contents'**
+  String get catalogTitle;
+
+  /// No description provided for @loadMoreAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get loadMoreAction;
+
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:

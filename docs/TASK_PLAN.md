@@ -1,6 +1,6 @@
 # Shiori Task Plan
 
-规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-07，按用户指定完成 DEV-001 代码与宿主验收（Android 设备解码待补验）；SRC-001..004 / CORE-001..004 已完成，Phase 0 技术 Gate = GO / PASS，当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
+规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-07，按用户指定完成 DEV-002，并补齐 DEV-001 Android 解码验收；SRC-001..004 / CORE-001..004 已完成，Phase 0 技术 Gate = GO / PASS，当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
 
 规划修订阶段（历史记录）：仅完善本文件并做 Self Review，基于完整的 41 节 / 59 Task 原计划，当时仓库为 Greenfield，未执行开发任务。后续用户已授权本次 SRC-001 / CORE-001 执行；除这两个任务的明确交付记录外，目录树、模型、配置值和测试命令仍为后续设计，不代表已实现。
 
@@ -647,7 +647,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | Deferred Track | IOS-001..006 | 全部 DEFERRED_NO_MAC；未来环境可用后才跑基础 / Source / UX / Reader / Offline / Release runtime，不影响上述完成 |
 | Optional Compile Track | CI-003 | OPTIONAL_PROPOSED；可用 macOS runner 时记录指定 target 编译结果，不产生 runtime PASS、不作为 Android required check |
 
-当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 新包安装因模拟器文件系统只读失败，未取得本轮新包 runtime smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001 已交付 17 个离线场景与源/媒体/内存仓库，当前 65 项测试及 Android 编译通过，设备解码因无连接设备待补验，见 [Fixture 验证](fixtures.md)。下一建议 DEV-002；NET-001、DB-001 也满足各自前置，但尚未执行。SRC-005 仍等待 NET-002 / DB-002。CI-003 未启用；本轮没有生产 Source / DB / 缓存实现；DEV-001 使用独立开发替身，不把它作为生产实现验收。
+当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 的安装阻塞已在 DEV-002 解除：复用同一应用壳的新开发包已完成 MuMu 安装、冷启动及返回导航 smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001..002 DONE：17 个离线场景、内存仓库、开发菜单和指定场景入口已交付；当前 73 项测试、Android 编译和 MuMu 开发入口运行通过，20 图设备解码已补齐，见 [Fixture 验证](fixtures.md) / [开发入口](dev-entry.md)。下一建议 READER-001；NET-001、DB-001 也满足各自前置，但尚未执行。SRC-005 仍等待 NET-002 / DB-002。CI-003 未启用；本轮没有生产 Source / DB / 缓存实现；DEV-001 使用独立开发替身，不把它作为生产实现验收。
 
 示例（未来某 Phase 完成后可记录，**不是当前结果**）：Feature Status = DONE；Android Validation = PASS；iOS Compatibility Review = PASS；iOS Runtime Validation = DEFERRED_NO_MAC。这样 Phase 4 可达到 Reader Feature Complete，而 Cross-platform Mobile MVP 仍等待 iOS 验证。
 
@@ -657,7 +657,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 
 ### 领取与交付约定
 
-每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 未特别标注者为 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。按用户指定执行；本轮仅领取 DEV-001，其余任务不自动领取。
+每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 未特别标注者为 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。按用户指定执行；本轮仅领取 DEV-002 并补验其前置 DEV-001，其余任务不自动领取。
 
 Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验收的模块行为；L 是风险实验或跨层集成，需要给出清楚的失败停止点，不扩展为整模块重写。执行一次只领取一个 Task。推荐分支 `codex/<task-id>-<short-name>`，先查工作区，保留他人改动；最终提交 / PR 聚焦该 Task，记录测试结果与平台待项，不自行发布。共享文件如 pubspec、composition root、schema 指定单一编辑者，不能因并行领取覆盖对方。
 
@@ -762,7 +762,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### CORE-004 — App 组装、导航与通用状态
 
-- Status：DONE（2026-09-07）；[应用装配与验证](app.md)。GetX 4.7.3 局部 Controller、显式 DI、类型化 Flutter 平台路由、主题/SafeArea 和通用状态组件已实现；50 项完整 Flutter 测试（含多语言补充）、静态分析及 Android Debug build PASS。新包 runtime smoke 因模拟器只读而未完成，旧版本启动不计新证据；iOS Level A PASS，Level B DEFERRED_NO_MAC。未实现真实功能页面或生产数据层。
+- Status：DONE（2026-09-07）；[应用装配与验证](app.md)。GetX 4.7.3 局部 Controller、显式 DI、类型化 Flutter 平台路由、主题/SafeArea 和通用状态组件已实现；50 项完整 Flutter 测试（含多语言补充）、静态分析及 Android Debug build PASS。新包 runtime smoke 已由 DEV-002 的同一应用壳开发包补齐（MuMu 安装、冷启动、显示及返回导航）；初次只读安装失败保留为历史记录；iOS Level A PASS，Level B DEFERRED_NO_MAC。未实现真实功能页面或生产数据层。
 - Phase：1；Complexity：M。
 - Goal：建立可替换依赖的应用壳和一致 loading / empty / error。
 - Input：第 8、10、24 节；Dependencies：CORE-003。
@@ -824,7 +824,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### DEV-001 — Fixture Source 与可控媒体
 
-- Status：IMPLEMENTED / HOST_PASS（2026-09-07）；17 个场景、正式 Source/Media/Repository 替身已交付，65 项完整测试及 Android Debug 编译 PASS。Android 设备解码 PENDING_NO_DEVICE；iOS Level A PASS，runtime DEFERRED_NO_MAC。验收明细与补测命令见 [Fixture 规范](fixtures.md)。
+- Status：DONE（2026-09-07）；17 个场景、正式 Source/Media/Repository 替身已交付，原 65 项完整测试及 Android Debug 编译 PASS；DEV-002 时补齐 MuMu 20 图设备解码 PASS；iOS Level A PASS，runtime DEFERRED_NO_MAC。验收明细与补测命令见 [Fixture 规范](fixtures.md)。
 
 - Phase：1；Complexity：M。
 - Goal：无需网站即可重复开发搜索 / 目录 / Reader。
@@ -837,6 +837,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：契约一致性、稳定 seed、图片解码、分页与故障开关、意外外网拒绝。
 
 #### DEV-002 — Reader 快捷入口与 Release 隔离
+
+- Status：DONE（2026-09-07）；独立 main_dev、17 场景菜单、指定场景启动与数据检查页已交付；73 项测试、静态分析、Android Debug 构建与 MuMu 新包运行 PASS。生产依赖图/route/assets 隔离测试通过；真实 Reader 和发布包审计仍归后续任务。iOS Level A PASS，runtime DEFERRED_NO_MAC。见 [开发入口与验证](dev-entry.md)。
 
 - Phase：1；Complexity：S。
 - Goal：日常一键进入指定 Reader 场景，不重复经过搜索。
@@ -1669,7 +1671,7 @@ flowchart TD
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001 已完成代码和宿主验收，Android 设备解码待补验。下一建议 **DEV-002**，将现有离线场景接入开发入口；NET-001、DB-001 可按各自前置另行领取。CORE-004 新包模拟器安装待只读文件系统问题解除后补测。CORE-005 及 Source 首项 SRC-005 仍等待 NET-002、DB-002。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。下一建议 **READER-001**，开展懒布局与深位置恢复实验；NET-001、DB-001 可按各自前置另行领取。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。CORE-005 及 Source 首项 SRC-005 仍等待 NET-002、DB-002。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
 
 ## 39. Parallelizable Work
 

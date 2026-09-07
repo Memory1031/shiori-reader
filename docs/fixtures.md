@@ -1,6 +1,6 @@
 # DEV-001：离线 Fixture Source 与可控媒体
 
-2026-09-07。代码、宿主契约/解码测试和 Android 编译已完成；Android 设备解码待补验（本轮 `adb devices -l` 无设备），iOS runtime 为 DEFERRED_NO_MAC。DEV-002 的菜单和快捷入口尚未实现。
+2026-09-07。DEV-001 DONE。代码、宿主契约/解码测试和 Android 编译已完成；DEV-002 执行时连接 MuMu 后补齐 20 图设备解码 PASS，iOS runtime 为 DEFERRED_NO_MAC。菜单和快捷入口现见 [DEV-002](dev-entry.md)。
 
 ## 入口和所有权
 
@@ -83,4 +83,4 @@ flutter test --no-pub --reporter expanded
 flutter run --no-pub --debug -d <device-id> --target test/support/fixture_android_decode.dart
 ```
 
-下一任务建议 DEV-002，接入离线开发菜单与快捷路径；设备可用后复用探针补齐 DEV-001 Android 解码记录。
+后续补验（2026-09-07，DEV-002）：连接已配置的 MuMu 127.0.0.1:16384，安装本探针后新进程日志输出 `FIXTURE_CODEC_PASS count=20`。已补齐 Android codec 验收，前述无设备记录保留为当时事实。开发菜单与快捷路径已在 [DEV-002](dev-entry.md) 交付。

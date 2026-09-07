@@ -12,6 +12,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accessRestrictedMessage => '此内容的访问受到限制。';
 
   @override
+  String get catalogTitle => '目录';
+
+  @override
+  String get loadMoreAction => '加载更多';
+
+  @override
   String get appTitle => 'Shiori';
 
   @override

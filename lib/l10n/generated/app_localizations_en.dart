@@ -12,6 +12,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accessRestrictedMessage => 'Access to this content is restricted.';
 
   @override
+  String get catalogTitle => 'Contents';
+
+  @override
+  String get loadMoreAction => 'Load more';
+
+  @override
   String get appTitle => 'Shiori';
 
   @override

@@ -1,6 +1,6 @@
 # CORE-004：应用装配、导航与通用状态
 
-2026-09-07。CORE-004 DONE；完成应用壳和所需 widget 验收。Android Debug build PASS；本轮新包的模拟器安装未完成，原因见验证记录。iOS Level A compatibility review PASS，实际 iOS runtime 仍为 DEFERRED_NO_MAC。
+2026-09-07。CORE-004 DONE；完成应用壳和所需 widget 验收。Android Debug build PASS；初次模拟器安装失败的待项已在 DEV-002 补齐，同一应用壳的新开发包安装、冷启动和返回导航 smoke PASS，见下文补验记录。iOS Level A compatibility review PASS，实际 iOS runtime 仍为 DEFERRED_NO_MAC。
 
 ## 装配与范围
 
@@ -67,7 +67,11 @@ iOS Level A：领域边界未改变，无 dart:io 平台分支或 Android-only �
 - `flutter test --no-pub --reporter expanded`：**44 项通过**，包括 33 项既有领域测试、1 项启动测试及本轮 10 项 widget 测试。覆盖设置依赖替换、失败保留首页与恢复、请求覆盖/晚结果丢弃、Android 返回、Cupertino 边缘滑动返回、重复 push 的独立 Controller、实际订阅数归零、取消与共享仓库存活、类型化参数、错误动作/冷却、小屏大字布局。
 - widget 测试用 test/support 的合成依赖及局部可控替身，不访问源站。平台返回的异步资源释放通过 tester.runAsync 等待，不把虚拟时钟等待误判为资源泄漏。
 - `flutter build apk --debug --no-pub`：PASS，Gradle assembleDebug 10.9 秒；APK 位于 `build/app/outputs/flutter-apk/app-debug.apk`。保留历史记录中的 Gradle launcher Java native-access warning，实际构建成功。
-- 已连接设备 `emulator-5554`：型号报告 V2366GA，x86_64，API 32。`adb install -r` 失败：无法创建 `/data/app/vmdl…tmp`；随后 `install --no-streaming -r` 失败：`/data/local/tmp/app-debug.apk` 为只读文件系统。`df` 报可用约 99 GB，未将问题误归为磁盘满。未卸载应用、清理设备数据或修改挂载。第一次安装失败后启动命令打开了设备上的旧版本，这不计为本轮新包 smoke PASS。新包运行验收待模拟器恢复可写后补测，ARM64 真机验收仍归 ANDROID-002。
+- 已连接设备 `emulator-5554`：型号报告 V2366GA，x86_64，API 32。`adb install -r` 失败：无法创建 `/data/app/vmdl…tmp`；随后 `install --no-streaming -r` 失败：`/data/local/tmp/app-debug.apk` 为只读文件系统。`df` 报可用约 99 GB，未将问题误归为磁盘满。未卸载应用、清理设备数据或修改挂载。第一次安装失败后启动命令打开了设备上的旧版本，这不计为本轮新包 smoke PASS。当时新包运行验收待模拟器恢复可写后补测；该待项现已按下文 DEV-002 记录补齐。ARM64 真机验收仍归 ANDROID-002。
+
+### 后续补验：DEV-002（2026-09-07）
+
+连接 MuMu `127.0.0.1:16384` 后，本轮新开发包 `adb install -r` 返回 Success，冷启动 Status ok；截图确认 singleImage 场景通过同一 ShioriApp 应用壳显示摘要和真实 PNG，系统返回后显示开发菜单，当前应用日志未见所检查的 Flutter/Android 致命错误。CORE-004 的新包安装/启动待项据此关闭，证据见 [DEV-002 验证](dev-entry.md)。这是后续开发入口对共享应用壳的 smoke，不将早期失败改写为成功，也不宣称重新安装运行了当时的旧 APK；普通入口本轮已独立编译通过。ARM64 真机和 iOS runtime 验收仍按原任务保留。
 
 ### 本机 Flutter 启动阻塞的处理
 
