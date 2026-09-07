@@ -8,6 +8,8 @@ import '../novel_detail/catalog_controller.dart';
 import '../novel_detail/catalog_view.dart';
 import 'reader_controller.dart';
 import 'reader_screen.dart';
+import '../cache/prefetch_sheet.dart';
+import '../../shared/source_image.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
 class BookReaderScreen extends StatefulWidget {
@@ -20,6 +22,8 @@ class BookReaderScreen extends StatefulWidget {
     this.settings,
     this.chapterFallback = false,
     this.onDetails,
+    this.cache,
+    this.offline = false,
   });
   final ChapterKey chapter;
   final NovelRepository repository;
@@ -28,6 +32,8 @@ class BookReaderScreen extends StatefulWidget {
   final SettingsStore? settings;
   final bool chapterFallback;
   final ValueChanged<NovelKey>? onDetails;
+  final CacheManagement? cache;
+  final bool offline;
   @override
   State<BookReaderScreen> createState() => _BookReaderScreenState();
 }
@@ -35,16 +41,23 @@ class BookReaderScreen extends StatefulWidget {
 class _BookReaderScreenState extends State<BookReaderScreen>
     with WidgetsBindingObserver {
   late ReaderController _reader;
+  late final ImageRepository? _displayImages;
   late final CatalogController _catalog;
   bool _changing = false, _canPop = false;
   @override
   void initState() {
     super.initState();
+    _displayImages = widget.offline && widget.images != null
+        ? _OfflineImages(widget.images!)
+        : widget.images;
     WidgetsBinding.instance.addObserver(this);
     _catalog =
         CatalogController(
             repository: widget.repository,
             novel: widget.chapter.novelKey,
+            initialMode: widget.offline
+                ? ReadMode.cacheOnly
+                : ReadMode.cacheFirst,
           )
           ..onStart()
           ..addListener(_changed);
@@ -67,10 +80,18 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           repository: widget.repository,
           chapter: key,
           library: widget.library,
+          cache: widget.cache,
+          readMode: widget.offline ? ReadMode.cacheOnly : ReadMode.cacheFirst,
+          onPosition: widget.offline ? null : widget.cache?.prefetch?.position,
         )
         ..onStart()
         ..addListener(_changed);
   void _changed() {
+    if (!widget.offline && _reader.content != null) {
+      unawaited(
+        widget.cache?.prefetch?.enter(_reader.content!, _catalog.loaded?.value),
+      );
+    }
     if (mounted) setState(() {});
   }
 
@@ -82,6 +103,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   void dispose() {
+    if (!widget.offline) widget.cache?.prefetch?.leave();
     WidgetsBinding.instance.removeObserver(this);
     _close(_reader);
     _catalog.removeListener(_changed);
@@ -92,6 +114,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!widget.offline) {
+      widget.cache?.prefetch?.active(state == AppLifecycleState.resumed);
+    }
     if (state != AppLifecycleState.resumed) unawaited(_reader.flushProgress());
   }
 
@@ -108,7 +133,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           ),
         ),
       );
-      return false;
+      return _reader.progress == null;
     }
     return true;
   }
@@ -148,6 +173,32 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   Future<void> _contents() async {
+    if (widget.offline) {
+      final entries =
+          _catalog.loaded?.value.flatChapters.toList() ?? <Chapter>[];
+      if (!mounted) return;
+      final selected = await showModalBottomSheet<ChapterKey>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: ListView(
+            children: [
+              if (entries.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(AppLocalizations.of(context).cacheEmpty),
+                ),
+              for (final item in entries)
+                ListTile(
+                  title: Text(item.title),
+                  onTap: () => Navigator.pop(context, item.key),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (mounted && selected != null) await _switch(selected);
+      return;
+    }
     final key = await openCatalog(
       context,
       novel: widget.chapter.novelKey,
@@ -172,64 +223,85 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     final chapters =
         _catalog.loaded?.value.flatChapters.toList() ?? <Chapter>[];
     final index = chapters.indexWhere((c) => c.key == _reader.chapter);
-    return PopScope(
-      // Cupertino's interactive back gesture requires canPop before it starts.
-      // Periodic/lifecycle commits remain the durable boundary on every platform.
-      canPop: _canPop || Theme.of(context).platform == TargetPlatform.iOS,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          unawaited(_exit());
-        } else {
-          unawaited(_reader.flushProgress());
-        }
-      },
-      child: _reader.status == ReaderStatus.ready
-          ? ReaderContentView(
-              key: ValueKey(_reader),
-              content: _reader.content!,
-              images: widget.images,
-              settings: widget.settings,
-              session: _reader,
-              initialPosition: _reader.initialPosition,
-              onCatalog: _changing ? null : _contents,
-              onDetails: widget.onDetails == null || _changing
-                  ? null
-                  : _details,
-              onPreviousChapter: !_changing && index > 0
-                  ? () => _switch(chapters[index - 1].key)
-                  : null,
-              onNextChapter:
-                  !_changing && index >= 0 && index + 1 < chapters.length
-                  ? () => _switch(chapters[index + 1].key)
-                  : null,
-            )
-          : Scaffold(
-              appBar: AppBar(
-                title: Text(AppLocalizations.of(context).readerTitle),
-                actions: [
-                  if (widget.onDetails != null)
-                    IconButton(
-                      tooltip: AppLocalizations.of(context).novelDetailsTitle,
-                      onPressed: _changing ? null : _details,
-                      icon: const Icon(Icons.info_outline),
-                    ),
-                ],
-              ),
-              body: SafeArea(
-                child: _reader.status == ReaderStatus.loading
-                    ? const LoadingView()
-                    : _reader.failure != null
-                    ? FailureView(
-                        failure: _reader.failure!,
-                        onRetry: _reader.load,
-                        onBack: _contents,
+    return SourceImageDecodeScope(
+      child: PopScope(
+        // Cupertino's interactive back gesture requires canPop before it starts.
+        // Periodic/lifecycle commits remain the durable boundary on every platform.
+        canPop: _canPop || Theme.of(context).platform == TargetPlatform.iOS,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) {
+            unawaited(_exit());
+          } else {
+            unawaited(_reader.flushProgress());
+          }
+        },
+        child: _reader.status == ReaderStatus.ready
+            ? ReaderContentView(
+                key: ValueKey(_reader),
+                content: _reader.content!,
+                images: _displayImages,
+                settings: widget.settings,
+                session: _reader,
+                initialPosition: _reader.initialPosition,
+                onCatalog: _changing ? null : _contents,
+                onPrefetch: !widget.offline && widget.cache?.prefetch != null
+                    ? () => showPrefetchSheet(
+                        context,
+                        cache: widget.cache!,
+                        catalog: _catalog.loaded?.value,
+                        current: _reader.chapter,
                       )
-                    : TextButton(
-                        onPressed: _reader.load,
-                        child: Text(AppLocalizations.of(context).retryAction),
+                    : null,
+                onDetails: widget.onDetails == null || _changing
+                    ? null
+                    : _details,
+                onPreviousChapter: !_changing && index > 0
+                    ? () => _switch(chapters[index - 1].key)
+                    : null,
+                onNextChapter:
+                    !_changing && index >= 0 && index + 1 < chapters.length
+                    ? () => _switch(chapters[index + 1].key)
+                    : null,
+              )
+            : Scaffold(
+                appBar: AppBar(
+                  title: Text(AppLocalizations.of(context).readerTitle),
+                  actions: [
+                    if (widget.onDetails != null)
+                      IconButton(
+                        tooltip: AppLocalizations.of(context).novelDetailsTitle,
+                        onPressed: _changing ? null : _details,
+                        icon: const Icon(Icons.info_outline),
                       ),
+                  ],
+                ),
+                body: SafeArea(
+                  child: _reader.status == ReaderStatus.loading
+                      ? const LoadingView()
+                      : _reader.failure != null
+                      ? FailureView(
+                          failure: _reader.failure!,
+                          onRetry: _reader.load,
+                          onBack: _contents,
+                        )
+                      : TextButton(
+                          onPressed: _reader.load,
+                          child: Text(AppLocalizations.of(context).retryAction),
+                        ),
+                ),
               ),
-            ),
+      ),
     );
   }
+}
+
+class _OfflineImages implements ImageRepository {
+  _OfflineImages(this.inner);
+  final ImageRepository inner;
+  @override
+  Future<Result<LoadResult<MediaLease>>> load(
+    MediaRef ref, {
+    required ReadMode mode,
+    required CancellationToken cancellation,
+  }) => inner.load(ref, mode: ReadMode.cacheOnly, cancellation: cancellation);
 }

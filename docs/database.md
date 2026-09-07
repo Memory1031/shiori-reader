@@ -1,5 +1,9 @@
 # DB-001 / DB-002：本地存储
 
+## CACHE schema v2（2026-09-07）
+
+当前两库均为 schemaVersion 2。缓存库新增 image_cache / image_owners；用户库新增 prefetch_choices（source / novel / 当前文章 → 一个目标）和 prefetch_settings（两个预取开关），与 reading_progress 分离。v1→v2 仅新增表 / 索引，保留 v1 快照并生成 v2；迁移测试验证旧书架和正文记录不丢失。缓存 clear 不访问用户库。下方 v1 内容为 DB-001 当时基线，当前覆盖行为见 [缓存](cache.md)。
+
 2026-09-07。DB-001 的 v1 schema、目录、生成快照与非破坏迁移基线已完成；DB-002 的本地仓库和设置实现已完成，Android 探针已验证正式 SQLite / preferences。**两项 DONE**，具体验证边界见下方记录。
 
 ## 数据与所有权

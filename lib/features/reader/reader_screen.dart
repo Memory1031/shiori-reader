@@ -89,6 +89,7 @@ class ReaderContentView extends StatefulWidget {
     this.onPreviousChapter,
     this.onNextChapter,
     this.onDetails,
+    this.onPrefetch,
   });
   final ImageRepository? images;
   final ChapterContent content;
@@ -97,6 +98,7 @@ class ReaderContentView extends StatefulWidget {
   final SettingsStore? settings;
   final VoidCallback? onCatalog, onPreviousChapter, onNextChapter;
   final VoidCallback? onDetails;
+  final VoidCallback? onPrefetch;
   @override
   State<ReaderContentView> createState() => _ReaderContentViewState();
 }
@@ -556,11 +558,17 @@ class _ReaderContentViewState extends State<ReaderContentView>
                   icon: const Icon(Icons.more_horiz),
                   onSelected: (value) {
                     if (value == 'details') widget.onDetails?.call();
+                    if (value == 'prefetch') widget.onPrefetch?.call();
                     if (value == 'hide') _toggle();
                     if (value == 'save') widget.session?.retryProgress();
                     if (value == 'settings') _panel(context);
                   },
                   itemBuilder: (_) => [
+                    if (widget.onPrefetch != null)
+                      PopupMenuItem(
+                        value: 'prefetch',
+                        child: Text(l.prefetchTitle),
+                      ),
                     if (widget.onDetails != null)
                       PopupMenuItem(
                         value: 'details',

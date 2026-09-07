@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../shared/app_logger.dart';
 import 'network_types.dart';
+import 'background_work.dart';
 
 /// One Source owns one transport; NET-002 schedules each bounded attempt.
 class NetworkTransport {
@@ -51,6 +52,12 @@ class NetworkTransport {
     bool crossOrigin = false,
   }) async {
     if (_closed) throw StateError('Transport closed');
+    final background = BackgroundWork.current;
+    if (background != null &&
+        !background.promoted &&
+        !background.budget.attempt()) {
+      return Failure(AppFailure.cancelled(request.operation));
+    }
     final started = now();
     final id = logger.newRequestId();
     if (cancellation.isCancelled) {
@@ -181,6 +188,12 @@ class NetworkTransport {
         bodySubscription = body.stream.listen(
           (chunk) {
             if (done.isCompleted) return;
+            if (background != null &&
+                !background.promoted &&
+                !background.budget.receive(chunk.length)) {
+              stop(AppFailure.cancelled(request.operation));
+              return;
+            }
             if (bytes.length + chunk.length > request.maxBytes) {
               done.complete(
                 Failure(

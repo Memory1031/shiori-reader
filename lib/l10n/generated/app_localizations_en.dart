@@ -207,14 +207,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backAction => 'Back';
 
   @override
-  String get cacheFailureMessage =>
-      'The cache is unavailable. Content may not have been saved locally.';
-
-  @override
-  String get cacheMissMessage =>
-      'No cached content is available. Connect to the internet and try again.';
-
-  @override
   String get connectionFailureMessage =>
       'Unable to connect. Check your network and try again.';
 
@@ -500,4 +492,96 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get launchLoading => 'Preparing your library…';
+
+  @override
+  String get cacheTitle => 'Cache & offline reading';
+
+  @override
+  String cacheUsage(String text, String images) {
+    return 'Text & metadata $text MiB · Images $images MiB';
+  }
+
+  @override
+  String get cacheOfflineHint =>
+      'The articles below have cached text. Image counts reflect valid local files. Cached content may be evicted.';
+
+  @override
+  String cacheChapterStatus(int saved, int total) {
+    return 'Text cached · Images $saved/$total';
+  }
+
+  @override
+  String get cacheEmpty => 'No cached articles yet';
+
+  @override
+  String get cacheClearTitle => 'Clear cached content?';
+
+  @override
+  String get cacheClearExplanation =>
+      'Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.';
+
+  @override
+  String get cacheClearBook => 'Clear book cache';
+
+  @override
+  String get cacheCancel => 'Cancel';
+
+  @override
+  String get cacheClear => 'Clear cache';
+
+  @override
+  String get prefetchTitle => 'Reading cache';
+
+  @override
+  String get prefetchExplanation =>
+      'Prepares this article and one article you choose. It never opens it or changes your reading progress.';
+
+  @override
+  String get prefetchCurrent => 'Cache images in this article';
+
+  @override
+  String get prefetchNext => 'Prepare the selected next article';
+
+  @override
+  String get prefetchChoose => 'Read next';
+
+  @override
+  String get prefetchNoTarget => 'No next article';
+
+  @override
+  String get prefetchPause => 'Pause';
+
+  @override
+  String get prefetchResume => 'Continue / retry';
+
+  @override
+  String get prefetchIdle => 'Not started';
+
+  @override
+  String get prefetchRunning => 'Preparing images and next reading';
+
+  @override
+  String get prefetchPaused => 'Caching paused';
+
+  @override
+  String get prefetchBudget => 'Batch limit reached. Continue manually.';
+
+  @override
+  String get prefetchPartial =>
+      'Some resources could not be saved. You can retry.';
+
+  @override
+  String get prefetchComplete =>
+      'Batch finished. Check saved content for offline availability.';
+
+  @override
+  String get prefetchSaveFailed => 'Could not save your choice. Please retry.';
+
+  @override
+  String get cacheFailureMessage =>
+      'The cache is unavailable. Content may not have been saved locally.';
+
+  @override
+  String get cacheMissMessage =>
+      'No cached content is available. Connect to the internet and try again.';
 }

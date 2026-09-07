@@ -69,8 +69,6 @@
   "scrollReading": "Scroll",
   "appTitle": "Shiori",
   "backAction": "Back",
-  "cacheFailureMessage": "The cache is unavailable. Content may not have been saved locally.",
-  "cacheMissMessage": "No cached content is available. Connect to the internet and try again.",
   "connectionFailureMessage": "Unable to connect. Check your network and try again.",
   "databaseFailureMessage": "A local storage problem prevented this operation.",
   "featurePending": "This feature is still in development.",
@@ -167,5 +165,52 @@
   "shelfDetails": "Details",
   "shelfRemove": "Remove",
   "launchTagline": "Your story continues",
-  "launchLoading": "Preparing your library…"
+  "launchLoading": "Preparing your library…",
+  "cacheTitle": "Cache & offline reading",
+  "cacheUsage": "Text & metadata {text} MiB · Images {images} MiB",
+  "@cacheUsage": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      },
+      "images": {
+        "type": "String"
+      }
+    }
+  },
+  "cacheOfflineHint": "The articles below have cached text. Image counts reflect valid local files. Cached content may be evicted.",
+  "cacheChapterStatus": "Text cached · Images {saved}/{total}",
+  "@cacheChapterStatus": {
+    "placeholders": {
+      "saved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "cacheEmpty": "No cached articles yet",
+  "cacheClearTitle": "Clear cached content?",
+  "cacheClearExplanation": "Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.",
+  "cacheClearBook": "Clear book cache",
+  "cacheCancel": "Cancel",
+  "cacheClear": "Clear cache",
+  "prefetchTitle": "Reading cache",
+  "prefetchExplanation": "Prepares this article and one article you choose. It never opens it or changes your reading progress.",
+  "prefetchCurrent": "Cache images in this article",
+  "prefetchNext": "Prepare the selected next article",
+  "prefetchChoose": "Read next",
+  "prefetchNoTarget": "No next article",
+  "prefetchPause": "Pause",
+  "prefetchResume": "Continue / retry",
+  "prefetchIdle": "Not started",
+  "prefetchRunning": "Preparing images and next reading",
+  "prefetchPaused": "Caching paused",
+  "prefetchBudget": "Batch limit reached. Continue manually.",
+  "prefetchPartial": "Some resources could not be saved. You can retry.",
+  "prefetchComplete": "Batch finished. Check saved content for offline availability.",
+  "prefetchSaveFailed": "Could not save your choice. Please retry.",
+  "cacheFailureMessage": "The cache is unavailable. Content may not have been saved locally.",
+  "cacheMissMessage": "No cached content is available. Connect to the internet and try again."
 }

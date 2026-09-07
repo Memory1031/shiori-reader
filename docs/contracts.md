@@ -1,5 +1,11 @@
 # CORE-003：Source / Repository / Error 契约
 
+## CACHE-001..005 补充（2026-09-07）
+
+新增纯 Dart CacheManagement：inspect 返回不可变容量、书籍和 CachedChapter（有效插图数 / 引用总数）；clear 按书 / 全部清理，pinChapter 返回幂等释放函数。可选 ReadingPrefetch 提供状态流、进入 / 离开、位置采样、明确目标选择、两个开关、暂停 / 继续与前后台通知。select/configure 返回 Result；目标独立于 ReadingProgress，不将预取完成算已读。
+
+ImageRepository / MediaLease 签名不变，生产可返回 LocalMedia + persistedLocal；提交失败返回 memoryOnly + persistenceFailure。调用者 close 独立租约；clear 不破坏活动租约，但新请求立即看到缺失。cacheOnly 包括图片重试均不调用 Source。SourceServices 先关闭预取，再关媒体 / 小说仓库与协调器，数据库由应用根最后关闭。详见 [缓存](cache.md)。
+
 2026-09-07。入口 `lib/domain/contracts/contracts.dart` 导出契约、Result 和 AppFailure；模型继续来自 CORE-002。全部纯 Dart，只增加 dart:async / dart:typed_data，无新包、无 Dio / SQL / Flutter 类型。这里固定接口和所有权；生产 Source、网络调度、存储、媒体缓存仍由后续任务实现。
 
 ## Result、失败和取消

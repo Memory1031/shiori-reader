@@ -6,6 +6,7 @@ import '../../domain/contracts/contracts.dart';
 import 'network_transport.dart';
 import 'network_types.dart';
 import 'request_scheduler.dart';
+import 'background_work.dart';
 
 /// Borrowed transport and application-wide scheduler; neither is closed here.
 class NetworkClient {
@@ -46,7 +47,10 @@ class NetworkClient {
       final result = await scheduler.run(
         source: transport.policy.sourceId,
         operation: request.operation,
-        priority: request.priority,
+        priority:
+            BackgroundWork.current != null && !BackgroundWork.current!.promoted
+            ? RequestPriority.background
+            : request.priority,
         deadline: end,
         cancellation: cancellation,
         work: (token) async {

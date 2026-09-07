@@ -1,5 +1,7 @@
 # CORE-002：领域值模型与内容规范
 
+CACHE-001..005（2026-09-07）：新增缓存状态投影 CachedChapter / CacheOverview 与 PrefetchState，均为不可变 Domain 数据。预取选择只使用既有 ChapterKey，不改变 Catalog.ordinal、ChapterContent、ReaderPosition 或 ReadingProgress 的语义；选择不表示已读，也不构造未经验证的续篇关系。接口见 [contracts](contracts.md)，验证见 [缓存](cache.md)。
+
 2026-09-07，Dart 3.10.3。入口为 `lib/domain/models/models.dart`，摘要 helper 为 `lib/domain/content_identity.dart`。本轮只实现模型和不变量，Source / Repository / AppFailure 契约留给 CORE-003。
 
 ## 使用与验证

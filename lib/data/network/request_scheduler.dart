@@ -3,6 +3,7 @@ import 'dart:async';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import 'network_types.dart';
+import 'background_work.dart';
 
 /// Shared across Source clients, including their metadata and image hosts.
 class RequestScheduler {
@@ -92,6 +93,8 @@ class RequestScheduler {
       }
     }
     final job = _Job(source, operation, priority, deadline, work);
+    job.scope?.onPromoted.add(_pump);
+    job.onComplete = () => job.scope?.onPromoted.remove(_pump);
     job.timer = Timer(deadline.difference(now()), () {
       _stop(job, networkFailure(operation, FailureKind.timeout));
       _pump();
@@ -164,7 +167,7 @@ class RequestScheduler {
 
   Future<void> _execute(_Job job) async {
     try {
-      final result = await job.work(job.cancel.token);
+      final result = await job.zone.run(() => job.work(job.cancel.token));
       if (!job.deadline.isAfter(now())) {
         job.complete(
           Failure(networkFailure(job.operation, FailureKind.timeout)),
@@ -197,18 +200,30 @@ class RequestScheduler {
 }
 
 class _Job {
-  _Job(this.source, this.operation, this.priority, this.deadline, this.work);
+  _Job(
+    this.source,
+    this.operation,
+    this.basePriority,
+    this.deadline,
+    this.work,
+  );
+  final zone = Zone.current;
+  final scope = BackgroundWork.current;
   final SourceId source;
   final Operation operation;
-  final RequestPriority priority;
+  final RequestPriority basePriority;
+  RequestPriority get priority =>
+      scope?.promoted == true ? RequestPriority.foreground : basePriority;
   final DateTime deadline;
   final Future<Result<NetworkResponse>> Function(CancellationToken) work;
   final cancel = CancellationSource();
   final result = Completer<Result<NetworkResponse>>();
   Timer? timer;
   StreamSubscription<void>? subscription;
+  void Function()? onComplete;
   void complete(Result<NetworkResponse> value) {
     if (result.isCompleted) return;
+    onComplete?.call();
     timer?.cancel();
     unawaited(subscription?.cancel());
     result.complete(value);

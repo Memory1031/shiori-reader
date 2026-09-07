@@ -470,18 +470,6 @@ abstract class AppLocalizations {
   /// **'Back'**
   String get backAction;
 
-  /// No description provided for @cacheFailureMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'The cache is unavailable. Content may not have been saved locally.'**
-  String get cacheFailureMessage;
-
-  /// No description provided for @cacheMissMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'No cached content is available. Connect to the internet and try again.'**
-  String get cacheMissMessage;
-
   /// No description provided for @connectionFailureMessage.
   ///
   /// In en, this message translates to:
@@ -1021,6 +1009,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Preparing your library…'**
   String get launchLoading;
+
+  /// No description provided for @cacheTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache & offline reading'**
+  String get cacheTitle;
+
+  /// No description provided for @cacheUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Text & metadata {text} MiB · Images {images} MiB'**
+  String cacheUsage(String text, String images);
+
+  /// No description provided for @cacheOfflineHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The articles below have cached text. Image counts reflect valid local files. Cached content may be evicted.'**
+  String get cacheOfflineHint;
+
+  /// No description provided for @cacheChapterStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Text cached · Images {saved}/{total}'**
+  String cacheChapterStatus(int saved, int total);
+
+  /// No description provided for @cacheEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No cached articles yet'**
+  String get cacheEmpty;
+
+  /// No description provided for @cacheClearTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear cached content?'**
+  String get cacheClearTitle;
+
+  /// No description provided for @cacheClearExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.'**
+  String get cacheClearExplanation;
+
+  /// No description provided for @cacheClearBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear book cache'**
+  String get cacheClearBook;
+
+  /// No description provided for @cacheCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cacheCancel;
+
+  /// No description provided for @cacheClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear cache'**
+  String get cacheClear;
+
+  /// No description provided for @prefetchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading cache'**
+  String get prefetchTitle;
+
+  /// No description provided for @prefetchExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepares this article and one article you choose. It never opens it or changes your reading progress.'**
+  String get prefetchExplanation;
+
+  /// No description provided for @prefetchCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache images in this article'**
+  String get prefetchCurrent;
+
+  /// No description provided for @prefetchNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare the selected next article'**
+  String get prefetchNext;
+
+  /// No description provided for @prefetchChoose.
+  ///
+  /// In en, this message translates to:
+  /// **'Read next'**
+  String get prefetchChoose;
+
+  /// No description provided for @prefetchNoTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'No next article'**
+  String get prefetchNoTarget;
+
+  /// No description provided for @prefetchPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get prefetchPause;
+
+  /// No description provided for @prefetchResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue / retry'**
+  String get prefetchResume;
+
+  /// No description provided for @prefetchIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Not started'**
+  String get prefetchIdle;
+
+  /// No description provided for @prefetchRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing images and next reading'**
+  String get prefetchRunning;
+
+  /// No description provided for @prefetchPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Caching paused'**
+  String get prefetchPaused;
+
+  /// No description provided for @prefetchBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch limit reached. Continue manually.'**
+  String get prefetchBudget;
+
+  /// No description provided for @prefetchPartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Some resources could not be saved. You can retry.'**
+  String get prefetchPartial;
+
+  /// No description provided for @prefetchComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch finished. Check saved content for offline availability.'**
+  String get prefetchComplete;
+
+  /// No description provided for @prefetchSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save your choice. Please retry.'**
+  String get prefetchSaveFailed;
+
+  /// No description provided for @cacheFailureMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The cache is unavailable. Content may not have been saved locally.'**
+  String get cacheFailureMessage;
+
+  /// No description provided for @cacheMissMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'No cached content is available. Connect to the internet and try again.'**
+  String get cacheMissMessage;
 }
 
 class _AppLocalizationsDelegate

@@ -29,7 +29,7 @@ void main() {
               .customSelect("SELECT name FROM sqlite_master WHERE type='table'")
               .get())
           .length,
-      3,
+      5,
     );
     expect(
       (await users.customSelect('PRAGMA foreign_key_list(bookshelf)').get()),

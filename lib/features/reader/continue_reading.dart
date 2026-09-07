@@ -119,6 +119,7 @@ class ContinueReadingScreen extends StatelessWidget {
     this.images,
     this.settings,
     this.onDetails,
+    this.cache,
   });
   final NovelKey novel;
   final NovelRepository repository;
@@ -126,6 +127,7 @@ class ContinueReadingScreen extends StatelessWidget {
   final ImageRepository? images;
   final SettingsStore? settings;
   final ValueChanged<NovelKey>? onDetails;
+  final CacheManagement? cache;
   @override
   Widget build(BuildContext context) => ControllerScope<ContinueController>(
     key: ValueKey((novel, repository, library)),
@@ -144,6 +146,7 @@ class ContinueReadingScreen extends StatelessWidget {
           settings: settings,
           chapterFallback: controller.usedFallback,
           onDetails: onDetails,
+          cache: cache,
         );
       }
       final strings = AppLocalizations.of(context);

@@ -12,6 +12,7 @@ import '../history/history_screen.dart';
 import '../reader/continue_reading.dart';
 import '../novel_detail/detail_screen.dart';
 import '../reader/book_reader_screen.dart';
+import '../cache/cache_screen.dart';
 import '../search/search_screen.dart';
 
 class ReadingHome extends StatefulWidget {
@@ -21,6 +22,7 @@ class ReadingHome extends StatefulWidget {
     required this.library,
     required this.sources,
     this.images,
+    this.cache,
     this.settings,
     this.onAppearance,
     this.environmentLabel,
@@ -29,6 +31,7 @@ class ReadingHome extends StatefulWidget {
   final LibraryRepository library;
   final List<SourceDescriptor> sources;
   final ImageRepository? images;
+  final CacheManagement? cache;
   final SettingsStore? settings;
   final VoidCallback? onAppearance;
   final String? environmentLabel;
@@ -108,6 +111,7 @@ class _ReadingHomeState extends State<ReadingHome> {
       images: widget.images,
       settings: widget.settings,
       onDetails: _readerDetails,
+      cache: widget.cache,
     ),
     reader: (_, key) => BookReaderScreen(
       chapter: key,
@@ -116,6 +120,7 @@ class _ReadingHomeState extends State<ReadingHome> {
       library: widget.library,
       settings: widget.settings,
       onDetails: _readerDetails,
+      cache: widget.cache,
     ),
   );
   void _readerDetails(NovelKey key) {
@@ -198,6 +203,28 @@ class _ReadingHomeState extends State<ReadingHome> {
           PopupMenuButton<String>(
             tooltip: strings.moreActions,
             onSelected: (value) {
+              if (value == 'cache') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CacheScreen(
+                      cache: widget.cache!,
+                      onRead: (key) => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => BookReaderScreen(
+                            chapter: key,
+                            repository: widget.repository,
+                            images: widget.images,
+                            library: widget.library,
+                            settings: widget.settings,
+                            cache: widget.cache,
+                            offline: true,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }
               if (value == 'appearance') widget.onAppearance?.call();
               if (value == 'history') {
                 Navigator.of(context).push(
@@ -211,6 +238,8 @@ class _ReadingHomeState extends State<ReadingHome> {
               }
             },
             itemBuilder: (_) => [
+              if (widget.cache != null)
+                PopupMenuItem(value: 'cache', child: Text(strings.cacheTitle)),
               PopupMenuItem(
                 value: 'history',
                 child: Row(

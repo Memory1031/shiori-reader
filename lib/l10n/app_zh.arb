@@ -69,8 +69,6 @@
   "scrollReading": "上下滚动",
   "appTitle": "Shiori",
   "backAction": "返回",
-  "cacheFailureMessage": "缓存暂时不可用，内容可能尚未保存到本地。",
-  "cacheMissMessage": "暂无可用缓存，请联网后再试。",
   "connectionFailureMessage": "无法连接，请检查网络后重试。",
   "databaseFailureMessage": "本地存储发生问题，暂时无法完成操作。",
   "featurePending": "此功能尚在开发中。",
@@ -167,5 +165,52 @@
   "shelfDetails": "详情",
   "shelfRemove": "移除",
   "launchTagline": "故事，即将继续",
-  "launchLoading": "正在准备书架…"
+  "launchLoading": "正在准备书架…",
+  "cacheTitle": "缓存与离线阅读",
+  "cacheUsage": "正文与资料 {text} MiB · 图片 {images} MiB",
+  "@cacheUsage": {
+    "placeholders": {
+      "text": {
+        "type": "String"
+      },
+      "images": {
+        "type": "String"
+      }
+    }
+  },
+  "cacheOfflineHint": "以下文章正文已缓存。图片数量以有效的本地文件为准；缓存可能被容量淘汰。",
+  "cacheChapterStatus": "正文已缓存 · 插图 {saved}/{total}",
+  "@cacheChapterStatus": {
+    "placeholders": {
+      "saved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "cacheEmpty": "还没有缓存的正文",
+  "cacheClearTitle": "清除缓存？",
+  "cacheClearExplanation": "书架、阅读进度和设置会保留。再次打开已清理内容可能需要联网。",
+  "cacheClearBook": "清除此书缓存",
+  "cacheCancel": "取消",
+  "cacheClear": "清除缓存",
+  "prefetchTitle": "阅读缓存",
+  "prefetchExplanation": "只准备当前文章和你选定的一篇后续文章，不自动打开或更改阅读进度。",
+  "prefetchCurrent": "缓存当前文章插图",
+  "prefetchNext": "准备选定的后续文章",
+  "prefetchChoose": "接下来阅读",
+  "prefetchNoTarget": "不选择后续文章",
+  "prefetchPause": "暂停",
+  "prefetchResume": "继续缓存 / 重试",
+  "prefetchIdle": "尚未开始",
+  "prefetchRunning": "正在准备图片与接下来阅读",
+  "prefetchPaused": "缓存已暂停",
+  "prefetchBudget": "本批额度已用完，可手动继续",
+  "prefetchPartial": "部分资源未能缓存，可重试",
+  "prefetchComplete": "本批准备结束，离线状态以缓存列表为准",
+  "prefetchSaveFailed": "未能保存选择，请重试",
+  "cacheFailureMessage": "缓存暂时不可用，内容可能尚未保存到本地。",
+  "cacheMissMessage": "暂无可用缓存，请联网后再试。"
 }

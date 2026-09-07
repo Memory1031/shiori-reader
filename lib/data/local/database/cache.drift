@@ -25,3 +25,21 @@ CREATE TABLE chapter_cache (
  PRIMARY KEY(source_id, novel_id, chapter_id)
 );
 CREATE INDEX chapter_access ON chapter_cache(last_access_at);
+
+CREATE TABLE image_cache (
+ cache_key TEXT NOT NULL PRIMARY KEY,
+ ref_json TEXT NOT NULL,
+ file_name TEXT NOT NULL,
+ checksum TEXT NOT NULL,
+ byte_size INTEGER NOT NULL CHECK(byte_size > 0),
+ format TEXT NOT NULL,
+ fetched_at INTEGER NOT NULL,
+ last_access_at INTEGER NOT NULL
+);
+CREATE INDEX image_access ON image_cache(last_access_at);
+CREATE TABLE image_owners (
+ cache_key TEXT NOT NULL,
+ source_id TEXT NOT NULL,
+ novel_id TEXT NOT NULL,
+ PRIMARY KEY(cache_key, source_id, novel_id)
+);

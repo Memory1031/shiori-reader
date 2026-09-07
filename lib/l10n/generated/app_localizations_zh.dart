@@ -197,12 +197,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backAction => '返回';
 
   @override
-  String get cacheFailureMessage => '缓存暂时不可用，内容可能尚未保存到本地。';
-
-  @override
-  String get cacheMissMessage => '暂无可用缓存，请联网后再试。';
-
-  @override
   String get connectionFailureMessage => '无法连接，请检查网络后重试。';
 
   @override
@@ -476,4 +470,89 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get launchLoading => '正在准备书架…';
+
+  @override
+  String get cacheTitle => '缓存与离线阅读';
+
+  @override
+  String cacheUsage(String text, String images) {
+    return '正文与资料 $text MiB · 图片 $images MiB';
+  }
+
+  @override
+  String get cacheOfflineHint => '以下文章正文已缓存。图片数量以有效的本地文件为准；缓存可能被容量淘汰。';
+
+  @override
+  String cacheChapterStatus(int saved, int total) {
+    return '正文已缓存 · 插图 $saved/$total';
+  }
+
+  @override
+  String get cacheEmpty => '还没有缓存的正文';
+
+  @override
+  String get cacheClearTitle => '清除缓存？';
+
+  @override
+  String get cacheClearExplanation => '书架、阅读进度和设置会保留。再次打开已清理内容可能需要联网。';
+
+  @override
+  String get cacheClearBook => '清除此书缓存';
+
+  @override
+  String get cacheCancel => '取消';
+
+  @override
+  String get cacheClear => '清除缓存';
+
+  @override
+  String get prefetchTitle => '阅读缓存';
+
+  @override
+  String get prefetchExplanation => '只准备当前文章和你选定的一篇后续文章，不自动打开或更改阅读进度。';
+
+  @override
+  String get prefetchCurrent => '缓存当前文章插图';
+
+  @override
+  String get prefetchNext => '准备选定的后续文章';
+
+  @override
+  String get prefetchChoose => '接下来阅读';
+
+  @override
+  String get prefetchNoTarget => '不选择后续文章';
+
+  @override
+  String get prefetchPause => '暂停';
+
+  @override
+  String get prefetchResume => '继续缓存 / 重试';
+
+  @override
+  String get prefetchIdle => '尚未开始';
+
+  @override
+  String get prefetchRunning => '正在准备图片与接下来阅读';
+
+  @override
+  String get prefetchPaused => '缓存已暂停';
+
+  @override
+  String get prefetchBudget => '本批额度已用完，可手动继续';
+
+  @override
+  String get prefetchPartial => '部分资源未能缓存，可重试';
+
+  @override
+  String get prefetchComplete => '本批准备结束，离线状态以缓存列表为准';
+
+  @override
+  String get prefetchSaveFailed => '未能保存选择，请重试';
+
+  @override
+  String get cacheFailureMessage => '缓存暂时不可用，内容可能尚未保存到本地。';
+
+  @override
+  String get cacheMissMessage => '暂无可用缓存，请联网后再试。';
 }

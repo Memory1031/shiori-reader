@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../network/background_work.dart';
 import 'dart:typed_data';
 
 import '../../domain/contracts/contracts.dart';
@@ -47,6 +48,16 @@ class MemoryImageRepository implements ImageRepository {
       _retained.fold(0, (sum, entry) => sum + entry.data.bytes.length);
   int get pendingCount => _flights.length;
 
+  /// Drop lookup visibility after an explicit clear; existing leases stay valid.
+  void invalidate() {
+    for (final flight in _flights.values.toList()) {
+      _abort(flight, AppFailure.cancelled(Operation.media));
+    }
+    _entries.clear();
+    _idle.clear();
+    _retained.removeWhere((entry) => entry.references == 0);
+  }
+
   @override
   Future<Result<LoadResult<MediaLease>>> load(
     MediaRef ref, {
@@ -91,6 +102,7 @@ class MemoryImageRepository implements ImageRepository {
       );
     }
     final owner = flight;
+    BackgroundWork.promote(owner.scope);
     final waiter = _Waiter(cancellation);
     owner.waiters.add(waiter);
     waiter.subscription = cancellation.whenCancelled.asStream().listen((_) {
@@ -116,7 +128,7 @@ class MemoryImageRepository implements ImageRepository {
       flight.started = true;
       _running++;
       _reserved += maxBytes;
-      unawaited(_fetch(flight));
+      unawaited(flight.zone.run(() => _fetch(flight)));
     }
   }
 
@@ -371,6 +383,8 @@ class _Entry {
 
 class _Flight {
   _Flight(this.ref);
+  final zone = Zone.current;
+  final scope = BackgroundWork.current;
   final MediaRef ref;
   final cancel = CancellationSource();
   final waiters = <_Waiter>{};

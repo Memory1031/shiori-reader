@@ -1718,6 +1718,593 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
   }
 }
 
+class PrefetchChoices extends Table
+    with TableInfo<PrefetchChoices, PrefetchChoice> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  PrefetchChoices(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _novelIdMeta = const VerificationMeta(
+    'novelId',
+  );
+  late final GeneratedColumn<String> novelId = GeneratedColumn<String>(
+    'novel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _chapterIdMeta = const VerificationMeta(
+    'chapterId',
+  );
+  late final GeneratedColumn<String> chapterId = GeneratedColumn<String>(
+    'chapter_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _targetIdMeta = const VerificationMeta(
+    'targetId',
+  );
+  late final GeneratedColumn<String> targetId = GeneratedColumn<String>(
+    'target_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    sourceId,
+    novelId,
+    chapterId,
+    targetId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'prefetch_choices';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PrefetchChoice> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('novel_id')) {
+      context.handle(
+        _novelIdMeta,
+        novelId.isAcceptableOrUnknown(data['novel_id']!, _novelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_novelIdMeta);
+    }
+    if (data.containsKey('chapter_id')) {
+      context.handle(
+        _chapterIdMeta,
+        chapterId.isAcceptableOrUnknown(data['chapter_id']!, _chapterIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chapterIdMeta);
+    }
+    if (data.containsKey('target_id')) {
+      context.handle(
+        _targetIdMeta,
+        targetId.isAcceptableOrUnknown(data['target_id']!, _targetIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_targetIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {sourceId, novelId, chapterId};
+  @override
+  PrefetchChoice map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PrefetchChoice(
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      novelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}novel_id'],
+      )!,
+      chapterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chapter_id'],
+      )!,
+      targetId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_id'],
+      )!,
+    );
+  }
+
+  @override
+  PrefetchChoices createAlias(String alias) {
+    return PrefetchChoices(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'PRIMARY KEY(source_id, novel_id, chapter_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class PrefetchChoice extends DataClass implements Insertable<PrefetchChoice> {
+  final String sourceId;
+  final String novelId;
+  final String chapterId;
+  final String targetId;
+  const PrefetchChoice({
+    required this.sourceId,
+    required this.novelId,
+    required this.chapterId,
+    required this.targetId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['source_id'] = Variable<String>(sourceId);
+    map['novel_id'] = Variable<String>(novelId);
+    map['chapter_id'] = Variable<String>(chapterId);
+    map['target_id'] = Variable<String>(targetId);
+    return map;
+  }
+
+  PrefetchChoicesCompanion toCompanion(bool nullToAbsent) {
+    return PrefetchChoicesCompanion(
+      sourceId: Value(sourceId),
+      novelId: Value(novelId),
+      chapterId: Value(chapterId),
+      targetId: Value(targetId),
+    );
+  }
+
+  factory PrefetchChoice.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PrefetchChoice(
+      sourceId: serializer.fromJson<String>(json['source_id']),
+      novelId: serializer.fromJson<String>(json['novel_id']),
+      chapterId: serializer.fromJson<String>(json['chapter_id']),
+      targetId: serializer.fromJson<String>(json['target_id']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'source_id': serializer.toJson<String>(sourceId),
+      'novel_id': serializer.toJson<String>(novelId),
+      'chapter_id': serializer.toJson<String>(chapterId),
+      'target_id': serializer.toJson<String>(targetId),
+    };
+  }
+
+  PrefetchChoice copyWith({
+    String? sourceId,
+    String? novelId,
+    String? chapterId,
+    String? targetId,
+  }) => PrefetchChoice(
+    sourceId: sourceId ?? this.sourceId,
+    novelId: novelId ?? this.novelId,
+    chapterId: chapterId ?? this.chapterId,
+    targetId: targetId ?? this.targetId,
+  );
+  PrefetchChoice copyWithCompanion(PrefetchChoicesCompanion data) {
+    return PrefetchChoice(
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      novelId: data.novelId.present ? data.novelId.value : this.novelId,
+      chapterId: data.chapterId.present ? data.chapterId.value : this.chapterId,
+      targetId: data.targetId.present ? data.targetId.value : this.targetId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PrefetchChoice(')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('chapterId: $chapterId, ')
+          ..write('targetId: $targetId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(sourceId, novelId, chapterId, targetId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PrefetchChoice &&
+          other.sourceId == this.sourceId &&
+          other.novelId == this.novelId &&
+          other.chapterId == this.chapterId &&
+          other.targetId == this.targetId);
+}
+
+class PrefetchChoicesCompanion extends UpdateCompanion<PrefetchChoice> {
+  final Value<String> sourceId;
+  final Value<String> novelId;
+  final Value<String> chapterId;
+  final Value<String> targetId;
+  final Value<int> rowid;
+  const PrefetchChoicesCompanion({
+    this.sourceId = const Value.absent(),
+    this.novelId = const Value.absent(),
+    this.chapterId = const Value.absent(),
+    this.targetId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PrefetchChoicesCompanion.insert({
+    required String sourceId,
+    required String novelId,
+    required String chapterId,
+    required String targetId,
+    this.rowid = const Value.absent(),
+  }) : sourceId = Value(sourceId),
+       novelId = Value(novelId),
+       chapterId = Value(chapterId),
+       targetId = Value(targetId);
+  static Insertable<PrefetchChoice> custom({
+    Expression<String>? sourceId,
+    Expression<String>? novelId,
+    Expression<String>? chapterId,
+    Expression<String>? targetId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (sourceId != null) 'source_id': sourceId,
+      if (novelId != null) 'novel_id': novelId,
+      if (chapterId != null) 'chapter_id': chapterId,
+      if (targetId != null) 'target_id': targetId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PrefetchChoicesCompanion copyWith({
+    Value<String>? sourceId,
+    Value<String>? novelId,
+    Value<String>? chapterId,
+    Value<String>? targetId,
+    Value<int>? rowid,
+  }) {
+    return PrefetchChoicesCompanion(
+      sourceId: sourceId ?? this.sourceId,
+      novelId: novelId ?? this.novelId,
+      chapterId: chapterId ?? this.chapterId,
+      targetId: targetId ?? this.targetId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (novelId.present) {
+      map['novel_id'] = Variable<String>(novelId.value);
+    }
+    if (chapterId.present) {
+      map['chapter_id'] = Variable<String>(chapterId.value);
+    }
+    if (targetId.present) {
+      map['target_id'] = Variable<String>(targetId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PrefetchChoicesCompanion(')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('chapterId: $chapterId, ')
+          ..write('targetId: $targetId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class PrefetchSettings extends Table
+    with TableInfo<PrefetchSettings, PrefetchSetting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  PrefetchSettings(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL PRIMARY KEY CHECK (id = 1)',
+  );
+  static const VerificationMeta _currentEnabledMeta = const VerificationMeta(
+    'currentEnabled',
+  );
+  late final GeneratedColumn<int> currentEnabled = GeneratedColumn<int>(
+    'current_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _nextEnabledMeta = const VerificationMeta(
+    'nextEnabled',
+  );
+  late final GeneratedColumn<int> nextEnabled = GeneratedColumn<int>(
+    'next_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, currentEnabled, nextEnabled];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'prefetch_settings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PrefetchSetting> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('current_enabled')) {
+      context.handle(
+        _currentEnabledMeta,
+        currentEnabled.isAcceptableOrUnknown(
+          data['current_enabled']!,
+          _currentEnabledMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_currentEnabledMeta);
+    }
+    if (data.containsKey('next_enabled')) {
+      context.handle(
+        _nextEnabledMeta,
+        nextEnabled.isAcceptableOrUnknown(
+          data['next_enabled']!,
+          _nextEnabledMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_nextEnabledMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PrefetchSetting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PrefetchSetting(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      currentEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}current_enabled'],
+      )!,
+      nextEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}next_enabled'],
+      )!,
+    );
+  }
+
+  @override
+  PrefetchSettings createAlias(String alias) {
+    return PrefetchSettings(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class PrefetchSetting extends DataClass implements Insertable<PrefetchSetting> {
+  final int id;
+  final int currentEnabled;
+  final int nextEnabled;
+  const PrefetchSetting({
+    required this.id,
+    required this.currentEnabled,
+    required this.nextEnabled,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['current_enabled'] = Variable<int>(currentEnabled);
+    map['next_enabled'] = Variable<int>(nextEnabled);
+    return map;
+  }
+
+  PrefetchSettingsCompanion toCompanion(bool nullToAbsent) {
+    return PrefetchSettingsCompanion(
+      id: Value(id),
+      currentEnabled: Value(currentEnabled),
+      nextEnabled: Value(nextEnabled),
+    );
+  }
+
+  factory PrefetchSetting.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PrefetchSetting(
+      id: serializer.fromJson<int>(json['id']),
+      currentEnabled: serializer.fromJson<int>(json['current_enabled']),
+      nextEnabled: serializer.fromJson<int>(json['next_enabled']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'current_enabled': serializer.toJson<int>(currentEnabled),
+      'next_enabled': serializer.toJson<int>(nextEnabled),
+    };
+  }
+
+  PrefetchSetting copyWith({int? id, int? currentEnabled, int? nextEnabled}) =>
+      PrefetchSetting(
+        id: id ?? this.id,
+        currentEnabled: currentEnabled ?? this.currentEnabled,
+        nextEnabled: nextEnabled ?? this.nextEnabled,
+      );
+  PrefetchSetting copyWithCompanion(PrefetchSettingsCompanion data) {
+    return PrefetchSetting(
+      id: data.id.present ? data.id.value : this.id,
+      currentEnabled: data.currentEnabled.present
+          ? data.currentEnabled.value
+          : this.currentEnabled,
+      nextEnabled: data.nextEnabled.present
+          ? data.nextEnabled.value
+          : this.nextEnabled,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PrefetchSetting(')
+          ..write('id: $id, ')
+          ..write('currentEnabled: $currentEnabled, ')
+          ..write('nextEnabled: $nextEnabled')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, currentEnabled, nextEnabled);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PrefetchSetting &&
+          other.id == this.id &&
+          other.currentEnabled == this.currentEnabled &&
+          other.nextEnabled == this.nextEnabled);
+}
+
+class PrefetchSettingsCompanion extends UpdateCompanion<PrefetchSetting> {
+  final Value<int> id;
+  final Value<int> currentEnabled;
+  final Value<int> nextEnabled;
+  const PrefetchSettingsCompanion({
+    this.id = const Value.absent(),
+    this.currentEnabled = const Value.absent(),
+    this.nextEnabled = const Value.absent(),
+  });
+  PrefetchSettingsCompanion.insert({
+    this.id = const Value.absent(),
+    required int currentEnabled,
+    required int nextEnabled,
+  }) : currentEnabled = Value(currentEnabled),
+       nextEnabled = Value(nextEnabled);
+  static Insertable<PrefetchSetting> custom({
+    Expression<int>? id,
+    Expression<int>? currentEnabled,
+    Expression<int>? nextEnabled,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (currentEnabled != null) 'current_enabled': currentEnabled,
+      if (nextEnabled != null) 'next_enabled': nextEnabled,
+    });
+  }
+
+  PrefetchSettingsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? currentEnabled,
+    Value<int>? nextEnabled,
+  }) {
+    return PrefetchSettingsCompanion(
+      id: id ?? this.id,
+      currentEnabled: currentEnabled ?? this.currentEnabled,
+      nextEnabled: nextEnabled ?? this.nextEnabled,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (currentEnabled.present) {
+      map['current_enabled'] = Variable<int>(currentEnabled.value);
+    }
+    if (nextEnabled.present) {
+      map['next_enabled'] = Variable<int>(nextEnabled.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PrefetchSettingsCompanion(')
+          ..write('id: $id, ')
+          ..write('currentEnabled: $currentEnabled, ')
+          ..write('nextEnabled: $nextEnabled')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$UserDatabase extends GeneratedDatabase {
   _$UserDatabase(QueryExecutor e) : super(e);
   $UserDatabaseManager get managers => $UserDatabaseManager(this);
@@ -1732,6 +2319,8 @@ abstract class _$UserDatabase extends GeneratedDatabase {
     'progress_recent',
     'CREATE INDEX progress_recent ON reading_progress (last_read_at DESC)',
   );
+  late final PrefetchChoices prefetchChoices = PrefetchChoices(this);
+  late final PrefetchSettings prefetchSettings = PrefetchSettings(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1742,6 +2331,8 @@ abstract class _$UserDatabase extends GeneratedDatabase {
     progressSessions,
     readingProgress,
     progressRecent,
+    prefetchChoices,
+    prefetchSettings,
   ];
 }
 
@@ -2576,6 +3167,347 @@ typedef $ReadingProgressProcessedTableManager =
       ReadingProgressData,
       PrefetchHooks Function()
     >;
+typedef $PrefetchChoicesCreateCompanionBuilder =
+    PrefetchChoicesCompanion Function({
+      required String sourceId,
+      required String novelId,
+      required String chapterId,
+      required String targetId,
+      Value<int> rowid,
+    });
+typedef $PrefetchChoicesUpdateCompanionBuilder =
+    PrefetchChoicesCompanion Function({
+      Value<String> sourceId,
+      Value<String> novelId,
+      Value<String> chapterId,
+      Value<String> targetId,
+      Value<int> rowid,
+    });
+
+class $PrefetchChoicesFilterComposer
+    extends Composer<_$UserDatabase, PrefetchChoices> {
+  $PrefetchChoicesFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chapterId => $composableBuilder(
+    column: $table.chapterId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetId => $composableBuilder(
+    column: $table.targetId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $PrefetchChoicesOrderingComposer
+    extends Composer<_$UserDatabase, PrefetchChoices> {
+  $PrefetchChoicesOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chapterId => $composableBuilder(
+    column: $table.chapterId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetId => $composableBuilder(
+    column: $table.targetId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $PrefetchChoicesAnnotationComposer
+    extends Composer<_$UserDatabase, PrefetchChoices> {
+  $PrefetchChoicesAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get novelId =>
+      $composableBuilder(column: $table.novelId, builder: (column) => column);
+
+  GeneratedColumn<String> get chapterId =>
+      $composableBuilder(column: $table.chapterId, builder: (column) => column);
+
+  GeneratedColumn<String> get targetId =>
+      $composableBuilder(column: $table.targetId, builder: (column) => column);
+}
+
+class $PrefetchChoicesTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          PrefetchChoices,
+          PrefetchChoice,
+          $PrefetchChoicesFilterComposer,
+          $PrefetchChoicesOrderingComposer,
+          $PrefetchChoicesAnnotationComposer,
+          $PrefetchChoicesCreateCompanionBuilder,
+          $PrefetchChoicesUpdateCompanionBuilder,
+          (
+            PrefetchChoice,
+            BaseReferences<_$UserDatabase, PrefetchChoices, PrefetchChoice>,
+          ),
+          PrefetchChoice,
+          PrefetchHooks Function()
+        > {
+  $PrefetchChoicesTableManager(_$UserDatabase db, PrefetchChoices table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $PrefetchChoicesFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $PrefetchChoicesOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $PrefetchChoicesAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> sourceId = const Value.absent(),
+                Value<String> novelId = const Value.absent(),
+                Value<String> chapterId = const Value.absent(),
+                Value<String> targetId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PrefetchChoicesCompanion(
+                sourceId: sourceId,
+                novelId: novelId,
+                chapterId: chapterId,
+                targetId: targetId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String sourceId,
+                required String novelId,
+                required String chapterId,
+                required String targetId,
+                Value<int> rowid = const Value.absent(),
+              }) => PrefetchChoicesCompanion.insert(
+                sourceId: sourceId,
+                novelId: novelId,
+                chapterId: chapterId,
+                targetId: targetId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $PrefetchChoicesProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      PrefetchChoices,
+      PrefetchChoice,
+      $PrefetchChoicesFilterComposer,
+      $PrefetchChoicesOrderingComposer,
+      $PrefetchChoicesAnnotationComposer,
+      $PrefetchChoicesCreateCompanionBuilder,
+      $PrefetchChoicesUpdateCompanionBuilder,
+      (
+        PrefetchChoice,
+        BaseReferences<_$UserDatabase, PrefetchChoices, PrefetchChoice>,
+      ),
+      PrefetchChoice,
+      PrefetchHooks Function()
+    >;
+typedef $PrefetchSettingsCreateCompanionBuilder =
+    PrefetchSettingsCompanion Function({
+      Value<int> id,
+      required int currentEnabled,
+      required int nextEnabled,
+    });
+typedef $PrefetchSettingsUpdateCompanionBuilder =
+    PrefetchSettingsCompanion Function({
+      Value<int> id,
+      Value<int> currentEnabled,
+      Value<int> nextEnabled,
+    });
+
+class $PrefetchSettingsFilterComposer
+    extends Composer<_$UserDatabase, PrefetchSettings> {
+  $PrefetchSettingsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get currentEnabled => $composableBuilder(
+    column: $table.currentEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get nextEnabled => $composableBuilder(
+    column: $table.nextEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $PrefetchSettingsOrderingComposer
+    extends Composer<_$UserDatabase, PrefetchSettings> {
+  $PrefetchSettingsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get currentEnabled => $composableBuilder(
+    column: $table.currentEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get nextEnabled => $composableBuilder(
+    column: $table.nextEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $PrefetchSettingsAnnotationComposer
+    extends Composer<_$UserDatabase, PrefetchSettings> {
+  $PrefetchSettingsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get currentEnabled => $composableBuilder(
+    column: $table.currentEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get nextEnabled => $composableBuilder(
+    column: $table.nextEnabled,
+    builder: (column) => column,
+  );
+}
+
+class $PrefetchSettingsTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          PrefetchSettings,
+          PrefetchSetting,
+          $PrefetchSettingsFilterComposer,
+          $PrefetchSettingsOrderingComposer,
+          $PrefetchSettingsAnnotationComposer,
+          $PrefetchSettingsCreateCompanionBuilder,
+          $PrefetchSettingsUpdateCompanionBuilder,
+          (
+            PrefetchSetting,
+            BaseReferences<_$UserDatabase, PrefetchSettings, PrefetchSetting>,
+          ),
+          PrefetchSetting,
+          PrefetchHooks Function()
+        > {
+  $PrefetchSettingsTableManager(_$UserDatabase db, PrefetchSettings table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $PrefetchSettingsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $PrefetchSettingsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $PrefetchSettingsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> currentEnabled = const Value.absent(),
+                Value<int> nextEnabled = const Value.absent(),
+              }) => PrefetchSettingsCompanion(
+                id: id,
+                currentEnabled: currentEnabled,
+                nextEnabled: nextEnabled,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int currentEnabled,
+                required int nextEnabled,
+              }) => PrefetchSettingsCompanion.insert(
+                id: id,
+                currentEnabled: currentEnabled,
+                nextEnabled: nextEnabled,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $PrefetchSettingsProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      PrefetchSettings,
+      PrefetchSetting,
+      $PrefetchSettingsFilterComposer,
+      $PrefetchSettingsOrderingComposer,
+      $PrefetchSettingsAnnotationComposer,
+      $PrefetchSettingsCreateCompanionBuilder,
+      $PrefetchSettingsUpdateCompanionBuilder,
+      (
+        PrefetchSetting,
+        BaseReferences<_$UserDatabase, PrefetchSettings, PrefetchSetting>,
+      ),
+      PrefetchSetting,
+      PrefetchHooks Function()
+    >;
 
 class $UserDatabaseManager {
   final _$UserDatabase _db;
@@ -2586,4 +3518,8 @@ class $UserDatabaseManager {
       $ProgressSessionsTableManager(_db, _db.progressSessions);
   $ReadingProgressTableManager get readingProgress =>
       $ReadingProgressTableManager(_db, _db.readingProgress);
+  $PrefetchChoicesTableManager get prefetchChoices =>
+      $PrefetchChoicesTableManager(_db, _db.prefetchChoices);
+  $PrefetchSettingsTableManager get prefetchSettings =>
+      $PrefetchSettingsTableManager(_db, _db.prefetchSettings);
 }

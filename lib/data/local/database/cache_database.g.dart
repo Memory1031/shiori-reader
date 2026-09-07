@@ -1816,6 +1816,800 @@ class ChapterCacheCompanion extends UpdateCompanion<ChapterCacheData> {
   }
 }
 
+class ImageCache extends Table with TableInfo<ImageCache, ImageCacheData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  ImageCache(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _cacheKeyMeta = const VerificationMeta(
+    'cacheKey',
+  );
+  late final GeneratedColumn<String> cacheKey = GeneratedColumn<String>(
+    'cache_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _refJsonMeta = const VerificationMeta(
+    'refJson',
+  );
+  late final GeneratedColumn<String> refJson = GeneratedColumn<String>(
+    'ref_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _fileNameMeta = const VerificationMeta(
+    'fileName',
+  );
+  late final GeneratedColumn<String> fileName = GeneratedColumn<String>(
+    'file_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _checksumMeta = const VerificationMeta(
+    'checksum',
+  );
+  late final GeneratedColumn<String> checksum = GeneratedColumn<String>(
+    'checksum',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _byteSizeMeta = const VerificationMeta(
+    'byteSize',
+  );
+  late final GeneratedColumn<int> byteSize = GeneratedColumn<int>(
+    'byte_size',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (byte_size > 0)',
+  );
+  static const VerificationMeta _formatMeta = const VerificationMeta('format');
+  late final GeneratedColumn<String> format = GeneratedColumn<String>(
+    'format',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _fetchedAtMeta = const VerificationMeta(
+    'fetchedAt',
+  );
+  late final GeneratedColumn<int> fetchedAt = GeneratedColumn<int>(
+    'fetched_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _lastAccessAtMeta = const VerificationMeta(
+    'lastAccessAt',
+  );
+  late final GeneratedColumn<int> lastAccessAt = GeneratedColumn<int>(
+    'last_access_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    cacheKey,
+    refJson,
+    fileName,
+    checksum,
+    byteSize,
+    format,
+    fetchedAt,
+    lastAccessAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'image_cache';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ImageCacheData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('cache_key')) {
+      context.handle(
+        _cacheKeyMeta,
+        cacheKey.isAcceptableOrUnknown(data['cache_key']!, _cacheKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cacheKeyMeta);
+    }
+    if (data.containsKey('ref_json')) {
+      context.handle(
+        _refJsonMeta,
+        refJson.isAcceptableOrUnknown(data['ref_json']!, _refJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_refJsonMeta);
+    }
+    if (data.containsKey('file_name')) {
+      context.handle(
+        _fileNameMeta,
+        fileName.isAcceptableOrUnknown(data['file_name']!, _fileNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fileNameMeta);
+    }
+    if (data.containsKey('checksum')) {
+      context.handle(
+        _checksumMeta,
+        checksum.isAcceptableOrUnknown(data['checksum']!, _checksumMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_checksumMeta);
+    }
+    if (data.containsKey('byte_size')) {
+      context.handle(
+        _byteSizeMeta,
+        byteSize.isAcceptableOrUnknown(data['byte_size']!, _byteSizeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_byteSizeMeta);
+    }
+    if (data.containsKey('format')) {
+      context.handle(
+        _formatMeta,
+        format.isAcceptableOrUnknown(data['format']!, _formatMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_formatMeta);
+    }
+    if (data.containsKey('fetched_at')) {
+      context.handle(
+        _fetchedAtMeta,
+        fetchedAt.isAcceptableOrUnknown(data['fetched_at']!, _fetchedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fetchedAtMeta);
+    }
+    if (data.containsKey('last_access_at')) {
+      context.handle(
+        _lastAccessAtMeta,
+        lastAccessAt.isAcceptableOrUnknown(
+          data['last_access_at']!,
+          _lastAccessAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_lastAccessAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {cacheKey};
+  @override
+  ImageCacheData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ImageCacheData(
+      cacheKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cache_key'],
+      )!,
+      refJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ref_json'],
+      )!,
+      fileName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_name'],
+      )!,
+      checksum: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}checksum'],
+      )!,
+      byteSize: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}byte_size'],
+      )!,
+      format: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}format'],
+      )!,
+      fetchedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}fetched_at'],
+      )!,
+      lastAccessAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}last_access_at'],
+      )!,
+    );
+  }
+
+  @override
+  ImageCache createAlias(String alias) {
+    return ImageCache(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class ImageCacheData extends DataClass implements Insertable<ImageCacheData> {
+  final String cacheKey;
+  final String refJson;
+  final String fileName;
+  final String checksum;
+  final int byteSize;
+  final String format;
+  final int fetchedAt;
+  final int lastAccessAt;
+  const ImageCacheData({
+    required this.cacheKey,
+    required this.refJson,
+    required this.fileName,
+    required this.checksum,
+    required this.byteSize,
+    required this.format,
+    required this.fetchedAt,
+    required this.lastAccessAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['cache_key'] = Variable<String>(cacheKey);
+    map['ref_json'] = Variable<String>(refJson);
+    map['file_name'] = Variable<String>(fileName);
+    map['checksum'] = Variable<String>(checksum);
+    map['byte_size'] = Variable<int>(byteSize);
+    map['format'] = Variable<String>(format);
+    map['fetched_at'] = Variable<int>(fetchedAt);
+    map['last_access_at'] = Variable<int>(lastAccessAt);
+    return map;
+  }
+
+  ImageCacheCompanion toCompanion(bool nullToAbsent) {
+    return ImageCacheCompanion(
+      cacheKey: Value(cacheKey),
+      refJson: Value(refJson),
+      fileName: Value(fileName),
+      checksum: Value(checksum),
+      byteSize: Value(byteSize),
+      format: Value(format),
+      fetchedAt: Value(fetchedAt),
+      lastAccessAt: Value(lastAccessAt),
+    );
+  }
+
+  factory ImageCacheData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ImageCacheData(
+      cacheKey: serializer.fromJson<String>(json['cache_key']),
+      refJson: serializer.fromJson<String>(json['ref_json']),
+      fileName: serializer.fromJson<String>(json['file_name']),
+      checksum: serializer.fromJson<String>(json['checksum']),
+      byteSize: serializer.fromJson<int>(json['byte_size']),
+      format: serializer.fromJson<String>(json['format']),
+      fetchedAt: serializer.fromJson<int>(json['fetched_at']),
+      lastAccessAt: serializer.fromJson<int>(json['last_access_at']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'cache_key': serializer.toJson<String>(cacheKey),
+      'ref_json': serializer.toJson<String>(refJson),
+      'file_name': serializer.toJson<String>(fileName),
+      'checksum': serializer.toJson<String>(checksum),
+      'byte_size': serializer.toJson<int>(byteSize),
+      'format': serializer.toJson<String>(format),
+      'fetched_at': serializer.toJson<int>(fetchedAt),
+      'last_access_at': serializer.toJson<int>(lastAccessAt),
+    };
+  }
+
+  ImageCacheData copyWith({
+    String? cacheKey,
+    String? refJson,
+    String? fileName,
+    String? checksum,
+    int? byteSize,
+    String? format,
+    int? fetchedAt,
+    int? lastAccessAt,
+  }) => ImageCacheData(
+    cacheKey: cacheKey ?? this.cacheKey,
+    refJson: refJson ?? this.refJson,
+    fileName: fileName ?? this.fileName,
+    checksum: checksum ?? this.checksum,
+    byteSize: byteSize ?? this.byteSize,
+    format: format ?? this.format,
+    fetchedAt: fetchedAt ?? this.fetchedAt,
+    lastAccessAt: lastAccessAt ?? this.lastAccessAt,
+  );
+  ImageCacheData copyWithCompanion(ImageCacheCompanion data) {
+    return ImageCacheData(
+      cacheKey: data.cacheKey.present ? data.cacheKey.value : this.cacheKey,
+      refJson: data.refJson.present ? data.refJson.value : this.refJson,
+      fileName: data.fileName.present ? data.fileName.value : this.fileName,
+      checksum: data.checksum.present ? data.checksum.value : this.checksum,
+      byteSize: data.byteSize.present ? data.byteSize.value : this.byteSize,
+      format: data.format.present ? data.format.value : this.format,
+      fetchedAt: data.fetchedAt.present ? data.fetchedAt.value : this.fetchedAt,
+      lastAccessAt: data.lastAccessAt.present
+          ? data.lastAccessAt.value
+          : this.lastAccessAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ImageCacheData(')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('refJson: $refJson, ')
+          ..write('fileName: $fileName, ')
+          ..write('checksum: $checksum, ')
+          ..write('byteSize: $byteSize, ')
+          ..write('format: $format, ')
+          ..write('fetchedAt: $fetchedAt, ')
+          ..write('lastAccessAt: $lastAccessAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    cacheKey,
+    refJson,
+    fileName,
+    checksum,
+    byteSize,
+    format,
+    fetchedAt,
+    lastAccessAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ImageCacheData &&
+          other.cacheKey == this.cacheKey &&
+          other.refJson == this.refJson &&
+          other.fileName == this.fileName &&
+          other.checksum == this.checksum &&
+          other.byteSize == this.byteSize &&
+          other.format == this.format &&
+          other.fetchedAt == this.fetchedAt &&
+          other.lastAccessAt == this.lastAccessAt);
+}
+
+class ImageCacheCompanion extends UpdateCompanion<ImageCacheData> {
+  final Value<String> cacheKey;
+  final Value<String> refJson;
+  final Value<String> fileName;
+  final Value<String> checksum;
+  final Value<int> byteSize;
+  final Value<String> format;
+  final Value<int> fetchedAt;
+  final Value<int> lastAccessAt;
+  final Value<int> rowid;
+  const ImageCacheCompanion({
+    this.cacheKey = const Value.absent(),
+    this.refJson = const Value.absent(),
+    this.fileName = const Value.absent(),
+    this.checksum = const Value.absent(),
+    this.byteSize = const Value.absent(),
+    this.format = const Value.absent(),
+    this.fetchedAt = const Value.absent(),
+    this.lastAccessAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ImageCacheCompanion.insert({
+    required String cacheKey,
+    required String refJson,
+    required String fileName,
+    required String checksum,
+    required int byteSize,
+    required String format,
+    required int fetchedAt,
+    required int lastAccessAt,
+    this.rowid = const Value.absent(),
+  }) : cacheKey = Value(cacheKey),
+       refJson = Value(refJson),
+       fileName = Value(fileName),
+       checksum = Value(checksum),
+       byteSize = Value(byteSize),
+       format = Value(format),
+       fetchedAt = Value(fetchedAt),
+       lastAccessAt = Value(lastAccessAt);
+  static Insertable<ImageCacheData> custom({
+    Expression<String>? cacheKey,
+    Expression<String>? refJson,
+    Expression<String>? fileName,
+    Expression<String>? checksum,
+    Expression<int>? byteSize,
+    Expression<String>? format,
+    Expression<int>? fetchedAt,
+    Expression<int>? lastAccessAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (cacheKey != null) 'cache_key': cacheKey,
+      if (refJson != null) 'ref_json': refJson,
+      if (fileName != null) 'file_name': fileName,
+      if (checksum != null) 'checksum': checksum,
+      if (byteSize != null) 'byte_size': byteSize,
+      if (format != null) 'format': format,
+      if (fetchedAt != null) 'fetched_at': fetchedAt,
+      if (lastAccessAt != null) 'last_access_at': lastAccessAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ImageCacheCompanion copyWith({
+    Value<String>? cacheKey,
+    Value<String>? refJson,
+    Value<String>? fileName,
+    Value<String>? checksum,
+    Value<int>? byteSize,
+    Value<String>? format,
+    Value<int>? fetchedAt,
+    Value<int>? lastAccessAt,
+    Value<int>? rowid,
+  }) {
+    return ImageCacheCompanion(
+      cacheKey: cacheKey ?? this.cacheKey,
+      refJson: refJson ?? this.refJson,
+      fileName: fileName ?? this.fileName,
+      checksum: checksum ?? this.checksum,
+      byteSize: byteSize ?? this.byteSize,
+      format: format ?? this.format,
+      fetchedAt: fetchedAt ?? this.fetchedAt,
+      lastAccessAt: lastAccessAt ?? this.lastAccessAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (cacheKey.present) {
+      map['cache_key'] = Variable<String>(cacheKey.value);
+    }
+    if (refJson.present) {
+      map['ref_json'] = Variable<String>(refJson.value);
+    }
+    if (fileName.present) {
+      map['file_name'] = Variable<String>(fileName.value);
+    }
+    if (checksum.present) {
+      map['checksum'] = Variable<String>(checksum.value);
+    }
+    if (byteSize.present) {
+      map['byte_size'] = Variable<int>(byteSize.value);
+    }
+    if (format.present) {
+      map['format'] = Variable<String>(format.value);
+    }
+    if (fetchedAt.present) {
+      map['fetched_at'] = Variable<int>(fetchedAt.value);
+    }
+    if (lastAccessAt.present) {
+      map['last_access_at'] = Variable<int>(lastAccessAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ImageCacheCompanion(')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('refJson: $refJson, ')
+          ..write('fileName: $fileName, ')
+          ..write('checksum: $checksum, ')
+          ..write('byteSize: $byteSize, ')
+          ..write('format: $format, ')
+          ..write('fetchedAt: $fetchedAt, ')
+          ..write('lastAccessAt: $lastAccessAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class ImageOwners extends Table with TableInfo<ImageOwners, ImageOwner> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  ImageOwners(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _cacheKeyMeta = const VerificationMeta(
+    'cacheKey',
+  );
+  late final GeneratedColumn<String> cacheKey = GeneratedColumn<String>(
+    'cache_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _novelIdMeta = const VerificationMeta(
+    'novelId',
+  );
+  late final GeneratedColumn<String> novelId = GeneratedColumn<String>(
+    'novel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [cacheKey, sourceId, novelId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'image_owners';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ImageOwner> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('cache_key')) {
+      context.handle(
+        _cacheKeyMeta,
+        cacheKey.isAcceptableOrUnknown(data['cache_key']!, _cacheKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cacheKeyMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('novel_id')) {
+      context.handle(
+        _novelIdMeta,
+        novelId.isAcceptableOrUnknown(data['novel_id']!, _novelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_novelIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {cacheKey, sourceId, novelId};
+  @override
+  ImageOwner map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ImageOwner(
+      cacheKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cache_key'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      novelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}novel_id'],
+      )!,
+    );
+  }
+
+  @override
+  ImageOwners createAlias(String alias) {
+    return ImageOwners(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'PRIMARY KEY(cache_key, source_id, novel_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class ImageOwner extends DataClass implements Insertable<ImageOwner> {
+  final String cacheKey;
+  final String sourceId;
+  final String novelId;
+  const ImageOwner({
+    required this.cacheKey,
+    required this.sourceId,
+    required this.novelId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['cache_key'] = Variable<String>(cacheKey);
+    map['source_id'] = Variable<String>(sourceId);
+    map['novel_id'] = Variable<String>(novelId);
+    return map;
+  }
+
+  ImageOwnersCompanion toCompanion(bool nullToAbsent) {
+    return ImageOwnersCompanion(
+      cacheKey: Value(cacheKey),
+      sourceId: Value(sourceId),
+      novelId: Value(novelId),
+    );
+  }
+
+  factory ImageOwner.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ImageOwner(
+      cacheKey: serializer.fromJson<String>(json['cache_key']),
+      sourceId: serializer.fromJson<String>(json['source_id']),
+      novelId: serializer.fromJson<String>(json['novel_id']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'cache_key': serializer.toJson<String>(cacheKey),
+      'source_id': serializer.toJson<String>(sourceId),
+      'novel_id': serializer.toJson<String>(novelId),
+    };
+  }
+
+  ImageOwner copyWith({String? cacheKey, String? sourceId, String? novelId}) =>
+      ImageOwner(
+        cacheKey: cacheKey ?? this.cacheKey,
+        sourceId: sourceId ?? this.sourceId,
+        novelId: novelId ?? this.novelId,
+      );
+  ImageOwner copyWithCompanion(ImageOwnersCompanion data) {
+    return ImageOwner(
+      cacheKey: data.cacheKey.present ? data.cacheKey.value : this.cacheKey,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      novelId: data.novelId.present ? data.novelId.value : this.novelId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ImageOwner(')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(cacheKey, sourceId, novelId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ImageOwner &&
+          other.cacheKey == this.cacheKey &&
+          other.sourceId == this.sourceId &&
+          other.novelId == this.novelId);
+}
+
+class ImageOwnersCompanion extends UpdateCompanion<ImageOwner> {
+  final Value<String> cacheKey;
+  final Value<String> sourceId;
+  final Value<String> novelId;
+  final Value<int> rowid;
+  const ImageOwnersCompanion({
+    this.cacheKey = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.novelId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ImageOwnersCompanion.insert({
+    required String cacheKey,
+    required String sourceId,
+    required String novelId,
+    this.rowid = const Value.absent(),
+  }) : cacheKey = Value(cacheKey),
+       sourceId = Value(sourceId),
+       novelId = Value(novelId);
+  static Insertable<ImageOwner> custom({
+    Expression<String>? cacheKey,
+    Expression<String>? sourceId,
+    Expression<String>? novelId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (cacheKey != null) 'cache_key': cacheKey,
+      if (sourceId != null) 'source_id': sourceId,
+      if (novelId != null) 'novel_id': novelId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ImageOwnersCompanion copyWith({
+    Value<String>? cacheKey,
+    Value<String>? sourceId,
+    Value<String>? novelId,
+    Value<int>? rowid,
+  }) {
+    return ImageOwnersCompanion(
+      cacheKey: cacheKey ?? this.cacheKey,
+      sourceId: sourceId ?? this.sourceId,
+      novelId: novelId ?? this.novelId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (cacheKey.present) {
+      map['cache_key'] = Variable<String>(cacheKey.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (novelId.present) {
+      map['novel_id'] = Variable<String>(novelId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ImageOwnersCompanion(')
+          ..write('cacheKey: $cacheKey, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$CacheDatabase extends GeneratedDatabase {
   _$CacheDatabase(QueryExecutor e) : super(e);
   $CacheDatabaseManager get managers => $CacheDatabaseManager(this);
@@ -1834,6 +2628,12 @@ abstract class _$CacheDatabase extends GeneratedDatabase {
     'chapter_access',
     'CREATE INDEX chapter_access ON chapter_cache (last_access_at)',
   );
+  late final ImageCache imageCache = ImageCache(this);
+  late final Index imageAccess = Index(
+    'image_access',
+    'CREATE INDEX image_access ON image_cache (last_access_at)',
+  );
+  late final ImageOwners imageOwners = ImageOwners(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1845,6 +2645,9 @@ abstract class _$CacheDatabase extends GeneratedDatabase {
     catalogAccess,
     chapterCache,
     chapterAccess,
+    imageCache,
+    imageAccess,
+    imageOwners,
   ];
 }
 
@@ -2712,6 +3515,423 @@ typedef $ChapterCacheProcessedTableManager =
       ChapterCacheData,
       PrefetchHooks Function()
     >;
+typedef $ImageCacheCreateCompanionBuilder =
+    ImageCacheCompanion Function({
+      required String cacheKey,
+      required String refJson,
+      required String fileName,
+      required String checksum,
+      required int byteSize,
+      required String format,
+      required int fetchedAt,
+      required int lastAccessAt,
+      Value<int> rowid,
+    });
+typedef $ImageCacheUpdateCompanionBuilder =
+    ImageCacheCompanion Function({
+      Value<String> cacheKey,
+      Value<String> refJson,
+      Value<String> fileName,
+      Value<String> checksum,
+      Value<int> byteSize,
+      Value<String> format,
+      Value<int> fetchedAt,
+      Value<int> lastAccessAt,
+      Value<int> rowid,
+    });
+
+class $ImageCacheFilterComposer extends Composer<_$CacheDatabase, ImageCache> {
+  $ImageCacheFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get cacheKey => $composableBuilder(
+    column: $table.cacheKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get refJson => $composableBuilder(
+    column: $table.refJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get checksum => $composableBuilder(
+    column: $table.checksum,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get byteSize => $composableBuilder(
+    column: $table.byteSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get format => $composableBuilder(
+    column: $table.format,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get fetchedAt => $composableBuilder(
+    column: $table.fetchedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get lastAccessAt => $composableBuilder(
+    column: $table.lastAccessAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $ImageCacheOrderingComposer
+    extends Composer<_$CacheDatabase, ImageCache> {
+  $ImageCacheOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get cacheKey => $composableBuilder(
+    column: $table.cacheKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get refJson => $composableBuilder(
+    column: $table.refJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fileName => $composableBuilder(
+    column: $table.fileName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get checksum => $composableBuilder(
+    column: $table.checksum,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get byteSize => $composableBuilder(
+    column: $table.byteSize,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get format => $composableBuilder(
+    column: $table.format,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get fetchedAt => $composableBuilder(
+    column: $table.fetchedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get lastAccessAt => $composableBuilder(
+    column: $table.lastAccessAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $ImageCacheAnnotationComposer
+    extends Composer<_$CacheDatabase, ImageCache> {
+  $ImageCacheAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get cacheKey =>
+      $composableBuilder(column: $table.cacheKey, builder: (column) => column);
+
+  GeneratedColumn<String> get refJson =>
+      $composableBuilder(column: $table.refJson, builder: (column) => column);
+
+  GeneratedColumn<String> get fileName =>
+      $composableBuilder(column: $table.fileName, builder: (column) => column);
+
+  GeneratedColumn<String> get checksum =>
+      $composableBuilder(column: $table.checksum, builder: (column) => column);
+
+  GeneratedColumn<int> get byteSize =>
+      $composableBuilder(column: $table.byteSize, builder: (column) => column);
+
+  GeneratedColumn<String> get format =>
+      $composableBuilder(column: $table.format, builder: (column) => column);
+
+  GeneratedColumn<int> get fetchedAt =>
+      $composableBuilder(column: $table.fetchedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get lastAccessAt => $composableBuilder(
+    column: $table.lastAccessAt,
+    builder: (column) => column,
+  );
+}
+
+class $ImageCacheTableManager
+    extends
+        RootTableManager<
+          _$CacheDatabase,
+          ImageCache,
+          ImageCacheData,
+          $ImageCacheFilterComposer,
+          $ImageCacheOrderingComposer,
+          $ImageCacheAnnotationComposer,
+          $ImageCacheCreateCompanionBuilder,
+          $ImageCacheUpdateCompanionBuilder,
+          (
+            ImageCacheData,
+            BaseReferences<_$CacheDatabase, ImageCache, ImageCacheData>,
+          ),
+          ImageCacheData,
+          PrefetchHooks Function()
+        > {
+  $ImageCacheTableManager(_$CacheDatabase db, ImageCache table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $ImageCacheFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $ImageCacheOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $ImageCacheAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> cacheKey = const Value.absent(),
+                Value<String> refJson = const Value.absent(),
+                Value<String> fileName = const Value.absent(),
+                Value<String> checksum = const Value.absent(),
+                Value<int> byteSize = const Value.absent(),
+                Value<String> format = const Value.absent(),
+                Value<int> fetchedAt = const Value.absent(),
+                Value<int> lastAccessAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ImageCacheCompanion(
+                cacheKey: cacheKey,
+                refJson: refJson,
+                fileName: fileName,
+                checksum: checksum,
+                byteSize: byteSize,
+                format: format,
+                fetchedAt: fetchedAt,
+                lastAccessAt: lastAccessAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String cacheKey,
+                required String refJson,
+                required String fileName,
+                required String checksum,
+                required int byteSize,
+                required String format,
+                required int fetchedAt,
+                required int lastAccessAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ImageCacheCompanion.insert(
+                cacheKey: cacheKey,
+                refJson: refJson,
+                fileName: fileName,
+                checksum: checksum,
+                byteSize: byteSize,
+                format: format,
+                fetchedAt: fetchedAt,
+                lastAccessAt: lastAccessAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $ImageCacheProcessedTableManager =
+    ProcessedTableManager<
+      _$CacheDatabase,
+      ImageCache,
+      ImageCacheData,
+      $ImageCacheFilterComposer,
+      $ImageCacheOrderingComposer,
+      $ImageCacheAnnotationComposer,
+      $ImageCacheCreateCompanionBuilder,
+      $ImageCacheUpdateCompanionBuilder,
+      (
+        ImageCacheData,
+        BaseReferences<_$CacheDatabase, ImageCache, ImageCacheData>,
+      ),
+      ImageCacheData,
+      PrefetchHooks Function()
+    >;
+typedef $ImageOwnersCreateCompanionBuilder =
+    ImageOwnersCompanion Function({
+      required String cacheKey,
+      required String sourceId,
+      required String novelId,
+      Value<int> rowid,
+    });
+typedef $ImageOwnersUpdateCompanionBuilder =
+    ImageOwnersCompanion Function({
+      Value<String> cacheKey,
+      Value<String> sourceId,
+      Value<String> novelId,
+      Value<int> rowid,
+    });
+
+class $ImageOwnersFilterComposer
+    extends Composer<_$CacheDatabase, ImageOwners> {
+  $ImageOwnersFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get cacheKey => $composableBuilder(
+    column: $table.cacheKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $ImageOwnersOrderingComposer
+    extends Composer<_$CacheDatabase, ImageOwners> {
+  $ImageOwnersOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get cacheKey => $composableBuilder(
+    column: $table.cacheKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $ImageOwnersAnnotationComposer
+    extends Composer<_$CacheDatabase, ImageOwners> {
+  $ImageOwnersAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get cacheKey =>
+      $composableBuilder(column: $table.cacheKey, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get novelId =>
+      $composableBuilder(column: $table.novelId, builder: (column) => column);
+}
+
+class $ImageOwnersTableManager
+    extends
+        RootTableManager<
+          _$CacheDatabase,
+          ImageOwners,
+          ImageOwner,
+          $ImageOwnersFilterComposer,
+          $ImageOwnersOrderingComposer,
+          $ImageOwnersAnnotationComposer,
+          $ImageOwnersCreateCompanionBuilder,
+          $ImageOwnersUpdateCompanionBuilder,
+          (
+            ImageOwner,
+            BaseReferences<_$CacheDatabase, ImageOwners, ImageOwner>,
+          ),
+          ImageOwner,
+          PrefetchHooks Function()
+        > {
+  $ImageOwnersTableManager(_$CacheDatabase db, ImageOwners table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $ImageOwnersFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $ImageOwnersOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $ImageOwnersAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> cacheKey = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> novelId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ImageOwnersCompanion(
+                cacheKey: cacheKey,
+                sourceId: sourceId,
+                novelId: novelId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String cacheKey,
+                required String sourceId,
+                required String novelId,
+                Value<int> rowid = const Value.absent(),
+              }) => ImageOwnersCompanion.insert(
+                cacheKey: cacheKey,
+                sourceId: sourceId,
+                novelId: novelId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $ImageOwnersProcessedTableManager =
+    ProcessedTableManager<
+      _$CacheDatabase,
+      ImageOwners,
+      ImageOwner,
+      $ImageOwnersFilterComposer,
+      $ImageOwnersOrderingComposer,
+      $ImageOwnersAnnotationComposer,
+      $ImageOwnersCreateCompanionBuilder,
+      $ImageOwnersUpdateCompanionBuilder,
+      (ImageOwner, BaseReferences<_$CacheDatabase, ImageOwners, ImageOwner>),
+      ImageOwner,
+      PrefetchHooks Function()
+    >;
 
 class $CacheDatabaseManager {
   final _$CacheDatabase _db;
@@ -2722,4 +3942,8 @@ class $CacheDatabaseManager {
       $CatalogCacheTableManager(_db, _db.catalogCache);
   $ChapterCacheTableManager get chapterCache =>
       $ChapterCacheTableManager(_db, _db.chapterCache);
+  $ImageCacheTableManager get imageCache =>
+      $ImageCacheTableManager(_db, _db.imageCache);
+  $ImageOwnersTableManager get imageOwners =>
+      $ImageOwnersTableManager(_db, _db.imageOwners);
 }

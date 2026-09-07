@@ -1,5 +1,7 @@
 # NET-001 / NET-002：受限网络与诊断
 
+CACHE-005（2026-09-07）：新增请求作用域 BackgroundWork（Dart Zone 传递元数据，不是全局服务定位器）。进程所有者共享 BackgroundBudget，Source 定位 / 重定向 / 重试和流式响应体均记账。Scheduler 保存提交时 Zone，避免延迟执行继承其他请求上下文；共享后台资源遇前台消费者立即提升排队优先级，HTTP 单次大小 / deadline / 同源间隔保持不变。详见 [缓存](cache.md)。
+
 2026-09-07。NET-001 / NET-002 DONE；网络层合计 14 项离线测试通过，完整工程 112 项通过，静态分析无问题；Android 组合探针安装 / 冷启动 / 执行通过。没有访问真实 Source。MEDIA-001 的所有权与内存边界见 [媒体说明](media.md)。
 
 NET-001：Source 各自拥有 NetworkTransport / Dio，注入允许的 HTTPS URI 和私有 Header / 响应接收策略；自动 redirect 关闭。响应通过流逐块计数，解压后元数据最多 8 MiB、媒体最多 20 MiB；MIME 不符、声明 / 实际长度异常及超限均不返回成功正文。connect / send 10s，receive 默认 20s（媒体可指定 30s），绝对 deadline 覆盖等待响应及流读取。取消绑定 Dio abort 和响应订阅取消；没有重写 Domain 契约。

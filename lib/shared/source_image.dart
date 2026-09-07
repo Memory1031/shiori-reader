@@ -50,6 +50,88 @@ class DecodedSourceImage {
 typedef SourceImageDecoder =
     Future<DecodedSourceImage> Function(MediaData data, int targetWidth);
 
+/// Reader-owned decoded LRU. Only already mounted/nearby pages populate it;
+/// downloading a volume never allocates decoded images for the entire volume.
+class SourceImageDecodeScope extends StatefulWidget {
+  const SourceImageDecodeScope({super.key, required this.child});
+  final Widget child;
+  @override
+  State<SourceImageDecodeScope> createState() => _SourceImageDecodeScopeState();
+}
+
+class _SourceImageDecodeScopeState extends State<SourceImageDecodeScope> {
+  final cache = _DecodedCache();
+  @override
+  void dispose() {
+    cache.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _DecodeOwner(cache: cache, child: widget.child);
+}
+
+class _DecodeOwner extends InheritedWidget {
+  const _DecodeOwner({required this.cache, required super.child});
+  final _DecodedCache cache;
+  @override
+  bool updateShouldNotify(_DecodeOwner oldWidget) => cache != oldWidget.cache;
+}
+
+class _DecodedCache {
+  final _entries = <(String, int), DecodedSourceImage>{};
+  int _bytes = 0;
+  bool _closed = false;
+  Future<void> _tail = Future.value();
+  Future<DecodedSourceImage> decode(MediaData data, int width) {
+    final result = _tail.then((_) => _decode(data, width));
+    _tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return result;
+  }
+
+  Future<DecodedSourceImage> _decode(MediaData data, int width) async {
+    if (_closed) throw StateError('Reader decode scope closed');
+    // Content-addressed persisted paths distinguish refreshed image versions.
+    if (data is! LocalMedia) return decodeSourceImage(data, width);
+    final key = (data.path, width);
+    final existing = _entries.remove(key);
+    if (existing != null) {
+      _entries[key] = existing;
+      return DecodedSourceImage(existing.image.clone(), existing.intrinsicSize);
+    }
+    final decoded = await decodeSourceImage(data, width);
+    if (_closed) return decoded;
+    final duplicate = _entries.remove(key);
+    if (duplicate != null) {
+      _bytes -= duplicate.image.width * duplicate.image.height * 4;
+      duplicate.image.dispose();
+    }
+    final size = decoded.image.width * decoded.image.height * 4;
+    while (_entries.isNotEmpty &&
+        (_bytes + size > 24 * 1024 * 1024 || _entries.length >= 5)) {
+      final old = _entries.remove(_entries.keys.first)!;
+      _bytes -= old.image.width * old.image.height * 4;
+      old.image.dispose();
+    }
+    _entries[key] = DecodedSourceImage(
+      decoded.image.clone(),
+      decoded.intrinsicSize,
+    );
+    _bytes += size;
+    return decoded;
+  }
+
+  void close() {
+    _closed = true;
+    for (final value in _entries.values) {
+      value.image.dispose();
+    }
+    _entries.clear();
+    _bytes = 0;
+  }
+}
+
 Future<DecodedSourceImage> decodeSourceImage(
   MediaData data,
   int targetWidth,
@@ -161,6 +243,7 @@ class _SourceImageState extends State<SourceImage> {
   bool _current(int generation) => mounted && generation == _generation;
 
   Future<void> _load(int width, {bool refresh = false}) async {
+    final shared = context.getInheritedWidgetOfExactType<_DecodeOwner>()?.cache;
     _request?.cancel();
     final request = _request = CancellationSource();
     final generation = ++_generation;
@@ -189,7 +272,10 @@ class _SourceImageState extends State<SourceImage> {
       final loaded = (result as Success<LoadResult<MediaLease>>).value;
       pendingLease = loaded.value;
       if (!_current(generation)) return;
-      final decoded = await widget.decoder(pendingLease.data, width);
+      final decoded =
+          await (widget.decoder == decodeSourceImage && shared != null
+              ? shared.decode(pendingLease.data, width)
+              : widget.decoder(pendingLease.data, width));
       pendingImage = decoded.image;
       if (!_current(generation)) return;
       _release();

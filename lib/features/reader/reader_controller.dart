@@ -17,10 +17,17 @@ class ReaderController extends ScopedController {
     required this.repository,
     required this.chapter,
     this.library,
+    this.cache,
+    this.readMode = ReadMode.cacheFirst,
+    this.onPosition,
   });
   final NovelRepository repository;
   final ChapterKey chapter;
   final LibraryRepository? library;
+  final CacheManagement? cache;
+  final ReadMode readMode;
+  final void Function(int)? onPosition;
+  void Function()? _unpin;
   ProgressTracker? progress;
   AppFailure? progressFailure;
   AppFailure? restoreFailure;
@@ -47,6 +54,7 @@ class ReaderController extends ScopedController {
     }
     _restoring = false;
     _sample = (position, completed);
+    onPosition?.call(position.blockIndex);
     progress?.restoring(false);
     progress?.sample(position, completed: completed);
   }
@@ -81,12 +89,12 @@ class ReaderController extends ScopedController {
     final results = await Future.wait([
       repository.loadDetail(
         chapter.novelKey,
-        mode: ReadMode.cacheFirst,
+        mode: readMode,
         cancellation: request.token,
       ),
       repository.loadCatalog(
         chapter.novelKey,
-        mode: ReadMode.cacheFirst,
+        mode: readMode,
         cancellation: request.token,
       ),
     ]);
@@ -121,6 +129,33 @@ class ReaderController extends ScopedController {
         return;
       }
     }
+    final saved = await library!.getProgress(
+      chapter.novelKey,
+      cancellation: request.token,
+    );
+    if (isClosed || request != _request || request.token.isCancelled) return;
+    if (saved case Success(
+      value: final previous?,
+    ) when previous.chapterKey == chapter) {
+      final tracker = progress = ProgressTracker(
+        library: library!,
+        content: content!,
+        snapshot: previous.snapshot,
+        ordinal: previous.chapterOrdinalSnapshot,
+        catalogRevision: previous.catalogRevision,
+        onStatus: () {
+          if (!isClosed) update();
+        },
+      );
+      progressFailure = null;
+      unawaited(tracker.start());
+      tracker.restoring(_restoring);
+      if (_sample case final sample?) {
+        tracker.sample(sample.$1, completed: sample.$2);
+      }
+      update();
+      return;
+    }
     progressFailure = AppFailure(
       kind: FailureKind.database,
       operation: Operation.progressWrite,
@@ -136,6 +171,7 @@ class ReaderController extends ScopedController {
   @override
   void onInit() {
     super.onInit();
+    _unpin = cache?.pinChapter(chapter);
     unawaited(load());
   }
 
@@ -165,7 +201,7 @@ class ReaderController extends ScopedController {
     update();
     final result = await repository.loadChapter(
       chapter,
-      mode: ReadMode.cacheFirst,
+      mode: readMode,
       cancellation: request.token,
     );
     if (isClosed || request != _request || request.token.isCancelled) return;
@@ -214,6 +250,7 @@ class ReaderController extends ScopedController {
 
   @override
   void onClose() {
+    _unpin?.call();
     _request?.cancel();
     unawaited(progress?.close());
     super.onClose();

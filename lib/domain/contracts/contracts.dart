@@ -5,3 +5,5 @@ export 'media.dart';
 export 'novel_source.dart';
 export 'repositories.dart';
 export 'result.dart';
+export 'cache.dart';
+export 'prefetch.dart';

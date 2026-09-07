@@ -60,7 +60,11 @@ class _ProductionAppState extends State<ProductionApp> {
       }
       final databases = (result as Success<LocalDatabases>).value;
       _databases = databases;
-      _services = SourceServices(cache: databases.cache);
+      _services = SourceServices(
+        cache: databases.cache,
+        paths: paths,
+        users: databases.users,
+      );
       _library = LocalLibraryRepository(databases.users);
       _appearance = PreferencesAppSettingsStore(
         preferences: SharedPreferencesAsync(),
@@ -119,6 +123,7 @@ class _ProductionAppState extends State<ProductionApp> {
             library: _library!,
             sources: _services!.registry.descriptors,
             images: _services!.images,
+            cache: _services!.cacheManagement,
             settings: _reading,
             onAppearance: () => showAppAppearance(context, app),
           ),

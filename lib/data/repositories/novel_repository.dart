@@ -1,9 +1,11 @@
 import 'dart:async';
+import '../network/background_work.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../shared/app_logger.dart';
 import '../local/novel_record_store.dart';
 import '../local/database/cache_database.dart';
+import '../cache/cache_policy.dart';
 import '../sources/source_registry.dart';
 
 /// Explicit composition for an already-owned cache database and Source registry.
@@ -12,10 +14,12 @@ DefaultNovelRepository createNovelRepository({
   required CacheDatabase cache,
   DateTime Function()? now,
   AppLogger? logger,
+  CacheCoordinator? coordinator,
 }) => DefaultNovelRepository(
   sources: sources,
-  records: NovelRecordStore(cache),
+  records: NovelRecordStore(cache, coordinator: coordinator),
   now: now,
+  coordinator: coordinator,
   logger: logger,
 );
 
@@ -27,11 +31,13 @@ final class DefaultNovelRepository implements NovelRepository {
     required NovelRecordStore records,
     DateTime Function()? now,
     AppLogger? logger,
+    CacheCoordinator? coordinator,
   }) : _logger = logger ?? AppLogger() {
     final clock = now ?? DateTime.now;
     _details = _Records(
       operation: Operation.novelDetail,
       now: clock,
+      coordinator: coordinator,
       logger: _logger,
       read: (key, token) => records.readDetail(key, cancellation: token),
       fetch: (key, token) => _source(
@@ -44,6 +50,9 @@ final class DefaultNovelRepository implements NovelRepository {
       write: (value, time, token) => records.writeDetail(
         value,
         fetchedAt: time,
+        expiresAt: time.add(
+          (coordinator?.policy ?? const CachePolicy()).detailTtl,
+        ),
         parserVersion: 1,
         cancellation: token,
       ),
@@ -51,6 +60,7 @@ final class DefaultNovelRepository implements NovelRepository {
     _catalogs = _Records(
       operation: Operation.catalog,
       now: clock,
+      coordinator: coordinator,
       logger: _logger,
       read: (key, token) => records.readCatalog(key, cancellation: token),
       fetch: (key, token) => _source(
@@ -63,6 +73,9 @@ final class DefaultNovelRepository implements NovelRepository {
       write: (value, time, token) => records.writeCatalog(
         value,
         fetchedAt: time,
+        expiresAt: time.add(
+          (coordinator?.policy ?? const CachePolicy()).catalogTtl,
+        ),
         parserVersion: 1,
         cancellation: token,
       ),
@@ -70,6 +83,7 @@ final class DefaultNovelRepository implements NovelRepository {
     _chapters = _Records(
       operation: Operation.chapter,
       now: clock,
+      coordinator: coordinator,
       logger: _logger,
       read: (key, token) => records.readChapter(key, cancellation: token),
       fetch: (key, token) => _source(
@@ -285,6 +299,7 @@ Future<Result<T>> _wait<T>(
 }
 
 final class _Job<T> {
+  final scope = BackgroundWork.current;
   final cancellation = CancellationSource();
   late Future<Result<LoadResult<T>>> result;
   int readers = 0;
@@ -295,13 +310,22 @@ final class _Job<T> {
 /// selecting TTLs and capacity/eviction belongs to CACHE-001/002.
 final class _Records<K, T> {
   _Records({
+    this.coordinator,
     required this.operation,
     required this.now,
     required this.logger,
     required this.read,
     required this.fetch,
     required this.write,
-  });
+  }) {
+    _clears = coordinator?.clears.listen((_) {
+      for (final job in _jobs.values) {
+        job.cancellation.cancel();
+      }
+    });
+  }
+  StreamSubscription<void>? _clears;
+  final CacheCoordinator? coordinator;
   final Operation operation;
   final DateTime Function() now;
   final AppLogger logger;
@@ -313,9 +337,19 @@ final class _Records<K, T> {
   final _lifetime = CancellationSource();
   Stream<Result<LoadResult<T>>> updates(K key) =>
       _events.stream.where((event) => event.$1 == key).map((event) => event.$2);
-  bool _stale(StoredRecord<T> record) =>
-      record.parserVersion != 1 ||
-      (record.expiresAt != null && !now().toUtc().isBefore(record.expiresAt!));
+  bool _stale(StoredRecord<T> record) {
+    final policy = coordinator?.policy ?? const CachePolicy();
+    final expiry =
+        record.expiresAt ??
+        switch (operation) {
+          Operation.novelDetail => record.fetchedAt.add(policy.detailTtl),
+          Operation.catalog => record.fetchedAt.add(policy.catalogTtl),
+          _ => null,
+        };
+    return record.parserVersion != 1 ||
+        (expiry != null && !now().toUtc().isBefore(expiry));
+  }
+
   LoadResult<T> _local(StoredRecord<T> record, {AppFailure? failure}) =>
       LoadResult(
         value: record.value,
@@ -333,6 +367,7 @@ final class _Records<K, T> {
     if (token.isCancelled || _lifetime.token.isCancelled) {
       return Failure(AppFailure.cancelled(operation));
     }
+    final generation = coordinator?.generation;
     Result<StoredRecord<T>?> cached;
     try {
       cached = await read(key, token);
@@ -345,7 +380,9 @@ final class _Records<K, T> {
         ),
       );
     }
-    if (token.isCancelled || _lifetime.token.isCancelled) {
+    if (token.isCancelled ||
+        _lifetime.token.isCancelled ||
+        coordinator?.generation != generation) {
       return Failure(AppFailure.cancelled(operation));
     }
     final record = switch (cached) {
@@ -401,6 +438,7 @@ final class _Records<K, T> {
         if (identical(_jobs[key], current)) _jobs.remove(key);
       });
     }
+    BackgroundWork.promote(job.scope);
     job.background |= background;
     if (background) return job.result;
     job.readers++;
@@ -418,6 +456,7 @@ final class _Records<K, T> {
     _Job<T> job,
   ) async {
     final token = job.cancellation.token;
+    final generation = coordinator?.generation;
     Result<T> remote;
     try {
       remote = await fetch(key, token);
@@ -427,6 +466,9 @@ final class _Records<K, T> {
       );
     }
     if (token.isCancelled) return Failure(AppFailure.cancelled(operation));
+    if (coordinator?.generation != generation) {
+      return Failure(AppFailure.cancelled(operation));
+    }
     Result<LoadResult<T>> result;
     switch (remote) {
       case Failure(:final failure):
@@ -455,6 +497,9 @@ final class _Records<K, T> {
     if (result case Failure(:final failure) when failure.isCancellation) {
       return result;
     }
+    if (coordinator?.generation != generation) {
+      return Failure(AppFailure.cancelled(operation));
+    }
     if (!_events.isClosed) _events.add((key, result));
     return result;
   }
@@ -465,6 +510,7 @@ final class _Records<K, T> {
     for (final job in jobs) {
       job.cancellation.cancel();
     }
+    await _clears?.cancel();
     await Future.wait(jobs.map((job) => job.result));
     // Do not wait for paused listeners to resume before the owner can close DB.
     unawaited(_events.close());
