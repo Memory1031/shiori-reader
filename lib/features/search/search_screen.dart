@@ -123,7 +123,10 @@ class _SearchBody extends StatelessWidget {
                       if (state.submittedQuery != null &&
                           state.status != SearchStatus.idle) ...[
                         const SizedBox(height: ShioriSpace.item),
-                        Text(strings.searchResultsFor(state.submittedQuery!)),
+                        Text(
+                          strings.searchResultsFor(state.submittedQuery!),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ],
                       if (state.needsSubmission && state.items.isNotEmpty)
                         Text(strings.searchDraftNotice),
@@ -171,6 +174,7 @@ class _SearchBody extends StatelessWidget {
                           )
                         : Text(
                             strings.searchNoMore,
+                            style: Theme.of(context).textTheme.bodySmall,
                             textAlign: TextAlign.center,
                           ),
                   ),
@@ -246,14 +250,38 @@ class _SearchInputState extends State<_SearchInput> {
         hintText: AppLocalizations.of(context).searchKeyword,
         floatingLabelBehavior: FloatingLabelBehavior.never,
         labelText: AppLocalizations.of(context).searchKeyword,
-        prefixIcon: const Icon(Icons.search),
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.primary,
+            width: 1,
+          ),
+        ),
+        prefixIcon: const Icon(Icons.search, size: 22),
         suffixIcon: Padding(
           padding: const EdgeInsets.all(4),
-          child: IconButton.filled(
+          child: TextButton(
             key: const ValueKey('search-submit'),
-            tooltip: AppLocalizations.of(context).searchTitle,
+
             onPressed: widget.enabled ? widget.onSubmit : null,
-            icon: const Icon(Icons.arrow_forward),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: Text(AppLocalizations.of(context).searchTitle),
           ),
         ),
       ),
@@ -278,44 +306,50 @@ class _ResultRow extends StatelessWidget {
     onTap: onTap,
     label: [book.title, ...book.authors].join(', '),
     excludeSemantics: true,
-    child: InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: ShioriSpace.page,
-          vertical: ShioriSpace.medium,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 56,
-              child: BookCover(book: book, images: images),
-            ),
-            const SizedBox(width: ShioriSpace.item),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    book.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Material(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 68,
+                  child: BookCover(book: book, images: images),
+                ),
+                const SizedBox(width: ShioriSpace.item),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        book.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                      if (book.authors.isNotEmpty) ...[
+                        const SizedBox(height: ShioriSpace.small),
+                        Text(
+                          book.authors.join(', '),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ],
                   ),
-                  if (book.authors.isNotEmpty) ...[
-                    const SizedBox(height: ShioriSpace.small),
-                    Text(
-                      book.authors.join(', '),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     ),

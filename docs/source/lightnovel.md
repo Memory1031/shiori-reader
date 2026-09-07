@@ -410,3 +410,5 @@ Windows 宿主分别启动两次独立 Flutter test 进程，使用正式 LightN
 验证入口 `integration_test/live/source_smoke.dart` 默认禁用，开启命令和一次运行锁见同目录README。新增1项离线装配/所有权测试；全项目 **226项离线测试 PASS**、analyze PASS。live Debug APK 构建/安装/运行 PASS；随后普通 lib/main_dev.dart Debug 构建、安装、冷启动和开发菜单显示均通过，模拟器已恢复普通开发入口。
 
 Phase 2生产数据链路本次样本 Gate PASS；这不代表所有书籍、真实ARM64手机性能、产品页面、离线持久图片或发布准备完成。正式搜索/详情/目录UI按相应任务实施。iOS Level A：共享Dart与既有跨平台依赖；iOS runtime保持 DEFERRED_NO_MAC / IOS-002，不能由本次Android成功替代。
+
+搜索封面接线补正（2026-09-07）：SRC-006 当时暂不提供 cover 的限制现由已完成的 SRC-010 媒体恢复协议解除。搜索摘要按合法 bookId 提供稳定 cover:v1 引用，图片消费方按既有详情端点取得当前定位；搜索本身不增加详情请求，不从未验证的搜索封面字段推断 URL。缺失封面沿用媒体 notFound / UI失败占位处理。本轮离线验证，无新实站字段证据。

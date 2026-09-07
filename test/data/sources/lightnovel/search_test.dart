@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:shiori/data/sources/lightnovel/lightnovel_api.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
@@ -62,7 +63,8 @@ void main() {
         await source.search('  中文 & +  ', cancellation: token),
       );
       expect(first.items.first.authors, ['Synthetic author']);
-      expect(first.items.first.cover, isNull);
+      expect(first.items.first.cover?.mediaId, 'cover:v1:1');
+      expect(first.items.first.cover?.sourceId, lightNovelSourceId);
       expect(first.nextCursor!.opaqueValue, isNot(contains('中文')));
       final payload = jsonDecode(
         utf8.decode(adapter.requests.single.data as List<int>),

@@ -124,6 +124,12 @@ final class LightNovelSearch {
         items.add(
           NovelSummary(
             key: key,
+            // Resolve the stable cover role through the existing media endpoint.
+            // Search itself does not fetch details or retain signed URLs.
+            cover: MediaRef(
+              sourceId: lightNovelSourceId,
+              mediaId: 'cover:v1:${key.novelId}',
+            ),
             title: row['title'] as String,
             authors: author is String && author.trim().isNotEmpty
                 ? [author.trim()]
