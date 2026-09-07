@@ -33,3 +33,5 @@ Transport.attempt 是内部“单次 HTTP 尝试”边界：3xx / 4xx / 5xx 可�
 非 2xx 响应只接收状态与 Header，关闭错误正文；已覆盖 429 超大且停滞正文，确保不绕过冷却。最后增补该回归后完整测试为 112 项。
 
 最终版本组合探针已再次安装 / 冷启动并输出同一 PASS。随后恢复已验证的 typography 常规开发包到 MuMu；普通 `lib/main.dart` 最终 APK 构建通过（4.4s），未覆盖安装。探针包保留在忽略的 `build/app/outputs/flutter-apk/network-media-probe-debug.apk`，普通包为 `app-debug.apk`。
+
+SRC-005：NetworkRequest 新增 maxRedirects（0..5，默认5），Source 可收紧但不能扩大 NET-002 上限；LightNovel JSON API 设为0，同域跳转也停止。该源 POST 不自动重放、不恢复未确认会话，仍借用全局 scheduler / deadline。新增源测试与既有网络回归通过，完整187项测试 PASS；本轮没有 Android 或真实源请求验证。

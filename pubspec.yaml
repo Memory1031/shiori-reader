@@ -8,6 +8,7 @@ environment:
   flutter: '>=3.38.4 <3.39.0'
 
 dependencies:
+  html: 0.15.7
   characters: 1.4.0
   crypto: 3.0.7
   dio: 5.11.1

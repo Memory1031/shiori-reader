@@ -14,6 +14,7 @@ final class NetworkRequest {
     this.method = HttpMethod.get,
     Uint8List? body,
     this.safeToRepeat = false,
+    this.maxRedirects = 5,
     this.priority = RequestPriority.foreground,
     this.maxBytes = 8 * 1024 * 1024,
     Set<String> mimeTypes = const {'application/json'},
@@ -22,7 +23,9 @@ final class NetworkRequest {
            ? null
            : Uint8List.fromList(body).asUnmodifiableView(),
        mimeTypes = Set.unmodifiable(mimeTypes) {
-    if (maxBytes < 1 ||
+    if (maxRedirects < 0 ||
+        maxRedirects > 5 ||
+        maxBytes < 1 ||
         maxBytes > 20 * 1024 * 1024 ||
         receiveTimeout <= Duration.zero ||
         mimeTypes.isEmpty) {
@@ -34,6 +37,7 @@ final class NetworkRequest {
   final HttpMethod method;
   final Uint8List? body;
   final bool safeToRepeat;
+  final int maxRedirects;
   final RequestPriority priority;
   final int maxBytes;
   final Set<String> mimeTypes;
@@ -44,6 +48,7 @@ final class NetworkRequest {
     method: nextMethod,
     body: nextMethod == HttpMethod.post ? body : null,
     safeToRepeat: safeToRepeat,
+    maxRedirects: maxRedirects,
     priority: priority,
     maxBytes: maxBytes,
     mimeTypes: mimeTypes,

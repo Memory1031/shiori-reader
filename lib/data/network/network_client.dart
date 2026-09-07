@@ -86,7 +86,7 @@ class NetworkClient {
               target.scheme != 'https' ||
               target.userInfo.isNotEmpty ||
               !transport.policy.allows(target) ||
-              redirects >= 5 ||
+              redirects >= request.maxRedirects ||
               !visited.add(target)) {
             return Failure(
               networkFailure(request.operation, FailureKind.accessRestricted),

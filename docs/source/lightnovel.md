@@ -277,3 +277,136 @@ book_id / volume_id / chapter_id 在独立 JSON 中为数值，页面 href 的 b
 | OQ-14：WebView 与平台 | 当前观察路径无需 WebView；不推断未来永久不需要 | SRC-005 / TEST-001 若发现正常访问必须平台能力，先更新 ADR / iOS impact 并重开 Source gate，不引入 Android-only Source。Android 生产 codec 待 TEST-001 / ANDROID-002，iOS 待 IOS-002，无 Mac 不阻塞本次技术 GO |
 
 下一项可领取的 Foundation 工作是 **CORE-002**（CORE-001 已完成）。Source 侧下一项为 SRC-005，但它还依赖 **NET-002、DB-002**；按原依赖先完成相关 Foundation 任务，不能仅凭 SRC-004 DONE 跳过前置。本次不自动领取后续任务。
+
+## SRC-005：生产请求与无会话分支（2026-09-07）
+
+状态：**DONE（请求基础层）**。实现位于 `lib/data/sources/lightnovel/`，采用 SRC-004 已决定的 no-op 会话基线。本轮新增源站 HTTP **0**；以下均为既有访问证据上的实现和合成响应回归，不是对网站当前可达性的重新证明。
+
+- `LightNovelSource` 实现 NovelSource 的装配骨架，固定 SourceId=`lightnovel`，构造器借用应用共享 RequestScheduler 并拥有私有 API / transport。创建对象、描述信息和 no-op ensureSession 均无 I/O。业务解析尚未进入本项：search / detail / catalog / chapter 暂时返回 unsupported，后续 SRC-006..009 接线；discover 保持 unsupported，分页能力也暂不声明已实现。没有自动替换 App 的 fixture 或宣称在线阅读已可用。
+- `LightNovelApi` 只接受枚举中的五个已验证 POST 端点，policy 精确匹配 URI；不开放任意 host / path、auth-session、taxonomy 或备用接口。采用已观察成功的 Accept / Content-Type / Origin / Referer 组合。payload 和响应 envelope 只留 data 层，具体字段构造与解析属于后续操作任务。
+- ensureSession 显式 no-op，无状态、无网络初始化，自然不存在并发重复初始化；不引入 CookieJar、AppPaths 会话文件或凭据持久化。Set-Cookie 被忽略，重建实例也不携带 Cookie / Authorization / security_key。损坏会话清理为 N/A，因为当前没有会话存储；不删除任何本地库或其他源数据。
+- 401 / 403 直接映射 accessRestricted，429 沿用同源冷却。所有本源 POST 的 safeToRepeat=false，不叠加恢复重试。未观察且不能确认的非零业务 code 返回 unsupported，缺失 / 错误 envelope 返回 parse / invalidContent；不猜登录失效码、不暴露服务端 message。真实异常 schema 仍 UNKNOWN。
+- API 请求不跟随重定向，包括同 origin 的其他已验证端点。为表达这一限制，NetworkRequest 增加有界 maxRedirects（默认仍为 5，本源设为 0），原网络行为保持默认值。接收上限沿用 8 MiB，调用 deadline 不延长 NetworkClient 的 45 秒总预算；排队、取消及限流沿用同一个 scheduler。
+- 数值远端 ID 在 Source 边界验证为正十进制字符串，构造 NovelKey / ChapterKey；缺失、0、负值、浮点、URL 等输入不能自动变为合法身份。没有从标题、顺序或试验固定 ID 生成生产标识。
+- composition root 负责先等待 Repository 结束，再 close Source，最后关闭共享 scheduler。Source.close 幂等并中断自己的 transport，不关闭其他源借用的 scheduler。
+
+验收：新增 **10 项**离线测试，完整工程 **187 项 PASS**；真实 Dio + TestAdapter 验证五端点、请求 Header、重建实例无 Cookie、错误响应、无自动恢复 / 重放、同域重定向停止、过期 deadline / 取消 / close、ID 及日志秘密哨兵。响应全部合成，没有保存真实失败正文或新小说内容。本机完整测试记录 `.tooling/evidence/src005-tests.txt`。
+
+iOS Level A：共享 Dart / 既有 Dio，无平台分支、新插件、会话磁盘或最低系统变化。Android 新包运行、真实 TLS、OS 重启均未在本轮验证；实例重建测试不冒充进程重启。生产真实链路归 TEST-001，iOS runtime 仍 **DEFERRED_NO_MAC / IOS-002**。未来只有自然出现并能确认的会话需求才能改变 no-op 决策并补恢复验收；本项不关闭 OQ-03 的长期访问假设。
+最终全项目 analyze：No issues found。
+
+## SRC-006：搜索解析与分页（2026-09-07）
+
+状态：**DONE**。LightNovelSource.search 已接入 SRC-005 的受限 API；supportsSearchPaging=true。discover 仍返回 unsupported、supportsDiscover=false，不请求仅观察过资源 URL 的首页接口。详情 / 目录 / 正文仍留 SRC-007..009，当前 App 未自动切换到生产源。
+
+- 搜索在 Source 内 trim 查询；空白查询直接返回空终页，不发送请求。非空查询以 UTF-8 JSON 传递，保留中文和特殊字符；沿用 SRC-002 的完整空 filter 字段、pageSize=20、sort=relevance，请求 page 从0开始。
+- 严格解析 list、book_id、非空 title 和 pagination；author_name 缺失 / 空值时保留空作者列表，错误类型拒绝。NovelSummary 使用固定 lightnovel 身份，保留源顺序。封面暂为 null：MediaRef 定位及跨重启准入属于 SRC-010，不把响应中的临时 URL 写入领域模型。
+- 响应 page 必须为请求 page+1；page_count / total / page_size 校验，存在的 has_next / 顶层 total 必须与 pagination 一致。合法空结果 total=0、page_count=1 是终页；缺失关键结构、矛盾分页或不完整空页返回 parse。has_next 允许缺失，由 pagination 判定（早期已记录投影没有保留此字段）。
+- 游标是实例内随机句柄，绑定 trim 后的查询、下一请求页及已见 ID；不含查询、URL、签名或凭据。不同 query / source、并发重复消费、伪造、已成功消费及已淘汰游标均返回 invalidCursor，且不发请求。跨页 / 页内重复 ID、响应重复页返回 repeatedPage；失败和取消不消费有效游标，允许用户明确重试。
+- 每个实例最多保留32条续页状态，超限按最早发放淘汰；每链最多5000个 ID，超限返回 tooLarge，不静默截断。游标不跨进程保存，重建 Source 或失效后需从首页重搜。close 清理状态并关闭既有 API。没有自动遍历、预取、增加网络重试或更改全局调度预算。
+
+验收：新增 **9项**搜索测试；完整 **196项离线测试 PASS**，全项目 analyze **No issues found**。覆盖首 / 后 / 末页、空白及实际空结果投影、中文请求编码、查询绑定、取消、重复 ID / 页、破坏字段、游标淘汰、目标标题作者和发现 unsupported。本机记录 `.tooling/evidence/src006-tests.txt`。
+
+fixture 来源：保留原 manifest / captured 文件不改；测试直接读取三页真实 ID / 分页投影，并在测试内明确添加 Synthetic 标题以构造解析输入。目标标题 / 作者沿用 initial-http-observations 的已记录元数据；末页、错误结构及容量场景均为合成，不宣称新捕获或已访问真实末页。本轮新增源站 HTTP=0。
+
+iOS Level A：共享 Dart 解析及既有 Dio，未增加依赖或平台分支。Android / iOS runtime 和真实在线搜索本轮未执行；生产链路仍由 TEST-001 验证，iOS runtime DEFERRED_NO_MAC。SRC-005 的访问假设与 SRC-010 媒体门槛继续保留。
+
+## SRC-007：小说详情（2026-09-07）
+
+状态：**DONE**。getNovelDetail 已通过 LightNovelDetail 请求 book_id / with_volumes=0，校验 source 和返回书籍身份；标题必须为非空字符串，缺作者、简介、标签或封面仍可成功。未知 status（包括历史1）继续 unknown，未确认时区的 updated_at 不转换为伪精确 UTC。
+
+本轮按用户明确授权补做 **1 次**详情 POST：无 Cookie / Authorization、无重试、禁止 redirect，响应200 / code0，book_id 与31607一致。只输出并记录字段结构，未保存简介、标签值、账号数据或完整封面地址。确认 summary_short 为字符串（31字符、当次无HTML）、tags / visible_tags 为字符串数组、cover_url 为 api.lightnovel.fun 的 HTTPS 绝对地址且有查询参数。最小结构记录为 `test/fixtures/lightnovel/src007/detail-structure.json`；这是本轮工具结果的人工投影，不改原 SRC-002 manifest 或旧快照。此请求是宿主 HttpClient 补证，不能冒充生产 Source 端到端运行。
+
+- 简介目前映射已证实的 summary_short，不猜测 description / intro 或未观察到的完整简介接口。使用 HTML parser 提取文字，丢弃 script / style / form / iframe / template / object 等节点；保留段落和换行，解码实体，不执行脚本或加载外部资源。tags 字符串逐项转为文本、去空去重；字段存在但类型异常返回 parse，而不是无声丢字段。
+- 封面解析只允许站点 www / api 两个 HTTPS host、默认443、无用户信息和 fragment。相对地址按站点根解析；相对输入只有合成边界测试证据，不宣称实站本次返回了相对 URL。领域 MediaRef 为 `cover:v1:<bookId>`，表达该书的封面角色，不含 URL / path / 签名。当前不持久保存 URL，也不下载封面；SRC-010 必须通过重新读取详情定位当前封面并验证跨重启，完成前不得宣称该 MediaRef 已可离线或实际加载。
+- 必要字段缺失、身份错误、登录 HTML、非法 UTF-8 和可选字段错误类型通过标准 Failure 返回；权限码仍由 SRC-005 映射，不为访问限制增加恢复或备用请求。
+
+新增 **7项**详情测试，完整 **203项离线测试 PASS**，analyze **No issues found**；本机 `.tooling/evidence/src007-tests.txt`。测试复用已记录详情元数据，HTML、相对封面、签名变化及异常输入均明确为合成；真实补证只验证结构，不保存或复用原文。
+
+依赖：固定 `html 0.15.7`，新增传递 `csslib 1.0.2`，均为 Dart 包，无原生插件。用于正确处理实体及 HTML 结构，避免正则剥标签；[官方版本列表](https://pub.dev/packages/html/versions) 声明该版本最低 Dart3.6，与固定 Dart3.10.3 相容，包声明 Android / iOS 支持。没有升级其他既有依赖、改最低 OS 或原生配置。iOS Level A PASS，runtime 仍 DEFERRED_NO_MAC；Android 新包运行与真实生产请求链仍未验收，后续 TEST-001。
+最终 Android Debug 构建（lib/main_dev.dart）PASS；未安装或执行模拟器新包，不替代设备 runtime 验证。
+
+## SRC-008：卷章节目录与顺序（2026-09-07）
+
+状态：**DONE（已验证的卷→章节协议）**。LightNovelSource.getCatalog 已接入目录聚合；先串行读取全部卷页，再按原顺序逐卷读取章节页。请求仅使用 SRC-005 的 volumes / chapters，page=1 起算、pageSize=50，不反转、不按数字或标题排序，也不初始化额外会话。
+
+- 卷 ID 为真实 groupId，缺卷名保留 null，空卷保留；章 ID 与 NovelKey 组合保证跨小说隔离，ordinal 在整份目录中连续递增。重复卷 ID、同页 / 跨页 / 跨卷重复章 ID 均失败；章的 book_id / volume_id 必须匹配当前请求。标题重复但 ID 不同可保留，不把重复显示名当重复章节。
+- 每页验证 page / page_count / total / page_size，分页中的总数或页数变化、重复页、提前空页、最终数量不足都返回 parse；卷声明 chapter_count 时必须与实际聚合一致。任何卷或页失败只返回 Failure，不交付已取到的部分 Catalog，也不提前写入 Repository 记录。
+- locked=1 的章节保留，不过滤或改顺序。现有 Chapter 是身份 / 标题 / 顺序模型，没有访问状态字段，因此目录存在不代表可读；实际正文访问须在 SRC-009 拒绝受限响应，不据此宣布已具备 UI 锁定标识。
+- 空卷列表映射为空的 synthetic group（groupId=ungrouped），不请求猜测的 volume_id=0。**无卷但实际有章的源站协议尚未验证**，本项不支持臆造该分支，也不宣称覆盖了真实无卷有章样本；后续若遇到该结构须补正常访问证据，再接入同一 Catalog 层级。当前空分组只表达已返回的空列表。
+- 单次聚合共享45秒总 deadline，最多100次逻辑请求、最多5000章；分页元信息超限立即 tooLarge，绝不静默截断或返回半份目录。沿用全局调度器500ms同源间隔、取消和源请求禁止自动重放的规则；取消在页面和卷之间检查。达到预算可由用户明确重试，尚未实现大目录续传。
+- 复用 Catalog.flatChapters 与既有 revision 计算；相同目录重复读取 revision 相同，卷名或顺序等语义变化产生新 revision。没有改变领域契约、目录 codec、数据库 schema、页面展开状态或导航 UI。
+
+验收：新增 **8项**目录测试，完整 **211项离线测试 PASS**，analyze **No issues found**。复用现有四卷十章投影与卷元数据，验证原顺序、连续 ordinal 和稳定 revision；合成多页、缺名、空目录、受限行、跨小说同章 ID、重复 ID、冲突归属、分页变化、超限、后续卷403与中途取消。合成测试不冒充真实多页 / 限流 / 无卷证据，原 fixture 与 manifest 保持不变。本机日志 `.tooling/evidence/src008-tests.txt`。
+
+本轮新增源站 HTTP=0，未复用 SRC-007 的单次授权追加访问。Android / iOS runtime 未执行，无新增依赖或原生配置；iOS Level A PASS，runtime 仍 DEFERRED_NO_MAC。生产目录网络链与设备行为仍归 TEST-001；下一项 SRC-009 正文解析。
+
+## SRC-009：正文 ContentBlock Parser（2026-09-07）
+
+状态：**DONE（正文结构化解析）**。LightNovelSource.getChapter 已通过已验证端点请求 book_id / chapter_id，校验归属、非空标题和 locked；locked=1 返回 accessRestricted，未知锁定类型 / 值返回 parse，不删除目录项或尝试解锁。
+
+- 正文只从 body_snapshot 获取。非空 body_html 按 HTML 解析；HTML 缺失 / 空白时允许 snapshot.body_text 按换行转换为段落；render_preview 单独存在永远不能作为全文。错误身份、缺 snapshot、仅空白或无可读文字 / 图片均失败。HTML 登录 form / 密码输入不误判为正文。
+- 输出 ParagraphBlock、ImageBlock、HeadingBlock、DividerBlock；保留源图文次序、段落边界、br 行内换行、显式空 p、中文全角空格语义缩进（最多8 em），段内强调和链接降级为文字。Ruby 基字保留、rt 转括注、rp 丢弃以免重复括号。未知普通标签遍历其可见文字，script / style / iframe / object / template 等非正文节点丢弃；不执行 JS 或加载 WebView。
+- HTML 排版用的 ASCII 空白按普通流折叠；没有逐像素复刻网页 CSS、pre 空白布局或任意 text-indent 样式。极长语义段仍一个 ParagraphBlock，不输出 RenderChunk；段内插图按文本 / 图片 / 文本拆出，确保文字没有被图替代。
+- img 优先非空 data-src，再 data-original，最后 src；惰性属性与 figure / figcaption 是合成兼容场景，不声称 Phase 0 实站已观察到这些属性。图片 alt / 正整数尺寸与 figure caption 被保留；纯图片章可成功，缺定位或未允许 URL 不静默跳图。
+- 图片只接受站点 www / api 的 HTTPS、默认443、无凭据和 fragment，相对 URI 按站点根解析。MediaRef 为书 / 章身份加 origin+path 的摘要，不携带实际 URL 或 query；查询签名变化不改变语义引用。**path 的长期稳定性和从此摘要恢复当前图片请求尚未验证**，必须由 SRC-010 重读正文、匹配 locator 并完成真实跨重启验证；本项只生成引用，未实现 SourceMedia 或下载图片，不能宣称图文链路已经完成。
+- 复用 ChapterContent 的 occurrence / blockKey / contentRevision 和 JSON 验证；同语义重复段有独立 occurrence，尺寸不影响已有图片语义 identity。HTML 深度限制128，按边界检查语义块上限20000，沿用8 MiB网络接收上限，不引入领域 AST 或依赖变更。
+
+验收：新增 **8项**测试；复用既有明确标注 SYNTHETIC 的 chapter-shape.html，其他长段、图片章、懒加载、caption、空行、坏结构和访问限制均为合成输入。验证超长段完整往返 ChapterContent JSON、重复段身份、revision稳定、签名变化不进入序列化；正式 Repository + in-memory SQLite 集成验证坏正文刷新保留旧缓存。原始小说正文及图片均未新增到仓库，既有 fixture / manifest 保持不变。
+
+本轮新增源站 HTTP=0；无新增依赖、原生代码或平台配置。iOS Level A PASS；Android / iOS runtime、生产原文兼容度和实际取图未在本轮验证，iOS runtime 仍 DEFERRED_NO_MAC。下一项 SRC-010 是媒体准入硬门槛，未自动执行。
+最终验证：完整219项离线测试 PASS（.tooling/evidence/src009-tests.txt），全项目 analyze No issues found；未构建或安装新包。
+
+## SRC-010：MediaRef 解析与图片访问（2026-09-07，待真实硬验收）
+
+状态：**IMPLEMENTED / PENDING_LIVE_VALIDATION**，不标 DONE。LightNovelSource 同时实现 SourceMedia，通过 LightNovelMedia 完成封面 / 正文插图定位和受限下载；OQ-04 的真实跨进程证据仍待用户批准 live 请求后执行。
+
+- 每次 openMedia 从新的受限元数据请求恢复定位：cover:v1 重新读取详情 cover_url；image:v1 重新读取所属章节 body_snapshot，按相同 origin+path 摘要匹配。拒绝跨源 / 非法引用、锁定章、preview-only、缺失或冲突 locator。没有使用过期 URL、签名推算、盲试其他 host 或备用端点；locator 无匹配返回 notFound，保留失败供用户重试。
+- 仅允许 www.lightnovel.fun / api.lightnovel.fun HTTPS / 443、无用户名密码 / fragment。请求目标按当前元数据解析，相对 URI 按站点根；媒体 transport 的 policy 精确限定本次 URI，maxRedirects=0，所有跳转停止。无 Cookie / Authorization；Referer 为已验证站点根组合，不声称逐字段必要性已证明。
+- 元数据与图片借用同一应用调度器及45秒总 deadline；没有新增自动重试或媒体缓存文件。图片最多20 MiB且服从调用者更低 maxBytes，receive timeout30秒，限定 JPEG / PNG / WebP / GIF / AVIF MIME。MediaInfo 格式来自 HTTP MIME，不冒充完整解码验证；实际显示继续由 SourceImage 的解码边界执行。
+- 沿用 NetworkTransport 有界缓冲：openMedia 成功前已接收完整且受限 bytes，关闭当次 transport；交付后按64KiB块提供只读列表，单消费者，取消发一个终止 Failure，close 幂等释放持有 bytes。此接口不是零拷贝网络流，图片磁盘缓存仍属于 CACHE-003。
+- Source 拥有媒体 transport，close 取消正在进行的定位和下载；借用的全局 scheduler 不被关闭。成功交付 body 后由消费者负责关闭，清理异常只形成脱敏日志，不输出 URI / Header / body / 原始异常。
+
+离线验收：新增 **6项**媒体测试，完整 **225项 PASS**；最终清理改动后媒体6项再次通过，analyze **No issues found**。覆盖序列化引用在新 Source 实例恢复、当前签名变化、真实自制PNG的Flutter解码、host变化 / 相对URL、锁定 / 缺locator、MIME / bytes / redirect / 取消 / 重复close。实例重建不是 OS 进程重启，合成签名变化不证明真实签名寿命。日志 `.tooling/evidence/src010-tests.txt`。
+
+默认关闭的 `test/support/source_media_live_probe.dart` 已准备：seed 进程最多6次（详情、正文、封面重定位+GET、插图重定位+GET），restore 新进程最多4次；合计最多10次，source间隔1秒，无重试、遇任何失败即停。仅将两份无secret MediaRef保存到忽略的 `.tooling/evidence/src010-refs.json`，图片与正文只在内存使用；解码采用已有 decodeSourceImage，输出尺寸与字节统计。必须显式 SRC010_LIVE=true 和 phase 才执行，普通测试不访问源站。
+
+本轮截至记录新增源站 HTTP=0；10次请求的异步授权问题仍待用户回答，未复用 SRC-007 的单次授权。SRC-010 / OQ-04 / TEST-001 不能仅凭离线通过解除硬门槛。iOS Level A：既有 Dart / Dio / html，无新依赖或平台分支；Android真实 codec / HTTPS设备证据归 ANDROID-002，iOS runtime DEFERRED_NO_MAC / IOS-002。
+
+### SRC-010：真实跨进程验收补齐（2026-09-07）
+
+用户随后明确允许原定最多10次请求；已按预算完成，Task Status 更新为 **DONE**。前述等待授权状态保留为历史记录，不代表仍未执行。
+
+Windows 宿主分别启动两次独立 Flutter test 进程，使用正式 LightNovelSource / SourceMedia 与 decodeSourceImage。seed进程6次请求：详情、正文、封面重新定位与GET、首图重新定位与GET；成功解码后仅保存两份无secret MediaRef。seed退出后启动restore进程，读取序列化引用，没有继承任何内存映射，再用4次请求重新定位并解码。两进程分别输出 SRC010_PASS，**总计10/10次，无重试或追加访问**，同源请求启动间隔至少1秒。
+
+| 内容 | seed | restore | 解码结果 |
+| --- | --- | --- | --- |
+| 封面 | 532541 bytes | 532541 bytes | 两轮固有尺寸1443×2048，实际解码成功 |
+| 首张正文插图 | 310858 bytes | 310858 bytes | 两轮固有尺寸2048×829，实际解码成功 |
+
+解码复用正式缩略图 / 像素预算，targetWidth=1024；表中尺寸为原图固有尺寸，不冒充输出缩略图大小。未将图片、正文、签名URL或用户凭据保存到磁盘。脱敏结果见 [结构化验收记录](../validation/src010-live.json)；本机日志 `.tooling/evidence/src010-live-seed.txt` 与 `src010-live-restore.txt`。现有225项离线测试和静态分析证据继续有效，本轮只运行2项显式live检查，不将其混入离线计数。
+
+**OQ-04 本次样本的跨重启定位硬门槛 PASS**：旧无secret引用可经当前元数据恢复请求，真实图片可解码。此证据不证明所有书籍 / 图片、path永久稳定或签名实际过期后的行为；未故意等到过期或探测权限边界，host/path改变仍按失败策略停止。源站允许的长期速率和内容分发依据仍未关闭。
+
+这是 Windows Flutter引擎与真实HTTPS的生产实现证据，不是Android模拟器/真机或iOS验证。ANDROID-002 / IOS-002继续各自验收；SRC-010对TEST-001的媒体前置现已解除，但TEST-001本身尚未执行。
+
+## TEST-001：Android 生产 Source 端到端 Smoke（2026-09-07）
+
+状态：**DONE / Android emulator PASS**。新增显式 SourceServices 装配，拥有共享调度器、LightNovelSource、注册表、DefaultNovelRepository 与 MemoryImageRepository；借用 CacheDatabase，构造不发请求，close 按消费者到源的顺序释放。它是可注入的生产服务工厂，没有自动替换普通开发 fixture 或宣称用户页面已接线。
+
+经用户另行授权最多12次请求，在 MuMu 127.0.0.1:16416 执行独立 live APK。使用生产数据实现、真实 HTTPS、正式图片解码器和独立内存 SQLite；无浏览器会话、调查客户端或替代解析器。一次运行锁在网络前写入，防止重启自动重复；遇失败即停。本次 **10/12次请求，无重试**，源请求至少间隔1秒，剩余2次未使用。
+
+| 阶段 | 实际结果 | 累计请求 |
+| --- | --- | --- |
+| Search | 精确匹配书31607、目标标题与作者 | 1 |
+| Detail | remote详情、正确书籍身份 | 2 |
+| Catalog | 四卷十章，目标章属于卷44117 | 7 |
+| Chapter | 正确章309555、非空正文、4084块与14张图片引用 | 8 |
+| Illustration | 首图经ImageRepository与SourceMedia重新定位，Android真实解码，固有尺寸2048×829 | 10 |
+| cacheOnly复读 | 正式SQLite记录返回相同contentRevision，origin=local，零额外请求 | 10 |
+
+截图和日志均确认 TEST001_PASS，结果见 [结构化报告](../validation/test001-android.json)；本机 `.tooling/evidence/test001-android-log.txt` / `test001-pass.png`。正文、原图和签名URL没有保存，SQLite只在内存运行，未导出或修改用户数据库。此次证明内存SQLite规范化记录读写，不补记此前MuMu磁盘重开/恢复缺口通过。
+
+验证入口 `integration_test/live/source_smoke.dart` 默认禁用，开启命令和一次运行锁见同目录README。新增1项离线装配/所有权测试；全项目 **226项离线测试 PASS**、analyze PASS。live Debug APK 构建/安装/运行 PASS；随后普通 lib/main_dev.dart Debug 构建、安装、冷启动和开发菜单显示均通过，模拟器已恢复普通开发入口。
+
+Phase 2生产数据链路本次样本 Gate PASS；这不代表所有书籍、真实ARM64手机性能、产品页面、离线持久图片或发布准备完成。正式搜索/详情/目录UI按相应任务实施。iOS Level A：共享Dart与既有跨平台依赖；iOS runtime保持 DEFERRED_NO_MAC / IOS-002，不能由本次Android成功替代。

@@ -896,6 +896,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### SRC-005 — 生产 Session 与请求编排
 
+- Status：DONE（2026-09-07）；五端点受限 API、no-op 会话、Source 装配骨架和身份基础已交付；新增10项测试，完整187项离线测试 PASS。无 Cookie 存储或未确认过期恢复；业务 Parser 留 SRC-006..009。Android runtime 本轮未执行，iOS runtime DEFERRED_NO_MAC；见 [源实现记录](source/lightnovel.md)。
+
 - Phase：2；Complexity：M。
 - Goal：按 Phase 0 实证建立最小私有 Source 客户端。
 - Input：`docs/source/lightnovel.md`、第 13、15–16 节；Dependencies：SRC-004、NET-002、DB-002。
@@ -907,6 +909,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：并发初始化、无会话分支、过期 / 损坏、重试总预算、secret 不泄漏。
 
 #### SRC-006 — Discover / Search 解析与分页
+
+- Status：DONE（2026-09-07）；搜索请求 / 解析、有界查询游标及重复页保护已交付；discover 按证据保持 unsupported。新增9项测试，完整196项测试与 analyze PASS；真实源 / Android runtime 本轮未执行，iOS runtime DEFERRED_NO_MAC。见 [搜索验收](source/lightnovel.md)。
 
 - Phase：2；Complexity：M。
 - Goal：把已验证首页 / 搜索响应映射为源无关结果。
@@ -920,6 +924,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### SRC-007 — 小说详情解析
 
+- Status：DONE（2026-09-07）；详情身份 / 标题 / 作者、简介文本、标签及无签名封面引用已实现；新增7项测试，完整203项测试与 analyze PASS。用户授权的1次详情结构补证完成；实际封面加载仍归 SRC-010。iOS runtime DEFERRED_NO_MAC，见 [详情验收](source/lightnovel.md)。
+
 - Phase：2；Complexity：M。
 - Goal：稳定输出允许缺字段的 NovelDetail。
 - Input：Detail fixtures 与身份规则；Dependencies：SRC-005。
@@ -931,6 +937,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：正常、缺可选字段、缺标题、登录 HTML、错误编码、相对封面定位 fixture。
 
 #### SRC-008 — 卷章节目录与顺序
+
+- Status：DONE（2026-09-07）；已验证卷→章节协议的分页聚合、原顺序、重复身份诊断和稳定 revision 已交付。新增8项测试，完整211项测试与 analyze PASS；无卷有章协议仍未验证，不猜测请求。Android runtime 本轮未执行，iOS runtime DEFERRED_NO_MAC；见 [目录验收](source/lightnovel.md)。
 
 - Phase：2；Complexity：M。
 - Goal：提供可导航且身份稳定的 Catalog。
@@ -944,6 +952,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### SRC-009 — 正文 ContentBlock Parser
 
+- Status：DONE（2026-09-07）；正文请求、snapshot准入、段落 / 图文 / Ruby降级及稳定语义块已交付，新增8项测试，完整219项测试与 analyze PASS。实际图片访问与locator跨重启仍由 SRC-010 验收；Android runtime 本轮未执行，iOS runtime DEFERRED_NO_MAC，见 [正文验收](source/lightnovel.md)。
+
 - Phase：2；Complexity：M。
 - Goal：源站正文转为 Native Reader 可读的结构化内容。
 - Input：Chapter fixtures、第 11、17–18 节；Dependencies：SRC-005。
@@ -955,6 +965,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：普通 / 极长完整段 / 空行 / 标点 / 强调 / lazy image / 图片章 / 缺正文 fixture；断言长段在 Domain / 序列化 / revision 中保持语义一致。
 
 #### SRC-010 — MediaRef 解析与图片访问
+
+- Status：DONE（2026-09-07）；SourceMedia 与新元数据恢复定位已实现，225项离线测试及 analyze PASS。用户授权的真实双进程检查 PASS：6+4=10次请求，封面与首图均重新定位并解码；OQ-04样本跨重启门槛解除。Windows Flutter证据不替代 Android设备 / iOS runtime。见 [媒体验收](source/lightnovel.md)。
 
 - Phase：2；Complexity：M。
 - Goal：封面和插图请求规则完全留在 Source 内且跨重启可用。
@@ -981,6 +993,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：成功 / 失败 / cached / missing source、跨源身份、取消及本地写失败降级。
 
 #### TEST-001 — 生产 Source 端到端 Smoke
+
+- Status：DONE（2026-09-07）；Android MuMu生产 Source / Repository / ImageRepository链路全部PASS，10/12次真实请求；四卷十章、4084正文块、首图解码及cacheOnly复读通过。226项离线测试、analyze、Debug构建通过；iOS runtime DEFERRED_NO_MAC。见 [Android报告](validation/test001-android.json)。
 
 - Phase：2；Complexity：M。
 - Goal：确认生产实现（非调查工具）可以完成核心访问链路。
@@ -1828,7 +1842,7 @@ UI 增量：CORE-004 + DEV-002 → UI-001 → 正式 HOME / SHELF / SEARCH / DET
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。**NET-001 / NET-002 / MEDIA-001 DONE**，**READER-003 DONE**，双模式图片与局部重试已交付，完整测试 120 项及 Android 图片探针 PASS。**DB-001 / DB-002 DONE**，127 项测试及 Android 持久化探针 PASS，见 [本地存储](database.md)。**READER-004 DONE**，设置持久化与受控重布局已交付，Android 旋转实测受 MuMu 限制待补（widget 横竖窗口变化通过），见 [Reader](reader.md)。**READER-005 DONE**，位置追踪、有界有序保存与短章完成已交付，143 项测试及新 MuMu 持久记录验证 PASS，见 [Reader](reader.md)。**UI-001 / READER-006 DONE**：三页样板、语义位置恢复、内容更新降级和恢复保护已交付；155 项完整测试与 Android 双模式 SQLite 重开恢复通过，见 [UI 记录](UI_PLAN.md) / [Reader](reader.md)。**UI-002 DONE**：正式阅读配色 / 行宽 / 操作栏、独立应用外观和旧偏好迁移已交付；164 项完整测试通过，Android 外观冷启动通过，SQLite 滚动重开补验仍受数据库打开失败阻断，详见 [Reader](reader.md)。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。**CORE-005 DONE**：通用 Repository、Source 注册表及装配工厂已交付，177 项完整离线测试与 analyze PASS，见 [Repository](novel-repository.md)。Source 首项 SRC-005 前置已齐备，尚未执行。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。**NET-001 / NET-002 / MEDIA-001 DONE**，**READER-003 DONE**，双模式图片与局部重试已交付，完整测试 120 项及 Android 图片探针 PASS。**DB-001 / DB-002 DONE**，127 项测试及 Android 持久化探针 PASS，见 [本地存储](database.md)。**READER-004 DONE**，设置持久化与受控重布局已交付，Android 旋转实测受 MuMu 限制待补（widget 横竖窗口变化通过），见 [Reader](reader.md)。**READER-005 DONE**，位置追踪、有界有序保存与短章完成已交付，143 项测试及新 MuMu 持久记录验证 PASS，见 [Reader](reader.md)。**UI-001 / READER-006 DONE**：三页样板、语义位置恢复、内容更新降级和恢复保护已交付；155 项完整测试与 Android 双模式 SQLite 重开恢复通过，见 [UI 记录](UI_PLAN.md) / [Reader](reader.md)。**UI-002 DONE**：正式阅读配色 / 行宽 / 操作栏、独立应用外观和旧偏好迁移已交付；164 项完整测试通过，Android 外观冷启动通过，SQLite 滚动重开补验仍受数据库打开失败阻断，详见 [Reader](reader.md)。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。**CORE-005 DONE**：通用 Repository、Source 注册表及装配工厂已交付，177 项完整离线测试与 analyze PASS，见 [Repository](novel-repository.md)。**SRC-005 DONE**：生产请求基础与 no-op 会话已交付，完整187项离线测试通过；**SRC-006 DONE**：搜索解析与分页已交付，完整196项离线测试及 analyze PASS；**SRC-007 DONE**：详情解析已交付，203项完整测试与 analyze PASS；**SRC-008 DONE**：目录聚合已交付，211项完整测试与 analyze PASS；**SRC-009 DONE**：正文结构化解析已交付；**SRC-010 DONE**：正式媒体请求与真实双进程恢复 / 解码通过，225项离线测试及2项显式live检查 PASS；**TEST-001 DONE**：Android生产链路10/12次请求PASS，226项离线测试与analyze PASS；正式功能页面仍按各任务实现。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
 
 ## 39. Parallelizable Work
 

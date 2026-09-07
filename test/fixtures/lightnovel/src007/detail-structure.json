@@ -1,0 +1,17 @@
+{
+  "evidenceKind": "DIRECT_HTTP_STRUCTURE_ONLY_MANUAL_PROJECTION",
+  "date": "2026-09-07",
+  "authorization": "User authorized one credential-free detail request; no retries",
+  "httpAttempts": 1,
+  "httpStatus": 200,
+  "code": 0,
+  "bookIdentityMatches31607": true,
+  "fields": {
+    "summary_short": {"type": "string", "length": 31, "hasMarkup": false},
+    "tags": {"type": "array", "count": 1, "itemType": "string"},
+    "visible_tags": {"type": "array", "count": 1, "itemType": "string"},
+    "cover_url": {"type": "string", "absolute": true, "scheme": "https", "host": "api.lightnovel.fun", "hasQuery": true},
+    "status": {"type": "integer", "semantics": "unknown"}
+  },
+  "omitted": "No synopsis, tag values, full URLs, signatures, cookies, personal data or raw response retained. Relative cover and HTML edge cases in tests are synthetic."
+}
