@@ -7,3 +7,4 @@ export 'repositories.dart';
 export 'result.dart';
 export 'cache.dart';
 export 'prefetch.dart';
+export 'local_books.dart';

@@ -1,8 +1,12 @@
 # DB-001 / DB-002：本地存储
 
+## LOCAL-001 用户库 v3（2026-09-07）
+
+当前 users.db 为 v3，cache.db 仍为 v2。新增 local_books 导入索引（原文件摘要、格式、标题、导入时间、manifest 摘要），v1 / v2 增量升级保留书架、进度与预取设置；v3 snapshot 和生成代码同步更新。托管文件位于 users/books，暂存位于 users/import-staging，与 disposable 缓存隔离。LocalDatabases 新增唯一 localBooks owner，在返回可用数据库组之前完成残留回收，关闭顺序为本地存储→数据库。详细发布协议和验证见 [本地导入](local-import.md)。
+
 ## CACHE schema v2（2026-09-07）
 
-当前两库均为 schemaVersion 2。缓存库新增 image_cache / image_owners；用户库新增 prefetch_choices（source / novel / 当前文章 → 一个目标）和 prefetch_settings（两个预取开关），与 reading_progress 分离。v1→v2 仅新增表 / 索引，保留 v1 快照并生成 v2；迁移测试验证旧书架和正文记录不丢失。缓存 clear 不访问用户库。下方 v1 内容为 DB-001 当时基线，当前覆盖行为见 [缓存](cache.md)。
+该阶段两库均为 schemaVersion 2。缓存库新增 image_cache / image_owners；用户库新增 prefetch_choices（source / novel / 当前文章 → 一个目标）和 prefetch_settings（两个预取开关），与 reading_progress 分离。v1→v2 仅新增表 / 索引，保留 v1 快照并生成 v2；迁移测试验证旧书架和正文记录不丢失。缓存 clear 不访问用户库。下方 v1 内容为 DB-001 当时基线，当前覆盖行为见 [缓存](cache.md)。
 
 2026-09-07。DB-001 的 v1 schema、目录、生成快照与非破坏迁移基线已完成；DB-002 的本地仓库和设置实现已完成，Android 探针已验证正式 SQLite / preferences。**两项 DONE**，具体验证边界见下方记录。
 

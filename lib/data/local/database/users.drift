@@ -38,3 +38,11 @@ CREATE TABLE prefetch_settings (
   current_enabled INTEGER NOT NULL,
   next_enabled INTEGER NOT NULL
 );
+
+CREATE TABLE local_books (
+ digest TEXT NOT NULL PRIMARY KEY CHECK(length(digest) = 64),
+ format TEXT NOT NULL CHECK(format IN ('txt', 'epub')),
+ title TEXT NOT NULL,
+ imported_at INTEGER NOT NULL,
+ manifest_hash TEXT NOT NULL CHECK(length(manifest_hash) = 64)
+);

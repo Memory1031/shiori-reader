@@ -2305,6 +2305,377 @@ class PrefetchSettingsCompanion extends UpdateCompanion<PrefetchSetting> {
   }
 }
 
+class LocalBooks extends Table with TableInfo<LocalBooks, LocalBook> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  LocalBooks(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _digestMeta = const VerificationMeta('digest');
+  late final GeneratedColumn<String> digest = GeneratedColumn<String>(
+    'digest',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY CHECK (length(digest) = 64)',
+  );
+  static const VerificationMeta _formatMeta = const VerificationMeta('format');
+  late final GeneratedColumn<String> format = GeneratedColumn<String>(
+    'format',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (format IN (\'txt\', \'epub\'))',
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _importedAtMeta = const VerificationMeta(
+    'importedAt',
+  );
+  late final GeneratedColumn<int> importedAt = GeneratedColumn<int>(
+    'imported_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _manifestHashMeta = const VerificationMeta(
+    'manifestHash',
+  );
+  late final GeneratedColumn<String> manifestHash = GeneratedColumn<String>(
+    'manifest_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (length(manifest_hash) = 64)',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    digest,
+    format,
+    title,
+    importedAt,
+    manifestHash,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_books';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalBook> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('digest')) {
+      context.handle(
+        _digestMeta,
+        digest.isAcceptableOrUnknown(data['digest']!, _digestMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_digestMeta);
+    }
+    if (data.containsKey('format')) {
+      context.handle(
+        _formatMeta,
+        format.isAcceptableOrUnknown(data['format']!, _formatMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_formatMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('imported_at')) {
+      context.handle(
+        _importedAtMeta,
+        importedAt.isAcceptableOrUnknown(data['imported_at']!, _importedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_importedAtMeta);
+    }
+    if (data.containsKey('manifest_hash')) {
+      context.handle(
+        _manifestHashMeta,
+        manifestHash.isAcceptableOrUnknown(
+          data['manifest_hash']!,
+          _manifestHashMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_manifestHashMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {digest};
+  @override
+  LocalBook map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalBook(
+      digest: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}digest'],
+      )!,
+      format: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}format'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      importedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}imported_at'],
+      )!,
+      manifestHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}manifest_hash'],
+      )!,
+    );
+  }
+
+  @override
+  LocalBooks createAlias(String alias) {
+    return LocalBooks(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class LocalBook extends DataClass implements Insertable<LocalBook> {
+  final String digest;
+  final String format;
+  final String title;
+  final int importedAt;
+  final String manifestHash;
+  const LocalBook({
+    required this.digest,
+    required this.format,
+    required this.title,
+    required this.importedAt,
+    required this.manifestHash,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['digest'] = Variable<String>(digest);
+    map['format'] = Variable<String>(format);
+    map['title'] = Variable<String>(title);
+    map['imported_at'] = Variable<int>(importedAt);
+    map['manifest_hash'] = Variable<String>(manifestHash);
+    return map;
+  }
+
+  LocalBooksCompanion toCompanion(bool nullToAbsent) {
+    return LocalBooksCompanion(
+      digest: Value(digest),
+      format: Value(format),
+      title: Value(title),
+      importedAt: Value(importedAt),
+      manifestHash: Value(manifestHash),
+    );
+  }
+
+  factory LocalBook.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalBook(
+      digest: serializer.fromJson<String>(json['digest']),
+      format: serializer.fromJson<String>(json['format']),
+      title: serializer.fromJson<String>(json['title']),
+      importedAt: serializer.fromJson<int>(json['imported_at']),
+      manifestHash: serializer.fromJson<String>(json['manifest_hash']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'digest': serializer.toJson<String>(digest),
+      'format': serializer.toJson<String>(format),
+      'title': serializer.toJson<String>(title),
+      'imported_at': serializer.toJson<int>(importedAt),
+      'manifest_hash': serializer.toJson<String>(manifestHash),
+    };
+  }
+
+  LocalBook copyWith({
+    String? digest,
+    String? format,
+    String? title,
+    int? importedAt,
+    String? manifestHash,
+  }) => LocalBook(
+    digest: digest ?? this.digest,
+    format: format ?? this.format,
+    title: title ?? this.title,
+    importedAt: importedAt ?? this.importedAt,
+    manifestHash: manifestHash ?? this.manifestHash,
+  );
+  LocalBook copyWithCompanion(LocalBooksCompanion data) {
+    return LocalBook(
+      digest: data.digest.present ? data.digest.value : this.digest,
+      format: data.format.present ? data.format.value : this.format,
+      title: data.title.present ? data.title.value : this.title,
+      importedAt: data.importedAt.present
+          ? data.importedAt.value
+          : this.importedAt,
+      manifestHash: data.manifestHash.present
+          ? data.manifestHash.value
+          : this.manifestHash,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalBook(')
+          ..write('digest: $digest, ')
+          ..write('format: $format, ')
+          ..write('title: $title, ')
+          ..write('importedAt: $importedAt, ')
+          ..write('manifestHash: $manifestHash')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(digest, format, title, importedAt, manifestHash);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalBook &&
+          other.digest == this.digest &&
+          other.format == this.format &&
+          other.title == this.title &&
+          other.importedAt == this.importedAt &&
+          other.manifestHash == this.manifestHash);
+}
+
+class LocalBooksCompanion extends UpdateCompanion<LocalBook> {
+  final Value<String> digest;
+  final Value<String> format;
+  final Value<String> title;
+  final Value<int> importedAt;
+  final Value<String> manifestHash;
+  final Value<int> rowid;
+  const LocalBooksCompanion({
+    this.digest = const Value.absent(),
+    this.format = const Value.absent(),
+    this.title = const Value.absent(),
+    this.importedAt = const Value.absent(),
+    this.manifestHash = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalBooksCompanion.insert({
+    required String digest,
+    required String format,
+    required String title,
+    required int importedAt,
+    required String manifestHash,
+    this.rowid = const Value.absent(),
+  }) : digest = Value(digest),
+       format = Value(format),
+       title = Value(title),
+       importedAt = Value(importedAt),
+       manifestHash = Value(manifestHash);
+  static Insertable<LocalBook> custom({
+    Expression<String>? digest,
+    Expression<String>? format,
+    Expression<String>? title,
+    Expression<int>? importedAt,
+    Expression<String>? manifestHash,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (digest != null) 'digest': digest,
+      if (format != null) 'format': format,
+      if (title != null) 'title': title,
+      if (importedAt != null) 'imported_at': importedAt,
+      if (manifestHash != null) 'manifest_hash': manifestHash,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalBooksCompanion copyWith({
+    Value<String>? digest,
+    Value<String>? format,
+    Value<String>? title,
+    Value<int>? importedAt,
+    Value<String>? manifestHash,
+    Value<int>? rowid,
+  }) {
+    return LocalBooksCompanion(
+      digest: digest ?? this.digest,
+      format: format ?? this.format,
+      title: title ?? this.title,
+      importedAt: importedAt ?? this.importedAt,
+      manifestHash: manifestHash ?? this.manifestHash,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (digest.present) {
+      map['digest'] = Variable<String>(digest.value);
+    }
+    if (format.present) {
+      map['format'] = Variable<String>(format.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (importedAt.present) {
+      map['imported_at'] = Variable<int>(importedAt.value);
+    }
+    if (manifestHash.present) {
+      map['manifest_hash'] = Variable<String>(manifestHash.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalBooksCompanion(')
+          ..write('digest: $digest, ')
+          ..write('format: $format, ')
+          ..write('title: $title, ')
+          ..write('importedAt: $importedAt, ')
+          ..write('manifestHash: $manifestHash, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$UserDatabase extends GeneratedDatabase {
   _$UserDatabase(QueryExecutor e) : super(e);
   $UserDatabaseManager get managers => $UserDatabaseManager(this);
@@ -2321,6 +2692,7 @@ abstract class _$UserDatabase extends GeneratedDatabase {
   );
   late final PrefetchChoices prefetchChoices = PrefetchChoices(this);
   late final PrefetchSettings prefetchSettings = PrefetchSettings(this);
+  late final LocalBooks localBooks = LocalBooks(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2333,6 +2705,7 @@ abstract class _$UserDatabase extends GeneratedDatabase {
     progressRecent,
     prefetchChoices,
     prefetchSettings,
+    localBooks,
   ];
 }
 
@@ -3508,6 +3881,202 @@ typedef $PrefetchSettingsProcessedTableManager =
       PrefetchSetting,
       PrefetchHooks Function()
     >;
+typedef $LocalBooksCreateCompanionBuilder =
+    LocalBooksCompanion Function({
+      required String digest,
+      required String format,
+      required String title,
+      required int importedAt,
+      required String manifestHash,
+      Value<int> rowid,
+    });
+typedef $LocalBooksUpdateCompanionBuilder =
+    LocalBooksCompanion Function({
+      Value<String> digest,
+      Value<String> format,
+      Value<String> title,
+      Value<int> importedAt,
+      Value<String> manifestHash,
+      Value<int> rowid,
+    });
+
+class $LocalBooksFilterComposer extends Composer<_$UserDatabase, LocalBooks> {
+  $LocalBooksFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get digest => $composableBuilder(
+    column: $table.digest,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get format => $composableBuilder(
+    column: $table.format,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get importedAt => $composableBuilder(
+    column: $table.importedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get manifestHash => $composableBuilder(
+    column: $table.manifestHash,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $LocalBooksOrderingComposer extends Composer<_$UserDatabase, LocalBooks> {
+  $LocalBooksOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get digest => $composableBuilder(
+    column: $table.digest,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get format => $composableBuilder(
+    column: $table.format,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get importedAt => $composableBuilder(
+    column: $table.importedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get manifestHash => $composableBuilder(
+    column: $table.manifestHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $LocalBooksAnnotationComposer
+    extends Composer<_$UserDatabase, LocalBooks> {
+  $LocalBooksAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get digest =>
+      $composableBuilder(column: $table.digest, builder: (column) => column);
+
+  GeneratedColumn<String> get format =>
+      $composableBuilder(column: $table.format, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<int> get importedAt => $composableBuilder(
+    column: $table.importedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get manifestHash => $composableBuilder(
+    column: $table.manifestHash,
+    builder: (column) => column,
+  );
+}
+
+class $LocalBooksTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          LocalBooks,
+          LocalBook,
+          $LocalBooksFilterComposer,
+          $LocalBooksOrderingComposer,
+          $LocalBooksAnnotationComposer,
+          $LocalBooksCreateCompanionBuilder,
+          $LocalBooksUpdateCompanionBuilder,
+          (LocalBook, BaseReferences<_$UserDatabase, LocalBooks, LocalBook>),
+          LocalBook,
+          PrefetchHooks Function()
+        > {
+  $LocalBooksTableManager(_$UserDatabase db, LocalBooks table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $LocalBooksFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $LocalBooksOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $LocalBooksAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> digest = const Value.absent(),
+                Value<String> format = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<int> importedAt = const Value.absent(),
+                Value<String> manifestHash = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalBooksCompanion(
+                digest: digest,
+                format: format,
+                title: title,
+                importedAt: importedAt,
+                manifestHash: manifestHash,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String digest,
+                required String format,
+                required String title,
+                required int importedAt,
+                required String manifestHash,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalBooksCompanion.insert(
+                digest: digest,
+                format: format,
+                title: title,
+                importedAt: importedAt,
+                manifestHash: manifestHash,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $LocalBooksProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      LocalBooks,
+      LocalBook,
+      $LocalBooksFilterComposer,
+      $LocalBooksOrderingComposer,
+      $LocalBooksAnnotationComposer,
+      $LocalBooksCreateCompanionBuilder,
+      $LocalBooksUpdateCompanionBuilder,
+      (LocalBook, BaseReferences<_$UserDatabase, LocalBooks, LocalBook>),
+      LocalBook,
+      PrefetchHooks Function()
+    >;
 
 class $UserDatabaseManager {
   final _$UserDatabase _db;
@@ -3522,4 +4091,6 @@ class $UserDatabaseManager {
       $PrefetchChoicesTableManager(_db, _db.prefetchChoices);
   $PrefetchSettingsTableManager get prefetchSettings =>
       $PrefetchSettingsTableManager(_db, _db.prefetchSettings);
+  $LocalBooksTableManager get localBooks =>
+      $LocalBooksTableManager(_db, _db.localBooks);
 }

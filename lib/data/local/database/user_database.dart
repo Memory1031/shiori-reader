@@ -5,17 +5,20 @@ part 'user_database.g.dart';
 class UserDatabase extends _$UserDatabase {
   UserDatabase(super.executor);
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
     // Never silently recreate user or cache files on an unknown version.
     onUpgrade: (m, from, to) async {
-      if (from != 1 || to != 2) {
+      if (from < 1 || from > 2 || to != 3) {
         throw StateError('Unsupported database version');
       }
-      await m.createTable(prefetchChoices);
-      await m.createTable(prefetchSettings);
+      if (from < 2) {
+        await m.createTable(prefetchChoices);
+        await m.createTable(prefetchSettings);
+      }
+      await m.createTable(localBooks);
     },
     beforeOpen: (_) async {
       final result = await customSelect('PRAGMA quick_check').get();
