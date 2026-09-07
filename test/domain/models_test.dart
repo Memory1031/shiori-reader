@@ -425,7 +425,8 @@ void main() {
     expect(() => ReaderSettings(horizontalPadding: 49), throwsArgumentError);
     expect(() => ReaderSettings(paragraphSpacing: -1), throwsArgumentError);
     expect(
-      () => ReaderSettings.fromJson({...settings.toJson(), 'schemaVersion': 2}),
+      () =>
+          ReaderSettings.fromJson({...settings.toJson(), 'schemaVersion': 999}),
       throwsFormatException,
     );
   });

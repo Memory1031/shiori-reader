@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../../domain/models/models.dart';
+import '../position/position_resolver.dart';
 import 'render_chunk.dart';
 import 'block_style.dart';
 
@@ -36,13 +37,19 @@ class ReaderViewport extends StatefulWidget {
     this.initialPosition,
     this.textStyle = const TextStyle(fontSize: 20, height: 1.7),
     this.maxChunkCodePoints = 800,
+    this.paragraphSpacing = 16,
     this.imageBuilder,
+    this.onPosition,
+    this.onRestoreStart,
   });
   final ChapterContent content;
   final ReaderViewportController controller;
   final ReaderPosition? initialPosition;
   final TextStyle textStyle;
   final int maxChunkCodePoints;
+  final double paragraphSpacing;
+  final void Function(ReaderPosition, bool)? onPosition;
+  final VoidCallback? onRestoreStart;
   final ReaderImageBuilder? imageBuilder;
   @override
   State<ReaderViewport> createState() => _ReaderViewportState();
@@ -59,6 +66,7 @@ class _ReaderViewportState extends State<ReaderViewport> {
   ReaderPosition? _target;
   int _pivot = 0;
   int _epoch = 0;
+  int _interaction = 0;
   int _buildCount = 0;
   bool _restoring = true;
   bool _usedFallback = false;
@@ -114,6 +122,7 @@ class _ReaderViewportState extends State<ReaderViewport> {
   }
 
   void _select(ReaderPosition position) {
+    widget.onRestoreStart?.call();
     final resolved = _index.resolve(position);
     _pivot = resolved.chunk;
     _usedFallback = resolved.usedFallback;
@@ -180,7 +189,12 @@ class _ReaderViewportState extends State<ReaderViewport> {
   ReaderPosition? _capture() {
     if (_restoring) return _target;
     final visible = _visible();
-    if (visible.isEmpty) return _last;
+    if (visible.isEmpty) {
+      // The trailing spacer allows the final block to leave the top edge.
+      // A fast fling can reach it without an intermediate visible sample.
+      if (_atEnd) return _last = _index.position(_index.chunks.length - 1, 1);
+      return _last;
+    }
     final (unit, box) = visible.first;
     final chunk = _index.chunks[unit];
     final y = (-_top(box)).clamp(0.0, box.size.height);
@@ -191,7 +205,7 @@ class _ReaderViewportState extends State<ReaderViewport> {
         final position = painter.getPositionForOffset(
           Offset(
             0,
-            (y - 8).clamp(0, double.infinity) +
+            (y - widget.paragraphSpacing / 2).clamp(0, double.infinity) +
                 painter.preferredLineHeight * .5,
           ),
         );
@@ -207,18 +221,29 @@ class _ReaderViewportState extends State<ReaderViewport> {
     return _last = _index.position(unit, fraction);
   }
 
+  bool get _atEnd =>
+      _scroll.hasClients &&
+      _scroll.offset >= _scroll.position.maxScrollExtent - .5;
+
   void _geometryChanged() {
     if (!mounted || _restoring || _userScrolling || _last == null) return;
     final anchor = _last!;
+    final interaction = _interaction;
     // RenderObject callbacks occur during layout; defer all state changes.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_restoring && !_userScrolling) _restore(anchor);
+      if (mounted &&
+          !_restoring &&
+          !_userScrolling &&
+          interaction == _interaction) {
+        _restore(anchor);
+      }
     });
   }
 
   void _scheduleSample() {
     if (_scheduled) return;
     _scheduled = true;
+    WidgetsBinding.instance.ensureVisualUpdate();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scheduled = false;
       if (!mounted) return;
@@ -229,7 +254,8 @@ class _ReaderViewportState extends State<ReaderViewport> {
         var within = _target!.blockFraction * box.size.height;
         if (chunk.text != null) {
           final cp =
-              ((_target!.blockFraction * chunk.total).floor() - chunk.start)
+              (readerCharacterOffset(_target!.blockFraction, chunk.total) -
+                      chunk.start)
                   .clamp(
                     0,
                     (chunk.end - chunk.start - 1).clamp(0, chunk.total),
@@ -238,7 +264,7 @@ class _ReaderViewportState extends State<ReaderViewport> {
           final painter = _painter(chunk, box.size.width);
           try {
             within =
-                8 +
+                widget.paragraphSpacing / 2 +
                 painter
                     .getOffsetForCaret(TextPosition(offset: utf16), Rect.zero)
                     .dy;
@@ -254,7 +280,18 @@ class _ReaderViewportState extends State<ReaderViewport> {
         _restoring = false;
         _scheduleSample();
       } else {
-        _capture();
+        final position = _capture();
+        if (position != null) {
+          final last = _boxes[_index.chunks.length - 1];
+          final viewport =
+              _viewport.currentContext?.findRenderObject() as RenderBox?;
+          final completed =
+              _atEnd ||
+              (last != null &&
+                  viewport != null &&
+                  _top(last) + last.size.height <= viewport.size.height + 1);
+          widget.onPosition?.call(position, completed);
+        }
       }
     });
   }
@@ -269,8 +306,8 @@ class _ReaderViewportState extends State<ReaderViewport> {
     } else if (chunk.text != null) {
       body = Padding(
         padding: EdgeInsets.only(
-          top: 8,
-          bottom: 8,
+          top: widget.paragraphSpacing / 2,
+          bottom: widget.paragraphSpacing / 2,
           left: _indent(chunk, _width),
         ),
         child: Text(
@@ -330,6 +367,7 @@ class _ReaderViewportState extends State<ReaderViewport> {
             if (notification is ScrollStartNotification &&
                 notification.dragDetails != null) {
               _userScrolling = true;
+              _interaction++;
               _restoring = false;
             }
             if (notification is ScrollEndNotification) {

@@ -22,8 +22,12 @@ class DevScenarioPage extends StatefulWidget {
     super.key,
     required this.scenario,
     this.createEnvironment,
+    this.settings,
+    this.library,
   });
   final FixtureScenario scenario;
+  final SettingsStore? settings;
+  final LibraryRepository? library;
   final FixtureEnvironment Function(FixtureScenario)? createEnvironment;
   @override
   State<DevScenarioPage> createState() => _DevScenarioPageState();
@@ -224,6 +228,8 @@ class _DevScenarioPageState extends State<DevScenarioPage> {
                     chapter: key,
                     repository: _env.novels,
                     images: _readerImages,
+                    settings: widget.settings ?? _env.settings,
+                    library: widget.library ?? _env.library,
                   ),
                 ).open(context, ReaderDestination(_chapter)),
                 child: Text(strings.openReaderAction),

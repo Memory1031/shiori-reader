@@ -43,7 +43,7 @@ dart --suppress-analytics analyze
 
 ChapterContent 统一重新分配 occurrence，不信任调用方手填值。不同语义块的插入不改变既有块键；在同样内容的重复块之前插入另一个相同块会改变后续 occurrence，这是规则的明确限制。blockKey 只在章节内使用；纯文本内容完全相同的不同章节可以得到相同摘要，业务定位始终同时使用 ChapterKey。
 
-ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion、块类型、blockKey、occurrence 和 contentRevision。JSON 返回的是独立容器，改动它不会修改值对象。存储 envelope 的 parserVersion、cache codec version、抓取时间不进入 Domain 摘要；其他业务模型的 DB / DTO codec 留给相应存储任务。ReaderSettings 单独携带 schemaVersion=1，并拒绝未知版本。
+ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion、块类型、blockKey、occurrence 和 contentRevision。JSON 返回的是独立容器，改动它不会修改值对象。存储 envelope 的 parserVersion、cache codec version、抓取时间不进入 Domain 摘要；其他业务模型的 DB / DTO codec 留给相应存储任务。ReaderSettings 单独携带 schemaVersion=2；读取 v1 时保留原数值与主题并补默认 paged，未知版本仍拒绝。
 
 字号、屏宽、DPR、主题、pixelOffset、layoutKey、临时渲染切片都不进入正文摘要或序列化。一个极长 Paragraph 始终一个语义块，presentation 可临时切片但不能回写 Domain。
 
@@ -53,7 +53,7 @@ ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion�
 
 ReaderPosition 的 blockIndex 非负，blockFraction / chapterFraction 必须有限且位于 0..1；NaN / Infinity / 越界直接拒绝，不静默改写错误进度。fractionFor 依 `(blockIndex + blockFraction) / blockCount` 计算，检查 index 属于本章；空内容仅允许 0/0 起点。文本 fraction 按 Unicode code point 偏移定义，UTF-16 布局索引转换留 presentation。构造位置时尚无正文实例，不假装已验证 blockKey 在某章内存在；实际恢复归 PROGRESS-001。
 
-像素提示必须同时包含非负有限 pixelOffset 和非空 layoutKey，否则拒绝；它们不替代语义位置。ReaderSettings 默认字号 20、行高 1.7、段间距 12、边距 20、system theme；范围依计划分别为 14–32、1.2–2.4、0–32、12–48。构造、copyWith 和 fromJson 均验证，当前选择拒绝越界而非隐式 clamp；未来 slider 可在 presentation 明确限制范围。
+像素提示必须同时包含非负有限 pixelOffset 和非空 layoutKey，否则拒绝；它们不替代语义位置。ReaderSettings 默认字号 20、行高 1.7、段间距 12、边距 20、system theme；范围依计划分别为 14–32、1.2–2.4、0–32、12–48。构造和 copyWith 保持严格验证；READER-004 的持久化读取对有限越界数值 clamp，缺字段、类型错误、非有限数值及未知枚举 / 版本仍拒绝，由 SettingsStore 回退默认并记录诊断。Slider 在 presentation 同样限制范围。ReaderMode 默认 paged，可选 scroll，纳入 copyWith、值相等与 v2 codec。
 
 ## 验收与平台范围
 

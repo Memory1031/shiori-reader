@@ -289,6 +289,306 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This feature is not supported yet.'**
   String get unsupportedMessage;
+
+  /// No description provided for @readerSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading settings'**
+  String get readerSettings;
+
+  /// No description provided for @readerFontSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Font size'**
+  String get readerFontSize;
+
+  /// No description provided for @readerLineHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Line height'**
+  String get readerLineHeight;
+
+  /// No description provided for @readerParagraphSpacing.
+  ///
+  /// In en, this message translates to:
+  /// **'Paragraph spacing'**
+  String get readerParagraphSpacing;
+
+  /// No description provided for @readerHorizontalPadding.
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal padding'**
+  String get readerHorizontalPadding;
+
+  /// No description provided for @readerThemeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get readerThemeSystem;
+
+  /// No description provided for @readerThemeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get readerThemeLight;
+
+  /// No description provided for @readerThemeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get readerThemeDark;
+
+  /// No description provided for @readerSettingsFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load or save reading settings.'**
+  String get readerSettingsFailure;
+
+  /// No description provided for @readerReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset defaults'**
+  String get readerReset;
+
+  /// No description provided for @readerProgressUnsaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading progress not saved. Tap to retry.'**
+  String get readerProgressUnsaved;
+
+  /// No description provided for @labTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme Lab'**
+  String get labTitle;
+
+  /// No description provided for @labNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline visual prototype · no library changes'**
+  String get labNotice;
+
+  /// No description provided for @labShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookshelf'**
+  String get labShelf;
+
+  /// No description provided for @labDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Book details'**
+  String get labDetail;
+
+  /// No description provided for @labReader.
+  ///
+  /// In en, this message translates to:
+  /// **'Reader'**
+  String get labReader;
+
+  /// No description provided for @labContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue reading'**
+  String get labContinue;
+
+  /// No description provided for @labMyBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'My books'**
+  String get labMyBooks;
+
+  /// No description provided for @labDiscover.
+  ///
+  /// In en, this message translates to:
+  /// **'Discover'**
+  String get labDiscover;
+
+  /// No description provided for @labChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter 1 · The last train'**
+  String get labChapter;
+
+  /// No description provided for @labProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'About 36% of this chapter'**
+  String get labProgress;
+
+  /// No description provided for @labAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'Shiori Studio'**
+  String get labAuthor;
+
+  /// No description provided for @labBook1.
+  ///
+  /// In en, this message translates to:
+  /// **'The Station Beyond Summer'**
+  String get labBook1;
+
+  /// No description provided for @labBook2.
+  ///
+  /// In en, this message translates to:
+  /// **'Letters to the Moon'**
+  String get labBook2;
+
+  /// No description provided for @labBook3.
+  ///
+  /// In en, this message translates to:
+  /// **'A City in the Rain'**
+  String get labBook3;
+
+  /// No description provided for @labBook4.
+  ///
+  /// In en, this message translates to:
+  /// **'Where the Sea Begins'**
+  String get labBook4;
+
+  /// No description provided for @labLongTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The day we followed the last train beyond summer, and found a letter addressed to tomorrow'**
+  String get labLongTitle;
+
+  /// No description provided for @labSynopsis.
+  ///
+  /// In en, this message translates to:
+  /// **'At a station with no name, a letter arrives every summer. This time, its sender is someone who has not yet been born. A quiet journey through seaside towns, small promises, and the space between two departures.'**
+  String get labSynopsis;
+
+  /// No description provided for @labParagraph.
+  ///
+  /// In en, this message translates to:
+  /// **'The platform was quiet. Beyond the tracks, the sea held the last light of the afternoon. She opened the envelope carefully, as though the summer itself might slip out.\nThe letter began with a date from tomorrow. Somewhere behind her, a bell rang once.'**
+  String get labParagraph;
+
+  /// No description provided for @labCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Contents'**
+  String get labCatalog;
+
+  /// No description provided for @labSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to bookshelf'**
+  String get labSave;
+
+  /// No description provided for @labSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'On your bookshelf'**
+  String get labSaved;
+
+  /// No description provided for @labEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Your next story is waiting.'**
+  String get labEmpty;
+
+  /// No description provided for @labSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a book'**
+  String get labSearch;
+
+  /// No description provided for @labImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import a file'**
+  String get labImport;
+
+  /// No description provided for @labNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Content'**
+  String get labNormal;
+
+  /// No description provided for @labLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Long titles'**
+  String get labLong;
+
+  /// No description provided for @labMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing cover'**
+  String get labMissing;
+
+  /// No description provided for @labEmptyState.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty'**
+  String get labEmptyState;
+
+  /// No description provided for @labLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading'**
+  String get labLoading;
+
+  /// No description provided for @labError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get labError;
+
+  /// No description provided for @labPreviewAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview only — this action will be connected in the feature task.'**
+  String get labPreviewAction;
+
+  /// No description provided for @labSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Canvas width'**
+  String get labSize;
+
+  /// No description provided for @labScale.
+  ///
+  /// In en, this message translates to:
+  /// **'Text scale'**
+  String get labScale;
+
+  /// No description provided for @labNight.
+  ///
+  /// In en, this message translates to:
+  /// **'Night'**
+  String get labNight;
+
+  /// No description provided for @labIllustration.
+  ///
+  /// In en, this message translates to:
+  /// **'Original geometric cover illustration'**
+  String get labIllustration;
+
+  /// No description provided for @labSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading settings'**
+  String get labSettings;
+
+  /// No description provided for @labFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Full screen preview'**
+  String get labFullscreen;
+
+  /// No description provided for @readerRestoreNearby.
+  ///
+  /// In en, this message translates to:
+  /// **'Content changed. Restored to a nearby position.'**
+  String get readerRestoreNearby;
+
+  /// No description provided for @readerRestoreReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read saved progress. Saving is paused; tap to retry restoration.'**
+  String get readerRestoreReadFailed;
 }
 
 class _AppLocalizationsDelegate

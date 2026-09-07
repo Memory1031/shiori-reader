@@ -14,6 +14,7 @@ class PagedReaderController {
   int get measuredChunks => _state?._layout?.measuredChunks ?? 0;
   int get cachedPages => _state?._pages.length ?? 0;
   bool get usedFallback => _state?._usedFallback ?? false;
+  bool get isRestoring => _state?._restoring ?? false;
 }
 
 /// Horizontal native pivot slivers + PageScrollPhysics. Pages before/after the
@@ -27,9 +28,12 @@ class PagedReaderViewport extends StatefulWidget {
     this.initialPosition,
     this.textStyle = const TextStyle(fontSize: 20, height: 1.7),
     this.maxChunkCodePoints = 800,
+    this.paragraphSpacing = 16,
     this.imageHeights = const {},
     this.imageExtent,
     this.imageBuilder,
+    this.onPosition,
+    this.onRestoreStart,
     this.onCenterTap,
   });
   final ChapterContent content;
@@ -37,6 +41,9 @@ class PagedReaderViewport extends StatefulWidget {
   final ReaderPosition? initialPosition;
   final TextStyle textStyle;
   final int maxChunkCodePoints;
+  final double paragraphSpacing;
+  final void Function(ReaderPosition, bool)? onPosition;
+  final VoidCallback? onRestoreStart;
   final Map<MediaRef, double> imageHeights;
   final double Function(ImageBlock)? imageExtent;
   final Widget Function(BuildContext, ImageBlock)? imageBuilder;
@@ -58,6 +65,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
   bool _usedFallback = false;
   bool _userScrolling = false;
   bool _deferredLayout = false;
+  bool _restoring = false;
   @override
   void initState() {
     super.initState();
@@ -94,6 +102,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
   }
 
   void _restore(ReaderPosition position) {
+    if (!mounted) return;
+    _restoring = true;
+    widget.onRestoreStart?.call();
     setState(() {
       _position = position;
       _signature = null;
@@ -142,11 +153,15 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
   }
 
   void _sample() {
-    if (!_scroll.hasClients || _layout == null) return;
+    if (_restoring || !_scroll.hasClients || _layout == null) return;
     final number = (_scroll.offset / _layout!.width).round();
     final page = _page(number);
     if (page == null) return;
     _position = _layout!.position(page.start);
+    widget.onPosition?.call(
+      _position!,
+      page.end.unit >= _layout!.index.chunks.length,
+    );
     _pages.removeWhere((key, _) => (key - number).abs() > 3);
   }
 
@@ -163,8 +178,11 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
         widget.textStyle,
         widget.content,
         widget.maxChunkCodePoints,
+        widget.paragraphSpacing,
       );
       if (_signature != signature) {
+        _restoring = true;
+        widget.onRestoreStart?.call();
         final index = ChunkIndex(
           widget.content,
           maxCodePoints: widget.maxChunkCodePoints,
@@ -175,6 +193,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
           width: constraints.maxWidth,
           height: constraints.maxHeight,
           style: widget.textStyle,
+          paragraphSpacing: widget.paragraphSpacing,
           scaler: scaler,
           direction: direction,
           imageHeights: widget.imageHeights,
@@ -190,6 +209,13 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
         _position = _layout!.position(first.start);
         _epoch++;
         _signature = signature;
+        final epoch = _epoch;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && epoch == _epoch && _restoring) {
+            _restoring = false;
+            _sample();
+          }
+        });
       }
       Widget? buildPage(BuildContext context, int number) {
         final page = _page(number);
@@ -215,8 +241,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
                         : fragment.text != null
                         ? Padding(
                             padding: EdgeInsets.only(
-                              top: 8,
-                              bottom: 8,
+                              top: widget.paragraphSpacing / 2,
+                              bottom: widget.paragraphSpacing / 2,
                               left: readerBlockIndent(
                                 widget.content.blocks[_layout!
                                     .index
@@ -270,6 +296,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
             if (notification is ScrollStartNotification &&
                 notification.dragDetails != null) {
               _userScrolling = true;
+              _restoring = false;
             }
             if (notification is ScrollEndNotification) {
               _userScrolling = false;

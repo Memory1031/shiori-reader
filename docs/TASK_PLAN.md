@@ -54,15 +54,17 @@ iOS **Level B — Runtime Validation** 归 IOS-001..006：Xcode / 原生依赖�
 
 ## 5. MVP Scope
 
+UI 共同规划见 [UI_PLAN.md](UI_PLAN.md)：保留 Material 3 交互基础，暖纸 / 封面 / 安静排版；书架作为默认首页，书架 / 发现双入口，搜索 / 设置为次级页面。UI-001 先交付 Theme Lab，UI-002 再实施阅读视觉与偏好拆分。UI-001 已交付开发专用样板；正式视觉扩散仍按各任务执行。
+
 | 功能 | 必须交付的行为 | 降级与边界 |
 | --- | --- | --- |
-| Home / Discover | 首页入口、源名、可稳定获取的最新 / 更新 / 推荐分区 | Phase 0 未验证的分区不显示；首页可退化为搜索入口、书架与最近阅读 |
+| Home / Discover | 默认书架首页，书架 / 发现根导航，搜索 / 导入 / 设置入口；发现展示源名与已验证分区 | supportsDiscover=false 时发现保留搜索及书源说明，不请求假分区；本地书架不依赖在线源 |
 | Search | 输入 keyword 后点击 Search 或键盘 Search / Enter 才请求；支持时加载更多；Loading / Empty / Error | 输入与停止输入均不自动请求；取消 / generation 防旧响应；分页失败保留已加载结果 |
 | Detail | 标题、封面、作者、简介、标签、连载状态等有证据字段；加入书架、开始 / 继续阅读 | 缺失字段隐藏或标“未知”；封面失败不阻止正文 |
 | Catalog | 卷及章节、卷折叠、当前章标识、章节跳转 | 保留源顺序；无卷、无标题、番外、重复编号均可表达 |
 | Reader | Native ContentBlock 渲染、默认左右翻页 / 可选上下滚动、插图、标题、前后章、目录、进度及恢复 | 切章独立加载；图片失败只影响该图；章节失败可重试 / 返回 / 读缓存 |
 | Local Import | 应用内选文件，或其他应用通过“打开方式 / 分享至 Shiori”导入 TXT / 无 DRM 流式 EPUB；托管副本、元数据、目录、插图、书架与继续阅读 | TXT 编码预览与选择；EPUB 基础语义排版；导入取消 / 失败不留半本书；本地书不受在线缓存清理影响 |
-| Reader Settings | 默认左右翻页 / 可选上下滚动、字号、行高、段间距、左右边距、亮 / 暗 / 跟随系统、Chrome 显隐 | 设置或模式改变保留原文语义位置；不加系统亮度插件 |
+| Reader Settings | 默认左右翻页 / 可选上下滚动、字号、行高、段间距、左右边距、阅读亮 / 暗 / 跟随系统、纸白 / 暖纸 / 夜间预览、Chrome 显隐 | 应用外观与阅读配色拆分；UI-002 迁移，设置改变保留语义位置；不加系统亮度插件 |
 | Bookshelf | 添加、移除、本地列表、封面标题、最近阅读、继续阅读 | 加入书架不下载全书；移除只移除书架项，不隐式清除进度和缓存 |
 | History / Progress | 每本书最后章节、顺序快照、阅读位置、最后时间；最近阅读入口 | 不是事件日志；未加入书架的小说也保存进度 |
 | Cache / Offline | 详情、目录、正文、已成功加载插图的本地复用；缓存状态与清理 | 缓存仍在时可离线读；未下载图显示占位；容量淘汰不承诺永久离线 |
@@ -157,11 +159,12 @@ Domain 包含业务模型、少量稳定契约和错误类型；presentation 只
 
 ## 9. Directory Structure
 
-下列是建议终态；文件在对应 Task 中按需创建，不一次生成空壳。
+下列是建议终态；文件在对应 Task 中按需创建，不一次生成空壳。视觉规范与主题落点另见 [UI_PLAN.md](UI_PLAN.md)。
 
 ```text
 docs/
   TASK_PLAN.md
+  UI_PLAN.md                      # 视觉方向、页面蓝图、tokens 与 UI 实施顺序
   source/lightnovel.md             # Phase 0 实证、请求表、失效定位手册
   development.md                  # 固定工具链、Android / MuMu、离线测试命令
   validation/                     # Android 证据；未来 deferred iOS runtime / 可选 compile 证据
@@ -376,9 +379,9 @@ Phase 4 通过 MEDIA-001 实现 MediaRef → SourceMedia → ImageRepository →
 
 ### 18.4 设置与移动交互
 
-阅读模式默认左右翻页，可选上下滚动；模式改变保留原文字符锚点，READER-004 增加持久偏好及 codec 迁移，当前 ReaderSettings v1 不变。建议初值：字号 20 logical px（范围 14..32），行高倍数 1.7（1.2..2.4），段间距 12（0..32），左右边距 20（12..48），跟随系统主题。具体默认视觉值由 fixture 评审调整，不属于 API 事实。用 slider 结束或短 debounce 提交持久化；拖动时即时更新可见布局但不每帧写偏好。保留系统文字缩放的可用性，较大字号下控件不溢出。
+阅读模式默认左右翻页，可选上下滚动；模式改变保留原文字符锚点，READER-004 已增加持久偏好及 codec 迁移：ReaderSettings v2，兼容读取 v1。建议初值：字号 20 logical px（范围 14..32），行高倍数 1.7（1.2..2.4），段间距 12（0..32），左右边距 20（12..48），跟随系统主题。具体默认视觉值由 fixture 评审调整，不属于 API 事实。用 slider 结束或短 debounce 提交持久化；拖动时即时更新可见布局但不每帧写偏好。保留系统文字缩放的可用性，较大字号下控件不溢出。
 
-Reader Chrome 默认可见，点正文空白切换，不拦截垂直拖动；目录 / 设置打开不意外触发下一章。当前验证 Android SafeArea、状态栏、edge-to-edge / back、横竖屏、大小屏和设备支持的刷新率；iOS swipe-back / scroll physics / SafeArea 等仅做兼容设计，实际测试归 IOS-003 / IOS-004。MVP 不锁死横屏、不抢全屏手势；系统栏状态离开 Reader 要恢复。brightness 指主题明暗，不自动调整硬件亮度。
+Reader Chrome 当前功能基线默认可见；UI-002 目标为首次操作提示后稳态默认隐藏，中间区域点按切换，不拦截垂直拖动；显隐保持同一正文布局边界。目录 / 设置打开不意外触发下一章。当前验证 Android SafeArea、状态栏、edge-to-edge / back、横竖屏、大小屏和设备支持的刷新率；iOS swipe-back / scroll physics / SafeArea 等仅做兼容设计，实际测试归 IOS-003 / IOS-004。MVP 不锁死横屏、不抢全屏手势；系统栏状态离开 Reader 要恢复。brightness 指主题明暗，不自动调整硬件亮度。
 
 ### 18.5 生命周期与验收
 
@@ -396,7 +399,7 @@ LibraryRepository 是书架和进度的唯一写入口。添加按 NovelKey 幂�
 
 ReaderPosition 始终锚定首个可见语义 ContentBlock，blockIndex 是语义块索引。为避免极长 Paragraph 分块后依赖尚未测量的整段高度，文本块的 blockFraction 表示可见位置对应字符偏移占该完整语义段落字符数的比例（Unicode code point offset，映射到 Flutter UTF-16 索引由 presentation 处理）；图像块则按越过可读视口顶边的块高度比例。确定性文本偏移不暴露 RenderChunk ID。视口顶边排除 SafeArea / 可见遮挡。chapterFraction 采用 `(blockIndex + blockFraction) / blockCount`，仅表示章内粗略位置，不假装精确字数百分比，也不把 ordinal 当全书已读比例。全部块为空时位置为起点；末尾允许显式 completed 标记，不能以短章无滚动误判未读。
 
-**PROPOSED**：滚动内存更新不落盘；有变更时每 2s 最多一次写入，停止滚动后 300ms trailing 保存（与周期写合并）；切章、退出、inactive / paused / hidden 尽力 flush。DB 队列按 novel 串行、只保留最新待写值；使用递增 session generation / sequence 防止慢的旧写覆盖新位置。先保存旧章，再提交新章 ready 状态及起始位置；加载失败不提前写新章进度。Controller 手动持有生命周期资源并 dispose；不能依赖 GetX 全局路由自动清理。
+**READER-005 已实现**：滚动内存更新不直接落盘；有变更时每 2s 最多一次写入，停止滚动后 300ms trailing 保存（与周期写合并）；切章、退出、inactive / paused / hidden 尽力 flush。DB 队列按 novel 串行、只保留最新待写值；使用递增 session generation / sequence 防止慢的旧写覆盖新位置。先保存旧章，再提交新章 ready 状态及起始位置；加载失败不提前写新章进度。Controller 手动持有生命周期资源并 dispose；不能依赖 GetX 全局路由自动清理。
 
 进度写失败保留内存最新值并给低干扰“进度暂未保存”状态，恢复后有界重试；正常阅读不能因 DB 写入失败卡住手势。lastReadAt 用 UTC 毫秒，UI 本地格式化；时间戳用于展示，写入新旧以 sequence 为准，避免系统时钟回拨。强杀恢复只能承诺最近成功提交的记录：正常持续滚动目标损失约 2s，DB 错误 / OS 终止时不能保证该上限。
 
@@ -654,7 +657,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | Deferred Track | IOS-001..006 | 全部 DEFERRED_NO_MAC；未来环境可用后才跑基础 / Source / UX / Reader / Offline / Release runtime，不影响上述完成 |
 | Optional Compile Track | CI-003 | OPTIONAL_PROPOSED；可用 macOS runner 时记录指定 target 编译结果，不产生 runtime PASS、不作为 Android required check |
 
-当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 的安装阻塞已在 DEV-002 解除：复用同一应用壳的新开发包已完成 MuMu 安装、冷启动及返回导航 smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001..002 DONE：17 个离线场景、内存仓库、开发菜单和指定场景入口已交付；当前 73 项测试、Android 编译和 MuMu 开发入口运行通过，20 图设备解码已补齐，见 [Fixture 验证](fixtures.md) / [开发入口](dev-entry.md)。READER-001 已通过双模式视口实验，当前 85 项测试及 Android 探针 PASS，见 [ADR-07](decisions/reader-viewport.md)。READER-002 已完成正式单章状态 / 块样式 / Chrome，当前完整测试 91 项通过，见 [Reader 验收](reader.md)。NET-001 / NET-002 / MEDIA-001 已顺序完成，完整测试更新为 112 项及 Android 组合探针 PASS，见 [网络](network.md) / [媒体](media.md)。READER-003 已完成图片展示与局部失败，完整测试 120 项及 Android 图片探针 PASS，见 [Reader](reader.md)。DB-001 / DB-002 已完成，完整测试 127 项及 Android 持久化探针 PASS；下一建议 READER-004，尚未执行。SRC-005 的 DB-002 / NET-002 前置已解除，尚未执行。CI-003 未启用；本轮没有生产 Source / DB / 缓存实现；DEV-001 使用独立开发替身，不把它作为生产实现验收。
+当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 的安装阻塞已在 DEV-002 解除：复用同一应用壳的新开发包已完成 MuMu 安装、冷启动及返回导航 smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001..002 DONE：17 个离线场景、内存仓库、开发菜单和指定场景入口已交付；当前 73 项测试、Android 编译和 MuMu 开发入口运行通过，20 图设备解码已补齐，见 [Fixture 验证](fixtures.md) / [开发入口](dev-entry.md)。READER-001 已通过双模式视口实验，当前 85 项测试及 Android 探针 PASS，见 [ADR-07](decisions/reader-viewport.md)。READER-002 已完成正式单章状态 / 块样式 / Chrome，当前完整测试 91 项通过，见 [Reader 验收](reader.md)。NET-001 / NET-002 / MEDIA-001 已顺序完成，完整测试更新为 112 项及 Android 组合探针 PASS，见 [网络](network.md) / [媒体](media.md)。READER-003 已完成图片展示与局部失败，完整测试 120 项及 Android 图片探针 PASS，见 [Reader](reader.md)。DB-001 / DB-002 已完成，完整测试 127 项及 Android 持久化探针 PASS；READER-004 已交付阅读偏好、v2 迁移与双模式受控重布局（133 项测试 / analyze / Android build PASS，旋转实测待补），见 [Reader](reader.md)；READER-005 已交付位置追踪与有序保存（143 项测试 / analyze / Android build 与新 MuMu 进度落盘验证 PASS），见 [Reader](reader.md)；UI-001 与 READER-006 已按用户顺序完成：候选主题 / 三页样板及位置恢复已交付，155 项完整测试、analyze、Android 恢复探针通过；见 [UI 记录](UI_PLAN.md) / [恢复矩阵](reader.md)。SRC-005 的 DB-002 / NET-002 前置已解除，尚未执行。CI-003 未启用；生产 Source / 完整缓存策略尚未交付；DEV-001 使用独立开发替身，不把它作为生产实现验收。
 
 示例（未来某 Phase 完成后可记录，**不是当前结果**）：Feature Status = DONE；Android Validation = PASS；iOS Compatibility Review = PASS；iOS Runtime Validation = DEFERRED_NO_MAC。这样 Phase 4 可达到 Reader Feature Complete，而 Cross-platform Mobile MVP 仍等待 iOS 验证。
 
@@ -664,7 +667,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 
 ### 领取与交付约定
 
-每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 未特别标注者为 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。按用户指定执行；本轮仅领取 READER-001，按用户要求扩展为默认左右翻页及可选上下滚动实验，其余任务不自动领取。
+每个 Task 的标题给出唯一 ID / Name；下列 Dependencies 是硬依赖，未列出的 Phase 不是隐藏前置。Input 指向本计划章节和已交付契约；Files 是预期边界，可按实际代码微调，但改变公共契约必须同步本计划和消费者。当前 Android Track Task 未特别标注者为 TODO；IOS-001..006 明确为 DEFERRED_NO_MAC；CI-003 为 OPTIONAL_PROPOSED。按用户指定执行；本轮按用户指定执行 UI-001 → READER-006；UI-002 保持待办；历史任务状态见第 35 节。
 
 Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验收的模块行为；L 是风险实验或跨层集成，需要给出清楚的失败停止点，不扩展为整模块重写。执行一次只领取一个 Task。推荐分支 `codex/<task-id>-<short-name>`，先查工作区，保留他人改动；最终提交 / PR 聚焦该 Task，记录测试结果与平台待项，不自行发布。共享文件如 pubspec、composition root、schema 指定单一编辑者，不能因并行领取覆盖对方。
 
@@ -987,17 +990,43 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Platform Notes：当前执行 Android 生产 Source 链路，iOS Level A review；IOS-002 属独立延期轨道，不影响本任务完成。
 - Test Requirements：完整离线 parser suite + 一次预算内 opt-in live，过期 session / 429 用 fake 测试。
 
+### UI foundation tasks（新增规划，未实施）
+
+#### UI-001 — Shiori Tokens 与 Theme Lab
+
+- Status：DONE（2026-09-07；见 UI_PLAN.md 实施与视觉核对）；Phase：3 前置；Complexity：M。
+- Goal：正式页面实现前，用统一视觉样板确定暖纸 / 封面 / 安静排版方向。
+- Input：[UI_PLAN.md](UI_PLAN.md)；Dependencies：CORE-004、DEV-002。
+- Scope：最小语义 tokens / 主题工厂、开发专用书架 / 详情 / Reader 三页高保真离线样板；明暗、中英、大小屏、大字、缺封面和关键状态；不接生产数据、不改数据库。
+- Files / Modules Expected：lib/app/theme/、lib/dev/ui/theme_lab/、docs/UI_PLAN.md 的视觉核对记录；不提前建立空组件库。
+- Deliverables：可运行样板、候选 tokens、截图与差异记录，供用户针对具体页面评审后扩散；保留 M3 行为，不重写 Reader 引擎。
+- Acceptance Criteria：三页共同视觉，封面尺寸稳定、主要操作真实可访问、无关键溢出；量化对比度；开发样板与生产入口隔离，不将样板标为业务完成。
+- Platform Notes：Android 预览；iOS Level A，runtime 延期。
+- Test Requirements：主题 / 双语 / 文字缩放、基本语义与关键截图；不为每个静态 token 写镜像测试。
+
+#### UI-002 — Reader 视觉与应用 / 阅读偏好拆分
+
+- Status：PLANNED；Phase：4 增量；Complexity：M。
+- Goal：在已验证位置恢复上实施克制的阅读视觉，避免视觉与存储设置耦合。
+- Input：[UI_PLAN.md](UI_PLAN.md)；Dependencies：UI-001、READER-006。
+- Scope：Reader 配色 / 行宽、Chrome 与排版 Sheet、初次操作提示、显式可访问动作；ReaderSettings v3 浅色纸色迁移；独立 AppSettings 外观存储与应用主题接线；保留阅读明暗、模式和数值。相关 domain / contracts / codec 同步，不重写视口 / tracker。
+- Files / Modules Expected：lib/features/reader/、lib/app/theme/、domain / data settings、对应 ARB 与迁移 / widget tests。
+- Deliverables：纸白 / 暖纸 / 夜间及系统跟随的明确组合，应用主题与阅读偏好互不串改，旧偏好非破坏迁移。
+- Acceptance Criteria：显隐 Chrome 不重排正文；字号 / 行宽 / 主题变化不丢锚点、不写恢复中位置；无常驻模式条；隐藏操作栏仍能发现重要未保存状态；保留系统缩放与返回。
+- Platform Notes：Android SafeArea / 系统栏 / 两种模式；iOS runtime 延期 IOS-004。
+- Test Requirements：v1 / v2 / v3 设置迁移、应用 / 阅读设置隔离、短章 / 图文 / 极长段、Chrome 显隐、大字 / 横竖窗口、低动效、恢复及后台补写回归。
+
 ### Product and Reader tasks
 
-#### HOME-001 — 能力驱动的首页
+#### HOME-001 — 书架优先根导航与能力驱动发现
 
 - Phase：3；Complexity：S。
-- Goal：提供可靠的搜索 / 本地入口及源可用分区。
-- Input：第 5、12 节、Source descriptor；Dependencies：CORE-004、DEV-001。
-- Scope：首页 layout / Controller、已验证 discover sections、unsupported 时搜索与书架入口；先 fixture，真实注入由 TEST-001 已建工厂提供。
+- Goal：提供默认书架首页、稳定的书架 / 发现导航及搜索 / 导入 / 设置入口。
+- Input：第 5、12 节、Source descriptor；Dependencies：CORE-004、DEV-001、UI-001、SHELF-001。
+- Scope：根导航 / Controller、承载 SHELF-001 书架、发现页的已验证 sections，unsupported 时保留搜索 / 书源说明；先 fixture，真实注入由 TEST-001 已建工厂提供。
 - Files / Modules Expected：`lib/features/home/`、`test/widgets/home/`。
 - Deliverables：首页和 loading / stale / error / 无 discover 状态。
-- Acceptance Criteria：能力不足不造空排行榜；点小说传 NovelKey；书架 / 搜索入口接正式 routes，尚未实现目标用明确开发占位而非无响应按钮。
+- Acceptance Criteria：能力不足不造空排行榜；默认本地书架不等待网络；点小说传 NovelKey；书架 / 搜索入口接正式 routes，尚未实现目标用明确开发占位而非无响应按钮。
 - Platform Notes：当前 Android 小屏 / 大字 / SafeArea tests；iOS layout compatibility review，真实 SafeArea 延期 IOS-003。
 - Test Requirements：有 / 无 discover、加载失败、点击导航 widget tests。
 
@@ -1017,7 +1046,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 - Phase：3；Complexity：M。
 - Goal：完成可操作的搜索到详情入口。
-- Input：SearchController、第 5 节状态；Dependencies：SEARCH-001。
+- Input：[UI_PLAN.md](UI_PLAN.md)、SearchController、第 5 节状态；Dependencies：SEARCH-001、UI-001。
 - Scope：输入框、Search 按钮与键盘 Search / Enter 显式提交、结果 / load more、所有状态 / retry、封面 placeholder 与详情 route；onChanged 只更新 draft 不发请求。
 - Files / Modules Expected：`lib/features/search/` screen / widgets、`test/widgets/search/`。
 - Deliverables：搜索页面，fixture 可完整交互。
@@ -1029,7 +1058,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 - Phase：3；Complexity：M。
 - Goal：展示源无关小说信息并容忍缺字段。
-- Input：第 5、11–12 节；Dependencies：CORE-004、DEV-001。
+- Input：[UI_PLAN.md](UI_PLAN.md)、第 5、11–12 节；Dependencies：CORE-004、DEV-001、UI-001。
 - Scope：DetailController / screen、封面 / 标题 / 作者 / 简介 / tags / status、刷新与 stale；书架和开始 / 继续行为留 SHELF-002 / PROGRESS-001 接通。
 - Files / Modules Expected：`lib/features/novel_detail/` detail、`test/widgets/novel_detail/`。
 - Deliverables：详情 UI / 状态与显式动作接口。
@@ -1106,6 +1135,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### READER-004 — 阅读偏好与布局变化
 
+- Status：DONE（2026-09-07）；实现与证据见 [Reader](reader.md)。Android 旋转 runtime 待补，iOS DEFERRED_NO_MAC。
+
 - Phase：4；Complexity：M。
 - Goal：调整排版与主题，尽量保留当前位置。
 - Input：第 18.4、20–21 节、SettingsStore；Dependencies：READER-002、DB-002。
@@ -1117,6 +1148,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：设置 CRUD / 损坏默认、slider 写入节流、anchor、主题 / padding / accessibility widget tests。
 
 #### READER-005 — 位置 Tracker 与有序保存
+
+- Status：DONE（2026-09-07）；实现与验证见 [Reader](reader.md)。iOS runtime DEFERRED_NO_MAC。
 
 - Phase：4；Complexity：M。
 - Goal：把 viewport 位置转成可靠且低频的持久记录。
@@ -1130,10 +1163,12 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### READER-006 — 位置恢复与内容变更降级
 
+- Status：DONE（2026-09-07）；恢复策略、误差矩阵及 Android / iOS 验证边界见 [Reader](reader.md)。
+
 - Phase：4；Complexity：M。
 - Goal：重新进入和排版变化时找回合理阅读位置。
 - Input：第 20 节恢复顺序及已有 tracker / viewport；Dependencies：READER-004、READER-005。
-- Scope：revision / blockKey / index / fraction 恢复、layoutKey pixel 优化、内容更新降级、图片完成补偿、恢复取消、恢复中禁止写入。
+- Scope：revision / blockKey / index / fraction 恢复、layoutKey pixel 提示的安全处理（当前懒布局无稳定全章像素原点，忽略该可选优化）、内容更新降级、图片完成补偿、恢复取消、恢复中禁止写入。
 - Files / Modules Expected：`lib/features/reader/position/`、`test/widgets/reader/restore_test.dart`。
 - Deliverables：恢复状态机与误差矩阵报告。
 - Acceptance Criteria：同设置同 block ≤1 行；改字号 / 屏宽 / 图片仍可见目标块且 ≤1 视口；找不到 key 使用 chapterFraction 并提示；用户滚动后不抢回位置。
@@ -1220,7 +1255,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 - Phase：5；Complexity：M。
 - Goal：本地可靠维护收藏，不依赖网络可用性。
-- Input：第 19 节、LibraryRepository；Dependencies：CORE-004、DB-002、DEV-001。
+- Input：[UI_PLAN.md](UI_PLAN.md)、第 19 节、LibraryRepository；Dependencies：CORE-004、DB-002、DEV-001、UI-001。
 - Scope：列表 / 网格、标题封面、最近阅读排序、添加 / 移除 / 撤销、empty state；以 SourceImage contract 渲染。
 - Files / Modules Expected：`lib/features/bookshelf/`、`test/widgets/bookshelf/`。
 - Deliverables：离线可操作的书架和响应式本地更新。
@@ -1332,7 +1367,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 - Phase：7；Complexity：M。
 - Goal：完成当前 Android 移动 UI 细节并保留 iOS 交互兼容。
-- Input：第 5、18.4、24 节；Dependencies：CACHE-004、SEARCH-002、HOME-001。
+- Input：第 5、18.4、24 节；Dependencies：CACHE-004、SEARCH-002、HOME-001、UI-002。
 - Scope：导航入口收尾、系统大字、亮 / 暗、SafeArea、横屏、长标题、小屏 / 大屏、错误动作文案、屏幕阅读顺序、点击目标；不增加新功能。
 - Files / Modules Expected：`lib/features/` / `lib/shared/` 有针对性的修复、`docs/validation/ux.md`。
 - Deliverables：状态 / 屏幕矩阵、缺陷修复与关键 widget 回归。
@@ -1564,7 +1599,9 @@ flowchart TD
     SRC010["SRC-010 MediaRef 解析与图片访问"]
     CORE005["CORE-005 通用小说 Repository 组装"]
     TEST001["TEST-001 生产 Source 端到端 Smoke"]
-    HOME001["HOME-001 能力驱动的首页"]
+    UI001["UI-001 Shiori Tokens 与 Theme Lab"]
+    UI002["UI-002 Reader 视觉与偏好拆分"]
+    HOME001["HOME-001 书架优先根导航与能力驱动发现"]
     SEARCH001["SEARCH-001 搜索状态与请求竞态"]
     SEARCH002["SEARCH-002 搜索页面与结果导航"]
     DETAIL001["DETAIL-001 详情状态与元信息展示"]
@@ -1651,6 +1688,16 @@ flowchart TD
   SRC009 --> TEST001
   SRC010 --> TEST001
   CORE005 --> TEST001
+  CORE004 --> UI001
+  DEV002 --> UI001
+  UI001 --> UI002
+  READER006 --> UI002
+  UI001 --> HOME001
+  SHELF001 --> HOME001
+  UI001 --> SHELF001
+  UI001 --> SEARCH002
+  UI001 --> DETAIL001
+  UI002 --> UX001
   CORE004 --> HOME001
   DEV001 --> HOME001
   CORE004 --> SEARCH001
@@ -1765,6 +1812,8 @@ flowchart TD
 
 ## 38. Critical Path
 
+UI 增量：CORE-004 + DEV-002 → UI-001 → 正式 HOME / SHELF / SEARCH / DETAIL 视觉；SHELF-001 → HOME-001。UI-001 + READER-006 → UI-002 → UX-001。UI-001 不依赖正式书架或详情，READER-006 不依赖 UI-001，避免样板与功能相互等待。
+
 此处是 Android MVP 的技术阻塞链，不在无工时数据时假装计算出精确日历工期。**任何 IOS-001..006 或 CI-003 均不在 Android 硬依赖的传递闭包中。**
 
 **Track A — Source 可行性**：SRC-001 → SRC-002 → SRC-003 → SRC-004 → SRC-005 → SRC-006 / SRC-007 / SRC-008 / SRC-009 → SRC-010 → TEST-001。Foundation contracts / transport / 基本 DB 在 SRC-005 合流；证据不足不能用实现量替代 Source Go。
@@ -1777,7 +1826,7 @@ flowchart TD
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。**NET-001 / NET-002 / MEDIA-001 DONE**，**READER-003 DONE**，双模式图片与局部重试已交付，完整测试 120 项及 Android 图片探针 PASS。**DB-001 / DB-002 DONE**，127 项测试及 Android 持久化探针 PASS，见 [本地存储](database.md)。下一建议 **READER-004**，尚未执行。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。CORE-005 及 Source 首项 SRC-005 的 DB-002 / NET-002 前置已解除，尚未执行。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。**NET-001 / NET-002 / MEDIA-001 DONE**，**READER-003 DONE**，双模式图片与局部重试已交付，完整测试 120 项及 Android 图片探针 PASS。**DB-001 / DB-002 DONE**，127 项测试及 Android 持久化探针 PASS，见 [本地存储](database.md)。**READER-004 DONE**，设置持久化与受控重布局已交付，Android 旋转实测受 MuMu 限制待补（widget 横竖窗口变化通过），见 [Reader](reader.md)。**READER-005 DONE**，位置追踪、有界有序保存与短章完成已交付，143 项测试及新 MuMu 持久记录验证 PASS，见 [Reader](reader.md)。**UI-001 / READER-006 DONE**：三页样板、语义位置恢复、内容更新降级和恢复保护已交付；155 项完整测试与 Android 双模式 SQLite 重开恢复通过，见 [UI 记录](UI_PLAN.md) / [Reader](reader.md)。UI-002 前置已齐备，但未自动执行。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。CORE-005 及 Source 首项 SRC-005 的 DB-002 / NET-002 前置已解除，尚未执行。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
 
 ## 39. Parallelizable Work
 
@@ -1788,7 +1837,7 @@ Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都�
 | A：SRC-001 → SRC-002 → SRC-003 → SRC-004 | 当前浏览器和正常公开访问 | evidence-first，历史端点只是线索；无 Mac 依赖 |
 | B：CORE-001 → CORE-002 → CORE-003 → DEV-001 + CORE-004 → DEV-002 → READER-001 | 模型 / contracts 先固定 | Fixture Reader 独立于网站；语义 Domain 不因 renderer 拆块 |
 | C：NET-001..002 与 DB-001..002 | CORE-002 / CORE-003 各自前置完成 | 通用网络与基本存储可以并行；不提前做 DB-003 复杂 harness |
-| UI：HOME-001、SEARCH-001..002、DETAIL-001..002、SHELF-001 | CORE-004 / DEV-001；书架另需 DB-002 | 通过 fake Repository / Media，不把网站规则放 Controller |
+| UI：HOME-001、SEARCH-001..002、DETAIL-001..002、SHELF-001 | CORE-004 / DEV-001；书架另需 DB-002；正式视觉均需 UI-001，HOME 另需 SHELF-001 | 通过 fake Repository / Media，不把网站规则放 Controller |
 | Media：MEDIA-001 与 READER-001..002 | CORE-003 + NET-002；Reader 按自己的前置 | 只实现网络 / 内存；Phase 4 不等待持久缓存 |
 | SRC-006 / SRC-007 / SRC-008 / SRC-009 | SRC-005 和相应 fixtures | 各 parser 独立；共享 identity / session 的修改需协调 |
 | READER-003 / READER-004 / READER-005 | READER-002；图片另需 MEDIA-001，设置 / tracker 另需 DB-002 | renderer / controller 共用接口统一维护；restore 在之后合流 |

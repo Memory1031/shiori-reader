@@ -2,15 +2,18 @@ import 'identity.dart';
 import 'novel.dart';
 import 'value_model.dart';
 
+enum ReaderMode { paged, scroll }
+
 enum ReaderThemeMode { system, light, dark }
 
 final class ReaderSettings extends ValueModel {
-  static const schemaVersion = 1;
+  static const schemaVersion = 2;
   ReaderSettings({
     double fontSize = 20,
     double lineHeight = 1.7,
     double paragraphSpacing = 12,
     double horizontalPadding = 20,
+    this.mode = ReaderMode.paged,
     this.themeMode = ReaderThemeMode.system,
   }) : fontSize = finiteRange(fontSize, 14, 32, 'fontSize'),
        lineHeight = finiteRange(lineHeight, 1.2, 2.4, 'lineHeight'),
@@ -31,18 +34,21 @@ final class ReaderSettings extends ValueModel {
   final double paragraphSpacing;
   final double horizontalPadding;
   final ReaderThemeMode themeMode;
+  final ReaderMode mode;
   ReaderSettings copyWith({
     double? fontSize,
     double? lineHeight,
     double? paragraphSpacing,
     double? horizontalPadding,
     ReaderThemeMode? themeMode,
+    ReaderMode? mode,
   }) => ReaderSettings(
     fontSize: fontSize ?? this.fontSize,
     lineHeight: lineHeight ?? this.lineHeight,
     paragraphSpacing: paragraphSpacing ?? this.paragraphSpacing,
     horizontalPadding: horizontalPadding ?? this.horizontalPadding,
     themeMode: themeMode ?? this.themeMode,
+    mode: mode ?? this.mode,
   );
   Map<String, Object?> toJson() => {
     'schemaVersion': schemaVersion,
@@ -51,16 +57,26 @@ final class ReaderSettings extends ValueModel {
     'paragraphSpacing': paragraphSpacing,
     'horizontalPadding': horizontalPadding,
     'themeMode': themeMode.name,
+    'mode': mode.name,
   };
   factory ReaderSettings.fromJson(Map<String, dynamic> json) {
-    if (json['schemaVersion'] != schemaVersion) {
+    if (json['schemaVersion'] != 1 && json['schemaVersion'] != schemaVersion) {
       throw const FormatException('Unsupported reader settings version');
     }
+    double number(String key, double min, double max) {
+      final value = (json[key] as num).toDouble();
+      if (!value.isFinite) throw const FormatException('Non-finite setting');
+      return value.clamp(min, max);
+    }
+
     return ReaderSettings(
-      fontSize: (json['fontSize'] as num).toDouble(),
-      lineHeight: (json['lineHeight'] as num).toDouble(),
-      paragraphSpacing: (json['paragraphSpacing'] as num).toDouble(),
-      horizontalPadding: (json['horizontalPadding'] as num).toDouble(),
+      mode: json['schemaVersion'] == 1
+          ? ReaderMode.paged
+          : ReaderMode.values.byName(json['mode'] as String),
+      fontSize: number('fontSize', 14, 32),
+      lineHeight: number('lineHeight', 1.2, 2.4),
+      paragraphSpacing: number('paragraphSpacing', 0, 32),
+      horizontalPadding: number('horizontalPadding', 12, 48),
       themeMode: ReaderThemeMode.values.byName(json['themeMode'] as String),
     );
   }
@@ -71,6 +87,7 @@ final class ReaderSettings extends ValueModel {
     paragraphSpacing,
     horizontalPadding,
     themeMode,
+    mode,
   ];
 }
 

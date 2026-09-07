@@ -75,3 +75,7 @@ iOS Level A：PASS，纯 Dart 标准库扩展，无 Native 插件、平台分支
 交接建议：下一项 CORE-004 建立应用组装和导航壳；DEV-001、NET-001、DB-001 也已满足各自前置，后续按计划领取，不把本次 fake 当正式 DEV-001 完成。
 
 DB-001 / DB-002 后续实现已完成：生产本地 LibraryRepository、进度持久代次、记录 stores 和 SharedPreferencesAsync 设置适配已落地，契约签名不变，见 [存储验收](database.md)。
+
+READER-004：SettingsStore 签名不变，ReaderSettings v2 读取迁移 v1，只有显式保存时写回 v2。阅读会话通过注入的 store 做 300ms trailing 合并，slider 结束、面板关闭、后台与 dispose 补写；慢写期间只保留最新待写值，错误保留预览并允许手动重试。不承诺系统强杀前未提交的数据落盘。
+
+READER-005：LibraryRepository 契约不变。Tracker 借用仓库，beginProgressSession 后序号单调；旧 stamp 的 Success(false) 终止本会话写入，不能当成功或自动抢新代次。flush / close 返回在途串行写完成的 Future；调用方负责让仓库活到补写结束。纯 Dart Tracker 不保存临时布局样本，元信息或 DB 失败只影响保存状态。

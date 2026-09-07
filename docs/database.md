@@ -16,7 +16,7 @@ LibraryRepository 的所有写操作通过 Drift 事务串行执行。重复收�
 
 NovelRecordStore 只接受类型化 Detail / Catalog / Chapter；缓存 codec 检查版本、类型、身份以及目录 / 正文摘要。写失败保留旧记录，单条损坏返回局部 cache Failure，不自动清库、不影响其他记录。没有网络调用，也没有 Source locator 表；只有 SRC-010 实证需要时才扩展。
 
-ReaderSettings 继续使用现有 v1 codec，通过注入的 SharedPreferencesAsync 存一个 JSON 字符串，key 按 production / development 隔离。单 Store 串行保存，读取等待已排队的保存；坏 JSON、类型、数值或未知版本返回默认设置并写入不含路径 / 原始值的本地诊断，读取不覆盖坏值或未来版本。设置不是关键数据，不承诺与 SQLite 的跨存储事务。此处没有提前增加 READER-004 设置 UI 或阅读模式 codec。
+ReaderSettings 在 DB-002 交付时使用 v1 codec，READER-004 已升级为兼容 v1 读取的 v2 codec，通过注入的 SharedPreferencesAsync 存一个 JSON 字符串，key 按 production / development 隔离。单 Store 串行保存，读取等待已排队的保存；坏 JSON、类型、数值或未知版本返回默认设置并写入不含路径 / 原始值的本地诊断，读取不覆盖坏值或未来版本。设置不是关键数据，不承诺与 SQLite 的跨存储事务。阅读模式 codec、有限数值 clamp 与设置 UI 的后续实现见 [Reader](reader.md)。
 
 ## 路径与备份（OQ-08）
 

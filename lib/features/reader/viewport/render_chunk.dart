@@ -1,6 +1,7 @@
 import 'package:characters/characters.dart';
 
 import '../../../domain/models/models.dart';
+import '../position/position_resolver.dart';
 
 /// Transient presentation metadata. Offsets count Unicode code points, not
 /// UTF-16 code units, and boundaries never split an extended grapheme cluster.
@@ -87,27 +88,24 @@ final class ChunkIndex {
     ReaderPosition? position,
   ) {
     if (position == null) return (chunk: 0, fraction: 0, usedFallback: false);
-    var block = content.blocks.indexWhere(
-      (b) => b.blockKey == position.blockKey,
-    );
-    final fallback = block < 0;
-    var fraction = position.blockFraction;
-    if (fallback) {
-      final coarse = position.chapterFraction * content.blocks.length;
-      block = coarse.floor().clamp(0, content.blocks.length - 1);
-      fraction = (coarse - block).clamp(0, 1);
-    }
+    final resolved = resolveReaderPosition(content, position);
+    final block = resolved.position.blockIndex;
+    final fraction = resolved.position.blockFraction;
     var selected = chunks.indexWhere((c) => c.blockIndex == block);
     final total = chunks[selected].total;
     final offset = total == 0
         ? 0
-        : (fraction * total).floor().clamp(0, total - 1);
+        : readerCharacterOffset(fraction, total).clamp(0, total - 1);
     while (selected + 1 < chunks.length &&
         chunks[selected].end <= offset &&
         chunks[selected + 1].blockIndex == block) {
       selected++;
     }
-    return (chunk: selected, fraction: fraction, usedFallback: fallback);
+    return (
+      chunk: selected,
+      fraction: fraction,
+      usedFallback: resolved.usedFallback,
+    );
   }
 
   ReaderPosition position(int unit, double fraction) {

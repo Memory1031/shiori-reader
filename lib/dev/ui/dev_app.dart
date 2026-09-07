@@ -6,6 +6,9 @@ import '../../app/routes.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../fixture_scenarios.dart';
 import 'scenario_page.dart';
+import 'theme_lab/theme_lab.dart';
+import '../../l10n/generated/app_localizations.dart';
+import '../../domain/contracts/contracts.dart';
 
 FixtureScenario? parseDevScenario(String value) {
   if (value.isEmpty) return null;
@@ -19,11 +22,25 @@ FixtureScenario? parseDevScenario(String value) {
   );
 }
 
-ShioriApp createDevApp({String scenarioId = '', Locale? locale}) {
+ShioriApp createDevApp({
+  String scenarioId = '',
+  Locale? locale,
+  SettingsStore? settings,
+  LibraryRepository? library,
+}) {
+  if (scenarioId == 'themeLab') {
+    return ShioriApp(
+      locale: locale,
+      routes: AppRoutes(home: (_) => const ThemeLab()),
+    );
+  }
   final initial = parseDevScenario(scenarioId);
   return ShioriApp(
     locale: locale,
-    routes: AppRoutes(home: (_) => DevMenu(initial: initial)),
+    routes: AppRoutes(
+      home: (_) =>
+          DevMenu(initial: initial, preferences: settings, library: library),
+    ),
   );
 }
 
@@ -33,8 +50,10 @@ String scenarioLabel(BuildContext context, FixtureScenario scenario) =>
     : scenario.labelEn;
 
 class DevMenu extends StatefulWidget {
-  const DevMenu({super.key, this.initial});
+  const DevMenu({super.key, this.initial, this.preferences, this.library});
   final FixtureScenario? initial;
+  final SettingsStore? preferences;
+  final LibraryRepository? library;
   @override
   State<DevMenu> createState() => _DevMenuState();
 }
@@ -51,7 +70,11 @@ class _DevMenuState extends State<DevMenu> {
   }
 
   void _open(FixtureScenario scenario) {
-    Widget builder(BuildContext context) => DevScenarioPage(scenario: scenario);
+    Widget builder(BuildContext context) => DevScenarioPage(
+      scenario: scenario,
+      settings: widget.preferences,
+      library: widget.library,
+    );
     const settings = RouteSettings(name: '/dev/scenario');
     Navigator.of(context).push<void>(
       Theme.of(context).platform == TargetPlatform.iOS
@@ -65,6 +88,13 @@ class _DevMenuState extends State<DevMenu> {
     title: 'Shiori DEV',
     body: ListView(
       children: [
+        ListTile(
+          title: Text(AppLocalizations.of(context).labTitle),
+          trailing: const Icon(Icons.palette_outlined),
+          onTap: () => Navigator.of(
+            context,
+          ).push<void>(MaterialPageRoute(builder: (_) => const ThemeLab())),
+        ),
         for (final scenario in FixtureScenario.values)
           ListTile(
             key: ValueKey(scenario.name),

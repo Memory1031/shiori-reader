@@ -2,6 +2,10 @@
 
 2026-09-07。CORE-004 DONE；完成应用壳和所需 widget 验收。Android Debug build PASS；初次模拟器安装失败的待项已在 DEV-002 补齐，同一应用壳的新开发包安装、冷启动和返回导航 smoke PASS，见下文补验记录。iOS Level A compatibility review PASS，实际 iOS runtime 仍为 DEFERRED_NO_MAC。
 
+## UI 后续规划
+
+统一视觉与信息架构见 [UI_PLAN.md](UI_PLAN.md)。保留 Material 3 行为基础，采用暖纸底色、封面主导与独立 Reader 配色；UI-001 先建立 Tokens / Theme Lab，正式页面复用；UI-002 负责 Reader 视觉及应用 / 阅读偏好拆分。当前 seed 主题、Reader 局部默认 ThemeData 和 AppController 借用 ReaderSettings 均为功能基线，不是最终 UI 规范。本轮仅更新文档，不改变已实现行为或声明视觉验收通过。
+
 ## 装配与范围
 
 `lib/main.dart` 调用 `lib/app/bootstrap.dart` 的 `createApp`，组装 `ShioriApp`、应用级 `AppController` 和 `AppRoutes`。依赖通过构造器和页面工厂闭包传入；没有 Get 服务注册、Get.find、GetMaterialApp 或站点常量。
@@ -90,3 +94,5 @@ flutter build apk --debug --no-pub
 本轮实际通过固定 SDK `dart.exe` 执行 `bin/cache/flutter_tools.snapshot` 的对应命令，等价进入 Flutter 工具；未修改 SDK 源码、删除锁文件或改全局 analytics 设置。gen-l10n 的 format 子进程也曾等待，增加进程级 `CI=true` 后生成正常完成。本次诊断启动的等待进程和本地 VM 调试服务均已停止。这些变量可用于其他本机验证，历史任务的未运行记录仍保留为当时事实。
 
 下一建议 DEV-001，构建完整的离线 Fixture Source / Media / Repository 场景，再由 DEV-002 接入开发入口。CORE-005 仍依赖 DB-002 和 NET-002；本轮不提前领取后续任务。
+
+UI-001 已交付开发菜单中的“视觉样板”：三页共享候选 tokens，中英 / 明暗 / 大字 / 状态 / 全屏预览。实现与 Android 截图记录见 [UI_PLAN.md](UI_PLAN.md)；指定 `themeLab` 场景不打开数据库，普通应用主题未提前切换。

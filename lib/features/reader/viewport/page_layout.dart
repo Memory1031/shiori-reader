@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../domain/models/models.dart';
 import 'render_chunk.dart';
+import '../position/position_resolver.dart';
 import 'block_style.dart';
 
 /// A cursor in transient chunks; exposed/persisted positions always use Domain.
@@ -40,6 +41,7 @@ final class PageLayout {
     required this.direction,
     this.imageHeights = const {},
     this.imageExtent,
+    this.paragraphSpacing = 16,
   }) {
     if (width < 1 || height < 1) {
       throw ArgumentError('Page needs positive dimensions');
@@ -49,6 +51,7 @@ final class PageLayout {
   final double width;
   final double height;
   final TextStyle style;
+  final double paragraphSpacing;
   final TextScaler scaler;
   final TextDirection direction;
   final Map<MediaRef, double> imageHeights;
@@ -70,8 +73,9 @@ final class PageLayout {
     final resolved = index.resolve(position);
     final chunk = index.chunks[resolved.chunk];
     if (chunk.text == null) return PageCursor(resolved.chunk, 0);
-    final desired = ((resolved.fraction * chunk.total).floor() - chunk.start)
-        .clamp(0, (chunk.end - chunk.start - 1).clamp(0, chunk.total));
+    final desired =
+        (readerCharacterOffset(resolved.fraction, chunk.total) - chunk.start)
+            .clamp(0, (chunk.end - chunk.start - 1).clamp(0, chunk.total));
     var offset = 0;
     for (final grapheme in chunk.text!.characters) {
       final next = offset + grapheme.runes.length;
@@ -116,7 +120,7 @@ final class PageLayout {
         );
     try {
       final lines = painter.computeLineMetrics();
-      var used = 16.0;
+      var used = paragraphSpacing;
       var count = 0;
       for (final line in backwards ? lines.reversed : lines) {
         if (used + line.height > available + .01) break;
