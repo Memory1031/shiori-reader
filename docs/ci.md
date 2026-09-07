@@ -15,7 +15,7 @@
 
 ## 发布工作流
 
-工作流：[`.github/workflows/release.yml`](../.github/workflows/release.yml)，**仅在推送 `v*` 标签时触发**；普通推送、PR 和手动入口都不产出发布包。结构校验已并入 `.tooling/check-ci-yaml.dart`（tag-only 触发、发布任务依赖检查）。
+工作流：[`.github/workflows/release.yml`](../.github/workflows/release.yml)，**仅在推送 `v*` 标签时触发**；普通推送、PR 和手动入口都不产出发布包。结构校验脚本为 [`tool/check_ci_yaml.dart`](../tool/check_ci_yaml.dart)（tag-only 触发、发布任务依赖检查）。
 
 | 任务 | 行为 |
 | --- | --- |
@@ -87,11 +87,10 @@ dart bin/source_probe.dart
 
 SDK / 依赖安装需要网络；上述测试和样本检查不启用 `--live`，不访问源站。
 
-工作流结构校验（`.tooling/check-ci-yaml.dart`，依赖由 Git 忽略的临时包 `.tooling/ci-yaml-run/` 提供；首次使用先在其中 `dart pub get`）：
+工作流结构校验（[`tool/check_ci_yaml.dart`](../tool/check_ci_yaml.dart)，依赖根项目的 `yaml` 开发依赖提供；先按上文完成严格锁定安装）：
 
 ```bash
-PUB_HOSTED_URL=https://pub.flutter-io.cn dart pub get --directory=.tooling/ci-yaml-run
-dart run --packages=.tooling/ci-yaml-run/.dart_tool/package_config.json .tooling/check-ci-yaml.dart
+dart tool/check_ci_yaml.dart
 ```
 
 ## 样本完整性与换行符
