@@ -229,4 +229,3 @@ class LocalLibraryRepository implements LibraryRepository {
     );
   });
 }
-

@@ -15,26 +15,30 @@
 
 ## 关于 Shiori
 
-Shiori（栞，书签）面向 Android 和 iOS，计划提供小说发现与搜索、原生图文阅读、本地书架、阅读进度恢复和缓存离线阅读。项目优先打磨阅读体验，并将数据源接入与阅读界面分离，方便后续维护。
+Shiori（栞，书签）面向 Android 和 iOS，计划提供小说发现与搜索、原生图文阅读、本地书架、阅读进度恢复、缓存离线阅读，以及本地 TXT / 无 DRM EPUB 导入。项目优先打磨阅读体验，并将数据源接入与阅读界面分离，方便后续维护。
 
 当前优先开发和验证 Android；iOS 保留为正式目标，等待 macOS / Xcode 环境进行构建和运行验证。Windows 是开发宿主，不是应用目标平台。
 
 ## 项目状态
 
-**项目处于早期开发阶段，尚未完成可日常使用的阅读器。** 当前启动后显示最小 Shiori 页面，搜索、目录、阅读和书架功能尚未接入应用。
+**项目处于早期开发阶段，尚未完成可日常使用的阅读器**。生产入口当前为加载并应用阅读设置的基础首页；单章阅读器通过离线开发入口（fixture 场景）体验，生产数据源尚未接入，在线搜索、目录和书架界面仍在开发中。
 
 截至 2026-09-07：
 
 | 模块 | 当前进展 |
 | --- | --- |
-| Flutter 基础工程 | 已建立 Android / iOS 工程、应用图标和 VS Code 启动配置 |
-| Android 验证 | Debug APK 构建及 MuMu 最小应用启动验证通过；ARM64 真机验收待完成 |
+| Flutter 基础工程 | Android / iOS 工程、应用图标、中英多语言与 VS Code 启动配置已建立 |
+| 领域层 | 纯 Dart 领域模型、内容身份摘要与 Source / Repository 契约已交付 |
+| 数据层 | 受限网络客户端、内存图片仓库与 Drift 双库存储（书架 / 进度 / 缓存记录）已交付 |
+| 阅读器 | 双模式视口（默认左右翻页、可选上下滚动）与单章阅读界面已交付，fixture 驱动 |
+| 离线开发入口 | `main_dev.dart` 场景菜单与生产隔离已交付 |
+| CI 与发布 | push / PR 离线检查、手动 APK 构建与 tag 触发的签名发布工作流已建立；发布密钥待配置 |
+| Android 验证 | Debug APK 构建、MuMu 最小应用启动与 SQLite / preferences 重开探针通过；ARM64 真机验收待完成 |
 | iOS 验证 | 已做基础代码与配置兼容性审查；尚未构建或运行 |
 | 首个数据源调查 | LightNovel.fun 样本图文链路已验证，技术可行性审查通过 |
-| 调查工具与样本 | 独立 Dart 调查包、离线测试及 fixture 已建立 |
-| 产品功能 | 生产数据源、阅读器、书架、进度和缓存仍在规划中 |
+| 生产数据源 | 在线搜索、详情、目录与正文获取尚未实现 |
 
-数据源调查工具独立于应用，调查通过不代表移动端功能已经实现。具体进展见[任务计划](docs/TASK_PLAN.md)。
+数据源调查工具独立于应用，调查通过不代表移动端功能已经实现。各模块的验证边界以对应文档为准，总览见[任务计划](docs/TASK_PLAN.md)。
 
 ## 快速开始
 
@@ -87,6 +91,16 @@ flutter run
 
 [launch.json](.vscode/launch.json) 还提供 `Shiori (Profile)` 和 `Shiori (Release)`。Windows 配置使用项目 `.tooling/` 下的 Android SDK、JDK 与 Gradle 缓存；如果使用系统工具链，请相应调整其中的 `windows.env`。
 
+### 离线开发入口
+
+阅读器与图片加载目前通过 fixture 场景体验，不请求源站：
+
+```powershell
+flutter run --target lib/main_dev.dart
+```
+
+启动后进入场景菜单，也可用 `--dart-define=SHIORI_SCENARIO=场景ID` 直达（场景清单见[离线入口文档](docs/dev-entry.md)）。开发 fixture 与生产入口隔离，不进入 release 构建。
+
 ### 构建 APK
 
 在准备好 Android 环境的终端中运行：
@@ -95,7 +109,7 @@ flutter run
 flutter build apk --debug --no-pub
 ```
 
-生成文件：`build/app/outputs/flutter-apk/app-debug.apk`。当前签名配置用于开发验证，正式发布配置尚未完成。
+生成文件：`build/app/outputs/flutter-apk/app-debug.apk`。debug 构建使用开发签名；签名 release APK 由推送 `v*` 标签触发的[发布工作流](docs/ci.md)构建，发布签名密钥尚未配置。
 
 ## 开发与验证
 
@@ -106,12 +120,14 @@ flutter pub get --enforce-lockfile
 Push-Location tools/source_probe
 dart pub get --enforce-lockfile
 Pop-Location
+flutter gen-l10n
+git diff --exit-code -- lib/l10n/generated
 dart format --output=none --set-exit-if-changed lib test
 flutter analyze --no-pub
 flutter test --no-pub
 ```
 
-根目录静态分析会扫描独立调查包，因此首次检查前也需要安装其依赖。
+根目录静态分析会扫描独立调查包，因此首次检查前也需要安装其依赖。修改文案后需重新生成 `lib/l10n/generated` 并提交。数据库生成代码与 schema 快照由 `tool/generate_database.ps1` 维护，变更方式见[本地存储文档](docs/database.md)。
 
 数据源调查包有独立的依赖与测试，在仓库根目录另开终端运行：
 
@@ -129,29 +145,39 @@ dart bin/source_probe.dart
 
 - [x] 建立移动端基础工程与应用图标。
 - [x] 完成首个数据源的样本调查与技术可行性验证。
-- [ ] 建立领域模型、基础网络与本地存储。
-- [ ] 实现生产数据源、搜索、详情和卷章节目录。
-- [ ] 实现原生垂直滚动阅读器、插图与排版设置。
-- [ ] 实现本地书架、阅读历史和进度恢复。
+- [x] 建立领域模型、领域契约、受限网络与本地存储。
+- [x] 实现双模式阅读视口与单章阅读界面（fixture 驱动，插图经内存图片仓库加载）。
+- [ ] 接入生产数据源，实现搜索、详情和卷章节目录。
+- [ ] 完善阅读排版与设置。
+- [ ] 实现本地书架、阅读历史和进度恢复界面（存储层已就绪）。
 - [ ] 实现有容量限制的缓存与离线续读。
+- [ ] 实现本地 TXT / 无 DRM EPUB 导入。
 - [ ] 完成 Android ARM64 真机验证与发布准备。
 - [ ] 完成 iOS 构建、设备验证与发布准备。
 
-首版聚焦在线轻小说阅读，暂不包含账号同步、TTS、EPUB / PDF 导入或桌面端。任务依赖和验收标准以[任务计划](docs/TASK_PLAN.md)为准。
+首版聚焦在线轻小说阅读与本地导入，暂不包含账号同步、TTS、PDF / 漫画阅读器或桌面端。任务依赖和验收标准以[任务计划](docs/TASK_PLAN.md)为准。
 
 ## 目录结构
 
 ```text
 shiori-reader/
-├── lib/                       # Flutter 应用，当前为最小启动页面
+├── lib/
+│   ├── app/                   # 应用组装、导航、主题与启动配置
+│   ├── domain/                # 纯 Dart 领域模型、契约与错误
+│   ├── data/                  # 受限网络、本地存储与媒体实现
+│   ├── features/              # 功能界面（阅读器等）
+│   ├── dev/                   # 离线开发入口（fixture 场景）
+│   ├── l10n/                  # 中英 ARB 与 gen-l10n 生成代码
+│   └── shared/                # 控制器与通用组件
 ├── android/                   # Android 原生工程
 ├── ios/                       # iOS 原生工程
 ├── assets/branding/           # Logo 原图、生成提示词与说明
-├── test/                      # 应用测试与数据源样本
+├── test/                      # 领域 / 数据 / 组件测试
 │   └── fixtures/lightnovel/   # 调查记录、结构摘要和合成输入
-├── tool/                      # 本地 Android 环境与图标生成脚本
+├── tool/                      # 环境脚本、数据库代码生成与图标工具
 ├── tools/source_probe/        # 独立 Dart 数据源调查包
-├── docs/                      # 任务计划、开发基线与源站调查
+├── .github/workflows/         # CI 与 tag 发布工作流
+├── docs/                      # 任务计划、验收记录与调查文档
 └── .vscode/                   # VS Code 启动配置
 ```
 
@@ -161,6 +187,11 @@ shiori-reader/
 | --- | --- |
 | [任务计划](docs/TASK_PLAN.md) | 产品范围、架构设计、任务依赖与验收标准 |
 | [开发环境](docs/development.md) | 固定工具链、Windows 配置、构建记录与已知问题 |
+| [领域模型](docs/domain.md) | 领域值模型与内容身份摘要规范 |
+| [领域契约](docs/contracts.md) | Source / Repository / 错误契约与验收 |
+| [本地存储](docs/database.md) | 双库 schema、迁移基线与验收记录 |
+| [持续集成](docs/ci.md) | CI 触发方式、依赖锁定与 tag 发布工作流 |
+| 验收记录 | [应用](docs/app.md) · [网络](docs/network.md) · [媒体](docs/media.md) · [阅读器](docs/reader.md) · [离线入口](docs/dev-entry.md) · [Fixture](docs/fixtures.md) |
 | [数据源调查](docs/source/lightnovel.md) | LightNovel.fun 访问证据、协议观察与可行性审查 |
 | [调查工具](tools/source_probe/README.md) | 离线检查、显式联网验证与报告 |
 | [测试样本](test/fixtures/lightnovel/README.md) | 样本来源、删减范围与合成数据说明 |
