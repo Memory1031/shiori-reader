@@ -4,13 +4,13 @@
 
 ## UI 后续规划
 
-统一视觉与信息架构见 [UI_PLAN.md](UI_PLAN.md)。保留 Material 3 行为基础，采用暖纸底色、封面主导与独立 Reader 配色；UI-001 先建立 Tokens / Theme Lab，正式页面复用；UI-002 负责 Reader 视觉及应用 / 阅读偏好拆分。当前 seed 主题、Reader 局部默认 ThemeData 和 AppController 借用 ReaderSettings 均为功能基线，不是最终 UI 规范。本轮仅更新文档，不改变已实现行为或声明视觉验收通过。
+统一视觉与信息架构见 [UI_PLAN.md](UI_PLAN.md)。保留 Material 3 行为基础，采用暖纸底色、封面主导与独立 Reader 配色；UI-001 先建立 Tokens / Theme Lab，正式页面复用；UI-002 负责 Reader 视觉及应用 / 阅读偏好拆分。UI-002 已接入 Shiori 主题工厂，Reader 纸色与应用明暗独立，AppController 不再借用 ReaderSettings。
 
 ## 装配与范围
 
 `lib/main.dart` 调用 `lib/app/bootstrap.dart` 的 `createApp`，组装 `ShioriApp`、应用级 `AppController` 和 `AppRoutes`。依赖通过构造器和页面工厂闭包传入；没有 Get 服务注册、Get.find、GetMaterialApp 或站点常量。
 
-当前 production 没有数据库或生产 Repository。可选 SettingsStore 未注入时只使用领域默认设置，不请求网络、不伪造持久化结果。注入后异步加载设置并应用 system/light/dark 主题；失败保留首页和默认/已有设置，显示领域错误与允许的重试动作。这里只读取设置，设置编辑和持久化归后续任务。
+当前 production 尚未装配数据库或生产 Repository。UI-002 在 main / main_dev 中分别注入对应环境的 PreferencesAppSettingsStore，提供应用外观入口；createApp 可显式注入 AppSettingsStore，省略时为内存默认。应用明暗异步加载、即时预览，写入有界合并，失败保留当前预览并允许重试；加载晚结果不覆盖用户选择。完整服务装配仍归 CORE-005。
 
 `AppRoutes` 接受 home/search/novel/reader 页面工厂。组装者在工厂闭包中捕获所需 Repository，再传入页面和 Controller；没有要求页面访问全局服务容器。SearchDestination、NovelDestination、ReaderDestination 分别携带不透明 SourceId、NovelKey、ChapterKey。路由名称只用固定 `/search`、`/novel`、`/reader`，不将身份或定位符放入日志可见的 route name / settings.arguments。
 
@@ -96,3 +96,6 @@ flutter build apk --debug --no-pub
 下一建议 DEV-001，构建完整的离线 Fixture Source / Media / Repository 场景，再由 DEV-002 接入开发入口。CORE-005 仍依赖 DB-002 和 NET-002；本轮不提前领取后续任务。
 
 UI-001 已交付开发菜单中的“视觉样板”：三页共享候选 tokens，中英 / 明暗 / 大字 / 状态 / 全屏预览。实现与 Android 截图记录见 [UI_PLAN.md](UI_PLAN.md)；指定 `themeLab` 场景不打开数据库，普通应用主题未提前切换。
+
+
+UI-002 的应用外观按钮位于当前首页 / 开发菜单右上方，打开独立 Sheet。ShioriApp 的 homeBuilder 显式把 AppController 传入页面工厂，再传递操作回调；无 Get.find 或新的全局服务。应用主题变更不做颜色补间；阅读 Sheet 在系统减少动态效果时关闭过渡。主入口仅新增应用偏好装配，不代表完整设置页 / 生产 Source 已完成。

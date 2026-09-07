@@ -1,17 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../domain/models/reader.dart';
+import '../domain/models/app_settings.dart';
+import 'theme/shiori_theme.dart';
 
-ThemeData appTheme(Brightness brightness) => ThemeData(
-  useMaterial3: true,
-  colorScheme: ColorScheme.fromSeed(
-    seedColor: const Color(0xff95506d),
-    brightness: brightness,
-  ),
-);
+ThemeData appTheme(Brightness brightness) => shioriTheme(brightness);
 
-ThemeMode appThemeMode(ReaderThemeMode mode) => switch (mode) {
-  ReaderThemeMode.system => ThemeMode.system,
-  ReaderThemeMode.light => ThemeMode.light,
-  ReaderThemeMode.dark => ThemeMode.dark,
+ThemeMode appThemeMode(AppThemeMode mode) => switch (mode) {
+  AppThemeMode.system => ThemeMode.system,
+  AppThemeMode.light => ThemeMode.light,
+  AppThemeMode.dark => ThemeMode.dark,
 };

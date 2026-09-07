@@ -9,6 +9,8 @@ import 'scenario_page.dart';
 import 'theme_lab/theme_lab.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../domain/contracts/contracts.dart';
+import '../../app/app_controller.dart';
+import '../../app/appearance_panel.dart';
 
 FixtureScenario? parseDevScenario(String value) {
   if (value.isEmpty) return null;
@@ -27,6 +29,7 @@ ShioriApp createDevApp({
   Locale? locale,
   SettingsStore? settings,
   LibraryRepository? library,
+  AppSettingsStore? appSettings,
 }) {
   if (scenarioId == 'themeLab') {
     return ShioriApp(
@@ -36,10 +39,13 @@ ShioriApp createDevApp({
   }
   final initial = parseDevScenario(scenarioId);
   return ShioriApp(
+    createController: () => AppController(settingsStore: appSettings),
     locale: locale,
-    routes: AppRoutes(
-      home: (_) =>
-          DevMenu(initial: initial, preferences: settings, library: library),
+    homeBuilder: (context, controller) => DevMenu(
+      initial: initial,
+      preferences: settings,
+      library: library,
+      onAppearance: () => showAppAppearance(context, controller),
     ),
   );
 }
@@ -50,7 +56,14 @@ String scenarioLabel(BuildContext context, FixtureScenario scenario) =>
     : scenario.labelEn;
 
 class DevMenu extends StatefulWidget {
-  const DevMenu({super.key, this.initial, this.preferences, this.library});
+  const DevMenu({
+    super.key,
+    this.initial,
+    this.preferences,
+    this.library,
+    this.onAppearance,
+  });
+  final VoidCallback? onAppearance;
   final FixtureScenario? initial;
   final SettingsStore? preferences;
   final LibraryRepository? library;
@@ -86,6 +99,13 @@ class _DevMenuState extends State<DevMenu> {
   @override
   Widget build(BuildContext context) => AppScaffold(
     title: 'Shiori DEV',
+    actions: [
+      IconButton(
+        onPressed: widget.onAppearance,
+        tooltip: AppLocalizations.of(context).appAppearance,
+        icon: const Icon(Icons.palette_outlined),
+      ),
+    ],
     body: ListView(
       children: [
         ListTile(

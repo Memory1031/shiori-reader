@@ -81,5 +81,23 @@
   "labSettings": "Reading settings",
   "labFullscreen": "Full screen preview",
   "readerRestoreNearby": "Content changed. Restored to a nearby position.",
-  "readerRestoreReadFailed": "Could not read saved progress. Saving is paused; tap to retry restoration."
+  "readerRestoreReadFailed": "Could not read saved progress. Saving is paused; tap to retry restoration.",
+  "appAppearance": "App appearance",
+  "appAppearanceDescription": "Applies to app pages. Reading colors are set separately.",
+  "readerColors": "Reading colors",
+  "readerPaper": "Paper",
+  "readerWarm": "Warm paper",
+  "readerNight": "Night",
+  "readerControlsHint": "Tap the center for controls. In paged mode, tap either side; in scroll mode, swipe vertically. Change modes in reading settings.",
+  "readerGotIt": "Got it",
+  "readerPreviousPage": "Previous page",
+  "readerNextPage": "Next page",
+  "readerChapterProgress": "About {percent}% of this chapter",
+  "@readerChapterProgress": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  }
 }

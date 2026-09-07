@@ -6,6 +6,7 @@ import '../shared/widgets/state_views.dart';
 import 'app_controller.dart';
 import 'routes.dart';
 import 'theme.dart';
+import 'appearance_panel.dart';
 
 AppController _defaultController() => AppController();
 
@@ -15,10 +16,12 @@ class ShioriApp extends StatelessWidget {
     this.createController = _defaultController,
     this.routes = const AppRoutes(),
     this.locale,
+    this.homeBuilder,
   });
 
   final AppController Function() createController;
   final AppRoutes routes;
+  final Widget Function(BuildContext, AppController)? homeBuilder;
 
   /// null follows system preferences. Kept in presentation, not ReaderSettings.
   final Locale? locale;
@@ -34,6 +37,7 @@ class ShioriApp extends StatelessWidget {
       theme: appTheme(Brightness.light),
       darkTheme: appTheme(Brightness.dark),
       themeMode: appThemeMode(controller.settings.themeMode),
+      themeAnimationDuration: Duration.zero,
       home: Builder(
         builder: (context) => LayoutBuilder(
           builder: (context, constraints) => Column(
@@ -53,12 +57,20 @@ class ShioriApp extends StatelessWidget {
                       bottom: false,
                       child: FailureView(
                         failure: failure,
-                        onRetry: controller.loadSettings,
+                        onRetry: controller.retrySettings,
                       ),
                     ),
                   ),
                 ),
-              Expanded(child: routes.buildHome(context)),
+              Expanded(
+                child:
+                    homeBuilder?.call(context, controller) ??
+                    routes.buildHome(
+                      context,
+                      onAppearance: () =>
+                          showAppAppearance(context, controller),
+                    ),
+              ),
             ],
           ),
         ),

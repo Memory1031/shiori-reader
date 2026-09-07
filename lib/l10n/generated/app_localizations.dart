@@ -589,6 +589,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not read saved progress. Saving is paused; tap to retry restoration.'**
   String get readerRestoreReadFailed;
+
+  /// No description provided for @appAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'App appearance'**
+  String get appAppearance;
+
+  /// No description provided for @appAppearanceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies to app pages. Reading colors are set separately.'**
+  String get appAppearanceDescription;
+
+  /// No description provided for @readerColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading colors'**
+  String get readerColors;
+
+  /// No description provided for @readerPaper.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper'**
+  String get readerPaper;
+
+  /// No description provided for @readerWarm.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm paper'**
+  String get readerWarm;
+
+  /// No description provided for @readerNight.
+  ///
+  /// In en, this message translates to:
+  /// **'Night'**
+  String get readerNight;
+
+  /// No description provided for @readerControlsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the center for controls. In paged mode, tap either side; in scroll mode, swipe vertically. Change modes in reading settings.'**
+  String get readerControlsHint;
+
+  /// No description provided for @readerGotIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get readerGotIt;
+
+  /// No description provided for @readerPreviousPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous page'**
+  String get readerPreviousPage;
+
+  /// No description provided for @readerNextPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Next page'**
+  String get readerNextPage;
+
+  /// No description provided for @readerChapterProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'About {percent}% of this chapter'**
+  String readerChapterProgress(int percent);
 }
 
 class _AppLocalizationsDelegate

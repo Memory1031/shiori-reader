@@ -110,3 +110,16 @@ READER-005 Android 补验：用户切换到新的 MuMu 实例，ADB 为 127.0.0.
 - 首次 Android 探针在第三次打开临时数据库时返回 database failure，分页两项此前已通过；新进程重跑完整双模式通过。保留首轮失败日志，不将 MuMu 的数据库环境异常宣称已根治。未导出用户数据库，也未读取非 fixture 记录。
 - Android 窗口测试通过改变正文约束完成，不等同系统旋转事件；READER-004 旧 MuMu 旋转待补项不据此销账。该探针验证 SQLite 关闭重开与 Reader 新会话，不冒充 OS 强杀后自动导航；启动后自动选择最近书籍仍归 PROGRESS-001。
 - iOS Level A：仅共享 Dart / Flutter 与既有存储依赖，尊重 SafeArea、系统文字缩放、资源取消；runtime / 实际字体误差 / lifecycle 仍 **DEFERRED_NO_MAC / IOS-004**。Android emulator 结果不替代 ARM64 真机性能验收。
+
+## UI-002：阅读视觉与独立应用外观（2026-09-07）
+
+- 正式 App 使用 Shiori Theme 工厂；Reader 通过独立 readerTheme 解析阅读明暗及纸色。纸白 #FFFCF8、暖纸 #F2E8D5、夜间 #1B181C；暖纸次要文字单独调为 #686166，以满足 ≥4.5:1。颜色留在 presentation，不进入 Domain / 数据库。
+- 正文单列居中，最大实际行宽 680 logical px；上下固定 56 / 64 留白。显隐工具栏不改变正文边界，恢复仍通过 READER-006 的语义锚点。没有新增全章测量或分页引擎。
+- 阅读模式移入排版 Sheet；三个纸色选项实时预览，夜间对应明暗=dark，纸白 / 暖纸对应 light；跟随系统开关保留上次浅色纸色，选中态按真实生效的系统明暗显示。Sheet 可滚动、支持中英和系统大字；减弱动态效果时关闭过渡。
+- 初次提示位于有界可滚动区域；点击“知道了”才写 controlsHintSeen，随后重进默认隐藏工具栏。确认前退出允许下次继续提示；重置排版不重置该标记。未注入持久 SettingsStore 的纯测试 / 无存储实例只能会话内记忆。
+- 工具栏提供返回、排版和真实页内前后翻页；底部仅章内粗略比例，不显示虚构总页数。键盘左右键翻页，F2 显隐；隐藏状态保留有标签的显示入口，以及进度 / 旧进度读取 / 阅读设置失败的可访问提示与重试入口。目录和跨章按钮待 READER-007 真正接线，不用页内按钮冒充跨章。
+- AppSettings v1 与 ReaderSettings v3 使用独立存储；v1 / v2 阅读设置保留原数值、模式、阅读明暗，补 paper / 提示标记。应用外观默认 system，绝不从旧阅读明暗推导。应用外观 Sheet 及生产 / 开发环境适配器已装配；完整书架、生产 Repository 与统一设置页面不在本项范围。
+- 新增9项测试覆盖 v1/v2/v3、读取不回写、两类 key 隔离、三种纸色对比、应用外观慢写 / 失败重试 / 重建、首次提示大字与记忆、680 行宽、系统明暗选中态、键盘 / 隐藏错误、低动效。完整离线 Flutter 测试 **164 项 PASS**；原有恢复、图文晚加载、双模式、短章、长段、窗口变化、后台补写回归继续通过。无新增依赖或 SQLite schema 变化。
+- iOS Level A：复用 Flutter 3.38.4 内已有 SafeArea、system text scaling、AnnotatedRegion 和 sheetAnimationStyle；保持平台返回与既有 shared_preferences。iOS runtime、VoiceOver / TalkBack 人工验收、ARM64 真机性能仍单列，不把 widget 或 Android 模拟器结果视为完成。
+- Android UI-002：普通开发 APK 构建、安装及 MuMu API 32 冷启动通过。暖纸正文、工具栏及系统栏已截图核对；强制停止后重新进入同一 fixture，暖纸及已确认提示状态保留。应用深色已通过选择后、冷启动后两份 UI hierarchy 的 selected=true 验证，分别记录在本机 `.tooling/evidence/ui002-dark-selected.xml` / `ui002-dark-restart.xml`。本轮夜间阅读配色与滚动模式的设备人工视觉检查尚未完成，自动测试覆盖不等同设备检查。
+- Android 恢复补验 **PARTIAL / 待补**：UI-002 隔离临时 fixture 数据库探针首轮分页 SQLite 重开误差 0、窗口变化误差 0；随后第三次数据库打开失败。两次新进程重试均在首次数据库打开失败，本轮没有完整 READER_RESTORE_PASS，不沿用 READER-006 历史 PASS 冒充新包通过。失败是 LocalDatabases.open 返回 Failure，底层原因未确认，不宣称 MuMu 文件系统问题已解决；滚动 SQLite 重开待环境排查后补验。未修改生产数据库逻辑或导出用户数据。已恢复普通开发包，未停留在探针入口。

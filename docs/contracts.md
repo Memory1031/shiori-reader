@@ -79,3 +79,8 @@ DB-001 / DB-002 后续实现已完成：生产本地 LibraryRepository、进度�
 READER-004：SettingsStore 签名不变，ReaderSettings v2 读取迁移 v1，只有显式保存时写回 v2。阅读会话通过注入的 store 做 300ms trailing 合并，slider 结束、面板关闭、后台与 dispose 补写；慢写期间只保留最新待写值，错误保留预览并允许手动重试。不承诺系统强杀前未提交的数据落盘。
 
 READER-005：LibraryRepository 契约不变。Tracker 借用仓库，beginProgressSession 后序号单调；旧 stamp 的 Success(false) 终止本会话写入，不能当成功或自动抢新代次。flush / close 返回在途串行写完成的 Future；调用方负责让仓库活到补写结束。纯 Dart Tracker 不保存临时布局样本，元信息或 DB 失败只影响保存状态。
+
+
+UI-002：SettingsStore 签名不变，读取 v1 / v2 到 ReaderSettings v3，仅用户显式修改或确认操作提示后保存新版本；读取未知版本不覆盖原值。新增独立 AppSettingsStore.load / save，传递纯 Domain AppSettings，遵守同样取消与 Result 失败语义。两个设置存储使用不同 key，彼此保存不写对方记录；不承诺跨设置或 SQLite 事务。AppController 注入 AppSettingsStore，阅读会话继续注入 SettingsStore，不通过全局 Get 服务定位。
+
+CORE-005：生产 DefaultNovelRepository 与 SourceRegistry 已实现，契约签名不变。基础读取使用本地规范化记录，失效记录后台刷新，同 key 去重并隔离调用者取消；写缓存失败仍交付 remote 内容并记录安全诊断。装配工厂及 close 所有权、无 TTL 基线与验证见 [Repository 实现](novel-repository.md)。完整 TTL / 容量 / 清理竞态仍由 CACHE 任务完成。

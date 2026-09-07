@@ -1,3 +1,4 @@
+import '../../support/reader_actions.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -85,10 +86,10 @@ void main() {
         Theme.of(tester.element(find.byType(PagedReaderViewport))).brightness,
         Brightness.dark,
       );
-      await tester.tap(find.byTooltip('Reading settings'));
+      await openReaderSettings(tester);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Light'));
-      await tester.tap(find.text('Light'));
+      await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Paper'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Paper'));
       await tester.pumpAndSettle();
       expect(
         Theme.of(tester.element(find.byType(PagedReaderViewport))).brightness,
@@ -216,7 +217,7 @@ void main() {
       );
       paged.controller.restore(anchor);
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Reading settings'));
+      await openReaderSettings(tester);
       await tester.pumpAndSettle();
       final panel = tester.widget<ReaderSettingsPanel>(
         find.byType(ReaderSettingsPanel),
@@ -244,7 +245,7 @@ void main() {
       expect(paged.controller.capture()!.blockFraction, closeTo(.6, .002));
       Navigator.of(tester.element(find.byType(ReaderSettingsPanel))).pop();
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Scroll'));
+      await chooseReaderMode(tester, 'Scroll');
       await tester.pumpAndSettle();
       var scroll = tester.widget<ReaderViewport>(find.byType(ReaderViewport));
       expect(scroll.controller.capture()!.blockFraction, closeTo(.6, .002));
@@ -254,7 +255,7 @@ void main() {
       await tester.pumpAndSettle();
       scroll = tester.widget<ReaderViewport>(find.byType(ReaderViewport));
       expect(scroll.controller.capture()!.blockFraction, closeTo(.6, .004));
-      await tester.tap(find.byTooltip('Reading settings'));
+      await openReaderSettings(tester);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());

@@ -1,3 +1,4 @@
+import '../../support/reader_actions.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -192,7 +193,7 @@ void main() {
         );
         await tester.pump();
         if (!paged) {
-          await tester.tap(find.text('Scroll'));
+          await chooseReaderMode(tester, 'Scroll');
           await tester.pump();
         }
         ReaderPosition? position() => paged

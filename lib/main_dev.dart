@@ -10,6 +10,7 @@ import 'data/repositories/library_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data/local/files/app_paths.dart';
 import 'data/local/preferences_settings_store.dart';
+import 'data/local/preferences_app_settings_store.dart';
 import 'shared/app_logger.dart';
 
 Future<void> main() async {
@@ -51,6 +52,11 @@ Future<void> main() async {
   );
   runApp(
     createDevApp(
+      appSettings: PreferencesAppSettingsStore(
+        preferences: SharedPreferencesAsync(),
+        paths: paths,
+        logger: AppLogger(),
+      ),
       settings: settings,
       library: library,
       scenarioId: const String.fromEnvironment('SHIORI_SCENARIO'),

@@ -255,4 +255,40 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerRestoreReadFailed => '暂时无法读取旧进度，已暂停保存；点按重试恢复';
+
+  @override
+  String get appAppearance => '应用外观';
+
+  @override
+  String get appAppearanceDescription => '仅影响应用页面；阅读配色单独设置。';
+
+  @override
+  String get readerColors => '阅读配色';
+
+  @override
+  String get readerPaper => '纸白';
+
+  @override
+  String get readerWarm => '暖纸';
+
+  @override
+  String get readerNight => '夜间';
+
+  @override
+  String get readerControlsHint =>
+      '点按正文中间显示或隐藏工具栏。分页模式点按两侧翻页，滚动模式上下拖动；模式在排版设置中切换。';
+
+  @override
+  String get readerGotIt => '知道了';
+
+  @override
+  String get readerPreviousPage => '上一页';
+
+  @override
+  String get readerNextPage => '下一页';
+
+  @override
+  String readerChapterProgress(int percent) {
+    return '本章约 $percent%';
+  }
 }

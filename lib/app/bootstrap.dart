@@ -8,7 +8,7 @@ import 'routes.dart';
 /// Composition entry: future production adapters are assembled here.
 /// Feature factories capture their own repositories; widgets never locate them.
 ShioriApp createApp({
-  SettingsStore? settings,
+  AppSettingsStore? settings,
   AppRoutes routes = const AppRoutes(),
   Locale? locale,
 }) => ShioriApp(

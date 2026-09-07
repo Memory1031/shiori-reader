@@ -27,6 +27,7 @@ class AppPaths {
   File get userDatabase => File(p.join(users.path, 'users.sqlite'));
   File get cacheDatabase => File(p.join(disposable.path, 'cache.sqlite'));
   String get settingsKey => 'shiori.${environment.name}.readerSettings';
+  String get appSettingsKey => 'shiori.${environment.name}.appSettings';
   static Future<AppPaths> resolve(StorageEnvironment environment) async =>
       AppPaths(
         support: await getApplicationSupportDirectory(),

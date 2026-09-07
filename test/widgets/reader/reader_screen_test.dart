@@ -1,3 +1,4 @@
+import '../../support/reader_actions.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -84,7 +85,7 @@ void main() {
       expect(find.byType(PagedReaderViewport), findsOneWidget);
       expect(find.byType(Image), findsNothing);
       expect(env.source.controls.calls[Operation.media] ?? 0, 0);
-      await tester.tap(find.text('上下滚动'));
+      await chooseReaderMode(tester, '上下滚动');
       await tester.pumpAndSettle();
       expect(find.byType(ReaderViewport), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -199,14 +200,14 @@ void main() {
       await tester.tap(find.byTooltip('Show reading controls'));
       await tester.pumpAndSettle();
       final anchor = viewport.controller.capture()!;
-      await tester.tap(find.text('Scroll'));
+      await chooseReaderMode(tester, 'Scroll');
       await tester.pumpAndSettle();
       final scroll = tester.widget<ReaderViewport>(find.byType(ReaderViewport));
       expect(scroll.controller.capture()!.blockKey, anchor.blockKey);
       expect(scroll.controller.mountedCount, lessThan(30));
       await tester.drag(find.byType(ReaderViewport), const Offset(0, -200));
       await tester.pumpAndSettle();
-      expect(find.text('Scroll'), findsOneWidget);
+      expect(find.byTooltip('Hide reading controls'), findsOneWidget);
       await tester.tapAt(tester.getCenter(find.byType(ReaderViewport)));
       await tester.pumpAndSettle();
       expect(find.text('Scroll'), findsNothing);
@@ -259,8 +260,7 @@ void main() {
       paged.controller.next();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.ensureVisible(find.text('Scroll'));
-      await tester.tap(find.text('Scroll'));
+      await chooseReaderMode(tester, 'Scroll');
       await tester.pumpAndSettle();
       expect(find.byType(ReaderViewport), findsOneWidget);
       expect(tester.takeException(), isNull);

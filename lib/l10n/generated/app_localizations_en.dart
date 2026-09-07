@@ -268,4 +268,41 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get readerRestoreReadFailed =>
       'Could not read saved progress. Saving is paused; tap to retry restoration.';
+
+  @override
+  String get appAppearance => 'App appearance';
+
+  @override
+  String get appAppearanceDescription =>
+      'Applies to app pages. Reading colors are set separately.';
+
+  @override
+  String get readerColors => 'Reading colors';
+
+  @override
+  String get readerPaper => 'Paper';
+
+  @override
+  String get readerWarm => 'Warm paper';
+
+  @override
+  String get readerNight => 'Night';
+
+  @override
+  String get readerControlsHint =>
+      'Tap the center for controls. In paged mode, tap either side; in scroll mode, swipe vertically. Change modes in reading settings.';
+
+  @override
+  String get readerGotIt => 'Got it';
+
+  @override
+  String get readerPreviousPage => 'Previous page';
+
+  @override
+  String get readerNextPage => 'Next page';
+
+  @override
+  String readerChapterProgress(int percent) {
+    return 'About $percent% of this chapter';
+  }
 }

@@ -6,8 +6,10 @@ enum ReaderMode { paged, scroll }
 
 enum ReaderThemeMode { system, light, dark }
 
+enum ReaderPaper { paper, warm }
+
 final class ReaderSettings extends ValueModel {
-  static const schemaVersion = 2;
+  static const schemaVersion = 3;
   ReaderSettings({
     double fontSize = 20,
     double lineHeight = 1.7,
@@ -15,6 +17,8 @@ final class ReaderSettings extends ValueModel {
     double horizontalPadding = 20,
     this.mode = ReaderMode.paged,
     this.themeMode = ReaderThemeMode.system,
+    this.paper = ReaderPaper.paper,
+    this.controlsHintSeen = false,
   }) : fontSize = finiteRange(fontSize, 14, 32, 'fontSize'),
        lineHeight = finiteRange(lineHeight, 1.2, 2.4, 'lineHeight'),
        paragraphSpacing = finiteRange(
@@ -35,6 +39,8 @@ final class ReaderSettings extends ValueModel {
   final double horizontalPadding;
   final ReaderThemeMode themeMode;
   final ReaderMode mode;
+  final ReaderPaper paper;
+  final bool controlsHintSeen;
   ReaderSettings copyWith({
     double? fontSize,
     double? lineHeight,
@@ -42,6 +48,8 @@ final class ReaderSettings extends ValueModel {
     double? horizontalPadding,
     ReaderThemeMode? themeMode,
     ReaderMode? mode,
+    ReaderPaper? paper,
+    bool? controlsHintSeen,
   }) => ReaderSettings(
     fontSize: fontSize ?? this.fontSize,
     lineHeight: lineHeight ?? this.lineHeight,
@@ -49,6 +57,8 @@ final class ReaderSettings extends ValueModel {
     horizontalPadding: horizontalPadding ?? this.horizontalPadding,
     themeMode: themeMode ?? this.themeMode,
     mode: mode ?? this.mode,
+    paper: paper ?? this.paper,
+    controlsHintSeen: controlsHintSeen ?? this.controlsHintSeen,
   );
   Map<String, Object?> toJson() => {
     'schemaVersion': schemaVersion,
@@ -58,9 +68,11 @@ final class ReaderSettings extends ValueModel {
     'horizontalPadding': horizontalPadding,
     'themeMode': themeMode.name,
     'mode': mode.name,
+    'paper': paper.name,
+    'controlsHintSeen': controlsHintSeen,
   };
   factory ReaderSettings.fromJson(Map<String, dynamic> json) {
-    if (json['schemaVersion'] != 1 && json['schemaVersion'] != schemaVersion) {
+    if (![1, 2, schemaVersion].contains(json['schemaVersion'])) {
       throw const FormatException('Unsupported reader settings version');
     }
     double number(String key, double min, double max) {
@@ -70,6 +82,12 @@ final class ReaderSettings extends ValueModel {
     }
 
     return ReaderSettings(
+      paper: json['schemaVersion'] == 3
+          ? ReaderPaper.values.byName(json['paper'] as String)
+          : ReaderPaper.paper,
+      controlsHintSeen: json['schemaVersion'] == 3
+          ? json['controlsHintSeen'] as bool
+          : false,
       mode: json['schemaVersion'] == 1
           ? ReaderMode.paged
           : ReaderMode.values.byName(json['mode'] as String),
@@ -88,6 +106,8 @@ final class ReaderSettings extends ValueModel {
     horizontalPadding,
     themeMode,
     mode,
+    paper,
+    controlsHintSeen,
   ];
 }
 

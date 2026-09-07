@@ -1,6 +1,6 @@
 # Shiori UI 规划
 
-日期：2026-09-07。适用于 Android / iOS。本文是后续 UI 实现的共同依据；本轮只编写规划，不修改 Widget、主题、持久化格式或阅读行为，也不开始 READER-006。
+日期：2026-09-07。适用于 Android / iOS。本文是 UI 实现的共同依据；最初规划阶段不改代码，后续 UI-001 / UI-002 实施记录见文末及 reader.md。
 
 ## 1. 产品方向与决策状态
 
@@ -129,9 +129,9 @@ CatalogView 共用数据与交互：详情内可预览目录并进入完整目�
 
 对用户展示纸白 / 暖纸 / 夜间三种阅读预览；夜间预览对应阅读明暗=深色，纸白或暖纸预览对应浅色及所选纸色，另有“跟随系统”开关。开启跟随后，系统亮时使用记住的浅色纸色，暗时使用夜间；控制可见状态必须与实际生效组合一致。首版不增加独立 AMOLED 配色。
 
-当前 ReaderSettings v2 的 themeMode 继续表示阅读明暗。未来 UI-002 增加浅色纸色字段时使用 v3，v1 / v2 迁移补 paper，保留字号、模式、边距、行高与原 themeMode；未知版本仍不覆盖。应用外观 / 语言使用独立 AppSettings 存储边界，不把字符串 locale 或颜色对象塞进 ReaderSettings。旧实现把 ReaderThemeMode 借作 appThemeMode，是需要拆开的现状；没有独立应用偏好时应用先默认跟随系统，不擅自将旧阅读偏好解释为用户对全 App 的选择。
+ReaderSettings v3 的 themeMode 继续表示阅读明暗，UI-002 已增加浅色纸色字段，v1 / v2 迁移补 paper，保留字号、模式、边距、行高与原 themeMode；未知版本仍不覆盖。应用外观 / 语言使用独立 AppSettings 存储边界，不把字符串 locale 或颜色对象塞进 ReaderSettings。旧实现把 ReaderThemeMode 借作 appThemeMode，是需要拆开的现状；没有独立应用偏好时应用先默认跟随系统，不擅自将旧阅读偏好解释为用户对全 App 的选择。
 
-颜色 hex、圆角、动画时长属于 presentation tokens，不入 Domain 或数据库。持久化只存用户偏好语义，不存 ThemeData / ColorScheme / TextStyle。本轮只定迁移方向，codec 及消费者在 UI-002 / 应用设置对应任务中一起修改与验证。
+颜色 hex、圆角、动画时长属于 presentation tokens，不入 Domain 或数据库。持久化只存用户偏好语义，不存 ThemeData / ColorScheme / TextStyle。UI-002 已同步 codec 及消费者；首次提示确认标记与迁移细节见 Reader 实施记录。
 
 ## 6. 组件和代码边界
 
@@ -188,7 +188,7 @@ UI-002 和既有功能任务完成后，按 UX-001 做完整状态 / 屏幕 / �
 
 规划阶段新增本文并同步 TASK_PLAN / app 文档入口；后续 UI-001 实现和验证见下节。UI 具体方案保留在本文，不进入 AGENTS.md 的长期代理约定。
 
-UI-001 已形成三页可评审样板，用户指定的后续 READER-006 也已完成。UI-002 前置已齐备，实施前可基于样板评审具体视觉；它尚未自动执行。动态封面取色、角色插画、额外字体和 AMOLED 主题均为后续可选项，不阻塞首版。
+UI-001 已形成三页可评审样板，用户指定的后续 READER-006 也已完成。UI-002 前置已齐备，实施前可基于样板评审具体视觉；UI-002 现已按用户后续指令执行。动态封面取色、角色插画、额外字体和 AMOLED 主题均为后续可选项，不阻塞首版。
 
 
 ## UI-001 实施与视觉核对（2026-09-07）
@@ -200,3 +200,8 @@ UI-001 已形成三页可评审样板，用户指定的后续 READER-006 也已�
 - MuMu 新实例 `127.0.0.1:16416`，Android API 32 / 1440×2560：安装启动、中文书架、中文详情及收藏状态、英文夜间阅读全屏预览已核对。真实系统中文字体无溢出；阅读样板使用原有双模式懒布局视口，补齐全屏 SafeArea。iOS 共享 API / SafeArea / 本地化 Level A 审查，无新增平台依赖；runtime 仍 DEFERRED_NO_MAC。
 - 本机截图：`.tooling/evidence/theme-lab/android-shelf.png`、`android-detail.png`、`android-reader-dark-en.png`；不将 Flutter 测试的占位字体截图作为视觉验收证据。截图是候选视觉供评审，并非生产页面完成。正式书架 / 详情导航仍由各自任务交付。
 - 本轮已按用户指定顺序完成 UI-001 → READER-006；UI-002 不自动领取。
+
+
+## UI-002 实施
+
+正式应用接入 Shiori 主题；正式 Reader 已交付独立纸色、最大680单列行宽、新工具栏和排版面板，应用外观与阅读偏好分开保存。旧设置迁移、首次提示确认、低动效、无障碍操作和恢复回归见 [Reader UI-002](reader.md)。保留现有页面职责，目录与跨章导航待 READER-007；没有提前实现书架 / 搜索 / 详情业务。具体纸色已通过 ≥4.5:1 文字对比度测试。

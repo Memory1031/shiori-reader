@@ -81,5 +81,23 @@
   "labSettings": "阅读设置",
   "labFullscreen": "全屏预览",
   "readerRestoreNearby": "内容更新，已恢复到附近位置",
-  "readerRestoreReadFailed": "暂时无法读取旧进度，已暂停保存；点按重试恢复"
+  "readerRestoreReadFailed": "暂时无法读取旧进度，已暂停保存；点按重试恢复",
+  "appAppearance": "应用外观",
+  "appAppearanceDescription": "仅影响应用页面；阅读配色单独设置。",
+  "readerColors": "阅读配色",
+  "readerPaper": "纸白",
+  "readerWarm": "暖纸",
+  "readerNight": "夜间",
+  "readerControlsHint": "点按正文中间显示或隐藏工具栏。分页模式点按两侧翻页，滚动模式上下拖动；模式在排版设置中切换。",
+  "readerGotIt": "知道了",
+  "readerPreviousPage": "上一页",
+  "readerNextPage": "下一页",
+  "readerChapterProgress": "本章约 {percent}%",
+  "@readerChapterProgress": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  }
 }

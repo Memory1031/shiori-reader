@@ -4,6 +4,7 @@ import '../../../domain/models/models.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../features/reader/reader_preferences.dart';
 import '../../../features/reader/settings_panel.dart';
+import '../../../features/reader/reader_theme.dart';
 import '../../../features/reader/viewport/paged_reader_viewport.dart';
 import '../../../features/reader/viewport/reader_viewport.dart';
 import '../../fixture_scenarios.dart';
@@ -198,6 +199,9 @@ class _ThemeLabState extends State<ThemeLab> {
                                           ),
                                           padding: EdgeInsets.zero,
                                           textScaler: TextScaler.linear(_scale),
+                                          platformBrightness: _dark
+                                              ? Brightness.dark
+                                              : Brightness.light,
                                         ),
                                         child: RepaintBoundary(
                                           key: ValueKey('lab-$index'),
@@ -593,31 +597,7 @@ class _LabReaderState extends State<LabReader> {
     isScrollControlled: true,
     builder: (_) => FractionallySizedBox(
       heightFactor: .8,
-      child: Column(
-        children: [
-          ListenableBuilder(
-            listenable: _preferences,
-            builder: (context, _) => Wrap(
-              spacing: 8,
-              children: [
-                for (final mode in ReaderMode.values)
-                  ChoiceChip(
-                    label: Text(
-                      mode == ReaderMode.paged
-                          ? AppLocalizations.of(context).pagedReading
-                          : AppLocalizations.of(context).scrollReading,
-                    ),
-                    selected: _preferences.value.mode == mode,
-                    onSelected: (_) => _preferences.update(
-                      _preferences.value.copyWith(mode: mode),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Expanded(child: ReaderSettingsPanel(preferences: _preferences)),
-        ],
-      ),
+      child: ReaderSettingsPanel(preferences: _preferences),
     ),
   );
   @override
@@ -628,7 +608,7 @@ class _LabReaderState extends State<LabReader> {
       ReaderThemeMode.dark => Brightness.dark,
     };
     return Theme(
-      data: shioriTheme(brightness),
+      data: readerTheme(_preferences.value, brightness),
       child: Builder(builder: _body),
     );
   }

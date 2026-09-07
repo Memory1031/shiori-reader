@@ -42,10 +42,18 @@ class AppRoutes {
   final Widget Function(BuildContext, NovelKey)? novel;
   final Widget Function(BuildContext, ChapterKey)? reader;
 
-  Widget buildHome(BuildContext context) =>
+  Widget buildHome(BuildContext context, {VoidCallback? onAppearance}) =>
       home?.call(context) ??
       AppScaffold(
         title: AppLocalizations.of(context).appTitle,
+        actions: [
+          if (onAppearance != null)
+            IconButton(
+              onPressed: onAppearance,
+              tooltip: AppLocalizations.of(context).appAppearance,
+              icon: const Icon(Icons.palette_outlined),
+            ),
+        ],
         body: EmptyView(
           message: AppLocalizations.of(context).readingFeaturesPending,
         ),

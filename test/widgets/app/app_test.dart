@@ -17,15 +17,29 @@ import 'package:shiori/shared/widgets/state_views.dart';
 
 import '../../support/contract_fakes.dart';
 
-class _PendingSettings implements SettingsStore {
-  final requests = <Completer<Result<ReaderSettings>>>[];
+class _AppStore implements AppSettingsStore {
+  AppSettings settings = AppSettings();
+  @override
+  Future<Result<AppSettings>> load({
+    required CancellationToken cancellation,
+  }) async => Success(settings);
+  @override
+  Future<Result<void>> save(
+    AppSettings value, {
+    required CancellationToken cancellation,
+  }) async {
+    settings = value;
+    return const Success(null);
+  }
+}
+
+class _PendingSettings implements AppSettingsStore {
+  final requests = <Completer<Result<AppSettings>>>[];
   final tokens = <CancellationToken>[];
   @override
-  Future<Result<ReaderSettings>> load({
-    required CancellationToken cancellation,
-  }) {
+  Future<Result<AppSettings>> load({required CancellationToken cancellation}) {
     tokens.add(cancellation);
-    final request = Completer<Result<ReaderSettings>>();
+    final request = Completer<Result<AppSettings>>();
     requests.add(request);
     return request
         .future; // Deliberately allows late results to test the owner.
@@ -33,7 +47,7 @@ class _PendingSettings implements SettingsStore {
 
   @override
   Future<Result<void>> save(
-    ReaderSettings settings, {
+    AppSettings settings, {
     required CancellationToken cancellation,
   }) => throw UnimplementedError('No settings editing in CORE-004');
 }
@@ -109,8 +123,8 @@ void main() {
   testWidgets(
     'composition injects settings and applies theme without globals',
     (tester) async {
-      final settings = ContractSettings()
-        ..settings = ReaderSettings(themeMode: ReaderThemeMode.dark);
+      final settings = _AppStore()
+        ..settings = AppSettings(themeMode: AppThemeMode.dark);
       await tester.pumpWidget(createApp(settings: settings));
       await tester.pumpAndSettle();
       expect(
@@ -138,23 +152,23 @@ void main() {
     final second = controller.loadSettings();
     expect(store.tokens.first.isCancelled, isTrue);
     store.requests[1].complete(
-      Success(ReaderSettings(themeMode: ReaderThemeMode.dark)),
+      Success(AppSettings(themeMode: AppThemeMode.dark)),
     );
     await second;
     store.requests[0].complete(
-      Success(ReaderSettings(themeMode: ReaderThemeMode.light)),
+      Success(AppSettings(themeMode: AppThemeMode.light)),
     );
     await tester.pump();
-    expect(controller.settings.themeMode, ReaderThemeMode.dark);
+    expect(controller.settings.themeMode, AppThemeMode.dark);
     final third = controller.loadSettings();
     await tester.pumpWidget(const SizedBox.shrink());
     expect(controller.isClosed, isTrue);
     expect(store.tokens.last.isCancelled, isTrue);
     store.requests.last.complete(
-      Success(ReaderSettings(themeMode: ReaderThemeMode.light)),
+      Success(AppSettings(themeMode: AppThemeMode.light)),
     );
     await third;
-    expect(controller.settings.themeMode, ReaderThemeMode.dark);
+    expect(controller.settings.themeMode, AppThemeMode.dark);
     expect(tester.takeException(), isNull);
   });
 
@@ -181,7 +195,7 @@ void main() {
       await tester.tap(find.text('重试'));
       await tester.pump();
       store.requests.last.complete(
-        Success(ReaderSettings(themeMode: ReaderThemeMode.dark)),
+        Success(AppSettings(themeMode: AppThemeMode.dark)),
       );
       await tester.pumpAndSettle();
       expect(find.byType(FailureView), findsNothing);

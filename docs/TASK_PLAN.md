@@ -968,6 +968,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### CORE-005 — 通用小说 Repository 组装
 
+- Status：DONE（2026-09-07）；SourceRegistry、通用读取 / 规范化记录存取、同 key 刷新去重、取消隔离与 composition 工厂已交付；新增 13 项测试，完整 177 项离线测试及 analyze PASS。Android / iOS runtime 本轮未执行；iOS Level A PASS。详见 [Repository 实现与验收](novel-repository.md)。
+
 - Phase：2；Complexity：M。
 - Goal：使应用通过可替换 Repository 加载小说而不依赖具体站点。
 - Input：第 12、21–24 节 contracts / stores；Dependencies：CORE-003、DB-002、NET-002。
@@ -1006,7 +1008,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### UI-002 — Reader 视觉与应用 / 阅读偏好拆分
 
-- Status：PLANNED；Phase：4 增量；Complexity：M。
+- Status：DONE（2026-09-07）；Phase：4 增量；Complexity：M。阅读视觉、独立 AppSettings 与 ReaderSettings v3 已交付；164 项测试、analyze、Android Debug build / 安装与外观冷启动验证 PASS。Android SQLite 恢复补验为 PARTIAL：分页误差 0，滚动重开受数据库打开失败阻断；详见 [Reader 验收](reader.md)。iOS runtime DEFERRED_NO_MAC。
 - Goal：在已验证位置恢复上实施克制的阅读视觉，避免视觉与存储设置耦合。
 - Input：[UI_PLAN.md](UI_PLAN.md)；Dependencies：UI-001、READER-006。
 - Scope：Reader 配色 / 行宽、Chrome 与排版 Sheet、初次操作提示、显式可访问动作；ReaderSettings v3 浅色纸色迁移；独立 AppSettings 外观存储与应用主题接线；保留阅读明暗、模式和数值。相关 domain / contracts / codec 同步，不重写视口 / tracker。
@@ -1826,7 +1828,7 @@ UI 增量：CORE-004 + DEV-002 → UI-001 → 正式 HOME / SHELF / SEARCH / DET
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。**NET-001 / NET-002 / MEDIA-001 DONE**，**READER-003 DONE**，双模式图片与局部重试已交付，完整测试 120 项及 Android 图片探针 PASS。**DB-001 / DB-002 DONE**，127 项测试及 Android 持久化探针 PASS，见 [本地存储](database.md)。**READER-004 DONE**，设置持久化与受控重布局已交付，Android 旋转实测受 MuMu 限制待补（widget 横竖窗口变化通过），见 [Reader](reader.md)。**READER-005 DONE**，位置追踪、有界有序保存与短章完成已交付，143 项测试及新 MuMu 持久记录验证 PASS，见 [Reader](reader.md)。**UI-001 / READER-006 DONE**：三页样板、语义位置恢复、内容更新降级和恢复保护已交付；155 项完整测试与 Android 双模式 SQLite 重开恢复通过，见 [UI 记录](UI_PLAN.md) / [Reader](reader.md)。UI-002 前置已齐备，但未自动执行。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。CORE-005 及 Source 首项 SRC-005 的 DB-002 / NET-002 前置已解除，尚未执行。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。**NET-001 / NET-002 / MEDIA-001 DONE**，**READER-003 DONE**，双模式图片与局部重试已交付，完整测试 120 项及 Android 图片探针 PASS。**DB-001 / DB-002 DONE**，127 项测试及 Android 持久化探针 PASS，见 [本地存储](database.md)。**READER-004 DONE**，设置持久化与受控重布局已交付，Android 旋转实测受 MuMu 限制待补（widget 横竖窗口变化通过），见 [Reader](reader.md)。**READER-005 DONE**，位置追踪、有界有序保存与短章完成已交付，143 项测试及新 MuMu 持久记录验证 PASS，见 [Reader](reader.md)。**UI-001 / READER-006 DONE**：三页样板、语义位置恢复、内容更新降级和恢复保护已交付；155 项完整测试与 Android 双模式 SQLite 重开恢复通过，见 [UI 记录](UI_PLAN.md) / [Reader](reader.md)。**UI-002 DONE**：正式阅读配色 / 行宽 / 操作栏、独立应用外观和旧偏好迁移已交付；164 项完整测试通过，Android 外观冷启动通过，SQLite 滚动重开补验仍受数据库打开失败阻断，详见 [Reader](reader.md)。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。**CORE-005 DONE**：通用 Repository、Source 注册表及装配工厂已交付，177 项完整离线测试与 analyze PASS，见 [Repository](novel-repository.md)。Source 首项 SRC-005 前置已齐备，尚未执行。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
 
 ## 39. Parallelizable Work
 

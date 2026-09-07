@@ -113,3 +113,12 @@ abstract interface class SettingsStore {
     required CancellationToken cancellation,
   });
 }
+
+/// Application appearance is independent of reading typography and paper.
+abstract interface class AppSettingsStore {
+  Future<Result<AppSettings>> load({required CancellationToken cancellation});
+  Future<Result<void>> save(
+    AppSettings settings, {
+    required CancellationToken cancellation,
+  });
+}

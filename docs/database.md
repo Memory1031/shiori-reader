@@ -16,7 +16,7 @@ LibraryRepository 的所有写操作通过 Drift 事务串行执行。重复收�
 
 NovelRecordStore 只接受类型化 Detail / Catalog / Chapter；缓存 codec 检查版本、类型、身份以及目录 / 正文摘要。写失败保留旧记录，单条损坏返回局部 cache Failure，不自动清库、不影响其他记录。没有网络调用，也没有 Source locator 表；只有 SRC-010 实证需要时才扩展。
 
-ReaderSettings 在 DB-002 交付时使用 v1 codec，READER-004 已升级为兼容 v1 读取的 v2 codec，通过注入的 SharedPreferencesAsync 存一个 JSON 字符串，key 按 production / development 隔离。单 Store 串行保存，读取等待已排队的保存；坏 JSON、类型、数值或未知版本返回默认设置并写入不含路径 / 原始值的本地诊断，读取不覆盖坏值或未来版本。设置不是关键数据，不承诺与 SQLite 的跨存储事务。阅读模式 codec、有限数值 clamp 与设置 UI 的后续实现见 [Reader](reader.md)。
+ReaderSettings 在 DB-002 交付时使用 v1 codec，READER-004 升级到 v2，UI-002 已升级为兼容 v1 / v2 的 v3 codec，通过注入的 SharedPreferencesAsync 存一个 JSON 字符串，key 按 production / development 隔离。单 Store 串行保存，读取等待已排队的保存；坏 JSON、类型、数值或未知版本返回默认设置并写入不含路径 / 原始值的本地诊断，读取不覆盖坏值或未来版本。设置不是关键数据，不承诺与 SQLite 的跨存储事务。阅读模式 codec、有限数值 clamp 与设置 UI 的后续实现见 [Reader](reader.md)。
 
 ## 路径与备份（OQ-08）
 
@@ -63,3 +63,8 @@ Windows 构建初次下载 SQLite 库遇到 Dart TLS handshake 错误：通过�
 运行期观察：早期探针在 MuMu 间歇返回 SQLITE_CANTOPEN（数据库文件保留且后续可读），新进程与同进程重开阶段均需关注。初始化已改为顺序执行，最终无诊断版本连续冷启动复测通过，但不能据此确认间歇故障根因已彻底消除；保留 ANDROID-002 / DB-003 的真机及反复启动关注项。没有通过删除数据库、自动重建或无限重试绕过故障。SQLite 实际 Android 编译选项 THREADSAFE=1。
 
 最终普通 `lib/main.dart` Android Debug 构建 PASS；127 项完整回归通过后，对最终初始化 / 诊断清理再执行 7 项本地测试与静态分析，均 PASS。备份云端往返、ARM64 真机和 iOS runtime 不在此次成功声明内。
+
+
+UI-002 增加 PreferencesAppSettingsStore，使用 shiori.{production|development}.appSettings；Reader 继续使用独立 readerSettings key。两个适配器各自串行写入、读取等待在途写入，并在坏类型 / JSON / 未知版本时返回默认与安全诊断，读操作不回写。应用外观不从旧阅读明暗初始化。此次无 SQLite schema 变更，无新增插件。
+
+CORE-005 已通过 NovelRecordStore 接入通用 NovelRepository；沿用现有三类记录和 schema v1，没有迁移或 SQL 结构变化。读取 / 刷新 / 写失败降级及 composition 所有权见 [Repository 实现](novel-repository.md)。

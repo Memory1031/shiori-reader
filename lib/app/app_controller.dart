@@ -6,16 +6,53 @@ import '../shared/controllers/scoped_controller.dart';
 
 /// App lifetime only; feature controllers belong to their own page scopes.
 class AppController extends ScopedController {
-  AppController({SettingsStore? settingsStore})
+  AppController({AppSettingsStore? settingsStore})
     : _settingsStore = settingsStore;
 
-  // No production store exists until DB-002. Absence means in-memory defaults,
+  // An omitted adapter means in-memory defaults,
   // not a fake store or a claim that settings have been persisted.
-  final SettingsStore? _settingsStore;
-  ReaderSettings settings = ReaderSettings();
+  final AppSettingsStore? _settingsStore;
+  AppSettings settings = AppSettings();
   AppFailure? settingsFailure;
   bool isLoadingSettings = false;
   CancellationSource? _request;
+  AppSettings? _pending;
+  bool _writing = false;
+
+  void setAppearance(AppThemeMode mode) {
+    if (isClosed || (settings.themeMode == mode && !isLoadingSettings)) return;
+    _request?.cancel();
+    isLoadingSettings = false;
+    settings = settings.copyWith(themeMode: mode);
+    _pending = settings;
+    update();
+    unawaited(_save());
+  }
+
+  Future<void> retrySettings() => _pending != null ? _save() : loadSettings();
+
+  Future<void> _save() async {
+    if (_writing || _settingsStore == null) return;
+    _writing = true;
+    try {
+      while (_pending != null) {
+        final candidate = _pending!;
+        _pending = null;
+        final result = await _settingsStore.save(
+          candidate,
+          cancellation: CancellationSource().token,
+        );
+        settingsFailure = result is Failure<void> ? result.failure : null;
+        if (!isClosed) update();
+        if (result is Failure<void>) {
+          _pending ??= candidate;
+          break;
+        }
+      }
+    } finally {
+      _writing = false;
+    }
+  }
 
   @override
   void onInit() {
@@ -53,6 +90,7 @@ class AppController extends ScopedController {
   @override
   void onClose() {
     _request?.cancel();
+    unawaited(_save());
     super.onClose();
   }
 }
