@@ -13,13 +13,31 @@ import 'library_rows.dart';
 import 'parser_worker.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import 'record_codec.dart';
+import 'epub/epub_parser.dart';
 
 /// Durable imported originals and normalized content. Never uses cache.db.
 /// Single owner, serialized operations; initialize/recover before exposure.
-class ManagedLocalBooks implements LocalBookStore, LocalBookManagement {
+class ManagedLocalBooks
+    implements
+        LocalBookStore,
+        LocalBookManagement,
+        LocalPagePresentationRepository {
   ManagedLocalBooks._(this.paths, this.db);
   final AppPaths paths;
   final UserDatabase db;
+  (NovelKey, String, DateTime, int, LocalBookRecord)? _readCache;
+  final _presentations = <NovelKey, (LocalBookContent, Map<String, String>)>{};
+  @override
+  Future<Result<String?>> loadPagePresentation(
+    ChapterKey chapter, {
+    required CancellationToken cancellation,
+  }) => _run(Operation.chapter, () async {
+    checkLocalCancellation(cancellation);
+    final record = await _read(chapter.novelKey, token: cancellation);
+    if (record == null || record.format != LocalBookFormat.epub) return null;
+    return _presentations[chapter.novelKey]?.$2[chapter.chapterId];
+  });
+
   Future<void> _tail = Future.value();
   bool _closed = false;
   static const maxOriginalBytes = 128 * 1024 * 1024;
@@ -286,14 +304,56 @@ class ManagedLocalBooks implements LocalBookStore, LocalBookManagement {
         .getSingleOrNull();
     if (row == null) return null;
     final file = await _file(key.novelId, 'manifest.json');
+    final stat = await file.stat();
+    final hash = row.read<String>('manifest_hash');
+    final cached = _readCache;
+    if (cached != null &&
+        cached.$1 == key &&
+        cached.$2 == hash &&
+        cached.$3 == stat.modified &&
+        cached.$4 == stat.size) {
+      return cached.$5;
+    }
+
     if (await file.length() > maxManifestBytes) throw const _LimitExceeded();
     final bytes = await file.readAsBytes();
-    return _decodeManifest(
+    final record = await _decodeManifest(
       bytes,
       key,
       row.read<String>('manifest_hash'),
       token,
     );
+    if (record.format != LocalBookFormat.epub) {
+      _readCache = (key, hash, stat.modified, stat.size, record);
+      return record;
+    }
+    var extracted = _presentations[key];
+    if (extracted == null) {
+      final original = await _file(key.novelId, 'original');
+      if (await original.length() > 64 * 1024 * 1024) {
+        throw const _LimitExceeded();
+      }
+      extracted = await _extractPresentations(
+        await original.readAsBytes(),
+        key,
+        token,
+      );
+      checkLocalCancellation(token);
+      _presentations.clear();
+      _presentations[key] = extracted;
+    }
+    final upgraded = LocalBookRecord(
+      content: LocalBookContent(
+        detail: record.content.detail,
+        catalog: extracted.$1.catalog,
+        chapters: extracted.$1.chapters,
+        navigation: extracted.$1.navigation,
+      ),
+      format: record.format,
+      importedAt: record.importedAt,
+    );
+    _readCache = (key, hash, stat.modified, stat.size, upgraded);
+    return upgraded;
   }
 
   @override
@@ -332,6 +392,8 @@ class ManagedLocalBooks implements LocalBookStore, LocalBookManagement {
       throw const FormatException('Invalid local identity');
     }
     checkLocalCancellation(cancellation);
+    _presentations.remove(key);
+    if (_readCache?.$1 == key) _readCache = null;
     await db.transaction(() async {
       final variables = [Variable(key.sourceId.value), Variable(key.novelId)];
       // Retain a generation tombstone even across a later re-import.
@@ -432,6 +494,8 @@ class ManagedLocalBooks implements LocalBookStore, LocalBookManagement {
   Future<void> close() async {
     _closed = true;
     await _tail;
+    _presentations.clear();
+    _readCache = null;
   }
 }
 
@@ -585,3 +649,28 @@ Future<LocalBookRecord> _decodeManifest(
     importedAt: DateTime.parse(map['importedAt'] as String).toUtc(),
   );
 }, token);
+
+Future<(LocalBookContent, Map<String, String>)> _extractPresentations(
+  List<int> bytes,
+  NovelKey key,
+  CancellationToken cancellation,
+) => runParserWorker(() {
+  if (sha256.convert(bytes).toString() != key.novelId) {
+    throw const LocalParseException(LocalParseProblem.invalid);
+  }
+  final parser = EpubParser(
+    Uint8List.fromList(bytes),
+    key,
+    'book.epub',
+    includePresentations: true,
+  );
+  final parsed = parser.parse();
+  if (parser.presentations.values.fold<int>(
+        0,
+        (sum, html) => sum + html.length,
+      ) >
+      16 * 1024 * 1024) {
+    throw const LocalParseException(LocalParseProblem.tooLarge);
+  }
+  return (parsed.content, parser.presentations);
+}, cancellation);

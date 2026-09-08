@@ -12,26 +12,14 @@ void main() {
       !ciEvents.containsKey('workflow_dispatch')) {
     throw StateError('Missing expected events');
   }
-  if (ciJobs['android-build']['if'] != null ||
-      ciJobs['android-build']['needs'] != 'analyze-test') {
-    throw StateError('Regular APK build must depend on checks');
+  if (ciJobs.keys.length != 1 || !ciJobs.containsKey('analyze-test')) {
+    throw StateError('Regular CI must contain only quality checks');
   }
-
-  final androidJob = ciJobs['android-build'] as YamlMap;
-  final androidSteps = androidJob['steps'] as YamlList;
-  final smoke = androidSteps.cast<YamlMap>().singleWhere(
-    (step) => step['name'] == '构建 release smoke APK',
-  );
-  if (androidJob['runs-on'] != 'ubuntu-latest' ||
-      smoke['if'] !=
-          "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')" ||
-      ci['permissions']['contents'] != 'read' ||
-      File(
-        '.github/workflows/ci.yml',
-      ).readAsStringSync().contains('secrets.')) {
-    throw StateError(
-      'Android smoke must be Linux, main/manual and secret-free',
-    );
+  for (final step in ciJobs['analyze-test']['steps'] as YamlList) {
+    final command = (step as YamlMap)['run']?.toString() ?? '';
+    if (RegExp(r'flutter\s+build\s').hasMatch(command)) {
+      throw StateError('Packaging is reserved for the tag release workflow');
+    }
   }
 
   final release =
@@ -57,7 +45,7 @@ void main() {
     }
   }
   stdout.writeln(
-    'Workflow YAML parsed; triggers, regular Debug, main/manual smoke, tag-only release '
+    'Workflow YAML parsed; quality-only CI, tag-only release '
     'and working directories verified.',
   );
 }

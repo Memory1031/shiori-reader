@@ -162,6 +162,6 @@ JDK 17 的当前进程配置仍须按上文设置。arm64 单架构构建用于�
 
 ## CI-002 Android 构建检查
 
-PR / develop 推送执行 Linux Debug 构建；main 推送或手动运行再执行 Release smoke。三份锁文件严格安装、数据库和本地化生成一致性检查先于构建。构建路径与排错日志见 [持续集成说明](ci.md)。本地等价命令为 `flutter build apk --debug --no-pub`、`flutter build apk --release --no-pub`，先完成锁定依赖安装并使用本页 JDK 17 配置；不限定 `--target-platform`，覆盖 Flutter 默认 Android 架构。
+按用户最新约定，普通推送 / PR / 手动 CI 仅执行质量检查，Android 打包只在推送 `v*` tag 时由 `release.yml` 执行。该流程需要发布签名 secrets，并创建 / 更新 GitHub Release。触发方式与签名配置见 [持续集成说明](ci.md)。
 
-CI smoke 使用 Debug 签名，不依赖发布 secrets，也不创建 GitHub Release。远端验收需查看本次提交的 Actions：PR Debug、main / 手动 Debug + Release 成功，以及重跑命中缓存后锁文件与生成代码仍通过；本机 macOS 构建不能替代 Linux runner 记录。
+本地原生改动仍可按需执行 `flutter build apk --debug --no-pub` 或 `flutter build apk --release --no-pub`，先完成锁定依赖安装并使用本页 JDK 17 配置；没有发布密钥时本地 Release 回退 Debug 签名。历史本地构建不替代 tag 发布的 Linux runner 验收。

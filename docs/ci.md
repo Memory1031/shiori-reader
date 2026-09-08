@@ -1,6 +1,6 @@
 # 持续集成
 
-工作流：[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)。CI-001 已完成验收（2026-09-08）；CI-002 配置与本地验证见下方记录，GitHub Linux 实跑待验收。tag 触发的发布工作流见[发布工作流](#发布工作流)一节（[`.github/workflows/release.yml`](../.github/workflows/release.yml)）。
+工作流：[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)。CI-001 已完成验收（2026-09-08）；CI-002 已按用户调整后的范围标记 DONE：仅 tag 打包，质量检查通过；正式签名发布链路的远端实跑归发布阶段验收。tag 触发的发布工作流见[发布工作流](#发布工作流)一节（[`.github/workflows/release.yml`](../.github/workflows/release.yml)）。
 
 ## CI-001 验收补齐（2026-09-08）
 
@@ -12,18 +12,12 @@
 
 | 事件 | 行为 |
 | --- | --- |
-| 创建 / 更新 PR、推送至 `develop` | 离线检查通过后构建 Android Debug APK |
-| 推送至 `main`（包括合并）、手动 `workflow_dispatch` | 离线检查通过后依次构建 Debug 与 Release smoke APK |
+| 创建 / 更新 PR、推送至 `main` / `develop`、手动运行 CI | 仅运行格式、静态分析、离线测试、锁文件与生成一致性检查 |
+| 推送 `v*` tag | 运行独立 Release 工作流，检查通过后构建签名 Release APK 并创建 / 更新 GitHub Release |
 
-仅修改文档时也执行上述检查。所有 job 在 Linux 上运行，固定 Flutter 3.38.4 / JDK 17；Android SDK / NDK 由项目与固定 Flutter 的配置决定，没有 Xcode、iOS 或 macOS 前置。Debug 与 Release 在同一 job 内依次构建，复用本次 Gradle 缓存；PR 不执行 Release 以控制开销。
+按用户 2026-09-08 的调整，取消日常 Debug 与 Release smoke 打包 job。普通 CI 不安装 Android 构建用 JDK、不打包或上传 APK；手动 CI 也只做质量检查。需要本地验证原生改动时仍可自行构建。
 
-手动入口为 GitHub **Actions → CI → Run workflow**；工作流进入默认分支后可使用。产物保留 7 天：
-
-- `app-debug-apk`：常规 Debug APK。
-- `app-release-smoke-debug-signed`：开启 Release 编译优化但使用 Debug 签名的检查包，不是正式 RC。
-- `android-build-logs`：Debug / Release 标准构建日志，构建失败也尝试上传；失败发生于构建前时查看对应 Actions 步骤日志。
-
-构建使用 Bash `pipefail`，`tee` 不会掩盖失败退出码。只上传指定 APK 和构建日志，不上传整个工作目录、Gradle 用户目录或签名文件。CI 仅有 `contents: read`，不读取发布 secrets，并要求 `android/key.properties` 不存在；正式签名发布仍由独立 tag 工作流负责。
+打包统一由下方 tag 发布工作流负责，需提前配置签名 secrets。注意该现有流程会创建 GitHub Release，并非只生成临时检查包。
 
 ## 发布工作流
 
@@ -63,7 +57,7 @@ Flutter 固定为 **3.38.4**。应用、独立调查包与数据库生成器均�
 
 数据库通过 `bash tool/generate_database.sh` 重新生成 Dart 与 schema 快照，随后检查 tracked diff 和新增未跟踪快照；生成器依赖隔离在 `tool/db_codegen`，不改应用依赖。Windows 继续使用原有 PowerShell 入口。
 
-Flutter SDK / Pub 缓存沿用 [flutter-action 的缓存能力](https://github.com/subosito/flutter-action#caching)，Pub 缓存键包含三份锁文件哈希及平台、SDK 版本。即使命中缓存也不跳过严格安装，并通过 `git diff` 检查锁文件；构建后再次检查应用锁文件与生成代码。缓存仅加速安装，不作为依赖版本来源。
+Flutter SDK / Pub 缓存沿用 [flutter-action 的缓存能力](https://github.com/subosito/flutter-action#caching)，Pub 缓存键包含三份锁文件哈希及平台、SDK 版本。即使命中缓存也不跳过严格安装，并通过 `git diff` 检查锁文件。缓存仅加速安装，不作为依赖版本来源。
 
 根目录 `flutter analyze` 会扫描独立调查包，因此必须在分析前完成应用与调查包的依赖安装；新增的数据库生成检查还需先安装隔离生成器依赖。仅安装主应用依赖不会生成 `tools/source_probe/.dart_tool/package_config.json`；干净的 runner 会因此找不到调查包自身以及 `html`、`image` 等依赖。不要通过忽略诊断或把调查依赖加入主应用来解决。
 
@@ -140,7 +134,7 @@ dart tool/check_ci_yaml.dart
 
 ## CI-002 验证记录（2026-09-08）
 
-状态：配置与本地验证完成，GitHub Linux 实跑待验收。未修改业务代码、发布工作流或应用依赖。
+历史记录：以下为调整前的 Debug / Release smoke 本地验证。用户随后要求仅 tag 打包，日常打包 job 已移除；这些记录不表示现行 tag 发布链路已验收。
 
 | 本地检查 | 结果 |
 | --- | --- |
@@ -159,8 +153,18 @@ dart tool/check_ci_yaml.dart
 - Debug：`9ded947397e39aa2cbaac55f335936b7b5281dcd40eb39387cb3c824e0119a45`
 - Release：`ac9def321c436ed15e1f9b3f5be98fa6978928bb34d855dd6130a5f775d13ed9`
 
-剩余：提交并推送本次配置后，记录 GitHub Linux 的 Debug 与 main / 手动 Release 成功 run URL；重跑观察 Pub 缓存命中，并确认锁文件 / 生成文件检查与 artifact 上传成功。当前没有可用的 GitHub CLI / 连接器，本轮未推送、触发远端运行或创建 Release；CI-001 的旧人工确认不替代本次 CI-002 运行证据。
+当前证据：用户后续截图确认“格式、静态分析与离线测试”job 已通过；截图未包含 run / commit，不能据此确认删除打包 job 的最新配置已运行。正式 tag 签名发布的远端运行证据留待发布阶段补齐，不再要求 PR / main 的 Debug 或 Release smoke 记录。
 
 ### 远端格式失败修正
 
-用户提供的 Actions 截图显示格式检查因 `test/data/media/persistent_image_repository_test.dart` 一处 `expect` 换行不符合格式而退出 1，后续静态分析与测试未执行。已使用固定 Dart 3.10.3 格式化该文件，仅调整换行，无逻辑改动；本地复跑同款 `dart format --output=none --set-exit-if-changed lib test`，220 个文件、0 changed，通过。本轮未重复运行行为测试。需提交并推送此修正后验证新提交，重跑旧提交仍会遇到相同问题；CI-002 继续保留远端待验状态。
+用户提供的 Actions 截图显示格式检查因 `test/data/media/persistent_image_repository_test.dart` 一处 `expect` 换行不符合格式而退出 1，后续静态分析与测试未执行。已使用固定 Dart 3.10.3 格式化该文件，仅调整换行，无逻辑改动；本地复跑同款 `dart format --output=none --set-exit-if-changed lib test`，220 个文件、0 changed，通过。本轮未重复运行行为测试。后续用户提供该质量检查 job 的绿色成功截图，确认质量检查已通过，此前格式失败不再列为未解决问题。截图未包含 run URL / commit，不推断具体运行版本、缓存命中或 tag 签名发布结果。
+
+### 打包触发策略调整（2026-09-08）
+
+按用户要求删除普通 CI 的 Android 打包 job，保留质量检查及锁文件缓存；现有 `release.yml` 的 `v*` tag 签名发布流程保持不变。更新工作流结构校验，防止普通 CI 再加入打包命令。本地 YAML / 触发边界检查通过；未创建 tag、未触发发布，本次仅删除日常构建路径，不重复 APK 构建。
+
+### 旧工作流 Android job 远端成功（2026-09-08）
+
+用户补充 Actions 截图，确认此前运行的“格式、静态分析与离线测试”和“Android Debug 与 Release smoke”两个 job 均为绿色成功。记录为旧 Android 构建 job 的远端 PASS，补齐此前只有本地构建结果的证据。截图未展示 run URL / commit、各步骤状态或缓存命中信息，因此不单独断言条件执行的 Release smoke 步骤是否运行；这也不是正式 tag 签名发布验收。
+
+CI-002 保持 DONE；现行“普通 CI 仅质量检查、`v*` tag 才打包”的用户约定不变。

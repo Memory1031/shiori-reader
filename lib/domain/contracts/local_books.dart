@@ -116,3 +116,12 @@ abstract interface class LocalNavigationRepository {
     required CancellationToken cancellation,
   });
 }
+
+/// Optional offline rendition alongside immutable semantic chapter content.
+/// HTML is inert, self-contained and bounded by the data layer; never a URL.
+abstract interface class LocalPagePresentationRepository {
+  Future<Result<String?>> loadPagePresentation(
+    ChapterKey chapter, {
+    required CancellationToken cancellation,
+  });
+}

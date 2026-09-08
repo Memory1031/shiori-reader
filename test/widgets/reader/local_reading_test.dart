@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/routes.dart';
@@ -85,10 +86,14 @@ void main() {
             tester.widget<ReaderContentView>(find.byType(ReaderContentView));
         await tester.pumpWidget(app());
         await tester.pumpAndSettle();
-        // Use the real reader callback and catalog route; select a nested fragment.
-        view().onCatalog!();
+        // Tap the visible catalog action: local books bypass article headings.
+        await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Book contents'));
         await tester.pumpAndSettle();
         expect(find.byType(LocalNavigationView), findsOneWidget);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.text('In-volume contents'), findsNothing);
         expect(
           tester
               .widget<ListTile>(find.byKey(const ValueKey(('local-toc', 2))))

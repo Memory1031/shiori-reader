@@ -10,6 +10,8 @@ import '../../../domain/models/models.dart';
 import '../txt/txt_decoder.dart';
 import '../txt/txt_parser.dart' show filenameTitle;
 import 'epub_zip.dart';
+import 'epub_presentation.dart';
+import 'epub_text_styles.dart';
 
 final class ParsedEpub {
   ParsedEpub(this.content, this.media);
@@ -61,7 +63,13 @@ String? attr(XmlElement e, String name) {
 }
 
 class EpubParser {
-  EpubParser(this.bytes, this.book, this.filename);
+  EpubParser(
+    this.bytes,
+    this.book,
+    this.filename, {
+    this.includePresentations = false,
+  });
+  final bool includePresentations;
   final Uint8List bytes;
   final NovelKey book;
   final String filename;
@@ -70,6 +78,7 @@ class EpubParser {
   final mediaByPath = <String, MediaRef>{};
   final items = <String, _Item>{};
   final chapters = <ChapterContent>[];
+  final presentations = <String, String>{};
   final byPath = <String, ChapterContent>{};
   final fragments = <String, Map<String, String>>{};
   int mediaSize = 0, textSize = 0;
@@ -299,6 +308,36 @@ class EpubParser {
 
   void _chapter(String path) {
     final doc = _html(path);
+    final styles = epubTextStyles(doc, [
+      for (final link in doc.querySelectorAll('link[rel="stylesheet"]'))
+        if (epubReference(path, link.attributes['href'] ?? '') case final ref?)
+          if (zip.entries.containsKey(ref.$1)) text(ref.$1),
+      for (final style in doc.querySelectorAll('style')) style.text,
+    ]);
+    dom.Element? paragraphOwner;
+    String? property(String name) {
+      for (var node = paragraphOwner; node != null; node = node.parent) {
+        if (styles[node]?[name] case final value?) return value;
+      }
+      return null;
+    }
+
+    final presentation = includePresentations
+        ? epubPresentation(
+            doc,
+            path,
+            (p) => zip.entries.containsKey(p) ? text(p) : '',
+            (p) => zip.entries.containsKey(p)
+                ? zip.read(p, limit: 8 * 1024 * 1024)
+                : Uint8List(0),
+            (base, href) => epubReference(base, href)?.$1,
+          )
+        : null;
+    if (presentation != null) {
+      presentations[LocalBookIdentity.chapter(book, 'epub:$path').chapterId] =
+          presentation;
+    }
+
     final blocks = <ContentBlock>[];
     final anchors = <String, int>{};
     var buffer = StringBuffer();
@@ -309,8 +348,33 @@ class EpubParser {
       if (value.trim().isEmpty) return;
       blocks.add(
         heading == null
-            ? ParagraphBlock(text: value)
-            : HeadingBlock(text: value, level: heading),
+            ? ParagraphBlock(
+                text: value,
+                alignment: switch (property('text-align')) {
+                  'center' => ParagraphAlignment.center,
+                  'right' => ParagraphAlignment.end,
+                  _ => ParagraphAlignment.start,
+                },
+                leadingIndent: (() {
+                  final indent = property('text-indent');
+                  if (indent == null || !indent.endsWith('em')) return 0;
+                  return (double.tryParse(
+                            indent.substring(0, indent.length - 2),
+                          ) ??
+                          0)
+                      .round()
+                      .clamp(0, 8);
+                })(),
+              )
+            : HeadingBlock(
+                text: value,
+                level: heading,
+                alignment: switch (property('text-align')) {
+                  'center' => ParagraphAlignment.center,
+                  'right' => ParagraphAlignment.end,
+                  _ => ParagraphAlignment.start,
+                },
+              ),
       );
       if (blocks.length > 100000) zipLimit();
     }
@@ -363,6 +427,8 @@ class EpubParser {
           paragraphs.contains(tag) ||
           heading != null;
       if (boundary) flush();
+      final previousOwner = paragraphOwner;
+      if (paragraphs.contains(tag) || heading != null) paragraphOwner = node;
       final id = node.id.isNotEmpty ? node.id : node.attributes['name'];
       if (id != null && id.isNotEmpty) {
         anchors.putIfAbsent(id, () => blocks.length);
@@ -401,6 +467,7 @@ class EpubParser {
         walk(child);
       }
       if (boundary) flush(heading: heading);
+      paragraphOwner = previousOwner;
       pre = wasPre;
     }
 

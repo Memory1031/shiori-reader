@@ -10,6 +10,136 @@ import 'package:shiori/features/reader/viewport/render_chunk.dart';
 import 'viewport_test.dart' show at;
 
 void main() {
+  testWidgets('heading moves with body and large illustration stays alone', (
+    tester,
+  ) async {
+    final base = const FixtureData().content(FixtureScenario.shortChapter);
+    ChapterContent content(List<ContentBlock> blocks) =>
+        ChapterContent(key: base.key, title: 'pagination', blocks: blocks);
+    PageLayout layout(ChapterContent c) => PageLayout(
+      index: ChunkIndex(c),
+      width: 300,
+      height: 200,
+      style: const TextStyle(fontSize: 20, height: 1.5),
+      scaler: TextScaler.noScaling,
+      direction: TextDirection.ltr,
+      paragraphSpacing: 20,
+    );
+    final headings = layout(
+      content([
+        ParagraphBlock(text: 'Before'),
+        ParagraphBlock(text: 'Before two'),
+        HeadingBlock(text: 'Chapter title', level: 1),
+        ParagraphBlock(
+          text:
+              'Body follows this chapter title with enough text for several lines.',
+        ),
+      ]),
+    );
+    final first = headings.forward(const PageCursor(0, 0))!;
+    expect(first.end.unit, 2);
+    final second = headings.forward(first.end)!;
+    expect(second.fragments.first.unit, 2);
+    expect(second.fragments.last.unit, 3);
+    final media = const FixtureData()
+        .content(FixtureScenario.twentyImages)
+        .blocks
+        .whereType<ImageBlock>()
+        .first;
+    final illustrations = layout(
+      content([
+        ParagraphBlock(text: 'Before'),
+        media,
+        ParagraphBlock(text: 'After'),
+      ]),
+    );
+    final before = illustrations.forward(const PageCursor(0, 0))!;
+    final picture = illustrations.forward(before.end)!;
+    expect(picture.fragments, hasLength(1));
+    expect(picture.fragments.single.unit, 1);
+    final back = illustrations.backward(picture.end)!;
+    expect(back.fragments, hasLength(1));
+    expect(back.fragments.single.unit, 1);
+  });
+
+  testWidgets('entering previous chapter lays out its final page', (
+    tester,
+  ) async {
+    final c = PagedReaderController();
+    final base = const FixtureData().content(FixtureScenario.shortChapter);
+    final content = ChapterContent(
+      key: base.key,
+      title: 'long',
+      blocks: [
+        for (var i = 0; i < 100; i++) ParagraphBlock(text: 'Paragraph $i'),
+      ],
+    );
+    final turns = <int>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 300,
+            height: 400,
+            child: PagedReaderViewport(
+              content: content,
+              controller: c,
+              startAtEnd: true,
+              onBoundary: turns.add,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(c.capture()!.blockIndex, greaterThan(85));
+    await c.next();
+    expect(turns, [1]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('single-page boundaries respond to tap and swipe once', (
+    tester,
+  ) async {
+    final c = PagedReaderController();
+    final base = const FixtureData().content(FixtureScenario.shortChapter);
+    final content = ChapterContent(
+      key: base.key,
+      title: 'single',
+      blocks: [ParagraphBlock(text: 'Only page')],
+    );
+    final turns = <int>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 300,
+            height: 500,
+            child: PagedReaderViewport(
+              content: content,
+              controller: c,
+              onBoundary: turns.add,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(turns, isEmpty);
+    await c.next();
+    expect(turns, [1]);
+    await c.previous();
+    expect(turns, [1, -1]);
+    final area = find.byType(PagedReaderViewport);
+    await tester.drag(area, const Offset(-180, 0));
+    await tester.pumpAndSettle();
+    expect(turns, [1, -1, 1]);
+    await tester.drag(area, const Offset(180, 0));
+    await tester.pumpAndSettle();
+    expect(turns, [1, -1, 1, -1]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'paged image reflow and large text keep anchor and source semantics',
     (tester) async {

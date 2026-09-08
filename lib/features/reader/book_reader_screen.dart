@@ -46,12 +46,40 @@ class BookReaderScreen extends StatefulWidget {
 class _BookReaderScreenState extends State<BookReaderScreen>
     with WidgetsBindingObserver {
   late ReaderController _reader;
+  ReaderController? _pending;
   late final ImageRepository? _displayImages;
   late final CatalogController _catalog;
   bool get _local =>
       widget.chapter.novelKey.sourceId == LocalBookIdentity.sourceId;
   CacheManagement? get _cache => _local ? null : widget.cache;
   bool _changing = false, _canPop = false;
+  final _titleRequest = CancellationSource();
+  String? _bookTitle;
+  Future<void> _loadBookTitle() async {
+    final result = await widget.repository.loadDetail(
+      widget.chapter.novelKey,
+      mode: ReadMode.cacheOnly,
+      cancellation: _titleRequest.token,
+    );
+    if (!mounted || _titleRequest.token.isCancelled) return;
+    if (result case Success<LoadResult<NovelDetail>>(:final value)) {
+      setState(() => _bookTitle = value.value.summary.title);
+    }
+  }
+
+  String? _runningTitle(ReaderController reader) {
+    for (final volume in _catalog.loaded?.value.volumes ?? <Volume>[]) {
+      if (!volume.isSynthetic &&
+          volume.title != null &&
+          volume.chapters.any((c) => c.key == reader.chapter)) {
+        return _bookTitle == null
+            ? volume.title
+            : '$_bookTitle · ${volume.title}';
+      }
+    }
+    return _bookTitle;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +97,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           )
           ..onStart()
           ..addListener(_changed);
+    unawaited(_loadBookTitle());
     _reader = _create(
       widget.chapter,
       blockKey: widget.initialBlockKey,
@@ -91,12 +120,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     ChapterKey key, {
     String? blockKey,
     bool fromStart = false,
+    bool fromEnd = false,
+    bool deferProgress = false,
   }) =>
       ReaderController(
           repository: widget.repository,
           chapter: key,
           initialBlockKey: blockKey,
           startAtBeginning: fromStart,
+          startAtEnd: fromEnd,
+          deferProgress: deferProgress,
           library: widget.library,
           cache: _cache,
           readMode: widget.offline ? ReadMode.cacheOnly : ReadMode.cacheFirst,
@@ -105,6 +138,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         ..onStart()
         ..addListener(_changed);
   void _changed() {
+    final pending = _pending;
+    if (pending != null &&
+        (pending.status == ReaderStatus.error ||
+            pending.status == ReaderStatus.cancelled)) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _rejectPending(pending),
+      );
+    }
     if (!widget.offline && _reader.content != null) {
       unawaited(
         _cache?.prefetch?.enter(_reader.content!, _catalog.loaded?.value),
@@ -121,8 +162,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   void dispose() {
+    _titleRequest.cancel();
     if (!widget.offline) _cache?.prefetch?.leave();
     WidgetsBinding.instance.removeObserver(this);
+    if (_pending case final pending?) _close(pending);
     _close(_reader);
     _catalog.removeListener(_changed);
     _catalog.onDelete();
@@ -160,6 +203,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     ChapterKey chapter, {
     String? blockKey,
     bool fromStart = false,
+    bool fromEnd = false,
   }) async {
     if (_changing ||
         chapter == _reader.chapter && blockKey == null && !fromStart ||
@@ -171,11 +215,55 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       if (mounted) setState(() => _changing = false);
       return;
     }
-    _close(_reader);
+    if (!mounted) return;
     setState(() {
-      _reader = _create(chapter, blockKey: blockKey, fromStart: fromStart);
+      _pending = _create(
+        chapter,
+        deferProgress: true,
+        blockKey: blockKey,
+        fromStart: fromStart,
+        fromEnd: fromEnd,
+      );
+    });
+  }
+
+  void _commitPending(ReaderController reader) {
+    if (!mounted || _pending != reader) return;
+    final previous = _reader;
+    setState(() {
+      _reader = reader;
+      _pending = null;
       _changing = false;
     });
+    _close(previous);
+    reader.activateProgress();
+  }
+
+  void _rejectPending(ReaderController reader) {
+    if (!mounted || _pending != reader) return;
+    final target = reader.chapter;
+    final blockKey = reader.initialBlockKey;
+    final fromStart = reader.startAtBeginning, fromEnd = reader.startAtEnd;
+    setState(() {
+      _pending = null;
+      _changing = false;
+    });
+    _close(reader);
+    final l = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(l.readerChapterLoadFailed),
+        action: SnackBarAction(
+          label: l.retryAction,
+          onPressed: () => _switch(
+            target,
+            blockKey: blockKey,
+            fromStart: fromStart,
+            fromEnd: fromEnd,
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _exit() async {
@@ -257,11 +345,41 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     widget.onDetails!(widget.chapter.novelKey);
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _view(ReaderController reader) {
     final chapters =
         _catalog.loaded?.value.flatChapters.toList() ?? <Chapter>[];
-    final index = chapters.indexWhere((c) => c.key == _reader.chapter);
+    final index = chapters.indexWhere((c) => c.key == reader.chapter);
+    return ReaderContentView(
+      key: ValueKey(reader),
+      content: reader.content!,
+      onReady: () => _commitPending(reader),
+      onLoadFailure: () => _rejectPending(reader),
+      runningTitle: _runningTitle(reader),
+      images: _displayImages,
+      settings: widget.settings,
+      session: reader,
+      initialPosition: reader.initialPosition,
+      onCatalog: _changing ? null : _contents,
+      onPrefetch: !widget.offline && _cache?.prefetch != null
+          ? () => showPrefetchSheet(
+              context,
+              cache: _cache!,
+              catalog: _catalog.loaded?.value,
+              current: reader.chapter,
+            )
+          : null,
+      onDetails: widget.onDetails == null || _changing ? null : _details,
+      onPreviousChapter: !_changing && index > 0
+          ? () => _switch(chapters[index - 1].key, fromEnd: true)
+          : null,
+      onNextChapter: !_changing && index >= 0 && index + 1 < chapters.length
+          ? () => _switch(chapters[index + 1].key, fromStart: true)
+          : null,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SourceImageDecodeScope(
       child: PopScope(
         // Cupertino's interactive back gesture requires canPop before it starts.
@@ -275,32 +393,28 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           }
         },
         child: _reader.status == ReaderStatus.ready
-            ? ReaderContentView(
-                key: ValueKey(_reader),
-                content: _reader.content!,
-                images: _displayImages,
-                settings: widget.settings,
-                session: _reader,
-                initialPosition: _reader.initialPosition,
-                onCatalog: _changing ? null : _contents,
-                onPrefetch: !widget.offline && _cache?.prefetch != null
-                    ? () => showPrefetchSheet(
-                        context,
-                        cache: _cache!,
-                        catalog: _catalog.loaded?.value,
-                        current: _reader.chapter,
-                      )
-                    : null,
-                onDetails: widget.onDetails == null || _changing
-                    ? null
-                    : _details,
-                onPreviousChapter: !_changing && index > 0
-                    ? () => _switch(chapters[index - 1].key)
-                    : null,
-                onNextChapter:
-                    !_changing && index >= 0 && index + 1 < chapters.length
-                    ? () => _switch(chapters[index + 1].key)
-                    : null,
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (_pending case final pending?
+                      when pending.status == ReaderStatus.ready)
+                    Positioned.fill(
+                      key: ValueKey(pending),
+                      child: IgnorePointer(
+                        child: ExcludeSemantics(child: _view(pending)),
+                      ),
+                    ),
+                  Positioned.fill(
+                    key: ValueKey(_reader),
+                    child: IgnorePointer(
+                      ignoring: _changing,
+                      child: ExcludeSemantics(
+                        excluding: false,
+                        child: _view(_reader),
+                      ),
+                    ),
+                  ),
+                ],
               )
             : Scaffold(
                 appBar: AppBar(

@@ -98,6 +98,12 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @localBookContents.
+  ///
+  /// In en, this message translates to:
+  /// **'Book contents'**
+  String get localBookContents;
+
   /// No description provided for @articleContents.
   ///
   /// In en, this message translates to:
@@ -1429,6 +1435,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Soft pink'**
   String get appAccentSoftPink;
+
+  /// No description provided for @readerChapterLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the chapter. Your current page is still available.'**
+  String get readerChapterLoadFailed;
 }
 
 class _AppLocalizationsDelegate

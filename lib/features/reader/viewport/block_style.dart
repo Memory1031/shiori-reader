@@ -17,8 +17,14 @@ TextStyle readerBlockStyle(ContentBlock block, TextStyle base) {
           ).hasMatch(block.text.trim());
   if (title || subtitle) {
     return base.copyWith(
-      fontSize: (base.fontSize ?? 18) * (title ? 1.22 : .94),
-      fontWeight: title ? FontWeight.w600 : FontWeight.w500,
+      fontSize:
+          (base.fontSize ?? 18) *
+          (title
+              ? 1.35
+              : block is HeadingBlock
+              ? 1.08
+              : .94),
+      fontWeight: FontWeight.w600,
       height: title ? 1.45 : 1.5,
       color: subtitle && !title
           ? base.color?.withValues(alpha: .7)
@@ -28,10 +34,18 @@ TextStyle readerBlockStyle(ContentBlock block, TextStyle base) {
   return base;
 }
 
-TextAlign readerBlockAlign(ContentBlock block) =>
-    block is ParagraphBlock && block.alignment == ParagraphAlignment.center
-    ? TextAlign.center
-    : TextAlign.start;
+TextAlign readerBlockAlign(ContentBlock block) {
+  final alignment = switch (block) {
+    ParagraphBlock(:final alignment) => alignment,
+    HeadingBlock(:final alignment) => alignment,
+    _ => ParagraphAlignment.start,
+  };
+  return switch (alignment) {
+    ParagraphAlignment.center => TextAlign.center,
+    ParagraphAlignment.end => TextAlign.end,
+    ParagraphAlignment.start => TextAlign.start,
+  };
+}
 
 /// Presentation-only em spaces. They never enter content or persisted offsets.
 String readerIndentPrefix(
@@ -43,11 +57,20 @@ String readerIndentPrefix(
 ) {
   if (block is! ParagraphBlock ||
       !startsBlock ||
-      block.alignment == ParagraphAlignment.center ||
+      block.alignment != ParagraphAlignment.start ||
       isArticleHeading(block.text) ||
       RegExp(r'^[\s　]').hasMatch(block.text)) {
     return '';
   }
   final capacity = (width / scaler.scale(style.fontSize ?? 20)).floor() - 1;
   return '\u2003' * block.leadingIndent.clamp(0, capacity.clamp(0, 2));
+}
+
+/// Shared vertical rhythm; measurement must reserve the same space as painting.
+double readerBlockSpacing(ContentBlock block, double paragraphSpacing) {
+  if (block is HeadingBlock ||
+      block is ParagraphBlock && isArticleHeading(block.text)) {
+    return paragraphSpacing + 20;
+  }
+  return paragraphSpacing;
 }

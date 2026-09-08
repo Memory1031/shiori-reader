@@ -80,3 +80,8 @@ UI-002：ReaderPaper（paper / warm）表示浅色阅读纸色，ReaderThemeMode
 ## LOCAL-005 补充（2026-09-08）
 
 LOCAL-005 新增不可变 LocalBookInfo / LocalBookDeletion，用于本地管理列表及已提交删除的清理状态；没有增加平台路径、持久页码或新章节身份。
+
+2026-09-08 阅读排版优化：按用户进一步要求接近 Apple Books 截图，新实例默认段间距调整为 20、左右边距为 40 logical px，字号 20、行高 1.6（取代本轮初稿 28/12）。已有合法偏好继续原样读取，可通过恢复默认排版采用新值；schemaVersion 不变。
+
+
+2026-09-08 EPUB 对齐：ParagraphAlignment 新增 end；HeadingBlock 支持显式 alignment，默认 start 时保持原 semanticFields 与 JSON 形式，旧内容摘要兼容。新显式对齐参与语义身份。HTML/CSS 特殊版式通过独立可选本地数据合约提供，ChapterContent 继续保存原生语义块，不持有 WebView/平台对象。

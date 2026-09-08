@@ -1,4 +1,5 @@
 {
+  "localBookContents": "Book contents",
   "articleContents": "In-volume contents",
   "articleContentsEmpty": "No recognisable section headings in this article. Use the volume list to switch articles.",
   "articleContentsHint": "Built from content headings; plain-text detection may be incomplete.",
@@ -262,5 +263,6 @@
   "appAccentTeal": "Soft teal",
   "appAccentBlueGrey": "Blue grey",
   "appAccentWarmBrown": "Warm brown",
-  "appAccentSoftPink": "Soft pink"
+  "appAccentSoftPink": "Soft pink",
+  "readerChapterLoadFailed": "Could not open the chapter. Your current page is still available."
 }

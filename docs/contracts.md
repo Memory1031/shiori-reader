@@ -101,3 +101,6 @@ CORE-005：生产 DefaultNovelRepository 与 SourceRegistry 已实现，契约�
 
 
 ANDROID-002 附带用户授权的主题色选择（2026-09-08）：AppSettings 升至 v2，AppAccent 保存语义枚举而非颜色值，AppSettingsStore 签名不变；v1 兼容读取保留明暗并补青绿。AppController 的明暗与主题色共用串行合并写入与失败重试，Reader 控件继承应用主题色但阅读明暗 / 纸张设置不变。
+
+
+2026-09-08：新增可选 LocalPagePresentationRepository.loadPagePresentation(ChapterKey, cancellation)，返回受限、自包含、离线的版式文档或 null；由本地数据层提取，普通 NovelRepository 合约不变。待切换 ReaderController 可延迟进度会话激活，只有目标页首帧准备好并替换当前页后才允许落盘。

@@ -9,6 +9,9 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get localBookContents => '全书目录';
+
+  @override
   String get articleContents => '卷内目录';
 
   @override
@@ -688,4 +691,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get appAccentSoftPink => '淡粉';
+
+  @override
+  String get readerChapterLoadFailed => '暂时无法打开目标章节，已保留当前页面。';
 }

@@ -2,7 +2,7 @@ import '../content_identity.dart';
 import 'identity.dart';
 import 'value_model.dart';
 
-enum ParagraphAlignment { start, center }
+enum ParagraphAlignment { start, center, end }
 
 sealed class ContentBlock extends ValueModel {
   ContentBlock(int occurrence)
@@ -51,6 +51,9 @@ sealed class ContentBlock extends ValueModel {
       'heading' => HeadingBlock(
         text: json['text'] as String,
         level: json['level'] as int,
+        alignment: json['alignment'] == null
+            ? ParagraphAlignment.start
+            : ParagraphAlignment.values.byName(json['alignment'] as String),
         occurrence: occurrence,
       ),
       'divider' => DividerBlock(occurrence: occurrence),
@@ -150,24 +153,41 @@ final class ImageBlock extends ContentBlock {
 }
 
 final class HeadingBlock extends ContentBlock {
-  HeadingBlock({required String text, this.level = 1, int occurrence = 0})
-    : text = nonBlank(ContentIdentity.normalizeText(text), 'heading'),
-      super(occurrence) {
+  HeadingBlock({
+    required String text,
+    this.level = 1,
+    this.alignment = ParagraphAlignment.start,
+    int occurrence = 0,
+  }) : text = nonBlank(ContentIdentity.normalizeText(text), 'heading'),
+       super(occurrence) {
     if (level < 1 || level > 6) {
       throw ArgumentError('Heading level must be 1..6');
     }
   }
   final String text;
   final int level;
+  final ParagraphAlignment alignment;
   @override
   String get kind => 'heading';
   @override
-  List<Object?> get semanticFields => [text, level];
+  List<Object?> get semanticFields => [
+    text,
+    level,
+    if (alignment != ParagraphAlignment.start) alignment.name,
+  ];
   @override
-  Map<String, Object?> get fieldsJson => {'text': text, 'level': level};
+  Map<String, Object?> get fieldsJson => {
+    'text': text,
+    'level': level,
+    if (alignment != ParagraphAlignment.start) 'alignment': alignment.name,
+  };
   @override
-  HeadingBlock withOccurrence(int occurrence) =>
-      HeadingBlock(text: text, level: level, occurrence: occurrence);
+  HeadingBlock withOccurrence(int occurrence) => HeadingBlock(
+    text: text,
+    level: level,
+    alignment: alignment,
+    occurrence: occurrence,
+  );
   @override
   List<Object?> get values => [...semanticFields, occurrence];
 }

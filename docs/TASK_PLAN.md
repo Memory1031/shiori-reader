@@ -557,7 +557,7 @@ FixtureNovelSource 实现正式 NovelSource / SourceMedia，所有图片及延�
 
 ## 30. CI / Build
 
-CI-001 保留简单 GitHub Actions：PR / 主分支固定 Flutter、lockfile 缓存、format、analyze、离线 tests、必要生成代码一致性和过期 job 取消。默认不访问真实源，不自动升级依赖。CI-002 只负责 Linux Android debug build 与合并 / 手动 release build smoke，不包含 Mac 依赖。
+CI-001 保留简单 GitHub Actions：PR / 主分支固定 Flutter、lockfile 缓存、format、analyze、离线 tests、必要生成代码一致性和过期 job 取消。默认不访问真实源，不自动升级依赖。CI-002 按用户 2026-09-08 的约定，仅在 `v*` tag 执行 Linux Android 签名打包；普通推送 / PR / 手动 CI 仅质量检查，不包含 Mac 依赖。
 
 **CI-003 — Optional macOS iOS Compile Compatibility，当前 OPTIONAL_PROPOSED。** 无本地 Mac 时，此 job 有提前发现插件链接 / 原生配置不兼容的价值；但 runner 权限、额度和维护成本尚待确认，不能成为 Android required check。本轮推荐保留并在首批 native plugins 稳定后按需启用，不每次 UI commit 执行。
 
@@ -636,7 +636,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | OQ-09 TECHNICAL_CHOICE_RESOLVED | CACHE-001 / CACHE-003 采用既有媒体协议的有限持久装饰层，256 MiB payload 分区与独立后台额度 | 不新增缓存包；自制图文件 / 故障 / 重开通过，长期实际容量与真机压力仍待设备验证，见 [缓存](cache.md) |
 | OQ-10 NEEDS VERIFICATION | 最终 SDK / 插件版本、最低 OS、Native dependencies、iOS limitations、生成器兼容 | CORE-001 / 依赖引入任务：Android build + Level A documented review；CI-003 可选 compile；IOS-001 未来实际链接 / runtime，不阻塞 Android |
 | OQ-11 PARTIALLY_OBSERVED | 验收书选择与图文可达子问题 CLOSED：玩乐关系 → 31607 / 44117 / 309555；真实限流规则仍 UNKNOWN | NET-002 / TEST-001 用保守预算并尊重自然 429；不压测；30 次只是客户端政策 |
-| OQ-12 PARTIALLY_OBSERVED | SRC-004 现有 fixture / report 脱敏审查通过，仅元数据、结构与自制资产；接入 / 分发许可仍 UNKNOWN。正式 Android applicationId / 渠道 / 签名及 iOS 发布身份未关闭 | RELEASE-001..002 在公开分发前核对规则、许可和正式身份；IOS-006 管 iOS 独有项。secret review 不等于内容授权；新增真实资产另审，不自行发布 |
+| OQ-12 PARTIALLY_OBSERVED（2026-09-08 更新见 RELEASE-001） | SRC-004 现有 fixture / report 脱敏审查通过，仅元数据、结构与自制资产；接入 / 分发许可仍 UNKNOWN。正式 Android applicationId / 渠道 / 签名及 iOS 发布身份未关闭 | RELEASE-001..002 在公开分发前核对规则、许可和正式身份；IOS-006 管 iOS 独有项。secret review 不等于内容授权；新增真实资产另审，不自行发布 |
 | OQ-13 UNKNOWN | GitHub macOS runner 的可用权限 / 额度、是否值得启用可选 iOS compile | CI-003 按第 30 节成本和触发策略决策；未启用不阻塞 Android，不把 runner 可用视为已有本地 iOS 环境 |
 | OQ-14 PARTIALLY_OBSERVED | 当前独立 Dart 样本无需 WebView；未来访问方式仍可能改变，Android / iOS runtime 未由此证明 | SRC-005 / TEST-001 若出现正常访问必须平台能力的新证据，先更新 ADR / iOS impact 并重开 Gate；禁止 Android-only Source。Android codec 待 TEST-001 / ANDROID-002，iOS 待 IOS-002 |
 
@@ -1491,12 +1491,12 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### CI-002 — Android 构建检查
 
-- Status：IN_PROGRESS（2026-09-08；配置与本地验证完成，等待新工作流 GitHub Linux 运行及缓存命中记录）。已补齐常规 Debug、main / 手动 Release smoke、失败日志、三份锁文件缓存键和生成一致性检查；macOS 完整三架构 Debug / Release 构建、Debug 签名核验、缓存严格安装及静态分析 PASS。证据与远端待项见 [CI 说明](ci.md#ci-002-验证记录2026-09-08)。
+- Status：DONE（2026-09-08，按用户调整后的范围验收）。普通 CI 仅执行质量检查，用户截图确认该 job 已通过；Android Debug / Release 本地构建已通过，用户后续截图也确认旧“Android Debug 与 Release smoke”远端 job 成功（未展示各步骤详情）；打包统一由 `v*` tag 触发现有签名发布流程，不再要求日常 APK 运行记录。tag 签名发布的远端实跑验证归发布阶段，不阻塞本任务完成；证据见 [CI 说明](ci.md)。
 
 - Phase：8；Complexity：M。
 - Goal：在个人项目成本可控的条件下尽早发现原生构建问题。
 - Input：第 30 节与 Android 工具链；Dependencies：CI-001、ANDROID-001。
-- Scope：Linux Android debug 常规 job、release 手动 / 合并 smoke、artifact 与签名界限；不含 macOS job，后者归 optional CI-003。
+- Scope：Linux Android tag 构建、普通 CI 仅质量检查、artifact 与签名界限（按用户 2026-09-08 调整）；不含 macOS job，后者归 optional CI-003。
 - Files / Modules Expected：`.github/workflows/`、`docs/development.md`。
 - Deliverables：Android 构建路径、触发规则和失败日志。
 - Acceptance Criteria：Android build 可复现；secret 不入产物 / 日志；普通 tests 不跑 live；完全无 Mac / Xcode / IOS task 前置。
@@ -1504,6 +1504,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：成功构建记录、缓存恢复不改变 lockfile、生成器一致性检查。
 
 #### RELEASE-001 — Android 发布边界、依赖与资产审计
+
+- Status：BLOCKED（2026-09-08；审计已执行，许可验收未关闭）。用户确认仅自己使用 / 私下测试；APK 资产、权限、日志及依赖清单已核对。角色素材来源为《更衣人偶坠入爱河》的乾纱寿叶，授权未提供；书源接入 / 内容许可仍 UNKNOWN，原生依赖完整 NOTICE 待补查。用户确认 GitHub 仓库为 private，现有 tag Release 用于私下分发，保留流程；未发布、未改 UI。见 [Android 审计](release/android-audit.md) 和 [依赖清单](release/dependencies.md)。
 
 - Phase：9；Complexity：M。
 - Goal：确认候选版本具备可交付条件和清楚的内容 / 隐私边界。
@@ -2066,3 +2068,23 @@ Phase 0 仍需真实正常公开 Text + Illustration 链路才能 Go；受限 / 
 - [x] IOS-001 子项：本次 Simulator Debug 完成原生资源 / LaunchScreen 随应用构建，安装后观察到 Flutter 启动页与后续页面。
 - [ ] IOS-003：独立冷启动、原生屏与首帧衔接、深浅色、iPhone / iPad 横竖屏矩阵仍待验证；单次启动不替代该矩阵。
 - [ ] IOS-003 / IOS-004：VoiceOver、导航 / 键盘 / SafeArea、Reader 排版及操作栏运行验收继续归 iOS Checklist，不因 UI 文档归并关闭。
+
+
+### 阅读体验逐项优化（2026-09-08，用户追加）
+
+进行中。第一批覆盖默认正文间距、常驻标题、小标题层级及阅读设置面板，后续 EPUB 样式、图文分页等继续逐项处理。实现范围与验证边界见 [阅读器记录](reader.md#阅读体验逐项优化2026-09-08)。不将本批视觉调整视为全部九项完成。
+
+
+#### 第三项 — EPUB 样式与特殊页面兼容
+
+状态：TODO，2026-09-08 用户明确要求纳入。除正文样式映射外，包含 HTML/CSS 扉页的分组布局与装饰，不接受将逐字段落顺序输出作为兼容完成。以用户提供 EPUB 的第二个 spine 页面 `OEBPS/Text/title.xhtml` 及 Apple Books 对照截图验收；具体范围见 [阅读器记录](reader.md#第三项epub-样式与特殊页面兼容)。本项扩展流式 EPUB 特殊页面的兼容要求，不等于支持所有 CSS 或固定版式 EPUB；实现前评估现有原生块渲染方案，若涉及渲染架构或内容契约变更，同步 ADR、领域和契约文档。本轮仅补充计划，未实现。
+
+
+#### 第二项 — 页眉、页脚与图文分页
+
+2026-09-08 用户授权执行并使用 Android 模拟器验收。实现书名/实际卷名页眉、本章百分比页脚、大图独页与标题后文有界同页规则；不包含第三项 CSS 扉页。状态：DONE（本项范围）。实现、离线回归、静态分析完成，用户 iPhone 真机确认正常；用户明确取消本轮 Android 模拟器验收，不计为 Android 运行通过。证据见 [阅读器记录](reader.md)。
+
+
+#### 用户优先修复 — EPUB 跨章白屏
+
+2026-09-08：第三项后用户优先要求修复跨章加载白屏。实现保留原页、后台准备单个目标页、首帧交接、失败原页重试与本地记录缓存；不移除 EPUB 章节结构。代码与离线验证记录见 reader.md，手机过渡效果仍待观察；未启动模拟器。

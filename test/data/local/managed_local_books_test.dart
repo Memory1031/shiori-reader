@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:shiori/data/local/book_decoder.dart';
+import 'package:shiori/domain/contracts/local_book_decoder.dart';
+import 'support/epub_fixtures.dart';
 import 'package:crypto/crypto.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -67,11 +70,85 @@ void main() {
     db = UserDatabase(NativeDatabase(paths.userDatabase));
     store = ok(await ManagedLocalBooks.open(paths, db));
   });
+  test(
+    'unchanged manifest reuses decoded record and changed file is revalidated',
+    () async {
+      final imported = ok(
+        await store.importBook(
+          bytes: Stream.value(utf8.encode('cache test')),
+          format: LocalBookFormat.txt,
+          parse: (session) async => fixture(session),
+          cancellation: token(),
+        ),
+      );
+      final key = imported.content.detail.summary.key;
+      final first = ok(await store.read(key, cancellation: token()));
+      final second = ok(await store.read(key, cancellation: token()));
+      expect(identical(first, second), isTrue);
+      final manifest = File(
+        '${paths.localBooks.path}/${key.novelId}/manifest.json',
+      );
+      await manifest.writeAsString(' ', mode: FileMode.append, flush: true);
+      expect(
+        await store.read(key, cancellation: token()),
+        isA<Failure<LocalBookRecord?>>(),
+      );
+    },
+  );
+
   tearDown(() async {
     await store.close();
     await db.close();
     await temp.delete(recursive: true);
   });
+  test(
+    'existing import gains authored rendition without changing stored chapter identity',
+    () async {
+      final files = epubFiles(ncx: true);
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '<html><head><title>Title</title><style>.column{float:right;color:blue;}</style></head><body><div class="column"><p>A</p><p>B</p></div></body></html>',
+      );
+      final imported = ok(
+        await store.importBook(
+          bytes: Stream.value(zipFiles(files)),
+          format: LocalBookFormat.epub,
+          cancellation: token(),
+          parse: (session) => const BookDecoder().decode(
+            session,
+            format: LocalBookFormat.epub,
+            filename: 'fixture.epub',
+            cancellation: token(),
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+          ),
+        ),
+      );
+      final chapter = imported.content.chapters.first;
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      final rendition = ok(
+        await store.loadPagePresentation(chapter.key, cancellation: token()),
+      );
+      expect(rendition, contains('float:right'));
+      expect(rendition, contains('<p>A</p><p>B</p>'));
+      final reread = ok(
+        await store.read(chapter.key.novelKey, cancellation: token()),
+      )!;
+      expect(
+        reread.content.chapters.first.contentRevision,
+        chapter.contentRevision,
+      );
+      expect(
+        ok(
+          await store.loadPagePresentation(
+            imported.content.chapters.last.key,
+            cancellation: token(),
+          ),
+        ),
+        isNull,
+      );
+    },
+  );
+
   Future<Result<LocalBookRecord>> add(
     String text, {
     LocalBookParser? parse,

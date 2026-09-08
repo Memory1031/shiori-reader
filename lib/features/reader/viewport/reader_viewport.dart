@@ -205,7 +205,13 @@ class _ReaderViewportState extends State<ReaderViewport> {
         final position = painter.getPositionForOffset(
           Offset(
             0,
-            (y - widget.paragraphSpacing / 2).clamp(0, double.infinity) +
+            (y -
+                        readerBlockSpacing(
+                              widget.content.blocks[chunk.blockIndex],
+                              widget.paragraphSpacing,
+                            ) /
+                            2)
+                    .clamp(0, double.infinity) +
                 painter.preferredLineHeight * .5,
           ),
         );
@@ -273,7 +279,11 @@ class _ReaderViewportState extends State<ReaderViewport> {
           final painter = _painter(chunk, box.size.width);
           try {
             within =
-                widget.paragraphSpacing / 2 +
+                readerBlockSpacing(
+                      widget.content.blocks[chunk.blockIndex],
+                      widget.paragraphSpacing,
+                    ) /
+                    2 +
                 painter
                     .getOffsetForCaret(
                       TextPosition(
@@ -320,8 +330,18 @@ class _ReaderViewportState extends State<ReaderViewport> {
     } else if (chunk.text != null) {
       body = Padding(
         padding: EdgeInsets.only(
-          top: widget.paragraphSpacing / 2,
-          bottom: widget.paragraphSpacing / 2,
+          top:
+              readerBlockSpacing(
+                widget.content.blocks[chunk.blockIndex],
+                widget.paragraphSpacing,
+              ) /
+              2,
+          bottom:
+              readerBlockSpacing(
+                widget.content.blocks[chunk.blockIndex],
+                widget.paragraphSpacing,
+              ) /
+              2,
         ),
         child: Text(
           key: ValueKey('reader-text-$unit'),

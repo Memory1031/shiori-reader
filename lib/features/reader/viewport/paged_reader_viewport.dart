@@ -35,6 +35,8 @@ class PagedReaderViewport extends StatefulWidget {
     this.onPosition,
     this.onRestoreStart,
     this.onCenterTap,
+    this.onBoundary,
+    this.startAtEnd = false,
   });
   final ChapterContent content;
   final PagedReaderController controller;
@@ -48,6 +50,8 @@ class PagedReaderViewport extends StatefulWidget {
   final double Function(ImageBlock)? imageExtent;
   final Widget Function(BuildContext, ImageBlock)? imageBuilder;
   final VoidCallback? onCenterTap;
+  final ValueChanged<int>? onBoundary;
+  final bool startAtEnd;
   @override
   State<PagedReaderViewport> createState() => _PagedReaderViewportState();
 }
@@ -66,11 +70,15 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
   bool _userScrolling = false;
   bool _deferredLayout = false;
   bool _restoring = false;
+  bool _openAtEnd = false;
+  Offset? _dragOrigin;
+  int? _dragPage;
   @override
   void initState() {
     super.initState();
     _attach();
     _position = widget.initialPosition;
+    _openAtEnd = widget.startAtEnd;
   }
 
   void _attach() {
@@ -144,7 +152,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
   Future<void> _turn(int direction) async {
     if (!_scroll.hasClients || _layout == null) return;
     final current = (_scroll.offset / _layout!.width).round();
-    if (_page(current + direction) == null) return;
+    if (_page(current + direction) == null) {
+      widget.onBoundary?.call(direction);
+      return;
+    }
     await _scroll.animateTo(
       (current + direction) * _layout!.width,
       duration: const Duration(milliseconds: 220),
@@ -199,9 +210,12 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
           imageHeights: widget.imageHeights,
           imageExtent: widget.imageExtent,
         );
-        final first = _layout!.forward(_layout!.cursor(_position));
+        final first = _openAtEnd
+            ? _layout!.backward(PageCursor(index.chunks.length, 0))
+            : _layout!.forward(_layout!.cursor(_position));
         // No clipping a text line into a viewport shorter than that line.
         if (first == null) return const SizedBox.shrink();
+        _openAtEnd = false;
         _pages.clear();
         _pages[0] = first;
         _first = null;
@@ -241,8 +255,24 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
                         : fragment.text != null
                         ? Padding(
                             padding: EdgeInsets.only(
-                              top: widget.paragraphSpacing / 2,
-                              bottom: widget.paragraphSpacing / 2,
+                              top:
+                                  readerBlockSpacing(
+                                    widget.content.blocks[_layout!
+                                        .index
+                                        .chunks[fragment.unit]
+                                        .blockIndex],
+                                    widget.paragraphSpacing,
+                                  ) /
+                                  2,
+                              bottom:
+                                  readerBlockSpacing(
+                                    widget.content.blocks[_layout!
+                                        .index
+                                        .chunks[fragment.unit]
+                                        .blockIndex],
+                                    widget.paragraphSpacing,
+                                  ) /
+                                  2,
                             ),
                             child: Text(
                               readerIndentPrefix(
@@ -285,66 +315,91 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
         );
       }
 
-      return GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTapUp: (details) {
-          if (details.localPosition.dx < constraints.maxWidth * .3) {
-            _turn(-1);
-          } else if (details.localPosition.dx > constraints.maxWidth * .7) {
-            _turn(1);
-          } else {
-            widget.onCenterTap?.call();
+      return Listener(
+        onPointerDown: (event) {
+          _dragOrigin = event.position;
+          _dragPage = _scroll.hasClients
+              ? (_scroll.offset / constraints.maxWidth).round()
+              : null;
+        },
+        onPointerUp: (event) {
+          final origin = _dragOrigin;
+          final page = _dragPage;
+          _dragOrigin = null;
+          _dragPage = null;
+          if (origin == null || page == null) return;
+          final delta = event.position - origin;
+          if (delta.dx.abs() < 48 || delta.dx.abs() <= delta.dy.abs()) return;
+          final direction = delta.dx < 0 ? 1 : -1;
+          if (_page(page + direction) == null) {
+            widget.onBoundary?.call(direction);
           }
         },
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            if (notification is ScrollStartNotification &&
-                notification.dragDetails != null) {
-              _userScrolling = true;
-              _restoring = false;
+        onPointerCancel: (_) {
+          _dragOrigin = null;
+          _dragPage = null;
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTapUp: (details) {
+            if (details.localPosition.dx < constraints.maxWidth * .3) {
+              _turn(-1);
+            } else if (details.localPosition.dx > constraints.maxWidth * .7) {
+              _turn(1);
+            } else {
+              widget.onCenterTap?.call();
             }
-            if (notification is ScrollEndNotification) {
-              _userScrolling = false;
-              _sample();
-              if (_deferredLayout) {
-                _deferredLayout = false;
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    setState(() {
-                      _signature = null;
-                    });
-                  }
-                });
-              }
-            }
-            return false;
           },
-          child: CustomScrollView(
-            key: ValueKey(_epoch),
-            controller: _scroll,
-            scrollDirection: Axis.horizontal,
-            center: _center,
-            physics: const PageScrollPhysics(),
-            cacheExtent: 0,
-            slivers: [
-              SliverFixedExtentList(
-                itemExtent: constraints.maxWidth,
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) => buildPage(context, -1 - i),
-                  addAutomaticKeepAlives: false,
-                  addSemanticIndexes: false,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollStartNotification &&
+                  notification.dragDetails != null) {
+                _userScrolling = true;
+                _restoring = false;
+              }
+              if (notification is ScrollEndNotification) {
+                _userScrolling = false;
+                _sample();
+                if (_deferredLayout) {
+                  _deferredLayout = false;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      setState(() {
+                        _signature = null;
+                      });
+                    }
+                  });
+                }
+              }
+              return false;
+            },
+            child: CustomScrollView(
+              key: ValueKey(_epoch),
+              controller: _scroll,
+              scrollDirection: Axis.horizontal,
+              center: _center,
+              physics: const PageScrollPhysics(),
+              cacheExtent: 0,
+              slivers: [
+                SliverFixedExtentList(
+                  itemExtent: constraints.maxWidth,
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => buildPage(context, -1 - i),
+                    addAutomaticKeepAlives: false,
+                    addSemanticIndexes: false,
+                  ),
                 ),
-              ),
-              SliverFixedExtentList(
-                key: _center,
-                itemExtent: constraints.maxWidth,
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) => buildPage(context, i),
-                  addAutomaticKeepAlives: false,
-                  addSemanticIndexes: false,
+                SliverFixedExtentList(
+                  key: _center,
+                  itemExtent: constraints.maxWidth,
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => buildPage(context, i),
+                    addAutomaticKeepAlives: false,
+                    addSemanticIndexes: false,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );

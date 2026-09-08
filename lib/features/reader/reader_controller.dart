@@ -22,7 +22,16 @@ class ReaderController extends ScopedController {
     this.onPosition,
     this.initialBlockKey,
     this.startAtBeginning = false,
-  });
+    this.startAtEnd = false,
+    bool deferProgress = false,
+  }) : _progressActive = !deferProgress;
+  bool _progressActive;
+  void activateProgress() {
+    if (isClosed || _progressActive) return;
+    _progressActive = true;
+    unawaited(_openProgress());
+  }
+
   final NovelRepository repository;
   final ChapterKey chapter;
   final LibraryRepository? library;
@@ -30,12 +39,14 @@ class ReaderController extends ScopedController {
   final ReadMode readMode;
   final String? initialBlockKey;
   final bool startAtBeginning;
+  final bool startAtEnd;
   final void Function(int)? onPosition;
   void Function()? _unpin;
   ProgressTracker? progress;
   AppFailure? progressFailure;
   AppFailure? restoreFailure;
   ReaderPosition? initialPosition;
+  String? pagePresentation;
   int restoreAttempt = 0;
   bool usedFallback = false;
   ReaderRestoreStatus restoreStatus = ReaderRestoreStatus.loading;
@@ -80,7 +91,8 @@ class ReaderController extends ScopedController {
   }
 
   Future<void> _openProgress() async {
-    if (library == null ||
+    if (!_progressActive ||
+        library == null ||
         content == null ||
         restoreFailure != null ||
         isClosed ||
@@ -198,6 +210,7 @@ class ReaderController extends ScopedController {
     restoreStatus = ReaderRestoreStatus.loading;
     restoreFailure = null;
     initialPosition = null;
+    pagePresentation = null;
     usedFallback = false;
     _sample = null;
     _restoring = true;
@@ -220,6 +233,18 @@ class ReaderController extends ScopedController {
           status = ReaderStatus.error;
         } else {
           content = value.value;
+          if (repository is LocalPagePresentationRepository) {
+            final presentation =
+                await (repository as LocalPagePresentationRepository)
+                    .loadPagePresentation(chapter, cancellation: request.token);
+            if (isClosed || request != _request || request.token.isCancelled) {
+              return;
+            }
+            if (presentation case Success<String?>(:final value)) {
+              pagePresentation = value;
+            }
+          }
+
           final saved = await library?.getProgress(
             chapter.novelKey,
             cancellation: request.token,
@@ -251,6 +276,17 @@ class ReaderController extends ScopedController {
                 blockFraction: 0,
                 chapterFraction: index / content!.blocks.length,
               );
+            }
+            if (startAtEnd) {
+              final index = content!.blocks.length - 1;
+              initialPosition = ReaderPosition(
+                contentRevision: content!.contentRevision,
+                blockKey: content!.blocks[index].blockKey,
+                blockIndex: index,
+                blockFraction: 1,
+                chapterFraction: 1,
+              );
+              usedFallback = false;
             }
             restoreStatus = ReaderRestoreStatus.positioning;
           }

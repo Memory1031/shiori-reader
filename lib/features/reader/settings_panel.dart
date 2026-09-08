@@ -28,184 +28,257 @@ class ReaderSettingsPanel extends StatelessWidget {
             double min,
             double max,
             ReaderSettings Function(double) change,
-          ) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    value.toStringAsFixed(1),
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                ],
-              ),
-              Slider(
-                semanticFormatterCallback: (v) =>
-                    '$label ${v.toStringAsFixed(1)}',
-                value: value.clamp(min, max),
-                min: min,
-                max: max,
-                onChanged: (v) => preferences.update(
-                  change(v.isFinite ? v.clamp(min, max) : value),
-                ),
-                onChangeEnd: (_) => preferences.flush(),
-              ),
-            ],
-          );
-          return SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    l.readerSettings,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: () {
-                        final defaults = ReaderSettings();
-                        preferences.update(
-                          s.copyWith(
-                            fontSize: defaults.fontSize,
-                            lineHeight: defaults.lineHeight,
-                            paragraphSpacing: defaults.paragraphSpacing,
-                            horizontalPadding: defaults.horizontalPadding,
-                          ),
-                        );
-                        preferences.flush();
-                      },
-                      child: Text(l.readerResetTypography),
-                    ),
-                  ),
-                  if (preferences.failure != null)
-                    TextButton(
-                      onPressed: preferences.retry,
+          ) => Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: .035),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
                       child: Text(
-                        '${l.readerSettingsFailure} ${l.retryAction}',
+                        label,
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final mode in ReaderMode.values)
-                        ChoiceChip(
-                          label: Text(
-                            mode == ReaderMode.paged
-                                ? l.pagedReading
-                                : l.scrollReading,
+                    const SizedBox(width: 12),
+                    Text(
+                      value.toStringAsFixed(1),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ],
+                ),
+                Slider(
+                  semanticFormatterCallback: (v) =>
+                      '$label ${v.toStringAsFixed(1)}',
+                  value: value.clamp(min, max),
+                  min: min,
+                  max: max,
+                  onChanged: (v) => preferences.update(
+                    change(v.isFinite ? v.clamp(min, max) : value),
+                  ),
+                  onChangeEnd: (_) => preferences.flush(),
+                ),
+              ],
+            ),
+          );
+          return Material(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            clipBehavior: Clip.antiAlias,
+            child: SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                            borderRadius: BorderRadius.circular(2),
                           ),
-                          selected: s.mode == mode,
-                          onSelected: (_) =>
-                              preferences.update(s.copyWith(mode: mode)),
                         ),
-                    ],
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                l.readerSettings,
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: MaterialLocalizations.of(
+                                context,
+                              ).closeButtonTooltip,
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  slider(
-                    l.readerFontSize,
-                    s.fontSize,
-                    14,
-                    32,
-                    (v) => s.copyWith(fontSize: v),
-                  ),
-                  slider(
-                    l.readerLineHeight,
-                    s.lineHeight,
-                    1.2,
-                    2.4,
-                    (v) => s.copyWith(lineHeight: v),
-                  ),
-                  slider(
-                    l.readerParagraphSpacing,
-                    s.paragraphSpacing,
-                    0,
-                    32,
-                    (v) => s.copyWith(paragraphSpacing: v),
-                  ),
-                  slider(
-                    l.readerHorizontalPadding,
-                    s.horizontalPadding,
-                    12,
-                    48,
-                    (v) => s.copyWith(horizontalPadding: v),
-                  ),
-                  Text(
-                    l.readerColors,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final paper in ReaderPaper.values)
-                        ChoiceChip(
-                          label: Text(
-                            paper == ReaderPaper.paper
-                                ? l.readerPaper
-                                : l.readerWarm,
-                          ),
-                          selected:
-                              s.themeMode != ReaderThemeMode.dark &&
-                              s.paper == paper &&
-                              (s.themeMode != ReaderThemeMode.system ||
-                                  MediaQuery.platformBrightnessOf(context) !=
-                                      Brightness.dark),
-                          onSelected: (_) => preferences.update(
-                            s.copyWith(
-                              paper: paper,
-                              themeMode: ReaderThemeMode.light,
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {
+                                final defaults = ReaderSettings();
+                                preferences.update(
+                                  s.copyWith(
+                                    fontSize: defaults.fontSize,
+                                    lineHeight: defaults.lineHeight,
+                                    paragraphSpacing: defaults.paragraphSpacing,
+                                    horizontalPadding:
+                                        defaults.horizontalPadding,
+                                  ),
+                                );
+                                preferences.flush();
+                              },
+                              child: Text(l.readerResetTypography),
                             ),
                           ),
-                        ),
-                      ChoiceChip(
-                        label: Text(l.readerNight),
-                        selected:
-                            s.themeMode == ReaderThemeMode.dark ||
-                            (s.themeMode == ReaderThemeMode.system &&
-                                MediaQuery.platformBrightnessOf(context) ==
-                                    Brightness.dark),
-                        onSelected: (_) => preferences.update(
-                          s.copyWith(themeMode: ReaderThemeMode.dark),
-                        ),
+                          if (preferences.failure != null)
+                            TextButton(
+                              onPressed: preferences.retry,
+                              child: Text(
+                                '${l.readerSettingsFailure} ${l.retryAction}',
+                              ),
+                            ),
+                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final mode in ReaderMode.values)
+                                ChoiceChip(
+                                  label: Text(
+                                    mode == ReaderMode.paged
+                                        ? l.pagedReading
+                                        : l.scrollReading,
+                                  ),
+                                  selected: s.mode == mode,
+                                  onSelected: (_) => preferences.update(
+                                    s.copyWith(mode: mode),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          slider(
+                            l.readerFontSize,
+                            s.fontSize,
+                            14,
+                            32,
+                            (v) => s.copyWith(fontSize: v),
+                          ),
+                          slider(
+                            l.readerLineHeight,
+                            s.lineHeight,
+                            1.2,
+                            2.4,
+                            (v) => s.copyWith(lineHeight: v),
+                          ),
+                          slider(
+                            l.readerParagraphSpacing,
+                            s.paragraphSpacing,
+                            0,
+                            32,
+                            (v) => s.copyWith(paragraphSpacing: v),
+                          ),
+                          slider(
+                            l.readerHorizontalPadding,
+                            s.horizontalPadding,
+                            12,
+                            48,
+                            (v) => s.copyWith(horizontalPadding: v),
+                          ),
+                          const SizedBox(height: 8),
+                          const Divider(),
+                          const SizedBox(height: 16),
+                          Text(
+                            l.readerColors,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final paper in ReaderPaper.values)
+                                ChoiceChip(
+                                  avatar: CircleAvatar(
+                                    backgroundColor: paper == ReaderPaper.paper
+                                        ? const Color(0xfffffcf8)
+                                        : const Color(0xfff2e8d5),
+                                  ),
+                                  label: Text(
+                                    paper == ReaderPaper.paper
+                                        ? l.readerPaper
+                                        : l.readerWarm,
+                                  ),
+                                  selected:
+                                      s.themeMode != ReaderThemeMode.dark &&
+                                      s.paper == paper &&
+                                      (s.themeMode != ReaderThemeMode.system ||
+                                          MediaQuery.platformBrightnessOf(
+                                                context,
+                                              ) !=
+                                              Brightness.dark),
+                                  onSelected: (_) => preferences.update(
+                                    s.copyWith(
+                                      paper: paper,
+                                      themeMode: ReaderThemeMode.light,
+                                    ),
+                                  ),
+                                ),
+                              ChoiceChip(
+                                avatar: const CircleAvatar(
+                                  backgroundColor: Color(0xff252525),
+                                ),
+                                label: Text(l.readerNight),
+                                selected:
+                                    s.themeMode == ReaderThemeMode.dark ||
+                                    (s.themeMode == ReaderThemeMode.system &&
+                                        MediaQuery.platformBrightnessOf(
+                                              context,
+                                            ) ==
+                                            Brightness.dark),
+                                onSelected: (_) => preferences.update(
+                                  s.copyWith(themeMode: ReaderThemeMode.dark),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(l.readerThemeSystem),
+                            subtitle: Text(
+                              s.paper == ReaderPaper.paper
+                                  ? l.readerPaper
+                                  : l.readerWarm,
+                            ),
+                            value: s.themeMode == ReaderThemeMode.system,
+                            onChanged: (follow) => preferences.update(
+                              s.copyWith(
+                                themeMode: follow
+                                    ? ReaderThemeMode.system
+                                    : MediaQuery.platformBrightnessOf(
+                                            context,
+                                          ) ==
+                                          Brightness.dark
+                                    ? ReaderThemeMode.dark
+                                    : ReaderThemeMode.light,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => preferences.update(
+                              ReaderSettings(
+                                controlsHintSeen: s.controlsHintSeen,
+                              ),
+                            ),
+                            child: Text(l.readerReset),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(l.readerThemeSystem),
-                    subtitle: Text(
-                      s.paper == ReaderPaper.paper
-                          ? l.readerPaper
-                          : l.readerWarm,
                     ),
-                    value: s.themeMode == ReaderThemeMode.system,
-                    onChanged: (follow) => preferences.update(
-                      s.copyWith(
-                        themeMode: follow
-                            ? ReaderThemeMode.system
-                            : MediaQuery.platformBrightnessOf(context) ==
-                                  Brightness.dark
-                            ? ReaderThemeMode.dark
-                            : ReaderThemeMode.light,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => preferences.update(
-                      ReaderSettings(controlsHintSeen: s.controlsHintSeen),
-                    ),
-                    child: Text(l.readerReset),
                   ),
                 ],
               ),

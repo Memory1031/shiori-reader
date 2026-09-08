@@ -52,7 +52,7 @@ class _LocalCatalogScreenState extends State<LocalCatalogScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(AppLocalizations.of(context).catalogTitle)),
+    appBar: AppBar(title: Text(AppLocalizations.of(context).localBookContents)),
     body: SafeArea(
       child: FutureBuilder(
         future: _result,

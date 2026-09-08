@@ -9,6 +9,9 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get localBookContents => 'Book contents';
+
+  @override
   String get articleContents => 'In-volume contents';
 
   @override
@@ -731,4 +734,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appAccentSoftPink => 'Soft pink';
+
+  @override
+  String get readerChapterLoadFailed =>
+      'Could not open the chapter. Your current page is still available.';
 }

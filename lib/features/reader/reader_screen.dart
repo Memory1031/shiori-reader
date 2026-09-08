@@ -13,6 +13,7 @@ import 'reader_theme.dart';
 import 'article_contents.dart';
 import 'settings_panel.dart';
 import 'reader_image.dart';
+import 'epub_layout_page.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'viewport/reader_viewport.dart';
 
@@ -81,6 +82,9 @@ class ReaderContentView extends StatefulWidget {
   const ReaderContentView({
     super.key,
     required this.content,
+    this.runningTitle,
+    this.onReady,
+    this.onLoadFailure,
     this.images,
     this.settings,
     this.session,
@@ -93,6 +97,8 @@ class ReaderContentView extends StatefulWidget {
   });
   final ImageRepository? images;
   final ChapterContent content;
+  final String? runningTitle;
+  final VoidCallback? onReady, onLoadFailure;
   final ReaderController? session;
   final ReaderPosition? initialPosition;
   final SettingsStore? settings;
@@ -159,6 +165,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       useSafeArea: true,
       sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
           ? AnimationStyle.noAnimation
@@ -172,6 +179,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   Future<void> _contents(BuildContext context) async {
+    if (widget.content.key.novelKey.sourceId == LocalBookIdentity.sourceId) {
+      widget.onCatalog?.call();
+      return;
+    }
     final target = await showArticleContents(
       context,
       widget.content,
@@ -192,7 +203,15 @@ class _ReaderContentViewState extends State<ReaderContentView>
   final _readingPosition = ValueNotifier<ReaderPosition?>(null);
   ReaderPosition? _latestReadingPosition;
   Timer? _positionLabelTimer;
+  bool _announcedReady = false;
   void _sample(ReaderPosition position, bool completed) {
+    if (!_announcedReady) {
+      _announcedReady = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onReady?.call();
+      });
+      WidgetsBinding.instance.scheduleFrame();
+    }
     _latestReadingPosition = position;
     // Display is bounded to 4Hz; persistence still receives every sample.
     _positionLabelTimer ??= Timer(const Duration(milliseconds: 250), () {
@@ -306,11 +325,19 @@ class _ReaderContentViewState extends State<ReaderContentView>
           const SingleActivator(LogicalKeyboardKey.f2): _toggle,
           if (_isPaged)
             const SingleActivator(LogicalKeyboardKey.arrowRight): () {
-              _paged.next();
+              if (widget.session?.pagePresentation != null) {
+                widget.onNextChapter?.call();
+              } else {
+                _paged.next();
+              }
             },
           if (_isPaged)
             const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
-              _paged.previous();
+              if (widget.session?.pagePresentation != null) {
+                widget.onPreviousChapter?.call();
+              } else {
+                _paged.previous();
+              }
             },
         },
         child: Focus(
@@ -369,11 +396,55 @@ class _ReaderContentViewState extends State<ReaderContentView>
                               );
                             }
 
+                            final presentation =
+                                widget.session?.pagePresentation;
+                            if (presentation != null) {
+                              return EpubLayoutPage(
+                                html: presentation,
+                                onFailed: widget.onLoadFailure,
+                                onCenterTap: _toggle,
+                                onPrevious: widget.onPreviousChapter,
+                                onNext: () {
+                                  final last = widget.content.blocks.length - 1;
+                                  _sample(
+                                    ReaderPosition(
+                                      contentRevision:
+                                          widget.content.contentRevision,
+                                      blockKey:
+                                          widget.content.blocks[last].blockKey,
+                                      blockIndex: last,
+                                      blockFraction: 1,
+                                      chapterFraction: 1,
+                                    ),
+                                    true,
+                                  );
+                                  widget.onNextChapter?.call();
+                                },
+                                onReady: () {
+                                  final position = ReaderPosition(
+                                    contentRevision:
+                                        widget.content.contentRevision,
+                                    blockKey:
+                                        widget.content.blocks.first.blockKey,
+                                    blockIndex: 0,
+                                    blockFraction: 0,
+                                    chapterFraction: 0,
+                                  );
+                                  _position = position;
+                                  _sample(position, false);
+                                },
+                              );
+                            }
                             return NotificationListener<ScrollNotification>(
                               onNotification: _notification,
                               child: _isPaged
                                   ? PagedReaderViewport(
                                       content: widget.content,
+                                      startAtEnd:
+                                          (widget.session?.startAtEnd ??
+                                              false) &&
+                                          _position?.chapterFraction == 1 &&
+                                          _position?.blockFraction == 1,
                                       onPosition: _sample,
                                       onRestoreStart:
                                           widget.session?.restoringProgress,
@@ -383,6 +454,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                       paragraphSpacing:
                                           _settings.paragraphSpacing,
                                       onCenterTap: _toggle,
+                                      onBoundary: (direction) {
+                                        if (direction > 0) {
+                                          widget.onNextChapter?.call();
+                                        } else {
+                                          widget.onPreviousChapter?.call();
+                                        }
+                                      },
                                       imageBuilder: image,
                                       imageExtent: (block) =>
                                           extent(block).height,
@@ -539,7 +617,49 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   Widget _controls(BuildContext context, bool visible) {
     final l = AppLocalizations.of(context);
-    if (!visible) return const SizedBox.shrink();
+    if (!visible) {
+      return IgnorePointer(
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: _settings.horizontalPadding,
+              right: _settings.horizontalPadding,
+              height: 48,
+              child: Center(
+                child: Text(
+                  widget.runningTitle ?? widget.content.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 12,
+              left: 16,
+              right: 16,
+              child: ValueListenableBuilder<ReaderPosition?>(
+                valueListenable: _readingPosition,
+                builder: (context, position, _) => Text(
+                  l.readerChapterProgress(
+                    ((position ?? _position)?.chapterFraction ?? 0) * 100 ~/ 1,
+                  ),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     final failedRead = widget.session?.restoreFailure != null;
     final unsaved =
         widget.session?.progressFailure != null ||
@@ -621,7 +741,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
               children: [
                 Expanded(
                   child: Tooltip(
-                    message: l.articleContents,
+                    message:
+                        widget.content.key.novelKey.sourceId ==
+                            LocalBookIdentity.sourceId
+                        ? l.localBookContents
+                        : l.articleContents,
                     child: TextButton.icon(
                       onPressed: () => _contents(context),
                       icon: const Icon(Icons.list, size: 20),

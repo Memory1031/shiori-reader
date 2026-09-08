@@ -80,3 +80,8 @@ flutter run --target lib/main_dev.dart --dart-define=SHIORI_SCENARIO=unknownImag
 READER-002 接入正式 ReaderController、章级加载/失败、完整块样式和 Chrome；READER-003 接生产 SourceImage、尺寸/解码预算；READER-004 增加模式默认值、偏好 schema 迁移和持久化；READER-005..006 接位置保存与完整恢复状态机。本轮没有更改 ReaderSettings v1 codec 或创建并行的进度模型。
 
 本地分页还不提供纸张卷曲动画、固定全章总页数、跨章翻页或精细禁则排版；极端到连一行都容不下的视口不会强行裁掉文字，保留位置等待可用尺寸。测试视口覆盖的正常手机字号/缩放范围之外不作保证。正式图片缓存、性能门槛和真实设备验收不能由该实验代替。
+
+
+### 2026-09-08：短篇幅 EPUB 特殊版式页例外
+
+用户明确要求兼容 CSS 构建的扉页。普通长篇阅读保留本 ADR 原生懒布局；短版式页以独立离线 WebView 呈现，通过 LocalPagePresentationRepository 获取受限自包含文档，不把网页协议混入普通 ContentBlock。首帧交接允许同时挂载当前与目标两页；禁止通过隐藏控制器提前创建进度写入会话。特殊页按单页语义恢复，纵向溢出仍可滚动，精确页内恢复未实现。

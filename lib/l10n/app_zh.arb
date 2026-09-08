@@ -1,4 +1,5 @@
 {
+  "localBookContents": "全书目录",
   "articleContents": "卷内目录",
   "articleContentsEmpty": "这篇正文没有可识别的章节标题。仍可通过分卷列表切换文章。",
   "articleContentsHint": "从正文标题生成；纯文本标题识别可能不完整。",
@@ -262,5 +263,6 @@
   "appAccentTeal": "青绿",
   "appAccentBlueGrey": "蓝灰",
   "appAccentWarmBrown": "暖棕",
-  "appAccentSoftPink": "淡粉"
+  "appAccentSoftPink": "淡粉",
+  "readerChapterLoadFailed": "暂时无法打开目标章节，已保留当前页面。"
 }

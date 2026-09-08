@@ -119,7 +119,7 @@ final class PageLayout {
     )..layout(maxWidth: width);
     try {
       final lines = painter.computeLineMetrics();
-      var used = paragraphSpacing;
+      var used = readerBlockSpacing(block, paragraphSpacing);
       var count = 0;
       for (final line in backwards ? lines.reversed : lines) {
         if (used + line.height > available + .01) break;
@@ -182,12 +182,45 @@ final class PageLayout {
       final text = chunk.text;
       if (text == null || text.isEmpty) {
         final extent = _objectHeight(cursor.unit);
-        if (extent > remaining + .01) break;
+        final fullPageImage =
+            index.content.blocks[chunk.blockIndex] is ImageBlock &&
+            extent >= height * .6;
+        if (extent > remaining + .01 || fullPageImage && fragments.isNotEmpty) {
+          break;
+        }
         fragments.add(PageFragment(cursor.unit, 0, 1, extent, text));
         remaining -= extent;
         cursor = PageCursor(cursor.unit + 1, 0);
+        if (fullPageImage) break;
       } else {
         final rest = _slice(text, cursor.offset, text.runes.length);
+        final block = index.content.blocks[chunk.blockIndex];
+        // Bounded lookahead: keep a complete heading with the first two body
+        // lines when that combination can fit on a fresh page.
+        if (block is HeadingBlock &&
+            cursor.offset == 0 &&
+            fragments.isNotEmpty &&
+            cursor.unit + 1 < index.chunks.length) {
+          final heading = _fit(
+            rest,
+            height,
+            backwards: false,
+            block: block,
+            startsBlock: chunk.start == 0,
+          );
+          final next = index.chunks[cursor.unit + 1];
+          final nextBlock = index.content.blocks[next.blockIndex];
+          if (heading != null &&
+              heading.count == rest.runes.length &&
+              next.text?.isNotEmpty == true &&
+              nextBlock is ParagraphBlock) {
+            final firstLines =
+                scaler.scale(style.fontSize ?? 18) * (style.height ?? 1.7) * 2 +
+                readerBlockSpacing(nextBlock, paragraphSpacing);
+            final required = heading.height + firstLines;
+            if (required <= height && required > remaining) break;
+          }
+        }
         final fitted = _fit(
           rest,
           remaining,
@@ -227,10 +260,16 @@ final class PageLayout {
       final text = chunk.text;
       if (text == null || text.isEmpty) {
         final extent = _objectHeight(cursor.unit);
-        if (extent > remaining + .01) break;
+        final fullPageImage =
+            index.content.blocks[chunk.blockIndex] is ImageBlock &&
+            extent >= height * .6;
+        if (extent > remaining + .01 || fullPageImage && fragments.isNotEmpty) {
+          break;
+        }
         fragments.add(PageFragment(cursor.unit, 0, 1, extent, text));
         remaining -= extent;
         cursor = PageCursor(cursor.unit, 0);
+        if (fullPageImage) break;
       } else {
         final prefix = _slice(text, 0, cursor.offset);
         final fitted = _fit(

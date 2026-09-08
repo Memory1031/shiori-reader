@@ -5,10 +5,28 @@ import '../../domain/models/models.dart';
 /// Local identity dispatch happens before all online cache/source decorators.
 /// Borrowed dependencies retain their original lifetime owners.
 class LocalReadingRepository
-    implements NovelRepository, LocalNavigationRepository {
+    implements
+        NovelRepository,
+        LocalNavigationRepository,
+        LocalPagePresentationRepository {
   LocalReadingRepository({required this.local, required this.online});
   final LocalBookStore local;
   final NovelRepository online;
+  @override
+  Future<Result<String?>> loadPagePresentation(
+    ChapterKey chapter, {
+    required CancellationToken cancellation,
+  }) async {
+    if (!_local(chapter.novelKey) ||
+        local is! LocalPagePresentationRepository) {
+      return const Success(null);
+    }
+    return (local as LocalPagePresentationRepository).loadPagePresentation(
+      chapter,
+      cancellation: cancellation,
+    );
+  }
+
   bool _local(NovelKey key) => key.sourceId == LocalBookIdentity.sourceId;
   Future<Result<LoadResult<T>>> _read<T>(
     NovelKey key,

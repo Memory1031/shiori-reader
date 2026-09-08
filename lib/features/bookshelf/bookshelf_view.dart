@@ -232,7 +232,8 @@ class _BookshelfViewState extends State<BookshelfView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
+                AspectRatio(
+                  aspectRatio: 2 / 3,
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
@@ -350,7 +351,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                         ((bounds.maxWidth - 32 - (columns - 1) * 16) /
                                 columns) *
                             1.5 +
-                        8 +
+                        10 +
                         48 * scale,
                   ),
                   itemCount: books.length,

@@ -10,6 +10,60 @@ import 'package:shiori/features/reader/reader_screen.dart';
 
 void main() {
   testWidgets(
+    'slow next chapter keeps current page until new layout is ready',
+    (tester) async {
+      final env = FixtureEnvironment(scenario: FixtureScenario.multiVolume);
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          routes: AppRoutes(
+            home: (_) => BookReaderScreen(
+              chapter: fixtureChapterKey(FixtureScenario.multiVolume),
+              repository: env.novels,
+              library: env.library,
+              settings: env.settings,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // Keep the exact current page mounted throughout a slow chapter request.
+      final before = tester.widget<ReaderContentView>(
+        find.byType(ReaderContentView),
+      );
+      env.source.controls.delays[Operation.chapter] = const Duration(
+        seconds: 2,
+      );
+      before.onNextChapter!();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(
+        tester
+            .widget<ReaderContentView>(find.byType(ReaderContentView))
+            .content
+            .key,
+        before.content.key,
+      );
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      final next = tester.widget<ReaderContentView>(
+        find.byType(ReaderContentView),
+      );
+      expect(
+        next.content.key,
+        fixtureChapterKey(FixtureScenario.multiVolume, 1),
+      );
+      env.source.controls.delays.remove(Operation.chapter);
+      next.onPreviousChapter!();
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      await env.close();
+    },
+  );
+
+  testWidgets(
     'cross chapter saves before switching; failure leaves previous progress; catalog chooses key',
     (tester) async {
       final env = FixtureEnvironment(scenario: FixtureScenario.multiVolume);
