@@ -10,6 +10,7 @@ import 'reader_controller.dart';
 import 'reader_screen.dart';
 import '../cache/prefetch_sheet.dart';
 import '../../shared/source_image.dart';
+import '../local_books/local_catalog.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
 class BookReaderScreen extends StatefulWidget {
@@ -24,6 +25,8 @@ class BookReaderScreen extends StatefulWidget {
     this.onDetails,
     this.cache,
     this.offline = false,
+    this.initialBlockKey,
+    this.startAtBeginning = false,
   });
   final ChapterKey chapter;
   final NovelRepository repository;
@@ -34,6 +37,8 @@ class BookReaderScreen extends StatefulWidget {
   final ValueChanged<NovelKey>? onDetails;
   final CacheManagement? cache;
   final bool offline;
+  final String? initialBlockKey;
+  final bool startAtBeginning;
   @override
   State<BookReaderScreen> createState() => _BookReaderScreenState();
 }
@@ -43,6 +48,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   late ReaderController _reader;
   late final ImageRepository? _displayImages;
   late final CatalogController _catalog;
+  bool get _local =>
+      widget.chapter.novelKey.sourceId == LocalBookIdentity.sourceId;
+  CacheManagement? get _cache => _local ? null : widget.cache;
   bool _changing = false, _canPop = false;
   @override
   void initState() {
@@ -61,7 +69,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           )
           ..onStart()
           ..addListener(_changed);
-    _reader = _create(widget.chapter);
+    _reader = _create(
+      widget.chapter,
+      blockKey: widget.initialBlockKey,
+      fromStart: widget.startAtBeginning,
+    );
     if (widget.chapterFallback) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -75,21 +87,27 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
-  ReaderController _create(ChapterKey key) =>
+  ReaderController _create(
+    ChapterKey key, {
+    String? blockKey,
+    bool fromStart = false,
+  }) =>
       ReaderController(
           repository: widget.repository,
           chapter: key,
+          initialBlockKey: blockKey,
+          startAtBeginning: fromStart,
           library: widget.library,
-          cache: widget.cache,
+          cache: _cache,
           readMode: widget.offline ? ReadMode.cacheOnly : ReadMode.cacheFirst,
-          onPosition: widget.offline ? null : widget.cache?.prefetch?.position,
+          onPosition: widget.offline ? null : _cache?.prefetch?.position,
         )
         ..onStart()
         ..addListener(_changed);
   void _changed() {
     if (!widget.offline && _reader.content != null) {
       unawaited(
-        widget.cache?.prefetch?.enter(_reader.content!, _catalog.loaded?.value),
+        _cache?.prefetch?.enter(_reader.content!, _catalog.loaded?.value),
       );
     }
     if (mounted) setState(() {});
@@ -103,7 +121,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   void dispose() {
-    if (!widget.offline) widget.cache?.prefetch?.leave();
+    if (!widget.offline) _cache?.prefetch?.leave();
     WidgetsBinding.instance.removeObserver(this);
     _close(_reader);
     _catalog.removeListener(_changed);
@@ -115,7 +133,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!widget.offline) {
-      widget.cache?.prefetch?.active(state == AppLifecycleState.resumed);
+      _cache?.prefetch?.active(state == AppLifecycleState.resumed);
     }
     if (state != AppLifecycleState.resumed) unawaited(_reader.flushProgress());
   }
@@ -138,9 +156,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     return true;
   }
 
-  Future<void> _switch(ChapterKey chapter) async {
+  Future<void> _switch(
+    ChapterKey chapter, {
+    String? blockKey,
+    bool fromStart = false,
+  }) async {
     if (_changing ||
-        chapter == _reader.chapter ||
+        chapter == _reader.chapter && blockKey == null && !fromStart ||
         chapter.novelKey != widget.chapter.novelKey) {
       return;
     }
@@ -151,7 +173,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
     _close(_reader);
     setState(() {
-      _reader = _create(chapter);
+      _reader = _create(chapter, blockKey: blockKey, fromStart: fromStart);
       _changing = false;
     });
   }
@@ -173,6 +195,23 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   Future<void> _contents() async {
+    final repository = widget.repository;
+    if (_local && repository is LocalNavigationRepository) {
+      final target = await openLocalCatalog(
+        context,
+        novel: widget.chapter.novelKey,
+        repository: repository as LocalNavigationRepository,
+        current: _reader.chapter,
+      );
+      if (mounted && target != null) {
+        await _switch(
+          target.chapterKey,
+          blockKey: target.blockKey,
+          fromStart: true,
+        );
+      }
+      return;
+    }
     if (widget.offline) {
       final entries =
           _catalog.loaded?.value.flatChapters.toList() ?? <Chapter>[];
@@ -244,10 +283,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 session: _reader,
                 initialPosition: _reader.initialPosition,
                 onCatalog: _changing ? null : _contents,
-                onPrefetch: !widget.offline && widget.cache?.prefetch != null
+                onPrefetch: !widget.offline && _cache?.prefetch != null
                     ? () => showPrefetchSheet(
                         context,
-                        cache: widget.cache!,
+                        cache: _cache!,
                         catalog: _catalog.loaded?.value,
                         current: _reader.chapter,
                       )

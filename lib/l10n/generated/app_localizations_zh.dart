@@ -641,4 +641,36 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get importEpubSupport =>
       '支持普通流式 EPUB 图文。文字样式简化；脚本、外部资源和自定义字体不加载，缺失图片保留占位。';
+
+  @override
+  String get localBooksTitle => '本地文件';
+
+  @override
+  String get localBooksHint => '移出书架不会删除文件。这里可以重新加入书架，或删除书籍及其阅读进度。';
+
+  @override
+  String get localBooksEmpty => '还没有导入本地书籍。';
+
+  @override
+  String get localDeleteTitle => '删除本地书籍？';
+
+  @override
+  String localDeleteMessage(String title) {
+    return '将删除《$title》的应用内原文件、正文、插图、书架记录和阅读进度。外部原文件不受影响，此操作无法撤销。';
+  }
+
+  @override
+  String get localDeleteConfirm => '删除书籍和进度';
+
+  @override
+  String get localDeleted => '本地书籍和阅读进度已删除。';
+
+  @override
+  String get localCleanupPending => '书籍和进度已移除，剩余文件将在下次启动时清理。';
+
+  @override
+  String get localShelfAdded => '已加入书架。';
+
+  @override
+  String get localReadNow => '立即阅读';
 }

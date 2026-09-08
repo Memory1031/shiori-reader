@@ -26,7 +26,8 @@ final class NovelDestination extends AppDestination {
 }
 
 final class ReaderDestination extends AppDestination {
-  const ReaderDestination(this.key);
+  const ReaderDestination(this.key, {this.blockKey});
+  final String? blockKey;
   final ChapterKey key;
   @override
   String get routeName => '/reader';
@@ -47,6 +48,7 @@ class AppRoutes {
     this.search,
     this.novel,
     this.reader,
+    this.readerTarget,
     this.continueReader,
   });
 
@@ -54,6 +56,7 @@ class AppRoutes {
   final Widget Function(BuildContext, SourceId)? search;
   final Widget Function(BuildContext, NovelKey)? novel;
   final Widget Function(BuildContext, ChapterKey)? reader;
+  final Widget Function(BuildContext, ChapterKey, String?)? readerTarget;
   final Widget Function(BuildContext, NovelKey)? continueReader;
 
   Widget buildHome(BuildContext context, {VoidCallback? onAppearance}) =>
@@ -81,8 +84,9 @@ class AppRoutes {
       NovelDestination(:final key) =>
         novel?.call(context, key) ??
             _PendingPage(title: AppLocalizations.of(context).novelDetailsTitle),
-      ReaderDestination(:final key) =>
-        reader?.call(context, key) ??
+      ReaderDestination(:final key, :final blockKey) =>
+        readerTarget?.call(context, key, blockKey) ??
+            reader?.call(context, key) ??
             _PendingPage(title: AppLocalizations.of(context).readerTitle),
       ContinueDestination(:final key) =>
         continueReader?.call(context, key) ??

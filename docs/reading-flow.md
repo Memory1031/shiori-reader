@@ -53,3 +53,8 @@ Android 离线 `integration_test/progress_smoke.dart` 使用正式 LocalDatabase
 - 正式 `lib/main.dart` 和开发 `lib/main_dev.dart --dart-define=SHIORI_SCENARIO=home` Android Debug 构建均 PASS。模拟器已安装恢复正常离线开发首页包，启动 UI 层级确认书架/发现、最近阅读及搜索入口（`.tooling/evidence/phase5-home.xml`）；不再停留在一次性联网探针。真实 Source 和离线生命周期 Android 探针结果单独记录，不以构建代替 runtime。
 - iOS Level A：共享 Flutter UI/Domain、既有跨平台存储和解码、Cupertino 路由；没有新增依赖或原生插件。iOS runtime 仍 DEFERRED_NO_MAC。
 - 未执行本地导入、持久图片缓存、缓存容量管理、预取、ARM64真机性能、正式迁移/损坏恢复或发布审计。本轮不自动领取 CACHE-001。
+
+
+## LOCAL-005 补充（2026-09-08）
+
+LOCAL-005 已将生产本地 TXT / EPUB 接入相同继续阅读、BookReaderScreen、ProgressTracker；本地身份在在线缓存前分流，Reader 禁用本地书预取 / 缓存操作。目录支持 EPUB fragment，显式跳转从目标块开始，继续阅读恢复已保存块位置。删除与移出书架为独立操作。验证记录见 [LOCAL-005](validation/local-005.md)。

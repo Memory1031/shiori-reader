@@ -20,12 +20,16 @@ class ReaderController extends ScopedController {
     this.cache,
     this.readMode = ReadMode.cacheFirst,
     this.onPosition,
+    this.initialBlockKey,
+    this.startAtBeginning = false,
   });
   final NovelRepository repository;
   final ChapterKey chapter;
   final LibraryRepository? library;
   final CacheManagement? cache;
   final ReadMode readMode;
+  final String? initialBlockKey;
+  final bool startAtBeginning;
   final void Function(int)? onPosition;
   void Function()? _unpin;
   ProgressTracker? progress;
@@ -233,6 +237,20 @@ class ReaderController extends ScopedController {
               final resolved = resolveReaderPosition(content!, record.position);
               initialPosition = resolved.position;
               usedFallback = resolved.usedFallback;
+            }
+            if (startAtBeginning || initialBlockKey != null) {
+              final found = content!.blocks.indexWhere(
+                (b) => b.blockKey == initialBlockKey,
+              );
+              final index = found < 0 ? 0 : found;
+              usedFallback = initialBlockKey != null && found < 0;
+              initialPosition = ReaderPosition(
+                contentRevision: content!.contentRevision,
+                blockKey: content!.blocks[index].blockKey,
+                blockIndex: index,
+                blockFraction: 0,
+                chapterFraction: index / content!.blocks.length,
+              );
             }
             restoreStatus = ReaderRestoreStatus.positioning;
           }

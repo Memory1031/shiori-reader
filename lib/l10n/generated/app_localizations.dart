@@ -1339,6 +1339,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Supports ordinary reflowable EPUB text and images. Styling is simplified; scripts, external resources, and custom fonts are not loaded. Missing images keep a placeholder.'**
   String get importEpubSupport;
+
+  /// No description provided for @localBooksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local files'**
+  String get localBooksTitle;
+
+  /// No description provided for @localBooksHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Removing a book from the shelf keeps its files. Add it back here, or delete the book and its reading progress.'**
+  String get localBooksHint;
+
+  /// No description provided for @localBooksEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No local books imported yet.'**
+  String get localBooksEmpty;
+
+  /// No description provided for @localDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete local book?'**
+  String get localDeleteTitle;
+
+  /// No description provided for @localDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the app-owned original, text, images, shelf entry, and reading progress for “{title}”. The external original is unaffected. This cannot be undone.'**
+  String localDeleteMessage(String title);
+
+  /// No description provided for @localDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete book and progress'**
+  String get localDeleteConfirm;
+
+  /// No description provided for @localDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Local book and reading progress deleted.'**
+  String get localDeleted;
+
+  /// No description provided for @localCleanupPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Book and progress removed. Remaining files will be cleaned up at the next launch.'**
+  String get localCleanupPending;
+
+  /// No description provided for @localShelfAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to bookshelf.'**
+  String get localShelfAdded;
+
+  /// No description provided for @localReadNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Read now'**
+  String get localReadNow;
 }
 
 class _AppLocalizationsDelegate

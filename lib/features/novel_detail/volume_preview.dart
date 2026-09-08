@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
+import '../../domain/contracts/local_book_decoder.dart';
+import '../local_books/local_catalog.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
@@ -14,10 +16,12 @@ class VolumePreview extends StatelessWidget {
     required this.novel,
     required this.repository,
     this.onChapter,
+    this.onTarget,
   });
   final NovelKey novel;
   final NovelRepository repository;
   final ValueChanged<ChapterKey>? onChapter;
+  final ValueChanged<LocalNavigationEntry>? onTarget;
 
   @override
   Widget build(BuildContext context) => ControllerScope<CatalogController>(
@@ -44,6 +48,18 @@ class VolumePreview extends StatelessWidget {
               TextButton(
                 key: const ValueKey('detail-catalog'),
                 onPressed: () async {
+                  final navigation = repository;
+                  if (novel.sourceId == LocalBookIdentity.sourceId &&
+                      navigation is LocalNavigationRepository &&
+                      onTarget != null) {
+                    final target = await openLocalCatalog(
+                      context,
+                      novel: novel,
+                      repository: navigation as LocalNavigationRepository,
+                    );
+                    if (context.mounted && target != null) onTarget!(target);
+                    return;
+                  }
                   final key = await openCatalog(
                     context,
                     novel: novel,

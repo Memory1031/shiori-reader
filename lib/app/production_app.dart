@@ -1,6 +1,10 @@
 import 'dart:async';
 import '../data/import/platform_import_source.dart';
 import '../data/local/book_decoder.dart';
+import '../data/repositories/local_reading_repository.dart';
+import '../data/media/local_image_repository.dart';
+import '../domain/models/models.dart';
+import '../features/reader/continue_reading.dart';
 import '../features/import/import_controller.dart';
 import '../features/import/import_overlay.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +33,9 @@ class ProductionApp extends StatefulWidget {
 }
 
 class _ProductionAppState extends State<ProductionApp> {
+  final _navigator = GlobalKey<NavigatorState>();
+  LocalReadingRepository? _novels;
+  LocalImageRepository? _images;
   LocalDatabases? _databases;
   ImportController? _imports;
   SourceServices? _services;
@@ -69,12 +76,21 @@ class _ProductionAppState extends State<ProductionApp> {
         source: PlatformImportSource(),
         store: databases.localBooks,
         decoder: const BookDecoder(),
+        addToShelf: true,
       );
       unawaited(_imports!.start());
       _services = SourceServices(
         cache: databases.cache,
         paths: paths,
         users: databases.users,
+      );
+      _novels = LocalReadingRepository(
+        local: databases.localBooks,
+        online: _services!.novels,
+      );
+      _images = LocalImageRepository(
+        local: databases.localBooks,
+        online: _services!.images,
       );
       _library = LocalLibraryRepository(databases.users);
       _appearance = PreferencesAppSettingsStore(
@@ -115,6 +131,23 @@ class _ProductionAppState extends State<ProductionApp> {
     await _databases?.close();
   }
 
+  Future<void> _readImported(NovelKey key) async {
+    await _imports!.finish();
+    if (!mounted) return;
+    _navigator.currentState?.push(
+      MaterialPageRoute(
+        settings: const RouteSettings(name: '/continue'),
+        builder: (_) => ContinueReadingScreen(
+          novel: key,
+          repository: _novels!,
+          library: _library!,
+          images: _images,
+          settings: _reading,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => _services == null
       ? ShioriApp(
@@ -130,18 +163,24 @@ class _ProductionAppState extends State<ProductionApp> {
         )
       : ShioriApp(
           key: const ValueKey('production-ready'),
-          overlayBuilder: (context, child) =>
-              ImportOverlay(controller: _imports!, child: child),
+          navigatorKey: _navigator,
+          overlayBuilder: (context, child) => ImportOverlay(
+            controller: _imports!,
+            onRead: _readImported,
+            child: child,
+          ),
           createController: () => AppController(settingsStore: _appearance),
           homeBuilder: (context, app) => ReadingHome(
-            repository: _services!.novels,
+            repository: _novels!,
             library: _library!,
             sources: _services!.registry.descriptors,
-            images: _services!.images,
+            images: _images!,
             cache: _services!.cacheManagement,
             settings: _reading,
             onAppearance: () => showAppAppearance(context, app),
             onImport: _imports!.open,
+            localBooks: _databases!.localBooks,
+            localManagement: _databases!.localBooks,
           ),
         );
 }

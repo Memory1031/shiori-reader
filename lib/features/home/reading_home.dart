@@ -14,6 +14,7 @@ import '../novel_detail/detail_screen.dart';
 import '../reader/book_reader_screen.dart';
 import '../cache/cache_screen.dart';
 import '../search/search_screen.dart';
+import '../local_books/local_books_screen.dart';
 
 class ReadingHome extends StatefulWidget {
   const ReadingHome({
@@ -26,6 +27,8 @@ class ReadingHome extends StatefulWidget {
     this.settings,
     this.onAppearance,
     this.onImport,
+    this.localBooks,
+    this.localManagement,
     this.environmentLabel,
   });
   final NovelRepository repository;
@@ -36,6 +39,8 @@ class ReadingHome extends StatefulWidget {
   final SettingsStore? settings;
   final VoidCallback? onAppearance;
   final VoidCallback? onImport;
+  final LocalBookStore? localBooks;
+  final LocalBookManagement? localManagement;
   final String? environmentLabel;
   @override
   State<ReadingHome> createState() => _ReadingHomeState();
@@ -89,6 +94,10 @@ class _ReadingHomeState extends State<ReadingHome> {
         novel: key,
         repository: widget.repository,
         images: widget.images,
+        onTarget: (target) => _routes.open(
+          context,
+          ReaderDestination(target.chapterKey, blockKey: target.blockKey),
+        ),
         onChapter: (chapter) =>
             _routes.open(context, ReaderDestination(chapter)),
         onRead: _continue,
@@ -115,7 +124,9 @@ class _ReadingHomeState extends State<ReadingHome> {
       onDetails: _readerDetails,
       cache: widget.cache,
     ),
-    reader: (_, key) => BookReaderScreen(
+    readerTarget: (_, key, block) => BookReaderScreen(
+      initialBlockKey: block,
+      startAtBeginning: key.novelKey.sourceId == LocalBookIdentity.sourceId,
       chapter: key,
       repository: widget.repository,
       images: widget.images,
@@ -233,6 +244,19 @@ class _ReadingHomeState extends State<ReadingHome> {
                   ),
                 );
               }
+              if (value == 'local') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => LocalBooksScreen(
+                      store: widget.localBooks!,
+                      management: widget.localManagement!,
+                      library: widget.library,
+                      onRead: _continue,
+                      onImport: widget.onImport!,
+                    ),
+                  ),
+                );
+              }
               if (value == 'appearance') widget.onAppearance?.call();
               if (value == 'history') {
                 Navigator.of(context).push(
@@ -246,6 +270,11 @@ class _ReadingHomeState extends State<ReadingHome> {
               }
             },
             itemBuilder: (_) => [
+              if (widget.localManagement != null)
+                PopupMenuItem(
+                  value: 'local',
+                  child: Text(strings.localBooksTitle),
+                ),
               if (widget.cache != null)
                 PopupMenuItem(value: 'cache', child: Text(strings.cacheTitle)),
               PopupMenuItem(

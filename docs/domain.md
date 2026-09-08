@@ -75,3 +75,8 @@ ReaderPosition 的 blockIndex 非负，blockFraction / chapterFraction 必须有
 UI-002：ReaderPaper（paper / warm）表示浅色阅读纸色，ReaderThemeMode 继续仅表示阅读明暗；controlsHintSeen 是已确认首次操作提示的阅读偏好，默认 false，恢复排版默认时保留其值。AppSettings 使用独立 schemaVersion=1，只包含 AppThemeMode（system / light / dark，默认 system），不借用或迁移 ReaderThemeMode，不含 Flutter Color / ThemeData 或语言字符串。
 
 2026-09-07 用户排版反馈：ReaderSettings 的新实例默认 fontSize=18、lineHeight=1.7、paragraphSpacing=8、horizontalPadding=20；已存合法设置不迁移覆盖，schemaVersion 维持 3。首行缩进展示封顶及空白去叠加属于 presentation，不改变 ParagraphBlock.leadingIndent 的 0..8 领域范围或源文本。
+
+
+## LOCAL-005 补充（2026-09-08）
+
+LOCAL-005 新增不可变 LocalBookInfo / LocalBookDeletion，用于本地管理列表及已提交删除的清理状态；没有增加平台路径、持久页码或新章节身份。

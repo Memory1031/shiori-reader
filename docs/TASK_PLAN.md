@@ -12,7 +12,7 @@
 
 Shiori（栞）是 Android / iOS 轻小说客户端，支持在线阅读和本地 TXT / EPUB 导入。最小业务闭环是发现或搜索小说，或导入本地书籍，查看详情及卷章节目录、原生阅读、加入本地书架、保存并恢复阅读进度；在线书籍利用已有缓存离线继续阅读，本地导入书籍通过应用托管文件完整离线阅读。
 
-**范围更新（2026-09-07，用户授权纳入规划）**：本地 TXT 与无 DRM 的流式 EPUB 纳入 MVP，新增 LOCAL-001..005。后续执行更新：LOCAL-001..004 已完成，LOCAL-005 仍为 PLANNED。复用现有双模式阅读器、目录、书架和进度，不依赖生产网站可用；不自动开始后续任务。
+**范围更新（2026-09-07，用户授权纳入规划）**：本地 TXT 与无 DRM 的流式 EPUB 纳入 MVP，新增 LOCAL-001..005。后续执行更新：LOCAL-001..005 已完成；LOCAL-005 的真机与 iOS Files 剩余验收边界见 [记录](validation/local-005.md)。复用现有双模式阅读器、目录、书架和进度，不依赖生产网站可用；不自动开始后续任务。
 
 首个生产 Source 是用户指定的 [LightNovel.fun](https://www.lightnovel.fun/)。SRC-001 / SRC-002 已观察访客首页，以及样本小说的搜索、详情、四卷目录、正文和浏览器图片解码，并独立验证核心 HTTP 协议，证据见 [源站调查](source/lightnovel.md)。自动化链路、会话寿命、异常覆盖和使用许可仍有待项，生产接入 Gate 未通过。未来 Source 通过同一业务边界接入；第一版不实现第二个生产 Source。
 
@@ -1275,7 +1275,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### LOCAL-005 — 本地书架、目录跳转与离线阅读闭环
 
-- Status：PLANNED；Phase：5 扩展；Complexity：M。
+- Status：DONE（2026-09-08）；Phase：5 扩展；Complexity：M。
+- 执行证据：生产本地分流、自动上架、Reader 双模式目录 / fragment、进度与独立删除已交付；新增 8 项测试，全量 374 项及 analyze PASS。Android 系统选择 / 真实导入 / 图文阅读与离线落盘、iOS Simulator 构建安装启动见 [LOCAL-005 验收](validation/local-005.md)。真机与 iOS Files 矩阵仍按下方 Platform Notes 延期。
 - Goal：TXT / EPUB 导入后可以立即阅读，并在重启后继续。
 - Input：本地解析结果、目录 / Reader / 书架；Dependencies：LOCAL-003、LOCAL-004、DETAIL-002、READER-003、READER-006、SHELF-001。
 - Scope：生产装配接入本地 Repository / Media、导入后加入书架、目录与当前章高亮、章 / EPUB fragment 跳转、跨章导航、进度保存恢复、删除本地书籍操作；提取复用 READER-007 的通用导航能力，不依赖真实 Source 集成完成。

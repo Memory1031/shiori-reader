@@ -12,12 +12,14 @@ class ImportController extends ChangeNotifier {
     required this.store,
     Map<LocalBookFormat, LocalBookParser> parsers = const {},
     this.decoder,
+    this.addToShelf = false,
   }) : parsers = Map.unmodifiable(parsers);
   static const maxBytes = 128 * 1024 * 1024;
   final ImportSource source;
   final LocalBookStore store;
   final Map<LocalBookFormat, LocalBookParser> parsers;
   final LocalBookDecoder? decoder;
+  final bool addToShelf;
   TxtEncoding? encoding;
   TxtEncodingPreview? encodingPreview;
   Completer<TxtEncoding>? _encodingChoice;
@@ -239,6 +241,7 @@ class ImportController extends ChangeNotifier {
         bytes: _validated(input, format, cancellation.token),
         format: format,
         parse: parser,
+        addToShelf: addToShelf,
         cancellation: cancellation.token,
       );
       if (value case Success<LocalBookRecord>(:final value)) {

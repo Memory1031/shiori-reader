@@ -2,14 +2,14 @@
 
 > iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。正式应用启动证据及 LOCAL-002 原生验证分开记录，后者见 [LOCAL-002 报告](validation/local-002.md)。系统分享面板及扩展交接已补验；Files 实际选中文件和签名真机矩阵仍待验。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
 
-LOCAL-001 已交付存储基础与解析器提交契约；LOCAL-002 增加文件选择、外部接收与导入编排，详见文末。LOCAL-003 / 004 已接入 TXT / EPUB 实际解析，详见 [解析支持范围](local-parsers.md)；书架 / Reader 闭环仍留 LOCAL-005，未实现整书下载。
+LOCAL-001 已交付存储基础与解析器提交契约；LOCAL-002 增加文件选择、外部接收与导入编排，详见文末。LOCAL-003 / 004 已接入 TXT / EPUB 实际解析，详见 [解析支持范围](local-parsers.md)；LOCAL-005 已接入书架 / Reader 闭环，见 [验收记录](validation/local-005.md)。未实现在线整书下载。
 
 ## 身份与内容边界
 
 - 保留 `SourceId('local')` namespace，`NovelKey.novelId` 为原文件完整字节的 SHA-256。文件名、外部路径、标题、格式选择和排版不参与身份；同文件重复导入返回已有记录，不重新解析、覆盖正文或更新进度。同名不同文件是不同书籍。
 - `LocalBookIdentity.chapter` 对解析器提供的稳定定位符生成 ID。TXT 使用原始章节起点的 code-point offset；EPUB 使用规范化 spine href。具体切章及 href 规范化由 LOCAL-003 / 004 固定，不得使用显示标题、屏幕页码或临时解压目录。
 - `ChapterContent` 沿用既有 blockKey / contentRevision 算法。`LocalBookContent` 提交完整 Detail、Catalog 和按目录顺序的 Chapters；提交校验同书归属、章数量 / 顺序及所有封面 / 插图均为本次托管资源。
-- LOCAL-004 用独立的 LocalNavigationEntry 树保存 nav / NCX 与语义块映射，不改变 Catalog 的唯一 spine 章序；实际点击跳转由 LOCAL-005 接入。
+- LOCAL-004 用独立的 LocalNavigationEntry 树保存 nav / NCX 与语义块映射，不改变 Catalog 的唯一 spine 章序；LOCAL-005 已接入实际点击跳转，缺失 fragment 从章首开始。
 - `MediaRef` 无需增加平台路径或 URL 字段：本地资源使用 `local` SourceId，mediaId 为 `书籍摘要/资源字节摘要`。这里是逻辑引用，数据层自行解析；搬迁应用根目录后引用不变。
 
 ## 接口与生命周期
@@ -20,7 +20,7 @@ LOCAL-001 已交付存储基础与解析器提交契约；LOCAL-002 增加文件
 
 `read` 只返回已发布书籍，未导入为 Success(null)；缺失 / 损坏的已发布文件为失败，保留原数据以便后续修复，不静默删书。`readMedia` 校验文件包含性、长度及字节摘要后返回只读字节，不访问 Source。
 
-`LocalDatabases` 持有唯一 ManagedLocalBooks，在数据库打开后初始化并回收残留，关闭时先等待本地导入存储再关闭 DB。暂不改造在线 NovelRepository、SourceMedia 或 ImageRepository；LOCAL-005 的路由 / 适配器按 `local` 身份分派到本契约，图片适配交付既有 MediaLease。不能把本地导入送入在线缓存装饰器或纳入 LRU。
+`LocalDatabases` 持有唯一 ManagedLocalBooks，在数据库打开后初始化并回收残留，关闭时先等待本地导入存储再关闭 DB。LOCAL-005 的 LocalReadingRepository / LocalImageRepository 在在线装饰器之前按 `local` 身份分派到本契约，图片交付既有 MediaLease；在线 NovelRepository / ImageRepository 的签名不变。不能把本地导入送入在线缓存装饰器或纳入 LRU。
 
 ## 文件、数据库与恢复协议
 
@@ -55,7 +55,7 @@ disposable/                               # 在线缓存，所有权完全独立
 
 当前工程硬上限：原文件 128 MiB、单资源 32 MiB、导入原文件及资源累计 512 MiB（重复资源也计入处理预算）、manifest 32 MiB、最多 4096 次媒体写入。实际字节数超限即停止，不只相信元信息。整体提交还检查 manifest 加总大小。后续解析器须另外限制 ZIP 展开比、条目数和 HTML / TXT 解析成本，存储上限不代替解析防护。
 
-移出书架只操作 bookshelf；清理历史只操作 progress；清理缓存只操作 disposable / cache.db。它们均不删除本地托管文件。本任务未提供删除导入原文件 API，未来必须作为独立明确操作设计，不能复用“移出书架”。
+移出书架只操作 bookshelf；清理历史只操作 progress；清理缓存只操作 disposable / cache.db。它们均不删除本地托管文件。LOCAL-005 增加独立的“本地文件”管理页与删除确认，不能复用“移出书架”。
 
 Android 使用已有 Application Support 私有目录，用户数据备份规则不排除正式 books。临时 import-staging 排除备份，iOS 同样应排除该可恢复暂存区；iOS 备份属性及备份一致性实测归 IOS-005 / ANDROID-002。没有新增 Native 依赖，沿用 Dart IO、crypto、Drift、path_provider，Android / iOS 最低版本不变。
 
@@ -100,3 +100,13 @@ iOS Level A 代码兼容审查完成，runtime 仍 DEFERRED_NO_MAC，未宣称 i
 App Group 的 ImportInbox 排除备份；正式书籍仍由主应用用户库管理。扩展不直接打开 SQLite、不解析正文。该协议覆盖进程中断恢复，不宣称已证明突然断电时的持久写入顺序。
 
 证据、重现命令与未验项见 [LOCAL-002 验证记录](validation/local-002.md)。iOS 原生测试与真实分享 UI 证据分别记录；Files、云文档提供者及签名真机的剩余矩阵归 IOS-005。
+
+## LOCAL-005：上架、阅读与删除
+
+生产导入传 `addToShelf: true`，书籍索引与书架行在同一用户库事务发布；任一写入失败则回滚并清理本次目录。契约默认 false 保留独立存储调用语义。重复导入复用已有内容、导入时间和进度，并保证书架存在，保留已有 addedAt。
+
+导入成功可“立即阅读”，首页书架与“更多 → 本地文件”均可继续阅读。本地文件页可重新上架，也可确认删除托管原文、规范化正文、图片、书架及进度；外部原文件不受影响。删除事务推进 progress_sessions generation，防止旧 Reader 或稍后重导入后恢复已删进度。清理目录失败时书籍仍从 UI 消失，并提示下次启动重试清理；未索引目录由启动恢复回收。
+
+本地 Repository 的详情 / 目录 / 正文在所有 ReadMode 下只读托管文件，返回 LoadOrigin.local；更新流为空。图片以验证过的 MemoryMedia 租约进入统一 SourceImage 解码器，旧租约在删除后仍可用，新请求失败。媒体读取只检查发布索引与摘要，不逐张反序列化整本书。manifest 解码与验证在可取消 worker 中完成。在线缓存清理和预取不涉及这些文件。
+
+目录独立保留 nav / NCX 层级与顺序；前后章使用 Catalog spine 顺序。目录项携带 ChapterKey / blockKey，复用 BookReaderScreen、ReaderController、ProgressTracker，显式目标覆盖历史位置；继续阅读不覆盖历史位置。翻页与滚动共用语义锚点，缺 fragment 章首降级。详细证据与未验范围见 [LOCAL-005](validation/local-005.md)。

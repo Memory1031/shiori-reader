@@ -240,5 +240,22 @@
   "importDrm": "This EPUB contains protected or encrypted content and cannot be imported.",
   "importFixedLayout": "Fixed-layout EPUB is not supported. Use a reflowable edition.",
   "importParseLimit": "Parsing limits exceeded: TXT 16 MiB, EPUB 64 MiB. Oversized chapters, images, or expanded content are also unsupported.",
-  "importEpubSupport": "Supports ordinary reflowable EPUB text and images. Styling is simplified; scripts, external resources, and custom fonts are not loaded. Missing images keep a placeholder."
+  "importEpubSupport": "Supports ordinary reflowable EPUB text and images. Styling is simplified; scripts, external resources, and custom fonts are not loaded. Missing images keep a placeholder.",
+  "localBooksTitle": "Local files",
+  "localBooksHint": "Removing a book from the shelf keeps its files. Add it back here, or delete the book and its reading progress.",
+  "localBooksEmpty": "No local books imported yet.",
+  "localDeleteTitle": "Delete local book?",
+  "localDeleteMessage": "Delete the app-owned original, text, images, shelf entry, and reading progress for “{title}”. The external original is unaffected. This cannot be undone.",
+  "localDeleteConfirm": "Delete book and progress",
+  "localDeleted": "Local book and reading progress deleted.",
+  "localCleanupPending": "Book and progress removed. Remaining files will be cleaned up at the next launch.",
+  "localShelfAdded": "Added to bookshelf.",
+  "localReadNow": "Read now",
+  "@localDeleteMessage": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
 }

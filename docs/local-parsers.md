@@ -1,6 +1,6 @@
 # LOCAL-003 / LOCAL-004：TXT 与 EPUB 解析
 
-本轮在 LOCAL-002 的接收副本、确认、取消和提交流程中接入 `BookDecoder`。两种格式共用 `LocalBookStore` 的原文件摘要去重、事务发布、失败回滚和媒体所有权。解析成功后已入库；加入书架、立即阅读、目录点击与阅读进度闭环属于 LOCAL-005，本轮没有自动执行。
+本轮在 LOCAL-002 的接收副本、确认、取消和提交流程中接入 `BookDecoder`。两种格式共用 `LocalBookStore` 的原文件摘要去重、事务发布、失败回滚和媒体所有权。解析成功后已入库。本文件记录 LOCAL-003 / 004 的解析范围；后续 LOCAL-005 已接入上架、立即阅读、目录点击与进度闭环，见 [验收记录](validation/local-005.md)。
 
 ## TXT
 
@@ -50,6 +50,6 @@ ZIP 只接收单磁盘、非 ZIP64、stored / deflate。先校验中央目录和
 
 `archive 4.2.0`（MIT，Dart >= 3.0）提供 CRC 工具和离线测试 ZIP 编码；生产解压由 Dart SDK zlib 加有界输出接收器处理，不依赖 ZIP 库预分配整个声明大小。`xml 6.6.1`（MIT，Dart >= 3.8）用于 OPF / NCX，沿用 `html 0.15.7`（MIT）处理正文。这些依赖已在项目固定 Dart 3.10.3 / Flutter 3.38.4 下解析；无平台最低版本变更。[archive 官方包](https://pub.dev/packages/archive/versions/4.2.0)、[xml 官方包](https://pub.dev/packages/xml/versions/6.6.1)。
 
-本地 manifest v1 增加可选 navigation 字段；旧记录缺省为空，既有详情 / 目录 / 正文 codec 和数据库 schema 不变。发布及重开均校验目录目标属于本书且 blockKey 存在，旧在线 Catalog / ReaderPosition 不受影响。LOCAL-005 再消费此导航树和托管媒体接口。
+本地 manifest v1 增加可选 navigation 字段；旧记录缺省为空，既有详情 / 目录 / 正文 codec 和数据库 schema 不变。发布及重开均校验目录目标属于本书且 blockKey 存在，旧在线 Catalog / ReaderPosition 不受影响。LOCAL-005 已消费此导航树和托管媒体接口。
 
 验证记录见 [LOCAL-003 / 004 验收](validation/local-003-004.md)。

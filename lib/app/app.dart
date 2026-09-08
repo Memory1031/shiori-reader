@@ -19,9 +19,11 @@ class ShioriApp extends StatelessWidget {
     this.locale,
     this.homeBuilder,
     this.overlayBuilder,
+    this.navigatorKey,
   });
 
   final Widget Function(BuildContext, Widget)? overlayBuilder;
+  final GlobalKey<NavigatorState>? navigatorKey;
   final AppController Function() createController;
   final AppRoutes routes;
   final Widget Function(BuildContext, AppController)? homeBuilder;
@@ -33,6 +35,7 @@ class ShioriApp extends StatelessWidget {
   Widget build(BuildContext context) => ControllerScope<AppController>(
     create: createController,
     builder: (context, controller) => MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       builder: (context, child) =>
           overlayBuilder?.call(context, child!) ?? child!,

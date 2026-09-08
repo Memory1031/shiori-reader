@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
+import '../../domain/contracts/local_book_decoder.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/source_image.dart';
 import '../../shared/widgets/app_scaffold.dart';
@@ -21,6 +22,7 @@ class DetailScreen extends StatelessWidget {
     this.onRead,
     this.onShelf,
     this.onChapter,
+    this.onTarget,
     this.onShelfSnapshot,
     this.actionFailure,
     this.showPendingActions = true,
@@ -32,6 +34,7 @@ class DetailScreen extends StatelessWidget {
   final ImageRepository? images;
   final ValueChanged<NovelKey>? onRead, onShelf;
   final ValueChanged<ChapterKey>? onChapter;
+  final ValueChanged<LocalNavigationEntry>? onTarget;
   final ValueChanged<NovelSummary>? onShelfSnapshot;
   final AppFailure? actionFailure;
   final bool showPendingActions;
@@ -152,6 +155,7 @@ class DetailScreen extends StatelessWidget {
                         novel: novel,
                         repository: repository,
                         onChapter: onChapter,
+                        onTarget: onTarget,
                       ),
                       const SizedBox(height: 24),
                     ],

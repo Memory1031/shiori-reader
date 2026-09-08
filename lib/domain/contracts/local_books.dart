@@ -68,6 +68,7 @@ abstract interface class LocalBookStore {
     required Stream<List<int>> bytes,
     required LocalBookFormat format,
     required LocalBookParser parse,
+    bool addToShelf = false,
     required CancellationToken cancellation,
   });
   Future<Result<LocalBookRecord?>> read(
@@ -79,4 +80,39 @@ abstract interface class LocalBookStore {
     required CancellationToken cancellation,
   });
   Future<void> close();
+}
+
+final class LocalBookInfo {
+  const LocalBookInfo({
+    required this.key,
+    required this.title,
+    required this.format,
+    required this.importedAt,
+  });
+  final NovelKey key;
+  final String title;
+  final LocalBookFormat format;
+  final DateTime importedAt;
+}
+
+final class LocalBookDeletion {
+  const LocalBookDeletion({this.cleanupPending = false});
+  final bool cleanupPending;
+}
+
+/// Separate from removing a shelf entry: deleting also removes owned files and
+/// progress, and invalidates outstanding progress sessions atomically.
+abstract interface class LocalBookManagement {
+  Stream<Result<List<LocalBookInfo>>> watchBooks();
+  Future<Result<LocalBookDeletion>> deleteBook(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  });
+}
+
+abstract interface class LocalNavigationRepository {
+  Future<Result<List<LocalNavigationEntry>>> loadNavigation(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  });
 }

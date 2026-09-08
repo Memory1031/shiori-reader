@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/contracts/import_source.dart';
 import '../../domain/contracts/local_book_decoder.dart';
+import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import 'import_controller.dart';
 
@@ -11,9 +12,11 @@ class ImportOverlay extends StatefulWidget {
     super.key,
     required this.controller,
     required this.child,
+    this.onRead,
   });
   final ImportController controller;
   final Widget child;
+  final ValueChanged<NovelKey>? onRead;
   @override
   State<ImportOverlay> createState() => _ImportOverlayState();
 }
@@ -196,6 +199,14 @@ class _ImportOverlayState extends State<ImportOverlay>
                                               ? l.importRetry
                                               : l.importStart,
                                         ),
+                                      ),
+                                    if (c.result != null &&
+                                        widget.onRead != null)
+                                      FilledButton(
+                                        onPressed: () => widget.onRead!(
+                                          c.result!.content.detail.summary.key,
+                                        ),
+                                        child: Text(l.localReadNow),
                                       ),
                                     if (c.result != null)
                                       FilledButton(

@@ -4,6 +4,7 @@ import '../../domain/models/models.dart';
 import '../local/database/user_database.dart' show UserDatabase;
 import '../local/local_guard.dart';
 import '../local/record_codec.dart';
+import '../local/library_rows.dart';
 
 /// Borrows the single app-owned user database. All writes are transactions.
 class LocalLibraryRepository implements LibraryRepository {
@@ -91,16 +92,10 @@ class LocalLibraryRepository implements LibraryRepository {
     BookshelfEntry entry, {
     required CancellationToken cancellation,
   }) => localWrite(db, Operation.libraryWrite, cancellation, () async {
-    await db.customUpdate(
-      'INSERT INTO bookshelf(source_id,novel_id,summary_json,added_at,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(source_id,novel_id) DO UPDATE SET summary_json=excluded.summary_json,updated_at=excluded.updated_at',
-      variables: [
-        ..._key(entry.snapshot.key),
-        Variable(RecordCodec.summary(entry.snapshot)),
-        Variable(entry.addedAt.millisecondsSinceEpoch),
-        Variable(now().millisecondsSinceEpoch),
-      ],
-      updates: {db.bookshelf},
-    );
+    if (!await _available(entry.snapshot.key)) {
+      throw const FormatException('Deleted local book');
+    }
+    await writeBookshelfRow(db, entry, now());
     return _book(
       await db
           .customSelect(
@@ -157,16 +152,26 @@ class LocalLibraryRepository implements LibraryRepository {
         .read<int>('generation');
   }
 
+  Future<bool> _available(NovelKey key) async =>
+      key.sourceId != LocalBookIdentity.sourceId ||
+      (await db
+              .customSelect(
+                'SELECT 1 FROM local_books WHERE digest=?',
+                variables: [Variable(key.novelId)],
+              )
+              .get())
+          .isNotEmpty;
+
   @override
   Future<Result<int>> beginProgressSession(
     NovelKey key, {
     required CancellationToken cancellation,
-  }) => localWrite(
-    db,
-    Operation.progressWrite,
-    cancellation,
-    () => _advance(key),
-  );
+  }) => localWrite(db, Operation.progressWrite, cancellation, () async {
+    if (!await _available(key)) {
+      throw const FormatException('Deleted local book');
+    }
+    return _advance(key);
+  });
   @override
   Future<Result<bool>> saveProgress(
     ReadingProgress progress, {
@@ -174,6 +179,7 @@ class LocalLibraryRepository implements LibraryRepository {
     required CancellationToken cancellation,
   }) => localWrite(db, Operation.progressWrite, cancellation, () async {
     final key = progress.novelKey;
+    if (!await _available(key)) return false;
     final session = await db
         .customSelect(
           'SELECT generation,sequence FROM progress_sessions WHERE $_where',

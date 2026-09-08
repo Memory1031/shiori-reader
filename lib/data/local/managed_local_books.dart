@@ -9,13 +9,14 @@ import '../../domain/models/models.dart';
 import 'database/user_database.dart';
 import 'files/app_paths.dart';
 import 'local_guard.dart';
+import 'library_rows.dart';
 import 'parser_worker.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import 'record_codec.dart';
 
 /// Durable imported originals and normalized content. Never uses cache.db.
 /// Single owner, serialized operations; initialize/recover before exposure.
-class ManagedLocalBooks implements LocalBookStore {
+class ManagedLocalBooks implements LocalBookStore, LocalBookManagement {
   ManagedLocalBooks._(this.paths, this.db);
   final AppPaths paths;
   final UserDatabase db;
@@ -98,6 +99,7 @@ class ManagedLocalBooks implements LocalBookStore {
     required Stream<List<int>> bytes,
     required LocalBookFormat format,
     required LocalBookParser parse,
+    bool addToShelf = false,
     required CancellationToken cancellation,
   }) => _run(Operation.libraryWrite, () async {
     checkLocalCancellation(cancellation);
@@ -111,8 +113,24 @@ class ManagedLocalBooks implements LocalBookStore {
       final digest = (await sha256.bind(original.openRead()).first).toString();
       checkLocalCancellation(cancellation);
       final key = LocalBookIdentity.book(digest);
-      final existing = await _read(key);
-      if (existing != null) return existing;
+      final existing = await _read(key, token: cancellation);
+      if (existing != null) {
+        if (addToShelf) {
+          await db.transaction(() async {
+            checkLocalCancellation(cancellation);
+            await writeBookshelfRow(
+              db,
+              BookshelfEntry(
+                snapshot: existing.content.detail.summary,
+                addedAt: DateTime.now(),
+              ),
+              DateTime.now(),
+            );
+            checkLocalCancellation(cancellation);
+          });
+        }
+        return existing;
+      }
       session = _ImportSession(
         key,
         stage,
@@ -154,8 +172,19 @@ class ManagedLocalBooks implements LocalBookStore {
             sha256.convert(manifest).toString(),
           ],
         );
+        if (addToShelf) {
+          await writeBookshelfRow(
+            db,
+            BookshelfEntry(
+              snapshot: content.detail.summary,
+              addedAt: importedAt,
+            ),
+            importedAt,
+          );
+        }
         checkLocalCancellation(cancellation);
       });
+      db.notifyUpdates({TableUpdate.onTable(db.localBooks)});
       committed = true;
       return LocalBookRecord(
         content: content,
@@ -236,12 +265,15 @@ class ManagedLocalBooks implements LocalBookStore {
     required CancellationToken cancellation,
   }) => _run(Operation.libraryRead, () async {
     checkLocalCancellation(cancellation);
-    final value = await _read(key);
+    final value = await _read(key, token: cancellation);
     checkLocalCancellation(cancellation);
     return value;
   });
 
-  Future<LocalBookRecord?> _read(NovelKey key) async {
+  Future<LocalBookRecord?> _read(
+    NovelKey key, {
+    required CancellationToken token,
+  }) async {
     if (key.sourceId != LocalBookIdentity.sourceId ||
         !_digest.hasMatch(key.novelId)) {
       throw const FormatException('Invalid local identity');
@@ -256,28 +288,88 @@ class ManagedLocalBooks implements LocalBookStore {
     final file = await _file(key.novelId, 'manifest.json');
     if (await file.length() > maxManifestBytes) throw const _LimitExceeded();
     final bytes = await file.readAsBytes();
-    if (sha256.convert(bytes).toString() != row.read<String>('manifest_hash')) {
-      throw const FormatException('Manifest checksum mismatch');
-    }
-    final map = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-    if (map['version'] != 1) throw const FormatException('Unknown local codec');
-    final content = LocalBookContent(
-      detail: RecordCodec.readDetail(map['detail'] as String),
-      catalog: RecordCodec.readCatalog(map['catalog'] as String),
-      navigation: (map['navigation'] as List? ?? const []).map(
-        (e) => LocalNavigationEntry.fromJson(e as Map<String, dynamic>),
-      ),
-      chapters: (map['chapters'] as List).cast<String>().map(
-        RecordCodec.readChapter,
-      ),
-    );
-    _validate(content, key, (map['media'] as List).cast<String>().toSet());
-    return LocalBookRecord(
-      content: content,
-      format: LocalBookFormat.values.byName(map['format'] as String),
-      importedAt: DateTime.parse(map['importedAt'] as String).toUtc(),
+    return _decodeManifest(
+      bytes,
+      key,
+      row.read<String>('manifest_hash'),
+      token,
     );
   }
+
+  @override
+  Stream<Result<List<LocalBookInfo>>> watchBooks() => localWatch(
+    db
+        .customSelect(
+          'SELECT digest,title,format,imported_at FROM local_books ORDER BY imported_at DESC,digest',
+          readsFrom: {db.localBooks},
+        )
+        .watch()
+        .map(
+          (rows) => List<LocalBookInfo>.unmodifiable(
+            rows.map(
+              (r) => LocalBookInfo(
+                key: LocalBookIdentity.book(r.read<String>('digest')),
+                title: r.read<String>('title'),
+                format: LocalBookFormat.values.byName(r.read<String>('format')),
+                importedAt: DateTime.fromMillisecondsSinceEpoch(
+                  r.read<int>('imported_at'),
+                  isUtc: true,
+                ),
+              ),
+            ),
+          ),
+        ),
+    Operation.libraryRead,
+  );
+
+  @override
+  Future<Result<LocalBookDeletion>> deleteBook(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  }) => _run(Operation.libraryWrite, () async {
+    if (key.sourceId != LocalBookIdentity.sourceId ||
+        !_digest.hasMatch(key.novelId)) {
+      throw const FormatException('Invalid local identity');
+    }
+    checkLocalCancellation(cancellation);
+    await db.transaction(() async {
+      final variables = [Variable(key.sourceId.value), Variable(key.novelId)];
+      // Retain a generation tombstone even across a later re-import.
+      await db.customUpdate(
+        'INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES(?,?,1,-1) ON CONFLICT(source_id,novel_id) DO UPDATE SET generation=generation+1,sequence=-1',
+        variables: variables,
+        updates: {db.progressSessions},
+      );
+      await db.customUpdate(
+        'DELETE FROM reading_progress WHERE source_id=? AND novel_id=?',
+        variables: variables,
+        updates: {db.readingProgress},
+      );
+      await db.customUpdate(
+        'DELETE FROM bookshelf WHERE source_id=? AND novel_id=?',
+        variables: variables,
+        updates: {db.bookshelf},
+      );
+      await db.customUpdate(
+        'DELETE FROM local_books WHERE digest=?',
+        variables: [Variable(key.novelId)],
+        updates: {db.localBooks},
+      );
+      checkLocalCancellation(cancellation);
+    });
+    // SQL is the visibility boundary. A failed filesystem cleanup is an
+    // unindexed orphan recovered on restart; never restore a deleted book.
+    try {
+      final directory = p.join(paths.localBooks.path, key.novelId);
+      if (await FileSystemEntity.type(directory, followLinks: false) !=
+          FileSystemEntityType.notFound) {
+        await _deleteChild(paths.localBooks, directory);
+      }
+      return const LocalBookDeletion();
+    } catch (_) {
+      return const LocalBookDeletion(cleanupPending: true);
+    }
+  });
 
   @override
   Future<Result<Uint8List>> readMedia(
@@ -291,8 +383,13 @@ class ManagedLocalBooks implements LocalBookStore {
         !parts.every(_digest.hasMatch)) {
       throw const FormatException('Invalid local media');
     }
-    final book = await _read(LocalBookIdentity.book(parts[0]));
-    if (book == null) throw const FormatException('Unpublished book');
+    final published = await db
+        .customSelect(
+          'SELECT 1 FROM local_books WHERE digest=?',
+          variables: [Variable(parts[0])],
+        )
+        .get();
+    if (published.isEmpty) throw const FormatException('Unpublished book');
     final file = await _file(parts[0], parts[1]);
     if (await file.length() > maxMediaBytes) throw const _LimitExceeded();
     final bytes = await file.readAsBytes();
@@ -455,3 +552,36 @@ Future<List<int>> _encodeManifest(
     }),
   );
 }, cancellation);
+
+Future<LocalBookRecord> _decodeManifest(
+  List<int> bytes,
+  NovelKey key,
+  String hash,
+  CancellationToken token,
+) => runParserWorker(() {
+  if (sha256.convert(bytes).toString() != hash) {
+    throw const FormatException('Manifest checksum mismatch');
+  }
+  final map = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+  if (map['version'] != 1) throw const FormatException('Unknown local codec');
+  final content = LocalBookContent(
+    detail: RecordCodec.readDetail(map['detail'] as String),
+    catalog: RecordCodec.readCatalog(map['catalog'] as String),
+    navigation: (map['navigation'] as List? ?? const []).map(
+      (e) => LocalNavigationEntry.fromJson(e as Map<String, dynamic>),
+    ),
+    chapters: (map['chapters'] as List).cast<String>().map(
+      RecordCodec.readChapter,
+    ),
+  );
+  ManagedLocalBooks._validate(
+    content,
+    key,
+    (map['media'] as List).cast<String>().toSet(),
+  );
+  return LocalBookRecord(
+    content: content,
+    format: LocalBookFormat.values.byName(map['format'] as String),
+    importedAt: DateTime.parse(map['importedAt'] as String).toUtc(),
+  );
+}, token);

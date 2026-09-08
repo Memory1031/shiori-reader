@@ -240,5 +240,22 @@
   "importDrm": "这本 EPUB 含受保护或加密的内容，暂不支持导入。",
   "importFixedLayout": "暂不支持固定版式 EPUB，请使用流式排版版本。",
   "importParseLimit": "文件超过解析限制：TXT 16 MiB、EPUB 64 MiB；过大的章节、图片或解压内容也无法导入。",
-  "importEpubSupport": "支持普通流式 EPUB 图文。文字样式简化；脚本、外部资源和自定义字体不加载，缺失图片保留占位。"
+  "importEpubSupport": "支持普通流式 EPUB 图文。文字样式简化；脚本、外部资源和自定义字体不加载，缺失图片保留占位。",
+  "localBooksTitle": "本地文件",
+  "localBooksHint": "移出书架不会删除文件。这里可以重新加入书架，或删除书籍及其阅读进度。",
+  "localBooksEmpty": "还没有导入本地书籍。",
+  "localDeleteTitle": "删除本地书籍？",
+  "localDeleteMessage": "将删除《{title}》的应用内原文件、正文、插图、书架记录和阅读进度。外部原文件不受影响，此操作无法撤销。",
+  "localDeleteConfirm": "删除书籍和进度",
+  "localDeleted": "本地书籍和阅读进度已删除。",
+  "localCleanupPending": "书籍和进度已移除，剩余文件将在下次启动时清理。",
+  "localShelfAdded": "已加入书架。",
+  "localReadNow": "立即阅读",
+  "@localDeleteMessage": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
 }

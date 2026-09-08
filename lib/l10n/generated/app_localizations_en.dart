@@ -682,4 +682,38 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get importEpubSupport =>
       'Supports ordinary reflowable EPUB text and images. Styling is simplified; scripts, external resources, and custom fonts are not loaded. Missing images keep a placeholder.';
+
+  @override
+  String get localBooksTitle => 'Local files';
+
+  @override
+  String get localBooksHint =>
+      'Removing a book from the shelf keeps its files. Add it back here, or delete the book and its reading progress.';
+
+  @override
+  String get localBooksEmpty => 'No local books imported yet.';
+
+  @override
+  String get localDeleteTitle => 'Delete local book?';
+
+  @override
+  String localDeleteMessage(String title) {
+    return 'Delete the app-owned original, text, images, shelf entry, and reading progress for “$title”. The external original is unaffected. This cannot be undone.';
+  }
+
+  @override
+  String get localDeleteConfirm => 'Delete book and progress';
+
+  @override
+  String get localDeleted => 'Local book and reading progress deleted.';
+
+  @override
+  String get localCleanupPending =>
+      'Book and progress removed. Remaining files will be cleaned up at the next launch.';
+
+  @override
+  String get localShelfAdded => 'Added to bookshelf.';
+
+  @override
+  String get localReadNow => 'Read now';
 }
