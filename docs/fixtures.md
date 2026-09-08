@@ -1,5 +1,7 @@
 # DEV-001：离线 Fixture Source 与可控媒体
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。本次验证的是正式入口，fixture 解码与开发场景未在 iOS 补验。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 2026-09-07。DEV-001 DONE。代码、宿主契约/解码测试和 Android 编译已完成；DEV-002 执行时连接 MuMu 后补齐 20 图设备解码 PASS，iOS runtime 为 DEFERRED_NO_MAC。菜单和快捷入口现见 [DEV-002](dev-entry.md)。
 
 ## 入口和所有权

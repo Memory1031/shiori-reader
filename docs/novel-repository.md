@@ -1,5 +1,7 @@
 # CORE-005：通用小说 Repository（2026-09-07）
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。本次仅验证正式应用启动，Repository 专项与失败恢复未补验。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 CACHE-001 / CACHE-002 已增强本实现：注入统一 CacheCoordinator、详情 24h / 目录 1h TTL、正文无硬 TTL、分区 LRU、活动正文 pin、清理取消与 generation 晚写保护。保持 in-flight 合并和当前 Reader 快照语义，不另外建立无界正文内存缓存。下文无 TTL 的描述为 CORE-005 交付基线，当前证据见 [缓存](cache.md)。
 
 `DefaultNovelRepository` 实现既有 `NovelRepository`，通过 `SourceRegistry` 与 `NovelRecordStore` 连接源契约和规范化 SQLite 记录。没有站点协议、URL、selector、会话初始化或新的依赖；没有替换开发 fixture 或自动接入生产应用。真实 Source 客户端仍由 SRC-005 开始实施。

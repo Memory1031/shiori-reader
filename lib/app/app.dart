@@ -18,8 +18,10 @@ class ShioriApp extends StatelessWidget {
     this.routes = const AppRoutes(),
     this.locale,
     this.homeBuilder,
+    this.overlayBuilder,
   });
 
+  final Widget Function(BuildContext, Widget)? overlayBuilder;
   final AppController Function() createController;
   final AppRoutes routes;
   final Widget Function(BuildContext, AppController)? homeBuilder;
@@ -32,6 +34,8 @@ class ShioriApp extends StatelessWidget {
     create: createController,
     builder: (context, controller) => MaterialApp(
       debugShowCheckedModeBanner: false,
+      builder: (context, child) =>
+          overlayBuilder?.call(context, child!) ?? child!,
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,

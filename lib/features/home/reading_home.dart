@@ -25,6 +25,7 @@ class ReadingHome extends StatefulWidget {
     this.cache,
     this.settings,
     this.onAppearance,
+    this.onImport,
     this.environmentLabel,
   });
   final NovelRepository repository;
@@ -34,6 +35,7 @@ class ReadingHome extends StatefulWidget {
   final CacheManagement? cache;
   final SettingsStore? settings;
   final VoidCallback? onAppearance;
+  final VoidCallback? onImport;
   final String? environmentLabel;
   @override
   State<ReadingHome> createState() => _ReadingHomeState();
@@ -195,6 +197,12 @@ class _ReadingHomeState extends State<ReadingHome> {
           style: TextStyle(letterSpacing: 1, fontWeight: FontWeight.w600),
         ),
         actions: [
+          if (widget.onImport != null)
+            IconButton(
+              onPressed: widget.onImport,
+              icon: const Icon(Icons.file_open_outlined),
+              tooltip: AppLocalizations.of(context).importTitle,
+            ),
           IconButton(
             onPressed: _search,
             tooltip: strings.searchTitle,

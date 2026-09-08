@@ -1,5 +1,7 @@
 # CACHE-001..005：缓存与预取实施记录
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。本次仅验证正式应用启动，未补验 iOS 离线缓存、清理、重开或备份。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 2026-09-07。五项功能已实现，310 项完整离线回归通过。**CACHE-004 的 ARM64 真机验收仍待设备；iOS runtime 保持 DEFERRED_NO_MAC。** MuMu 结果不替代真机验收。本轮没有生产 Source 请求，也没有执行 LOCAL 或整书下载。
 
 ## 产品行为

@@ -2,6 +2,8 @@
 
 LOCAL-001（2026-09-07）：新增 LocalBookStore / LocalImportSession 纯 Dart 契约，可提交原文件流与规范化解析结果、读取已发布书籍和托管媒体。沿用 Result、CancellationToken、NovelKey / ChapterKey / MediaRef；线上 Repository / SourceMedia / ImageRepository 签名不变，本地路由适配留 LOCAL-005。文件与 DB 的发布 / 恢复协议、独立所有权及资源限制见 [本地导入](local-import.md)。
 
+LOCAL-002（2026-09-08）：新增 `ImportSource` 文件接收边界（`import_source.dart`），候选仅含 opaque ID、显示名称、字节大小及封闭错误码；事件区分复制进度与完成，pending 是重启恢复的数据源。读取返回字节流，ack 按 ID 幂等，cancelCopy 等待后台副本操作结束；平台 URI / 路径与权限留在数据及 native 层。它负责接收副本，不发布书籍；发布仍由 LocalBookStore 唯一承担。
+
 ## CACHE-001..005 补充（2026-09-07）
 
 新增纯 Dart CacheManagement：inspect 返回不可变容量、书籍和 CachedChapter（有效插图数 / 引用总数）；clear 按书 / 全部清理，pinChapter 返回幂等释放函数。可选 ReadingPrefetch 提供状态流、进入 / 离开、位置采样、明确目标选择、两个开关、暂停 / 继续与前后台通知。select/configure 返回 Result；目标独立于 ReadingProgress，不将预取完成算已读。

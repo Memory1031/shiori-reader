@@ -197,7 +197,7 @@ abstract class AppLocalizations {
   /// No description provided for @importTitle.
   ///
   /// In en, this message translates to:
-  /// **'Import'**
+  /// **'Import book'**
   String get importTitle;
 
   /// No description provided for @importPending.
@@ -1171,6 +1171,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No cached content is available. Connect to the internet and try again.'**
   String get cacheMissMessage;
+
+  /// No description provided for @importIncoming.
+  ///
+  /// In en, this message translates to:
+  /// **'A file is ready to import'**
+  String get importIncoming;
+
+  /// No description provided for @importReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get importReview;
+
+  /// No description provided for @importLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get importLater;
+
+  /// No description provided for @importReceiving.
+  ///
+  /// In en, this message translates to:
+  /// **'Copying file…'**
+  String get importReceiving;
+
+  /// No description provided for @importProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing book…'**
+  String get importProcessing;
+
+  /// No description provided for @importSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'The book has been saved.'**
+  String get importSuccess;
+
+  /// No description provided for @importHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose one TXT or EPUB file, up to 128 MiB.'**
+  String get importHint;
+
+  /// No description provided for @importChoose.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose file'**
+  String get importChoose;
+
+  /// No description provided for @importStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get importStart;
+
+  /// No description provided for @importRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get importRetry;
+
+  /// No description provided for @importCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get importCancel;
+
+  /// No description provided for @importDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get importDone;
+
+  /// No description provided for @importTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'The file exceeds 128 MiB. Choose a smaller file.'**
+  String get importTooLarge;
+
+  /// No description provided for @importMultiple.
+  ///
+  /// In en, this message translates to:
+  /// **'Only one file can be received at a time. Select again.'**
+  String get importMultiple;
+
+  /// No description provided for @importBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Handle the pending file first, then open or share this file again.'**
+  String get importBusy;
+
+  /// No description provided for @importUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a TXT or EPUB file. Web links cannot be imported.'**
+  String get importUnsupported;
+
+  /// No description provided for @importInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is empty or its contents do not match the format.'**
+  String get importInvalid;
+
+  /// No description provided for @importParserUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This version cannot parse this format yet. Nothing was imported. You can cancel and choose the file again later.'**
+  String get importParserUnavailable;
+
+  /// No description provided for @importStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'The file could not be saved. Check available space and retry.'**
+  String get importStorage;
+
+  /// No description provided for @importCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Import cancelled. The book was not saved.'**
+  String get importCancelled;
+
+  /// No description provided for @importUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'The file could not be read. Check access and choose it again.'**
+  String get importUnreadable;
 }
 
 class _AppLocalizationsDelegate

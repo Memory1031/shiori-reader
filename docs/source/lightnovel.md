@@ -1,5 +1,7 @@
 # LightNovel.fun 源站调查
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](../validation/ios-001.md)。本次未由代理执行 iOS 真实 Source 请求，历史 Windows / Android Source 证据不外推为 iOS 通过。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 当前结果（2026-09-07）：**SRC-001..004 DONE；Phase 0 技术可行性 Gate = GO / PASS，可按依赖进入生产接入开发。** 这不表示生产 Source 已实现、媒体跨重启已验证或已获内容分发许可。前文保留历史快照；其中 UNKNOWN / 未执行和 SRC-003 报告的 NOT_EVALUATED_SRC004 均指当时状态，以文末 SRC-004 的结论、责任与后续门槛为准。
 
 ## SRC-001：访问边界与调查基线

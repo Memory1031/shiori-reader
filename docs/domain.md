@@ -1,5 +1,7 @@
 # CORE-002：领域值模型与内容规范
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。本次应用启动不新增领域契约或完整 iOS 业务验收结论。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 LOCAL-001（2026-09-07）：新增纯 Dart LocalBookFormat、LocalBookContent / LocalBookRecord 和 LocalBookIdentity。保留 `local` namespace，书籍用原文件 SHA-256、章节用解析器稳定定位符摘要，blockKey 沿用现有算法；不增加平台路径或页码身份。详细限制和后续 EPUB fragment 边界见 [本地导入](local-import.md)。
 
 CACHE-001..005（2026-09-07）：新增缓存状态投影 CachedChapter / CacheOverview 与 PrefetchState，均为不可变 Domain 数据。预取选择只使用既有 ChapterKey，不改变 Catalog.ordinal、ChapterContent、ReaderPosition 或 ReadingProgress 的语义；选择不表示已读，也不构造未经验证的续篇关系。接口见 [contracts](contracts.md)，验证见 [缓存](cache.md)。

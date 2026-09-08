@@ -1,5 +1,7 @@
 # NET-001 / NET-002：受限网络与诊断
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。本次仅验证正式应用启动，未补验 iOS TLS、session 或真实 Source 网络。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 CACHE-005（2026-09-07）：新增请求作用域 BackgroundWork（Dart Zone 传递元数据，不是全局服务定位器）。进程所有者共享 BackgroundBudget，Source 定位 / 重定向 / 重试和流式响应体均记账。Scheduler 保存提交时 Zone，避免延迟执行继承其他请求上下文；共享后台资源遇前台消费者立即提升排队优先级，HTTP 单次大小 / deadline / 同源间隔保持不变。详见 [缓存](cache.md)。
 
 2026-09-07。NET-001 / NET-002 DONE；网络层合计 14 项离线测试通过，完整工程 112 项通过，静态分析无问题；Android 组合探针安装 / 冷启动 / 执行通过。没有访问真实 Source。MEDIA-001 的所有权与内存边界见 [媒体说明](media.md)。

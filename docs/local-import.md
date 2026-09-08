@@ -1,6 +1,8 @@
-# LOCAL-001：本地书籍身份与托管存储
+# 本地导入：身份、托管存储与文件接收
 
-本任务只交付存储基础与解析器提交契约。文件选择、外部应用打开、TXT / EPUB 解析以及书架 / Reader 路由分别留给 LOCAL-002..005；当前没有新增用户可见导入入口，也未实现整书下载。
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。正式应用启动证据及 LOCAL-002 原生验证分开记录，后者见 [LOCAL-002 报告](validation/local-002.md)。系统分享面板及扩展交接已补验；Files 实际选中文件和签名真机矩阵仍待验。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
+LOCAL-001 已交付存储基础与解析器提交契约；LOCAL-002 增加文件选择、外部接收与导入编排，详见文末。TXT / EPUB 实际解析及书架 / Reader 接入仍留 LOCAL-003..005，未实现整书下载。
 
 ## 身份与内容边界
 
@@ -70,3 +72,31 @@ MuMu Android API 32 首次 `LOCAL001_PREPARE_AND_REOPEN_PASS`，最终探针版�
 iOS Level A 代码兼容审查完成，runtime 仍 DEFERRED_NO_MAC，未宣称 iOS 真机通过。Android 真机磁盘满 / backup-restore / 断电持久性未实测，归 ANDROID-002；模拟器结果不替代这些验证。
 
 验收结束已用 `lib/main.dart` 构建普通 Android Debug 包并 `install -r` 成功替换探针；未自动启动真实书源页面。没有开始 LOCAL-002。
+
+## LOCAL-002：文件接收与导入编排（2026-09-08）
+
+新增首页文件入口，以及不会替换 Navigator / Reader 的根级提示。外部接收只显示待处理提示，用户可“稍后”，由用户确认后才调用导入。中英文文案来自 ARB；扩展使用独立 en / zh-Hans Localizable.strings。面板支持滚动与大字号。复制和文件 I/O 在后台执行；取消会等待复制 / 解析收束，再删除对应 receipt，提交后的成功优先于迟到的取消。
+
+领域层 `ImportSource` 只暴露不可变文件候选、事件、流式读取、确认与取消；不泄露 URI、平台权限或路径。数据层 `PlatformImportSource` 持有 native 返回的应用自有文件路径。应用装配显式注入源、LocalBookStore 和解析器映射。当前正式解析器映射为空，确认时明确提示暂不支持解析；fake parser 仅用于测试，不写入生产行为。实际解码、章节和 EPUB 结构校验由后续任务实现。
+
+### 平台接收与持久交接
+
+- Android 使用 ACTION_OPEN_DOCUMENT、ACTION_VIEW、ACTION_SEND / SEND_MULTIPLE。只接收单个 content URI，在临时读取授权仍有效时通过 ContentResolver 流式复制到 noBackupFilesDir/import-inbox。不请求全盘存储权限，也不依赖永久 URI 授权。
+- iOS 使用 UIDocumentPicker、TXT / EPUB 文档类型关联和 Share Extension。主应用用 security-scoped access / NSFileCoordinator 读取；扩展在 NSItemProvider 的临时 URL 回调返回前完成副本，不将临时 URL 留给之后的异步任务。
+- 双端共享“working → pending”目录发布协议：只保留一个待处理文件，receipt 含随机 ID、显示文件名及真实字节数；payload 使用固定内部文件名。读、写和 ack 受文件锁保护；iOS flock 跨扩展与主应用进程。部分复制不暴露，重开在获取锁后清理 working。已有 pending 不被新文件覆盖，多文件或繁忙明确提示重新处理。
+- app 启动 / resume 查询持久 pending；事件只负责提示，不作为唯一数据源。只有成功提交或明确取消才按 ID 回收；陈旧 ack 不删除新候选，重复 ack 无害。提交成功但 ack 失败时保留 receipt，下次用既有 SHA-256 去重恢复，不重复解析 / 覆盖进度。
+- 外部接收不自动导航；打开中的 Reader 继续保留。扩展完成后告知用户打开 Shiori 确认，不使用未保证的“扩展强行拉起主应用”方案。
+
+### 限制与错误
+
+入口副本按实际读取字节限 128 MiB，单槽最多保留一个 128 MiB 文件；解析服务额外复制原文件，因此峰值须预留两份原文件空间及 LOCAL-001 的资源 / manifest 预算。空间不足按读写错误返回可恢复提示，清理部分副本，允许重新选择；不承诺只凭元信息就能准确预估剩余空间。
+
+扩展名和 MIME / UTType 仅作初筛。Dart 流检查空输入、实际大小、EPUB ZIP 魔数、TXT 的 ZIP / 二进制伪装（容许 UTF-16 BOM）；这不能代替 TXT 解码或 EPUB 合法性校验。失败保留完整 pending 以便重试或取消；纯链接 / 不支持格式、多文件、权限失效、繁忙、取消、空间错误均使用封闭错误词汇，不把底层异常或外部路径显示给用户。
+
+### iOS App Group 配置
+
+主应用和 ShareExtension 的 `SHIORI_IMPORT_GROUP` 必须一致，当前开发占位为 `group.dev.shiori.reader.import`；各自 entitlements 声明该组，Info.plist 通过 build setting 读取。扩展 Bundle ID 为 `dev.shiori.reader.ShareExtension`，最低 iOS 15，与主应用一起嵌入构建。签名真机必须为自己的 Team 注册两个 App ID、同一个 App Group 并更新 provisioning profiles；改变发布身份时同步两个 target，不能只改 Dart 常量。发布版本升级时同步扩展的 MARKETING_VERSION / CURRENT_PROJECT_VERSION。
+
+App Group 的 ImportInbox 排除备份；正式书籍仍由主应用用户库管理。扩展不直接打开 SQLite、不解析正文。该协议覆盖进程中断恢复，不宣称已证明突然断电时的持久写入顺序。
+
+证据、重现命令与未验项见 [LOCAL-002 验证记录](validation/local-002.md)。iOS 原生测试与真实分享 UI 证据分别记录；Files、云文档提供者及签名真机的剩余矩阵归 IOS-005。

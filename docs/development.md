@@ -2,9 +2,9 @@
 
 当前基础 CI 的触发方式、依赖源配置及本地复验命令见[持续集成说明](ci.md)。DEV-001 的离线场景、故障控制和解码复验见 [Fixture 规范](fixtures.md)。DEV-002 的菜单、启动参数与普通/dev 构建命令见 [开发入口](dev-entry.md)。READER-001 的双模式阅读实验与复验见 [ADR-07](decisions/reader-viewport.md)。READER-002 的正式单章页面与验证见 [Reader 说明](reader.md)。NET-001 / NET-002 的预算和诊断见 [网络说明](network.md)，MEDIA-001 的租约及内存边界见 [媒体说明](media.md)。下文保留 CORE-001 的历史开发基线与验证记录。
 
-记录日期：2026-09-06。当前只建立最小移动端启动工程，不包含 Source、导航、状态管理、领域模型或存储实现。README 原文保留。
+历史基线日期：2026-09-06。下表与 Windows 验证记录描述 CORE-001 当时的最小工程，不代表当前功能与依赖清单；2026-09-08 的 macOS / iOS 结果见下方入口。
 
-## 固定工具链
+## 固定工具链与 CORE-001 历史基线
 
 | 项目 | 本次选择 / 证据 |
 | --- | --- |
@@ -38,6 +38,20 @@ env PUB_HOSTED_URL=https://pub.flutter-io.cn fvm flutter pub get --enforce-lockf
 项目命令统一使用 `fvm flutter` / `fvm dart`，例如 `fvm flutter run`、`fvm flutter analyze --no-pub`、`fvm flutter test --no-pub`。这不会切换 FVM 的全局默认版本；直接运行 `flutter` 仍可能使用 PATH 中的其他 SDK。编辑器的项目 Flutter SDK 路径使用 `.fvm/flutter_sdk`；该目录已被 Git 忽略，不提交 SDK 或宿主绝对路径。
 
 上述 `env` 写法适用于 macOS / Linux shell，仅对该命令使用锁文件中的包源；Windows PowerShell 写法见 [CI 依赖源说明](ci.md)。2026-09-08 已在 macOS 安装并启用 FVM 3.38.4，实测 Flutter 3.38.4 / revision `66dd93f9a2`、Dart 3.10.3，严格锁文件依赖安装通过，`pubspec.lock` 未改动。FVM 自动生成 VS Code 项目配置 `.fvm/versions/3.38.4`（同一 SDK 的链接），全局默认链接仍指向 3.32.5。本次仅验证工具链与依赖安装，未执行 Android / iOS 构建或运行；`pub get` 自动生成的 iOS CocoaPods 模板改动已撤回。
+
+## macOS iOS 模拟器启动验证（2026-09-08）
+
+**模拟器 Debug 构建、安装与启动 PASS；IOS-001 部分完成，完整 iOS 验收未完成。** 当前 Mac / Xcode 已可用；环境版本、实际命令、失败与修复过程、已知提示和验收边界统一见 [IOS-001 报告](validation/ios-001.md)。下方 Windows / 无 Mac 的描述为 2026-09-06 历史记录。
+
+在已完成 FVM 配置的仓库根目录，使用本机实际设备 ID：
+
+```sh
+fvm flutter devices
+# 将设备 ID 替换为上一步列出的 iOS 模拟器 ID。
+fvm flutter run --debug --no-pub --target lib/main.dart -d <设备ID>
+```
+
+首次运行先按上方 FVM 说明安装依赖。若 Xcode 提示与 SDK 匹配的 runtime 未安装，先在 Xcode Components 补齐；本次补齐 26.5 runtime 后，仍可在原 26.2 模拟器运行。Apple 下载实测直连更快，但不外推为其他网络的固定规则。未更改全局 Flutter / Git / 代理配置。
 
 ## Windows 本地准备
 
@@ -114,3 +128,20 @@ CORE-001 结果：**DONE（2026-09-06，working tree，未提交 commit）**。A
 ## DB-001 / DB-002 存储与代码生成
 
 数据库路径、双库备份边界、固定依赖、隔离生成器和验证记录见 [本地存储](database.md)。首次代码生成前进入 `tool/db_codegen` 执行 `dart pub get`，返回根目录运行 `./tool/generate_database.ps1`；所有命令仍使用固定 Dart 3.10.3。不要在主工程加入生成器的 analyzer 约束或强制依赖覆盖。数据库 schema 快照属于源码，工具包工作目录和原生下载缓存不属于源码。
+
+
+## LOCAL-002 双端原生接收配置
+
+LOCAL-002 不引入文件接收插件：Android 使用系统 Document Provider / Intent，iOS 使用 UIDocumentPicker 与 Share Extension。iOS 主应用与扩展最低 15.0，共享组和签名配置见 [本地导入](local-import.md)，原生测试命令见 [验证记录](validation/local-002.md)。当前 Flutter 3.38.4 使用 AppDelegate 启动路径；Xcode 构建出现未来 UIScene 迁移的 rootViewController 弃用提示，升级 Flutter / 迁移 UIScene 时需同步迁移导入通道与 openURL 生命周期，不能仅忽略接收入口。
+
+本次 Mac Android 构建使用 Git 忽略的仓库本地 Temurin JDK 17，未改系统 Java / Flutter 配置。Flutter 可选择 Android Studio JBR，因此构建时除 JAVA_HOME 外还通过 GRADLE_OPTS 的 `-Dorg.gradle.java.home=<本机 JDK 17 目录>` 指定 Gradle JVM；不要把机器绝对路径写入已跟踪配置。
+
+2026-09-08 LOCAL-002 收尾：用户已在全局 SDK 并存安装 NDK 28.2.13676358（r28c）；版本文件、clang / ndk-build 启动与 Android arm64 debug 构建检查通过，其他 NDK 版本保留。此前隔离目录的失败 NDK 安装和下载残留已清理，构建继续使用原有全局 sdk.dir。镜像构建命令示例（仅对当前命令生效）：
+
+```sh
+FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn \
+PUB_HOSTED_URL=https://pub.flutter-io.cn \
+fvm flutter build apk --debug --target-platform android-arm64 --no-pub
+```
+
+JDK 17 的当前进程配置仍须按上文设置。arm64 单架构构建用于本次 Apple Silicon Android 模拟器，不等同全架构发布包验收。

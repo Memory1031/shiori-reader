@@ -1,5 +1,7 @@
 # DETAIL-001：详情状态与元信息展示
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。本次仅验证正式应用启动，详情、目录与导航专项尚未补验。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 2026-09-07，状态 DONE。详情组件位于 `lib/features/novel_detail/`，领域契约和 Source 实现未改变。
 
 ## 状态与生命周期

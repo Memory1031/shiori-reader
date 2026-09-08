@@ -1,0 +1,11 @@
+"receiving" = "正在接收文件…";
+"received" = "文件已保存。请打开 Shiori 确认导入。";
+"cancel" = "取消";
+"done" = "完成";
+"multiple" = "每次只支持一个文件，请重新分享。";
+"unsupported" = "仅支持 TXT / EPUB 文件，不支持网页链接。";
+"unreadable" = "无法读取文件，请重新选择。";
+"tooLarge" = "文件超过 128 MiB。";
+"busy" = "请先在 Shiori 处理待导入文件，再重新分享。";
+"storage" = "无法保存，请检查可用空间后重试。";
+"cancelled" = "接收已取消。";

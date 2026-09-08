@@ -1,4 +1,7 @@
 import 'dart:async';
+import '../data/import/platform_import_source.dart';
+import '../features/import/import_controller.dart';
+import '../features/import/import_overlay.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/local/database/local_databases.dart';
@@ -26,6 +29,7 @@ class ProductionApp extends StatefulWidget {
 
 class _ProductionAppState extends State<ProductionApp> {
   LocalDatabases? _databases;
+  ImportController? _imports;
   SourceServices? _services;
   AppSettingsStore? _appearance;
   SettingsStore? _reading;
@@ -60,6 +64,12 @@ class _ProductionAppState extends State<ProductionApp> {
       }
       final databases = (result as Success<LocalDatabases>).value;
       _databases = databases;
+      _imports = ImportController(
+        source: PlatformImportSource(),
+        store: databases.localBooks,
+        parsers: const {},
+      );
+      unawaited(_imports!.start());
       _services = SourceServices(
         cache: databases.cache,
         paths: paths,
@@ -98,6 +108,8 @@ class _ProductionAppState extends State<ProductionApp> {
   }
 
   Future<void> _close() async {
+    await _imports?.shutdown();
+    _imports?.dispose();
     await _services?.close();
     await _databases?.close();
   }
@@ -117,6 +129,8 @@ class _ProductionAppState extends State<ProductionApp> {
         )
       : ShioriApp(
           key: const ValueKey('production-ready'),
+          overlayBuilder: (context, child) =>
+              ImportOverlay(controller: _imports!, child: child),
           createController: () => AppController(settingsStore: _appearance),
           homeBuilder: (context, app) => ReadingHome(
             repository: _services!.novels,
@@ -126,6 +140,7 @@ class _ProductionAppState extends State<ProductionApp> {
             cache: _services!.cacheManagement,
             settings: _reading,
             onAppearance: () => showAppAppearance(context, app),
+            onImport: _imports!.open,
           ),
         );
 }

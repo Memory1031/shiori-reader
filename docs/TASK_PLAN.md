@@ -1,5 +1,7 @@
 # Shiori Task Plan
 
+> 2026-09-08 iOS 状态：Mac / Xcode 已可用；正式入口在 iPhone 17 Pro / iOS 26.2 模拟器完成 Debug 构建、安装和启动。**IOS-001 = PARTIAL，IOS-002..006 = NOT_STARTED；完整 iOS 验收未通过。** 当前证据与待项见 [IOS-001 报告](validation/ios-001.md)。带 2026-09-06/07 日期的执行记录与规划自检保留历史结论，不能将其中 `DEFERRED_NO_MAC` 当作当前环境状态。
+
 规划日期：2026-09-06；定向修订：Android Current Track + Deferred iOS Runtime Track。执行更新：2026-09-07，NET-001 / NET-002 / MEDIA-001 已按顺序完成，完整 112 项测试与 Android 组合探针 PASS；按用户指定完成 READER-001 / READER-002，默认左右翻页并保留上下滚动，双模式实验与正式单章 Reader 已交付；SRC-001..004 / CORE-001..004 已完成，Phase 0 技术 Gate = GO / PASS，当前结果见第 35–36 节。本文是个人开发项目的主任务契约，正文使用中文，章节与 Task ID 保持稳定，便于 Coding Agent 按 ID 执行。
 
 规划修订阶段（历史记录）：仅完善本文件并做 Self Review，基于完整的 41 节 / 59 Task 原计划，当时仓库为 Greenfield，未执行开发任务。后续用户已授权本次 SRC-001 / CORE-001 执行；除这两个任务的明确交付记录外，目录树、模型、配置值和测试命令仍为后续设计，不代表已实现。
@@ -10,7 +12,7 @@
 
 Shiori（栞）是 Android / iOS 轻小说客户端，支持在线阅读和本地 TXT / EPUB 导入。最小业务闭环是发现或搜索小说，或导入本地书籍，查看详情及卷章节目录、原生阅读、加入本地书架、保存并恢复阅读进度；在线书籍利用已有缓存离线继续阅读，本地导入书籍通过应用托管文件完整离线阅读。
 
-**范围更新（2026-09-07，用户授权纳入规划）**：本地 TXT 与无 DRM 的流式 EPUB 纳入 MVP，新增 LOCAL-001..005。后续执行更新：LOCAL-001 已完成，LOCAL-002..005 仍为 PLANNED。复用现有双模式阅读器、目录、书架和进度，不依赖生产网站可用；不自动开始后续任务。
+**范围更新（2026-09-07，用户授权纳入规划）**：本地 TXT 与无 DRM 的流式 EPUB 纳入 MVP，新增 LOCAL-001..005。后续执行更新：LOCAL-001 / LOCAL-002 已完成，LOCAL-003..005 仍为 PLANNED。复用现有双模式阅读器、目录、书架和进度，不依赖生产网站可用；不自动开始后续任务。
 
 首个生产 Source 是用户指定的 [LightNovel.fun](https://www.lightnovel.fun/)。SRC-001 / SRC-002 已观察访客首页，以及样本小说的搜索、详情、四卷目录、正文和浏览器图片解码，并独立验证核心 HTTP 协议，证据见 [源站调查](source/lightnovel.md)。自动化链路、会话寿命、异常覆盖和使用许可仍有待项，生产接入 Gate 未通过。未来 Source 通过同一业务边界接入；第一版不实现第二个生产 Source。
 
@@ -19,7 +21,7 @@ Shiori（栞）是 Android / iOS 轻小说客户端，支持在线阅读和本�
 - 让“找到一本书并继续读”成为稳定、低干扰的主要路径；Reader 的阅读体验优先于页面数量。
 - 源站改变时，能定位到 Search / Detail / Catalog / Chapter / Media / Session 中具体失效环节，主要修改 Source Adapter 恢复。
 - 书架和进度属于本地用户数据，与源站在线状态、缓存淘汰解耦。
-- 当前用 Windows + Flutter + MuMu 快速开发，以至少一台 Android ARM64 真机验收；iOS 保持正式目标与代码兼容，运行验证延期至 macOS + Xcode + iPhone 环境可用。
+- 保留 Windows + Flutter + MuMu 开发流程，以至少一台 Android ARM64 真机验收；macOS / Xcode 已支持 iOS Simulator 验证，iPhone 与签名验收条件分别补齐。
 - 保持单个 Flutter 应用、少量有明确用途的契约；后续 Agent 能根据一个 Task 的输入、输出和测试完成工作。
 - 界面从当前阶段起支持中文和英文，文案集中管理并考虑不同语言的长度；默认跟随系统，未支持的语言回退英文。小说标题、正文等源内容不属于界面翻译范围。
 
@@ -33,24 +35,24 @@ MVP 不包含 LightNovel 账号、登录书架同步、评论及发布、论坛�
 
 ## 4. Supported Platforms
 
-**KNOWN RESOURCE CONSTRAINT（用户已确认）**：当前有 Windows PC、Flutter 开发环境、MuMu，可使用 Android Studio Emulator，并可在后续使用 Android 真机；没有 Mac / macOS / Xcode / iOS Simulator / iPhone 开发调试环境。当前不能本地执行 iOS build、CocoaPods 最终链接、模拟器、真机、Signing 或 App Store 打包。这不是“是否有 Mac”的 UNKNOWN。
+**环境状态（2026-09-08）**：Windows / Android 验证记录保留；当前 Mac、Xcode 与 iOS Simulator 已可用，已完成模拟器 Debug 构建和启动 smoke。iPhone 调试设备、签名与发布环境未确认，不能由模拟器通过推断已具备。后续任务按实际设备与验收范围安排。
 
 | Platform | Target | Implementation / Compatibility | Local Development | Runtime / Device Validation | Release Candidate |
 | --- | --- | --- | --- | --- | --- |
 | Android | YES | Implementation：YES（当前可执行范围） | YES：Windows → Flutter → MuMu / Android Studio Emulator / Android device | YES（可安排执行）；最终必须至少一台 ARM64 手机 | YES（当前可交付范围） |
-| iOS | YES，正式目标 | Implementation Compatibility：YES；当前维持设计 / 代码 / 依赖兼容 | NO | DEFERRED_NO_MAC；NOT_RUNTIME_VERIFIED / NOT_DEVICE_VERIFIED | DEFERRED_NO_MAC；NOT_RELEASE_VERIFIED |
+| iOS | YES，正式目标 | 兼容性审查及本次 Simulator Debug 构建 PASS | YES：macOS + Xcode | Simulator launch PASS；完整 runtime PARTIAL；iPhone NOT_RUN | NOT_RUN；签名环境未确认 |
 | Windows | NO | 仅 Development Host | 宿主可用 | 不开发 Windows App | 无 |
-| macOS | NO | 未来 iOS Development Host；当前不可用 | NO | 不开发 macOS App | 无 |
+| macOS | NO | iOS Development Host 已可用 | YES（开发宿主） | 不开发 macOS App | 无 |
 
 YES 指环境能力或计划范围，**不表示代码已实现、测试已通过或候选包已生成**；已执行 Task 的证据单独记录。MuMu PASS 只证明该模拟器行为，不能替代 Android Device PASS。
 
 iOS **Level A — Compatibility** 是当前共享代码 DoD：Pure Dart Domain / Source 逻辑，跨平台网络 / 路径 / Drift，Native Flutter Reader，所有核心依赖有 iOS 文档支持；无 Android-only 核心 API / Widget / back 假设，无无理由 Platform.isAndroid 分叉。平台行为封装在 presentation / platform boundary。结果只记 Design / Code Compatibility，不宣称 runtime verified。
 
-iOS **Level B — Runtime Validation** 归 IOS-001..006：Xcode / 原生依赖最终构建、Simulator、iPhone、TLS / Cookie / SQLite / filesystem、SafeArea / swipe-back、lifecycle / memory / performance、签名和安装。当前均 DEFERRED_NO_MAC。可选 macOS CI 成功时，只增加对应 commit / SDK / target 的 Compile Compatibility 证据，不改变 Level B 状态。
+iOS **Level B — Runtime Validation** 归 IOS-001..006：Xcode / 原生依赖最终构建、Simulator、iPhone、TLS / Cookie / SQLite / filesystem、SafeArea / swipe-back、lifecycle / memory / performance、签名和安装。当前 IOS-001 部分完成，其他任务尚未启动。模拟器 smoke 只覆盖本次记录的运行项；可选 macOS CI 也只增加所记录的编译证据。
 
 **DECIDED（CORE-001，2026-09-06）**：沿用并固定已安装 Flutter 3.38.4 stable / Dart 3.10.3，项目最低系统为 Android API 24、iOS 15.0；当前仅有 Flutter SDK 运行期依赖。锁定版本的 SDK 源码 / 模板证据和后续构建结果见 [开发基线](development.md)。此前 Flutter 3.47.2 官方资料只是规划快照，不代表本项目版本；每次新增插件仍须重查 OS 交集。[Flutter 平台支持](https://docs.flutter.dev/reference/supported-platforms)
 
-项目分别记录 ANDROID_MVP_DONE 与 CROSS_PLATFORM_MOBILE_MVP_DONE。后者当前为 BLOCKED_PENDING_IOS_VALIDATION_ENVIRONMENT；它不阻止前者独立达成。**Android MVP Ready 不代表 iOS Ready。**
+项目分别记录 ANDROID_MVP_DONE 与 CROSS_PLATFORM_MOBILE_MVP_DONE。后者当前为 NOT_COMPLETE（IOS-001 部分通过，其余 iOS 验收与真机 / 签名仍待完成）；它不阻止前者独立达成。**Android MVP Ready 不代表 iOS Ready。**
 
 ## 5. MVP Scope
 
@@ -70,7 +72,7 @@ UI 共同规划见 [应用 UI 规范](app.md#ui-规范)：保留 Material 3 交�
 | Cache / Offline | 详情、目录、正文、已成功加载插图的本地复用；缓存状态与清理 | 缓存仍在时可离线读；未下载图显示占位；容量淘汰不承诺永久离线 |
 | Diagnostics | 可定位失败阶段、请求数量、缓存命中、脱敏 debug 信息 | 默认不上传日志；Release 无调试入口 |
 
-本节是最终移动端产品范围；当前可验收交付为 Android，同一功能的 iOS runtime 证据延期。Phase 4 图片仅保证在线 / memory 显示，Phase 6 才承诺仍在磁盘的图文冷启动离线。
+本节是最终移动端产品范围；当前可验收交付为 Android，同一功能的 iOS runtime 按专项验收；已通过的启动 smoke 不覆盖全部功能。Phase 4 图片仅保证在线 / memory 显示，Phase 6 才承诺仍在磁盘的图文冷启动离线。
 
 本地导入使用独立于在线缓存的持久文件所有权：选择文件 → 复制到应用私有暂存区 → 解析 / 校验 → 提交托管书籍与索引 → 加入书架。不得只持久化外部路径或临时 URI；导入成功后移动原文件不影响阅读。应用内只记录可重定位的相对资源路径。本地文件不进入在线 TTL / LRU，不因“清除缓存”被删除；“移出书架”与“删除本地书籍文件”是两个明确动作，删除需说明进度保留策略，不能影响其他书籍。卸载应用会移除托管数据，首版不承诺云备份或恢复。
 
@@ -80,7 +82,7 @@ UI 共同规划见 [应用 UI 规范](app.md#ui-规范)：保留 Material 3 交�
 
 ## 6. Technical Stack
 
-以下版本仅是只读查询快照，**不能直接据此修改 pubspec**。CORE-001 锁定 Flutter / Dart；对应实现任务加入必要 dependency 并提交应用 lockfile。原生插件每次新增或升级，当前要求 Android build / 相关 runtime smoke + iOS Level A compatibility review；可选 macOS CI 只记 compile 结果，iOS runtime 一律归 Deferred Track。
+以下版本仅是只读查询快照，**不能直接据此修改 pubspec**。CORE-001 锁定 Flutter / Dart；对应实现任务加入必要 dependency 并提交应用 lockfile。原生插件每次新增或升级，当前要求 Android build / 相关 runtime smoke + iOS Level A compatibility review；可选 macOS CI 只记 compile 结果，iOS runtime 分项归 iOS Track。
 
 | 技术 / 决策 | Purpose / 使用位置 / 理由 | Android | iOS | Native dependency | 长期风险及更简单替代 |
 | --- | --- | --- | --- | --- | --- |
@@ -100,7 +102,7 @@ UI 共同规划见 [应用 UI 规范](app.md#ui-规范)：保留 Material 3 交�
 
 Drift 官方推荐新项目用 native / FFI，当前 sqlite3 3.x 可自动打包 SQLite；不要机械添加历史教程中的 `sqlite3_flutter_libs`。采用 `NativeDatabase.createInBackground`，DB 创建与目录选择统一封装，Android runtime 以 DB-001 / ANDROID-002 为准；iOS 文档兼容当前审查，实际 SQLite / ABI 验证延期 IOS-001。[平台说明](https://drift.simonbinder.eu/platforms/)、[后台 isolate](https://drift.simonbinder.eu/platforms/vm/)
 
-**当前 iOS package 状态统一为 DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED**。表中的“支持 / 可用 / 共用”只表达官方文档和架构适配；尚无本项目 iOS build / simulator / device / release 证据。采纳每个核心依赖前必须记录：Android 声明、iOS 声明、维护状态、iOS 最低版本与 SDK 交集、CocoaPods / SwiftPM / Native framework / build hooks 依赖、已知 iOS limitations、出处和日期。当前跑 Android smoke；iOS 最终链接和运行延期，CI 可用时单列编译证据。Android-only 包不能进入核心路径；仅可存在于完全可替换、关闭后不损核心功能的 optional Android adapter，并说明 iOS 等价策略。
+**当前 iOS package 状态统一为 DOCUMENTED_SUPPORTED / NOT_RUNTIME_VERIFIED**。表中的“支持 / 可用 / 共用”只表达官方文档和架构适配；尚无本项目 iOS build / simulator / device / release 证据。采纳每个核心依赖前必须记录：Android 声明、iOS 声明、维护状态、iOS 最低版本与 SDK 交集、CocoaPods / SwiftPM / Native framework / build hooks 依赖、已知 iOS limitations、出处和日期。当前跑 Android smoke；本次 iOS Simulator Debug 链接已通过，后续依赖变更仍需复验相关构建与运行；CI 可用时单列编译证据。Android-only 包不能进入核心路径；仅可存在于完全可替换、关闭后不损核心功能的 optional Android adapter，并说明 iOS 等价策略。
 
 不预装 connectivity、brightness、permission_handler、WebView、Freezed、json_serializable、后台任务或 DI 生成器。网络可达性从实际请求判断；简单不可变 Dart 模型与局部序列化足够。若后续必要新增包，Task 必须补齐本表相同的兼容、维护与替代分析。
 
@@ -152,7 +154,7 @@ Domain 包含业务模型、少量稳定契约和错误类型；presentation 只
 | ADR-10 | DECIDED：Phase 4 最小 network / memory ImageRepository；Phase 6 才加持久缓存 | MEDIA-001 不依赖 CACHE-003；Reader 永远消费同一契约，Phase 6 不要求修改其业务代码 |
 | ADR-11 | DECIDED：Phase 1 仅存储基线 / 快照 / 非破坏迁移政策，DB-003 后移 Phase 8 | 当前开发库可显式 reset，正式用户库不可破坏性升级；Source / Reader 不等待完整 migration harness |
 | ADR-12 | DECIDED：默认测试完全离线，真实 Source 测试显式 opt-in | 网站不稳定不能让所有 UI / DB 开发停摆；opt-in 不能变成忽略源失效的借口 |
-| ADR-13 | DECIDED：Android MVP 独立完成；iOS Level A 当前必审，Level B 为 DEFERRED_NO_MAC | KNOWN RESOURCE CONSTRAINT：没有 macOS / Xcode / iPhone 开发环境；IOS-001..006 不属于当前 Phase Hard Gate |
+| ADR-13 | DECIDED：Android MVP 独立完成；iOS Level A 必审，Level B 单独按证据验收 | 2026-09-08 Mac / Simulator 已可用，IOS-001 PARTIAL；iPhone / 签名未确认。IOS-001..006 不属于 Android Phase Hard Gate |
 | ADR-14 | DECIDED：Search 仅显式提交 | 输入停止不发请求；仍取消旧请求、保护 generation、管理分页竞态，减少第三方请求 |
 | ADR-15 | DECIDED：语义 Paragraph 不为性能拆分；RenderChunk 只在 presentation | chunk 不入 Domain / serialization / revision / blockKey / 长期进度；renderer 优化不改变正文身份 |
 | ADR-16 | PROPOSED：CI-003 可选 macOS compile track | 按需编译有提前暴露链接问题的价值；成本 / runner 未确认，不阻塞 Android，compile PASS 不等于 runtime PASS |
@@ -499,28 +501,28 @@ Android profile / release 验证 internet permission、HTTPS、系统 back、edg
 
 ## 27. iOS Validation Strategy
 
-iOS 正式目标不变，采用当前 **Level A compatibility review** 与未来 **Level B runtime validation** 两层。没有 Mac 是已知资源约束；只把“何时获得完整验证环境”留为 OQ-07。此节任务不属于当前 Phase 1–9 Hard Gate，不阻塞 Source / Reader / Android 候选包。
+iOS 正式目标不变，采用 **Level A compatibility review** 与 **Level B runtime validation** 两层。Mac / Simulator 环境已可用，Level B 已有有限启动证据；真机 / 签名环境缺口继续由 OQ-07 跟踪。此节任务不属于当前 Phase 1–9 Hard Gate，不阻塞 Source / Reader / Android 候选包。
 
 ### Level A — 当前可完成
 
 每次核心依赖或平台敏感变更记录：package iOS 声明 / minimum OS / native framework 与集成方式 / 已知限制、代码分层与可替换性、纯 Dart tests、Flutter widget tests、Android runtime 结果。共享的 paths、SQLite、HTTP、会话、Reader、navigation 设计不得假设 Android 实现。iOS-specific 配置只按官方支持进行静态审查，未经 Mac 构建不写 VERIFIED。
 
-### Deferred iOS Validation Track — Level B
+### iOS Validation Track — Level B
 
 统一保留 IOS-001..005 的身份，并新增 IOS-006 承接原 RELEASE-002 中的 iOS 发布验证。旧 G1..G6 名称只在本表作为迁移索引，退出当前 Phase gate；执行与状态的唯一入口为下列 Task。
 
-| Task | 历史索引（不再是当前 gate） | 未来环境具备后验证 | 当前 Status |
+| Task | 历史索引（不再是当前 gate） | 验收范围 | 当前 Status |
 | --- | --- | --- | --- |
-| IOS-001 | G1 | Xcode build、依赖链接 / CocoaPods 或实际集成方式、Simulator、iPhone development install、Drift / preferences / path | DEFERRED_NO_MAC |
-| IOS-002 | G2 | HTTPS / TLS、redirect、匿名 Cookie / session、图片与 Source 真机链路 | DEFERRED_NO_MAC |
-| IOS-003 | G3 | 搜索键盘、详情目录、SafeArea、swipe-back、navigation / 状态 UI | DEFERRED_NO_MAC |
-| IOS-004 | G4 | Reader 排版 / scroll / rotation、lifecycle / restore、图片内存与性能 | DEFERRED_NO_MAC |
-| IOS-005 | G5 | 离线冷启动、filesystem / cache / backup、migration / corruption、内存压力与完整回归 | DEFERRED_NO_MAC |
-| IOS-006 | G6 | 隐私元信息、Signing、release candidate、真机安装与升级 | DEFERRED_NO_MAC |
+| IOS-001 | G1 | Xcode build、依赖链接 / CocoaPods 或实际集成方式、Simulator、iPhone development install、Drift / preferences / path | PARTIAL |
+| IOS-002 | G2 | HTTPS / TLS、redirect、匿名 Cookie / session、图片与 Source 真机链路 | NOT_STARTED |
+| IOS-003 | G3 | 搜索键盘、详情目录、SafeArea、swipe-back、navigation / 状态 UI | NOT_STARTED |
+| IOS-004 | G4 | Reader 排版 / scroll / rotation、lifecycle / restore、图片内存与性能 | NOT_STARTED |
+| IOS-005 | G5 | 离线冷启动、filesystem / cache / backup、migration / corruption、内存压力与完整回归 | NOT_STARTED |
+| IOS-006 | G6 | 隐私元信息、Signing、release candidate、真机安装与升级 | NOT_STARTED |
 
-**激活条件**：用户未来确认 macOS + Xcode + iPhone 调试环境可用后，按任务依赖执行；记录 Flutter / Xcode / OS / 设备型号及测试 commit。仅拿到 macOS CI runner 不满足整条 runtime track 的环境条件。没有环境时保留 DEFERRED_NO_MAC，不标 FAILED、无限 TODO 或 BLOCKING_ANDROID。
+**执行条件**：Mac / Simulator 已可用；按用户指定范围与任务依赖继续执行，并逐项记录 Flutter / Xcode / OS / 设备及工作树版本。模拟器可验证项与 iPhone / 签名项分别追踪；缺真机不抹去已有模拟器证据，也不能自动满足真机验收。当前详细证据见 [IOS-001](validation/ios-001.md)。
 
-未来 IOS-001 按官方 iOS setup 确认构建与插件环境，再补 simulator / device；IOS-006 才做发行签名与安装验证。iOS 测试复用共享 fixture / Android 测试场景，补真实系统行为，避免另造一套产品测试。ATS、路径和图片格式若需修复，保持平台边界并回归 Android；不能用全局任意 HTTP 例外掩盖问题。[Flutter iOS 环境](https://docs.flutter.dev/platform-integration/ios/setup)
+IOS-001 已完成本次 Simulator Debug 构建与启动，继续补数据库 / 路径 / 重开及 device；IOS-006 才做发行签名与安装验证。iOS 测试复用共享 fixture / Android 测试场景，补真实系统行为，避免另造一套产品测试。ATS、路径和图片格式若需修复，保持平台边界并回归 Android；不能用全局任意 HTTP 例外掩盖问题。[Flutter iOS 环境](https://docs.flutter.dev/platform-integration/ios/setup)
 
 ### Optional Compile Compatibility
 
@@ -629,8 +631,8 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | OQ-04 PARTIALLY_OBSERVED | 书 / 卷 / 章 ID 跨 UI / API / Dart 一致；当次 JPEG 可解码。MediaRef 长期定位、m/t 语义、Referer 必要性仍未知，去 query 的 path 也未证实长期稳定 | SRC-010 硬门槛：清空内存并重启后由无 secret 的 MediaRef / locator 恢复；失败则阻塞 SRC-010 / TEST-001，独立 Fixture 工作可继续；不以图片哈希或签名 URL 充当已验证稳定键 |
 | OQ-05 PARTIALLY_OBSERVED | p / img / ruby / rt / strong / a、整卷长章与 JPEG 已观察；br / 空行、真实极长段 / 图片章及异常仍缺样本 | SRC-009 明确合成 provenance，验证语义顺序与 Ruby 括注；READER-001 验证长章布局。结构摘要不代替生产 Parser 测试，Domain 不拆语义段 |
 | OQ-06 NEEDS VERIFICATION | 原生 pivot viewport 恢复精度、语义顺序、高刷 / 多图性能 | READER-001 实验；不合格再评估维护中的 indexed-scroll 包，阻塞 READER-002 |
-| OQ-07 UNKNOWN | 已知当前无 Mac / Xcode / iPhone 开发环境；未来何时能取得完整环境？ | 当前无环境是 KNOWN RESOURCE CONSTRAINT；获得环境后激活 IOS-001..006。只阻塞 iOS Runtime / RC / Cross-platform Mobile MVP，不阻塞 Android MVP；不在 CORE-001 重新调查“是否有 Mac” |
-| OQ-08 PARTIALLY_RESOLVED | DB-001 决定拆分用户 / 缓存库，Android 两代备份 XML 排除 disposable 和开发目录；iOS 文档兼容路径已记录 | Android 完整 backup / restore 留 ANDROID-002；iOS 排除属性接入与实测留 IOS-005，仍 DEFERRED_NO_MAC；见 [存储决定](database.md) |
+| OQ-07 PARTIALLY_RESOLVED | Mac / Xcode / Simulator 已确认并完成启动 smoke；iPhone 与 development / release 签名环境何时可用？ | 2026-09-08 关闭无 Mac 的环境假设；余项影响对应真机 / 发布验收，不阻塞 Android MVP，也不否定已通过的模拟器 smoke |
+| OQ-08 PARTIALLY_RESOLVED | DB-001 决定拆分用户 / 缓存库，Android 两代备份 XML 排除 disposable 和开发目录；iOS 文档兼容路径已记录 | Android 完整 backup / restore 留 ANDROID-002；iOS 排除属性接入与实测留 IOS-005，专项 NOT_RUN；见 [存储决定](database.md) |
 | OQ-09 TECHNICAL_CHOICE_RESOLVED | CACHE-001 / CACHE-003 采用既有媒体协议的有限持久装饰层，256 MiB payload 分区与独立后台额度 | 不新增缓存包；自制图文件 / 故障 / 重开通过，长期实际容量与真机压力仍待设备验证，见 [缓存](cache.md) |
 | OQ-10 NEEDS VERIFICATION | 最终 SDK / 插件版本、最低 OS、Native dependencies、iOS limitations、生成器兼容 | CORE-001 / 依赖引入任务：Android build + Level A documented review；CI-003 可选 compile；IOS-001 未来实际链接 / runtime，不阻塞 Android |
 | OQ-11 PARTIALLY_OBSERVED | 验收书选择与图文可达子问题 CLOSED：玩乐关系 → 31607 / 44117 / 309555；真实限流规则仍 UNKNOWN | NET-002 / TEST-001 用保守预算并尊重自然 429；不压测；30 次只是客户端政策 |
@@ -654,10 +656,10 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | 7 | Android Hardening；ANDROID-002、UX-001 | 至少一台 Android ARM64 手机的网络 / TLS / SQLite / filesystem / lifecycle / kill / cache / 图片 / 导航验证；官方模拟器交叉 |
 | 8 | Stability / Performance / Regression；DB-003、TEST-002..004、CI-002 | 完整迁移 / corruption harness、竞态故障、Android 真机 profile / 内存 / 长章、默认离线回归、Android 构建通过 |
 | 9 | Android Release Candidate；RELEASE-001..003 | Android 许可 / 资产 / 权限审查、签名候选包真机安装及升级、Android MVP Checklist 与维护交接；不自动发布 |
-| Deferred Track | IOS-001..006 | 全部 DEFERRED_NO_MAC；未来环境可用后才跑基础 / Source / UX / Reader / Offline / Release runtime，不影响上述完成 |
+| iOS Track | IOS-001..006 | IOS-001 PARTIAL（Simulator smoke PASS）；IOS-002..006 NOT_STARTED。完整 runtime 与真机 / 发布待验，不影响 Android 独立验收 |
 | Optional Compile Track | CI-003 | OPTIONAL_PROPOSED；可用 macOS runner 时记录指定 target 编译结果，不产生 runtime PASS、不作为 Android required check |
 
-当前执行状态（2026-09-07）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 的安装阻塞已在 DEV-002 解除：复用同一应用壳的新开发包已完成 MuMu 安装、冷启动及返回导航 smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001..002 DONE：17 个离线场景、内存仓库、开发菜单和指定场景入口已交付；当前 73 项测试、Android 编译和 MuMu 开发入口运行通过，20 图设备解码已补齐，见 [Fixture 验证](fixtures.md) / [开发入口](dev-entry.md)。READER-001 已通过双模式视口实验，当前 85 项测试及 Android 探针 PASS，见 [ADR-07](decisions/reader-viewport.md)。READER-002 已完成正式单章状态 / 块样式 / Chrome，当前完整测试 91 项通过，见 [Reader 验收](reader.md)。NET-001 / NET-002 / MEDIA-001 已顺序完成，完整测试更新为 112 项及 Android 组合探针 PASS，见 [网络](network.md) / [媒体](media.md)。READER-003 已完成图片展示与局部失败，完整测试 120 项及 Android 图片探针 PASS，见 [Reader](reader.md)。DB-001 / DB-002 已完成，完整测试 127 项及 Android 持久化探针 PASS；READER-004 已交付阅读偏好、v2 迁移与双模式受控重布局（133 项测试 / analyze / Android build PASS，旋转实测待补），见 [Reader](reader.md)；READER-005 已交付位置追踪与有序保存（143 项测试 / analyze / Android build 与新 MuMu 进度落盘验证 PASS），见 [Reader](reader.md)；UI-001 与 READER-006 已按用户顺序完成：候选主题 / 三页样板及位置恢复已交付，155 项完整测试、analyze、Android 恢复探针通过；见 [UI 记录](app.md#ui-规范) / [恢复矩阵](reader.md)。SRC-005 的 DB-002 / NET-002 前置已解除，尚未执行。CI-003 未启用；生产 Source / 完整缓存策略尚未交付；DEV-001 使用独立开发替身，不把它作为生产实现验收。
+历史执行快照（2026-09-07，当前 iOS 状态见第 4 / 27 节）：**Phase 0 PASS（技术 Gate GO）；SRC-001..004 DONE**。Phase 1 中 **CORE-001..004 DONE**：移动工程、领域模型/契约、应用装配、类型化导航、局部 Controller 生命周期及通用状态组件已交付；50 项 Flutter 测试（含多语言补充）、全项目静态分析及 Android Debug build 通过。CORE-004 的安装阻塞已在 DEV-002 解除：复用同一应用壳的新开发包已完成 MuMu 安装、冷启动及返回导航 smoke；iOS Level A PASS，Runtime 全部 DEFERRED_NO_MAC，详见 [CORE-004 验证](app.md)。DEV-001..002 DONE：17 个离线场景、内存仓库、开发菜单和指定场景入口已交付；当前 73 项测试、Android 编译和 MuMu 开发入口运行通过，20 图设备解码已补齐，见 [Fixture 验证](fixtures.md) / [开发入口](dev-entry.md)。READER-001 已通过双模式视口实验，当前 85 项测试及 Android 探针 PASS，见 [ADR-07](decisions/reader-viewport.md)。READER-002 已完成正式单章状态 / 块样式 / Chrome，当前完整测试 91 项通过，见 [Reader 验收](reader.md)。NET-001 / NET-002 / MEDIA-001 已顺序完成，完整测试更新为 112 项及 Android 组合探针 PASS，见 [网络](network.md) / [媒体](media.md)。READER-003 已完成图片展示与局部失败，完整测试 120 项及 Android 图片探针 PASS，见 [Reader](reader.md)。DB-001 / DB-002 已完成，完整测试 127 项及 Android 持久化探针 PASS；READER-004 已交付阅读偏好、v2 迁移与双模式受控重布局（133 项测试 / analyze / Android build PASS，旋转实测待补），见 [Reader](reader.md)；READER-005 已交付位置追踪与有序保存（143 项测试 / analyze / Android build 与新 MuMu 进度落盘验证 PASS），见 [Reader](reader.md)；UI-001 与 READER-006 已按用户顺序完成：候选主题 / 三页样板及位置恢复已交付，155 项完整测试、analyze、Android 恢复探针通过；见 [UI 记录](app.md#ui-规范) / [恢复矩阵](reader.md)。SRC-005 的 DB-002 / NET-002 前置已解除，尚未执行。CI-003 未启用；生产 Source / 完整缓存策略尚未交付；DEV-001 使用独立开发替身，不把它作为生产实现验收。
 
 示例（未来某 Phase 完成后可记录，**不是当前结果**）：Feature Status = DONE；Android Validation = PASS；iOS Compatibility Review = PASS；iOS Runtime Validation = DEFERRED_NO_MAC。这样 Phase 4 可达到 Reader Feature Complete，而 Cross-platform Mobile MVP 仍等待 iOS 验证。
 
@@ -738,7 +740,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Scope：锁定 stable SDK、文档核对 Android / iOS OS 下限、开发包名、两个 mobile targets、lints；已知无 Mac，记录 Android 验证设备安排，不安装 / 构建 iOS 工具链，不预装全部包。
 - Files / Modules Expected：主 `pubspec.yaml` / lockfile、`lib/main.dart`、`android/`、`ios/`、`analysis_options.yaml`、`docs/development.md`。
 - Deliverables：最小启动工程和固定构建环境说明；已有 README 内容按后续任务范围维护。
-- Acceptance Criteria：无 desktop / web target；analyze / test / Android build 可复现；iOS target 保留且 Level A review 有据，runtime 明确 DEFERRED_NO_MAC；不需要 IOS-001 或 CI-003 完成。
+- Acceptance Criteria：无 desktop / web target；analyze / test / Android build 可复现；iOS target 保留且 Level A review 有据，runtime 按当次证据分项记录；不需要 IOS-001 或 CI-003 完成。
 - Platform Notes：确认所选 Flutter / 插件 OS 交集和 MuMu ABI，未获最终身份时不注册发布包名。
 - Test Requirements：工程 smoke、工具链版本记录；不为默认模板堆测试。
 
@@ -1231,15 +1233,17 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### LOCAL-002 — 文件选择、外部打开 / 分享与导入流程
 
-- Status：PLANNED；Phase：5 扩展；Complexity：M。
+- Status：DONE（2026-09-08）；Phase：5 扩展；Complexity：M。
 - Goal：应用内选文件和其他应用“打开方式 / 分享至 Shiori”均进入可取消、可重试的中英文导入流程。
 - Input：第 5 节、本地导入契约；Dependencies：LOCAL-001、CORE-004。
 - Scope：书架 / 首页可复用入口、单文件 TXT / EPUB 选择；Android 外部打开及分享接收；iOS 文件类型关联与 Share Extension 接收；统一流式复制、进度 / 取消 / 错误 UI、格式校验及解析器注入。支持 App 冷启动和已运行时接收，不强行覆盖当前阅读会话；暂不做文件夹扫描和批量导入队列，多文件请求明确提示首版仅支持单文件，不能静默丢弃。
 - Files / Modules Expected：`lib/features/import/`、平台文件接收边界、`lib/app/` 启动 / 路由、`android/` 注册配置、`ios/` 文件关联 / 分享扩展及共享暂存配置、ARB、导入流程测试。
 - Deliverables：应用内选择 / 外部打开 / 分享三类入口共用暂存 → 解析 → 去重 → 提交服务；本任务用 fake parser 验证，实际格式在 LOCAL-003 / 004 接入。iOS 分享扩展先接收并暂存到可交接区域，由主应用消费；不得把“扩展可直接拉起主应用”作为流程成立的前提。
 - Acceptance Criteria：取消选择不报错；无权限 / 文件失效 / 空间不足可恢复；在临时授权有效期间取得托管副本，复制完成后不依赖原 URI；冷启动等待应用装配后只消费一次，运行中接收不丢事件，重复投递 / 重启交接不重复提交书籍；导入取消或失败可返回原阅读位置；大文件处理不阻塞 UI；在实现时确定并记录输入大小 / 暂存空间限制，超限明确提示。外部扩展名 / 类型声明只用于入口筛选，实际文件仍校验；纯链接、非支持格式有明确反馈。
-- Platform Notes：选插件 / 原生接收方案时核验锁定 Flutter / Android / iOS 兼容性；Android 用实际文件 provider 验证打开与分享、临时 URI 权限，不索取全盘权限。iOS 明确文档类型、临时文件访问、扩展与主应用共享暂存 / 完成交接 / 回收、签名及 entitlement 配置；当前做 Level A 设计 / 代码审查，实际构建、Files 打开、分享面板和生命周期验证延期 IOS-001 / IOS-005，不宣称已可运行。
+- Platform Notes：选插件 / 原生接收方案时核验锁定 Flutter / Android / iOS 兼容性；Android 用实际文件 provider 验证打开与分享、临时 URI 权限，不索取全盘权限。iOS 明确文档类型、临时文件访问、扩展与主应用共享暂存 / 完成交接 / 回收、签名及 entitlement 配置；2026-09-08 已完成主应用 / 扩展 Simulator debug 构建、7 项原生测试、系统文件 URL 接收及冷启动副本恢复；后续已补真实分享面板 TXT / EPUB 冷启动交接及原生选择取消；Files 实际选中文件、云提供者和签名真机矩阵仍归 IOS-005。各类证据不能互相替代。
 - Test Requirements：选择取消、读取中断、超限、导入取消后晚结果、失败重试 widget tests；冷 / 热启动文件事件、重复投递、失效权限、错误类型、多文件反馈、分享交接中断回收；Android 分别从文件管理器“打开方式”和其他应用“分享”导入 TXT / EPUB，并验证原文件移走后读取。LOCAL-005 用实际解析器补完整阅读闭环，iOS 同类运行证据独立延期。
+
+- 执行证据：双端接收边界、根级中英文导入面板、可取消流式提交已接入；完整离线测试 330 项 PASS。正式解析器映射为空，不自动开始 LOCAL-003 / 004。Android arm64 debug 构建、系统选择器 / Files 外部打开、私有 Provider TXT / EPUB 打开分享及错误恢复 PASS；iOS 7 项原生测试与真实分享 / 原生选择取消 PASS。剩余 iOS Files / 云提供者、签名真机和完整阅读闭环按 IOS-005 / LOCAL-005 继续，详见 [LOCAL-002 验证记录](validation/local-002.md)。
 
 #### LOCAL-003 — TXT 解码与章节解析
 
@@ -1511,90 +1515,90 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Scope：核对 Android Track tasks / checklist、源修复手册、候选版本 / 命令 / 已知限制；单独列出 iOS compatibility 结果与 deferred runtime 状态，不执行发布。
 - Files / Modules Expected：`docs/TASK_PLAN.md`、`docs/release/`、必要 README / development 指引。
 - Deliverables：Android MVP 完成报告与可复现候选包交接；Cross-platform 状态独立记录。
-- Acceptance Criteria：Android 硬前置有证据且该平台阻塞 UNKNOWN 关闭；iOS runtime 仍可为 DEFERRED_NO_MAC；仅按第 40 节授予 ANDROID_MVP_DONE，不宣称 iOS Ready。
+- Acceptance Criteria：Android 硬前置有证据且该平台阻塞 UNKNOWN 关闭；iOS runtime 可保留未完成项；仅按第 40 节授予 ANDROID_MVP_DONE，不宣称 iOS Ready。
 - Platform Notes：ANDROID_MVP_DONE 可独立成立；CROSS_PLATFORM_MOBILE_MVP_DONE 未来须 IOS-001..006 PASS。
 - Test Requirements：复用 RELEASE-002 / TEST-004 证据，无新变化不重复运行全部 tests。
 
-### Deferred iOS Validation Track
+### iOS Validation Track
 
-以下任务集中保留，当前均 DEFERRED_NO_MAC；仅在未来完整环境可用并获用户任务指令后执行。历史 iOS gate 只保留第 27 节迁移索引，无 Android Hard Gate 语义。
+以下任务按范围分别验收：IOS-001 为 PARTIAL，IOS-002..006 为 NOT_STARTED。Mac 已可用，后续仍按用户任务指令与依赖执行；真机和签名条件单独确认。历史 iOS gate 只保留第 27 节迁移索引，无 Android Hard Gate 语义。
 
 #### IOS-001 — iOS Foundation Runtime Validation
 
-- Phase：Deferred iOS Runtime Track；Complexity：M。
-- Status：DEFERRED_NO_MAC。
+- Phase：iOS Runtime Track；Complexity：M。
+- Status：PARTIAL（2026-09-08，Simulator Debug 构建 / 安装 / 启动 PASS；完整数据库与真机验收待补，见 [报告](validation/ios-001.md)）。
 - Goal：取得环境后验证核心原生依赖、Simulator 与 iPhone 基础运行。
 - Input：第 4、6、27 节与当前工具链；Dependencies：CORE-004、DB-002、NET-002。
 - Scope：macOS / Xcode setup、实际 native dependency 集成（CocoaPods / SwiftPM / build hooks 依锁定版本）、Simulator build / launch、development signing / iPhone install、Drift / preferences / AppPaths 重开。
 - Files / Modules Expected：`docs/validation/ios-001.md`、必要的 `ios/` / presentation / transport / storage 兼容修复；签名 secrets 不入仓库。
 - Deliverables：基础构建和原生依赖 runtime 报告。
 - Acceptance Criteria：Simulator 启动、iPhone 安装、SQLite / preferences / paths 实测通过；不能把 CI compile 结果复制成 runtime PASS。
-- Platform Notes：资源前置：macOS + Xcode + iPhone 开发调试环境，当前不具备；此 Task 永不作为 Android Current Track 前置。
+- Platform Notes：资源前置：macOS + Xcode / Simulator 已可用；iPhone 与签名环境未确认；此 Task 永不作为 Android Current Track 前置。
 - Test Requirements：模拟器 smoke + iPhone CRUD / 路径 / restart，涉及共享修复回归 Android。
 
 #### IOS-002 — iOS Source Runtime Validation
 
-- Phase：Deferred iOS Runtime Track；Complexity：M。
-- Status：DEFERRED_NO_MAC。
+- Phase：iOS Runtime Track；Complexity：M。
+- Status：NOT_STARTED（本次未执行；依赖、真机与专项验收条件仍按下文）。
 - Goal：在 iPhone 实测 Source 网络与匿名会话。
 - Input：第 13–17、27 节及当前 Source 证据；Dependencies：IOS-001、TEST-001、MEDIA-001。
 - Scope：TLS / HTTPS、redirect、Cookie / session 创建与跨启动恢复、Source parser / media 完整链路、图像解码；低频 opt-in，不绕过限制。
 - Files / Modules Expected：`docs/validation/ios-002.md`、必要的 `ios/` / presentation / transport / storage 兼容修复；签名 secrets 不入仓库。
 - Deliverables：iOS Search → Detail → Catalog → Chapter → Illustration 的阶段报告。
 - Acceptance Criteria：真机取得正确图文，session / TLS 失败可诊断；Source 保持平台边界，无全局 ATS 放开或 Android-only 替代。
-- Platform Notes：资源前置：macOS + Xcode + iPhone 开发调试环境，当前不具备；此 Task 永不作为 Android Current Track 前置。
+- Platform Notes：资源前置：macOS + Xcode / Simulator 已可用；iPhone 与签名环境未确认；此 Task 永不作为 Android Current Track 前置。
 - Test Requirements：一次预算内 live smoke、cookie restart、坏 session 用 fake；Android 受影响路径回归。
 
 #### IOS-003 — iOS Search / Detail UX Validation
 
-- Phase：Deferred iOS Runtime Track；Complexity：S。
-- Status：DEFERRED_NO_MAC。
+- Phase：iOS Runtime Track；Complexity：S。
+- Status：NOT_STARTED（本次未执行；依赖、真机与专项验收条件仍按下文）。
 - Goal：验证 iOS 输入、导航与页面状态。
 - Input：第 5、27 节及当前 Home / Search / Detail；Dependencies：IOS-002、HOME-001、SEARCH-002、DETAIL-002。
 - Scope：Simulator + iPhone 键盘 Search / Enter、只输入不请求、分页、详情目录、SafeArea、swipe-back、系统栏、暗色 / 大字。
 - Files / Modules Expected：`docs/validation/ios-003.md`、必要的 `ios/` / presentation / transport / storage 兼容修复；签名 secrets 不入仓库。
 - Deliverables：iOS UX runtime 矩阵与必要平台边界修复。
 - Acceptance Criteria：真实键盘 / swipe-back 正常，route identity / error / retry 正确，返回不遗留 Controller / 请求；没有占位动作。
-- Platform Notes：资源前置：macOS + Xcode + iPhone 开发调试环境，当前不具备；此 Task 永不作为 Android Current Track 前置。
+- Platform Notes：资源前置：macOS + Xcode / Simulator 已可用；iPhone 与签名环境未确认；此 Task 永不作为 Android Current Track 前置。
 - Test Requirements：fixture navigation + 真机手势 / keyboard，源访问尽量复用已有链路证据。
 
 #### IOS-004 — iOS Reader Runtime Validation
 
-- Phase：Deferred iOS Runtime Track；Complexity：M。
-- Status：DEFERRED_NO_MAC。
+- Phase：iOS Runtime Track；Complexity：M。
+- Status：NOT_STARTED（本次未执行；依赖、真机与专项验收条件仍按下文）。
 - Goal：验证 iPhone 的阅读体验、语义位置与内存性能。
 - Input：第 18、20、27、31 节；Dependencies：IOS-003、PROGRESS-001。
 - Scope：scroll / physics、typography、SafeArea / status bar、rotation / 大字、RenderChunk 的语义映射、字体变更恢复、lifecycle / kill / resume、图片 decode / memory；按真机 profile 记录长章 / 多图性能。
 - Files / Modules Expected：`docs/validation/ios-004.md`、必要的 `ios/` / presentation / transport / storage 兼容修复；签名 secrets 不入仓库。
 - Deliverables：iOS Reader 误差矩阵、帧 / 内存记录与进度可靠性报告。
 - Acceptance Criteria：恢复达到第 20 节阈值，无明显卡顿 / OOM / 线性内存增长；真实 swipe-back / 后台恢复正常；不以 Android trace 代证。
-- Platform Notes：资源前置：macOS + Xcode + iPhone 开发调试环境，当前不具备；此 Task 永不作为 Android Current Track 前置。
+- Platform Notes：资源前置：macOS + Xcode / Simulator 已可用；iPhone 与签名环境未确认；此 Task 永不作为 Android Current Track 前置。
 - Test Requirements：iPhone fixture 长章 / 极长段 / 多图 / 字号 / 冷启动，必要真实内容 smoke；共享修复回归 Android。
 
 #### IOS-005 — iOS Offline / Storage / Stability Validation
 
-- Phase：Deferred iOS Runtime Track；Complexity：M。
-- Status：DEFERRED_NO_MAC。
+- Phase：iOS Runtime Track；Complexity：M。
+- Status：NOT_STARTED（本次未执行；依赖、真机与专项验收条件仍按下文）。
 - Goal：验证 iPhone 离线、文件持久化和升级后的稳定性。
 - Input：第 21–23、27–28、31 节，Android 已有测试 harness；Dependencies：IOS-004、CACHE-004、CACHE-005、DB-003、TEST-004。
 - Scope：iPhone 离线冷启动、filesystem / path、image / text cache、backup 排除、schema / codec migration、缓存损坏 / missing files、内存压力、大书架启动；复用 Android fixture / 回归补 iOS 系统行为。
 - Files / Modules Expected：`docs/validation/ios-005.md`、必要的 `ios/` / presentation / transport / storage 兼容修复；签名 secrets 不入仓库。
 - Deliverables：iOS storage / offline / stability 报告、OQ-08 iOS runtime 结论与完整 iOS MVP 回归。
 - Acceptance Criteria：重启可读缓存正文 / 图，清理 / 升级保留用户数据；文件 / backup 实测，无严重 data-loss / 内存缺陷；所有 iOS 运行缺口可追溯。
-- Platform Notes：资源前置：macOS + Xcode + iPhone 开发调试环境，当前不具备；此 Task 永不作为 Android Current Track 前置。
+- Platform Notes：资源前置：macOS + Xcode / Simulator 已可用；iPhone 与签名环境未确认；此 Task 永不作为 Android Current Track 前置。
 - Test Requirements：真机飞行模式 / kill / upgrade / memory，故障注入用测试目录；复用 DB-003 / TEST-002，不另建重复 harness。
 
 #### IOS-006 — iOS Release Validation
 
-- Phase：Deferred iOS Runtime Track；Complexity：M。
-- Status：DEFERRED_NO_MAC。
+- Phase：iOS Runtime Track；Complexity：M。
+- Status：NOT_STARTED（本次未执行；依赖、真机与专项验收条件仍按下文）。
 - Goal：完成 iOS 签名候选包与 Cross-platform Mobile MVP 的最终验收。
 - Input：第 27、32、40–41 节及 Android 候选交接；Dependencies：IOS-005、RELEASE-003。
 - Scope：取得有效签名环境后确认 bundle ID / 版本、iOS 许可 / 隐私 metadata / native framework 声明、release signing、iPhone 安装与升级、release 日志 / fixture 隔离及真实源 / 离线 smoke；不自动发布 App Store。
 - Files / Modules Expected：`docs/validation/ios-006.md`、必要的 `ios/` / presentation / transport / storage 兼容修复；签名 secrets 不入仓库。
-- Deliverables：iOS release candidate 版本 / commit / 校验摘要 / 真机安装证据，更新 Deferred iOS Checklist 和跨平台完成状态。
-- Acceptance Criteria：IOS-001..005 与签名安装 / 升级全部 PASS，正式数据保留，无 debug / fixture / secret；连同 ANDROID_MVP_DONE 才可标 CROSS_PLATFORM_MOBILE_MVP_DONE。缺环境仍 DEFERRED_NO_MAC。
-- Platform Notes：资源前置：macOS + Xcode + iPhone 开发调试环境，当前不具备；此 Task 永不作为 Android Current Track 前置。
+- Deliverables：iOS release candidate 版本 / commit / 校验摘要 / 真机安装证据，更新 iOS Checklist 和跨平台完成状态。
+- Acceptance Criteria：IOS-001..005 与签名安装 / 升级全部 PASS，正式数据保留，无 debug / fixture / secret；连同 ANDROID_MVP_DONE 才可标 CROSS_PLATFORM_MOBILE_MVP_DONE。缺真机或签名环境时记录具体待项，不标完整通过。
+- Platform Notes：资源前置：macOS + Xcode / Simulator 已可用；iPhone 与签名环境未确认；此 Task 永不作为 Android Current Track 前置。
 - Test Requirements：iPhone release install / upgrade、Source 图文 / settings / progress / offline smoke、实际包隐私 / 资源检查；共享修复回归 Android。
 
 ### Optional Compile Track
@@ -1682,14 +1686,14 @@ flowchart TD
     RELEASE002["RELEASE-002 Android 签名候选包与真机安装"]
     RELEASE003["RELEASE-003 Android MVP 验收与交接"]
   end
-  subgraph DEFERRED[Deferred iOS Runtime Track]
+  subgraph DEFERRED[iOS Runtime Track]
     IOSENV[Mac Xcode iPhone environment currently unavailable]
-    IOS001["IOS-001 DEFERRED_NO_MAC"]
-    IOS002["IOS-002 DEFERRED_NO_MAC"]
-    IOS003["IOS-003 DEFERRED_NO_MAC"]
-    IOS004["IOS-004 DEFERRED_NO_MAC"]
-    IOS005["IOS-005 DEFERRED_NO_MAC"]
-    IOS006["IOS-006 DEFERRED_NO_MAC"]
+    IOS001["IOS-001 PARTIAL"]
+    IOS002["IOS-002 NOT_STARTED"]
+    IOS003["IOS-003 NOT_STARTED"]
+    IOS004["IOS-004 NOT_STARTED"]
+    IOS005["IOS-005 NOT_STARTED"]
+    IOS006["IOS-006 NOT_STARTED"]
   end
   subgraph OPTIONAL[Optional Compile Track]
     MACRUNNER[Optional macOS runner availability and cost decision]
@@ -1871,7 +1875,7 @@ UI 增量：CORE-004 + DEV-002 → UI-001 → 正式 HOME / SHELF / SEARCH / DET
 
 Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都是最终 Android 主线的合流条件。iOS Level A compatibility review 随相关任务完成，不引入必须 Mac 的测试。iOS Level B 是未来独立轨道，其未执行不改变 Android 的完成状态。
 
-**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。**NET-001 / NET-002 / MEDIA-001 DONE**，**READER-003 DONE**，双模式图片与局部重试已交付，完整测试 120 项及 Android 图片探针 PASS。**DB-001 / DB-002 DONE**，127 项测试及 Android 持久化探针 PASS，见 [本地存储](database.md)。**READER-004 DONE**，设置持久化与受控重布局已交付，Android 旋转实测受 MuMu 限制待补（widget 横竖窗口变化通过），见 [Reader](reader.md)。**READER-005 DONE**，位置追踪、有界有序保存与短章完成已交付，143 项测试及新 MuMu 持久记录验证 PASS，见 [Reader](reader.md)。**UI-001 / READER-006 DONE**：三页样板、语义位置恢复、内容更新降级和恢复保护已交付；155 项完整测试与 Android 双模式 SQLite 重开恢复通过，见 [UI 记录](app.md#ui-规范) / [Reader](reader.md)。**UI-002 DONE**：正式阅读配色 / 行宽 / 操作栏、独立应用外观和旧偏好迁移已交付；164 项完整测试通过，Android 外观冷启动通过，SQLite 滚动重开补验仍受数据库打开失败阻断，详见 [Reader](reader.md)。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。**CORE-005 DONE**：通用 Repository、Source 注册表及装配工厂已交付，177 项完整离线测试与 analyze PASS，见 [Repository](novel-repository.md)。**SRC-005 DONE**：生产请求基础与 no-op 会话已交付，完整187项离线测试通过；**SRC-006 DONE**：搜索解析与分页已交付，完整196项离线测试及 analyze PASS；**SRC-007 DONE**：详情解析已交付，203项完整测试与 analyze PASS；**SRC-008 DONE**：目录聚合已交付，211项完整测试与 analyze PASS；**SRC-009 DONE**：正文结构化解析已交付；**SRC-010 DONE**：正式媒体请求与真实双进程恢复 / 解码通过，225项离线测试及2项显式live检查 PASS；**TEST-001 DONE**：Android生产链路10/12次请求PASS，226项离线测试与analyze PASS；**SEARCH-001 DONE**：搜索状态机已交付，235项完整测试与analyze PASS；**SEARCH-002 DONE**：搜索页面与离线入口已交付，245项完整测试、analyze及Android Debug build PASS；**DETAIL-001 DONE**：详情元信息与刷新状态已交付，255项完整测试、analyze及Android Debug build PASS；**DETAIL-002 / READER-007 / SHELF-001 / HOME-001 / SHELF-002 / PROGRESS-001 DONE**：目录、跨章、书架首页与继续阅读闭环已交付，270项全量测试及Android真实图文/本地生命周期通过；CACHE-001..005 的功能实现已交付（310 项回归及 MuMu 离线冷启动通过）；CACHE-004 的 ARM64 真机验收待补，后续任务未自动启动，详见 [缓存实施记录](cache.md)。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。当前无 Mac 已知，无需将“寻找本地 Mac”放进 Critical Path。
+**SRC-001..004、CORE-001..004 已完成，Phase 0 技术 GO**。DEV-001..002 DONE，离线菜单、快捷入口及 Android 20 图解码已通过。READER-001 双模式视口 Gate PASS。**READER-002 DONE**，正式 Reader 状态、块样式与 Chrome 已交付，见 [验收](reader.md)。**NET-001 / NET-002 / MEDIA-001 DONE**，**READER-003 DONE**，双模式图片与局部重试已交付，完整测试 120 项及 Android 图片探针 PASS。**DB-001 / DB-002 DONE**，127 项测试及 Android 持久化探针 PASS，见 [本地存储](database.md)。**READER-004 DONE**，设置持久化与受控重布局已交付，Android 旋转实测受 MuMu 限制待补（widget 横竖窗口变化通过），见 [Reader](reader.md)。**READER-005 DONE**，位置追踪、有界有序保存与短章完成已交付，143 项测试及新 MuMu 持久记录验证 PASS，见 [Reader](reader.md)。**UI-001 / READER-006 DONE**：三页样板、语义位置恢复、内容更新降级和恢复保护已交付；155 项完整测试与 Android 双模式 SQLite 重开恢复通过，见 [UI 记录](app.md#ui-规范) / [Reader](reader.md)。**UI-002 DONE**：正式阅读配色 / 行宽 / 操作栏、独立应用外观和旧偏好迁移已交付；164 项完整测试通过，Android 外观冷启动通过，SQLite 滚动重开补验仍受数据库打开失败阻断，详见 [Reader](reader.md)。CORE-004 模拟器安装/启动待项已在 DEV-002 补齐，详见 [应用壳补验记录](app.md)。**CORE-005 DONE**：通用 Repository、Source 注册表及装配工厂已交付，177 项完整离线测试与 analyze PASS，见 [Repository](novel-repository.md)。**SRC-005 DONE**：生产请求基础与 no-op 会话已交付，完整187项离线测试通过；**SRC-006 DONE**：搜索解析与分页已交付，完整196项离线测试及 analyze PASS；**SRC-007 DONE**：详情解析已交付，203项完整测试与 analyze PASS；**SRC-008 DONE**：目录聚合已交付，211项完整测试与 analyze PASS；**SRC-009 DONE**：正文结构化解析已交付；**SRC-010 DONE**：正式媒体请求与真实双进程恢复 / 解码通过，225项离线测试及2项显式live检查 PASS；**TEST-001 DONE**：Android生产链路10/12次请求PASS，226项离线测试与analyze PASS；**SEARCH-001 DONE**：搜索状态机已交付，235项完整测试与analyze PASS；**SEARCH-002 DONE**：搜索页面与离线入口已交付，245项完整测试、analyze及Android Debug build PASS；**DETAIL-001 DONE**：详情元信息与刷新状态已交付，255项完整测试、analyze及Android Debug build PASS；**DETAIL-002 / READER-007 / SHELF-001 / HOME-001 / SHELF-002 / PROGRESS-001 DONE**：目录、跨章、书架首页与继续阅读闭环已交付，270项全量测试及Android真实图文/本地生命周期通过；CACHE-001..005 的功能实现已交付（310 项回归及 MuMu 离线冷启动通过）；CACHE-004 的 ARM64 真机验收待补，后续任务未自动启动，详见 [缓存实施记录](cache.md)。SRC-010 跨重启媒体和 TEST-001 生产图文验证保留硬门槛；技术 GO 不替代发布许可审查。Mac 环境已可用，iOS 状态见第 27 节；iOS 后续验收仍不加入 Android Critical Path。
 
 ## 39. Parallelizable Work
 
@@ -1891,7 +1895,7 @@ Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都�
 | CI：CI-001 / CI-002 | 各 Task 前置 | 当前可用 Linux / Windows 流程；不是本地 iOS 验证 |
 | Optional Compile：CI-003 | CI-001 + 可用 macOS runner / 成本决策 | 可旁路执行，只产生 compile 证据；不阻塞 Source / Reader / Android RC |
 
-**本地 iOS Runtime Validation 不是当前可并行工作**。IOS-001..006 全部保持 DEFERRED_NO_MAC；未来环境可用后才执行。可选 macOS CI 不等同拥有本地 Mac 或 iPhone 开发环境。
+**本地 iOS Simulator 验证已具备条件**。IOS-001 已有部分证据；后续按用户授权和依赖安排，不自动并行启动任务。iPhone 与签名环境尚未确认，模拟器或可选 CI 不替代真机验证。
 
 共享 pubspec / lockfile、composition root、schema、ReaderController 需单一编辑者协调；并行开发不能覆盖其他改动。数据库完整迁移演练放后期，iOS release 准备只在 deferred track，不让早期开发承担重复平台管理任务。
 
@@ -1905,15 +1909,15 @@ Search / Home UI、书架、网络预算和 CI 各自依赖见第 36 节，都�
 - Source 规则变更有独立 fixture regression，live 显式 opt-in 且有预算；无秘密日志、无未知 endpoint 伪事实、无 UI → Source 实现泄漏。
 - 新增或修改界面文案同步维护中文与英文资源，避免在 Widget / Controller 写死可翻译文案；验证受影响界面的两种语言和长文本布局。领域数据、源站原文与安全诊断字段不依赖界面语言。
 - 审查前置输出，保留用户 / 他人修改；公共契约变动更新文档和必要消费者；记录实际命令 / 结果 / commit / 平台状态，不虚构未运行检查。
-- IOS-001..006 当前为 **DEFERRED_NO_MAC**，不要求现在失败或完成。未来激活后必须有对应 iOS build / simulator / device / runtime / signing 证据才可 PASS；编译 CI 不能代替。
+- IOS-001 为 **PARTIAL**；IOS-002..006 为 **NOT_STARTED**。只有相应 build / simulator / device / runtime / signing 条目取得证据才可 PASS，启动 smoke 不代表整项任务完成。
 - CI-003 是 optional：未启用不进入 Android DoD；启用后单列编译结果和 scope。发现明确兼容缺陷应解决 Level A，runner 资源缺失不是 Android 阻塞理由。
 - Task ID 不重用；完成时写 Status / 日期 / commit / evidence，新增任务补 dependencies。只执行后续领取的 Task，不自行发布。
 
 ### Phase DoD
 
-当前 Phase 0–9 只包含第 35 节 Android Current Track 对应 Task。完成条件：阶段功能验收、适用 Android 验证、共享代码 iOS Compatibility Review 通过；未实现动作不得冒充 MVP 功能。跨 Phase 的真实硬依赖必须完成，但 Deferred iOS Track / Optional Compile Track 不计入当前 Phase 硬前置。
+当前 Phase 0–9 只包含第 35 节 Android Current Track 对应 Task。完成条件：阶段功能验收、适用 Android 验证、共享代码 iOS Compatibility Review 通过；未实现动作不得冒充 MVP 功能。跨 Phase 的真实硬依赖必须完成，但 iOS Track / Optional Compile Track 不计入当前 Phase 硬前置。
 
-未来状态记录模板：Feature Status = DONE；Android Validation = PASS（纯调查可为 N/A 并附浏览器证据）；iOS Compatibility Review = PASS / N/A（据任务性质）；iOS Runtime Validation = DEFERRED_NO_MAC。这允许 Android Reader Feature Complete，不要求整个 Phase 因无 Mac BLOCKED。模板不表示当前任务已经通过。
+状态记录模板：Feature Status 与平台验收分开；iOS Compatibility Review 按证据填 PASS / N/A，Simulator Build、Simulator Runtime、Device Runtime、Release 分项填写 PASS / PARTIAL / NOT_RUN，并注明范围。历史无 Mac 只写入当次记录。模板不表示当前任务已经通过。
 
 Phase 0 仍需真实正常公开 Text + Illustration 链路才能 Go；受限 / 不可行是 Source 本身的 BLOCKED / No-Go，不能移入“iOS 延期”来掩盖，也不能擅自换另一个生产源。
 
@@ -1971,13 +1975,14 @@ Phase 0 仍需真实正常公开 Text + Illustration 链路才能 Go；受限 / 
 - [ ] Android release candidate 真机安装 / 升级 smoke 通过，书架进度保留，无 debug / fixture / secret。
 - [ ] Android Track 全部任务（含新增 LOCAL-001..005）的验收 / 状态可追溯，RELEASE-003 独立交接；未错误宣称 iOS Ready。
 
-### Deferred iOS Checklist
+### iOS Checklist
 
-当前 **全部 DEFERRED_NO_MAC**，未勾选是正常状态，不阻塞 Android MVP。未来取得环境后按 IOS-001..006 验证；以下运行项不得凭 package 文档 / widget tests / CI 编译勾选。
+截至 2026-09-08，**仅以下明确勾选的 Simulator Debug 条目通过**；IOS-001 仍为 PARTIAL。其余按原依赖与验收范围待补，不阻塞 Android MVP。不得凭 package 文档 / widget tests / CI 编译勾选运行项；证据见 [IOS-001](validation/ios-001.md)。
 
-- [ ] macOS + Xcode + iPhone 开发调试环境已可用，Flutter / Xcode / OS 版本记录齐全。
-- [ ] IOS-001：实际 iOS project / native dependency 构建、CocoaPods / 实际集成方式链接通过。
-- [ ] Simulator 安装 / launch smoke 完成，非仅 compile。
+- [x] macOS + Xcode + Simulator 已可用，Flutter / Xcode / OS 版本记录齐全。
+- [ ] iPhone 与 development signing 环境已确认并可用。
+- [x] IOS-001 子项：正式主应用 Simulator Debug 构建与 CocoaPods / 原生依赖链接通过（不含 Profile / Release / 分享扩展）。
+- [x] iPhone 17 Pro / iOS 26.2 Simulator 正式入口安装 / launch smoke 完成，非仅 compile。
 - [ ] iPhone development signing / install / launch 完成。
 - [ ] Drift / SQLite 与 preferences 的 iOS runtime CRUD / 重开通过。
 - [ ] AppPaths / filesystem 的真实容器路径、读写与重启通过。
@@ -2038,5 +2043,6 @@ Phase 0 仍需真实正常公开 Text + Illustration 链路才能 Go；受限 / 
 - [ ] Android 原生启动屏纸白背景下状态栏图标偏白仍待修复 / 验证；已有 Logo 裁切修复不代表系统栏通过。纳入 UX-001 / Android 系统栏验收。
 - [ ] 搜索封面接线与样式已通过离线34项及安装，真实搜索 → 详情定位 → 封面显示的补验尚未完成；如执行源站探针，需另行显式授权和请求预算，不能复用历史额度。
 - [ ] UX-001 / ANDROID-002：全页面 Android 真机视觉、TalkBack、大小字体、横竖屏、键盘、手势及明暗模式矩阵仍需补齐；MuMu / widget 证据不能替代 ARM64 真机验收。阅读恢复的具体未完成项继续以 reader.md 为准。
-- [ ] IOS-001 / IOS-003：原生 LaunchScreen 的 ibtool / actool 编译、Simulator / iPhone 冷启动、深浅色、iPhone / iPad 横竖屏布局及与 Flutter 首帧衔接待验证，状态 DEFERRED_NO_MAC。已有 XML / 资源检查不算编译或运行通过。
-- [ ] IOS-003 / IOS-004：VoiceOver、导航 / 键盘 / SafeArea、Reader 排版及操作栏运行验收继续归 Deferred iOS Checklist，不因 UI 文档归并关闭。
+- [x] IOS-001 子项：本次 Simulator Debug 完成原生资源 / LaunchScreen 随应用构建，安装后观察到 Flutter 启动页与后续页面。
+- [ ] IOS-003：独立冷启动、原生屏与首帧衔接、深浅色、iPhone / iPad 横竖屏矩阵仍待验证；单次启动不替代该矩阵。
+- [ ] IOS-003 / IOS-004：VoiceOver、导航 / 键盘 / SafeArea、Reader 排版及操作栏运行验收继续归 iOS Checklist，不因 UI 文档归并关闭。

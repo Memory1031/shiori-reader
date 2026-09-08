@@ -57,7 +57,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get discoverEmpty => '暂无推荐内容。';
 
   @override
-  String get importTitle => '导入';
+  String get importTitle => '导入书籍';
 
   @override
   String get importPending => 'TXT / EPUB 导入及通过其他应用打开已纳入规划，仍在开发中。';
@@ -555,4 +555,67 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get cacheMissMessage => '暂无可用缓存，请联网后再试。';
+
+  @override
+  String get importIncoming => '有文件等待导入';
+
+  @override
+  String get importReview => '查看';
+
+  @override
+  String get importLater => '稍后处理';
+
+  @override
+  String get importReceiving => '正在复制文件…';
+
+  @override
+  String get importProcessing => '正在导入书籍…';
+
+  @override
+  String get importSuccess => '书籍已保存。';
+
+  @override
+  String get importHint => '选择一个 TXT 或 EPUB 文件，最大 128 MiB。';
+
+  @override
+  String get importChoose => '选择文件';
+
+  @override
+  String get importStart => '导入';
+
+  @override
+  String get importRetry => '重试';
+
+  @override
+  String get importCancel => '取消';
+
+  @override
+  String get importDone => '完成';
+
+  @override
+  String get importTooLarge => '文件超过 128 MiB，请选择较小的文件。';
+
+  @override
+  String get importMultiple => '每次仅支持一个文件，请重新选择。';
+
+  @override
+  String get importBusy => '请先处理已有的待导入文件，再重新打开或分享此文件。';
+
+  @override
+  String get importUnsupported => '请选择 TXT 或 EPUB 文件；不支持导入网页链接。';
+
+  @override
+  String get importInvalid => '文件为空或内容与格式不符，请检查文件。';
+
+  @override
+  String get importParserUnavailable => '当前版本暂不支持解析此格式。文件尚未导入，你可以取消并稍后重新选择。';
+
+  @override
+  String get importStorage => '无法保存文件，请检查可用空间后重试。';
+
+  @override
+  String get importCancelled => '导入已取消，书籍未提交。';
+
+  @override
+  String get importUnreadable => '无法读取文件，请确认文件仍可访问后重新选择。';
 }

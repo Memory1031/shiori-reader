@@ -1,5 +1,7 @@
 # DB-001 / DB-002：本地存储
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。正式入口已生成生产双库文件；完整 CRUD、preferences / 路径重开与备份属性未验证。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 ## LOCAL-001 用户库 v3（2026-09-07）
 
 当前 users.db 为 v3，cache.db 仍为 v2。新增 local_books 导入索引（原文件摘要、格式、标题、导入时间、manifest 摘要），v1 / v2 增量升级保留书架、进度与预取设置；v3 snapshot 和生成代码同步更新。托管文件位于 users/books，暂存位于 users/import-staging，与 disposable 缓存隔离。LocalDatabases 新增唯一 localBooks owner，在返回可用数据库组之前完成残留回收，关闭顺序为本地存储→数据库。详细发布协议和验证见 [本地导入](local-import.md)。
@@ -34,7 +36,7 @@ AppPaths 从 path_provider 取得 ApplicationSupport / temporary 根，固定子
 
 依据：[Android Auto Backup](https://developer.android.com/identity/data/autobackup)、[path_provider 2.1.5](https://pub.dev/packages/path_provider/versions/2.1.5)。Android 路径及实际安装验证见下；完整备份 / 恢复演练归 ANDROID-002，不能把 XML 配置等同于云端恢复成功。
 
-iOS 使用同一 ApplicationSupport 抽象，用户库与 disposable 子目录分开。排除缓存备份的兼容路径为 Foundation `isExcludedFromBackup`；尚未接原生属性设置或实际验证，IOS-005 必须补齐。因此 iOS backup exclusion / runtime 保持 DEFERRED_NO_MAC，不能宣称已排除。此边界不阻止 Android 存储任务验收。
+iOS 使用同一 ApplicationSupport 抽象，用户库与 disposable 子目录分开。排除缓存备份的兼容路径为 Foundation `isExcludedFromBackup`；尚未接原生属性设置或实际验证，IOS-005 必须补齐。因此 iOS backup exclusion 专项仍为 NOT_RUN，不能宣称已排除；当前基础启动结果见 IOS-001 报告。此边界不阻止 Android 存储任务验收。
 
 ## Schema 与生成流程
 

@@ -1,5 +1,7 @@
 # SEARCH-001：搜索状态与请求竞态（2026-09-07）
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。本次观察到搜索页显示；未受控验证 Search / Enter、请求预算、分页或 swipe-back。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 状态：DONE。SearchController 位于 lib/features/search/search_controller.dart，继承既有 ScopedController，显式注入 NovelRepository、SourceId 和 supportsPaging，不依赖 Source 协议、计时器或全局服务定位。SearchState 是不可变快照，items 复制为只读列表。
 
 ## 提交、编辑和分页

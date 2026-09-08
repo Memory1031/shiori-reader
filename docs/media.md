@@ -1,5 +1,7 @@
 # MEDIA-001：最小内存 ImageRepository
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。本次仅验证正式应用启动，图片解码、内存与租约专项未补验。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 CACHE-003（2026-09-07）现已增强生产组合：PersistentImageRepository 装饰本页内存实现，使用有界托管文件和独立租约，失败降级仍遵守原接口。Reader 使用有界解码 LRU，整卷预取只下载编码图，不整卷解码。下文“只在内存”描述 MEDIA-001 基线；当前持久策略、路径 / quota / clear 与 Android 冷进程证据见 [缓存](cache.md)。
 
 2026-09-07，MEDIA-001 DONE。6 项媒体所有权 / 限额测试 + 1 项网络到 codec 组合测试通过；与 NET-001 / 002 一起，完整测试 112 项、静态分析、Android Debug 构建和 MuMu 组合探针通过。iOS Level A PASS，runtime DEFERRED_NO_MAC。

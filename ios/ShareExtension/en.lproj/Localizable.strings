@@ -1,0 +1,11 @@
+"receiving" = "Receiving file…";
+"received" = "File saved. Open Shiori to confirm the import.";
+"cancel" = "Cancel";
+"done" = "Done";
+"multiple" = "Share only one file at a time.";
+"unsupported" = "Only TXT / EPUB files are supported, not web links.";
+"unreadable" = "Cannot read this file. Please select it again.";
+"tooLarge" = "The file exceeds 128 MiB.";
+"busy" = "Handle the pending file in Shiori, then share again.";
+"storage" = "Cannot save. Check available space and try again.";
+"cancelled" = "Receiving cancelled.";

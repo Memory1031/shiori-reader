@@ -62,7 +62,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get discoverEmpty => 'No recommendations available.';
 
   @override
-  String get importTitle => 'Import';
+  String get importTitle => 'Import book';
 
   @override
   String get importPending =>
@@ -584,4 +584,75 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get cacheMissMessage =>
       'No cached content is available. Connect to the internet and try again.';
+
+  @override
+  String get importIncoming => 'A file is ready to import';
+
+  @override
+  String get importReview => 'Review';
+
+  @override
+  String get importLater => 'Later';
+
+  @override
+  String get importReceiving => 'Copying file…';
+
+  @override
+  String get importProcessing => 'Importing book…';
+
+  @override
+  String get importSuccess => 'The book has been saved.';
+
+  @override
+  String get importHint => 'Choose one TXT or EPUB file, up to 128 MiB.';
+
+  @override
+  String get importChoose => 'Choose file';
+
+  @override
+  String get importStart => 'Import';
+
+  @override
+  String get importRetry => 'Retry';
+
+  @override
+  String get importCancel => 'Cancel';
+
+  @override
+  String get importDone => 'Done';
+
+  @override
+  String get importTooLarge =>
+      'The file exceeds 128 MiB. Choose a smaller file.';
+
+  @override
+  String get importMultiple =>
+      'Only one file can be received at a time. Select again.';
+
+  @override
+  String get importBusy =>
+      'Handle the pending file first, then open or share this file again.';
+
+  @override
+  String get importUnsupported =>
+      'Choose a TXT or EPUB file. Web links cannot be imported.';
+
+  @override
+  String get importInvalid =>
+      'The file is empty or its contents do not match the format.';
+
+  @override
+  String get importParserUnavailable =>
+      'This version cannot parse this format yet. Nothing was imported. You can cancel and choose the file again later.';
+
+  @override
+  String get importStorage =>
+      'The file could not be saved. Check available space and retry.';
+
+  @override
+  String get importCancelled => 'Import cancelled. The book was not saved.';
+
+  @override
+  String get importUnreadable =>
+      'The file could not be read. Check access and choose it again.';
 }

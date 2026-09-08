@@ -1,5 +1,7 @@
 # DEV-002：离线开发入口与生产隔离
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。本次验证的是 lib/main.dart 正式入口，开发菜单与场景未在 iOS 补验。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 2026-09-07。DEV-002 DONE。73 项完整 Flutter 测试、静态分析、Android Debug 编译及 MuMu 新包启动通过。当前入口保留场景数据检查页；READER-002 已将「打开阅读器」接入正式单章 Reader 状态与操作栏，见 [Reader 验收](reader.md)；READER-001 实验视口改由「视口实验」进入，见 [ADR-07](decisions/reader-viewport.md)。
 
 ## 日常启动

@@ -372,7 +372,11 @@ class PersistentImageRepository implements ImageRepository {
         return;
       }
       final entity = sweep.current;
-      if (entity is! File || coordinator.isPinned(entity.path)) continue;
+      if (entity is! File) continue;
+      // Leases use canonical paths. macOS temporary roots may be reached via
+      // /var while their canonical identity starts with /private/var.
+      final identity = await entity.resolveSymbolicLinks();
+      if (coordinator.isPinned(identity)) continue;
       if (p.dirname(entity.path) == paths.staging.path) {
         await entity.delete();
         continue;

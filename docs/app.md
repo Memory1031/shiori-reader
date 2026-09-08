@@ -1,5 +1,7 @@
 # 应用规范：UI、多语言、装配与导航
 
+> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。应用壳的 Simulator Debug 构建、安装和启动已通过；全页面 UX 与系统行为矩阵仍待验。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+
 2026-09-07。CORE-004 DONE；完成应用壳和所需 widget 验收。Android Debug build PASS；初次模拟器安装失败的待项已在 DEV-002 补齐，同一应用壳的新开发包安装、冷启动和返回导航 smoke PASS，见下文补验记录。iOS Level A compatibility review PASS，实际 iOS runtime 仍为 DEFERRED_NO_MAC。
 
 ## UI 规范
@@ -169,3 +171,8 @@ UI-002 的应用外观按钮位于当前首页 / 开发菜单右上方，打开�
 TEST-001：新增 SourceServices 作为显式在线数据装配，Source注册、NovelRepository和ImageRepository共用预算与生命周期；构造不联网。普通App页面/开发菜单尚未自动切换到此装配，Android独立验证入口已使用该工厂完成真实生产链路。验收见 [Source报告](source/lightnovel.md)，页面接线仍按后续任务执行。
 
 2026-09-07 HOME-001 / SHELF-002 / PROGRESS-001 后续接线：普通 main 现通过 ProductionApp 打开正式数据库、SourceServices 和独立应用/阅读偏好，默认展示本地书架，搜索/详情/目录/跨章阅读/收藏/历史/继续阅读均已接通。ContinueDestination 使用固定 `/continue` 路由名，不记录身份。开发首页使用相同页面但仅注入 Fixture 数据；此前“普通页面尚未装配”的段落为历史记录。资源边界、Android runtime 与剩余范围见 [六项闭环验收](reading-flow.md)。
+
+
+## LOCAL-002 文件导入入口（2026-09-08）
+
+正式应用装配 ImportController + PlatformImportSource + 现有 LocalBookStore，首页入口打开根级 ImportOverlay。外部文件只触发待处理提示，用户确认 / 稍后不会替换现有导航或阅读会话。退出先取消并等待导入，再关闭本地库。当前解析器注册表为空，确认提示尚未支持解析；fake parser 不进入生产装配。详细生命周期、App Group 及验证边界见 [本地导入](local-import.md)。
