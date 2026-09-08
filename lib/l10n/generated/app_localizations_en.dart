@@ -9,6 +9,14 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get shelfLocal => 'Local';
+
+  @override
+  String shelfLocalFormat(String format) {
+    return 'Local · $format';
+  }
+
+  @override
   String get localBookContents => 'Book contents';
 
   @override
@@ -80,9 +88,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shelfEmpty => 'Your bookshelf is empty.';
-
-  @override
-  String get shelfUndo => 'Undo removal';
 
   @override
   String get shelfLayout => 'Switch bookshelf layout';
@@ -688,7 +693,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localBooksHint =>
-      'Removing a book from the shelf keeps its files. Add it back here, or delete the book and its reading progress.';
+      'Manage imported books. Removing a local book deletes its in-app files and reading progress. The original external file is unaffected.';
 
   @override
   String get localBooksEmpty => 'No local books imported yet.';

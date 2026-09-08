@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:shiori/features/bookshelf/library_controller.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:drift/native.dart';
@@ -186,7 +187,7 @@ void main() {
     expect(await paths.localBooks.list().toList(), isEmpty);
   });
   test(
-    'delete invalidates leases and old progress, including after reimport',
+    'shelf removal deletes managed files and progress, rejects old writes after reimport',
     () async {
       final record = ok(await add(LocalBookFormat.epub));
       final key = record.content.detail.summary.key;
@@ -209,8 +210,16 @@ void main() {
           cancellation: token(),
         ),
       );
-      final deleted = ok(await store.deleteBook(key, cancellation: token()));
-      expect(deleted.cleanupPending, isFalse);
+      final external = File('${temp.path}/external.epub');
+      await external.writeAsBytes(epubBytes);
+      final controller = LibraryController(library, localBooks: store)
+        ..onStart();
+      expect(await controller.remove(key), isTrue);
+      expect(controller.localCleanupPending, isFalse);
+      controller.onDelete();
+      await controller.resourcesReleased;
+      controller.dispose();
+      expect(await external.readAsBytes(), epubBytes);
       expect(ok(await store.watchBooks().first), isEmpty);
       expect(ok(await library.watchBookshelf().first), isEmpty);
       expect(ok(await library.getProgress(key, cancellation: token())), isNull);

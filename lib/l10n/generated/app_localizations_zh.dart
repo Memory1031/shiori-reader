@@ -9,6 +9,14 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get shelfLocal => '本地';
+
+  @override
+  String shelfLocalFormat(String format) {
+    return '本地 · $format';
+  }
+
+  @override
   String get localBookContents => '全书目录';
 
   @override
@@ -73,9 +81,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get shelfEmpty => '书架暂无书籍。';
-
-  @override
-  String get shelfUndo => '撤销移除';
 
   @override
   String get shelfLayout => '切换书架布局';
@@ -645,7 +650,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get localBooksTitle => '本地文件';
 
   @override
-  String get localBooksHint => '移出书架不会删除文件。这里可以重新加入书架，或删除书籍及其阅读进度。';
+  String get localBooksHint => '管理已导入的书籍。移除本地书籍会删除应用内文件及阅读进度，外部原文件不受影响。';
 
   @override
   String get localBooksEmpty => '还没有导入本地书籍。';

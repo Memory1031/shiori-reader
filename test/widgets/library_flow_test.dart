@@ -8,6 +8,7 @@ import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/home/reading_home.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'reader/continue_test.dart' show seed;
+import 'bookshelf_test.dart' show RemovalCache;
 
 void main() {
   testWidgets('continue reading can open details without stacking readers', (
@@ -66,9 +67,10 @@ void main() {
   });
 
   testWidgets(
-    'detail removal reflects on shelf; undo and history clearing have separate boundaries',
+    'detail removal reflects on shelf without undo; history clears independently',
     (tester) async {
       final env = FixtureEnvironment(scenario: FixtureScenario.multiVolume);
+      final cache = RemovalCache();
       final summary = env.source.data.summary(FixtureScenario.multiVolume);
       await env.library.putBookshelf(
         BookshelfEntry(snapshot: summary, addedAt: DateTime.now()),
@@ -80,6 +82,7 @@ void main() {
           locale: const Locale('en'),
           routes: AppRoutes(
             home: (_) => ReadingHome(
+              cache: cache,
               repository: env.novels,
               library: env.library,
               sources: [env.source.descriptor],
@@ -97,12 +100,11 @@ void main() {
       await tester.tap(find.text('Remove from bookshelf'));
       await tester.pumpAndSettle();
       expect(find.text('Add to bookshelf'), findsOneWidget);
+      expect(cache.cleared, [summary.key]);
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('Your bookshelf is empty.'), findsOneWidget);
-      await tester.tap(find.text('Undo removal'));
-      await tester.pumpAndSettle();
-      expect(find.text('Your bookshelf is empty.'), findsNothing);
+      expect(find.text('Undo removal'), findsNothing);
       await tester.tap(find.byTooltip('More'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Recent reading'));
@@ -116,7 +118,7 @@ void main() {
                   as Success<List<BookshelfEntry>>)
               .value
               .length,
-          1,
+          0,
         );
       });
       await tester.pumpWidget(const SizedBox());

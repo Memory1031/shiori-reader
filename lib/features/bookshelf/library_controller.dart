@@ -3,16 +3,28 @@ import '../../domain/models/models.dart';
 import '../../shared/controllers/scoped_controller.dart';
 
 class LibraryController extends ScopedController {
-  LibraryController(this.repository);
+  LibraryController(this.repository, {this.cache, this.localBooks});
+  final LocalBookManagement? localBooks;
+  bool localCleanupPending = false;
+  Map<NovelKey, LocalBookFormat> localFormats = const {};
+  final CacheManagement? cache;
   final LibraryRepository repository;
   List<BookshelfEntry> books = const [];
   List<ReadingProgress> recent = const [];
   AppFailure? shelfFailure, historyFailure, writeFailure;
   bool shelfReady = false, historyReady = false, writing = false;
-  BookshelfEntry? removed;
   @override
   void onInit() {
     super.onInit();
+    final management = localBooks;
+    if (management != null) {
+      listenTo(management.watchBooks(), (result) {
+        if (result case Success(:final value)) {
+          localFormats = {for (final book in value) book.key: book.format};
+          update();
+        }
+      });
+    }
     listenTo(repository.watchBookshelf(), (result) {
       shelfReady = true;
       switch (result) {
@@ -101,17 +113,33 @@ class LibraryController extends ScopedController {
     ),
     (_) {},
   );
-  Future<bool> remove(NovelKey key) => _write(
-    () => repository.removeFromBookshelf(key, cancellation: cancellation),
-    (value) => removed = value,
-  );
-  Future<bool> undo() async {
-    final entry = removed;
-    if (entry == null) return false;
-    return _write(
-      () => repository.putBookshelf(entry, cancellation: cancellation),
-      (_) => removed = null,
-    );
+  Future<bool> remove(NovelKey key) {
+    if (key.sourceId == LocalBookIdentity.sourceId) {
+      return _write<LocalBookDeletion>(() async {
+        final management = localBooks;
+        if (management == null) {
+          return Failure(
+            AppFailure(
+              kind: FailureKind.unsupported,
+              operation: Operation.libraryWrite,
+            ),
+          );
+        }
+        return management.deleteBook(key, cancellation: cancellation);
+      }, (result) => localCleanupPending = result.cleanupPending);
+    }
+    return _write(() async {
+      // Keep the entry available for retry if cache cleanup fails. These stores
+      // cannot share a transaction; a later library failure may leave no cache.
+      final management = cache;
+      if (management != null) {
+        final cleared = await management.clear(novel: key);
+        if (cleared case Failure(:final failure)) {
+          return Failure<BookshelfEntry?>(failure);
+        }
+      }
+      return repository.removeFromBookshelf(key, cancellation: cancellation);
+    }, (_) {});
   }
 
   Future<bool> clearHistory(NovelKey key) => _write(

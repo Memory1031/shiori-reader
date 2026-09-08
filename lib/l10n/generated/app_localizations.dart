@@ -98,6 +98,18 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @shelfLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get shelfLocal;
+
+  /// No description provided for @shelfLocalFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Local · {format}'**
+  String shelfLocalFormat(String format);
+
   /// No description provided for @localBookContents.
   ///
   /// In en, this message translates to:
@@ -229,12 +241,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your bookshelf is empty.'**
   String get shelfEmpty;
-
-  /// No description provided for @shelfUndo.
-  ///
-  /// In en, this message translates to:
-  /// **'Undo removal'**
-  String get shelfUndo;
 
   /// No description provided for @shelfLayout.
   ///
@@ -1349,7 +1355,7 @@ abstract class AppLocalizations {
   /// No description provided for @localBooksHint.
   ///
   /// In en, this message translates to:
-  /// **'Removing a book from the shelf keeps its files. Add it back here, or delete the book and its reading progress.'**
+  /// **'Manage imported books. Removing a local book deletes its in-app files and reading progress. The original external file is unaffected.'**
   String get localBooksHint;
 
   /// No description provided for @localBooksEmpty.

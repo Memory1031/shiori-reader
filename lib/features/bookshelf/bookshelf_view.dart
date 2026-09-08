@@ -5,6 +5,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/state_views.dart';
 import 'library_controller.dart';
+import 'remove_shelf_book.dart';
 
 class BookshelfView extends StatefulWidget {
   const BookshelfView({
@@ -65,7 +66,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                     ? null
                     : () {
                         Navigator.pop(sheet);
-                        widget.controller.remove(book.key);
+                        removeShelfBook(context, widget.controller, book);
                       },
               ),
             ],
@@ -88,6 +89,19 @@ class _BookshelfViewState extends State<BookshelfView> {
             .clamp(2, 6);
         Widget item(int index) {
           final book = books[index].snapshot;
+          final local = book.key.sourceId == LocalBookIdentity.sourceId;
+          final format = controller.localFormats[book.key];
+          final localLabel = format == null
+              ? strings.shelfLocal
+              : strings.shelfLocalFormat(format.name.toUpperCase());
+          Widget provenance() => Text(
+            localLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          );
           final cover = BookCover(book: book, images: widget.images);
           if (!_grid) {
             final open = _revealed == book.key;
@@ -134,7 +148,11 @@ class _BookshelfViewState extends State<BookshelfView> {
                                           ? null
                                           : () {
                                               setState(() => _revealed = null);
-                                              controller.remove(book.key);
+                                              removeShelfBook(
+                                                context,
+                                                controller,
+                                                book,
+                                              );
                                             },
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
@@ -197,7 +215,9 @@ class _BookshelfViewState extends State<BookshelfView> {
                               height: 66,
                               child: cover,
                             ),
-                            subtitle: book.authors.isEmpty
+                            subtitle: local
+                                ? provenance()
+                                : book.authors.isEmpty
                                 ? null
                                 : Text(
                                     book.authors.join(', '),
@@ -259,6 +279,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                     context,
                   ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
                 ),
+                if (local) ...[const SizedBox(height: 4), provenance()],
               ],
             ),
           );
@@ -311,13 +332,6 @@ class _BookshelfViewState extends State<BookshelfView> {
               SliverToBoxAdapter(
                 child: FailureView(failure: controller.writeFailure!),
               ),
-            if (controller.removed != null)
-              SliverToBoxAdapter(
-                child: TextButton(
-                  onPressed: controller.writing ? null : controller.undo,
-                  child: Text(strings.shelfUndo),
-                ),
-              ),
             if (!controller.shelfReady)
               const SliverFillRemaining(
                 hasScrollBody: false,
@@ -352,7 +366,14 @@ class _BookshelfViewState extends State<BookshelfView> {
                                 columns) *
                             1.5 +
                         10 +
-                        48 * scale,
+                        48 * scale +
+                        (books.any(
+                              (entry) =>
+                                  entry.snapshot.key.sourceId ==
+                                  LocalBookIdentity.sourceId,
+                            )
+                            ? 24 * scale
+                            : 0),
                   ),
                   itemCount: books.length,
                   itemBuilder: (_, i) => item(i),

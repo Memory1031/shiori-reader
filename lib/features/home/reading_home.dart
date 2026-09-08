@@ -8,6 +8,7 @@ import '../../shared/widgets/shiori_logo.dart';
 import '../bookshelf/library_controller.dart';
 import '../bookshelf/bookshelf_view.dart';
 import '../bookshelf/library_observer.dart';
+import '../bookshelf/remove_shelf_book.dart';
 import '../history/history_screen.dart';
 import '../reader/continue_reading.dart';
 import '../novel_detail/detail_screen.dart';
@@ -51,9 +52,14 @@ class _ReadingHomeState extends State<ReadingHome> {
   @override
   void initState() {
     super.initState();
-    _library = LibraryController(widget.library)
-      ..onStart()
-      ..addListener(_changed);
+    _library =
+        LibraryController(
+            widget.library,
+            cache: widget.cache,
+            localBooks: widget.localManagement,
+          )
+          ..onStart()
+          ..addListener(_changed);
   }
 
   void _changed() {
@@ -104,9 +110,22 @@ class _ReadingHomeState extends State<ReadingHome> {
                 library.shelfFailure != null ||
                 library.writing
             ? null
-            : (summary) => library.contains(key)
-                  ? library.remove(key)
-                  : library.add(summary),
+            : (summary) async {
+                if (!library.contains(key)) {
+                  await library.add(summary);
+                  return;
+                }
+                final removed = await removeShelfBook(
+                  context,
+                  library,
+                  summary,
+                );
+                if (removed &&
+                    key.sourceId == LocalBookIdentity.sourceId &&
+                    context.mounted) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
+              },
       ),
     ),
     continueReader: (_, key) => ContinueReadingScreen(
