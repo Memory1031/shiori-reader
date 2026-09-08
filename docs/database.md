@@ -1,84 +1,47 @@
-# DB-001 / DB-002：本地存储
+# 数据库与用户数据保护
 
-## DB-003（2026-09-08）
+## 当前存储
 
-保留开发快照迁移、事务中途失败回滚 / 重试、原损坏文件保留、坏缓存隔离与清缓存用户数据保留已验收。升级 DDL 与 user_version 在同一事务中提交；缓存列表同读取层一样拒绝不支持的 codec。当前 schema 版本不变。386 项离线测试、analyze 与 Android ARM64 独立临时库迁移 / 重开通过；没有历史正式发布版，首次 RC 后继续按 [升级 DoD](development.md) 验证。详见 [DB-003 记录](validation/db-003.md)。下方 DB-001 阶段的“当前仅 v1”等表述为历史基线。
+| 位置 | Schema | 内容 |
+| --- | --- | --- |
+| `users/users.sqlite` | v3 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books |
+| `disposable/cache.sqlite` | v2 | novel_cache、catalog_cache、chapter_cache、image_cache、image_owners |
+| 平台 preferences | 独立 codec | readerSettings v3、appSettings v2 |
+| `users/books/` | manifest v1 | 本地书托管原件、语义正文索引与媒体 |
 
-> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。正式入口已生成生产双库文件；完整 CRUD、preferences / 路径重开与备份属性未验证。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
+AppPaths 通过 path_provider 解析 ApplicationSupport / temporary，固定 `shiori/production` 或 `shiori/development` 子目录。机器绝对路径、URL 和 Source 秘密不进入持久身份。
 
-## LOCAL-001 用户库 v3（2026-09-07）
+LocalDatabases.open 顺序打开用户库和缓存库，各用 NativeDatabase.createInBackground 的后台连接；应用根拥有数据库，Repository 借用。运行期复用连接，不逐页 open。localBooks 管理器负责文件回收，先关闭管理器，再关库。
 
-当前 users.db 为 v3，cache.db 仍为 v2。新增 local_books 导入索引（原文件摘要、格式、标题、导入时间、manifest 摘要），v1 / v2 增量升级保留书架、进度与预取设置；v3 snapshot 和生成代码同步更新。托管文件位于 users/books，暂存位于 users/import-staging，与 disposable 缓存隔离。LocalDatabases 新增唯一 localBooks owner，在返回可用数据库组之前完成残留回收，关闭顺序为本地存储→数据库。详细发布协议和验证见 [本地导入](local-import.md)。
+## 事务与 codec
 
-## CACHE schema v2（2026-09-07）
+Library 写入由事务串行执行；重复收藏保留首次 addedAt，移除书架保留历史。书架按最近阅读时间（无历史时 addedAt）降序，平局按 Source / Novel 键排序。watch 返回初始及后续不可变快照。
 
-该阶段两库均为 schemaVersion 2。缓存库新增 image_cache / image_owners；用户库新增 prefetch_choices（source / novel / 当前文章 → 一个目标）和 prefetch_settings（两个预取开关），与 reading_progress 分离。v1→v2 仅新增表 / 索引，保留 v1 快照并生成 v2；迁移测试验证旧书架和正文记录不丢失。缓存 clear 不访问用户库。下方 v1 内容为 DB-001 当时基线，当前覆盖行为见 [缓存](cache.md)。
+beginProgressSession 原子递增 generation 并重置 sequence；saveProgress 只接受当前 generation 和严格递增 sequence，旧写返回 false。clearHistory 推进 generation 并保留会话保护行，防止晚响应恢复已清历史。提交前取消可回滚，提交后返回真实结果。
 
-2026-09-07。DB-001 的 v1 schema、目录、生成快照与非破坏迁移基线已完成；DB-002 的本地仓库和设置实现已完成，Android 探针已验证正式 SQLite / preferences。**两项 DONE**，具体验证边界见下方记录。
+缓存存规范化领域 JSON、codec / parser 版本及抓取、过期、访问时间。校验类型、身份和摘要，单项损坏局部失败；离线列表同时检查外层 codec 和内部数据。TTL / LRU 由[缓存策略](cache.md)负责。
 
-## 数据与所有权
+用户与缓存没有跨库事务或跨库外键；缓存失败不能回滚已保存的书架和进度。用户库升级成功而缓存打开失败时保留用户库，不删除重建。
 
-`LocalDatabases.open(AppPaths)` 创建两个数据库，各自使用 `NativeDatabase.createInBackground` 的单后台连接，依次完成用户库、缓存库的打开与 schema 检查。装配方拥有并关闭数据库；LibraryRepository 和 NovelRecordStore 借用连接，不自行关闭。应用运行中复用这一组连接，不为每个页面重复 open。生产应用的 Repository / Source 装配仍归 CORE-005，当前普通入口不自行写入用户数据。
+preferences 使用独立 JSON key，Store 串行写入，读取等待已排队写入。坏 JSON、未知版本或非法数据返回默认与安全诊断，读操作不覆盖坏值 / 未来版本。偏好不承诺与 SQLite 跨存储事务。
 
-- `users/users.sqlite`：bookshelf、reading_progress、progress_sessions。复合键包含 source_id / novel_id；进度快照和位置原子写入。分数、索引、代次和 sequence 有 SQL CHECK。进度表不额外伪造 Domain 中不存在的 chapterTitle。
-- `disposable/cache.sqlite`：novel_cache、catalog_cache、chapter_cache，章节另包含 chapter_id。存规范化 Domain JSON 和 codec / parser 版本、抓取 / 过期 / 访问时间、UTF-8 payload 字节数。当前只提供基本记录读写；不执行 TTL 判断、LRU、图片元数据、文件缓存或清理任务。last_access_at 初始为 fetched_at，后续缓存策略再负责访问更新。
-- 用户表没有指向缓存表的外键；清缓存不需要也不允许操作用户数据库。没有跨库事务；缓存写失败不能回滚已保存的书架或进度。
+## 迁移与生成
 
-LibraryRepository 的所有写操作通过 Drift 事务串行执行。重复收藏保留首次 addedAt，移除收藏返回原条目且保留历史；书架按最近阅读时间（无历史时 addedAt）降序，平局按 Source / Novel 键排序。watch 返回初始与后续不可变快照，SQL / codec 错误作为 Failure 数据发出，不泄漏原始异常。
+保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
 
-进度会话代次在 progress_sessions 中持久化；beginProgressSession 原子递增 generation 并重置 sequence。saveProgress 只接受当前代次且严格递增的 sequence，旧写返回 false。clearHistory 删除历史并推进代次，保留 session 行作为拒绝晚写的记录；移除书架不删除这条保护记录。取消在事务内提交前检查，取消则回滚；已经提交的写入返回真实成功结果。
+升级 DDL、完整性检查和 user_version 同事务提交；失败回滚，损坏或未知未来版本保留原文件并报错。不提供自动删用户库、drop/recreate 或生产 reset 来绕过故障。旧快照不能被当前 schema 重新导出覆盖。
 
-NovelRecordStore 只接受类型化 Detail / Catalog / Chapter；缓存 codec 检查版本、类型、身份以及目录 / 正文摘要。写失败保留旧记录，单条损坏返回局部 cache Failure，不自动清库、不影响其他记录。没有网络调用，也没有 Source locator 表；只有 SRC-010 实证需要时才扩展。
+运行时 Drift 2.32.1 / sqlite3 3.5.2；生成器独立在 `tool/db_codegen`，避免 analyzer 与固定 Flutter 工具链冲突。安装工具锁定依赖后：
 
-ReaderSettings 在 DB-002 交付时使用 v1 codec，READER-004 升级到 v2，UI-002 已升级为兼容 v1 / v2 的 v3 codec，通过注入的 SharedPreferencesAsync 存一个 JSON 字符串，key 按 production / development 隔离。单 Store 串行保存，读取等待已排队的保存；坏 JSON、类型、数值或未知版本返回默认设置并写入不含路径 / 原始值的本地诊断，读取不覆盖坏值或未来版本。设置不是关键数据，不承诺与 SQLite 的跨存储事务。阅读模式 codec、有限数值 clamp 与设置 UI 的后续实现见 [Reader](reader.md)。
-
-## 路径与备份（OQ-08）
-
-AppPaths 从 path_provider 取得 ApplicationSupport / temporary 根，固定子目录 `shiori/production` 或 `shiori/development`；数据库和托管图片 / 正文在 support 内分离。staging 位于 disposable 下，与目标文件同文件系统；临时日志使用 temporary。Source ID、URL、宿主绝对路径均不参与磁盘目录命名或持久配置。
-
-选择拆库，避免可淘汰记录混入用户备份文件。Android backup_rules（旧 API）与 data_extraction_rules（API 31+ 的 cloud-backup / device-transfer）均排除 file domain 的 `shiori/production/disposable/` 和整个开发数据目录，用户库保持可备份。两个文件及目录内可能存在的 SQLite journal / WAL 均由目录边界覆盖。临时目录由平台排除。设置使用平台偏好存储的命名空间，与这两个数据库文件分开。
-
-依据：[Android Auto Backup](https://developer.android.com/identity/data/autobackup)、[path_provider 2.1.5](https://pub.dev/packages/path_provider/versions/2.1.5)。Android 路径及实际安装验证见下；完整备份 / 恢复演练归 ANDROID-002，不能把 XML 配置等同于云端恢复成功。
-
-iOS 使用同一 ApplicationSupport 抽象，用户库与 disposable 子目录分开。排除缓存备份的兼容路径为 Foundation `isExcludedFromBackup`；尚未接原生属性设置或实际验证，IOS-005 必须补齐。因此 iOS backup exclusion 专项仍为 NOT_RUN，不能宣称已排除；当前基础启动结果见 IOS-001 报告。此边界不阻止 Android 存储任务验收。
-
-## Schema 与生成流程
-
-两个数据库当前 schemaVersion 都为 1；已提交的快照分别在 `lib/data/local/database/schemas/user` 与 `schemas/cache`。schema version、RecordCodec envelope version、ReaderSettings version、parser version 和进度 generation 互不替代。
-
-尚无历史发布 schema，不虚构旧版本迁移。当前仅创建 v1；未知升级 / 降级直接拒绝，打开时执行 quick_check。坏目录、损坏或未来版本失败后保留原文件，不自动删除重建，不通过 drop/recreate 升级用户表。没有生产 reset 入口。后续 schema 变更必须保留旧快照、提高版本并添加非破坏迁移及测试；完整旧版本 / 损坏 / RC 回归留 DB-003。
-
-运行时固定 Drift **2.32.1**、sqlite3 **3.5.2**、path_provider **2.1.5**、shared_preferences **2.5.5**。计划中的 Drift 2.34.4 生成器要求 analyzer 13，而 Flutter 3.38.4 的 test 1.26.3 要求 analyzer <9；不升级固定 SDK 或强制 dependency_overrides。独立工具包 `tool/db_codegen` 固定 drift_dev 2.32.1 / build_runner 2.10.5，使用自己的 lockfile 与 analyzer 10.2.0；生成产物仍编译在主工程，运行时没有生成器依赖。
-
-```powershell
-# 使用项目固定 Dart 3.10.3；首次在工具包解析依赖
-Push-Location tool/db_codegen
-dart pub get
-Pop-Location
-./tool/generate_database.ps1
-flutter test --no-pub test/data/local --reporter expanded
-flutter analyze --no-pub
-flutter build apk --debug --no-pub --target test/support/database_probe.dart
+```sh
+bash tool/generate_database.sh
+fvm flutter test --no-pub test/data/local
 ```
 
-脚本只复制 schema 输入到被忽略的工具工作目录，再生成 `.g.dart` 与当前版本 snapshot；评审必须检查 snapshot 差异，不得用重新导出 v1 来掩盖受支持数据库的 schema 变化。依据：[Drift native](https://drift.simonbinder.eu/platforms/vm/)、[schema / migrations](https://drift.simonbinder.eu/migrations/)。SQLite 3 由 hooks 打包，不增加旧的 sqlite3_flutter_libs。
+Windows 用 `tool/generate_database.ps1`。生成 `.g.dart` 与 schema 快照一并评审，CI 检查 diff 及新增快照。首次正式发布后保留实际发布版本的升级起点与自制旧库样本，不能仅靠开发 schema 声称正式升级通过。
 
-## 验证记录
+## 备份与恢复
 
-- **127 项完整 Flutter 测试 PASS**，静态分析 PASS。新增 7 项本地测试覆盖内存建表 / 索引 / CHECK、临时目录后台重开、未来 schema 保留、坏目录保护、跨源相同 ID、收藏幂等 / 历史隔离、事务失败与取消回滚、乱序 sequence、持久 generation 与 clearHistory 后重开、缓存 codec / 原子替换 / 单条损坏、设置坏值 / 版本 / 类型与失败。
-- 测试只在新建的临时目录模拟坏文件 / 未来版本，并在校验目录归属后清理；未操作真实用户库。SQL trigger 模拟写失败，不能代替真实磁盘满 / 文件系统故障，后者仍归 DB-003 / ANDROID-002。
-- Android 探针 `test/support/database_probe.dart` 采用开发路径和正式数据库 / LibraryRepository / NovelRecordStore / SharedPreferencesAsync，首次 MuMu 安装与冷启动 PASS，输出 `DB_PASS coldExisting=false generation=1 reopen=true settings=26 staleWriteRejected=true`。最终移除临时诊断的 APK 连续两次独立启动（进程 6642 / 6764）均为 `coldExisting=true`，generation 从 6 到 7，`reopen=true settings=26 staleWriteRejected=true`；第二次通过 force-stop 后启动验证，包含进度、书架、章节缓存与平台偏好检查。截图 `.tooling/evidence/db-restart.png`。Android `run-as` 实测文件位于 `files/shiori/development/users/users.sqlite` 与 `files/shiori/development/disposable/cache.sqlite`，与 file-domain 备份路径一致。
-- iOS Level A：Drift native / sqlite3 hooks 文档支持 iOS；SharedPreferences Foundation 最低 iOS 13，项目 iOS 15 满足；路径通过官方插件，无 Android-only 核心读写。Xcode 最终链接、SQLite ABI、preferences / filesystem 与备份属性实际行为均 DEFERRED_NO_MAC（IOS-001 / IOS-005）。
+Android XML 排除 disposable、开发目录和导入暂存，用户数据可参与系统备份 / 换机。iOS 尚未完整验证缓存排除属性；目录分开本身不证明不会备份。系统备份恢复和整机磁盘耗尽按用户决定未执行。
 
-Windows 构建初次下载 SQLite 库遇到 Dart TLS handshake 错误：通过正常 TLS 的 curl 获取官方 GitHub release 文件，并与 sqlite3 包内 asset_hashes.dart 的 SHA-256 比对后放入被忽略的构建缓存，未关闭证书校验，也未修改应用依赖以引用宿主路径。Android 插件另触发 SDK Platform 35 安装及 Maven 首次下载；具体版本保留在锁文件，临时下载和 Gradle 报告均不属于源码。
-
-构建时另遇到仓库已知 Windows Gradle transform 移动失败及 Kotlin 跨盘增量缓存异常：停止该项目 Gradle daemon 后重试，并在被忽略的项目 Gradle 用户目录中设置 `kotlin.incremental=false`，构建通过；未修改全局 Gradle 配置。
-
-运行期观察：早期探针在 MuMu 间歇返回 SQLITE_CANTOPEN（数据库文件保留且后续可读），新进程与同进程重开阶段均需关注。初始化已改为顺序执行，最终无诊断版本连续冷启动复测通过，但不能据此确认间歇故障根因已彻底消除；保留 ANDROID-002 / DB-003 的真机及反复启动关注项。没有通过删除数据库、自动重建或无限重试绕过故障。SQLite 实际 Android 编译选项 THREADSAFE=1。
-
-最终普通 `lib/main.dart` Android Debug 构建 PASS；127 项完整回归通过后，对最终初始化 / 诊断清理再执行 7 项本地测试与静态分析，均 PASS。备份云端往返、ARM64 真机和 iOS runtime 不在此次成功声明内。
-
-
-UI-002 增加 PreferencesAppSettingsStore，使用 shiori.{production|development}.appSettings；Reader 继续使用独立 readerSettings key。两个适配器各自串行写入、读取等待在途写入，并在坏类型 / JSON / 未知版本时返回默认与安全诊断，读操作不回写。应用外观不从旧阅读明暗初始化。此次无 SQLite schema 变更，无新增插件。
-
-CORE-005 已通过 NovelRecordStore 接入通用 NovelRepository；沿用现有三类记录和 schema v1，没有迁移或 SQL 结构变化。读取 / 刷新 / 写失败降级及 composition 所有权见 [Repository 实现](novel-repository.md)。
+排障先退出应用，保全数据库、WAL / SHM、preferences、托管原件及 manifest，在副本上检查；不以卸载或删库作为默认恢复步骤。本地文件发布协议见[本地导入](local-import.md)，已有迁移 / 故障 / 设备结果见[验收摘要](validation/README.md)。

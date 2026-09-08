@@ -447,7 +447,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerControlsHint =>
-      'Tap the center for controls. In paged mode, tap either side; in scroll mode, swipe vertically. Change modes in reading settings.';
+      'Tap the center to show or hide controls. Tap either side or swipe horizontally to turn pages.';
 
   @override
   String get readerGotIt => 'Got it';

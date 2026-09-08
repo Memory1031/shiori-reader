@@ -12,7 +12,6 @@ import 'package:shiori/features/reader/reader_preferences.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/settings_panel.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
-import 'package:shiori/features/reader/viewport/reader_viewport.dart';
 
 class Store implements SettingsStore {
   ReaderSettings value = ReaderSettings();
@@ -45,6 +44,31 @@ class Store implements SettingsStore {
 }
 
 void main() {
+  test(
+    'legacy scroll settings open paged without changing other preferences',
+    () async {
+      final store = Store()
+        ..value = ReaderSettings(
+          mode: ReaderMode.scroll,
+          fontSize: 26,
+          paragraphSpacing: 24,
+          paper: ReaderPaper.warm,
+          themeMode: ReaderThemeMode.dark,
+          controlsHintSeen: true,
+        );
+      final old = store.value;
+      final preferences = ReaderPreferences(store);
+      await preferences.load();
+      expect(preferences.value, old.copyWith(mode: ReaderMode.paged));
+      preferences.update(
+        preferences.value.copyWith(fontSize: 28, mode: ReaderMode.scroll),
+      );
+      await preferences.flush();
+      expect(store.value, old.copyWith(mode: ReaderMode.paged, fontSize: 28));
+      preferences.dispose();
+    },
+  );
+
   testWidgets('failed save exposes retry and preserves preview', (
     tester,
   ) async {
@@ -245,22 +269,20 @@ void main() {
       expect(paged.controller.capture()!.blockFraction, closeTo(.6, .002));
       Navigator.of(tester.element(find.byType(ReaderSettingsPanel))).pop();
       await tester.pumpAndSettle();
-      await chooseReaderMode(tester, 'Scroll');
-      await tester.pumpAndSettle();
-      var scroll = tester.widget<ReaderViewport>(find.byType(ReaderViewport));
-      expect(scroll.controller.capture()!.blockFraction, closeTo(.6, .002));
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       tester.view.physicalSize = const Size(900, 400);
       await tester.pumpAndSettle();
-      scroll = tester.widget<ReaderViewport>(find.byType(ReaderViewport));
-      expect(scroll.controller.capture()!.blockFraction, closeTo(.6, .004));
+      paged = tester.widget<PagedReaderViewport>(
+        find.byType(PagedReaderViewport),
+      );
+      expect(paged.controller.capture()!.blockFraction, closeTo(.6, .004));
       await openReaderSettings(tester);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
-      expect(store.value.mode, ReaderMode.scroll);
+      expect(store.value.mode, ReaderMode.paged);
       await env.close();
     },
   );

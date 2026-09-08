@@ -8,6 +8,7 @@ import '../novel_detail/catalog_controller.dart';
 import '../novel_detail/catalog_view.dart';
 import 'reader_controller.dart';
 import 'reader_screen.dart';
+import 'viewport/paper_turn.dart';
 import '../cache/prefetch_sheet.dart';
 import '../../shared/source_image.dart';
 import '../local_books/local_catalog.dart';
@@ -44,9 +45,14 @@ class BookReaderScreen extends StatefulWidget {
 }
 
 class _BookReaderScreenState extends State<BookReaderScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   late ReaderController _reader;
   ReaderController? _pending;
+  late final AnimationController _chapterTurn;
+  int _turnDirection = 1;
+  bool _animateChapter = false;
+  bool _committing = false;
+  Color _paper = const Color(0xfffaf7f2);
   late final ImageRepository? _displayImages;
   late final CatalogController _catalog;
   bool get _local =>
@@ -83,6 +89,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   @override
   void initState() {
     super.initState();
+    _chapterTurn = AnimationController(
+      vsync: this,
+      duration: PaperTurnMotion.duration,
+    );
     _displayImages = widget.offline && widget.images != null
         ? _OfflineImages(widget.images!)
         : widget.images;
@@ -162,6 +172,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   void dispose() {
+    _chapterTurn.dispose();
     _titleRequest.cancel();
     if (!widget.offline) _cache?.prefetch?.leave();
     WidgetsBinding.instance.removeObserver(this);
@@ -210,6 +221,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         chapter.novelKey != widget.chapter.novelKey) {
       return;
     }
+    _animateChapter = fromStart || fromEnd;
+    _turnDirection = fromEnd ? -1 : 1;
     setState(() => _changing = true);
     if (!await _save()) {
       if (mounted) setState(() => _changing = false);
@@ -227,12 +240,23 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     });
   }
 
-  void _commitPending(ReaderController reader) {
+  Future<void> _commitPending(ReaderController reader) async {
+    if (!mounted || _pending != reader || _committing) return;
+    _committing = true;
+    if (_animateChapter && !MediaQuery.disableAnimationsOf(context)) {
+      try {
+        await PaperTurnMotion.settle(_chapterTurn);
+      } on TickerCanceled {
+        return;
+      }
+    }
     if (!mounted || _pending != reader) return;
     final previous = _reader;
     setState(() {
       _reader = reader;
       _pending = null;
+      _committing = false;
+      _chapterTurn.value = 0;
       _changing = false;
     });
     _close(previous);
@@ -241,6 +265,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   void _rejectPending(ReaderController reader) {
     if (!mounted || _pending != reader) return;
+    _chapterTurn.stop(canceled: true);
+    _chapterTurn.value = 0;
+    _committing = false;
     final target = reader.chapter;
     final blockKey = reader.initialBlockKey;
     final fromStart = reader.startAtBeginning, fromEnd = reader.startAtEnd;
@@ -353,6 +380,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       key: ValueKey(reader),
       content: reader.content!,
       onReady: () => _commitPending(reader),
+      onPageAppearance: (paper) {
+        if (reader == _reader) {
+          _paper = paper;
+        }
+      },
       onLoadFailure: () => _rejectPending(reader),
       runningTitle: _runningTitle(reader),
       images: _displayImages,
@@ -378,6 +410,25 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     );
   }
 
+  Widget _pageLayer(ReaderController reader, {required bool active}) =>
+      Positioned.fill(
+        key: ValueKey(reader),
+        child: IgnorePointer(
+          ignoring: !active || _changing,
+          child: AnimatedBuilder(
+            animation: _chapterTurn,
+            child: ExcludeSemantics(excluding: !active, child: _view(reader)),
+            builder: (context, child) => ClipPath(
+              clipper: PaperTurnClipper(
+                active ? _chapterTurn.value : 0,
+                _turnDirection,
+              ),
+              child: child,
+            ),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     return SourceImageDecodeScope(
@@ -398,19 +449,15 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 children: [
                   if (_pending case final pending?
                       when pending.status == ReaderStatus.ready)
-                    Positioned.fill(
-                      key: ValueKey(pending),
-                      child: IgnorePointer(
-                        child: ExcludeSemantics(child: _view(pending)),
-                      ),
-                    ),
+                    _pageLayer(pending, active: false),
+                  _pageLayer(_reader, active: true),
                   Positioned.fill(
-                    key: ValueKey(_reader),
-                    child: IgnorePointer(
-                      ignoring: _changing,
-                      child: ExcludeSemantics(
-                        excluding: false,
-                        child: _view(_reader),
+                    child: AnimatedBuilder(
+                      animation: _chapterTurn,
+                      builder: (context, _) => PaperTurnFold(
+                        progress: _chapterTurn.value,
+                        direction: _turnDirection,
+                        paper: _paper,
                       ),
                     ),
                   ),

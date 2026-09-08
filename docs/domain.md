@@ -1,39 +1,17 @@
-# CORE-002：领域值模型与内容规范
+# 领域模型与内容身份
 
-> iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。本次应用启动不新增领域契约或完整 iOS 业务验收结论。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
-
-LOCAL-001（2026-09-07）：新增纯 Dart LocalBookFormat、LocalBookContent / LocalBookRecord 和 LocalBookIdentity。保留 `local` namespace，书籍用原文件 SHA-256、章节用解析器稳定定位符摘要，blockKey 沿用现有算法；不增加平台路径或页码身份。详细限制和后续 EPUB fragment 边界见 [本地导入](local-import.md)。
-
-LOCAL-003 / 004（2026-09-08）：`LocalBookContent` 增加独立的不可变 navigation 树，`LocalNavigationEntry` 用语义 blockKey 定位 EPUB fragment，允许多项指向同章，保持既有 Catalog 章身份 / 顺序不变。TXT 章节以去 BOM 后、规范化前的 code-point offset 定位，EPUB 以规范化包内 spine 路径定位。具体规则见 [本地解析](local-parsers.md)。
-
-CACHE-001..005（2026-09-07）：新增缓存状态投影 CachedChapter / CacheOverview 与 PrefetchState，均为不可变 Domain 数据。预取选择只使用既有 ChapterKey，不改变 Catalog.ordinal、ChapterContent、ReaderPosition 或 ReadingProgress 的语义；选择不表示已读，也不构造未经验证的续篇关系。接口见 [contracts](contracts.md)，验证见 [缓存](cache.md)。
-
-2026-09-07，Dart 3.10.3。入口为 `lib/domain/models/models.dart`，摘要 helper 为 `lib/domain/content_identity.dart`。本轮只实现模型和不变量，Source / Repository / AppFailure 契约留给 CORE-003。
-
-## 使用与验证
-
-仓库根目录、已安装项目固定 Flutter SDK 并解析依赖后：
-
-```powershell
-dart tool/domain_example.dart
-dart --suppress-analytics test test/domain
-dart --suppress-analytics analyze
-```
-
-示例用自制内容构造章节、目录和阅读进度，输出 UTF-8 JSON，不依赖 Flutter runtime、SQL、HTML 或源站。若直接用 SDK 内的 dart.exe 解析 Flutter 项目依赖，需要为当次终端设置 `FLUTTER_ROOT` 指向项目固定的 Flutter SDK；正常 `flutter pub get` 会处理该环境。
-
-运行依赖新增并锁定 `crypto 3.0.7`，用于 [Dart SHA-256 实现](https://pub.dev/packages/crypto/versions/3.0.7)（BSD-3-Clause）；其传递依赖为纯 Dart typed_data。开发依赖 `test 1.26.3` 与已安装 Flutter SDK 自身锁定版本一致，用于不经过 Flutter 引擎的 Domain 测试；没有新增 Native 插件或更改 Android / iOS target。
+领域层保持纯 Dart、不可变，不依赖 UI、网络、SQL 或平台。入口 `lib/domain/models/models.dart`，摘要实现 `lib/domain/content_identity.dart`。
 
 ## 模型边界
 
 - 所有模型具有值相等语义；构造时复制集合，对外不可修改。运行时 hashCode 只服务内存集合，不可持久化。
-- SourceId / NovelKey / ChapterKey / MediaRef 保留不透明字符串，不 trim、不拼 URL；拒绝空白 ID 和非法 Unicode。SourceId 在注册层按 SRC-004 使用 `lightnovel`，Domain 不内置具体源常量。MediaRef 无 secret 的前提由 Source 保证，Domain 不猜测 URL 的签名字段。
+- SourceId / NovelKey / ChapterKey / MediaRef 保留不透明字符串，不 trim、不拼 URL；拒绝空白 ID 和非法 Unicode。SourceId 在注册层使用 `lightnovel`，Domain 不内置具体源常量。MediaRef 无 secret 的前提由 Source 保证，Domain 不猜测 URL 的签名字段。
 - Summary / Detail 以字符串列表表示作者和标签；缺少信息保留 empty / null / unknown，不猜作者、完结状态或时间。Source 负责 HTML entity / 标记清理，Domain 只接收普通文本；不因文本含 `<` 等合法字符便把它当 HTML 删除。
 - Catalog 只持有不可变卷章树，flatChapters 是惰性视图；不按 ID 或标题排序。全目录 ordinal 必须从 0 连续递增；重复 groupId / ChapterKey、跨小说归属或卷归属错误直接拒绝。Source 先处理重复链接和缺名诊断，不能依赖 Domain 静默去重。无卷可用明确 isSynthetic 的分组，缺卷名为 null，由 UI 展示占位名。
 - ChapterContent 接受 Paragraph / Image / Heading / Divider，保留段落顺序和单段完整文本。可读正文至少有一个非空 Paragraph 或 Image；纯图片章有效，只有空白 / 标题 / 分隔符无效。空 Paragraph 可在有效正文中表达已确认的语义空白。
-- Paragraph 的 alignment 为 start / center，leadingIndent 为整数 0–8 em，表示段落首行缩进，不是整段左内边距；展示用前缀不计入原文位置。当前不启用 text runs / 嵌套 AST；Source 的 Ruby 初始降级为基字加括注、强调保留文字，不在 Domain 处理站点标签。
+- Paragraph 的 alignment 为 start / center / end，leadingIndent 为整数 0–8 em，表示段落首行缩进，不是整段左内边距；展示用前缀不计入原文位置。当前不启用 text runs / 嵌套 AST；Source 的 Ruby 初始降级为基字加括注、强调保留文字，不在 Domain 处理站点标签。
 - 图片尺寸各自可未知；已知值须正数。封面和正文图片必须属于相同 Source。ImageBlock 尺寸为后续可发现的布局元数据，更新尺寸不改变 blockKey / contentRevision；mediaId、alt、caption 的改变会改变语义身份。
-- ReadingProgress 持有 NovelSummary 快照以保留离线标题 / 封面，并检查 ChapterKey 与快照属于同一本书；是否收藏由独立 BookshelfEntry 表示。lastReadAt 统一为 UTC 毫秒，写入先后仍交后续持久化 sequence 策略处理。
+- ReadingProgress 持有 NovelSummary 快照以保留离线标题 / 封面，并检查 ChapterKey 与快照属于同一本书；是否收藏由独立 BookshelfEntry 表示。lastReadAt 统一为 UTC 毫秒，写入先后由持久化 sequence 控制。
 
 ## 摘要 v1 与序列化
 
@@ -43,7 +21,7 @@ dart --suppress-analytics analyze
 | --- | --- |
 | Paragraph 语义 | text、alignment.name、leadingIndent |
 | Image 语义 | `[sourceId, mediaId]`、alt、caption；不含 width / height |
-| Heading 语义 | text、level（1–6） |
+| Heading 语义 | text、level（1–6）；非默认 alignment 追加参与身份，默认 start 保持旧格式 |
 | Divider 语义 | 空数组 |
 | blockKey（kind=block） | block kind、该类 semantic fields、同章该语义的 occurrence（从 0 开始） |
 | contentRevision（kind=chapter） | title、按正文顺序排列的 blockKey 数组 |
@@ -51,7 +29,7 @@ dart --suppress-analytics analyze
 
 ChapterContent 统一重新分配 occurrence，不信任调用方手填值。不同语义块的插入不改变既有块键；在同样内容的重复块之前插入另一个相同块会改变后续 occurrence，这是规则的明确限制。blockKey 只在章节内使用；纯文本内容完全相同的不同章节可以得到相同摘要，业务定位始终同时使用 ChapterKey。
 
-ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion、块类型、blockKey、occurrence 和 contentRevision。JSON 返回的是独立容器，改动它不会修改值对象。存储 envelope 的 parserVersion、cache codec version、抓取时间不进入 Domain 摘要；其他业务模型的 DB / DTO codec 留给相应存储任务。ReaderSettings 当前为 schemaVersion=3；读取 v1 / v2 保留原数值与阅读明暗，v1 补 paged，旧版统一补 paper=paper、controlsHintSeen=false。未知版本仍拒绝。
+ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion、块类型、blockKey、occurrence 和 contentRevision。JSON 返回的是独立容器，改动它不会修改值对象。存储 envelope 的 parserVersion、cache codec version、抓取时间不进入 Domain 摘要；其他模型由存储层 codec 负责。ReaderSettings 当前为 schemaVersion=3；读取 v1 / v2 保留原数值与阅读明暗，v1 补 paged，旧版统一补 paper=paper、controlsHintSeen=false。未知版本仍拒绝。
 
 字号、屏宽、DPR、主题、pixelOffset、layoutKey、临时渲染切片都不进入正文摘要或序列化。一个极长 Paragraph 始终一个语义块，presentation 可临时切片但不能回写 Domain。
 
@@ -59,29 +37,18 @@ ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion�
 
 ## 阅读位置与设置
 
-ReaderPosition 的 blockIndex 非负，blockFraction / chapterFraction 必须有限且位于 0..1；NaN / Infinity / 越界直接拒绝，不静默改写错误进度。fractionFor 依 `(blockIndex + blockFraction) / blockCount` 计算，检查 index 属于本章；空内容仅允许 0/0 起点。文本 fraction 按 Unicode code point 偏移定义，UTF-16 布局索引转换留 presentation。构造位置时尚无正文实例，不假装已验证 blockKey 在某章内存在；实际恢复归 PROGRESS-001。
+ReaderPosition 的 blockIndex 非负，blockFraction / chapterFraction 必须有限且位于 0..1；NaN / Infinity / 越界直接拒绝，不静默改写错误进度。fractionFor 依 `(blockIndex + blockFraction) / blockCount` 计算，检查 index 属于本章；空内容仅允许 0/0 起点。文本 fraction 按 Unicode code point 偏移定义，UTF-16 布局索引转换留 presentation。构造位置时尚无正文实例，不假装已验证 blockKey 在某章内存在；实际恢复由阅读器处理。
 
-像素提示必须同时包含非负有限 pixelOffset 和非空 layoutKey，否则拒绝；它们不替代语义位置。ReaderSettings 默认字号 20、行高 1.7、段间距 12、边距 20、system theme；范围依计划分别为 14–32、1.2–2.4、0–32、12–48。构造和 copyWith 保持严格验证；READER-004 的持久化读取对有限越界数值 clamp，缺字段、类型错误、非有限数值及未知枚举 / 版本仍拒绝，由 SettingsStore 回退默认并记录诊断。Slider 在 presentation 同样限制范围。ReaderMode 默认 paged，可选 scroll，纳入 copyWith、值相等与兼容旧版的 v3 codec。
+像素提示必须同时包含合法 pixelOffset 和 layoutKey，仅用于同布局提示，不能替代语义位置。ReaderSettings 当前 schemaVersion=3，默认字号 20、行高 1.6、段间距 20、左右边距 40；有效历史排版保留，未知版本拒绝。ReaderMode.scroll 只保留兼容解码，生产偏好层归一化为 paged，详见[阅读器](reader.md)。
 
-## 验收与平台范围
-
-18 项纯 Dart 测试通过：跨源 / 跨书身份、集合不可变、目录顺序 / 重复身份 / 归属、Unicode 与固定摘要、重复块、图片身份、正文有效性、序列化错误、4 万 code points 单段在不同模拟渲染切片下身份不变、fraction / settings / progress，以及两个独立进程的一致性。静态检查验证 Domain 不导入 Flutter、SQL、HTML、网络、平台库或渲染切片类型。
-
-本次 Flutter 包装脚本和直接工具 snapshot 的测试入口在启动阶段持续无输出，均已中止；没有得到新的 widget smoke / Android runtime 结果，也未删除 SDK 锁文件或修改系统执行策略。改由纯 Dart test runner 完成该任务要求的模型验证；CORE-001 的平台历史记录保持原状。本次 iOS Level A review 通过（纯 Dart + crypto，无 Native 依赖变化），iOS runtime 仍 DEFERRED_NO_MAC。未把本次 Domain 测试视为 Reader 性能或平台渲染通过。
-
-交接 CORE-003：直接复用这些类型建立 Source / Media / Repository / Failure / cancellation 契约，不引入重复实体、站点参数或通用 dynamic extra。
+AppSettings 独立 schemaVersion=2，包含 system / light / dark 和 teal / blueGrey / warmBrown / softPink；旧 v1 补默认青绿，不借用阅读主题。ReaderPaper 表示阅读纸色，controlsHintSeen 记录提示已确认；恢复默认保留该提示状态。所有值模型不含 Flutter Color 或语言文案。
 
 
-UI-002：ReaderPaper（paper / warm）表示浅色阅读纸色，ReaderThemeMode 继续仅表示阅读明暗；controlsHintSeen 是已确认首次操作提示的阅读偏好，默认 false，恢复排版默认时保留其值。AppSettings 当前使用独立 schemaVersion=2，包含 AppThemeMode（system / light / dark，默认 system）与 AppAccent（teal / blueGrey / warmBrown / softPink，默认 teal）；读取 v1 保留原明暗并补默认青绿，不借用或迁移 ReaderThemeMode，不含 Flutter Color / ThemeData 或语言字符串。
 
-2026-09-07 用户排版反馈：ReaderSettings 的新实例默认 fontSize=18、lineHeight=1.7、paragraphSpacing=8、horizontalPadding=20；已存合法设置不迁移覆盖，schemaVersion 维持 3。首行缩进展示封顶及空白去叠加属于 presentation，不改变 ParagraphBlock.leadingIndent 的 0..8 领域范围或源文本。
+## 本地与缓存模型
 
+本地书籍以原文件 SHA-256 标识，章节使用稳定解析定位符。LocalNavigationEntry 独立保存嵌套目录与可选 blockKey，不改变 Catalog 章顺序；LocalBookInfo / LocalBookDeletion 描述管理结果，不暴露平台路径。规则见[本地导入](local-import.md)。
 
-## LOCAL-005 补充（2026-09-08）
+CachedChapter / CacheOverview / PrefetchState 是不可变投影，预取目标是既有 ChapterKey，不代表已读或未经确认的续卷关系。见[契约](contracts.md)与[缓存](cache.md)。
 
-LOCAL-005 新增不可变 LocalBookInfo / LocalBookDeletion，用于本地管理列表及已提交删除的清理状态；没有增加平台路径、持久页码或新章节身份。
-
-2026-09-08 阅读排版优化：按用户进一步要求接近 Apple Books 截图，新实例默认段间距调整为 20、左右边距为 40 logical px，字号 20、行高 1.6（取代本轮初稿 28/12）。已有合法偏好继续原样读取，可通过恢复默认排版采用新值；schemaVersion 不变。
-
-
-2026-09-08 EPUB 对齐：ParagraphAlignment 新增 end；HeadingBlock 支持显式 alignment，默认 start 时保持原 semanticFields 与 JSON 形式，旧内容摘要兼容。新显式对齐参与语义身份。HTML/CSS 特殊版式通过独立可选本地数据合约提供，ChapterContent 继续保存原生语义块，不持有 WebView/平台对象。
+模型与摘要测试位于 `test/domain/`；`fvm dart tool/domain_example.dart` 使用自制内容演示跨进程确定性。平台证据见[验收摘要](validation/README.md)。

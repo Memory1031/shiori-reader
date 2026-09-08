@@ -7,6 +7,7 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/features/reader/viewport/paper_turn.dart';
 
 void main() {
   testWidgets(
@@ -45,6 +46,22 @@ void main() {
         before.content.key,
       );
       await tester.pump(const Duration(seconds: 2));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is ReaderContentView && w.key == before.key,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widgetList<PaperTurnFold>(find.byType(PaperTurnFold))
+            .any((fold) => fold.progress > 0 && fold.progress < 1),
+        isTrue,
+      );
       await tester.pumpAndSettle();
       final next = tester.widget<ReaderContentView>(
         find.byType(ReaderContentView),

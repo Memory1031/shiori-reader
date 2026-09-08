@@ -39,7 +39,7 @@ class MemoryBooks implements LocalBookStore {
 }
 
 void main() {
-  for (final mode in ReaderMode.values) {
+  for (final mode in [ReaderMode.paged]) {
     testWidgets(
       'local nested fragment, same chapter jump, previous/next and resume in ${mode.name}',
       (tester) async {

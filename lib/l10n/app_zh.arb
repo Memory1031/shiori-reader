@@ -144,7 +144,7 @@
   "readerPaper": "纸白",
   "readerWarm": "暖纸",
   "readerNight": "夜间",
-  "readerControlsHint": "点按正文中间显示或隐藏工具栏。分页模式点按两侧翻页，滚动模式上下拖动；模式在排版设置中切换。",
+  "readerControlsHint": "点按正文中间显示或隐藏工具栏，点按两侧或左右拖动翻页。",
   "readerGotIt": "知道了",
   "readerPreviousPage": "上一页",
   "readerNextPage": "下一页",

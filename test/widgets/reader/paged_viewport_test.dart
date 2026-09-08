@@ -199,7 +199,9 @@ void main() {
         }
       }
 
-      visit(tester.getSemantics(find.byType(CustomScrollView)));
+      visit(
+        tester.getSemantics(find.byKey(const ValueKey('paper-reader-pages'))),
+      );
       expect(ids, isNotEmpty);
       expect(ids, orderedEquals(ids.toList()..sort()));
       expect(tester.takeException(), isNull);
@@ -272,16 +274,25 @@ void main() {
     await tester.pumpAndSettle();
     await next;
     expect(controller.capture()!.blockIndex, 1499);
-    await tester.drag(find.byType(CustomScrollView), const Offset(-700, 0));
+    await tester.drag(
+      find.byKey(const ValueKey('paper-reader-pages')),
+      const Offset(-700, 0),
+    );
     await tester.pumpAndSettle();
     expect(controller.capture()!.blockIndex, greaterThan(1499));
-    await tester.drag(find.byType(CustomScrollView), const Offset(700, 0));
+    await tester.drag(
+      find.byKey(const ValueKey('paper-reader-pages')),
+      const Offset(700, 0),
+    );
     await tester.pumpAndSettle();
     expect(controller.capture()!.blockIndex, 1499);
     controller.restore(at(content, 1999));
     await tester.pumpAndSettle();
     expect(controller.capture()!.blockIndex, 1999);
-    await tester.drag(find.byType(CustomScrollView), const Offset(-700, 0));
+    await tester.drag(
+      find.byKey(const ValueKey('paper-reader-pages')),
+      const Offset(-700, 0),
+    );
     await tester.pumpAndSettle();
     expect(controller.capture()!.blockIndex, 1999);
     expect(controller.cachedPages, lessThanOrEqualTo(7));
@@ -295,7 +306,9 @@ void main() {
     await tester.pumpAndSettle();
     await noPrevious;
     expect(controller.capture()!.blockIndex, 0);
-    final rect = tester.getRect(find.byType(CustomScrollView));
+    final rect = tester.getRect(
+      find.byKey(const ValueKey('paper-reader-pages')),
+    );
     await tester.tapAt(Offset(rect.right - 10, rect.center.dy));
     await tester.pumpAndSettle();
     expect(controller.capture()!.blockIndex, greaterThan(0));

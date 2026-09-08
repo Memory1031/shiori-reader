@@ -23,7 +23,7 @@ class ReaderPreferences extends ChangeNotifier {
     final result = await store?.load(cancellation: _load.token);
     if (_disposed || revision != _revision) return;
     if (result case Success<ReaderSettings>(value: final loaded)) {
-      value = loaded;
+      value = loaded.copyWith(mode: ReaderMode.paged);
       failure = null;
     }
     if (result case Failure<ReaderSettings>(failure: final error)) {
@@ -33,6 +33,7 @@ class ReaderPreferences extends ChangeNotifier {
   }
 
   void update(ReaderSettings settings) {
+    settings = settings.copyWith(mode: ReaderMode.paged);
     if (_disposed || settings == value) return;
     value = settings;
     _revision++;

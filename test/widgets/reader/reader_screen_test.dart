@@ -1,4 +1,3 @@
-import '../../support/reader_actions.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -85,9 +84,7 @@ void main() {
       expect(find.byType(PagedReaderViewport), findsOneWidget);
       expect(find.byType(Image), findsNothing);
       expect(env.source.controls.calls[Operation.media] ?? 0, 0);
-      await chooseReaderMode(tester, '上下滚动');
-      await tester.pumpAndSettle();
-      expect(find.byType(ReaderViewport), findsOneWidget);
+      expect(find.byType(ReaderViewport), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await env.close();
@@ -200,17 +197,8 @@ void main() {
       await tester.tapAt(tester.getCenter(find.byType(PagedReaderViewport)));
       await tester.pumpAndSettle();
       final anchor = viewport.controller.capture()!;
-      await chooseReaderMode(tester, 'Scroll');
-      await tester.pumpAndSettle();
-      final scroll = tester.widget<ReaderViewport>(find.byType(ReaderViewport));
-      expect(scroll.controller.capture()!.blockKey, anchor.blockKey);
-      expect(scroll.controller.mountedCount, lessThan(30));
-      await tester.drag(find.byType(ReaderViewport), const Offset(0, -200));
-      await tester.pumpAndSettle();
-      expect(find.byTooltip('More'), findsOneWidget);
-      await tester.tapAt(tester.getCenter(find.byType(ReaderViewport)));
-      await tester.pumpAndSettle();
-      expect(find.text('Scroll'), findsNothing);
+      expect(viewport.controller.capture()!.blockKey, anchor.blockKey);
+      expect(viewport.controller.cachedPages, lessThanOrEqualTo(7));
       expect(tester.takeException(), isNull);
     },
   );
@@ -260,9 +248,7 @@ void main() {
       paged.controller.next();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await chooseReaderMode(tester, 'Scroll');
-      await tester.pumpAndSettle();
-      expect(find.byType(ReaderViewport), findsOneWidget);
+      expect(find.byType(ReaderViewport), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );

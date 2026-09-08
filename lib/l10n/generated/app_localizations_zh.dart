@@ -424,8 +424,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerNight => '夜间';
 
   @override
-  String get readerControlsHint =>
-      '点按正文中间显示或隐藏工具栏。分页模式点按两侧翻页，滚动模式上下拖动；模式在排版设置中切换。';
+  String get readerControlsHint => '点按正文中间显示或隐藏工具栏，点按两侧或左右拖动翻页。';
 
   @override
   String get readerGotIt => '知道了';

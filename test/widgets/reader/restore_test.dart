@@ -178,7 +178,7 @@ void main() {
     },
   );
 
-  for (final mode in ReaderMode.values) {
+  for (final mode in [ReaderMode.paged]) {
     testWidgets(
       '${mode.name}: reopened persisted anchor survives delayed settings; no temporary writes',
       (tester) async {
@@ -345,7 +345,10 @@ void main() {
       await tester.pumpWidget(reader(env, library));
       await tester.pumpAndSettle();
       expect(find.byType(PagedReaderViewport), findsOneWidget);
-      await tester.drag(find.byType(CustomScrollView), const Offset(-500, 0));
+      await tester.drag(
+        find.byType(PagedReaderViewport),
+        const Offset(-500, 0),
+      );
       await tester.pumpAndSettle();
       await tester.pump(const Duration(seconds: 3));
       expect(library.writes, isEmpty);

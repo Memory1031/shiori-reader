@@ -10,7 +10,7 @@ import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/features/reader/viewport/reader_viewport.dart';
 
 void main() {
-  for (final mode in ReaderMode.values) {
+  for (final mode in [ReaderMode.paged]) {
     testWidgets(
       'short chapter is saved as completed without gestures in ${mode.name}',
       (tester) async {

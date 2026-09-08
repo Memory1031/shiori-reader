@@ -923,7 +923,7 @@ abstract class AppLocalizations {
   /// No description provided for @readerControlsHint.
   ///
   /// In en, this message translates to:
-  /// **'Tap the center for controls. In paged mode, tap either side; in scroll mode, swipe vertically. Change modes in reading settings.'**
+  /// **'Tap the center to show or hide controls. Tap either side or swipe horizontally to turn pages.'**
   String get readerControlsHint;
 
   /// No description provided for @readerGotIt.

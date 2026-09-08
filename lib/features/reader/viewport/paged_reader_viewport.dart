@@ -4,6 +4,7 @@ import '../../../domain/models/models.dart';
 import 'page_layout.dart';
 import 'render_chunk.dart';
 import 'block_style.dart';
+import 'paper_turn.dart';
 
 class PagedReaderController {
   _PagedReaderViewportState? _state;
@@ -17,7 +18,7 @@ class PagedReaderController {
   bool get isRestoring => _state?._restoring ?? false;
 }
 
-/// Horizontal native pivot slivers + PageScrollPhysics. Pages before/after the
+/// Native pages with a shared blank-back paper fold. Pages before/after the
 /// semantic pivot are computed only when requested; no fictitious global page
 /// number, no full-prefix layout, and no stored page index.
 class PagedReaderViewport extends StatefulWidget {
@@ -36,6 +37,10 @@ class PagedReaderViewport extends StatefulWidget {
     this.onRestoreStart,
     this.onCenterTap,
     this.onBoundary,
+    this.onTurning,
+    this.onTurnVisual,
+    this.pageSize,
+    this.contentOrigin = Offset.zero,
     this.startAtEnd = false,
   });
   final ChapterContent content;
@@ -51,15 +56,23 @@ class PagedReaderViewport extends StatefulWidget {
   final Widget Function(BuildContext, ImageBlock)? imageBuilder;
   final VoidCallback? onCenterTap;
   final ValueChanged<int>? onBoundary;
+  final ValueChanged<bool>? onTurning;
+  final void Function(double progress, int direction)? onTurnVisual;
+  final Size? pageSize;
+  final Offset contentOrigin;
   final bool startAtEnd;
   @override
   State<PagedReaderViewport> createState() => _PagedReaderViewportState();
 }
 
-class _PagedReaderViewportState extends State<PagedReaderViewport> {
-  final _scroll = ScrollController(keepScrollOffset: false);
+class _PagedReaderViewportState extends State<PagedReaderViewport>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _turnAnimation;
+  int _current = 0;
+  int? _target;
+  int _direction = 1;
+  double _dragDistance = 0;
   final _pages = <int, ReaderPage>{};
-  final _center = const ValueKey('paged-forward');
   PageLayout? _layout;
   Object? _signature;
   ReaderPosition? _position;
@@ -71,11 +84,14 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
   bool _deferredLayout = false;
   bool _restoring = false;
   bool _openAtEnd = false;
-  Offset? _dragOrigin;
-  int? _dragPage;
   @override
   void initState() {
     super.initState();
+    _turnAnimation =
+        AnimationController(vsync: this, duration: PaperTurnMotion.duration)
+          ..addListener(
+            () => widget.onTurnVisual?.call(_turnAnimation.value, _direction),
+          );
     _attach();
     _position = widget.initialPosition;
     _openAtEnd = widget.startAtEnd;
@@ -105,7 +121,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
   @override
   void dispose() {
     widget.controller._state = null;
-    _scroll.dispose();
+    _turnAnimation.dispose();
     super.dispose();
   }
 
@@ -149,23 +165,87 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
     return _pages[number];
   }
 
+  Future<void> _finish(bool commit) async {
+    final target = _target;
+    if (target == null) return;
+    final epoch = _epoch;
+    final reduced = MediaQuery.disableAnimationsOf(context);
+    try {
+      await PaperTurnMotion.settle(
+        _turnAnimation,
+        target: commit ? 1 : 0,
+        reduced: reduced,
+      );
+    } on TickerCanceled {
+      return;
+    }
+    if (!mounted || epoch != _epoch) return;
+    setState(() {
+      if (commit) _current = target;
+      _target = null;
+      _userScrolling = false;
+      _turnAnimation.value = 0;
+      if (_deferredLayout) {
+        _signature = null;
+        _deferredLayout = false;
+      }
+    });
+    widget.onTurning?.call(false);
+    if (commit) _sample();
+  }
+
   Future<void> _turn(int direction) async {
-    if (!_scroll.hasClients || _layout == null) return;
-    final current = (_scroll.offset / _layout!.width).round();
-    if (_page(current + direction) == null) {
+    if (_layout == null || _target != null || _restoring) return;
+    if (_page(_current + direction) == null) {
       widget.onBoundary?.call(direction);
       return;
     }
-    await _scroll.animateTo(
-      (current + direction) * _layout!.width,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOut,
-    );
+    setState(() {
+      _direction = direction;
+      _target = _current + direction;
+      _userScrolling = true;
+    });
+    widget.onTurning?.call(true);
+    await _finish(true);
+  }
+
+  void _dragUpdate(DragUpdateDetails details) {
+    if (_layout == null || _restoring || _turnAnimation.isAnimating) return;
+    _dragDistance += details.delta.dx;
+    final direction = _dragDistance < 0 ? 1 : -1;
+    if (_target == null) {
+      if (_page(_current + direction) == null) return;
+      setState(() {
+        _direction = direction;
+        _target = _current + direction;
+        _userScrolling = true;
+      });
+      widget.onTurning?.call(true);
+    }
+    _turnAnimation.value =
+        (-_dragDistance *
+                _direction /
+                (widget.pageSize?.width ?? _layout!.width))
+            .clamp(0.0, 1.0);
+  }
+
+  void _dragEnd(DragEndDetails details) {
+    if (_turnAnimation.isAnimating) return;
+    if (_target != null) {
+      final velocity = -(details.primaryVelocity ?? 0) * _direction;
+      _finish(velocity > 600 || velocity >= -600 && _turnAnimation.value > .28);
+    } else if (_dragDistance.abs() >= 48 &&
+        (_dragDistance.abs() >=
+                (widget.pageSize?.width ?? _layout?.width ?? 360) * .28 ||
+            (details.primaryVelocity ?? 0) * _dragDistance.sign > 600)) {
+      widget.onBoundary?.call(_dragDistance < 0 ? 1 : -1);
+    }
+    _dragDistance = 0;
   }
 
   void _sample() {
-    if (_restoring || !_scroll.hasClients || _layout == null) return;
-    final number = (_scroll.offset / _layout!.width).round();
+    if (_restoring || _layout == null) return;
+    final number = _current;
     final page = _page(number);
     if (page == null) return;
     _position = _layout!.position(page.start);
@@ -216,6 +296,12 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
         // No clipping a text line into a viewport shorter than that line.
         if (first == null) return const SizedBox.shrink();
         _openAtEnd = false;
+        _turnAnimation.stop(canceled: true);
+        _turnAnimation.value = 0;
+        _target = null;
+        _userScrolling = false;
+        _deferredLayout = false;
+        _current = 0;
         _pages.clear();
         _pages[0] = first;
         _first = null;
@@ -316,32 +402,20 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
         );
       }
 
-      return Listener(
-        onPointerDown: (event) {
-          _dragOrigin = event.position;
-          _dragPage = _scroll.hasClients
-              ? (_scroll.offset / constraints.maxWidth).round()
-              : null;
-        },
-        onPointerUp: (event) {
-          final origin = _dragOrigin;
-          final page = _dragPage;
-          _dragOrigin = null;
-          _dragPage = null;
-          if (origin == null || page == null) return;
-          final delta = event.position - origin;
-          if (delta.dx.abs() < 48 || delta.dx.abs() <= delta.dy.abs()) return;
-          final direction = delta.dx < 0 ? 1 : -1;
-          if (_page(page + direction) == null) {
-            widget.onBoundary?.call(direction);
-          }
-        },
-        onPointerCancel: (_) {
-          _dragOrigin = null;
-          _dragPage = null;
-        },
+      return Semantics(
+        key: const ValueKey('paper-reader-pages'),
+        container: true,
+        onScrollLeft: () => _turn(1),
+        onScrollRight: () => _turn(-1),
         child: GestureDetector(
-          behavior: HitTestBehavior.translucent,
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: (_) => _dragDistance = 0,
+          onHorizontalDragUpdate: _dragUpdate,
+          onHorizontalDragEnd: _dragEnd,
+          onHorizontalDragCancel: () {
+            _dragDistance = 0;
+            if (_target != null && !_turnAnimation.isAnimating) _finish(false);
+          },
           onTapUp: (details) {
             if (details.localPosition.dx < constraints.maxWidth * .3) {
               _turn(-1);
@@ -351,55 +425,34 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
               widget.onCenterTap?.call();
             }
           },
-          child: NotificationListener<ScrollNotification>(
-            onNotification: (notification) {
-              if (notification is ScrollStartNotification &&
-                  notification.dragDetails != null) {
-                _userScrolling = true;
-                _restoring = false;
-              }
-              if (notification is ScrollEndNotification) {
-                _userScrolling = false;
-                _sample();
-                if (_deferredLayout) {
-                  _deferredLayout = false;
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      setState(() {
-                        _signature = null;
-                      });
-                    }
-                  });
-                }
-              }
-              return false;
-            },
-            child: CustomScrollView(
-              key: ValueKey(_epoch),
-              controller: _scroll,
-              scrollDirection: Axis.horizontal,
-              center: _center,
-              physics: const PageScrollPhysics(),
-              cacheExtent: 0,
-              slivers: [
-                SliverFixedExtentList(
-                  itemExtent: constraints.maxWidth,
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => buildPage(context, -1 - i),
-                    addAutomaticKeepAlives: false,
-                    addSemanticIndexes: false,
+          child: AnimatedBuilder(
+            animation: _turnAnimation,
+            builder: (context, _) => ClipRect(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (_target case final target?)
+                    ExcludeSemantics(child: buildPage(context, target)!),
+                  ClipPath(
+                    clipper: PaperTurnClipper(
+                      _turnAnimation.value,
+                      _direction,
+                      pageSize: widget.pageSize,
+                      contentOrigin: widget.contentOrigin,
+                    ),
+                    child: ColoredBox(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      child: buildPage(context, _current)!,
+                    ),
                   ),
-                ),
-                SliverFixedExtentList(
-                  key: _center,
-                  itemExtent: constraints.maxWidth,
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => buildPage(context, i),
-                    addAutomaticKeepAlives: false,
-                    addSemanticIndexes: false,
-                  ),
-                ),
-              ],
+                  if (widget.onTurnVisual == null)
+                    PaperTurnFold(
+                      progress: _turnAnimation.value,
+                      direction: _direction,
+                      paper: Theme.of(context).scaffoldBackgroundColor,
+                    ),
+                ],
+              ),
             ),
           ),
         ),

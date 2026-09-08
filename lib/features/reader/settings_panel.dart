@@ -123,25 +123,6 @@ class ReaderSettingsPanel extends StatelessWidget {
                               ),
                             ),
                           const SizedBox(height: 16),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              for (final mode in ReaderMode.values)
-                                ChoiceChip(
-                                  label: Text(
-                                    mode == ReaderMode.paged
-                                        ? l.pagedReading
-                                        : l.scrollReading,
-                                  ),
-                                  selected: s.mode == mode,
-                                  onSelected: (_) => preferences.update(
-                                    s.copyWith(mode: mode),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
                           slider(
                             l.readerFontSize,
                             s.fontSize,

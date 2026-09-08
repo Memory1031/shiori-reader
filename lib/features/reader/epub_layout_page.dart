@@ -32,6 +32,7 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.disabled)
       ..setBackgroundColor(Colors.transparent)
+      ..setOverScrollMode(WebViewOverScrollMode.never)
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (request) =>

@@ -2,6 +2,8 @@ import 'identity.dart';
 import 'novel.dart';
 import 'value_model.dart';
 
+// scroll is retained for legacy settings and isolated viewport experiments.
+// The application reader normalizes preferences to paged.
 enum ReaderMode { paged, scroll }
 
 enum ReaderThemeMode { system, light, dark }

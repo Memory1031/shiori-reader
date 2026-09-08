@@ -15,7 +15,7 @@ import 'settings_panel.dart';
 import 'reader_image.dart';
 import 'epub_layout_page.dart';
 import 'viewport/paged_reader_viewport.dart';
-import 'viewport/reader_viewport.dart';
+import 'viewport/paper_turn.dart';
 
 class ReaderScreen extends StatelessWidget {
   const ReaderScreen({
@@ -85,6 +85,7 @@ class ReaderContentView extends StatefulWidget {
     this.runningTitle,
     this.onReady,
     this.onLoadFailure,
+    this.onPageAppearance,
     this.images,
     this.settings,
     this.session,
@@ -99,6 +100,7 @@ class ReaderContentView extends StatefulWidget {
   final ChapterContent content;
   final String? runningTitle;
   final VoidCallback? onReady, onLoadFailure;
+  final ValueChanged<Color>? onPageAppearance;
   final ReaderController? session;
   final ReaderPosition? initialPosition;
   final SettingsStore? settings;
@@ -113,6 +115,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     with WidgetsBindingObserver {
   late final ReaderPreferences _preferences;
   ReaderSettings _settings = ReaderSettings();
+  final _paperTurn = ValueNotifier<(double, int)>((0, 1));
   bool _settingsReady = false;
   bool _hintVisible = false;
   @override
@@ -146,10 +149,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   void _changed() {
     if (!mounted || _settings == _preferences.value) return;
-    _position = (_isPaged ? _paged.capture() : _scroll.capture()) ?? _position;
+    _position = _paged.capture() ?? _position;
     setState(() {
       _settings = _preferences.value;
-      _isPaged = _settings.mode == ReaderMode.paged;
     });
   }
 
@@ -190,15 +192,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
     );
     if (!mounted || target == null) return;
     _position = target;
-    if (_isPaged) {
-      _paged.restore(target);
-    } else {
-      _scroll.restore(target);
-    }
+    _paged.restore(target);
   }
 
   final _paged = PagedReaderController();
-  final _scroll = ReaderViewportController();
   final _chrome = ValueNotifier(true);
   final _readingPosition = ValueNotifier<ReaderPosition?>(null);
   ReaderPosition? _latestReadingPosition;
@@ -221,7 +218,6 @@ class _ReaderContentViewState extends State<ReaderContentView>
     widget.session?.sampleProgress(position, completed);
   }
 
-  bool _isPaged = true;
   ReaderPosition? _position;
   final _sizes = <MediaRef, Size>{};
   final _pendingSizes = <MediaRef, Size>{};
@@ -234,22 +230,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   void _applySizes() {
     if (!mounted || _dragging || _pendingSizes.isEmpty) return;
-    _position = _isPaged ? _paged.capture() : _scroll.capture();
+    _position = _paged.capture();
     setState(() {
       _sizes.addAll(_pendingSizes);
       _pendingSizes.clear();
     });
-  }
-
-  bool _notification(ScrollNotification event) {
-    if (event is ScrollStartNotification && event.dragDetails != null) {
-      _dragging = true;
-    }
-    if (event is ScrollEndNotification) {
-      _dragging = false;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _applySizes());
-    }
-    return false;
   }
 
   void _toggle() => _chrome.value = !_chrome.value;
@@ -258,6 +243,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     WidgetsBinding.instance.removeObserver(this);
     _preferences.removeListener(_changed);
     _preferences.dispose();
+    _paperTurn.dispose();
     _chrome.dispose();
     _positionLabelTimer?.cancel();
     _readingPosition.dispose();
@@ -314,230 +300,251 @@ class _ReaderContentViewState extends State<ReaderContentView>
     if (!_settingsReady) {
       return const Scaffold(body: SafeArea(child: LoadingView()));
     }
+    widget.onPageAppearance?.call(Theme.of(context).scaffoldBackgroundColor);
+    final pageInsets = MediaQuery.paddingOf(context);
     final style = TextStyle(
       fontSize: _settings.fontSize,
       height: _settings.lineHeight,
       color: Theme.of(context).colorScheme.onSurface,
     );
-    return Scaffold(
-      body: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.f2): _toggle,
-          if (_isPaged)
-            const SingleActivator(LogicalKeyboardKey.arrowRight): () {
-              if (widget.session?.pagePresentation != null) {
-                widget.onNextChapter?.call();
-              } else {
-                _paged.next();
-              }
-            },
-          if (_isPaged)
-            const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
-              if (widget.session?.pagePresentation != null) {
-                widget.onPreviousChapter?.call();
-              } else {
-                _paged.previous();
-              }
-            },
-        },
-        child: Focus(
-          autofocus: true,
-          child: SafeArea(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Stable gutters keep showing/hiding controls from repaginating content.
-                Positioned.fill(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      _settings.horizontalPadding,
-                      56,
-                      _settings.horizontalPadding,
-                      64,
-                    ),
-                    child: Align(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 680),
-                        child: LayoutBuilder(
-                          builder: (context, bounds) {
-                            final maxHeight =
-                                bounds.maxHeight * (_isPaged ? 1 : 2);
-                            ({double height, double caption}) extent(
-                              ImageBlock block,
-                            ) => readerImageExtent(
-                              block,
-                              width: bounds.maxWidth,
-                              maxHeight: maxHeight,
-                              scaler: MediaQuery.textScalerOf(context),
-                              direction: Directionality.of(context),
-                              knownSize: _sizes[block.media],
-                            );
-                            Widget image(
-                              BuildContext context,
-                              ImageBlock block,
-                            ) {
-                              final geometry = extent(block);
-                              return SizedBox(
-                                height: geometry.height,
-                                child: widget.images == null
-                                    ? _image(context, block)
-                                    : ReaderImage(
-                                        block: block,
-                                        repository: widget.images!,
-                                        captionHeight: geometry.caption,
-                                        onIntrinsicSize: (size) {
-                                          if (block.width == size.width &&
-                                              block.height == size.height) {
-                                            return;
-                                          }
-                                          _dimensions(block.media, size);
-                                        },
-                                      ),
-                              );
-                            }
-
-                            final presentation =
-                                widget.session?.pagePresentation;
-                            if (presentation != null) {
-                              return EpubLayoutPage(
-                                html: presentation,
-                                onFailed: widget.onLoadFailure,
-                                onCenterTap: _toggle,
-                                onPrevious: widget.onPreviousChapter,
-                                onNext: () {
-                                  final last = widget.content.blocks.length - 1;
-                                  _sample(
-                                    ReaderPosition(
-                                      contentRevision:
-                                          widget.content.contentRevision,
-                                      blockKey:
-                                          widget.content.blocks[last].blockKey,
-                                      blockIndex: last,
-                                      blockFraction: 1,
-                                      chapterFraction: 1,
-                                    ),
-                                    true,
+    return LayoutBuilder(
+      builder: (context, pageBounds) => Stack(
+        fit: StackFit.expand,
+        children: [
+          Scaffold(
+            body: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.f2): _toggle,
+                const SingleActivator(LogicalKeyboardKey.arrowRight): () {
+                  if (widget.session?.pagePresentation != null) {
+                    widget.onNextChapter?.call();
+                  } else {
+                    _paged.next();
+                  }
+                },
+                const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
+                  if (widget.session?.pagePresentation != null) {
+                    widget.onPreviousChapter?.call();
+                  } else {
+                    _paged.previous();
+                  }
+                },
+              },
+              child: Focus(
+                autofocus: true,
+                child: SafeArea(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Stable gutters keep showing/hiding controls from repaginating content.
+                      Positioned.fill(
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            _settings.horizontalPadding,
+                            56,
+                            _settings.horizontalPadding,
+                            64,
+                          ),
+                          child: Align(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 680),
+                              child: LayoutBuilder(
+                                builder: (context, bounds) {
+                                  final maxHeight = bounds.maxHeight;
+                                  ({double height, double caption}) extent(
+                                    ImageBlock block,
+                                  ) => readerImageExtent(
+                                    block,
+                                    width: bounds.maxWidth,
+                                    maxHeight: maxHeight,
+                                    scaler: MediaQuery.textScalerOf(context),
+                                    direction: Directionality.of(context),
+                                    knownSize: _sizes[block.media],
                                   );
-                                  widget.onNextChapter?.call();
-                                },
-                                onReady: () {
-                                  final position = ReaderPosition(
-                                    contentRevision:
-                                        widget.content.contentRevision,
-                                    blockKey:
-                                        widget.content.blocks.first.blockKey,
-                                    blockIndex: 0,
-                                    blockFraction: 0,
-                                    chapterFraction: 0,
-                                  );
-                                  _position = position;
-                                  _sample(position, false);
-                                },
-                              );
-                            }
-                            return NotificationListener<ScrollNotification>(
-                              onNotification: _notification,
-                              child: _isPaged
-                                  ? PagedReaderViewport(
-                                      content: widget.content,
-                                      startAtEnd:
-                                          (widget.session?.startAtEnd ??
-                                              false) &&
-                                          _position?.chapterFraction == 1 &&
-                                          _position?.blockFraction == 1,
-                                      onPosition: _sample,
-                                      onRestoreStart:
-                                          widget.session?.restoringProgress,
-                                      controller: _paged,
-                                      initialPosition: _position,
-                                      textStyle: style,
-                                      paragraphSpacing:
-                                          _settings.paragraphSpacing,
-                                      onCenterTap: _toggle,
-                                      onBoundary: (direction) {
-                                        if (direction > 0) {
-                                          widget.onNextChapter?.call();
-                                        } else {
-                                          widget.onPreviousChapter?.call();
-                                        }
-                                      },
-                                      imageBuilder: image,
-                                      imageExtent: (block) =>
-                                          extent(block).height,
-                                    )
-                                  : GestureDetector(
-                                      behavior: HitTestBehavior.translucent,
-                                      onTap: _toggle,
-                                      child: ReaderViewport(
-                                        content: widget.content,
-                                        onPosition: _sample,
-                                        onRestoreStart:
-                                            widget.session?.restoringProgress,
-                                        controller: _scroll,
-                                        initialPosition: _position,
-                                        textStyle: style,
-                                        paragraphSpacing:
-                                            _settings.paragraphSpacing,
-                                        imageBuilder: image,
-                                      ),
-                                    ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                ValueListenableBuilder<bool>(
-                  valueListenable: _chrome,
-                  builder: (context, visible, _) => ListenableBuilder(
-                    listenable: _preferences,
-                    builder: (context, _) => _controls(context, visible),
-                  ),
-                ),
-                if (_hintVisible)
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 72,
-                    child: Material(
-                      elevation: 2,
-                      borderRadius: BorderRadius.circular(12),
-                      color: Theme.of(context).colorScheme.surface,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxHeight: MediaQuery.sizeOf(context).height * .4,
-                        ),
-                        child: SingleChildScrollView(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(strings.readerControlsHint),
-                                TextButton(
-                                  onPressed: () {
-                                    setState(() => _hintVisible = false);
-                                    _preferences.update(
-                                      _settings.copyWith(
-                                        controlsHintSeen: true,
-                                      ),
+                                  Widget image(
+                                    BuildContext context,
+                                    ImageBlock block,
+                                  ) {
+                                    final geometry = extent(block);
+                                    return SizedBox(
+                                      height: geometry.height,
+                                      child: widget.images == null
+                                          ? _image(context, block)
+                                          : ReaderImage(
+                                              block: block,
+                                              repository: widget.images!,
+                                              captionHeight: geometry.caption,
+                                              onIntrinsicSize: (size) {
+                                                if (block.width == size.width &&
+                                                    block.height ==
+                                                        size.height) {
+                                                  return;
+                                                }
+                                                _dimensions(block.media, size);
+                                              },
+                                            ),
                                     );
-                                    _preferences.flush();
-                                  },
-                                  child: Text(strings.readerGotIt),
-                                ),
-                              ],
+                                  }
+
+                                  final presentation =
+                                      widget.session?.pagePresentation;
+                                  if (presentation != null) {
+                                    return EpubLayoutPage(
+                                      html: presentation,
+                                      onFailed: widget.onLoadFailure,
+                                      onCenterTap: _toggle,
+                                      onPrevious: widget.onPreviousChapter,
+                                      onNext: () {
+                                        final last =
+                                            widget.content.blocks.length - 1;
+                                        _sample(
+                                          ReaderPosition(
+                                            contentRevision:
+                                                widget.content.contentRevision,
+                                            blockKey: widget
+                                                .content
+                                                .blocks[last]
+                                                .blockKey,
+                                            blockIndex: last,
+                                            blockFraction: 1,
+                                            chapterFraction: 1,
+                                          ),
+                                          true,
+                                        );
+                                        widget.onNextChapter?.call();
+                                      },
+                                      onReady: () {
+                                        final position = ReaderPosition(
+                                          contentRevision:
+                                              widget.content.contentRevision,
+                                          blockKey: widget
+                                              .content
+                                              .blocks
+                                              .first
+                                              .blockKey,
+                                          blockIndex: 0,
+                                          blockFraction: 0,
+                                          chapterFraction: 0,
+                                        );
+                                        _position = position;
+                                        _sample(position, false);
+                                      },
+                                    );
+                                  }
+                                  return PagedReaderViewport(
+                                    content: widget.content,
+                                    pageSize: pageBounds.biggest,
+                                    contentOrigin: Offset(
+                                      (pageBounds.maxWidth - bounds.maxWidth) /
+                                          2,
+                                      pageInsets.top + 56,
+                                    ),
+                                    onTurnVisual: (progress, direction) {
+                                      _paperTurn.value = (progress, direction);
+                                    },
+                                    startAtEnd:
+                                        (widget.session?.startAtEnd ?? false) &&
+                                        _position?.chapterFraction == 1 &&
+                                        _position?.blockFraction == 1,
+                                    onTurning: (turning) {
+                                      _dragging = turning;
+                                      if (!turning) {
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                              if (mounted) {
+                                                _applySizes();
+                                              }
+                                            });
+                                      }
+                                    },
+                                    onPosition: _sample,
+                                    onRestoreStart:
+                                        widget.session?.restoringProgress,
+                                    controller: _paged,
+                                    initialPosition: _position,
+                                    textStyle: style,
+                                    paragraphSpacing:
+                                        _settings.paragraphSpacing,
+                                    onCenterTap: _toggle,
+                                    onBoundary: (direction) {
+                                      if (direction > 0) {
+                                        widget.onNextChapter?.call();
+                                      } else {
+                                        widget.onPreviousChapter?.call();
+                                      }
+                                    },
+                                    imageBuilder: image,
+                                    imageExtent: (block) =>
+                                        extent(block).height,
+                                  );
+                                },
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _chrome,
+                        builder: (context, visible, _) => ListenableBuilder(
+                          listenable: _preferences,
+                          builder: (context, _) => _controls(context, visible),
+                        ),
+                      ),
+                      if (_hintVisible)
+                        Positioned(
+                          left: 16,
+                          right: 16,
+                          bottom: 72,
+                          child: Material(
+                            elevation: 2,
+                            borderRadius: BorderRadius.circular(12),
+                            color: Theme.of(context).colorScheme.surface,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxHeight:
+                                    MediaQuery.sizeOf(context).height * .4,
+                              ),
+                              child: SingleChildScrollView(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(strings.readerControlsHint),
+                                      TextButton(
+                                        onPressed: () {
+                                          setState(() => _hintVisible = false);
+                                          _preferences.update(
+                                            _settings.copyWith(
+                                              controlsHintSeen: true,
+                                            ),
+                                          );
+                                          _preferences.flush();
+                                        },
+                                        child: Text(strings.readerGotIt),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+                ),
+              ),
             ),
           ),
-        ),
+          ValueListenableBuilder<(double, int)>(
+            valueListenable: _paperTurn,
+            builder: (context, turn, _) => PaperTurnFold(
+              progress: turn.$1,
+              direction: turn.$2,
+              paper: Theme.of(context).scaffoldBackgroundColor,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -574,11 +581,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                     chapterFraction: v,
                   );
                   _position = target;
-                  if (_isPaged) {
-                    _paged.restore(target);
-                  } else {
-                    _scroll.restore(target);
-                  }
+                  _paged.restore(target);
                 },
               ),
               if (widget.onCatalog != null)

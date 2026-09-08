@@ -1,0 +1,51 @@
+# 验收摘要
+
+汇总截至 2026-09-08 的已有证据。各轮提交不同，下面不是当前工作树完整回归报告；构建、模拟器、真机和用户反馈分开记录。历史逐步日志查 Git，本机 `.tooling/evidence/` 不随仓库提供。
+
+## 功能与平台
+
+| 范围 | 已有证据 | 边界 |
+| --- | --- | --- |
+| 核心业务与缓存 | 多轮离线单元 / widget 测试；MVP、阅读流与缓存持久化探针 | 旧测试总数不能代表最新全量套件 |
+| Android 本地阅读 | API 36.1 模拟器导入 TXT / EPUB、目录 fragment、图片、去重及托管副本离线恢复；BMH-AN10 / Android 12 / API 31 ARM64 有安装、启动和本地阅读证据 | 未覆盖全部厂商和文件提供器 |
+| 系统导入 | Android 文件选择 / 接收，iOS 模拟器原生 inbox / ShareExtension、解析和 PNG 解码探针通过 | 不等于所有 iOS Files 提供器和签名设备组合通过 |
+| iOS 应用 | iOS 26.2 模拟器正式入口启动；26.5 有本地导入 / 解析探针；个人签名 iPhone Release arm64 构建、校验、安装与启动 | 未覆盖最低 iOS 15.0 或完整发布矩阵 |
+| iPhone 阅读 | 用户手动确认书名 / 卷名页眉、本章进度、大图和前后翻页正常，后续确认特殊 EPUB 标题页能够显示 | 是用户反馈，未由代理独立复测；发生在最近动画调整之前 |
+| UI | Android 小屏 / 横屏 / 大字、搜索键盘与返回、四种强调色；中英文 widget 与语义触控目标回归 | 未实测完整 TalkBack / VoiceOver 朗读和手势 |
+| CI | 用户截图确认质量 job 与旧 Android 构建 job 成功；本地生成、格式、分析及严格锁定检查有记录 | 无 run URL / commit；正式 tag 签名发布未验收 |
+
+## 最近阅读器变化
+
+纸张翻页、整页裁剪、移除滚动模式、WebView 禁止越界回弹和统一动画时间已做相关离线回归与静态分析。最近统一时间的相关测试为 13 项通过；这不替代最终设备上的视觉和性能验收，也不与此前测试数量相加。
+
+章节内外基准统一为 280ms，跨章准备内容的等待与动画时长是不同问题。按用户要求不再自动使用模拟器验收；最终设备体验留待实际使用确认。
+
+## 存储保护
+
+- DB-003：用户库 v1 / v2 → v3、缓存库 v1 → v2 使用保留开发 schema；主机测试覆盖迁移事务失败回滚、损坏原文件保留、codec 不兼容隔离。Android 隔离数据库迁移及重开通过，不能宣称历史正式版本升级通过。
+- TEST-002：真实 SQLite `max_page_count` 制造 SQLITE_FULL，验证旧数据保留和显式重试；测试控制晚响应与缓存清理代际。Android 隔离探针确认清缓存后书架、进度和托管原件保留。
+- ANDROID-002：用户明确跳过整机磁盘写满与系统备份恢复，按调整范围关闭。两项是 **未执行**，不是通过；不重新作为开发阻塞。
+
+故障测试只触及临时库和自制数据，不写满设备、不清生产书库。排障与迁移约定见[开发说明](../development.md)。
+
+## 历史性能
+
+BMH-AN10 / Android 12 / ARM64，Profile、约 60Hz、离线合成内容：500 项无封面书架三次进程冷启动，从 Dart main 到书架就绪为 412–458ms；10 次图片会话 / 200 次目标图显示未观察到逐次持续内存增长或 OOM，解码最大 3997968 像素。
+
+旧滚动阅读三次各 10 秒测量：UI p95 4.470–4.571ms、Raster p95 4.865–4.955ms。**这是旧滚动路径数据，不能用于证明当前分页折页帧率**。没有 120Hz 或 iOS 性能结果，也不是任意长时间无泄漏证明。
+
+复跑入口见[性能探针](../../integration_test/performance/README.md)，原测量摘要见下方 JSON。
+
+## 保留的结构化报告与复跑入口
+
+| 报告 | 用途 |
+| --- | --- |
+| [mvp-android.json](mvp-android.json) | 历史 Android MVP 探针 |
+| [reading-flow.json](reading-flow.json) | 历史阅读流程 |
+| [test001-android.json](test001-android.json) | Android 业务与离线恢复 |
+| [performance-android.json](performance-android.json) | 历史性能测量 |
+| [src010-live.json](src010-live.json) | 当次显式在线 Source 验收 |
+
+其他入口：[MVP](../../integration_test/README-mvp.md)、[在线验收](../../integration_test/live/README.md)、[Source 调查](../../tools/source_probe/README.md)。设备上的合成 Source 适配器测试（9 次适配调用、0 外部请求）不能当作实时书源可用性证明。在线报告只说明对应日期和样本，禁止据此自动扩大访问或重跑。
+
+尚待确认的产品 / 发布事项见[任务计划](../TASK_PLAN.md)，签名与许可见[发布说明](../release/README.md)。

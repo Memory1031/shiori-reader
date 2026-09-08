@@ -167,7 +167,7 @@ void main() {
     repo.close();
     await env.close();
   });
-  for (final paged in [true, false]) {
+  for (final paged in [true]) {
     testWidgets(
       'unknown dimensions preserve anchor and caption in ${paged ? 'paged' : 'scroll'} reader',
       (tester) async {

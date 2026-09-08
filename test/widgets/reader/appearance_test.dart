@@ -10,6 +10,7 @@ import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/reader_theme.dart';
 import 'package:shiori/features/reader/settings_panel.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
+import 'package:shiori/features/reader/viewport/paper_turn.dart';
 import 'package:shiori/features/reader/viewport/reader_viewport.dart';
 import '../../support/reader_actions.dart';
 import 'settings_test.dart' show Store;
@@ -26,7 +27,63 @@ Widget app(Store store, {AppController? controller}) => ShioriApp(
 );
 
 void main() {
-  for (final mode in ReaderMode.values) {
+  testWidgets(
+    'legacy scroll preference has no scrolling viewport or mode selector',
+    (tester) async {
+      final store = Store()
+        ..value = ReaderSettings(
+          mode: ReaderMode.scroll,
+          controlsHintSeen: true,
+        );
+      await tester.pumpWidget(app(store));
+      await tester.pumpAndSettle();
+      expect(find.byType(PagedReaderViewport), findsOneWidget);
+      expect(find.byType(ReaderViewport), findsNothing);
+      await openReaderSettings(tester);
+      await tester.pumpAndSettle();
+      expect(find.text('Scroll'), findsNothing);
+      expect(find.text('Paged'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'paper fold spans the full reader with safe-area content coordinates',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      tester.view.padding = const FakeViewPadding(top: 44, bottom: 34);
+      addTearDown(tester.view.reset);
+      final store = Store()..value = ReaderSettings(controlsHintSeen: true);
+      await tester.pumpWidget(app(store));
+      await tester.pumpAndSettle();
+      final viewport = tester.widget<PagedReaderViewport>(
+        find.byType(PagedReaderViewport),
+      );
+      expect(viewport.pageSize, const Size(390, 844));
+      expect(viewport.contentOrigin, const Offset(40, 100));
+      expect(tester.getSize(find.byType(PaperTurnFold)), const Size(390, 844));
+      final next = viewport.controller.next();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      final fold = tester.widget<PaperTurnFold>(find.byType(PaperTurnFold));
+      expect(fold.progress, greaterThan(0));
+      final clip = tester
+          .widgetList<ClipPath>(find.byType(ClipPath))
+          .map((w) => w.clipper)
+          .whereType<PaperTurnClipper>()
+          .single;
+      expect(clip.pageSize, const Size(390, 844));
+      expect(clip.contentOrigin, const Offset(40, 100));
+      expect(clip.progress, fold.progress);
+      await tester.pumpAndSettle();
+      await next;
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final mode in [ReaderMode.paged]) {
     testWidgets(
       'progress sheet seeks and center restores fully hidden chrome: $mode',
       (tester) async {
