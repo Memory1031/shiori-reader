@@ -40,9 +40,12 @@ class LocalCacheManagement implements CacheManagement {
             .getSingle();
         textBytes += row.read<int>('total');
       }
+      // A valid JSON payload can still have an unsupported outer codec.
+      final readableFilter =
+          '$filter${novel == null ? " WHERE" : " AND"} codec_version=1';
       final chapterRows = await db
           .customSelect(
-            'SELECT payload FROM chapter_cache$filter',
+            'SELECT payload FROM chapter_cache$readableFilter',
             variables: vars,
           )
           .get();
@@ -50,7 +53,7 @@ class LocalCacheManagement implements CacheManagement {
       final books = <NovelKey, String>{};
       final details = await db
           .customSelect(
-            'SELECT payload FROM novel_cache$filter',
+            'SELECT payload FROM novel_cache$readableFilter',
             variables: vars,
           )
           .get();

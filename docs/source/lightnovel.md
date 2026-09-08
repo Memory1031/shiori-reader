@@ -1,5 +1,7 @@
 # LightNovel.fun 源站调查
 
+> TEST-004 复核（2026-09-08）：393 项默认离线测试及 Android ARM64 合成 HTTP/UI/冷重启链路通过；四阶段解析失败能定位并保留缓存。未变更源协议，新增真实源 HTTP=0；最新真实协议/媒体证据仍为下文 2026-09-07 的 SRC-010、TEST-001、READER-007，不代表今日现时可用。历史一次性授权不复用，当前 live 状态为 NOT_REVALIDATED_LIVE。详见 [MVP 回归](../validation/mvp.md)。
+
 > iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](../validation/ios-001.md)。本次未由代理执行 iOS 真实 Source 请求，历史 Windows / Android Source 证据不外推为 iOS 通过。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
 
 当前结果（2026-09-07）：**SRC-001..004 DONE；Phase 0 技术可行性 Gate = GO / PASS，可按依赖进入生产接入开发。** 这不表示生产 Source 已实现、媒体跨重启已验证或已获内容分发许可。前文保留历史快照；其中 UNKNOWN / 未执行和 SRC-003 报告的 NOT_EVALUATED_SRC004 均指当时状态，以文末 SRC-004 的结论、责任与后续门槛为准。

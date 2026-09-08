@@ -1435,6 +1435,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### DB-003 — 迁移和损坏恢复保护
 
+- Status：**DONE（2026-09-08）**。保留快照 user v1/v2 → v3、cache v1 → v2 回归完成；修复迁移中途失败的非原子 DDL 及离线列表遗漏 codec 检查。8 项专项、386 项完整离线测试与 analyze PASS，Android BMH-AN10 / API 31 / ARM64 隔离临时库升级与重开 PASS。没有历史正式发布版，不声称正式 RC 升级；Windows / iOS runtime 本轮未执行。见 [DB-003 验收](validation/db-003.md)与 [升级 DoD](development.md)。
 - Phase：8；Complexity：M。
 - Goal：在首次发布前就建立不可丢用户数据的升级测试方法。
 - Input：第 21、28 节、已保留 schema snapshots 与功能闭环；Dependencies：DB-002、CACHE-004。
@@ -1446,6 +1447,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：旧 schema → 当前、失败回滚、坏 codec、只缓存清除、用户数据保留断言。
 
 #### TEST-002 — 存储、缓存与竞态故障回归
+
+- Status：DONE（2026-09-08）。新增 SQLite 空间不足与 parser 版本不匹配回归，补强真实清理入口的晚响应测试；388 项全量测试、11 项补强图片测试、静态分析通过。Android ARM64 临时目录存储重开 / 清理与用户哨兵保留 smoke PASS；未填满整机磁盘，iOS / Windows 运行时未执行。详见 [稳定性验证](validation/stability.md)。
 
 - Phase：8；Complexity：M。
 - Goal：找出会导致用户数据丢失或离线错误的跨模块缺陷。
@@ -1459,6 +1462,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### TEST-003 — Android Reader 与启动性能验收
 
+- Status：DONE（2026-09-08）。BMH-AN10 / Android 12 / ARM64 / Profile / 60Hz：3×10s 正文滚动 UI p95 4.470–4.571ms、raster p95 4.865–4.955ms；进度写入 6/5/5 次；500 项冷启动观测上界 1.023–1.105s；2000 块深恢复、极长单段与 20 图×10 章内存循环通过，未降低阈值。修复进度标签 4Hz 限频，389 项回归与静态分析通过；iOS NOT_RUNTIME_VERIFIED，设备不支持 120Hz。详见 [性能验收](validation/performance.md)。
+
 - Phase：8；Complexity：L。
 - Goal：用 Android ARM64 真机数据证明长章多图可持续阅读。
 - Input：第 31 节、完整 Android App 与真实设备；Dependencies：ANDROID-002、UX-001。
@@ -1470,6 +1475,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：3 次可复跑滚动测量、20 图 10 次切章、500 项冷启动、2,000 块深恢复；修复后只重跑受影响与必要回归。
 
 #### TEST-004 — Android MVP 回归与 Source 维修演练
+
+- Status：DONE（2026-09-08）。393 项离线回归、四阶段 parser 故障定位/缓存保留/黄金协议恢复、静态分析通过；BMH-AN10 Android ARM64 Profile UI 搜索→收藏→阅读图文→进度提交→force-stop→离线书架/继续阅读/正文插图 PASS，冷阶段零 adapter 请求，进度精确恢复。本轮真实 HTTP=0，历史源证据不外推当前在线可用；iOS NOT_RUNTIME_VERIFIED。详见 [MVP 回归](validation/mvp.md)。
 
 - Phase：8；Complexity：M。
 - Goal：证明功能整合与 Source 改版诊断流程可执行。

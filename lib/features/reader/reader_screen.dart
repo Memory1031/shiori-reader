@@ -190,8 +190,15 @@ class _ReaderContentViewState extends State<ReaderContentView>
   final _scroll = ReaderViewportController();
   final _chrome = ValueNotifier(true);
   final _readingPosition = ValueNotifier<ReaderPosition?>(null);
+  ReaderPosition? _latestReadingPosition;
+  Timer? _positionLabelTimer;
   void _sample(ReaderPosition position, bool completed) {
-    _readingPosition.value = position;
+    _latestReadingPosition = position;
+    // Display is bounded to 4Hz; persistence still receives every sample.
+    _positionLabelTimer ??= Timer(const Duration(milliseconds: 250), () {
+      _positionLabelTimer = null;
+      _readingPosition.value = _latestReadingPosition;
+    });
     widget.session?.sampleProgress(position, completed);
   }
 
@@ -233,6 +240,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _preferences.removeListener(_changed);
     _preferences.dispose();
     _chrome.dispose();
+    _positionLabelTimer?.cancel();
     _readingPosition.dispose();
     super.dispose();
   }
@@ -458,7 +466,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   Future<void> _progressPanel(BuildContext context) async {
     final l = AppLocalizations.of(context);
-    var fraction = (_readingPosition.value?.chapterFraction ?? 0).clamp(
+    var fraction = (_latestReadingPosition?.chapterFraction ?? 0).clamp(
       0.0,
       1.0,
     );

@@ -1,5 +1,19 @@
 # Development baseline — CORE-001
 
+## DB-003 升级与恢复验证（2026-09-08）
+
+当前用户库 v3、缓存库 v2。专项命令：`PUB_HOSTED_URL=https://pub.flutter-io.cn fvm flutter test test/data/local/migrations`；全量回归用 `fvm flutter test`。真实旧快照、故障注入和恢复边界见 [DB-003 验收](validation/db-003.md)。本轮没有历史正式版本，使用仓库保留开发快照。
+
+从首次 Android RC 开始，每次 schema / codec 变化的升级 DoD：
+
+- 保留已发布版本的 schema 与自制数据旧库样本，不重写旧 snapshot；覆盖所有受支持升级起点，另测拒绝未知未来版本。
+- 对比书架、语义进度、会话序列、设置、托管文件及 manifest；事务中途失败须回滚并可重试，原损坏文件必须保留。
+- SQL schema 与缓存 codec 独立版本化；明确兼容转换或仅缓存失效策略，不删除用户数据来解决不兼容。
+- 使用明确的测试包 / 隔离目录做 Android 升级安装与冷启动证据，记录机型、OS、旧 / 新版本；模拟器或 widget 不能替代该记录。iOS runtime 由 IOS-005 复用同一验收，不能用 Android 结果代证。
+- 恢复只在副本演练，开发 reset 仅限明确的开发目录。没有可靠备份时不得用清数据作为默认修复。
+
+设备探针输入：将 `schemas/user/drift_schema_v1.json`、`user/drift_schema_v2.json`、`cache/drift_schema_v1.json` 的文件字节分别 Base64 编码，写入 dart-define JSON 的 `DB003_USER_1`、`DB003_USER_2`、`DB003_CACHE_1`。用 `fvm flutter build apk --profile --target integration_test/database_migration_smoke.dart --dart-define-from-file=<该 JSON> --target-platform android-arm64 --no-pub` 构建。开始前清掉本探针旧报告，检查本次 `files/db003-report.json`，结束后恢复正式入口 APK；不要清应用数据。
+
 当前基础 CI 的触发方式、依赖源配置及本地复验命令见[持续集成说明](ci.md)。DEV-001 的离线场景、故障控制和解码复验见 [Fixture 规范](fixtures.md)。DEV-002 的菜单、启动参数与普通/dev 构建命令见 [开发入口](dev-entry.md)。READER-001 的双模式阅读实验与复验见 [ADR-07](decisions/reader-viewport.md)。READER-002 的正式单章页面与验证见 [Reader 说明](reader.md)。NET-001 / NET-002 的预算和诊断见 [网络说明](network.md)，MEDIA-001 的租约及内存边界见 [媒体说明](media.md)。下文保留 CORE-001 的历史开发基线与验证记录。
 
 历史基线日期：2026-09-06。下表与 Windows 验证记录描述 CORE-001 当时的最小工程，不代表当前功能与依赖清单；2026-09-08 的 macOS / iOS 结果见下方入口。

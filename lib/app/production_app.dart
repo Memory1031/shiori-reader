@@ -27,7 +27,10 @@ import 'launch_view.dart';
 
 /// Process root owns databases and source services. Initial home does no HTTP.
 class ProductionApp extends StatefulWidget {
-  const ProductionApp({super.key});
+  const ProductionApp({super.key, this.resolvePaths});
+
+  /// Optional composition override for an isolated storage root.
+  final Future<AppPaths> Function()? resolvePaths;
   @override
   State<ProductionApp> createState() => _ProductionAppState();
 }
@@ -57,7 +60,9 @@ class _ProductionAppState extends State<ProductionApp> {
       _failure = null;
     });
     try {
-      final paths = await AppPaths.resolve(StorageEnvironment.production);
+      final paths =
+          await (widget.resolvePaths?.call() ??
+              AppPaths.resolve(StorageEnvironment.production));
       final result = await LocalDatabases.open(paths);
       if (!mounted) {
         if (result case Success(:final value)) await value.close();

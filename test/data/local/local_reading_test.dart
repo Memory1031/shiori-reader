@@ -27,6 +27,7 @@ class ForbiddenOnline implements NovelRepository, ImageRepository {
 
 void main() {
   late Directory temp;
+  late List<int> epubBytes;
   late AppPaths paths;
   late UserDatabase db;
   late ManagedLocalBooks store;
@@ -42,6 +43,8 @@ void main() {
   }
 
   setUp(() async {
+    // Duplicate import must use identical bytes, including ZIP timestamps.
+    epubBytes = zipFiles(epubFiles());
     temp = await Directory.systemTemp.createTemp('local005-');
     paths = AppPaths(
       support: temp,
@@ -59,7 +62,7 @@ void main() {
   Future<Result<LocalBookRecord>> add(LocalBookFormat format) {
     final bytes = format == LocalBookFormat.txt
         ? utf8.encode('第一章 星光\n开头正文。\n第二章 日出\n日出正文。')
-        : zipFiles(epubFiles());
+        : epubBytes;
     return store.importBook(
       bytes: Stream.value(bytes),
       format: format,
