@@ -145,6 +145,12 @@ jobs:
           else
             RELEASE_FLAGS=()
             if [[ "$GITHUB_REF_NAME" == *-* ]]; then RELEASE_FLAGS+=(--prerelease); fi
+            NOTES_FILE="docs/release/notes/${GITHUB_REF_NAME}.md"
+            if [[ -f "$NOTES_FILE" ]]; then
+              RELEASE_FLAGS+=(--notes-file "$NOTES_FILE")
+            else
+              RELEASE_FLAGS+=(--generate-notes)
+            fi
             gh release create "$GITHUB_REF_NAME" build/release-assets/* \
-              --title "$GITHUB_REF_NAME" --generate-notes --verify-tag "${RELEASE_FLAGS[@]}"
+              --title "$GITHUB_REF_NAME" --verify-tag "${RELEASE_FLAGS[@]}"
           fi

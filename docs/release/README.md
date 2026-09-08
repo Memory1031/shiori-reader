@@ -46,6 +46,8 @@ Android 真机、iOS 模拟器与 iPhone 已有不同范围的运行证据；完
 
 ## develop → master 发布脚本
 
+Release notes 优先读取 `docs/release/notes/<tag>.md`，例如 [v1.0.0](notes/v1.0.0.md)；没有对应文件时使用 GitHub 自动生成说明。说明随 develop 一起提交，tag 指向的内容即发布正文。重复运行已有 Release 只更新附件，保留在 GitHub 上编辑过的说明；需要修改已发布正文时在 GitHub Release 的 Edit 页面操作。
+
 正式版本和标签使用 `1.0.0` / `v1.0.0`。pubspec 的 `+2` 是平台内部构建编号，不进入发布标签。后续支持 `patch`（1.0.0 → 1.0.1）、`minor`（1.0.0 → 1.1.0）、`major`（1.0.0 → 2.0.0）；minor 清零 patch，major 清零 minor / patch，内部构建编号每次递增。
 
 ```sh
