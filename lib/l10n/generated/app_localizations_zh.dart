@@ -460,9 +460,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onlineSource => '在线书源';
 
   @override
-  String get readerResetTypography => '恢复默认排版';
-
-  @override
   String get shelfDetails => '详情';
 
   @override

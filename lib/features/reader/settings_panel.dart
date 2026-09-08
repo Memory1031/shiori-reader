@@ -115,25 +115,6 @@ class ReaderSettingsPanel extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                final defaults = ReaderSettings();
-                                preferences.update(
-                                  s.copyWith(
-                                    fontSize: defaults.fontSize,
-                                    lineHeight: defaults.lineHeight,
-                                    paragraphSpacing: defaults.paragraphSpacing,
-                                    horizontalPadding:
-                                        defaults.horizontalPadding,
-                                  ),
-                                );
-                                preferences.flush();
-                              },
-                              child: Text(l.readerResetTypography),
-                            ),
-                          ),
                           if (preferences.failure != null)
                             TextButton(
                               onPressed: preferences.retry,

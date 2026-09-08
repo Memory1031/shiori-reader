@@ -986,12 +986,6 @@ abstract class AppLocalizations {
   /// **'Online source'**
   String get onlineSource;
 
-  /// No description provided for @readerResetTypography.
-  ///
-  /// In en, this message translates to:
-  /// **'Reset typography'**
-  String get readerResetTypography;
-
   /// No description provided for @shelfDetails.
   ///
   /// In en, this message translates to:

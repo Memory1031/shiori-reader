@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/models.dart';
+import '../../../domain/contracts/local_books.dart';
 import '../article_heading.dart';
+
+bool _isChapterHeading(ContentBlock block) =>
+    block is HeadingBlock && block.level <= 2 ||
+    block is ParagraphBlock && isArticleHeading(block.text);
 
 /// Shared by text measurement and rendering in both reading modes.
 TextStyle readerBlockStyle(ContentBlock block, TextStyle base) {
-  final title =
-      block is HeadingBlock && block.level <= 2 ||
-      block is ParagraphBlock && isArticleHeading(block.text);
+  final title = _isChapterHeading(block);
   final subtitle =
       block is HeadingBlock ||
       block is ParagraphBlock &&
@@ -20,12 +23,12 @@ TextStyle readerBlockStyle(ContentBlock block, TextStyle base) {
       fontSize:
           (base.fontSize ?? 18) *
           (title
-              ? 1.35
+              ? 1.4
               : block is HeadingBlock
-              ? 1.08
+              ? 1.15
               : .94),
-      fontWeight: FontWeight.w600,
-      height: title ? 1.45 : 1.5,
+      fontWeight: title ? FontWeight.w700 : FontWeight.w600,
+      height: title ? 1.3 : 1.5,
       color: subtitle && !title
           ? base.color?.withValues(alpha: .7)
           : base.color,
@@ -43,7 +46,8 @@ TextAlign readerBlockAlign(ContentBlock block) {
   return switch (alignment) {
     ParagraphAlignment.center => TextAlign.center,
     ParagraphAlignment.end => TextAlign.end,
-    ParagraphAlignment.start => TextAlign.start,
+    ParagraphAlignment.start =>
+      _isChapterHeading(block) ? TextAlign.center : TextAlign.start,
   };
 }
 
@@ -53,24 +57,37 @@ String readerIndentPrefix(
   bool startsBlock,
   double width,
   TextStyle style,
-  TextScaler scaler,
-) {
+  TextScaler scaler, {
+  ChapterKey? chapter,
+}) {
   if (block is! ParagraphBlock ||
       !startsBlock ||
+      block.text.trim().isEmpty ||
       block.alignment != ParagraphAlignment.start ||
       isArticleHeading(block.text) ||
       RegExp(r'^[\s　]').hasMatch(block.text)) {
     return '';
   }
   final capacity = (width / scaler.scale(style.fontSize ?? 20)).floor() - 1;
-  return '\u2003' * block.leadingIndent.clamp(0, capacity.clamp(0, 2));
+  final onlineBody =
+      chapter != null &&
+      chapter.novelKey.sourceId != LocalBookIdentity.sourceId &&
+      RegExp(r'[㐀-鿿]').hasMatch(block.text) &&
+      !RegExp(
+        r'^[（(]Day\s*[0-9０-９]+[）)]$',
+        caseSensitive: false,
+      ).hasMatch(block.text.trim());
+  final indent = block.leadingIndent > 0
+      ? block.leadingIndent
+      : onlineBody
+      ? 2
+      : 0;
+  return '\u2003' * indent.clamp(0, capacity.clamp(0, 2));
 }
 
 /// Shared vertical rhythm; measurement must reserve the same space as painting.
 double readerBlockSpacing(ContentBlock block, double paragraphSpacing) {
-  if (block is HeadingBlock ||
-      block is ParagraphBlock && isArticleHeading(block.text)) {
-    return paragraphSpacing + 20;
-  }
+  if (_isChapterHeading(block)) return paragraphSpacing + 64;
+  if (block is HeadingBlock) return paragraphSpacing + 28;
   return paragraphSpacing;
 }

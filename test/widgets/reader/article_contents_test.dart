@@ -3,12 +3,86 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/domain/contracts/local_books.dart';
 import 'package:shiori/features/reader/article_contents.dart';
 import 'package:shiori/features/reader/viewport/block_style.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/features/reader/viewport/reader_viewport.dart';
 
 void main() {
+  test(
+    'chapter typography centers major headings and preserves explicit alignment',
+    () {
+      const base = TextStyle(fontSize: 20, height: 1.6);
+      final heading = HeadingBlock(text: '（原）三年F组学号39号 吉田由希的证言', level: 1);
+      expect(readerBlockAlign(heading), TextAlign.center);
+      expect(readerBlockStyle(heading, base).fontSize, 28);
+      expect(readerBlockStyle(heading, base).fontWeight, FontWeight.w700);
+      expect(readerBlockSpacing(heading, 20), 84);
+      expect(
+        readerBlockAlign(ParagraphBlock(text: '【第一话】 章节标题')),
+        TextAlign.center,
+      );
+      expect(
+        readerBlockAlign(
+          HeadingBlock(text: '署名', level: 1, alignment: ParagraphAlignment.end),
+        ),
+        TextAlign.end,
+      );
+      expect(
+        readerBlockAlign(HeadingBlock(text: '较低层级', level: 3)),
+        TextAlign.start,
+      );
+      expect(readerBlockAlign(ParagraphBlock(text: '普通正文')), TextAlign.start);
+      expect(readerBlockSpacing(ParagraphBlock(text: '普通正文'), 20), 20);
+    },
+  );
+
+  test(
+    'online body fallback preserves source data and paragraph boundaries',
+    () {
+      final online = fixtureChapterKey(FixtureScenario.shortChapter);
+      final local = ChapterKey(
+        novelKey: NovelKey(
+          sourceId: LocalBookIdentity.sourceId,
+          novelId: 'test',
+        ),
+        chapterId: 'one',
+      );
+      const style = TextStyle(fontSize: 20);
+      String prefix(ContentBlock block, {bool start = true, ChapterKey? key}) =>
+          readerIndentPrefix(
+            block,
+            start,
+            320,
+            style,
+            TextScaler.noScaling,
+            chapter: key ?? online,
+          );
+      final body = ParagraphBlock(text: '普通中文正文。');
+      expect(prefix(body), '\u2003\u2003');
+      expect(body.text, '普通中文正文。');
+      expect(body.leadingIndent, 0);
+      expect(prefix(body, start: false), isEmpty);
+      expect(prefix(body, key: local), isEmpty);
+      expect(prefix(ParagraphBlock(text: '已有缩进', leadingIndent: 1)), '\u2003');
+      expect(prefix(ParagraphBlock(text: '　　已有空格')), isEmpty);
+      expect(prefix(ParagraphBlock(text: '')), isEmpty);
+      expect(prefix(ParagraphBlock(text: 'English prose')), isEmpty);
+      expect(prefix(HeadingBlock(text: '章节标题', level: 1)), isEmpty);
+      expect(prefix(ParagraphBlock(text: '【第一话】 标题')), isEmpty);
+      for (final alignment in [
+        ParagraphAlignment.center,
+        ParagraphAlignment.end,
+      ]) {
+        expect(
+          prefix(ParagraphBlock(text: '居中或靠右文字', alignment: alignment)),
+          isEmpty,
+        );
+      }
+    },
+  );
+
   test(
     'source whitespace is not compounded and UI indentation is at most two em',
     () {

@@ -289,6 +289,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport> {
                                     constraints.maxWidth,
                                     widget.textStyle,
                                     scaler,
+                                    chapter: widget.content.key,
                                   ) +
                                   fragment.text!,
                               style: readerBlockStyle(

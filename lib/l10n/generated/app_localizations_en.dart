@@ -482,9 +482,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onlineSource => 'Online source';
 
   @override
-  String get readerResetTypography => 'Reset typography';
-
-  @override
   String get shelfDetails => 'Details';
 
   @override

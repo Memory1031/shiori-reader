@@ -482,7 +482,19 @@ class EpubParser {
         }
       }
     }
-    final title = doc.querySelector('h1,h2,h3')?.text.trim();
+    // EPUB authors often use h4–h6 for the document's chapter heading.
+    // Promote only an opening heading at the document's highest heading rank.
+    if (blocks.firstOrNull case HeadingBlock(
+      :final text,
+      :final level,
+      :final alignment,
+    )) {
+      if (level > 2 &&
+          !blocks.whereType<HeadingBlock>().any((h) => h.level < level)) {
+        blocks[0] = HeadingBlock(text: text, level: 2, alignment: alignment);
+      }
+    }
+    final title = doc.querySelector('h1,h2,h3,h4,h5,h6')?.text.trim();
     final docTitle = doc.querySelector('title')?.text.trim();
     final chapter = ChapterContent(
       key: LocalBookIdentity.chapter(book, 'epub:$path'),

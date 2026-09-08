@@ -168,3 +168,7 @@ dart tool/check_ci_yaml.dart
 用户补充 Actions 截图，确认此前运行的“格式、静态分析与离线测试”和“Android Debug 与 Release smoke”两个 job 均为绿色成功。记录为旧 Android 构建 job 的远端 PASS，补齐此前只有本地构建结果的证据。截图未展示 run URL / commit、各步骤状态或缓存命中信息，因此不单独断言条件执行的 Release smoke 步骤是否运行；这也不是正式 tag 签名发布验收。
 
 CI-002 保持 DONE；现行“普通 CI 仅质量检查、`v*` tag 才打包”的用户约定不变。
+
+### 2026-09-08：主锁文件下载源漂移修复
+
+CI 严格安装报 `Would change 99 dependencies`，版本号均未变化。主锁文件 hosted URL 已变为 `pub.dev`，与工作流及两个工具包锁文件的 `pub.flutter-io.cn` 不一致。本次仅恢复主锁文件的 99 个 hosted URL，版本和 SHA-256 保持不变；使用固定 SDK、显式 `PUB_HOSTED_URL=https://pub.flutter-io.cn` 执行 `flutter pub get --enforce-lockfile` 本地通过。保留 CI 严格锁定要求，远端重跑结果待确认。

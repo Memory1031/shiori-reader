@@ -107,7 +107,14 @@ final class PageLayout {
   }) {
     if (text.isEmpty) return (text: '', count: 0, height: 16);
     measuredChunks++;
-    final prefix = readerIndentPrefix(block, startsBlock, width, style, scaler);
+    final prefix = readerIndentPrefix(
+      block,
+      startsBlock,
+      width,
+      style,
+      scaler,
+      chapter: index.content.key,
+    );
     final painter = TextPainter(
       text: TextSpan(
         text: prefix + text,

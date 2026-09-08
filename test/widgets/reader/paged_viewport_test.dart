@@ -16,10 +16,10 @@ void main() {
     final base = const FixtureData().content(FixtureScenario.shortChapter);
     ChapterContent content(List<ContentBlock> blocks) =>
         ChapterContent(key: base.key, title: 'pagination', blocks: blocks);
-    PageLayout layout(ChapterContent c) => PageLayout(
+    PageLayout layout(ChapterContent c, {double height = 200}) => PageLayout(
       index: ChunkIndex(c),
       width: 300,
-      height: 200,
+      height: height,
       style: const TextStyle(fontSize: 20, height: 1.5),
       scaler: TextScaler.noScaling,
       direction: TextDirection.ltr,
@@ -35,6 +35,7 @@ void main() {
               'Body follows this chapter title with enough text for several lines.',
         ),
       ]),
+      height: 260,
     );
     final first = headings.forward(const PageCursor(0, 0))!;
     expect(first.end.unit, 2);

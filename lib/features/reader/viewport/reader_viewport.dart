@@ -170,6 +170,7 @@ class _ReaderViewportState extends State<ReaderViewport> {
     width,
     widget.textStyle,
     _scaler,
+    chapter: widget.content.key,
   );
   TextStyle _style(RenderChunk chunk) => readerBlockStyle(
     widget.content.blocks[chunk.blockIndex],

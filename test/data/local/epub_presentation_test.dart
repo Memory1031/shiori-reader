@@ -9,6 +9,26 @@ import 'package:shiori/data/local/epub/epub_presentation.dart';
 
 void main() {
   test(
+    'opening h4 is a chapter heading but inner headings retain their level',
+    () {
+      final files = epubFiles();
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '<html><body><h4 class="left" style="text-align:left">Opening chapter</h4>'
+        '<p>Body</p><h4>Inner section</h4><p>More body</p></body></html>',
+      );
+      final parsed = EpubParser(
+        zipFiles(files),
+        NovelKey(sourceId: SourceId('local'), novelId: 'test'),
+        'fixture.epub',
+      ).parse();
+      final chapter = parsed.content.chapters.first;
+      expect(chapter.title, 'Opening chapter');
+      expect((chapter.blocks[0] as HeadingBlock).level, 2);
+      expect((chapter.blocks[2] as HeadingBlock).level, 4);
+    },
+  );
+
+  test(
     'native paragraphs and headings retain CSS alignment with legacy heading codec intact',
     () {
       final files = epubFiles();
