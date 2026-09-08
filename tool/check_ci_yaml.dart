@@ -12,13 +12,20 @@ void main() {
       !ciEvents.containsKey('workflow_dispatch')) {
     throw StateError('Missing expected events');
   }
-  if (ciJobs.keys.length != 1 || !ciJobs.containsKey('analyze-test')) {
+  if (ciJobs.keys.length != 1 || !ciJobs.containsKey('quality')) {
     throw StateError('Regular CI must contain only quality checks');
   }
-  for (final step in ciJobs['analyze-test']['steps'] as YamlList) {
+  for (final step in ciJobs['quality']['steps'] as YamlList) {
     final command = (step as YamlMap)['run']?.toString() ?? '';
     if (RegExp(r'flutter\s+build\s').hasMatch(command)) {
       throw StateError('Packaging is reserved for the tag release workflow');
+    }
+    if (RegExp(
+      r'\b(flutter|dart)\s+(?:--suppress-analytics\s+)?test\b|\bpython3?\s+-m\s+unittest\b',
+    ).hasMatch(command)) {
+      throw StateError(
+        'Run unit/widget tests locally before committing, not in daily CI',
+      );
     }
   }
 
@@ -37,7 +44,7 @@ void main() {
       releaseJobs['android-release']['needs'] != null) {
     throw StateError('Tag release must enter Android packaging directly');
   }
-  final releaseChecks = ciJobs['analyze-test']['steps'] as YamlList;
+  final releaseChecks = ciJobs['quality']['steps'] as YamlList;
   final releaseCommands = releaseChecks
       .map((step) => (step as YamlMap)['run']?.toString() ?? '')
       .join('\n');
@@ -46,7 +53,6 @@ void main() {
     'bash tool/generate_database.sh',
     'git diff --exit-code -- lib/l10n/generated',
     'dart format --output=none --set-exit-if-changed lib test',
-    'test_release_android.py',
   ]) {
     if (!releaseCommands.contains(required)) {
       throw StateError('Missing release check: $required');

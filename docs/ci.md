@@ -13,7 +13,9 @@
 
 固定 Flutter 3.38.4，应用、`tools/source_probe`、`tool/db_codegen` 三份依赖严格按 lockfile 安装。统一 `PUB_HOSTED_URL=https://pub.flutter-io.cn`，缓存只加速安装，不能替代锁文件校验。
 
-CI 检查工作流结构、锁文件变化、数据库生成与新 schema、gen-l10n 生成一致性、Dart 格式、静态分析、应用离线测试，以及独立 Source 调查包的格式 / 分析 / 样本预检 / 离线测试。根分析会扫描工具包，必须提前完成其依赖安装。
+CI 检查工作流结构、锁文件变化、数据库生成与新 schema、gen-l10n 生成一致性、Dart 格式、静态分析，以及独立 Source 调查包的格式 / 分析 / 样本完整性预检。根分析会扫描工具包，必须提前完成其依赖安装。
+
+按用户约定，应用单元 / 组件测试、调查包 UT、Python 发布工具 UT 均在提交前本地执行，日常 CI（含 PR 和手动运行）不再重复运行。测试代码仍保留，格式和静态分析仍覆盖测试文件；远端 CI 绿色不代表 UT 已通过，应在提交或 PR 中记录实际本地验证。未添加强制 Git hook。
 
 本地命令见[开发说明](development.md)。工作流结构校验入口为 [check_ci_yaml.dart](../tool/check_ci_yaml.dart)。样本哈希按原始字节计算，`.gitattributes` 固定 LF；哈希失败先修样本完整性，不放宽校验或把网络请求数为零误判为网络故障。
 

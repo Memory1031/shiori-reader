@@ -20,8 +20,8 @@ env:
   PUB_HOSTED_URL: https://pub.flutter-io.cn
 
 jobs:
-  analyze-test:
-    name: 格式、静态分析与离线测试
+  quality:
+    name: 格式、静态分析与生成一致性
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -51,10 +51,6 @@ jobs:
           dart tool/check_ci_yaml.dart
           git diff --exit-code -- pubspec.lock tools/source_probe/pubspec.lock tool/db_codegen/pubspec.lock
 
-      - name: 发布工具离线测试
-        run: |
-          python3 -m unittest discover -s tool -p 'test_release_android.py'
-
       - name: 检查数据库生成代码
         run: |
           bash tool/generate_database.sh
@@ -73,9 +69,6 @@ jobs:
       - name: 静态分析
         run: flutter analyze --no-pub
 
-      - name: 单元与组件测试
-        run: flutter test --no-pub
-
       - name: 调查包格式检查
         working-directory: tools/source_probe
         run: dart format --output=none --set-exit-if-changed bin lib test
@@ -89,7 +82,3 @@ jobs:
         # 先输出预检报告，避免样本损坏只表现为多项测试的连带失败。
         # 默认不请求源站，不传 --live。
         run: dart bin/source_probe.dart
-
-      - name: 调查包离线测试
-        working-directory: tools/source_probe
-        run: dart --suppress-analytics test --reporter expanded

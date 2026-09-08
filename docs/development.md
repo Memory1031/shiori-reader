@@ -33,6 +33,8 @@ iOS 安装依赖后在 `ios` 目录执行 `pod install`，打开 `ios/Runner.xcw
 
 ## 本地检查
 
+提交前按改动范围运行相关 UT；跨模块或发布准备时运行完整离线测试。日常 GitHub CI 不运行 UT，保留格式、分析及生成一致性检查；不要将 CI 成功当作本地测试证据。修改发布工具时另运行 `python3 -m unittest discover -s tool -p 'test_release_android.py'`（Windows 可使用本机 Python 命令）。
+
 ```sh
 fvm dart tool/check_ci_yaml.dart
 fvm flutter gen-l10n
