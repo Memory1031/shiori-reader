@@ -23,9 +23,7 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 
 已知校验错误现在输出受控原因（版本、证书、工具），不会输出工具参数、原始 stderr 或签名秘密；未知异常仍使用通用提示。
 
-`ci-status` 查询本仓库 `ci.yml` 的同一提交 SHA，复用最近一次 push / workflow_dispatch 的成功结果；不接受其他 SHA、PR 或其他仓库结果。没有可复用结果时，`quality` 通过 workflow_call 执行同一份完整 CI（包括调查包检查），避免维护第二份 UT 配置。查询失败直接阻止发布，补验失败 / 取消也不能进入构建。实现参考 [GitHub Workflow Runs API](https://docs.github.com/en/rest/actions/workflow-runs) 与[共享工作流](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)。
-
-发布脚本优先快进 master 到已通过 CI 的 develop SHA；仅分支分叉时产生新合并提交，此时补验。`android-release` 在复用或补验成功后使用 JDK 17 构建，始终单独校验 tag 等于 `v` + pubspec 版本（不含 `+build`）及合法正整数 build number，再签名、校验 APK。签名需要四个仓库 Actions secrets：
+按用户最新约定，tag 发布直接进入 `android-release`，不查询或等待 CI、不重复执行格式 / 分析 / UT。develop 日常 CI 保持独立；master 仅作为发布中间分支，不因推送触发 CI 或 Release。发布脚本优先快进 master，保留最终提交与标签的可追溯性。Android 构建仍保留工具预检、版本一致性、签名和 APK 校验；失败时不上传 Release。签名需要四个仓库 Actions secrets：
 
 | Secret | 内容 |
 | --- | --- |

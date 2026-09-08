@@ -9,8 +9,7 @@ void main() {
   final ciJobs = ci['jobs'] as YamlMap;
   if (!ciEvents.containsKey('push') ||
       !ciEvents.containsKey('pull_request') ||
-      !ciEvents.containsKey('workflow_dispatch') ||
-      !ciEvents.containsKey('workflow_call')) {
+      !ciEvents.containsKey('workflow_dispatch')) {
     throw StateError('Missing expected events');
   }
   if (ciJobs.keys.length != 1 || !ciJobs.containsKey('analyze-test')) {
@@ -33,26 +32,10 @@ void main() {
       (releaseEvents['push'] as YamlMap)['tags'] == null) {
     throw StateError('Release workflow must be tag-triggered only');
   }
-  if (releaseJobs['android-release']['needs'].toString() !=
-          '[ci-status, quality]' ||
-      releaseJobs['quality']['uses'] != './.github/workflows/ci.yml' ||
-      releaseJobs['quality']['if'] !=
-          "needs.ci-status.outputs.reuse != 'true'" ||
-      releaseJobs['ci-status']['permissions']['actions'] != 'read') {
-    throw StateError(
-      'Release must reuse exact-commit CI or call shared quality checks',
-    );
-  }
-  final condition = releaseJobs['android-release']['if'].toString();
-  for (final guard in [
-    "needs.ci-status.result == 'success'",
-    "needs.ci-status.outputs.reuse == 'true'",
-    "needs.quality.result == 'success'",
-    '!cancelled()',
-  ]) {
-    if (!condition.contains(guard)) {
-      throw StateError('Missing release gate: $guard');
-    }
+  if (releaseJobs.length != 1 ||
+      !releaseJobs.containsKey('android-release') ||
+      releaseJobs['android-release']['needs'] != null) {
+    throw StateError('Tag release must enter Android packaging directly');
   }
   final releaseChecks = ciJobs['analyze-test']['steps'] as YamlList;
   final releaseCommands = releaseChecks
@@ -64,7 +47,6 @@ void main() {
     'git diff --exit-code -- lib/l10n/generated',
     'dart format --output=none --set-exit-if-changed lib test',
     'test_release_android.py',
-    'node --test tool/test_release_ci_gate.cjs',
   ]) {
     if (!releaseCommands.contains(required)) {
       throw StateError('Missing release check: $required');
@@ -76,6 +58,13 @@ void main() {
     throw StateError('Release analysis needs database generator dependencies');
   }
   final publishSteps = releaseJobs['android-release']['steps'] as YamlList;
+  if (publishSteps.any(
+    (step) => RegExp(
+      r'flutter\s+(test|analyze)\b',
+    ).hasMatch(step['run']?.toString() ?? ''),
+  )) {
+    throw StateError('Full quality checks belong in develop CI only');
+  }
   int commandIndex(String command) => publishSteps.indexWhere(
     (step) => ((step as YamlMap)['run']?.toString() ?? '').contains(command),
   );

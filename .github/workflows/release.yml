@@ -1,7 +1,7 @@
 name: Release
 
 # 正式发布工作流：仅在推送 v* 标签时触发。日常质量检查由 ci.yml 负责，
-# 同提交复用 CI；未验证提交调用共享 CI，通过后产出签名 APK。
+# 按用户约定直接构建 Android；完整检查由 develop CI 独立执行。
 # 对外公开分发前需完成 TASK_PLAN 的 RELEASE-001 渠道 / 许可审查。
 on:
   push:
@@ -22,36 +22,8 @@ env:
   PUB_HOSTED_URL: https://pub.flutter-io.cn
 
 jobs:
-  ci-status:
-    name: 复用已通过的 CI
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      actions: read
-    outputs:
-      reuse: ${{ steps.lookup.outputs.reuse }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: lookup
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const gate = require('./tool/release_ci_gate.cjs');
-            await gate({ github, context, core });
-
-  quality:
-    name: 验证尚未通过 CI 的发布提交
-    needs: ci-status
-    if: needs.ci-status.outputs.reuse != 'true'
-    uses: ./.github/workflows/ci.yml
-
   android-release:
     name: Android 签名发布构建
-    needs: [ci-status, quality]
-    if: >-
-      ${{ always() && !cancelled() && needs.ci-status.result == 'success' &&
-          (needs.ci-status.outputs.reuse == 'true' || needs.quality.result == 'success') }}
     permissions:
       contents: write
     runs-on: ubuntu-latest
