@@ -160,7 +160,7 @@
   "shelfGrid": "网格",
   "shelfList": "列表",
   "allChapters": "全部章节",
-  "lightNovelSource": "轻之国度",
+  "onlineSource": "在线书源",
   "readerResetTypography": "恢复默认排版",
   "shelfDetails": "详情",
   "shelfRemove": "移除",
@@ -257,5 +257,10 @@
         "type": "String"
       }
     }
-  }
+  },
+  "appAccentTitle": "主题色",
+  "appAccentTeal": "青绿",
+  "appAccentBlueGrey": "蓝灰",
+  "appAccentWarmBrown": "暖棕",
+  "appAccentSoftPink": "淡粉"
 }

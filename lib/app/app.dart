@@ -43,8 +43,8 @@ class ShioriApp extends StatelessWidget {
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      theme: appTheme(Brightness.light),
-      darkTheme: appTheme(Brightness.dark),
+      theme: appTheme(Brightness.light, accent: controller.settings.accent),
+      darkTheme: appTheme(Brightness.dark, accent: controller.settings.accent),
       themeMode: appThemeMode(controller.settings.themeMode),
       themeAnimationDuration: Duration.zero,
       home: Builder(

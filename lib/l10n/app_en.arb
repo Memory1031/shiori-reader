@@ -160,7 +160,7 @@
   "shelfGrid": "Grid",
   "shelfList": "List",
   "allChapters": "All chapters",
-  "lightNovelSource": "LightNovel.fun",
+  "onlineSource": "Online source",
   "readerResetTypography": "Reset typography",
   "shelfDetails": "Details",
   "shelfRemove": "Remove",
@@ -257,5 +257,10 @@
         "type": "String"
       }
     }
-  }
+  },
+  "appAccentTitle": "Accent color",
+  "appAccentTeal": "Soft teal",
+  "appAccentBlueGrey": "Blue grey",
+  "appAccentWarmBrown": "Warm brown",
+  "appAccentSoftPink": "Soft pink"
 }

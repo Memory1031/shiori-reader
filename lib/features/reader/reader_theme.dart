@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/models/models.dart';
 
-ThemeData readerTheme(ReaderSettings settings, Brightness system) {
+export '../../app/theme/shiori_theme.dart' show appAccentOf;
+
+ThemeData readerTheme(
+  ReaderSettings settings,
+  Brightness system, {
+  AppAccent accent = AppAccent.teal,
+}) {
   final brightness = switch (settings.themeMode) {
     ReaderThemeMode.system => system,
     ReaderThemeMode.light => Brightness.light,
     ReaderThemeMode.dark => Brightness.dark,
   };
-  final base = shioriTheme(brightness);
+  final base = shioriTheme(brightness, accent: accent);
   final paper = brightness == Brightness.dark
       ? ShioriPalette.dark.paper
       : settings.paper == ReaderPaper.warm

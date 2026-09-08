@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../domain/models/app_settings.dart';
 
 /// Semantic palette; UI prototypes use this before production adoption (UI-002).
 @immutable
@@ -18,7 +19,7 @@ class ShioriPalette extends ThemeExtension<ShioriPalette> {
     surface: Color(0xfffffcf8),
     ink: Color(0xff302c2b),
     secondary: Color(0xff70686b),
-    accent: Color(0xff95506d),
+    accent: Color(0xff52756b),
     separator: Color(0xffded8d5),
   );
   static const dark = ShioriPalette(
@@ -26,7 +27,7 @@ class ShioriPalette extends ThemeExtension<ShioriPalette> {
     surface: Color(0xff252126),
     ink: Color(0xffeee7eb),
     secondary: Color(0xffbeb3ba),
-    accent: Color(0xffd8a1b9),
+    accent: Color(0xff96cec0),
     separator: Color(0xff454047),
   );
   @override
@@ -75,16 +76,65 @@ abstract final class ShioriMotion {
   static const transition = Duration(milliseconds: 240);
 }
 
-ThemeData shioriTheme(Brightness brightness) {
-  final p = brightness == Brightness.light
-      ? ShioriPalette.light
-      : ShioriPalette.dark;
+@immutable
+class ShioriAccent extends ThemeExtension<ShioriAccent> {
+  const ShioriAccent(this.value);
+  final AppAccent value;
+  @override
+  ShioriAccent copyWith({AppAccent? value}) =>
+      ShioriAccent(value ?? this.value);
+  @override
+  ShioriAccent lerp(covariant ShioriAccent? other, double t) =>
+      t < .5 ? this : other ?? this;
+}
+
+Color accentColor(AppAccent accent, Brightness brightness) =>
+    switch ((accent, brightness)) {
+      (AppAccent.teal, Brightness.light) => const Color(0xff52756b),
+      (AppAccent.teal, Brightness.dark) => const Color(0xff96cec0),
+      (AppAccent.blueGrey, Brightness.light) => const Color(0xff5b7185),
+      (AppAccent.blueGrey, Brightness.dark) => const Color(0xffacc8df),
+      (AppAccent.warmBrown, Brightness.light) => const Color(0xff81694f),
+      (AppAccent.warmBrown, Brightness.dark) => const Color(0xffdabb9b),
+      (AppAccent.softPink, Brightness.light) => const Color(0xff976478),
+      (AppAccent.softPink, Brightness.dark) => const Color(0xffe5b6c8),
+    };
+
+/// Pastel fills and swatches; foreground accents retain readable contrast.
+Color accentFillColor(AppAccent accent, Brightness brightness) {
+  if (brightness == Brightness.dark) return accentColor(accent, brightness);
+  return switch (accent) {
+    AppAccent.teal => const Color(0xffdce9de),
+    AppAccent.blueGrey => const Color(0xffdfe8f0),
+    AppAccent.warmBrown => const Color(0xffefe3d4),
+    AppAccent.softPink => const Color(0xfff3dfe7),
+  };
+}
+
+AppAccent appAccentOf(BuildContext context) =>
+    Theme.of(context).extension<ShioriAccent>()?.value ?? AppAccent.teal;
+
+ThemeData shioriTheme(
+  Brightness brightness, {
+  AppAccent accent = AppAccent.teal,
+}) {
+  final p =
+      (brightness == Brightness.light
+              ? ShioriPalette.light
+              : ShioriPalette.dark)
+          .copyWith(accent: accentColor(accent, brightness));
+  final light = brightness == Brightness.light;
+  final fill = accentFillColor(accent, brightness);
   final scheme =
       ColorScheme.fromSeed(
         seedColor: p.accent,
         brightness: brightness,
       ).copyWith(
         primary: p.accent,
+        primaryContainer: light ? fill : null,
+        onPrimaryContainer: light ? p.ink : null,
+        secondaryContainer: light ? fill : null,
+        onSecondaryContainer: light ? p.ink : null,
         onPrimary: brightness == Brightness.light ? Colors.white : p.paper,
         surface: p.surface,
         surfaceContainerHighest: p.surfaceSubtle,
@@ -109,7 +159,7 @@ ThemeData shioriTheme(Brightness brightness) {
     brightness: brightness,
     colorScheme: scheme,
     scaffoldBackgroundColor: p.paper,
-    extensions: [p],
+    extensions: [p, ShioriAccent(accent)],
     dividerColor: p.separator,
     popupMenuTheme: PopupMenuThemeData(
       color: p.surface,
@@ -155,7 +205,7 @@ ThemeData shioriTheme(Brightness brightness) {
     navigationBarTheme: NavigationBarThemeData(
       height: 72,
       backgroundColor: p.paper,
-      indicatorColor: p.accent.withValues(alpha: .12),
+      indicatorColor: light ? fill : p.accent.withValues(alpha: .12),
       elevation: 0,
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -186,6 +236,8 @@ ThemeData shioriTheme(Brightness brightness) {
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
+        backgroundColor: light ? fill : null,
+        foregroundColor: light ? p.ink : null,
         minimumSize: const Size(48, 48),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ShioriShape.control),

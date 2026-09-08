@@ -101,10 +101,7 @@ class _SearchBody extends StatelessWidget {
                                 vertical: 3,
                               ),
                               child: Text(
-                                environmentLabel ??
-                                    (sourceName == 'LightNovel.fun'
-                                        ? strings.lightNovelSource
-                                        : sourceName!),
+                                environmentLabel ?? strings.onlineSource,
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ),

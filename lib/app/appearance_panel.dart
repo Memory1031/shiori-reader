@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../domain/models/models.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'app_controller.dart';
+import 'theme/shiori_theme.dart';
 
 Future<void> showAppAppearance(
   BuildContext context,
@@ -63,6 +64,7 @@ class _AppearancePanelState extends State<_AppearancePanel> {
               children: [
                 for (final mode in AppThemeMode.values)
                   ChoiceChip(
+                    showCheckmark: false,
                     avatar: Icon(switch (mode) {
                       AppThemeMode.system => Icons.brightness_auto_outlined,
                       AppThemeMode.light => Icons.light_mode_outlined,
@@ -75,6 +77,37 @@ class _AppearancePanelState extends State<_AppearancePanel> {
                     }),
                     selected: controller.settings.themeMode == mode,
                     onSelected: (_) => controller.setAppearance(mode),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(
+              l.appAccentTitle,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final accent in AppAccent.values)
+                  ChoiceChip(
+                    avatar: Icon(
+                      Icons.circle,
+                      size: 16,
+                      color: accentFillColor(
+                        accent,
+                        Theme.of(context).brightness,
+                      ),
+                    ),
+                    label: Text(switch (accent) {
+                      AppAccent.teal => l.appAccentTeal,
+                      AppAccent.blueGrey => l.appAccentBlueGrey,
+                      AppAccent.warmBrown => l.appAccentWarmBrown,
+                      AppAccent.softPink => l.appAccentSoftPink,
+                    }),
+                    selected: controller.settings.accent == accent,
+                    onSelected: (_) => controller.setAccent(accent),
                   ),
               ],
             ),

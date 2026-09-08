@@ -21,9 +21,18 @@ class AppController extends ScopedController {
 
   void setAppearance(AppThemeMode mode) {
     if (isClosed || (settings.themeMode == mode && !isLoadingSettings)) return;
+    _setSettings(settings.copyWith(themeMode: mode));
+  }
+
+  void setAccent(AppAccent accent) {
+    if (isClosed || (settings.accent == accent && !isLoadingSettings)) return;
+    _setSettings(settings.copyWith(accent: accent));
+  }
+
+  void _setSettings(AppSettings value) {
     _request?.cancel();
     isLoadingSettings = false;
-    settings = settings.copyWith(themeMode: mode);
+    settings = value;
     _pending = settings;
     update();
     unawaited(_save());

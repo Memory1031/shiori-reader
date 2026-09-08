@@ -3,8 +3,8 @@ import '../../app/routes.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
-import '../../shared/widgets/state_views.dart';
 import '../../shared/widgets/book_cover.dart';
+import '../../shared/widgets/shiori_logo.dart';
 import '../bookshelf/library_controller.dart';
 import '../bookshelf/bookshelf_view.dart';
 import '../bookshelf/library_observer.dart';
@@ -48,11 +48,6 @@ class ReadingHome extends StatefulWidget {
 
 class _ReadingHomeState extends State<ReadingHome> {
   late final LibraryController _library;
-  int _tab = 0, _source = 0;
-  CancellationSource? _request;
-  List<DiscoverSection>? _sections;
-  AppFailure? _failure;
-  bool _loading = false;
   @override
   void initState() {
     super.initState();
@@ -67,7 +62,6 @@ class _ReadingHomeState extends State<ReadingHome> {
 
   @override
   void dispose() {
-    _request?.cancel();
     _library.removeListener(_changed);
     _library.onDelete();
     _library.dispose();
@@ -150,52 +144,12 @@ class _ReadingHomeState extends State<ReadingHome> {
       _routes.open(context, ContinueDestination(key));
   void _search() {
     if (widget.sources.isEmpty) {
-      setState(() => _tab = 1);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).noSources)),
+      );
       return;
     }
-    _routes.open(context, SearchDestination(widget.sources[_source].sourceId));
-  }
-
-  Future<void> _discover() async {
-    _request?.cancel();
-    if (widget.sources.isEmpty || !widget.sources[_source].supportsDiscover) {
-      setState(() {
-        _loading = false;
-        _sections = null;
-        _failure = null;
-      });
-      return;
-    }
-    final request = _request = CancellationSource();
-    setState(() {
-      _loading = true;
-      _failure = null;
-    });
-    Result<List<DiscoverSection>> result;
-    try {
-      result = await widget.repository.discover(
-        widget.sources[_source].sourceId,
-        cancellation: request.token,
-      );
-    } catch (_) {
-      result = Failure(
-        AppFailure(
-          kind: FailureKind.sourceUnavailable,
-          operation: Operation.discover,
-          retryPolicy: RetryPolicy.manual,
-        ),
-      );
-    }
-    if (!mounted || request != _request || request.token.isCancelled) return;
-    setState(() {
-      _loading = false;
-      switch (result) {
-        case Success(:final value):
-          _sections = value;
-        case Failure(:final failure):
-          if (!failure.isCancellation) _failure = failure;
-      }
-    });
+    _routes.open(context, SearchDestination(widget.sources.first.sourceId));
   }
 
   @override
@@ -203,17 +157,8 @@ class _ReadingHomeState extends State<ReadingHome> {
     final strings = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Shiori',
-          style: TextStyle(letterSpacing: 1, fontWeight: FontWeight.w600),
-        ),
+        title: const ShioriLogo(),
         actions: [
-          if (widget.onImport != null)
-            IconButton(
-              onPressed: widget.onImport,
-              icon: const Icon(Icons.file_open_outlined),
-              tooltip: AppLocalizations.of(context).importTitle,
-            ),
           IconButton(
             onPressed: _search,
             tooltip: strings.searchTitle,
@@ -222,6 +167,7 @@ class _ReadingHomeState extends State<ReadingHome> {
           PopupMenuButton<String>(
             tooltip: strings.moreActions,
             onSelected: (value) {
+              if (value == 'import') widget.onImport?.call();
               if (value == 'cache') {
                 Navigator.of(context).push(
                   MaterialPageRoute(
@@ -270,6 +216,11 @@ class _ReadingHomeState extends State<ReadingHome> {
               }
             },
             itemBuilder: (_) => [
+              if (widget.onImport != null)
+                PopupMenuItem(
+                  value: 'import',
+                  child: Text(strings.importTitle),
+                ),
               if (widget.localManagement != null)
                 PopupMenuItem(
                   value: 'local',
@@ -329,223 +280,71 @@ class _ReadingHomeState extends State<ReadingHome> {
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 840),
-                  child: IndexedStack(
-                    index: _tab,
+                  child: Column(
                     children: [
-                      Column(
-                        children: [
-                          if (_library.recent.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  strings.detailContinue,
-                                  style: Theme.of(context).textTheme.titleSmall,
+                      if (_library.recent.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              strings.detailContinue,
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                          ),
+                        ),
+                      if (_library.recent.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 8,
+                          ),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ListTile(
+                              title: Text(
+                                _library.recent.first.snapshot.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                strings.readerChapterProgress(
+                                  (_library
+                                              .recent
+                                              .first
+                                              .position
+                                              .chapterFraction *
+                                          100)
+                                      .round(),
                                 ),
                               ),
-                            ),
-                          if (_library.recent.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 8,
-                              ),
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: ListTile(
-                                  title: Text(
-                                    _library.recent.first.snapshot.title,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Text(
-                                    strings.readerChapterProgress(
-                                      (_library
-                                                  .recent
-                                                  .first
-                                                  .position
-                                                  .chapterFraction *
-                                              100)
-                                          .round(),
-                                    ),
-                                  ),
-                                  leading: SizedBox(
-                                    width: 36,
-                                    child: BookCover(
-                                      book: _library.recent.first.snapshot,
-                                      images: widget.images,
-                                    ),
-                                  ),
-                                  trailing: const Icon(Icons.arrow_forward),
-                                  onTap: () =>
-                                      _continue(_library.recent.first.novelKey),
+                              leading: SizedBox(
+                                width: 36,
+                                child: BookCover(
+                                  book: _library.recent.first.snapshot,
+                                  images: widget.images,
                                 ),
                               ),
-                            ),
-                          Expanded(
-                            child: BookshelfView(
-                              controller: _library,
-                              images: widget.images,
-                              onOpen: _continue,
-                              onDetails: (key) =>
-                                  _routes.open(context, NovelDestination(key)),
-                              onSearch: _search,
+                              trailing: const Icon(Icons.arrow_forward),
+                              onTap: () =>
+                                  _continue(_library.recent.first.novelKey),
                             ),
                           ),
-                        ],
-                      ),
-                      Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                strings.discoverTitle,
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineSmall,
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                strings.discoverTagline,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 8,
-                            ),
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: widget.sources.isEmpty
-                                    ? null
-                                    : _search,
-                                icon: const Icon(Icons.search),
-                                label: Text(strings.searchKeyword),
-                              ),
-                            ),
-                          ),
-                          if (widget.sources.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: DropdownButton<int>(
-                                isExpanded: true,
-                                value: _source,
-                                items: [
-                                  for (
-                                    var i = 0;
-                                    i < widget.sources.length;
-                                    i++
-                                  )
-                                    DropdownMenuItem(
-                                      value: i,
-                                      child: Text(
-                                        widget.sources[i].displayName,
-                                      ),
-                                    ),
-                                ],
-                                onChanged: (value) {
-                                  if (value == null) return;
-                                  setState(() {
-                                    _source = value;
-                                    _sections = null;
-                                  });
-                                  _discover();
-                                },
-                              ),
-                            ),
-                          if (_loading) const LinearProgressIndicator(),
-                          if (_failure != null)
-                            Flexible(
-                              flex: 3,
-                              child: FailureView(
-                                failure: _failure!,
-                                onRetry: _discover,
-                                retryAvailable: !_loading,
-                              ),
-                            ),
-                          if (_failure == null ||
-                              (_sections?.isNotEmpty ?? false))
-                            Expanded(
-                              flex: 3,
-                              child: _sections == null || _sections!.isEmpty
-                                  ? EmptyView(
-                                      message: widget.sources.isEmpty
-                                          ? strings.noSources
-                                          : !widget
-                                                .sources[_source]
-                                                .supportsDiscover
-                                          ? strings.discoverUnsupported
-                                          : strings.discoverEmpty,
-                                    )
-                                  : ListView.builder(
-                                      itemCount: _sections!.fold<int>(
-                                        0,
-                                        (sum, s) => sum + 1 + s.items.length,
-                                      ),
-                                      itemBuilder: (context, index) {
-                                        for (final section in _sections!) {
-                                          if (index == 0) {
-                                            return Padding(
-                                              padding: const EdgeInsets.all(16),
-                                              child: Text(
-                                                section.label,
-                                                style: Theme.of(
-                                                  context,
-                                                ).textTheme.titleLarge,
-                                              ),
-                                            );
-                                          }
-                                          index--;
-                                          if (index < section.items.length) {
-                                            final book = section.items[index];
-                                            return ListTile(
-                                              leading: SizedBox(
-                                                width: 40,
-                                                child: BookCover(
-                                                  book: book,
-                                                  images: widget.images,
-                                                ),
-                                              ),
-                                              title: Text(book.title),
-                                              subtitle: book.authors.isEmpty
-                                                  ? null
-                                                  : Text(
-                                                      book.authors.join(', '),
-                                                    ),
-                                              trailing: const Icon(
-                                                Icons.chevron_right,
-                                              ),
-                                              onTap: () => _routes.open(
-                                                context,
-                                                NovelDestination(book.key),
-                                              ),
-                                            );
-                                          }
-                                          index -= section.items.length;
-                                        }
-                                        return const SizedBox.shrink();
-                                      },
-                                    ),
-                            ),
-                        ],
+                        ),
+                      Expanded(
+                        child: BookshelfView(
+                          controller: _library,
+                          images: widget.images,
+                          onOpen: _continue,
+                          onDetails: (key) =>
+                              _routes.open(context, NovelDestination(key)),
+                          onSearch: _search,
+                        ),
                       ),
                     ],
                   ),
@@ -554,23 +353,6 @@ class _ReadingHomeState extends State<ReadingHome> {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (value) {
-          setState(() => _tab = value);
-          if (value == 1 && _sections == null && !_loading) _discover();
-        },
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.library_books_outlined),
-            label: strings.shelfTitle,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.explore_outlined),
-            label: strings.discoverTitle,
-          ),
-        ],
       ),
     );
   }

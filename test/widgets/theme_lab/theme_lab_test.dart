@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:shiori/domain/models/app_settings.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/theme/shiori_theme.dart';
@@ -14,17 +15,34 @@ void main() {
       return (x > y ? (x + .05) / (y + .05) : (y + .05) / (x + .05));
     }
 
-    for (final brightness in Brightness.values) {
-      final t = shioriTheme(brightness), p = t.extension<ShioriPalette>()!;
-      for (final background in [p.paper, p.surface]) {
-        expect(contrast(p.ink, background), greaterThanOrEqualTo(4.5));
-        expect(contrast(p.secondary, background), greaterThanOrEqualTo(4.5));
-        expect(contrast(p.accent, background), greaterThanOrEqualTo(3));
+    for (final accent in AppAccent.values) {
+      for (final brightness in Brightness.values) {
+        final t = shioriTheme(brightness, accent: accent),
+            p = t.extension<ShioriPalette>()!;
+        for (final background in [p.paper, p.surface]) {
+          expect(contrast(p.ink, background), greaterThanOrEqualTo(4.5));
+          expect(contrast(p.secondary, background), greaterThanOrEqualTo(4.5));
+          expect(contrast(p.accent, background), greaterThanOrEqualTo(3));
+        }
+        expect(
+          contrast(
+            t.colorScheme.primaryContainer,
+            t.colorScheme.onPrimaryContainer,
+          ),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(
+          contrast(
+            t.colorScheme.secondaryContainer,
+            t.colorScheme.onSecondaryContainer,
+          ),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(
+          contrast(t.colorScheme.primary, t.colorScheme.onPrimary),
+          greaterThanOrEqualTo(4.5),
+        );
       }
-      expect(
-        contrast(t.colorScheme.primary, t.colorScheme.onPrimary),
-        greaterThanOrEqualTo(4.5),
-      );
     }
   });
   testWidgets(

@@ -18,10 +18,13 @@ class _BooksPainter extends CustomPainter {
   final ColorScheme colors;
   @override
   void paint(Canvas canvas, Size size) {
-    final ink = Paint()..color = colors.primary;
+    final accent = colors.brightness == Brightness.light
+        ? colors.primaryContainer
+        : colors.primary;
+    final ink = Paint()..color = accent;
     canvas.drawOval(
       Rect.fromLTWH(4, 72, 112, 12),
-      Paint()..color = colors.primary.withValues(alpha: .08),
+      Paint()..color = accent.withValues(alpha: .08),
     );
     for (var i = 0; i < 3; i++) {
       canvas.save();
@@ -36,7 +39,7 @@ class _BooksPainter extends CustomPainter {
         Paint()
           ..color = Color.lerp(
             colors.surfaceContainerHighest,
-            colors.primary,
+            accent,
             .12 + i * .19,
           )!,
       );

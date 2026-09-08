@@ -39,6 +39,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(ChoiceChip, 'Dark'));
       await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Blue grey'));
+      await tester.pumpAndSettle();
+      expect(store.value.accent, AppAccent.blueGrey);
       expect(store.value.themeMode, AppThemeMode.dark);
       expect(
         tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
@@ -52,6 +55,7 @@ void main() {
         tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
         ThemeMode.dark,
       );
+      expect(store.value.accent, AppAccent.blueGrey);
       await tester.pumpWidget(const SizedBox());
     },
   );
@@ -63,6 +67,7 @@ void main() {
       controller.setAppearance(AppThemeMode.dark);
       controller.setAppearance(AppThemeMode.light);
       controller.setAppearance(AppThemeMode.system);
+      controller.setAccent(AppAccent.warmBrown);
       expect(store.writes, hasLength(1));
       store.pending!.complete(
         Failure(
@@ -79,6 +84,7 @@ void main() {
       await controller.retrySettings();
       expect(store.writes, hasLength(2));
       expect(store.value.themeMode, AppThemeMode.system);
+      expect(store.value.accent, AppAccent.warmBrown);
       expect(controller.settingsFailure, isNull);
       controller.onDelete();
       controller.dispose();

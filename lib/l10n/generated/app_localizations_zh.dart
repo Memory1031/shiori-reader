@@ -454,7 +454,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get allChapters => '全部章节';
 
   @override
-  String get lightNovelSource => '轻之国度';
+  String get onlineSource => '在线书源';
 
   @override
   String get readerResetTypography => '恢复默认排版';
@@ -673,4 +673,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get localReadNow => '立即阅读';
+
+  @override
+  String get appAccentTitle => '主题色';
+
+  @override
+  String get appAccentTeal => '青绿';
+
+  @override
+  String get appAccentBlueGrey => '蓝灰';
+
+  @override
+  String get appAccentWarmBrown => '暖棕';
+
+  @override
+  String get appAccentSoftPink => '淡粉';
 }

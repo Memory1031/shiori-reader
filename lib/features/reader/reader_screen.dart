@@ -272,7 +272,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
           ? SystemUiOverlayStyle.light
           : SystemUiOverlayStyle.dark,
       child: Theme(
-        data: readerTheme(_settings, MediaQuery.platformBrightnessOf(context)),
+        data: readerTheme(
+          _settings,
+          MediaQuery.platformBrightnessOf(context),
+          accent: appAccentOf(context),
+        ),
         child: Builder(builder: _body),
       ),
     );

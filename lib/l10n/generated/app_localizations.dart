@@ -974,11 +974,11 @@ abstract class AppLocalizations {
   /// **'All chapters'**
   String get allChapters;
 
-  /// No description provided for @lightNovelSource.
+  /// No description provided for @onlineSource.
   ///
   /// In en, this message translates to:
-  /// **'LightNovel.fun'**
-  String get lightNovelSource;
+  /// **'Online source'**
+  String get onlineSource;
 
   /// No description provided for @readerResetTypography.
   ///
@@ -1399,6 +1399,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Read now'**
   String get localReadNow;
+
+  /// No description provided for @appAccentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Accent color'**
+  String get appAccentTitle;
+
+  /// No description provided for @appAccentTeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft teal'**
+  String get appAccentTeal;
+
+  /// No description provided for @appAccentBlueGrey.
+  ///
+  /// In en, this message translates to:
+  /// **'Blue grey'**
+  String get appAccentBlueGrey;
+
+  /// No description provided for @appAccentWarmBrown.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm brown'**
+  String get appAccentWarmBrown;
+
+  /// No description provided for @appAccentSoftPink.
+  ///
+  /// In en, this message translates to:
+  /// **'Soft pink'**
+  String get appAccentSoftPink;
 }
 
 class _AppLocalizationsDelegate

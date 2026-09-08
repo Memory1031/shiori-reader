@@ -72,7 +72,7 @@ ReaderPosition 的 blockIndex 非负，blockFraction / chapterFraction 必须有
 交接 CORE-003：直接复用这些类型建立 Source / Media / Repository / Failure / cancellation 契约，不引入重复实体、站点参数或通用 dynamic extra。
 
 
-UI-002：ReaderPaper（paper / warm）表示浅色阅读纸色，ReaderThemeMode 继续仅表示阅读明暗；controlsHintSeen 是已确认首次操作提示的阅读偏好，默认 false，恢复排版默认时保留其值。AppSettings 使用独立 schemaVersion=1，只包含 AppThemeMode（system / light / dark，默认 system），不借用或迁移 ReaderThemeMode，不含 Flutter Color / ThemeData 或语言字符串。
+UI-002：ReaderPaper（paper / warm）表示浅色阅读纸色，ReaderThemeMode 继续仅表示阅读明暗；controlsHintSeen 是已确认首次操作提示的阅读偏好，默认 false，恢复排版默认时保留其值。AppSettings 当前使用独立 schemaVersion=2，包含 AppThemeMode（system / light / dark，默认 system）与 AppAccent（teal / blueGrey / warmBrown / softPink，默认 teal）；读取 v1 保留原明暗并补默认青绿，不借用或迁移 ReaderThemeMode，不含 Flutter Color / ThemeData 或语言字符串。
 
 2026-09-07 用户排版反馈：ReaderSettings 的新实例默认 fontSize=18、lineHeight=1.7、paragraphSpacing=8、horizontalPadding=20；已存合法设置不迁移覆盖，schemaVersion 维持 3。首行缩进展示封顶及空白去叠加属于 presentation，不改变 ParagraphBlock.leadingIndent 的 0..8 领域范围或源文本。
 

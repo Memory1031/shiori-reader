@@ -476,7 +476,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get allChapters => 'All chapters';
 
   @override
-  String get lightNovelSource => 'LightNovel.fun';
+  String get onlineSource => 'Online source';
 
   @override
   String get readerResetTypography => 'Reset typography';
@@ -716,4 +716,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localReadNow => 'Read now';
+
+  @override
+  String get appAccentTitle => 'Accent color';
+
+  @override
+  String get appAccentTeal => 'Soft teal';
+
+  @override
+  String get appAccentBlueGrey => 'Blue grey';
+
+  @override
+  String get appAccentWarmBrown => 'Warm brown';
+
+  @override
+  String get appAccentSoftPink => 'Soft pink';
 }

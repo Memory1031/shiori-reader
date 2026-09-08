@@ -632,7 +632,7 @@ Parser 不执行脚本、不加载外部 WebView、不跟随正文任意 link。
 | OQ-05 PARTIALLY_OBSERVED | p / img / ruby / rt / strong / a、整卷长章与 JPEG 已观察；br / 空行、真实极长段 / 图片章及异常仍缺样本 | SRC-009 明确合成 provenance，验证语义顺序与 Ruby 括注；READER-001 验证长章布局。结构摘要不代替生产 Parser 测试，Domain 不拆语义段 |
 | OQ-06 NEEDS VERIFICATION | 原生 pivot viewport 恢复精度、语义顺序、高刷 / 多图性能 | READER-001 实验；不合格再评估维护中的 indexed-scroll 包，阻塞 READER-002 |
 | OQ-07 PARTIALLY_RESOLVED | Mac / Xcode / Simulator 已确认并完成启动 smoke；iPhone 与 development / release 签名环境何时可用？ | 2026-09-08 关闭无 Mac 的环境假设；余项影响对应真机 / 发布验收，不阻塞 Android MVP，也不否定已通过的模拟器 smoke |
-| OQ-08 PARTIALLY_RESOLVED | DB-001 决定拆分用户 / 缓存库，Android 两代备份 XML 排除 disposable 和开发目录；iOS 文档兼容路径已记录 | Android 完整 backup / restore 留 ANDROID-002；iOS 排除属性接入与实测留 IOS-005，专项 NOT_RUN；见 [存储决定](database.md) |
+| OQ-08 PARTIALLY_RESOLVED | DB-001 决定拆分用户 / 缓存库，Android 两代备份 XML 排除 disposable 和开发目录；iOS 文档兼容路径已记录 | Android 完整 backup / restore 于 2026-09-08 按用户决定跳过（NOT_RUN，不阻塞 ANDROID-002 DONE）；iOS 排除属性接入与实测留 IOS-005，专项 NOT_RUN；见 [存储决定](database.md) |
 | OQ-09 TECHNICAL_CHOICE_RESOLVED | CACHE-001 / CACHE-003 采用既有媒体协议的有限持久装饰层，256 MiB payload 分区与独立后台额度 | 不新增缓存包；自制图文件 / 故障 / 重开通过，长期实际容量与真机压力仍待设备验证，见 [缓存](cache.md) |
 | OQ-10 NEEDS VERIFICATION | 最终 SDK / 插件版本、最低 OS、Native dependencies、iOS limitations、生成器兼容 | CORE-001 / 依赖引入任务：Android build + Level A documented review；CI-003 可选 compile；IOS-001 未来实际链接 / runtime，不阻塞 Android |
 | OQ-11 PARTIALLY_OBSERVED | 验收书选择与图文可达子问题 CLOSED：玩乐关系 → 31607 / 44117 / 309555；真实限流规则仍 UNKNOWN | NET-002 / TEST-001 用保守预算并尊重自然 429；不压测；30 次只是客户端政策 |
@@ -1406,6 +1406,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### ANDROID-002 — Android 真机兼容与存储验证
 
+- Status：**DONE（2026-09-08，按用户确认的验收范围）**。ARM64 真机 Profile 存储 / 离线图文 / 强杀进度恢复、官方模拟器交叉及正式入口 Release 安装通过；修复 Release INTERNET 权限，交付可选青绿 / 蓝灰 / 暖棕主题。375 项测试与 analyze PASS。用户明确决定跳过完整系统备份恢复及文件系统空间耗尽验证，不再作为本任务完成门槛；这些检查仍记录为 NOT_RUN，不计为测试通过。范围与证据见 [Android 验收](validation/android.md)。
 - Phase：7；Complexity：M。
 - Goal：排除 MuMu 未覆盖的真实 Android 问题。
 - Input：第 26、31 节与实际 App；Dependencies：ANDROID-001、CACHE-004、CACHE-005。
@@ -1417,6 +1418,10 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：至少一台 Android ARM64 手机验证 network / TLS / SQLite / filesystem / lifecycle / kill / cache / image decode / scroll / memory / offline cold boot / release-mode install，官方模拟器交叉；性能定量留 TEST-003、正式签名 RC 留 RELEASE-002；iOS 共享代码只做兼容审查。
 
 #### UX-001 — Android 交互收尾与 iOS 兼容审查
+
+- Status：**DONE（2026-09-08）**。按当前 Android 范围完成核查：140 项既有 UI 回归、4 组新增中英文双倍字体横竖屏 / 语义检查通过，修复明暗选项图标叠加；真机系统栏、键盘 / 返回及隔离样例阅读交互已核查。TalkBack 真实朗读、厂商手势穷举未实测，iOS 仅 Level A；完整证据边界见 [UX 验收](validation/ux.md)。
+
+- 产品范围调整（2026-09-08，用户确认）：移除正式应用发现 / 推荐页及底部导航，书架为唯一首页，保留搜索 / 导入。自有界面不展示来源品牌名或域名，使用中性“在线书源”；内部来源身份与契约保留。此增量不代表 UX-001 全部验收完成，见 [应用说明](app.md)。
 
 - Phase：7；Complexity：M。
 - Goal：完成当前 Android 移动 UI 细节并保留 iOS 交互兼容。

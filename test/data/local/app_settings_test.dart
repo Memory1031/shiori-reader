@@ -10,6 +10,23 @@ import 'repositories_test.dart' show Preferences, token, value;
 
 void main() {
   test(
+    'v1 appearance adopts teal without losing brightness; all v2 accents round trip',
+    () {
+      expect(
+        AppSettings.fromJson({'schemaVersion': 1, 'themeMode': 'dark'}),
+        AppSettings(themeMode: AppThemeMode.dark, accent: AppAccent.teal),
+      );
+      for (final accent in AppAccent.values) {
+        final settings = AppSettings(
+          themeMode: AppThemeMode.dark,
+          accent: accent,
+        );
+        expect(AppSettings.fromJson(settings.toJson()), settings);
+      }
+    },
+  );
+
+  test(
     'application and reader keys are independent; migration and unknown reads are non-destructive',
     () async {
       final prefs = Preferences(), logger = AppLogger();

@@ -98,3 +98,6 @@ READER-005：LibraryRepository 契约不变。Tracker 借用仓库，beginProgre
 UI-002：SettingsStore 签名不变，读取 v1 / v2 到 ReaderSettings v3，仅用户显式修改或确认操作提示后保存新版本；读取未知版本不覆盖原值。新增独立 AppSettingsStore.load / save，传递纯 Domain AppSettings，遵守同样取消与 Result 失败语义。两个设置存储使用不同 key，彼此保存不写对方记录；不承诺跨设置或 SQLite 事务。AppController 注入 AppSettingsStore，阅读会话继续注入 SettingsStore，不通过全局 Get 服务定位。
 
 CORE-005：生产 DefaultNovelRepository 与 SourceRegistry 已实现，契约签名不变。基础读取使用本地规范化记录，失效记录后台刷新，同 key 去重并隔离调用者取消；写缓存失败仍交付 remote 内容并记录安全诊断。装配工厂及 close 所有权、无 TTL 基线与验证见 [Repository 实现](novel-repository.md)。完整 TTL / 容量 / 清理竞态仍由 CACHE 任务完成。
+
+
+ANDROID-002 附带用户授权的主题色选择（2026-09-08）：AppSettings 升至 v2，AppAccent 保存语义枚举而非颜色值，AppSettingsStore 签名不变；v1 兼容读取保留明暗并补青绿。AppController 的明暗与主题色共用串行合并写入与失败重试，Reader 控件继承应用主题色但阅读明暗 / 纸张设置不变。

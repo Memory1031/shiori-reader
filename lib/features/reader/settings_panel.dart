@@ -16,6 +16,7 @@ class ReaderSettingsPanel extends StatelessWidget {
       data: readerTheme(
         preferences.value,
         MediaQuery.platformBrightnessOf(context),
+        accent: appAccentOf(context),
       ),
       child: Builder(
         builder: (context) {
