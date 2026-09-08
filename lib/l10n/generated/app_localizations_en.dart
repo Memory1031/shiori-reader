@@ -655,4 +655,31 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get importUnreadable =>
       'The file could not be read. Check access and choose it again.';
+
+  @override
+  String get importEncodingHint =>
+      'Check the previews and choose the encoding that displays the text correctly.';
+
+  @override
+  String get importEncodingAuto => 'Text encoding: Automatic';
+
+  @override
+  String get importEncodingInvalid =>
+      'The entire file could not be decoded with this encoding. Choose another encoding or check the original.';
+
+  @override
+  String get importDrm =>
+      'This EPUB contains protected or encrypted content and cannot be imported.';
+
+  @override
+  String get importFixedLayout =>
+      'Fixed-layout EPUB is not supported. Use a reflowable edition.';
+
+  @override
+  String get importParseLimit =>
+      'Parsing limits exceeded: TXT 16 MiB, EPUB 64 MiB. Oversized chapters, images, or expanded content are also unsupported.';
+
+  @override
+  String get importEpubSupport =>
+      'Supports ordinary reflowable EPUB text and images. Styling is simplified; scripts, external resources, and custom fonts are not loaded. Missing images keep a placeholder.';
 }

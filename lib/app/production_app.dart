@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../data/import/platform_import_source.dart';
+import '../data/local/book_decoder.dart';
 import '../features/import/import_controller.dart';
 import '../features/import/import_overlay.dart';
 import 'package:flutter/material.dart';
@@ -67,7 +68,7 @@ class _ProductionAppState extends State<ProductionApp> {
       _imports = ImportController(
         source: PlatformImportSource(),
         store: databases.localBooks,
-        parsers: const {},
+        decoder: const BookDecoder(),
       );
       unawaited(_imports!.start());
       _services = SourceServices(

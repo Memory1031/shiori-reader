@@ -8,6 +8,8 @@ environment:
   flutter: '>=3.38.4 <3.39.0'
 
 dependencies:
+  archive: 4.2.0
+  xml: 6.6.1
   html: 0.15.7
   characters: 1.4.0
   crypto: 3.0.7
@@ -36,4 +38,5 @@ flutter:
   generate: true
   uses-material-design: true
   assets:
+    - assets/licenses/whatwg-encoding.txt
     - assets/branding/shiori-chibi-logo-v1.png

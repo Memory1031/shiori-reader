@@ -618,4 +618,27 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get importUnreadable => '无法读取文件，请确认文件仍可访问后重新选择。';
+
+  @override
+  String get importEncodingHint => '请检查预览，选择文字显示正确的编码后继续。';
+
+  @override
+  String get importEncodingAuto => '文字编码：自动识别';
+
+  @override
+  String get importEncodingInvalid => '无法按所选编码完整解码，请更换编码或检查原文件。';
+
+  @override
+  String get importDrm => '这本 EPUB 含受保护或加密的内容，暂不支持导入。';
+
+  @override
+  String get importFixedLayout => '暂不支持固定版式 EPUB，请使用流式排版版本。';
+
+  @override
+  String get importParseLimit =>
+      '文件超过解析限制：TXT 16 MiB、EPUB 64 MiB；过大的章节、图片或解压内容也无法导入。';
+
+  @override
+  String get importEpubSupport =>
+      '支持普通流式 EPUB 图文。文字样式简化；脚本、外部资源和自定义字体不加载，缺失图片保留占位。';
 }

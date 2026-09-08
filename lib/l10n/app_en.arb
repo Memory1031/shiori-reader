@@ -233,5 +233,12 @@
   "importParserUnavailable": "This version cannot parse this format yet. Nothing was imported. You can cancel and choose the file again later.",
   "importStorage": "The file could not be saved. Check available space and retry.",
   "importCancelled": "Import cancelled. The book was not saved.",
-  "importUnreadable": "The file could not be read. Check access and choose it again."
+  "importUnreadable": "The file could not be read. Check access and choose it again.",
+  "importEncodingHint": "Check the previews and choose the encoding that displays the text correctly.",
+  "importEncodingAuto": "Text encoding: Automatic",
+  "importEncodingInvalid": "The entire file could not be decoded with this encoding. Choose another encoding or check the original.",
+  "importDrm": "This EPUB contains protected or encrypted content and cannot be imported.",
+  "importFixedLayout": "Fixed-layout EPUB is not supported. Use a reflowable edition.",
+  "importParseLimit": "Parsing limits exceeded: TXT 16 MiB, EPUB 64 MiB. Oversized chapters, images, or expanded content are also unsupported.",
+  "importEpubSupport": "Supports ordinary reflowable EPUB text and images. Styling is simplified; scripts, external resources, and custom fonts are not loaded. Missing images keep a placeholder."
 }

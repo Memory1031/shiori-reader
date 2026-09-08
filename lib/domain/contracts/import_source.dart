@@ -22,6 +22,10 @@ enum ImportProblem {
   busy,
   invalidContent,
   parserUnavailable,
+  encoding,
+  drm,
+  fixedLayout,
+  parseLimit,
   storage,
   cancelled,
 }

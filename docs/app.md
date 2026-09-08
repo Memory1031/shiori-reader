@@ -175,4 +175,7 @@ TEST-001：新增 SourceServices 作为显式在线数据装配，Source注册�
 
 ## LOCAL-002 文件导入入口（2026-09-08）
 
-正式应用装配 ImportController + PlatformImportSource + 现有 LocalBookStore，首页入口打开根级 ImportOverlay。外部文件只触发待处理提示，用户确认 / 稍后不会替换现有导航或阅读会话。退出先取消并等待导入，再关闭本地库。当前解析器注册表为空，确认提示尚未支持解析；fake parser 不进入生产装配。详细生命周期、App Group 及验证边界见 [本地导入](local-import.md)。
+正式应用装配 ImportController + PlatformImportSource + 现有 LocalBookStore，首页入口打开根级 ImportOverlay。外部文件只触发待处理提示，用户确认 / 稍后不会替换现有导航或阅读会话。退出先取消并等待导入，再关闭本地库。LOCAL-002 验收时注册表为空；LOCAL-003 / 004 已接入实际 BookDecoder，fake parser 仅用于测试。详细生命周期、App Group 及验证边界见 [本地导入](local-import.md)。
+
+
+LOCAL-003 / 004（2026-09-08）：ProductionApp 注入实际 BookDecoder；TXT 编码不确定时导入面板展示预览与选择，等待期间允许取消；EPUB 显示流式图文支持 / 降级范围。严格解码、格式拒绝和限额错误有中英文反馈。成功表示托管入库，书架与 Reader 连接仍由 LOCAL-005 交付。详见 [解析支持范围](local-parsers.md)。

@@ -4,6 +4,8 @@
 
 LOCAL-001（2026-09-07）：新增纯 Dart LocalBookFormat、LocalBookContent / LocalBookRecord 和 LocalBookIdentity。保留 `local` namespace，书籍用原文件 SHA-256、章节用解析器稳定定位符摘要，blockKey 沿用现有算法；不增加平台路径或页码身份。详细限制和后续 EPUB fragment 边界见 [本地导入](local-import.md)。
 
+LOCAL-003 / 004（2026-09-08）：`LocalBookContent` 增加独立的不可变 navigation 树，`LocalNavigationEntry` 用语义 blockKey 定位 EPUB fragment，允许多项指向同章，保持既有 Catalog 章身份 / 顺序不变。TXT 章节以去 BOM 后、规范化前的 code-point offset 定位，EPUB 以规范化包内 spine 路径定位。具体规则见 [本地解析](local-parsers.md)。
+
 CACHE-001..005（2026-09-07）：新增缓存状态投影 CachedChapter / CacheOverview 与 PrefetchState，均为不可变 Domain 数据。预取选择只使用既有 ChapterKey，不改变 Catalog.ordinal、ChapterContent、ReaderPosition 或 ReadingProgress 的语义；选择不表示已读，也不构造未经验证的续篇关系。接口见 [contracts](contracts.md)，验证见 [缓存](cache.md)。
 
 2026-09-07，Dart 3.10.3。入口为 `lib/domain/models/models.dart`，摘要 helper 为 `lib/domain/content_identity.dart`。本轮只实现模型和不变量，Source / Repository / AppFailure 契约留给 CORE-003。

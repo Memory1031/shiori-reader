@@ -2,14 +2,14 @@
 
 > iOS 状态更新（2026-09-08）：Mac / Simulator 已可用，当前证据见 [IOS-001 报告](validation/ios-001.md)。正式应用启动证据及 LOCAL-002 原生验证分开记录，后者见 [LOCAL-002 报告](validation/local-002.md)。系统分享面板及扩展交接已补验；Files 实际选中文件和签名真机矩阵仍待验。下方带日期的 `DEFERRED_NO_MAC` 等结论是当次历史记录，不代表当前环境。
 
-LOCAL-001 已交付存储基础与解析器提交契约；LOCAL-002 增加文件选择、外部接收与导入编排，详见文末。TXT / EPUB 实际解析及书架 / Reader 接入仍留 LOCAL-003..005，未实现整书下载。
+LOCAL-001 已交付存储基础与解析器提交契约；LOCAL-002 增加文件选择、外部接收与导入编排，详见文末。LOCAL-003 / 004 已接入 TXT / EPUB 实际解析，详见 [解析支持范围](local-parsers.md)；书架 / Reader 闭环仍留 LOCAL-005，未实现整书下载。
 
 ## 身份与内容边界
 
 - 保留 `SourceId('local')` namespace，`NovelKey.novelId` 为原文件完整字节的 SHA-256。文件名、外部路径、标题、格式选择和排版不参与身份；同文件重复导入返回已有记录，不重新解析、覆盖正文或更新进度。同名不同文件是不同书籍。
 - `LocalBookIdentity.chapter` 对解析器提供的稳定定位符生成 ID。TXT 使用原始章节起点的 code-point offset；EPUB 使用规范化 spine href。具体切章及 href 规范化由 LOCAL-003 / 004 固定，不得使用显示标题、屏幕页码或临时解压目录。
 - `ChapterContent` 沿用既有 blockKey / contentRevision 算法。`LocalBookContent` 提交完整 Detail、Catalog 和按目录顺序的 Chapters；提交校验同书归属、章数量 / 顺序及所有封面 / 插图均为本次托管资源。
-- EPUB nav / NCX、fragment 与语义块的映射仍由 LOCAL-004 / 005 完成；本任务不把现有 Catalog 冒充已经具备 EPUB 片段导航。
+- LOCAL-004 用独立的 LocalNavigationEntry 树保存 nav / NCX 与语义块映射，不改变 Catalog 的唯一 spine 章序；实际点击跳转由 LOCAL-005 接入。
 - `MediaRef` 无需增加平台路径或 URL 字段：本地资源使用 `local` SourceId，mediaId 为 `书籍摘要/资源字节摘要`。这里是逻辑引用，数据层自行解析；搬迁应用根目录后引用不变。
 
 ## 接口与生命周期
@@ -77,7 +77,7 @@ iOS Level A 代码兼容审查完成，runtime 仍 DEFERRED_NO_MAC，未宣称 i
 
 新增首页文件入口，以及不会替换 Navigator / Reader 的根级提示。外部接收只显示待处理提示，用户可“稍后”，由用户确认后才调用导入。中英文文案来自 ARB；扩展使用独立 en / zh-Hans Localizable.strings。面板支持滚动与大字号。复制和文件 I/O 在后台执行；取消会等待复制 / 解析收束，再删除对应 receipt，提交后的成功优先于迟到的取消。
 
-领域层 `ImportSource` 只暴露不可变文件候选、事件、流式读取、确认与取消；不泄露 URI、平台权限或路径。数据层 `PlatformImportSource` 持有 native 返回的应用自有文件路径。应用装配显式注入源、LocalBookStore 和解析器映射。当前正式解析器映射为空，确认时明确提示暂不支持解析；fake parser 仅用于测试，不写入生产行为。实际解码、章节和 EPUB 结构校验由后续任务实现。
+领域层 `ImportSource` 只暴露不可变文件候选、事件、流式读取、确认与取消；不泄露 URI、平台权限或路径。数据层 `PlatformImportSource` 持有 native 返回的应用自有文件路径。应用装配显式注入源、LocalBookStore 和解析器映射。LOCAL-002 验收时正式解析器映射为空，fake parser 仅用于测试；后续 LOCAL-003 / 004 已以 BookDecoder 接入生产实际解码、章节和 EPUB 结构校验，新增编码预览和明确格式错误。
 
 ### 平台接收与持久交接
 

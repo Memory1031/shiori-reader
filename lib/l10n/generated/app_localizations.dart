@@ -1297,6 +1297,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The file could not be read. Check access and choose it again.'**
   String get importUnreadable;
+
+  /// No description provided for @importEncodingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the previews and choose the encoding that displays the text correctly.'**
+  String get importEncodingHint;
+
+  /// No description provided for @importEncodingAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Text encoding: Automatic'**
+  String get importEncodingAuto;
+
+  /// No description provided for @importEncodingInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The entire file could not be decoded with this encoding. Choose another encoding or check the original.'**
+  String get importEncodingInvalid;
+
+  /// No description provided for @importDrm.
+  ///
+  /// In en, this message translates to:
+  /// **'This EPUB contains protected or encrypted content and cannot be imported.'**
+  String get importDrm;
+
+  /// No description provided for @importFixedLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed-layout EPUB is not supported. Use a reflowable edition.'**
+  String get importFixedLayout;
+
+  /// No description provided for @importParseLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Parsing limits exceeded: TXT 16 MiB, EPUB 64 MiB. Oversized chapters, images, or expanded content are also unsupported.'**
+  String get importParseLimit;
+
+  /// No description provided for @importEpubSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Supports ordinary reflowable EPUB text and images. Styling is simplified; scripts, external resources, and custom fonts are not loaded. Missing images keep a placeholder.'**
+  String get importEpubSupport;
 }
 
 class _AppLocalizationsDelegate

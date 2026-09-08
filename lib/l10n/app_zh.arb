@@ -233,5 +233,12 @@
   "importParserUnavailable": "当前版本暂不支持解析此格式。文件尚未导入，你可以取消并稍后重新选择。",
   "importStorage": "无法保存文件，请检查可用空间后重试。",
   "importCancelled": "导入已取消，书籍未提交。",
-  "importUnreadable": "无法读取文件，请确认文件仍可访问后重新选择。"
+  "importUnreadable": "无法读取文件，请确认文件仍可访问后重新选择。",
+  "importEncodingHint": "请检查预览，选择文字显示正确的编码后继续。",
+  "importEncodingAuto": "文字编码：自动识别",
+  "importEncodingInvalid": "无法按所选编码完整解码，请更换编码或检查原文件。",
+  "importDrm": "这本 EPUB 含受保护或加密的内容，暂不支持导入。",
+  "importFixedLayout": "暂不支持固定版式 EPUB，请使用流式排版版本。",
+  "importParseLimit": "文件超过解析限制：TXT 16 MiB、EPUB 64 MiB；过大的章节、图片或解压内容也无法导入。",
+  "importEpubSupport": "支持普通流式 EPUB 图文。文字样式简化；脚本、外部资源和自定义字体不加载，缺失图片保留占位。"
 }

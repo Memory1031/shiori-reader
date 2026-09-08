@@ -29,6 +29,7 @@ Shiori（栞，书签）面向 Android 和 iOS，计划提供小说发现与搜�
 | --- | --- |
 | Flutter 基础工程 | Android / iOS 工程、应用图标、中英多语言与 VS Code 启动配置已建立 |
 | 领域层 | 纯 Dart 领域模型、内容身份摘要与 Source / Repository 契约已交付 |
+| 本地导入 | TXT 编码 / 章节、EPUB 包 / 图文 / 目录锚点解析已接入托管入库；书架与阅读闭环留 LOCAL-005 |
 | 数据层 | 受限网络客户端、内存图片仓库与 Drift 双库存储（书架 / 进度 / 缓存记录）已交付 |
 | 阅读器 | 双模式阅读、图文、跨章与进度恢复已实现；iOS 阅读器专项仍待验 |
 | 离线开发入口 | `main_dev.dart` 场景菜单与生产隔离已交付 |
@@ -50,7 +51,7 @@ Shiori（栞，书签）面向 Android 和 iOS，计划提供小说发现与搜�
 | Dart | **3.10.3**，随上述 Flutter SDK 提供 |
 | Android | 最低 API 24；编译 / 目标 API 36 |
 | Java | JDK 17 |
-| iOS | 项目最低版本 15.0；本次在 Xcode 26.5 + iOS 26.2 模拟器验证，iOS 15.0 runtime 未测 |
+| iOS | 项目最低版本 15.0；本次在 Xcode 26.5 + iOS 26.5 模拟器验证，iOS 15.0 runtime 未测 |
 | 编辑器 | VS Code + Flutter / Dart 扩展，或其他 Flutter 开发环境 |
 
 请使用固定的 Flutter 版本。Android SDK、NDK、Gradle 与本地 JDK 的完整配置见[开发环境说明](docs/development.md)。
@@ -162,7 +163,7 @@ dart bin/source_probe.dart
 - [ ] 完善阅读排版与设置。
 - [ ] 实现本地书架、阅读历史和进度恢复界面（存储层已就绪）。
 - [ ] 实现有容量限制的缓存与离线续读。
-- [ ] 实现本地 TXT / 无 DRM EPUB 导入（存储与文件接收流程已接入，实际解析及阅读接入待完成）。
+- [ ] 实现本地 TXT / 无 DRM EPUB 导入（存储、文件接收和实际解析已接入，书架与阅读闭环待 LOCAL-005 完成）。
 - [ ] 完成 Android ARM64 真机验证与发布准备。
 - [x] 完成 iOS Simulator Debug 构建、安装与启动 smoke。
 - [ ] 完成 iOS 专项功能、iPhone 设备验证与发布准备。

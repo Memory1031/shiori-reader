@@ -12,7 +12,7 @@
 
 Shiori（栞）是 Android / iOS 轻小说客户端，支持在线阅读和本地 TXT / EPUB 导入。最小业务闭环是发现或搜索小说，或导入本地书籍，查看详情及卷章节目录、原生阅读、加入本地书架、保存并恢复阅读进度；在线书籍利用已有缓存离线继续阅读，本地导入书籍通过应用托管文件完整离线阅读。
 
-**范围更新（2026-09-07，用户授权纳入规划）**：本地 TXT 与无 DRM 的流式 EPUB 纳入 MVP，新增 LOCAL-001..005。后续执行更新：LOCAL-001 / LOCAL-002 已完成，LOCAL-003..005 仍为 PLANNED。复用现有双模式阅读器、目录、书架和进度，不依赖生产网站可用；不自动开始后续任务。
+**范围更新（2026-09-07，用户授权纳入规划）**：本地 TXT 与无 DRM 的流式 EPUB 纳入 MVP，新增 LOCAL-001..005。后续执行更新：LOCAL-001..004 已完成，LOCAL-005 仍为 PLANNED。复用现有双模式阅读器、目录、书架和进度，不依赖生产网站可用；不自动开始后续任务。
 
 首个生产 Source 是用户指定的 [LightNovel.fun](https://www.lightnovel.fun/)。SRC-001 / SRC-002 已观察访客首页，以及样本小说的搜索、详情、四卷目录、正文和浏览器图片解码，并独立验证核心 HTTP 协议，证据见 [源站调查](source/lightnovel.md)。自动化链路、会话寿命、异常覆盖和使用许可仍有待项，生产接入 Gate 未通过。未来 Source 通过同一业务边界接入；第一版不实现第二个生产 Source。
 
@@ -1217,7 +1217,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Platform Notes：Android 导航 / lifecycle 当前在 PROGRESS-001 验证；iOS runtime 延期 IOS-004，不作为 Phase 4 Hard Gate。
 - Test Requirements：fixture 跨卷 / 失败 / 快速切章集成、有界真实图文 smoke；明确用 MEDIA-001 运行且无 persistent cache 模块，Phase 6 更换实现后 renderer tests 不改业务预期。
 
-### Local Import tasks（新增 MVP 范围，均未执行）
+### Local Import tasks（本地导入 MVP）
 
 #### LOCAL-001 — 本地书籍身份、托管存储与契约
 
@@ -1243,31 +1243,35 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Platform Notes：选插件 / 原生接收方案时核验锁定 Flutter / Android / iOS 兼容性；Android 用实际文件 provider 验证打开与分享、临时 URI 权限，不索取全盘权限。iOS 明确文档类型、临时文件访问、扩展与主应用共享暂存 / 完成交接 / 回收、签名及 entitlement 配置；2026-09-08 已完成主应用 / 扩展 Simulator debug 构建、7 项原生测试、系统文件 URL 接收及冷启动副本恢复；后续已补真实分享面板 TXT / EPUB 冷启动交接及原生选择取消；Files 实际选中文件、云提供者和签名真机矩阵仍归 IOS-005。各类证据不能互相替代。
 - Test Requirements：选择取消、读取中断、超限、导入取消后晚结果、失败重试 widget tests；冷 / 热启动文件事件、重复投递、失效权限、错误类型、多文件反馈、分享交接中断回收；Android 分别从文件管理器“打开方式”和其他应用“分享”导入 TXT / EPUB，并验证原文件移走后读取。LOCAL-005 用实际解析器补完整阅读闭环，iOS 同类运行证据独立延期。
 
-- 执行证据：双端接收边界、根级中英文导入面板、可取消流式提交已接入；完整离线测试 330 项 PASS。正式解析器映射为空，不自动开始 LOCAL-003 / 004。Android arm64 debug 构建、系统选择器 / Files 外部打开、私有 Provider TXT / EPUB 打开分享及错误恢复 PASS；iOS 7 项原生测试与真实分享 / 原生选择取消 PASS。剩余 iOS Files / 云提供者、签名真机和完整阅读闭环按 IOS-005 / LOCAL-005 继续，详见 [LOCAL-002 验证记录](validation/local-002.md)。
+- 执行证据：双端接收边界、根级中英文导入面板、可取消流式提交已接入；完整离线测试 330 项 PASS。LOCAL-002 当次验收时正式解析器映射为空；后续 LOCAL-003 / 004 已接入 BookDecoder。Android arm64 debug 构建、系统选择器 / Files 外部打开、私有 Provider TXT / EPUB 打开分享及错误恢复 PASS；iOS 7 项原生测试与真实分享 / 原生选择取消 PASS。剩余 iOS Files / 云提供者、签名真机和完整阅读闭环按 IOS-005 / LOCAL-005 继续，详见 [LOCAL-002 验证记录](validation/local-002.md)。
 
 #### LOCAL-003 — TXT 解码与章节解析
 
-- Status：PLANNED；Phase：5 扩展；Complexity：M。
+- Status：DONE（2026-09-08）；Phase：5 扩展；Complexity：M。
 - Goal：把常见中文 TXT 转成可导航的原生正文。
 - Input：本地存储与导入流程；Dependencies：LOCAL-001、LOCAL-002。
 - Scope：UTF-8 / BOM、UTF-16 BOM、GB18030（含常见 GBK 文件）解码；不确定编码提供预览与手动选择；统一换行、保留段落 / 空白语义、保守识别章标题，无匹配时作为整篇；解析器依赖与性能限额在实现时验证。
 - Files / Modules Expected：`lib/data/local/txt/`、编码选择 UI / ARB、自写 TXT fixtures。
 - Deliverables：Novel 元数据、Catalog、ChapterContent 及稳定身份；无标题使用文件名作为可编辑前的默认标题。
 - Acceptance Criteria：不能静默用替换字符提交乱码；非标准编号、重复章名不覆盖；无章节书可读；长单段不因渲染 chunk 改写；标题识别不丢失原文；首版不提供复杂规则编辑器。
-- Platform Notes：解析在适当后台执行单元运行，避免主 isolate 长时间阻塞；共享 Dart 逻辑，iOS runtime 延期。
+- Platform Notes：解析在适当后台执行单元运行，避免主 isolate 长时间阻塞；共享 Dart 逻辑；已补 iOS 26.5 Simulator 解析 / 存储运行验证，签名真机及阅读闭环仍待 IOS-005 / LOCAL-005。
 - Test Requirements：各支持编码、非法字节、CRLF / LF、空文件、无标题、多章 / 重复标题、长单段、大文件取消及原文完整性。
+
+- 执行证据：实际 BookDecoder 已接入生产导入流程；新增解析 / 导入测试共 36 项，完整离线回归 366 项及 analyze PASS；Android / iOS 模拟器完成真实解析、数据库重开、去重与 PNG 解码探针。支持范围和精确限额见 [本地解析](local-parsers.md)，证据 / 未验边界见 [联合验收](validation/local-003-004.md)。LOCAL-005 不在本轮范围。
 
 #### LOCAL-004 — EPUB 包、目录与图文解析
 
-- Status：PLANNED；Phase：5 扩展；Complexity：L。
+- Status：DONE（2026-09-08）；Phase：5 扩展；Complexity：L。
 - Goal：支持无 DRM 的普通流式 EPUB 2 / 3，以原生阅读器显示基础图文。
 - Input：本地存储与导入流程、ContentBlock / Media 契约；Dependencies：LOCAL-001、LOCAL-002。
 - Scope：container / OPF 元数据、spine 阅读顺序、nav / NCX 目录与 fragment 映射、封面 / 内嵌图片、相对路径解析；XHTML 转 Heading / Paragraph / Divider / Image，基础强调等按现有模型能力保留或明确降级；不引入 WebView 执行正文。
 - Files / Modules Expected：`lib/data/local/epub/`、本地媒体适配、自建 EPUB fixtures、解析测试与支持范围文档。
 - Deliverables：有序 Catalog、正文、目录语义锚点与本地图片读取；不支持格式的明确错误 / 降级说明。
 - Acceptance Criteria：spine 与目录顺序不同仍按 spine 阅读；嵌套目录及同章多个 fragment 可定位，缺 fragment 降级章首；无目录时按 spine 生成；图片缺失只影响该图；不执行脚本或自动请求外部资源；DRM / 固定版式明确拒绝；限制条目数 / 解压总量 / 单项大小，拒绝越界路径和畸形包，具体限额实现时记录。
-- Platform Notes：ZIP / XML / HTML 库选择核验 SDK 与许可；本地媒体遵循统一解码 / lease 生命周期，不能把路径伪装成网络 URL；iOS runtime 延期 IOS-005。
+- Platform Notes：ZIP / XML / HTML 库选择核验 SDK 与许可；本地媒体遵循统一解码 / lease 生命周期，不能把路径伪装成网络 URL；已补 iOS 26.5 Simulator 解析 / 图片运行验证，签名真机及阅读闭环仍待 IOS-005 / LOCAL-005。
 - Test Requirements：EPUB 2 NCX、EPUB 3 nav、跨卷 / 嵌套目录、fragment、spine 顺序、封面 / 相对图片路径、缺资源、损坏包、路径穿越 / 超限、自写中日文及长章。
+
+- 执行证据：实际 BookDecoder 已接入生产导入流程；新增解析 / 导入测试共 36 项，完整离线回归 366 项及 analyze PASS；Android / iOS 模拟器完成真实解析、数据库重开、去重与 PNG 解码探针。支持范围和精确限额见 [本地解析](local-parsers.md)，证据 / 未验边界见 [联合验收](validation/local-003-004.md)。LOCAL-005 不在本轮范围。
 
 #### LOCAL-005 — 本地书架、目录跳转与离线阅读闭环
 

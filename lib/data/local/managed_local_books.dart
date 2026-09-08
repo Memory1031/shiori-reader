@@ -9,6 +9,8 @@ import '../../domain/models/models.dart';
 import 'database/user_database.dart';
 import 'files/app_paths.dart';
 import 'local_guard.dart';
+import 'parser_worker.dart';
+import '../../domain/contracts/local_book_decoder.dart';
 import 'record_codec.dart';
 
 /// Durable imported originals and normalized content. Never uses cache.db.
@@ -73,7 +75,9 @@ class ManagedLocalBooks implements LocalBookStore {
         return Success<T>(await action());
       } catch (e) {
         return Failure<T>(
-          e is _LimitExceeded
+          e is _LimitExceeded ||
+                  e is LocalParseException &&
+                      e.problem == LocalParseProblem.tooLarge
               ? AppFailure(kind: FailureKind.tooLarge, operation: op)
               : e is FormatException
               ? AppFailure(
@@ -117,19 +121,15 @@ class ManagedLocalBooks implements LocalBookStore {
       );
       final content = await parse(session);
       await session.finish();
-      _validate(content, key, session.media);
       checkLocalCancellation(cancellation);
       final importedAt = DateTime.now().toUtc();
-      final manifest = utf8.encode(
-        jsonEncode({
-          'version': 1,
-          'format': format.name,
-          'importedAt': importedAt.toIso8601String(),
-          'detail': RecordCodec.detail(content.detail),
-          'catalog': RecordCodec.catalog(content.catalog),
-          'chapters': content.chapters.map(RecordCodec.chapter).toList(),
-          'media': session.media.toList()..sort(),
-        }),
+      final manifest = await _encodeManifest(
+        content,
+        key,
+        session.media,
+        format,
+        importedAt,
+        cancellation,
       );
       if (manifest.length > maxManifestBytes ||
           session.used + manifest.length > maxBundleBytes) {
@@ -194,6 +194,24 @@ class ManagedLocalBooks implements LocalBookStore {
         chapters.length != content.chapters.length) {
       throw const FormatException('Local book identity mismatch');
     }
+    var navigationCount = 0;
+    final byKey = {for (final c in content.chapters) c.key: c};
+    void validateNavigation(List<LocalNavigationEntry> entries, int depth) {
+      if (depth > 32) throw const FormatException('Navigation too deep');
+      for (final entry in entries) {
+        final chapter = byKey[entry.chapterKey];
+        if (++navigationCount > 10000 ||
+            entry.title.trim().isEmpty ||
+            chapter == null ||
+            (entry.blockKey != null &&
+                !chapter.blocks.any((b) => b.blockKey == entry.blockKey))) {
+          throw const FormatException('Invalid local navigation');
+        }
+        validateNavigation(entry.children, depth + 1);
+      }
+    }
+
+    validateNavigation(content.navigation, 0);
     final refs = <MediaRef>[?content.detail.summary.cover];
     for (var i = 0; i < chapters.length; i++) {
       if (content.chapters[i].key != chapters[i].key) {
@@ -246,6 +264,9 @@ class ManagedLocalBooks implements LocalBookStore {
     final content = LocalBookContent(
       detail: RecordCodec.readDetail(map['detail'] as String),
       catalog: RecordCodec.readCatalog(map['catalog'] as String),
+      navigation: (map['navigation'] as List? ?? const []).map(
+        (e) => LocalNavigationEntry.fromJson(e as Map<String, dynamic>),
+      ),
       chapters: (map['chapters'] as List).cast<String>().map(
         RecordCodec.readChapter,
       ),
@@ -409,3 +430,28 @@ class _ImportSession implements LocalImportSession {
     await Future.wait(pending);
   }
 }
+
+// Keep validation, digest generation and potentially large JSON encoding off
+// the UI isolate. The worker owns only immutable values, never the live store.
+Future<List<int>> _encodeManifest(
+  LocalBookContent content,
+  NovelKey key,
+  Set<String> media,
+  LocalBookFormat format,
+  DateTime importedAt,
+  CancellationToken cancellation,
+) => runParserWorker(() {
+  ManagedLocalBooks._validate(content, key, media);
+  return utf8.encode(
+    jsonEncode({
+      'version': 1,
+      'navigation': content.navigation.map((e) => e.toJson()).toList(),
+      'format': format.name,
+      'importedAt': importedAt.toIso8601String(),
+      'detail': RecordCodec.detail(content.detail),
+      'catalog': RecordCodec.catalog(content.catalog),
+      'chapters': content.chapters.map(RecordCodec.chapter).toList(),
+      'media': media.toList()..sort(),
+    }),
+  );
+}, cancellation);

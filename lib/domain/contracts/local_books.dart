@@ -3,6 +3,7 @@ import '../content_identity.dart';
 import '../models/models.dart';
 import 'cancellation.dart';
 import 'result.dart';
+import 'local_book_decoder.dart';
 
 enum LocalBookFormat { txt, epub }
 
@@ -29,10 +30,13 @@ final class LocalBookContent {
     required this.detail,
     required this.catalog,
     required Iterable<ChapterContent> chapters,
-  }) : chapters = List.unmodifiable(chapters);
+    Iterable<LocalNavigationEntry> navigation = const [],
+  }) : chapters = List.unmodifiable(chapters),
+       navigation = List.unmodifiable(navigation);
   final NovelDetail detail;
   final Catalog catalog;
   final List<ChapterContent> chapters;
+  final List<LocalNavigationEntry> navigation;
 }
 
 final class LocalBookRecord {
