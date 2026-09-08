@@ -45,5 +45,1662 @@
   "indentAfter": [
     0,
     1
-  ]
+  ],
+  "expandedAudit": {
+    "date": "2026-09-08",
+    "host": "Windows Flutter 3.38.4 / Dart 3.10.3",
+    "scope": "User-provided 35 files, read only; no library changes or device run",
+    "before": [
+      {
+        "file": "西 条陽  我，当备胎友就可以。 第6卷(1).epub",
+        "sha256": "30d8d71221f46938ac092ed66578890d09352105d6b2c0d791681bcacdce6007",
+        "bytes": 15787432,
+        "status": "failed",
+        "failure": "invalid"
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.02(1).epub",
+        "sha256": "360fedd33ac76b2fd8ce59624fe66f7273c05ddcac9c94aaa1673955ccd5303f",
+        "bytes": 1670912,
+        "status": "parsed",
+        "chapters": 33,
+        "sourceImageReferences": 17,
+        "parsedImages": 17,
+        "uniqueImages": 17,
+        "nav": 18,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.01(1).epub",
+        "sha256": "7b71b9a3f5312da866f59c255187ac3137451346c9033ee86369abc1df9ad0ef",
+        "bytes": 2128023,
+        "status": "parsed",
+        "chapters": 39,
+        "sourceImageReferences": 21,
+        "parsedImages": 20,
+        "uniqueImages": 20,
+        "nav": 21,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 1,
+        "emptyPages": 0,
+        "differences": [
+          {
+            "path": "OEBPS/Text/postscript.xhtml",
+            "rawTextCharacters": 838,
+            "parsedTextCharacters": 841,
+            "rawTextEqual": false,
+            "sourceImageReferences": 1,
+            "parsedImages": 0
+          }
+        ]
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.04(1).epub",
+        "sha256": "6087a3c31f3b88e0ca7ba3d84f753cf683f2f631deeba01074b534e7d326e2ab",
+        "bytes": 1806012,
+        "status": "parsed",
+        "chapters": 25,
+        "sourceImageReferences": 14,
+        "parsedImages": 14,
+        "uniqueImages": 14,
+        "nav": 14,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 6,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.07(1).epub",
+        "sha256": "e9878aca91e804c22f7673da16b1eea662abd035af4b840500d21993571726bc",
+        "bytes": 2711030,
+        "status": "parsed",
+        "chapters": 22,
+        "sourceImageReferences": 7,
+        "parsedImages": 7,
+        "uniqueImages": 7,
+        "nav": 14,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.03(1).epub",
+        "sha256": "e3849c29c98ab8ef53f645aa426d03369ee8b9599b68b79ee7a12e543684aed1",
+        "bytes": 1689759,
+        "status": "parsed",
+        "chapters": 31,
+        "sourceImageReferences": 17,
+        "parsedImages": 17,
+        "uniqueImages": 17,
+        "nav": 16,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 6,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.05(1).epub",
+        "sha256": "7bb2a4070e21283c6b87a23eaf2acae571d48c9f9d56b23fa0e380e848c1b73d",
+        "bytes": 2567287,
+        "status": "parsed",
+        "chapters": 32,
+        "sourceImageReferences": 18,
+        "parsedImages": 18,
+        "uniqueImages": 18,
+        "nav": 16,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.06(1).epub",
+        "sha256": "b15d6afa7c4e9ece0a9985824cbec6551c2ee5f2d0ac8d2c5ab511aa18559165",
+        "bytes": 2242378,
+        "status": "parsed",
+        "chapters": 21,
+        "sourceImageReferences": 6,
+        "parsedImages": 6,
+        "uniqueImages": 6,
+        "nav": 14,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.08(1).epub",
+        "sha256": "08a3e6e153064d460df45544d6d4919e0f969f4b8e53fe6fde6c0fa9cc5c38a4",
+        "bytes": 5390958,
+        "status": "parsed",
+        "chapters": 24,
+        "sourceImageReferences": 11,
+        "parsedImages": 11,
+        "uniqueImages": 11,
+        "nav": 11,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "欢迎来到实力至上主义教室2年级12.epub",
+        "sha256": "0fe42c7e11e58720c105e8c4fee19d0ceb37742d102ec04daf407bb844690b22",
+        "bytes": 14695104,
+        "status": "failed",
+        "failure": "UnimplementedError"
+      },
+      {
+        "file": "[三河ごーすと].义妹生活.11.[日翻].epub",
+        "sha256": "af7db52ea3fc36522b3945bd32d652f38686e8cd8f381421bef5c99b33f1384e",
+        "bytes": 5121103,
+        "status": "failed",
+        "failure": "invalid"
+      },
+      {
+        "file": "藏地密码·珍藏版大全集(套装共10册) - 何马(1).epub",
+        "sha256": "5c9f89b4605772af024723bf0c2cc2b66c5ead81c018ed1195daea74c0ccda8e",
+        "bytes": 3488914,
+        "status": "failed",
+        "failure": "invalid"
+      },
+      {
+        "file": "[三河ごーすと].义妹生活.10.[日翻].epub",
+        "sha256": "3e07f5411307751d1d3accab8a8f8ef0265d9bba80896a2f2c9823980df12f1c",
+        "bytes": 4252908,
+        "status": "failed",
+        "failure": "ArgumentError"
+      },
+      {
+        "file": "「你不敢吻我对吧？」自大的青梅竹马挑衅我，结果她比我想像中更容易害羞 01.epub",
+        "sha256": "dc22ab9e5142aa3e954107d165e466fcb8cb2ad182ad59534028d25284520504",
+        "bytes": 6107997,
+        "status": "parsed",
+        "chapters": 25,
+        "sourceImageReferences": 19,
+        "parsedImages": 19,
+        "uniqueImages": 19,
+        "nav": 19,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "[冬野夜空] 我永远不会忘记，灿烂一瞬间的你(1).epub",
+        "sha256": "1bf31270c8ffc42a59cc5b20a95dfc3abbff26ca16a3d098078c475f5ae1ba3a",
+        "bytes": 1563494,
+        "status": "parsed",
+        "chapters": 20,
+        "sourceImageReferences": 18,
+        "parsedImages": 18,
+        "uniqueImages": 6,
+        "nav": 17,
+        "invalidTargets": 0,
+        "presentations": 1,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "[志马なにがし].与奔驰于彩之-的你，谈一场看不见的恋。.epub",
+        "sha256": "3e541d5d755f890d779921359776677b8defc0b6c0c24111934c8e2587cfab90",
+        "bytes": 4567869,
+        "status": "parsed",
+        "chapters": 30,
+        "sourceImageReferences": 17,
+        "parsedImages": 17,
+        "uniqueImages": 17,
+        "nav": 16,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": [
+          {
+            "path": "OEBPS/Text/nav.xhtml",
+            "rawTextCharacters": 67,
+            "parsedTextCharacters": 61,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ]
+      },
+      {
+        "file": "为渴望未得的你，献上光之花束.epub",
+        "sha256": "85c5d28fa489679dcb5ba5c611abff0905a6e5771502a13e620d90e4e6f7953f",
+        "bytes": 1276281,
+        "status": "parsed",
+        "chapters": 20,
+        "sourceImageReferences": 4,
+        "parsedImages": 4,
+        "uniqueImages": 3,
+        "nav": 19,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": [
+          {
+            "path": "OEBPS/Text/nav.xhtml",
+            "rawTextCharacters": 111,
+            "parsedTextCharacters": 102,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ]
+      },
+      {
+        "file": "重回青春时代，与孤独的她共度盛夏时光 01.epub",
+        "sha256": "b4f2df2c1b8d7c944cccb135cabf75196d2d86c589931a709211cec38cabe13a",
+        "bytes": 3792134,
+        "status": "parsed",
+        "chapters": 38,
+        "sourceImageReferences": 45,
+        "parsedImages": 45,
+        "uniqueImages": 27,
+        "nav": 21,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": [
+          {
+            "path": "OEBPS/Text/nav.xhtml",
+            "rawTextCharacters": 116,
+            "parsedTextCharacters": 107,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ]
+      },
+      {
+        "file": "[水镜月圣].我们在「解读」上犯了错误 01.epub",
+        "sha256": "221b1185898d534e1bfb8952ab19a936a1077877a567afdf88f67754d009c5f1",
+        "bytes": 10157370,
+        "status": "parsed",
+        "chapters": 22,
+        "sourceImageReferences": 23,
+        "parsedImages": 23,
+        "uniqueImages": 19,
+        "nav": 15,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 25,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "[繁][長山九龍].縱使星辰殞落，妳仍在歌.epub",
+        "sha256": "53b4897fd73e6b7a623e407ebda4d575ec8ef9e025c7c4a5869d5e08ee520046",
+        "bytes": 9011067,
+        "status": "failed",
+        "failure": "ArgumentError"
+      },
+      {
+        "file": "[衣笠彰梧]欢迎来到实力至上主义的教室 3年级篇 3.epub",
+        "sha256": "75214c8b31ba4e5d7763c2e9a30b33a946169e9a5c87fc2dc967837e449187d0",
+        "bytes": 12058223,
+        "status": "failed",
+        "failure": "invalid"
+      },
+      {
+        "file": "[水镜月圣].我们在「解读」上犯了错误 02.epub",
+        "sha256": "ecccfbc1c0023664091a6507c0f128cac08158a7678c9b83aee2647dbc8637a9",
+        "bytes": 8687699,
+        "status": "parsed",
+        "chapters": 20,
+        "sourceImageReferences": 24,
+        "parsedImages": 24,
+        "uniqueImages": 17,
+        "nav": 13,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 8,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "[简][長山九龍].纵使星辰陨落，你仍在歌.epub",
+        "sha256": "62f3d2758c6c6b39e3fbd890c2676c36476d28e308722897ac68404d2e34d4ca",
+        "bytes": 8878514,
+        "status": "failed",
+        "failure": "ArgumentError"
+      },
+      {
+        "file": "成为阳光系的我专属的青春至上主义 01.epub",
+        "sha256": "1e4a09d653fbacae2710dabc1733b7662abce0b4025cdfd3a9d9adfab802c4d6",
+        "bytes": 3314292,
+        "status": "parsed",
+        "chapters": 18,
+        "sourceImageReferences": 22,
+        "parsedImages": 22,
+        "uniqueImages": 19,
+        "nav": 13,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 1,
+        "emptyPages": 0,
+        "differences": [
+          {
+            "path": "OEBPS/Text/nav.xhtml",
+            "rawTextCharacters": 112,
+            "parsedTextCharacters": 103,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ]
+      },
+      {
+        "file": "成为阳光系的我专属的青春至上主义 02.epub",
+        "sha256": "0d5dee1e6071de470eb8877d5439dc7c06e2f5ca01584a017173b26b82457deb",
+        "bytes": 3232420,
+        "status": "parsed",
+        "chapters": 17,
+        "sourceImageReferences": 25,
+        "parsedImages": 25,
+        "uniqueImages": 17,
+        "nav": 13,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 3,
+        "emptyPages": 0,
+        "differences": [
+          {
+            "path": "OEBPS/Text/nav.xhtml",
+            "rawTextCharacters": 105,
+            "parsedTextCharacters": 96,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ]
+      },
+      {
+        "file": "8 精翻(1).epub",
+        "sha256": "cedcfa13ec5b0f044c8cdbf036fbfd43a70692a293f13789cfa12ca137654af6",
+        "bytes": 26952014,
+        "status": "parsed",
+        "chapters": 12,
+        "sourceImageReferences": 17,
+        "parsedImages": 17,
+        "uniqueImages": 17,
+        "nav": 12,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "6 (1).epub",
+        "sha256": "2d850d2d4b8c4451e4705786f6fd34be86064c717a99b95fed4457f85b58713a",
+        "bytes": 113955854,
+        "status": "failed",
+        "failure": "invalid"
+      },
+      {
+        "file": "7(1).epub",
+        "sha256": "81cb0574a49a0c141d1fc0b2db79651bd999cbea3b97731ed9bdfabb6880a816",
+        "bytes": 62145064,
+        "status": "failed",
+        "failure": "invalid"
+      },
+      {
+        "file": "玩乐关系2(1).epub",
+        "sha256": "7ae2f6af8782f434b771b7b51e7225dfd406db25856e7243c04bd6a7a7d53263",
+        "bytes": 9051224,
+        "status": "failed",
+        "failure": "UnimplementedError"
+      },
+      {
+        "file": "玩乐关系3(1).epub",
+        "sha256": "7f5dcaf298d637ee93d0b2c9194c972d89be00eac73877df5fec07f226e8a8cf",
+        "bytes": 12220868,
+        "status": "failed",
+        "failure": "UnimplementedError"
+      },
+      {
+        "file": "玩乐关系1(1).epub",
+        "sha256": "1353a4f3fe3a24562189057b4e02701d83a4f80e8bb3c7f12d654bd1c75b3782",
+        "bytes": 4013967,
+        "status": "parsed",
+        "chapters": 16,
+        "sourceImageReferences": 13,
+        "parsedImages": 13,
+        "uniqueImages": 13,
+        "nav": 16,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "和你恋爱什么，应该是不可能的 然后，毕业(1).epub",
+        "sha256": "0f6a3d798e0354b5eb9ae370ebacce14529158b53d5631595bb8fc5902af7471",
+        "bytes": 7244827,
+        "status": "parsed",
+        "chapters": 23,
+        "sourceImageReferences": 43,
+        "parsedImages": 43,
+        "uniqueImages": 10,
+        "nav": 18,
+        "invalidTargets": 0,
+        "presentations": 3,
+        "ruby": 1,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "和你恋爱什么，应该是不可能的(1).epub",
+        "sha256": "7cf21fb1654849d72d8c1a05879806e5886f9772b800b7f2de6a31bbe34fe92f",
+        "bytes": 2735043,
+        "status": "parsed",
+        "chapters": 19,
+        "sourceImageReferences": 14,
+        "parsedImages": 14,
+        "uniqueImages": 4,
+        "nav": 18,
+        "invalidTargets": 0,
+        "presentations": 1,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "和你恋爱什么，应该是不可能的 课外补习仍未结束(1).epub",
+        "sha256": "8f3b0484f6f5c016da00dd3405d1be2405cb2226e5c2b6c6426c20dd6af8c301",
+        "bytes": 1093322,
+        "status": "parsed",
+        "chapters": 32,
+        "sourceImageReferences": 67,
+        "parsedImages": 67,
+        "uniqueImages": 32,
+        "nav": 17,
+        "invalidTargets": 0,
+        "presentations": 1,
+        "ruby": 2,
+        "emptyPages": 0,
+        "differences": []
+      },
+      {
+        "file": "1.epub",
+        "sha256": "1353a4f3fe3a24562189057b4e02701d83a4f80e8bb3c7f12d654bd1c75b3782",
+        "bytes": 4013967,
+        "status": "parsed",
+        "chapters": 16,
+        "sourceImageReferences": 13,
+        "parsedImages": 13,
+        "uniqueImages": 13,
+        "nav": 16,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "differences": []
+      }
+    ],
+    "after": [
+      {
+        "file": "西 条陽  我，当备胎友就可以。 第6卷(1).epub",
+        "sha256": "30d8d71221f46938ac092ed66578890d09352105d6b2c0d791681bcacdce6007",
+        "bytes": 15787432,
+        "status": "parsed",
+        "chapters": 15,
+        "sourceImageReferences": 22,
+        "parsedImages": 22,
+        "uniqueImages": 21,
+        "nav": 15,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.02(1).epub",
+        "sha256": "360fedd33ac76b2fd8ce59624fe66f7273c05ddcac9c94aaa1673955ccd5303f",
+        "bytes": 1670912,
+        "status": "parsed",
+        "chapters": 33,
+        "sourceImageReferences": 17,
+        "parsedImages": 17,
+        "uniqueImages": 17,
+        "nav": 18,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.01(1).epub",
+        "sha256": "7b71b9a3f5312da866f59c255187ac3137451346c9033ee86369abc1df9ad0ef",
+        "bytes": 2128023,
+        "status": "parsed",
+        "chapters": 39,
+        "sourceImageReferences": 21,
+        "parsedImages": 21,
+        "uniqueImages": 21,
+        "nav": 21,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 1,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/ch5.xhtml",
+            "rawTextCharacters": 8091,
+            "parsedTextCharacters": 8093,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.04(1).epub",
+        "sha256": "6087a3c31f3b88e0ca7ba3d84f753cf683f2f631deeba01074b534e7d326e2ab",
+        "bytes": 1806012,
+        "status": "parsed",
+        "chapters": 25,
+        "sourceImageReferences": 14,
+        "parsedImages": 14,
+        "uniqueImages": 14,
+        "nav": 14,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 6,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/ch5.xhtml",
+            "rawTextCharacters": 12473,
+            "parsedTextCharacters": 12485,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.07(1).epub",
+        "sha256": "e9878aca91e804c22f7673da16b1eea662abd035af4b840500d21993571726bc",
+        "bytes": 2711030,
+        "status": "parsed",
+        "chapters": 22,
+        "sourceImageReferences": 7,
+        "parsedImages": 7,
+        "uniqueImages": 7,
+        "nav": 14,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.03(1).epub",
+        "sha256": "e3849c29c98ab8ef53f645aa426d03369ee8b9599b68b79ee7a12e543684aed1",
+        "bytes": 1689759,
+        "status": "parsed",
+        "chapters": 31,
+        "sourceImageReferences": 17,
+        "parsedImages": 17,
+        "uniqueImages": 17,
+        "nav": 16,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 6,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/introduction.xhtml",
+            "rawTextCharacters": 198,
+            "parsedTextCharacters": 200,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          },
+          {
+            "path": "OEBPS/Text/ch5.xhtml",
+            "rawTextCharacters": 5663,
+            "parsedTextCharacters": 5669,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          },
+          {
+            "path": "OEBPS/Text/ch10.xhtml",
+            "rawTextCharacters": 14466,
+            "parsedTextCharacters": 14470,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.05(1).epub",
+        "sha256": "7bb2a4070e21283c6b87a23eaf2acae571d48c9f9d56b23fa0e380e848c1b73d",
+        "bytes": 2567287,
+        "status": "parsed",
+        "chapters": 32,
+        "sourceImageReferences": 18,
+        "parsedImages": 18,
+        "uniqueImages": 18,
+        "nav": 16,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.06(1).epub",
+        "sha256": "b15d6afa7c4e9ece0a9985824cbec6551c2ee5f2d0ac8d2c5ab511aa18559165",
+        "bytes": 2242378,
+        "status": "parsed",
+        "chapters": 21,
+        "sourceImageReferences": 6,
+        "parsedImages": 6,
+        "uniqueImages": 6,
+        "nav": 14,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[猫宽].勇者大人，我是非攻略对象！.08(1).epub",
+        "sha256": "08a3e6e153064d460df45544d6d4919e0f969f4b8e53fe6fde6c0fa9cc5c38a4",
+        "bytes": 5390958,
+        "status": "parsed",
+        "chapters": 24,
+        "sourceImageReferences": 11,
+        "parsedImages": 11,
+        "uniqueImages": 11,
+        "nav": 11,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "欢迎来到实力至上主义教室2年级12.epub",
+        "sha256": "0fe42c7e11e58720c105e8c4fee19d0ceb37742d102ec04daf407bb844690b22",
+        "bytes": 14695104,
+        "status": "parsed",
+        "chapters": 27,
+        "sourceImageReferences": 20,
+        "parsedImages": 20,
+        "uniqueImages": 20,
+        "nav": 17,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[三河ごーすと].义妹生活.11.[日翻].epub",
+        "sha256": "af7db52ea3fc36522b3945bd32d652f38686e8cd8f381421bef5c99b33f1384e",
+        "bytes": 5121103,
+        "status": "failed",
+        "failure": "drm"
+      },
+      {
+        "file": "藏地密码·珍藏版大全集(套装共10册) - 何马(1).epub",
+        "sha256": "5c9f89b4605772af024723bf0c2cc2b66c5ead81c018ed1195daea74c0ccda8e",
+        "bytes": 3488914,
+        "status": "parsed",
+        "chapters": 266,
+        "sourceImageReferences": 37,
+        "parsedImages": 37,
+        "uniqueImages": 24,
+        "nav": 12,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[三河ごーすと].义妹生活.10.[日翻].epub",
+        "sha256": "3e07f5411307751d1d3accab8a8f8ef0265d9bba80896a2f2c9823980df12f1c",
+        "bytes": 4252908,
+        "status": "parsed",
+        "chapters": 28,
+        "sourceImageReferences": 39,
+        "parsedImages": 39,
+        "uniqueImages": 23,
+        "nav": 21,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [
+          "OEBPS/Text/pre.xhtml"
+        ],
+        "differences": [
+          {
+            "path": "OEBPS/Text/navigation-documents.xhtml",
+            "rawTextCharacters": 213,
+            "parsedTextCharacters": 204,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "「你不敢吻我对吧？」自大的青梅竹马挑衅我，结果她比我想像中更容易害羞 01.epub",
+        "sha256": "dc22ab9e5142aa3e954107d165e466fcb8cb2ad182ad59534028d25284520504",
+        "bytes": 6107997,
+        "status": "parsed",
+        "chapters": 25,
+        "sourceImageReferences": 19,
+        "parsedImages": 19,
+        "uniqueImages": 19,
+        "nav": 19,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[冬野夜空] 我永远不会忘记，灿烂一瞬间的你(1).epub",
+        "sha256": "1bf31270c8ffc42a59cc5b20a95dfc3abbff26ca16a3d098078c475f5ae1ba3a",
+        "bytes": 1563494,
+        "status": "parsed",
+        "chapters": 20,
+        "sourceImageReferences": 18,
+        "parsedImages": 18,
+        "uniqueImages": 6,
+        "nav": 17,
+        "invalidTargets": 0,
+        "presentations": 1,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[志马なにがし].与奔驰于彩之-的你，谈一场看不见的恋。.epub",
+        "sha256": "3e541d5d755f890d779921359776677b8defc0b6c0c24111934c8e2587cfab90",
+        "bytes": 4567869,
+        "status": "parsed",
+        "chapters": 30,
+        "sourceImageReferences": 17,
+        "parsedImages": 17,
+        "uniqueImages": 17,
+        "nav": 16,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/nav.xhtml",
+            "rawTextCharacters": 67,
+            "parsedTextCharacters": 61,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "为渴望未得的你，献上光之花束.epub",
+        "sha256": "85c5d28fa489679dcb5ba5c611abff0905a6e5771502a13e620d90e4e6f7953f",
+        "bytes": 1276281,
+        "status": "parsed",
+        "chapters": 20,
+        "sourceImageReferences": 4,
+        "parsedImages": 4,
+        "uniqueImages": 3,
+        "nav": 19,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/nav.xhtml",
+            "rawTextCharacters": 111,
+            "parsedTextCharacters": 102,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "重回青春时代，与孤独的她共度盛夏时光 01.epub",
+        "sha256": "b4f2df2c1b8d7c944cccb135cabf75196d2d86c589931a709211cec38cabe13a",
+        "bytes": 3792134,
+        "status": "parsed",
+        "chapters": 38,
+        "sourceImageReferences": 45,
+        "parsedImages": 45,
+        "uniqueImages": 27,
+        "nav": 21,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/nav.xhtml",
+            "rawTextCharacters": 116,
+            "parsedTextCharacters": 107,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[水镜月圣].我们在「解读」上犯了错误 01.epub",
+        "sha256": "221b1185898d534e1bfb8952ab19a936a1077877a567afdf88f67754d009c5f1",
+        "bytes": 10157370,
+        "status": "parsed",
+        "chapters": 22,
+        "sourceImageReferences": 23,
+        "parsedImages": 23,
+        "uniqueImages": 19,
+        "nav": 15,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 25,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/ch1.xhtml",
+            "rawTextCharacters": 15068,
+            "parsedTextCharacters": 15086,
+            "rawTextEqual": false,
+            "sourceImageReferences": 1,
+            "parsedImages": 1
+          },
+          {
+            "path": "OEBPS/Text/ch4.xhtml",
+            "rawTextCharacters": 21401,
+            "parsedTextCharacters": 21413,
+            "rawTextEqual": false,
+            "sourceImageReferences": 4,
+            "parsedImages": 4
+          },
+          {
+            "path": "OEBPS/Text/ch5.xhtml",
+            "rawTextCharacters": 8065,
+            "parsedTextCharacters": 8069,
+            "rawTextEqual": false,
+            "sourceImageReferences": 1,
+            "parsedImages": 1
+          },
+          {
+            "path": "OEBPS/Text/ch7.xhtml",
+            "rawTextCharacters": 11145,
+            "parsedTextCharacters": 11159,
+            "rawTextEqual": false,
+            "sourceImageReferences": 3,
+            "parsedImages": 3
+          },
+          {
+            "path": "OEBPS/Text/ch8.xhtml",
+            "rawTextCharacters": 11352,
+            "parsedTextCharacters": 11354,
+            "rawTextEqual": false,
+            "sourceImageReferences": 2,
+            "parsedImages": 2
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[繁][長山九龍].縱使星辰殞落，妳仍在歌.epub",
+        "sha256": "53b4897fd73e6b7a623e407ebda4d575ec8ef9e025c7c4a5869d5e08ee520046",
+        "bytes": 9011067,
+        "status": "parsed",
+        "chapters": 25,
+        "sourceImageReferences": 16,
+        "parsedImages": 16,
+        "uniqueImages": 14,
+        "nav": 12,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 24,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/navigation-documents.xhtml",
+            "rawTextCharacters": 146,
+            "parsedTextCharacters": 137,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[衣笠彰梧]欢迎来到实力至上主义的教室 3年级篇 3.epub",
+        "sha256": "75214c8b31ba4e5d7763c2e9a30b33a946169e9a5c87fc2dc967837e449187d0",
+        "bytes": 12058223,
+        "status": "parsed",
+        "chapters": 31,
+        "sourceImageReferences": 26,
+        "parsedImages": 26,
+        "uniqueImages": 22,
+        "nav": 20,
+        "invalidTargets": 0,
+        "presentations": 2,
+        "ruby": 1,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/Section002.xhtml",
+            "rawTextCharacters": 16767,
+            "parsedTextCharacters": 16769,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[水镜月圣].我们在「解读」上犯了错误 02.epub",
+        "sha256": "ecccfbc1c0023664091a6507c0f128cac08158a7678c9b83aee2647dbc8637a9",
+        "bytes": 8687699,
+        "status": "parsed",
+        "chapters": 20,
+        "sourceImageReferences": 24,
+        "parsedImages": 24,
+        "uniqueImages": 17,
+        "nav": 13,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 8,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/ch1.xhtml",
+            "rawTextCharacters": 28472,
+            "parsedTextCharacters": 28476,
+            "rawTextEqual": false,
+            "sourceImageReferences": 4,
+            "parsedImages": 4
+          },
+          {
+            "path": "OEBPS/Text/ch3.xhtml",
+            "rawTextCharacters": 19407,
+            "parsedTextCharacters": 19411,
+            "rawTextEqual": false,
+            "sourceImageReferences": 4,
+            "parsedImages": 4
+          },
+          {
+            "path": "OEBPS/Text/ch4.xhtml",
+            "rawTextCharacters": 8433,
+            "parsedTextCharacters": 8437,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          },
+          {
+            "path": "OEBPS/Text/ch6.xhtml",
+            "rawTextCharacters": 12092,
+            "parsedTextCharacters": 12096,
+            "rawTextEqual": false,
+            "sourceImageReferences": 4,
+            "parsedImages": 4
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "[简][長山九龍].纵使星辰陨落，你仍在歌.epub",
+        "sha256": "62f3d2758c6c6b39e3fbd890c2676c36476d28e308722897ac68404d2e34d4ca",
+        "bytes": 8878514,
+        "status": "parsed",
+        "chapters": 25,
+        "sourceImageReferences": 16,
+        "parsedImages": 16,
+        "uniqueImages": 14,
+        "nav": 12,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 24,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/navigation-documents.xhtml",
+            "rawTextCharacters": 146,
+            "parsedTextCharacters": 137,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "成为阳光系的我专属的青春至上主义 01.epub",
+        "sha256": "1e4a09d653fbacae2710dabc1733b7662abce0b4025cdfd3a9d9adfab802c4d6",
+        "bytes": 3314292,
+        "status": "parsed",
+        "chapters": 18,
+        "sourceImageReferences": 22,
+        "parsedImages": 22,
+        "uniqueImages": 19,
+        "nav": 13,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 1,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/nav.xhtml",
+            "rawTextCharacters": 112,
+            "parsedTextCharacters": 103,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "成为阳光系的我专属的青春至上主义 02.epub",
+        "sha256": "0d5dee1e6071de470eb8877d5439dc7c06e2f5ca01584a017173b26b82457deb",
+        "bytes": 3232420,
+        "status": "parsed",
+        "chapters": 17,
+        "sourceImageReferences": 25,
+        "parsedImages": 25,
+        "uniqueImages": 17,
+        "nav": 13,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 3,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/nav.xhtml",
+            "rawTextCharacters": 105,
+            "parsedTextCharacters": 96,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "8 精翻(1).epub",
+        "sha256": "cedcfa13ec5b0f044c8cdbf036fbfd43a70692a293f13789cfa12ca137654af6",
+        "bytes": 26952014,
+        "status": "parsed",
+        "chapters": 12,
+        "sourceImageReferences": 17,
+        "parsedImages": 17,
+        "uniqueImages": 17,
+        "nav": 12,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "6 (1).epub",
+        "sha256": "2d850d2d4b8c4451e4705786f6fd34be86064c717a99b95fed4457f85b58713a",
+        "bytes": 113955854,
+        "status": "parsed",
+        "chapters": 37,
+        "sourceImageReferences": 15,
+        "parsedImages": 15,
+        "uniqueImages": 15,
+        "nav": 7,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "7(1).epub",
+        "sha256": "81cb0574a49a0c141d1fc0b2db79651bd999cbea3b97731ed9bdfabb6880a816",
+        "bytes": 62145064,
+        "status": "parsed",
+        "chapters": 18,
+        "sourceImageReferences": 20,
+        "parsedImages": 20,
+        "uniqueImages": 20,
+        "nav": 18,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "玩乐关系2(1).epub",
+        "sha256": "7ae2f6af8782f434b771b7b51e7225dfd406db25856e7243c04bd6a7a7d53263",
+        "bytes": 9051224,
+        "status": "parsed",
+        "chapters": 12,
+        "sourceImageReferences": 43,
+        "parsedImages": 43,
+        "uniqueImages": 15,
+        "nav": 11,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [
+          "OEBPS/Text/nav.xhtml"
+        ],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "玩乐关系3(1).epub",
+        "sha256": "7f5dcaf298d637ee93d0b2c9194c972d89be00eac73877df5fec07f226e8a8cf",
+        "bytes": 12220868,
+        "status": "parsed",
+        "chapters": 29,
+        "sourceImageReferences": 34,
+        "parsedImages": 34,
+        "uniqueImages": 17,
+        "nav": 23,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 8,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/nav.xhtml",
+            "rawTextCharacters": 308,
+            "parsedTextCharacters": 65,
+            "rawTextEqual": false,
+            "sourceImageReferences": 0,
+            "parsedImages": 0
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "玩乐关系1(1).epub",
+        "sha256": "1353a4f3fe3a24562189057b4e02701d83a4f80e8bb3c7f12d654bd1c75b3782",
+        "bytes": 4013967,
+        "status": "parsed",
+        "chapters": 16,
+        "sourceImageReferences": 13,
+        "parsedImages": 13,
+        "uniqueImages": 13,
+        "nav": 16,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "和你恋爱什么，应该是不可能的 然后，毕业(1).epub",
+        "sha256": "0f6a3d798e0354b5eb9ae370ebacce14529158b53d5631595bb8fc5902af7471",
+        "bytes": 7244827,
+        "status": "parsed",
+        "chapters": 23,
+        "sourceImageReferences": 43,
+        "parsedImages": 43,
+        "uniqueImages": 10,
+        "nav": 18,
+        "invalidTargets": 0,
+        "presentations": 3,
+        "ruby": 1,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/Section009.xhtml",
+            "rawTextCharacters": 28320,
+            "parsedTextCharacters": 28322,
+            "rawTextEqual": false,
+            "sourceImageReferences": 7,
+            "parsedImages": 7
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "和你恋爱什么，应该是不可能的(1).epub",
+        "sha256": "7cf21fb1654849d72d8c1a05879806e5886f9772b800b7f2de6a31bbe34fe92f",
+        "bytes": 2735043,
+        "status": "parsed",
+        "chapters": 19,
+        "sourceImageReferences": 14,
+        "parsedImages": 14,
+        "uniqueImages": 4,
+        "nav": 18,
+        "invalidTargets": 0,
+        "presentations": 1,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "和你恋爱什么，应该是不可能的 课外补习仍未结束(1).epub",
+        "sha256": "8f3b0484f6f5c016da00dd3405d1be2405cb2226e5c2b6c6426c20dd6af8c301",
+        "bytes": 1093322,
+        "status": "parsed",
+        "chapters": 32,
+        "sourceImageReferences": 67,
+        "parsedImages": 67,
+        "uniqueImages": 32,
+        "nav": 17,
+        "invalidTargets": 0,
+        "presentations": 1,
+        "ruby": 2,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [
+          {
+            "path": "OEBPS/Text/Section008.xhtml",
+            "rawTextCharacters": 15495,
+            "parsedTextCharacters": 15497,
+            "rawTextEqual": false,
+            "sourceImageReferences": 5,
+            "parsedImages": 5
+          },
+          {
+            "path": "OEBPS/Text/Section009.xhtml",
+            "rawTextCharacters": 6481,
+            "parsedTextCharacters": 6483,
+            "rawTextEqual": false,
+            "sourceImageReferences": 5,
+            "parsedImages": 5
+          }
+        ],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      },
+      {
+        "file": "1.epub",
+        "sha256": "1353a4f3fe3a24562189057b4e02701d83a4f80e8bb3c7f12d654bd1c75b3782",
+        "bytes": 4013967,
+        "status": "parsed",
+        "chapters": 16,
+        "sourceImageReferences": 13,
+        "parsedImages": 13,
+        "uniqueImages": 13,
+        "nav": 16,
+        "invalidTargets": 0,
+        "presentations": 0,
+        "ruby": 0,
+        "emptyPages": 0,
+        "skippedEmptyPaths": [],
+        "differences": [],
+        "policyDifferences": [],
+        "presentationImageDifferences": [],
+        "missingImages": []
+      }
+    ],
+    "imageDecode": {
+      "scope": "Host Flutter first-frame decode at width 32; not device visual QA",
+      "uniqueImages": 508,
+      "failedImageHashes": [],
+      "samples": [
+        {
+          "sha256": "30d8d71221f46938ac092ed66578890d09352105d6b2c0d791681bcacdce6007",
+          "status": "parsed",
+          "images": 21,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "360fedd33ac76b2fd8ce59624fe66f7273c05ddcac9c94aaa1673955ccd5303f",
+          "status": "parsed",
+          "images": 17,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "7b71b9a3f5312da866f59c255187ac3137451346c9033ee86369abc1df9ad0ef",
+          "status": "parsed",
+          "images": 21,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "6087a3c31f3b88e0ca7ba3d84f753cf683f2f631deeba01074b534e7d326e2ab",
+          "status": "parsed",
+          "images": 14,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "e9878aca91e804c22f7673da16b1eea662abd035af4b840500d21993571726bc",
+          "status": "parsed",
+          "images": 7,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "e3849c29c98ab8ef53f645aa426d03369ee8b9599b68b79ee7a12e543684aed1",
+          "status": "parsed",
+          "images": 17,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "7bb2a4070e21283c6b87a23eaf2acae571d48c9f9d56b23fa0e380e848c1b73d",
+          "status": "parsed",
+          "images": 18,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "b15d6afa7c4e9ece0a9985824cbec6551c2ee5f2d0ac8d2c5ab511aa18559165",
+          "status": "parsed",
+          "images": 6,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "08a3e6e153064d460df45544d6d4919e0f969f4b8e53fe6fde6c0fa9cc5c38a4",
+          "status": "parsed",
+          "images": 11,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "0fe42c7e11e58720c105e8c4fee19d0ceb37742d102ec04daf407bb844690b22",
+          "status": "parsed",
+          "images": 20,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "af7db52ea3fc36522b3945bd32d652f38686e8cd8f381421bef5c99b33f1384e",
+          "status": "notParsed"
+        },
+        {
+          "sha256": "5c9f89b4605772af024723bf0c2cc2b66c5ead81c018ed1195daea74c0ccda8e",
+          "status": "parsed",
+          "images": 24,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "3e07f5411307751d1d3accab8a8f8ef0265d9bba80896a2f2c9823980df12f1c",
+          "status": "parsed",
+          "images": 23,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "dc22ab9e5142aa3e954107d165e466fcb8cb2ad182ad59534028d25284520504",
+          "status": "parsed",
+          "images": 19,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "1bf31270c8ffc42a59cc5b20a95dfc3abbff26ca16a3d098078c475f5ae1ba3a",
+          "status": "parsed",
+          "images": 6,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "3e541d5d755f890d779921359776677b8defc0b6c0c24111934c8e2587cfab90",
+          "status": "parsed",
+          "images": 17,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "85c5d28fa489679dcb5ba5c611abff0905a6e5771502a13e620d90e4e6f7953f",
+          "status": "parsed",
+          "images": 3,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "b4f2df2c1b8d7c944cccb135cabf75196d2d86c589931a709211cec38cabe13a",
+          "status": "parsed",
+          "images": 27,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "221b1185898d534e1bfb8952ab19a936a1077877a567afdf88f67754d009c5f1",
+          "status": "parsed",
+          "images": 19,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "53b4897fd73e6b7a623e407ebda4d575ec8ef9e025c7c4a5869d5e08ee520046",
+          "status": "parsed",
+          "images": 14,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "75214c8b31ba4e5d7763c2e9a30b33a946169e9a5c87fc2dc967837e449187d0",
+          "status": "parsed",
+          "images": 22,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "ecccfbc1c0023664091a6507c0f128cac08158a7678c9b83aee2647dbc8637a9",
+          "status": "parsed",
+          "images": 17,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "62f3d2758c6c6b39e3fbd890c2676c36476d28e308722897ac68404d2e34d4ca",
+          "status": "parsed",
+          "images": 14,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "1e4a09d653fbacae2710dabc1733b7662abce0b4025cdfd3a9d9adfab802c4d6",
+          "status": "parsed",
+          "images": 19,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "0d5dee1e6071de470eb8877d5439dc7c06e2f5ca01584a017173b26b82457deb",
+          "status": "parsed",
+          "images": 17,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "cedcfa13ec5b0f044c8cdbf036fbfd43a70692a293f13789cfa12ca137654af6",
+          "status": "parsed",
+          "images": 17,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "2d850d2d4b8c4451e4705786f6fd34be86064c717a99b95fed4457f85b58713a",
+          "status": "parsed",
+          "images": 15,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "81cb0574a49a0c141d1fc0b2db79651bd999cbea3b97731ed9bdfabb6880a816",
+          "status": "parsed",
+          "images": 20,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "7ae2f6af8782f434b771b7b51e7225dfd406db25856e7243c04bd6a7a7d53263",
+          "status": "parsed",
+          "images": 15,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "7f5dcaf298d637ee93d0b2c9194c972d89be00eac73877df5fec07f226e8a8cf",
+          "status": "parsed",
+          "images": 17,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "1353a4f3fe3a24562189057b4e02701d83a4f80e8bb3c7f12d654bd1c75b3782",
+          "status": "parsed",
+          "images": 13,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "0f6a3d798e0354b5eb9ae370ebacce14529158b53d5631595bb8fc5902af7471",
+          "status": "parsed",
+          "images": 10,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "7cf21fb1654849d72d8c1a05879806e5886f9772b800b7f2de6a31bbe34fe92f",
+          "status": "parsed",
+          "images": 4,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "8f3b0484f6f5c016da00dd3405d1be2405cb2226e5c2b6c6426c20dd6af8c301",
+          "status": "parsed",
+          "images": 32,
+          "decodeFailures": 0
+        },
+        {
+          "sha256": "1353a4f3fe3a24562189057b4e02701d83a4f80e8bb3c7f12d654bd1c75b3782",
+          "status": "parsed",
+          "images": 13,
+          "decodeFailures": 0
+        }
+      ]
+    },
+    "tests": 426,
+    "newCompatibilityTests": 13,
+    "analysis": "pass"
+  }
 }

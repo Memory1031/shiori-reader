@@ -51,6 +51,9 @@ jobs:
           dart tool/check_ci_yaml.dart
           git diff --exit-code -- pubspec.lock tools/source_probe/pubspec.lock tool/db_codegen/pubspec.lock
 
+      - name: 发布工具离线测试
+        run: python3 -m unittest discover -s tool -p 'test_release_android.py'
+
       - name: 检查数据库生成代码
         run: |
           bash tool/generate_database.sh

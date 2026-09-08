@@ -8,7 +8,7 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -18,7 +18,7 @@ concurrency:
 env:
   # 必须与 .fvmrc 和 pubspec.yaml 的 Flutter 约束保持一致
   FLUTTER_VERSION: 3.38.4
-  # 两个 pubspec.lock 都记录此镜像；源地址不同也会导致严格锁定校验失败。
+  # 三份 pubspec.lock 都记录此镜像；源地址不同也会导致严格锁定校验失败。
   PUB_HOSTED_URL: https://pub.flutter-io.cn
 
 jobs:
@@ -34,6 +34,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+          pub-cache-key: "flutter-pub-:os:-:version:-:arch:-${{ hashFiles('pubspec.lock', 'tools/source_probe/pubspec.lock', 'tool/db_codegen/pubspec.lock') }}"
 
       - name: 安装依赖
         run: flutter pub get --enforce-lockfile
@@ -43,8 +44,35 @@ jobs:
         working-directory: tools/source_probe
         run: dart pub get --enforce-lockfile
 
-      - name: 生成本地化代码
-        run: flutter gen-l10n
+      - name: 安装数据库生成器依赖
+        working-directory: tool/db_codegen
+        run: dart pub get --enforce-lockfile
+
+      - name: 检查工作流与锁文件
+        run: |
+          dart tool/check_ci_yaml.dart
+          git diff --exit-code -- pubspec.lock tools/source_probe/pubspec.lock tool/db_codegen/pubspec.lock
+
+      - name: 校验 tag 与包版本
+        run: python3 tool/release_android.py version
+
+      - name: 发布工具离线测试
+        run: python3 -m unittest discover -s tool -p 'test_release_android.py'
+
+      - name: 检查数据库生成代码
+        run: |
+          bash tool/generate_database.sh
+          git diff --exit-code -- tool/db_codegen/pubspec.lock lib/data/local/database
+          test -z "$(git ls-files --others --exclude-standard lib/data/local/database)"
+
+      - name: 检查本地化生成代码
+        run: |
+          flutter gen-l10n
+          git diff --exit-code -- lib/l10n/generated
+          test -z "$(git ls-files --others --exclude-standard lib/l10n/generated)"
+
+      - name: 格式检查
+        run: dart format --output=none --set-exit-if-changed lib test
 
       - name: 静态分析
         run: flutter analyze --no-pub
@@ -55,6 +83,8 @@ jobs:
   android-release:
     name: Android 签名发布构建
     needs: checks
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -70,6 +100,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+          pub-cache-key: "flutter-pub-:os:-:version:-:arch:-${{ hashFiles('pubspec.lock', 'tools/source_probe/pubspec.lock', 'tool/db_codegen/pubspec.lock') }}"
 
       - name: 安装依赖
         run: flutter pub get --enforce-lockfile
@@ -77,41 +108,43 @@ jobs:
       - name: 生成本地化代码
         run: flutter gen-l10n
 
-      - name: 检查签名密钥
+      - name: 校验并写入签名配置
         env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        # 缺 secrets 时立即失败，不产出无法安装或签名不一致的包。
-        run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::未配置 ANDROID_KEYSTORE_BASE64 / ANDROID_STORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD；发布流程见 docs/ci.md。"
-            exit 1
-          fi
-
-      - name: 写入签名配置
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/release-keystore.jks
-          {
-            echo "storeFile=release-keystore.jks"
-            echo "storePassword=$STORE_PASSWORD"
-            echo "keyAlias=$KEY_ALIAS"
-            echo "keyPassword=$KEY_PASSWORD"
-          } > android/key.properties
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: python3 tool/release_android.py signing
 
       - name: 构建 release APK
-        run: flutter build apk --release --no-pub
+        run: flutter build apk --release --no-pub --target lib/main.dart
 
-      - name: 创建 GitHub Release 并附上 APK
+      - name: 验证 APK 签名、版本并生成校验文件
+        run: python3 tool/release_android.py verify
+
+      - name: 清理签名文件
+        if: always()
+        run: rm -f android/key.properties android/app/release-keystore.jks android/release-certificate.der
+
+      - name: 保存已验证产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ github.ref_name }}
+          path: build/release-assets/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: 创建 GitHub Release 并附上产物
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          APK="shiori-reader-${GITHUB_REF_NAME}-android.apk"
-          mv build/app/outputs/flutter-apk/app-release.apk "$APK"
-          # 重跑时 Release 已存在，改为覆盖上传同一资产。
-          gh release create "$GITHUB_REF_NAME" "$APK" \
-            --title "$GITHUB_REF_NAME" --generate-notes --verify-tag \
-            || gh release upload "$GITHUB_REF_NAME" "$APK" --clobber
+          set -euo pipefail
+          # 已有 Release 才走覆盖上传；创建失败不再被无条件 fallback 掩盖。
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" build/release-assets/* --clobber
+          else
+            RELEASE_FLAGS=()
+            if [[ "$GITHUB_REF_NAME" == *-* ]]; then RELEASE_FLAGS+=(--prerelease); fi
+            gh release create "$GITHUB_REF_NAME" build/release-assets/* \
+              --title "$GITHUB_REF_NAME" --generate-notes --verify-tag "${RELEASE_FLAGS[@]}"
+          fi

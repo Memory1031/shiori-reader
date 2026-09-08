@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:html/dom.dart' as dom;
+import 'epub_text_styles.dart';
 
 /// Builds a self-contained, inert document for short, authored layout pages.
 /// The caller resolves archive paths; no filesystem or network URLs survive.
@@ -25,29 +26,42 @@ String? epubPresentation(
     r'(?:float\s*:\s*(?:left|right)|(?:^|[;{])\s*(?:-webkit-)?transform\s*:|writing-mode\s*:\s*vertical|position\s*:\s*absolute)',
     caseSensitive: false,
   );
-  var authored = body
-      .querySelectorAll('[style]')
-      .any((e) => layout.hasMatch(e.attributes['style']!));
+  var authored = [
+    body,
+    ...body.querySelectorAll('[style]'),
+  ].any((e) => layout.hasMatch(e.attributes['style'] ?? ''));
   for (final (_, css) in sheets) {
-    for (final rule in RegExp(r'([^{}]+)\{([^{}]*)\}').allMatches(css)) {
-      if (!layout.hasMatch(rule.group(2)!)) continue;
+    for (final (selector, declarations) in epubScreenRules(css)) {
+      if (!layout.hasMatch(declarations)) continue;
       try {
-        if (body.querySelector(
-              rule.group(1)!.replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '').trim(),
-            ) !=
-            null) {
+        if (document.querySelectorAll(selector).any((e) {
+          for (dom.Element? node = e; node != null; node = node.parent) {
+            if (node == body) return true;
+          }
+          return false;
+        })) {
           authored = true;
         }
       } on FormatException {
         /* Unsupported selectors do not select a page. */
+      } on UnimplementedError {
+        /* A publisher pseudo-class must not abort importing the whole book. */
       }
     }
   }
   if (!authored) return null;
+  // Complex SVG is not in the inert HTML subset. The native parser retains
+  // package-local SVG <image> bitmaps; prefer that to a visually empty page.
+  if (body.querySelector('svg') != null) return null;
   var resourceBytes = 0;
   final resources = <String, String>{};
   String resource(String base, String href) {
-    final ref = resolve(base, href.trim());
+    String? ref;
+    try {
+      ref = resolve(base, href.trim());
+    } on FormatException {
+      return '';
+    }
     if (ref == null) return '';
     if (resources.containsKey(ref)) return resources[ref]!;
     final ext = ref.split('.').last.toLowerCase();
@@ -107,6 +121,28 @@ String? epubPresentation(
     'ul',
     'ol',
     'li',
+    'a',
+    'nav',
+    'main',
+    'header',
+    'footer',
+    'aside',
+    'table',
+    'thead',
+    'tbody',
+    'tfoot',
+    'tr',
+    'th',
+    'td',
+    'dl',
+    'dt',
+    'dd',
+    'sup',
+    'sub',
+    's',
+    'u',
+    'pre',
+    'code',
   };
   for (final e in copy.querySelectorAll('*').toList()) {
     if (!allowed.contains(e.localName)) {
@@ -115,7 +151,7 @@ String? epubPresentation(
     }
     final original = Map<Object, String>.from(e.attributes);
     e.attributes.clear();
-    for (final name in ['class', 'id', 'lang', 'dir', 'title']) {
+    for (final name in ['class', 'id', 'lang', 'dir', 'title', 'hidden']) {
       if (original[name] case final value?) e.attributes[name] = value;
     }
     if (original['style'] case final value?) {
@@ -128,7 +164,7 @@ String? epubPresentation(
   }
   final bodyAttributes = Map<Object, String>.from(copy.attributes);
   copy.attributes.clear();
-  for (final name in ['class', 'lang', 'dir']) {
+  for (final name in ['class', 'id', 'lang', 'dir', 'hidden']) {
     if (bodyAttributes[name] case final value?) copy.attributes[name] = value;
   }
   if (bodyAttributes['style'] case final value?) {

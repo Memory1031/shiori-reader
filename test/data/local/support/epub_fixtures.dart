@@ -46,11 +46,15 @@ Map<String, List<int>> epubFiles({bool ncx = false, bool toc = true}) {
   };
 }
 
-Uint8List zipFiles(Map<String, List<int>> files, {bool compress = true}) {
+Uint8List zipFiles(
+  Map<String, List<int>> files, {
+  bool compress = true,
+  bool compressMimetype = false,
+}) {
   final archive = Archive();
   for (final e in files.entries) {
     final file = ArchiveFile(e.key, e.value.length, e.value);
-    if (!compress || e.key == 'mimetype') {
+    if (!compress || e.key == 'mimetype' && !compressMimetype) {
       file.compression = CompressionType.none;
     }
     archive.add(file);

@@ -1,6 +1,6 @@
 # 发布状态与私下测试
 
-更新：2026-09-08。当前分发范围由用户确认为**个人 / 私下测试**，GitHub 仓库为 private。现有功能作为 1.0.0 基线整理，代码版本仍是 `0.1.0+1`；未生成正式 1.0.0 tag 或完成其签名发布验收。
+更新：2026-09-08。当前分发范围由用户确认为**个人 / 私下测试**，GitHub 仓库为 private。现有功能作为 1.0.0 基线整理，应用及 ShareExtension 已对齐 `1.0.0+2`；未生成正式 1.0.0 tag 或完成其签名发布验收。
 
 ## 版本与安装身份
 
@@ -37,3 +37,43 @@ ac9def321c436ed15e1f9b3f5be98fa6978928bb34d855dd6130a5f775d13ed9
 该包未启用 debuggable，观察到 INTERNET 与签名级动态 receiver 权限，没有所有文件 / 相机 / 联系人权限；检查未发现开发 fixture 入口与密钥标记。结论只适用于该产物，不是最近阅读器改动的重新审计。
 
 Android 真机、iOS 模拟器与 iPhone 已有不同范围的运行证据；完整矩阵和跳过项统一见[验收摘要](../validation/README.md)。
+
+## RELEASE-002 当前进度
+
+2026-09-08：用户已生成个人Android发布密钥并确认四项仓库Secrets已配置；这里只记录用户确认，没有读取或验证真实秘密值。发布工作流已补齐依赖 / 生成 / 格式、tag与版本一致性、四项Secret检查、密码转义、APK签名证书与包版本校验、SHA-256及元数据产物，详见[CI验证](../ci.md#release-002-工作流补齐2026-09-08)。本地合成密钥冒烟通过，不等同正式签名发布验收。
+
+下一步：提交已完成的 EPUB 修复、工作流及 `1.0.0+2` 版本变化，推送 develop 并确认该提交的 CI 通过，再执行下述发布脚本。尚未执行真实 tag 或远端 Release；原有 Debug 签名安装与新正式签名的更新身份不同，安装前核对数据保留方式。
+
+## develop → master 发布脚本
+
+正式版本和标签使用 `1.0.0` / `v1.0.0`。pubspec 的 `+2` 是平台内部构建编号，不进入发布标签。后续支持 `patch`（1.0.0 → 1.0.1）、`minor`（1.0.0 → 1.1.0）、`major`（1.0.0 → 2.0.0）；minor 清零 patch，major 清零 minor / patch，内部构建编号每次递增。
+
+```sh
+# 下一版：在干净的 develop 上预览，再应用版本变化。
+dart tool/publish_release.dart prepare patch
+dart tool/publish_release.dart prepare patch --apply
+# patch 可替换成 minor 或 major。
+```
+
+准备命令同步 pubspec 和全部 ShareExtension 配置，不提交、不推送、不打标签。审阅并提交版本改动、推送 develop、确认 CI 后，使用工具输出的版本执行发布。重复运行会因未提交改动而停止；版本改动提交后再执行 prepare 则会再次递增。当前已准备好 1.0.0，首次发布无需运行 prepare。
+
+使用项目 Dart SDK，macOS / Windows 命令相同（安装 FVM 时可将 `dart` 换成 `fvm dart`）：
+
+```sh
+# 先将本次发布的完整改动提交并推送到 origin/develop，确认 CI 通过。
+# 预览：只读取本地状态和远端 refs，不切换分支或创建标签。
+dart tool/publish_release.dart v1.0.0
+
+# 执行：合并、附注标签、原子推送，触发 Android Release 工作流。
+dart tool/publish_release.dart v1.0.0 --publish
+```
+
+[脚本](../../tool/publish_release.dart)固定使用 `origin`、`develop`、`master` 和稳定版 `vX.Y.Z`。要求当前在 develop、工作区干净、本地 develop 与远端一致、标签不存在，且提交中的 pubspec 和所有 ShareExtension 配置版本 / build 一致。不自动提交、修改版本、运行应用测试或查询 CI 状态；应先确认 develop 对应提交的 CI。
+
+- 首次没有 master 时，从 develop 创建 master；已有 master 时通过 `--no-ff` 合并，标签指向 master 的最终提交。已有本地 master 必须与远端一致。
+- 执行前 fetch 并核对分支没有变化，合并后再次检查版本配置。附注标签与 master 使用一次 `--atomic` 推送；master 使用明确旧提交的 lease 防止并发覆盖，并要求旧 master 是新提交的祖先，不用于改写历史。不支持 atomic push 或保护规则拒绝时停止，不降级为分开推送。
+- 成功后回到 develop；不自动将 master 合并回 develop。后续版本继续在 develop 开发并递增版本 / build。
+- 合并冲突时保留 master 冲突现场，不打标签、不推送；检查后可手动 `git merge --abort`。推送失败时保留本地 master / tag，不自动删除或重建；先检查远端 refs（网络中断可能发生在服务端已接收后），核对后再重试同一发布。原脚本会拒绝已有标签，不会重复发布或覆盖。
+- 标签触发 Android 签名 APK 工作流；脚本退出成功表示 Git 推送成功，不能代替 Actions 产物、签名和设备验收，也不会发布 iOS 包。
+
+验证：11 项临时本地 Git 仓库测试覆盖三种版本递增及扩展同步、准备失败不写入、只读预览、首次发布、双亲合并提交、重复标签、脏工作区、版本 / 扩展不一致、未推送 develop、master 不一致、冲突及远端拒绝标签的原子性。测试不接触真实 origin。

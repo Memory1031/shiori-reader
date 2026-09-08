@@ -56,7 +56,9 @@ class EpubZip {
       if (flags & 1 != 0) {
         throw const LocalParseException(LocalParseProblem.drm);
       }
-      if (flags & ~0x080e != 0 ||
+      // Tolerate the observed legacy bit 4 only with stored/deflate entries.
+      // No additional codecs: bounded inflation and CRC remain mandatory.
+      if (flags & ~0x081e != 0 ||
           (method != 0 && method != 8) ||
           u16(at + 34) != 0 ||
           mode & 0xf000 == 0xa000) {
@@ -144,7 +146,7 @@ class EpubZip {
         name.length > 1024 ||
         name.startsWith('/') ||
         name.contains('\\') ||
-        name.contains(':') ||
+        name.split('/').first.contains(':') ||
         name.contains('\x00')) {
       invalidZip();
     }

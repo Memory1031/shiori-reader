@@ -22,15 +22,17 @@ final class ParsedEpub {
 /// Only package-local references are returned. External resources are never
 /// resolved or fetched. Percent decoding happens once, before containment.
 (String, String?)? epubReference(String base, String reference) {
-  final uri = Uri.tryParse(reference);
-  if (uri == null || uri.hasScheme || uri.hasAuthority || uri.hasQuery) {
+  final uri = Uri.tryParse(
+    reference.replaceAll(RegExp(r'^[ \t\r\n\f]+|[ \t\r\n\f]+$'), ''),
+  );
+  if (uri == null || uri.hasScheme || uri.hasAuthority) {
     return null;
   }
   final raw = Uri.decodeComponent(uri.path);
   if (raw.startsWith('/') ||
       raw.contains('\\') ||
       raw.contains('\x00') ||
-      raw.contains(':')) {
+      raw.split('/').first.contains(':')) {
     invalidZip();
   }
   final parts = raw.isEmpty
@@ -47,6 +49,7 @@ final class ParsedEpub {
     }
   }
   if (normalized.isEmpty) invalidZip();
+  if (normalized.first.contains(':')) invalidZip();
   return (
     normalized.join('/'),
     uri.hasFragment ? Uri.decodeComponent(uri.fragment) : null,
@@ -80,6 +83,7 @@ class EpubParser {
   final chapters = <ChapterContent>[];
   final presentations = <String, String>{};
   final byPath = <String, ChapterContent>{};
+  final skippedEmptyPaths = <String>{};
   final fragments = <String, Map<String, String>>{};
   int mediaSize = 0, textSize = 0;
 
@@ -134,11 +138,12 @@ class EpubParser {
   }
 
   ParsedEpub parse() {
-    if (utf8.decode(zip.read('mimetype', limit: 100)) !=
+    if (utf8.decode(zip.read('mimetype', limit: 100)).trim() !=
         'application/epub+zip') {
       invalidZip();
     }
-    if (zip.entries['mimetype']!.method != 0) invalidZip();
+    // Some otherwise readable packages compress mimetype or add a newline.
+    // EpubZip still verifies compression, declared length and CRC.
     if (zip.entries.containsKey('META-INF/encryption.xml')) {
       // Font obfuscation is safe to ignore because publisher fonts are unused.
       final encryption = xml('META-INF/encryption.xml');
@@ -200,7 +205,10 @@ class EpubParser {
           !{'application/xhtml+xml', 'text/html'}.contains(item.type)) {
         invalidZip();
       }
-      if (byPath.containsKey(item.path)) invalidZip();
+      if (byPath.containsKey(item.path) ||
+          skippedEmptyPaths.contains(item.path)) {
+        invalidZip();
+      }
       _chapter(item.path!);
     }
     if (chapters.isEmpty) invalidZip();
@@ -294,7 +302,17 @@ class EpubParser {
     if (RegExp(r'<!\s*ENTITY', caseSensitive: false).hasMatch(input)) {
       invalidZip();
     }
-    final document = html.parse(input);
+    // XHTML permits self-closing script/style elements; HTML's raw-text parser
+    // otherwise swallows the rest of the document as script. Never execute it.
+    final document = html.parse(
+      input.replaceAll(
+        RegExp(
+          r'''<(?:script|style)\b(?:[^>"']|"[^"]*"|'[^']*')*/\s*>''',
+          caseSensitive: false,
+        ),
+        '',
+      ),
+    );
     // Bound traversal and nesting before recursive rendering.
     var count = 0;
     final stack = <(dom.Node, int)>[(document, 0)];
@@ -420,7 +438,8 @@ class EpubParser {
             'video',
             'canvas',
           }.contains(tag) ||
-          node.attributes.containsKey('hidden')) {
+          node.attributes.containsKey('hidden') ||
+          styles[node]?['display'] == 'none') {
         return;
       }
       final heading = RegExp(r'^h[1-6]$').hasMatch(tag)
@@ -471,6 +490,14 @@ class EpubParser {
         buffer.write('\n');
         return;
       }
+      if (tag == 'rp') return;
+      if (tag == 'rt') {
+        final annotation = node.text
+            .replaceAll(RegExp(r'[ \t\r\n\f]+'), ' ')
+            .trim();
+        if (annotation.isNotEmpty) buffer.write('（$annotation）');
+        return;
+      }
       final wasPre = pre;
       if (tag == 'pre') pre = true;
       for (final child in node.nodes) {
@@ -487,10 +514,19 @@ class EpubParser {
       (b) => b is ImageBlock || b is ParagraphBlock && b.text.trim().isNotEmpty,
     )) {
       for (var i = 0; i < blocks.length; i++) {
-        if (blocks[i] case HeadingBlock(:final text)) {
-          blocks[i] = ParagraphBlock(text: text);
+        if (blocks[i] case HeadingBlock(:final text, :final alignment)) {
+          blocks[i] = ParagraphBlock(text: text, alignment: alignment);
         }
       }
+    }
+    if (!blocks.any(
+      (b) => b is ImageBlock || b is ParagraphBlock && b.text.trim().isNotEmpty,
+    )) {
+      skippedEmptyPaths.add(path);
+      presentations.remove(
+        LocalBookIdentity.chapter(book, 'epub:$path').chapterId,
+      );
+      return;
     }
     // EPUB authors often use h4–h6 for the document's chapter heading.
     // Promote only an opening heading at the document's highest heading rank.
@@ -504,7 +540,20 @@ class EpubParser {
         blocks[0] = HeadingBlock(text: text, level: 2, alignment: alignment);
       }
     }
-    final title = doc.querySelector('h1,h2,h3,h4,h5,h6')?.text.trim();
+    final title = doc
+        .querySelectorAll('h1,h2,h3,h4,h5,h6')
+        .where((heading) {
+          for (dom.Element? node = heading; node != null; node = node.parent) {
+            if (node.attributes.containsKey('hidden') ||
+                styles[node]?['display'] == 'none') {
+              return false;
+            }
+          }
+          return true;
+        })
+        .firstOrNull
+        ?.text
+        .trim();
     final docTitle = doc.querySelector('title')?.text.trim();
     final chapter = ChapterContent(
       key: LocalBookIdentity.chapter(book, 'epub:$path'),

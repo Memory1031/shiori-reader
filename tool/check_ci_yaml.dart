@@ -35,6 +35,60 @@ void main() {
   if (releaseJobs['android-release']['needs'] != 'checks') {
     throw StateError('Android release build must depend on checks');
   }
+  final releaseChecks = releaseJobs['checks']['steps'] as YamlList;
+  final releaseCommands = releaseChecks
+      .map((step) => (step as YamlMap)['run']?.toString() ?? '')
+      .join('\n');
+  for (final required in [
+    'dart tool/check_ci_yaml.dart',
+    'bash tool/generate_database.sh',
+    'git diff --exit-code -- lib/l10n/generated',
+    'dart format --output=none --set-exit-if-changed lib test',
+    'python3 tool/release_android.py version',
+    'test_release_android.py',
+  ]) {
+    if (!releaseCommands.contains(required)) {
+      throw StateError('Missing release check: $required');
+    }
+  }
+  if (!releaseChecks.any(
+    (step) => (step as YamlMap)['working-directory'] == 'tool/db_codegen',
+  )) {
+    throw StateError('Release analysis needs database generator dependencies');
+  }
+  final publishSteps = releaseJobs['android-release']['steps'] as YamlList;
+  int commandIndex(String command) => publishSteps.indexWhere(
+    (step) => ((step as YamlMap)['run']?.toString() ?? '').contains(command),
+  );
+  final signing = commandIndex('release_android.py signing');
+  final build = commandIndex('flutter build apk --release');
+  final verify = commandIndex('release_android.py verify');
+  final publish = commandIndex('gh release create');
+  if (signing < 0 || build <= signing || verify <= build || publish <= verify) {
+    throw StateError(
+      'Release must prepare signing, build, verify, then publish',
+    );
+  }
+  final secrets = publishSteps[signing]['env'] as YamlMap;
+  for (final name in [
+    'ANDROID_KEYSTORE_BASE64',
+    'ANDROID_STORE_PASSWORD',
+    'ANDROID_KEY_ALIAS',
+    'ANDROID_KEY_PASSWORD',
+  ]) {
+    if (secrets[name] != '\${{ secrets.$name }}') {
+      throw StateError('Missing signing secret binding: $name');
+    }
+  }
+  if (!publishSteps.any(
+    (step) =>
+        step['if'] == 'always()' &&
+        (step['run']?.toString() ?? '').contains(
+          'rm -f android/key.properties',
+        ),
+  )) {
+    throw StateError('Signing files need unconditional cleanup');
+  }
 
   for (final job in [...ciJobs.values, ...releaseJobs.values]) {
     for (final step in (job as YamlMap)['steps'] as YamlList) {
