@@ -1,0 +1,30 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:crypto/crypto.dart';
+import 'package:shiori/data/local/epub/epub_parser.dart';
+import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/domain/contracts/local_book_decoder.dart';
+
+void main(List<String> args) {
+  final file = File(args[0]);
+  final bytes = file.readAsBytesSync();
+  final hash = sha256.convert(bytes).toString();
+  final result = <String, Object?>{'file': file.uri.pathSegments.last, 'sha256': hash, 'bytes': bytes.length};
+  final watch = Stopwatch()..start();
+  try {
+    final parser = EpubParser(bytes, NovelKey(sourceId: SourceId('local'), novelId: hash), file.uri.pathSegments.last, includePresentations: true);
+    final parsed = parser.parse();
+    watch.stop();
+    result.addAll({'status': 'parsed', 'parseMs': watch.elapsedMicroseconds / 1000,
+      'peakRssBytes': ProcessInfo.maxRss, 'chapters': parsed.content.chapters.length,
+      'presentations': parser.presentations.length,
+      'chapterPaths': parser.byPath.keys.toList(), 'skippedEmptyPaths': parser.skippedEmptyPaths.toList(),
+      'mediaHashes': parsed.media.keys.toList()});
+  } catch (error) {
+    watch.stop();
+    result.addAll({'status': 'failed', 'errorType': error.runtimeType.toString(),
+      'errorCategory': error is LocalParseException ? error.problem.name : 'other',
+      'parseMs': watch.elapsedMicroseconds / 1000, 'peakRssBytes': ProcessInfo.maxRss});
+  }
+  stdout.writeln(jsonEncode(result));
+}

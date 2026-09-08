@@ -59,3 +59,5 @@ BMH-AN10 / Android 12 / ARM64，Profile、约 60Hz、离线合成内容：500 �
 2026-09-08：用户提供的 EPUB 首章在修复前解析为 ParagraphBlock 占位，修复带命名空间的 xlink:href 后解析为 ImageBlock。用户原件临时诊断加合成解析回归共 30 项通过，原件和正文未加入仓库；未运行设备验证。旧导入 manifest 不会自动更新，重复导入仍去重。
 
 EPUB 扩展核查及修复见[专项报告](epub-compatibility.md)：35 个文件中 34 个解析成功，1 个因加密声明继续拒绝；426 项离线测试通过。报告区分文件结构比对、宿主机图片解码与尚未执行的设备展示验证，并保留此前 Mac 核查的历史记录。
+
+第三方库实测见 [EPUB 解析库比较](epub-library-comparison.md)：本轮可读取 31 个文件，比较 Shiori、epubx 4.0.0 与 epub_parser 3.0.1；区分 Windows 路径问题、WebP 分类与真正资源缺失，未更换生产依赖。

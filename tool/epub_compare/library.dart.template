@@ -1,0 +1,66 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:crypto/crypto.dart';
+import 'package:LIBRARY/LIBRARY.dart';
+
+String canonical(String base, String path) => Uri.decodeComponent(Uri.parse(base.isEmpty ? 'file:///' : 'file:///$base/').resolve(path).path.substring(1));
+Future<void> main(List<String> args) async {
+  final bytes = File(args[0]).readAsBytesSync();
+  final result = <String, Object?>{'file': File(args[0]).uri.pathSegments.last,
+    'sha256': sha256.convert(bytes).toString(), 'bytes': bytes.length};
+  final watch = Stopwatch()..start();
+  try {
+    final book = await EpubReader.readBook(bytes);
+    watch.stop();
+    result['parseMs'] = watch.elapsedMicroseconds / 1000;
+    result['peakRssBytes'] = ProcessInfo.maxRss;
+    final base = book.Schema!.ContentDirectoryPath ?? '';
+    final resources = <Map<String, Object?>>[];
+    for (final item in book.Content!.Html!.entries) {
+      final content = item.value.Content ?? '';
+      resources.add({'path': canonical(base, item.key), 'kind': 'html',
+        'sha256': sha256.convert(utf8.encode(content.replaceFirst(RegExp(r'^\uFEFF'), ''))).toString(),
+        'characters': content.length});
+    }
+    for (final item in book.Content!.Images!.entries) {
+      resources.add({'path': canonical(base, item.key), 'kind': 'image',
+        'sha256': sha256.convert(item.value.Content!).toString()});
+    }
+    final unclassifiedImages = <String>[];
+    for (final item in book.Content!.AllFiles!.entries) {
+      final value = item.value;
+      if (value is EpubByteContentFile &&
+          (value.ContentMimeType ?? '').startsWith('image/') &&
+          !book.Content!.Images!.containsKey(item.key)) {
+        unclassifiedImages.add(canonical(base, item.key));
+        resources.add({'path': canonical(base, item.key), 'kind': 'image',
+          'sha256': sha256.convert(value.Content!).toString()});
+      }
+    }
+    final manifest = {for (final item in book.Schema!.Package!.Manifest!.Items!) item.Id: item};
+    final spine = [for (final item in book.Schema!.Package!.Spine!.Items!)
+      canonical(base, manifest[item.IdRef]!.Href!)];
+    final navigation = <Map<String, Object?>>[];
+    void visit(EpubChapter chapter) {
+      navigation.add({'path': canonical(base, chapter.ContentFileName ?? ''), 'fragment': chapter.Anchor,
+        'titleHash': sha256.convert(utf8.encode(chapter.Title ?? '')).toString()});
+      for (final child in chapter.SubChapters ?? <EpubChapter>[]) { visit(child); }
+    }
+    for (final chapter in book.Chapters ?? <EpubChapter>[]) { visit(chapter); }
+    result.addAll({'status': 'parsed', 'spine': spine, 'navigation': navigation, 'resources': resources,
+      'imagesOnlyInAllFiles': unclassifiedImages,
+      'titlePresent': (book.Title ?? '').isNotEmpty, 'authorPresent': (book.Author ?? '').isNotEmpty,
+      'coverDecoded': book.CoverImage != null});
+  } catch (error) {
+    watch.stop();
+    // Keep error categories and resource paths, never book content or stack traces.
+    final message = error.toString();
+    result.addAll({'status': 'failed', 'errorType': error.runtimeType.toString(),
+      if (message.length < 500 && RegExp(r'^Exception: (Incorrect EPUB|EPUB parsing error)').hasMatch(message)) 'resourceError': message,
+      'errorCategory': message.contains('navigation') || message.contains('Navigation') ? 'navigation'
+        : message.contains('manifest') ? 'manifest' : message.contains('cover') ? 'cover'
+        : message.contains('XML') || message.contains('Xml') ? 'xml' : 'other',
+      'parseMs': watch.elapsedMicroseconds / 1000, 'peakRssBytes': ProcessInfo.maxRss});
+  }
+  stdout.writeln(jsonEncode(result));
+}
