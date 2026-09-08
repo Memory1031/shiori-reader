@@ -133,7 +133,7 @@ void publishRelease(String directory, String tag, {bool publish = false}) {
     'develop: $source\nmaster: ${master ?? '(first release)'}\nrelease: $tag\ninternal build: ${version[2]}',
   );
   stdout.writeln(
-    'Plan: ${master == null ? 'create master from develop' : 'merge develop into master (--no-ff)'}; annotated tag on master; atomic push master + tag.',
+    'Plan: ${master == null ? 'create master from develop' : 'merge develop into master (fast-forward when possible)'}; annotated tag on master; atomic push master + tag.',
   );
   if (!publish) {
     stdout.writeln('Preview only; use --publish to execute. No refs changed.');
@@ -159,7 +159,7 @@ void publishRelease(String directory, String tag, {bool publish = false}) {
   if (master != null) {
     git([
       'merge',
-      '--no-ff',
+      '--ff',
       source,
       '-m',
       'chore: release $tag\n\n- Merge develop into master for release',

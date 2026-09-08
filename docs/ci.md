@@ -19,7 +19,9 @@ CI 检查工作流结构、锁文件变化、数据库生成与新 schema、gen-
 
 ## Android tag 发布
 
-`checks` 安装三份锁定依赖，并执行工作流 / 锁文件、数据库生成、本地化生成、格式、分析和应用离线测试；另运行发布工具离线测试。tag 必须等于 `v` + pubspec 版本（不含 `+build`），build number 必须是合法正整数。`android-release` 在其成功后使用 JDK 17 构建。签名需要四个仓库 Actions secrets：
+`ci-status` 查询本仓库 `ci.yml` 的同一提交 SHA，复用最近一次 push / workflow_dispatch 的成功结果；不接受其他 SHA、PR 或其他仓库结果。没有可复用结果时，`quality` 通过 workflow_call 执行同一份完整 CI（包括调查包检查），避免维护第二份 UT 配置。查询失败直接阻止发布，补验失败 / 取消也不能进入构建。实现参考 [GitHub Workflow Runs API](https://docs.github.com/en/rest/actions/workflow-runs) 与[共享工作流](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)。
+
+发布脚本优先快进 master 到已通过 CI 的 develop SHA；仅分支分叉时产生新合并提交，此时补验。`android-release` 在复用或补验成功后使用 JDK 17 构建，始终单独校验 tag 等于 `v` + pubspec 版本（不含 `+build`）及合法正整数 build number，再签名、校验 APK。签名需要四个仓库 Actions secrets：
 
 | Secret | 内容 |
 | --- | --- |

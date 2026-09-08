@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -52,7 +53,9 @@ jobs:
           git diff --exit-code -- pubspec.lock tools/source_probe/pubspec.lock tool/db_codegen/pubspec.lock
 
       - name: 发布工具离线测试
-        run: python3 -m unittest discover -s tool -p 'test_release_android.py'
+        run: |
+          python3 -m unittest discover -s tool -p 'test_release_android.py'
+          node --test tool/test_release_ci_gate.cjs
 
       - name: 检查数据库生成代码
         run: |

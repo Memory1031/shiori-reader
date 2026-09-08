@@ -143,9 +143,11 @@ void main() {
   });
 
   test('existing master produces a merge commit and tag at that commit', () {
-    git(['branch', 'master']);
+    git(['switch', '-c', 'master']);
+    commit('master-only');
     git(['push', 'origin', 'master']);
     final previous = git(['rev-parse', 'master']);
+    git(['switch', 'develop']);
     commit('next');
     git(['push', 'origin', 'develop']);
     final source = git(['rev-parse', 'develop']);
@@ -153,6 +155,17 @@ void main() {
     expect(git(['rev-parse', 'master^1']), previous);
     expect(git(['rev-parse', 'master^2']), source);
     expect(git(['rev-parse', 'v1.0.0^{}']), git(['rev-parse', 'master']));
+  });
+
+  test('linear release retains the tested develop SHA', () {
+    git(['branch', 'master']);
+    git(['push', 'origin', 'master']);
+    commit('linear-next');
+    git(['push', 'origin', 'develop']);
+    final source = git(['rev-parse', 'develop']);
+    publishRelease(repo, 'v1.0.0', publish: true);
+    expect(git(['rev-parse', 'master']), source);
+    expect(git(['rev-parse', 'v1.0.0^{}']), source);
   });
 
   test('rejects dirty tree, wrong version and unpushed develop', () {

@@ -72,10 +72,10 @@ dart tool/publish_release.dart v1.0.0 --publish
 
 [脚本](../../tool/publish_release.dart)固定使用 `origin`、`develop`、`master` 和稳定版 `vX.Y.Z`。要求当前在 develop、工作区干净、本地 develop 与远端一致、标签不存在，且提交中的 pubspec 和所有 ShareExtension 配置版本 / build 一致。不自动提交、修改版本、运行应用测试或查询 CI 状态；应先确认 develop 对应提交的 CI。
 
-- 首次没有 master 时，从 develop 创建 master；已有 master 时通过 `--no-ff` 合并，标签指向 master 的最终提交。已有本地 master 必须与远端一致。
+- 首次没有 master 时，从 develop 创建 master；已有 master 时优先快进合并以保持已验证提交的 SHA；仅分支分叉时产生合并提交，标签指向 master 的最终提交。已有本地 master 必须与远端一致。
 - 执行前 fetch 并核对分支没有变化，合并后再次检查版本配置。附注标签与 master 使用一次 `--atomic` 推送；master 使用明确旧提交的 lease 防止并发覆盖，并要求旧 master 是新提交的祖先，不用于改写历史。不支持 atomic push 或保护规则拒绝时停止，不降级为分开推送。
 - 成功后回到 develop；不自动将 master 合并回 develop。后续版本继续在 develop 开发并递增版本 / build。
 - 合并冲突时保留 master 冲突现场，不打标签、不推送；检查后可手动 `git merge --abort`。推送失败时保留本地 master / tag，不自动删除或重建；先检查远端 refs（网络中断可能发生在服务端已接收后），核对后再重试同一发布。原脚本会拒绝已有标签，不会重复发布或覆盖。
 - 标签触发 Android 签名 APK 工作流；脚本退出成功表示 Git 推送成功，不能代替 Actions 产物、签名和设备验收，也不会发布 iOS 包。
 
-验证：11 项临时本地 Git 仓库测试覆盖三种版本递增及扩展同步、准备失败不写入、只读预览、首次发布、双亲合并提交、重复标签、脏工作区、版本 / 扩展不一致、未推送 develop、master 不一致、冲突及远端拒绝标签的原子性。测试不接触真实 origin。
+验证：12 项临时本地 Git 仓库测试覆盖三种版本递增及扩展同步、准备失败不写入、只读预览、首次发布、双亲合并提交、重复标签、脏工作区、版本 / 扩展不一致、未推送 develop、master 不一致、冲突及远端拒绝标签的原子性。测试不接触真实 origin。

@@ -9,7 +9,8 @@ void main() {
   final ciJobs = ci['jobs'] as YamlMap;
   if (!ciEvents.containsKey('push') ||
       !ciEvents.containsKey('pull_request') ||
-      !ciEvents.containsKey('workflow_dispatch')) {
+      !ciEvents.containsKey('workflow_dispatch') ||
+      !ciEvents.containsKey('workflow_call')) {
     throw StateError('Missing expected events');
   }
   if (ciJobs.keys.length != 1 || !ciJobs.containsKey('analyze-test')) {
@@ -32,10 +33,28 @@ void main() {
       (releaseEvents['push'] as YamlMap)['tags'] == null) {
     throw StateError('Release workflow must be tag-triggered only');
   }
-  if (releaseJobs['android-release']['needs'] != 'checks') {
-    throw StateError('Android release build must depend on checks');
+  if (releaseJobs['android-release']['needs'].toString() !=
+          '[ci-status, quality]' ||
+      releaseJobs['quality']['uses'] != './.github/workflows/ci.yml' ||
+      releaseJobs['quality']['if'] !=
+          "needs.ci-status.outputs.reuse != 'true'" ||
+      releaseJobs['ci-status']['permissions']['actions'] != 'read') {
+    throw StateError(
+      'Release must reuse exact-commit CI or call shared quality checks',
+    );
   }
-  final releaseChecks = releaseJobs['checks']['steps'] as YamlList;
+  final condition = releaseJobs['android-release']['if'].toString();
+  for (final guard in [
+    "needs.ci-status.result == 'success'",
+    "needs.ci-status.outputs.reuse == 'true'",
+    "needs.quality.result == 'success'",
+    '!cancelled()',
+  ]) {
+    if (!condition.contains(guard)) {
+      throw StateError('Missing release gate: $guard');
+    }
+  }
+  final releaseChecks = ciJobs['analyze-test']['steps'] as YamlList;
   final releaseCommands = releaseChecks
       .map((step) => (step as YamlMap)['run']?.toString() ?? '')
       .join('\n');
@@ -44,8 +63,8 @@ void main() {
     'bash tool/generate_database.sh',
     'git diff --exit-code -- lib/l10n/generated',
     'dart format --output=none --set-exit-if-changed lib test',
-    'python3 tool/release_android.py version',
     'test_release_android.py',
+    'node --test tool/test_release_ci_gate.cjs',
   ]) {
     if (!releaseCommands.contains(required)) {
       throw StateError('Missing release check: $required');
@@ -61,6 +80,10 @@ void main() {
     (step) => ((step as YamlMap)['run']?.toString() ?? '').contains(command),
   );
   final signing = commandIndex('release_android.py signing');
+  if (commandIndex('release_android.py version') < 0 ||
+      commandIndex('release_android.py version') >= signing) {
+    throw StateError('Tag version check must precede signing');
+  }
   final build = commandIndex('flutter build apk --release');
   final verify = commandIndex('release_android.py verify');
   final publish = commandIndex('gh release create');
@@ -91,7 +114,8 @@ void main() {
   }
 
   for (final job in [...ciJobs.values, ...releaseJobs.values]) {
-    for (final step in (job as YamlMap)['steps'] as YamlList) {
+    if ((job as YamlMap)['uses'] != null) continue;
+    for (final step in job['steps'] as YamlList) {
       final dir = (step as YamlMap)['working-directory'];
       if (dir != null && !Directory(dir as String).existsSync()) {
         throw StateError('Missing working directory: $dir');

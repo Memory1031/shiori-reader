@@ -1,7 +1,7 @@
 name: Release
 
 # 正式发布工作流：仅在推送 v* 标签时触发。日常质量检查由 ci.yml 负责，
-# 这里只复核应用级检查并产出签名 APK；调查包检查不在发布关键路径上。
+# 同提交复用 CI；未验证提交调用共享 CI，通过后产出签名 APK。
 # 对外公开分发前需完成 TASK_PLAN 的 RELEASE-001 渠道 / 许可审查。
 on:
   push:
@@ -22,67 +22,36 @@ env:
   PUB_HOSTED_URL: https://pub.flutter-io.cn
 
 jobs:
-  checks:
-    name: 发布前应用检查
+  ci-status:
+    name: 复用已通过的 CI
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      reuse: ${{ steps.lookup.outputs.reuse }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
+      - id: lookup
+        uses: actions/github-script@v7
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-          pub-cache-key: "flutter-pub-:os:-:version:-:arch:-${{ hashFiles('pubspec.lock', 'tools/source_probe/pubspec.lock', 'tool/db_codegen/pubspec.lock') }}"
+          script: |
+            const gate = require('./tool/release_ci_gate.cjs');
+            await gate({ github, context, core });
 
-      - name: 安装依赖
-        run: flutter pub get --enforce-lockfile
-
-      # 根目录 analyze 会扫描嵌套包，必须先生成调查包自己的 package_config。
-      - name: 安装调查包依赖
-        working-directory: tools/source_probe
-        run: dart pub get --enforce-lockfile
-
-      - name: 安装数据库生成器依赖
-        working-directory: tool/db_codegen
-        run: dart pub get --enforce-lockfile
-
-      - name: 检查工作流与锁文件
-        run: |
-          dart tool/check_ci_yaml.dart
-          git diff --exit-code -- pubspec.lock tools/source_probe/pubspec.lock tool/db_codegen/pubspec.lock
-
-      - name: 校验 tag 与包版本
-        run: python3 tool/release_android.py version
-
-      - name: 发布工具离线测试
-        run: python3 -m unittest discover -s tool -p 'test_release_android.py'
-
-      - name: 检查数据库生成代码
-        run: |
-          bash tool/generate_database.sh
-          git diff --exit-code -- tool/db_codegen/pubspec.lock lib/data/local/database
-          test -z "$(git ls-files --others --exclude-standard lib/data/local/database)"
-
-      - name: 检查本地化生成代码
-        run: |
-          flutter gen-l10n
-          git diff --exit-code -- lib/l10n/generated
-          test -z "$(git ls-files --others --exclude-standard lib/l10n/generated)"
-
-      - name: 格式检查
-        run: dart format --output=none --set-exit-if-changed lib test
-
-      - name: 静态分析
-        run: flutter analyze --no-pub
-
-      - name: 单元与组件测试
-        run: flutter test --no-pub
+  quality:
+    name: 验证尚未通过 CI 的发布提交
+    needs: ci-status
+    if: needs.ci-status.outputs.reuse != 'true'
+    uses: ./.github/workflows/ci.yml
 
   android-release:
     name: Android 签名发布构建
-    needs: checks
+    needs: [ci-status, quality]
+    if: >-
+      ${{ always() && !cancelled() && needs.ci-status.result == 'success' &&
+          (needs.ci-status.outputs.reuse == 'true' || needs.quality.result == 'success') }}
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -107,6 +76,9 @@ jobs:
 
       - name: 生成本地化代码
         run: flutter gen-l10n
+
+      - name: 校验 tag 与包版本
+        run: python3 tool/release_android.py version
 
       - name: 校验并写入签名配置
         env:
