@@ -19,6 +19,10 @@ CI 检查工作流结构、锁文件变化、数据库生成与新 schema、gen-
 
 ## Android tag 发布
 
+APK 校验固定使用 Build Tools **35.0.0**，发布构建前安装并执行 `release_android.py tools` 预检，不自动选 runner 上最高版本。2026-09-08 的 v1.0.0 首次发布已构建出 68.6 MB APK，但校验失败：runner 预装 37.0.0，其 `apksigner --print-certs` 输出 `V2 Signer: certificate SHA-256 digest`，与校验器预期的 `Signer #1 certificate SHA-256 digest` 不同。已用官方 37 Windows 工具和同一测试 APK 复现格式差异；固定 35 后合成密钥签名 / 校验 / 元数据冒烟通过，6 项 Python 回归通过。未绕过签名检查；真实 v1.0.0 Release 尚未产出，修复待新的发布运行验证。
+
+已知校验错误现在输出受控原因（版本、证书、工具），不会输出工具参数、原始 stderr 或签名秘密；未知异常仍使用通用提示。
+
 `ci-status` 查询本仓库 `ci.yml` 的同一提交 SHA，复用最近一次 push / workflow_dispatch 的成功结果；不接受其他 SHA、PR 或其他仓库结果。没有可复用结果时，`quality` 通过 workflow_call 执行同一份完整 CI（包括调查包检查），避免维护第二份 UT 配置。查询失败直接阻止发布，补验失败 / 取消也不能进入构建。实现参考 [GitHub Workflow Runs API](https://docs.github.com/en/rest/actions/workflow-runs) 与[共享工作流](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)。
 
 发布脚本优先快进 master 到已通过 CI 的 develop SHA；仅分支分叉时产生新合并提交，此时补验。`android-release` 在复用或补验成功后使用 JDK 17 构建，始终单独校验 tag 等于 `v` + pubspec 版本（不含 `+build`）及合法正整数 build number，再签名、校验 APK。签名需要四个仓库 Actions secrets：

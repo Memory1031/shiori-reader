@@ -64,6 +64,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: 安装并预检固定版本的 APK 校验工具
+        run: |
+          sdkmanager "build-tools;35.0.0"
+          python3 tool/release_android.py tools
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}

@@ -80,6 +80,10 @@ void main() {
     (step) => ((step as YamlMap)['run']?.toString() ?? '').contains(command),
   );
   final signing = commandIndex('release_android.py signing');
+  if (commandIndex('release_android.py tools') < 0 ||
+      commandIndex('release_android.py tools') >= signing) {
+    throw StateError('Pinned APK tools must be checked before signing/build');
+  }
   if (commandIndex('release_android.py version') < 0 ||
       commandIndex('release_android.py version') >= signing) {
     throw StateError('Tag version check must precede signing');

@@ -12,12 +12,19 @@ import subprocess
 import sys
 
 
+BUILD_TOOLS_VERSION = "35.0.0"
+
+
+class ReleaseCheckError(ValueError):
+    """Only controlled, credential-free messages may be put in this exception."""
+
+
 def version(pubspec, tag):
     match = re.search(r"^version:\s*(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\+([1-9]\d*)\s*$", pubspec, re.M)
     if not match or int(match[2]) > 2100000000:
-        raise ValueError("pubspec must have an Android-compatible version and positive build number")
+        raise ReleaseCheckError("pubspec must have an Android-compatible version and positive build number")
     if tag != "v" + match[1]:
-        raise ValueError("Release tag must equal v + pubspec version (without build number)")
+        raise ReleaseCheckError("Release tag must equal v + pubspec version (without build number)")
     return match[1], match[2]
 
 
@@ -41,13 +48,13 @@ def signing_values(environment):
     names = ("ANDROID_KEYSTORE_BASE64", "ANDROID_STORE_PASSWORD", "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD")
     missing = [name for name in names if not environment.get(name)]
     if missing:
-        raise ValueError("Missing Actions secrets: " + ", ".join(missing))
+        raise ReleaseCheckError("Missing Actions secrets: " + ", ".join(missing))
     try:
         binary = base64.b64decode("".join(environment[names[0]].split()), validate=True)
     except ValueError:
-        raise ValueError("ANDROID_KEYSTORE_BASE64 is invalid") from None
+        raise ReleaseCheckError("ANDROID_KEYSTORE_BASE64 is invalid") from None
     if not binary:
-        raise ValueError("Keystore is empty")
+        raise ReleaseCheckError("Keystore is empty")
     return binary, environment
 
 
@@ -55,8 +62,25 @@ def run(command):
     result = subprocess.run(command, capture_output=True, check=False)
     if result.returncode:
         # Tool output may contain credential-dependent data; fail without echoing it.
-        raise ValueError("Release tool failed: " + Path(command[0]).name)
+        raise ReleaseCheckError("Release tool failed: " + Path(command[0]).name)
     return result.stdout
+
+
+def sdk_tools():
+    sdk = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
+    if not sdk:
+        raise ReleaseCheckError("Android SDK environment is missing")
+    tools = Path(sdk) / "build-tools" / BUILD_TOOLS_VERSION
+    if not (tools / "lib/apksigner.jar").is_file() or not (tools / ("aapt.exe" if os.name == "nt" else "aapt")).is_file():
+        raise ReleaseCheckError("Required Android Build Tools 35.0.0 are missing; install build-tools;35.0.0")
+    return tools
+
+
+def check_tools():
+    tools = sdk_tools()
+    run(["java", "-jar", str(tools / "lib/apksigner.jar"), "version"])
+    run([str(tools / ("aapt.exe" if os.name == "nt" else "aapt")), "version"])
+    print("Android verification tools ready: Build Tools " + BUILD_TOOLS_VERSION)
 
 
 def prepare_signing(root):
@@ -77,23 +101,17 @@ def prepare_signing(root):
 def verify_metadata(badging, certs, expected_version, expected_build, expected_certificate):
     package = re.search(r"^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'", badging, re.M)
     if not package or package.groups() != ("dev.shiori.reader", expected_build, expected_version):
-        raise ValueError("APK package/version does not match release configuration")
+        raise ReleaseCheckError("APK package/version does not match release configuration")
     if re.search(r"^application-debuggable(?:\s|$)", badging, re.M):
-        raise ValueError("APK must not be debuggable")
+        raise ReleaseCheckError("APK must not be debuggable")
     fingerprints = re.findall(r"^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]{64})\s*$", certs, re.M)
     if [value.lower() for value in fingerprints] != [expected_certificate.lower()]:
-        raise ValueError("APK signing certificate differs from the configured keystore")
+        raise ReleaseCheckError("APK signing certificate differs from the configured keystore")
 
 
 def verify_apk(root, tag):
     name, number = version((root / "pubspec.yaml").read_text(encoding="utf-8"), tag)
-    sdk = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
-    if not sdk:
-        raise ValueError("Android SDK environment is missing")
-    candidates = [path for path in (Path(sdk) / "build-tools").iterdir() if re.fullmatch(r"\d+\.\d+\.\d+", path.name)]
-    if not candidates:
-        raise ValueError("Android SDK Build Tools are missing")
-    tools = max(candidates, key=lambda path: tuple(map(int, path.name.split("."))))
+    tools = sdk_tools()
     apk = root / "build/app/outputs/flutter-apk/app-release.apk"
     certs = run(["java", "-jar", str(tools / "lib/apksigner.jar"), "verify", "--print-certs", str(apk)]).decode("utf-8")
     aapt = tools / ("aapt.exe" if os.name == "nt" else "aapt")
@@ -114,10 +132,12 @@ def verify_apk(root, tag):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("version", "signing", "verify"))
+    parser.add_argument("command", choices=("version", "tools", "signing", "verify"))
     args = parser.parse_args()
     root = Path.cwd()
-    if args.command == "signing":
+    if args.command == "tools":
+        check_tools()
+    elif args.command == "signing":
         prepare_signing(root)
     else:
         tag = os.environ.get("GITHUB_REF_NAME", "")
@@ -130,6 +150,9 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except ReleaseCheckError as error:
+        print("Release check failed: " + str(error), file=sys.stderr)
+        sys.exit(1)
     except (ValueError, OSError):
         # Do not put secrets or untrusted exception text into Actions annotations.
         print("Release check failed; check version/tag, signing secrets and Android tools.", file=sys.stderr)
