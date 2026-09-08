@@ -1,17 +1,29 @@
 # 持续集成
 
-工作流：[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)。当前是提前引入的基础质量检查，不代表任务计划中的 CI-001 / CI-002 已完成全部验收。tag 触发的发布工作流见[发布工作流](#发布工作流)一节（[`.github/workflows/release.yml`](../.github/workflows/release.yml)）。
+工作流：[`.github/workflows/ci.yml`](../.github/workflows/ci.yml)。CI-001 已完成验收（2026-09-08）；CI-002 配置与本地验证见下方记录，GitHub Linux 实跑待验收。tag 触发的发布工作流见[发布工作流](#发布工作流)一节（[`.github/workflows/release.yml`](../.github/workflows/release.yml)）。
+
+## CI-001 验收补齐（2026-09-08）
+
+用户在本次会话确认已人工验证两项剩余要求：GitHub Actions 工作流成功运行；测试失败会使对应 job 失败。结合下方已有配置及本地验证记录，CI-001 标记 DONE。
+
+远端运行结果的证据来源为用户人工确认；未提供具体 run URL / commit，本轮代理没有独立检查远端记录，也没有重复运行或注入故意失败代码。下方 2026-09-07 的待验描述保留为历史记录，不代表当前 CI-001 状态。此确认不扩展为 CI-002、签名发布或 iOS 编译验收。
 
 ## 触发方式
 
 | 事件 | 行为 |
 | --- | --- |
-| 推送至 `main` / `develop`，或创建 / 更新 PR | 运行应用与调查包的格式、静态分析及离线测试 |
-| 手动 `workflow_dispatch` | 先执行相同检查，通过后构建并上传 Android Debug APK |
+| 创建 / 更新 PR、推送至 `develop` | 离线检查通过后构建 Android Debug APK |
+| 推送至 `main`（包括合并）、手动 `workflow_dispatch` | 离线检查通过后依次构建 Debug 与 Release smoke APK |
 
-仅修改文档时也运行基础检查。普通推送和 PR 不构建 APK。
+仅修改文档时也执行上述检查。所有 job 在 Linux 上运行，固定 Flutter 3.38.4 / JDK 17；Android SDK / NDK 由项目与固定 Flutter 的配置决定，没有 Xcode、iOS 或 macOS 前置。Debug 与 Release 在同一 job 内依次构建，复用本次 Gradle 缓存；PR 不执行 Release 以控制开销。
 
-手动构建入口为 GitHub **Actions → CI → Run workflow**；工作流进入默认分支后可使用该入口。产物名为 `app-debug-apk`，保留 7 天，仅用于开发验证。本工作流（ci.yml）自身没有发布、签名密钥或 iOS 构建步骤。
+手动入口为 GitHub **Actions → CI → Run workflow**；工作流进入默认分支后可使用。产物保留 7 天：
+
+- `app-debug-apk`：常规 Debug APK。
+- `app-release-smoke-debug-signed`：开启 Release 编译优化但使用 Debug 签名的检查包，不是正式 RC。
+- `android-build-logs`：Debug / Release 标准构建日志，构建失败也尝试上传；失败发生于构建前时查看对应 Actions 步骤日志。
+
+构建使用 Bash `pipefail`，`tee` 不会掩盖失败退出码。只上传指定 APK 和构建日志，不上传整个工作目录、Gradle 用户目录或签名文件。CI 仅有 `contents: read`，不读取发布 secrets，并要求 `android/key.properties` 不存在；正式签名发布仍由独立 tag 工作流负责。
 
 ## 发布工作流
 
@@ -45,13 +57,17 @@
 
 ## 依赖锁定
 
-Flutter 固定为 **3.38.4**。应用和独立调查包都使用 `pub get --enforce-lockfile`；Flutter 后续检查和构建使用 `--no-pub`。
+Flutter 固定为 **3.38.4**。应用、独立调查包与数据库生成器均使用 `pub get --enforce-lockfile`；Flutter 后续检查和构建使用 `--no-pub`。
 
 应用多语言采用 gen-l10n + ARB，生成的 `lib/l10n/generated/` Dart 文件随资源一起提交。CI 在格式检查前运行 `flutter gen-l10n` 和 `git diff --exit-code -- lib/l10n/generated`，检查提交的代码与资源是否一致；修改文案后应在本地重新生成。
 
-根目录 `flutter analyze` 会扫描独立调查包，因此必须在分析前完成两份依赖安装。仅安装主应用依赖不会生成 `tools/source_probe/.dart_tool/package_config.json`；干净的 runner 会因此找不到调查包自身以及 `html`、`image` 等依赖。不要通过忽略诊断或把调查依赖加入主应用来解决。
+数据库通过 `bash tool/generate_database.sh` 重新生成 Dart 与 schema 快照，随后检查 tracked diff 和新增未跟踪快照；生成器依赖隔离在 `tool/db_codegen`，不改应用依赖。Windows 继续使用原有 PowerShell 入口。
 
-两份 `pubspec.lock` 的 hosted URL 均为 `https://pub.flutter-io.cn`，因此工作流统一设置：
+Flutter SDK / Pub 缓存沿用 [flutter-action 的缓存能力](https://github.com/subosito/flutter-action#caching)，Pub 缓存键包含三份锁文件哈希及平台、SDK 版本。即使命中缓存也不跳过严格安装，并通过 `git diff` 检查锁文件；构建后再次检查应用锁文件与生成代码。缓存仅加速安装，不作为依赖版本来源。
+
+根目录 `flutter analyze` 会扫描独立调查包，因此必须在分析前完成应用与调查包的依赖安装；新增的数据库生成检查还需先安装隔离生成器依赖。仅安装主应用依赖不会生成 `tools/source_probe/.dart_tool/package_config.json`；干净的 runner 会因此找不到调查包自身以及 `html`、`image` 等依赖。不要通过忽略诊断或把调查依赖加入主应用来解决。
+
+三份 `pubspec.lock` 的 hosted URL 均为 `https://pub.flutter-io.cn`，因此工作流统一设置：
 
 ```yaml
 env:
@@ -60,7 +76,7 @@ env:
 
 Pub 默认使用 `pub.dev`，可通过 [`PUB_HOSTED_URL`](https://dart.dev/tools/pub/environment-variables) 选择镜像。源地址也属于依赖解析的一部分：若锁文件记录镜像、运行环境却使用默认源，即使版本号完全相同，严格锁定安装仍可能报 `Would change ... dependencies`。
 
-遇到此类错误，先核对两份锁文件的源地址及 CI 环境；不要直接删除锁文件或移除严格检查。将来切换源时需同步更新本地配置、两份锁文件和工作流，重新验证版本与内容哈希。
+遇到此类错误，先核对三份锁文件的源地址及 CI 环境；不要直接删除锁文件或移除严格检查。将来切换源时需同步更新本地配置、三份锁文件和工作流，重新验证版本与内容哈希。
 
 ## 本地复验
 
@@ -72,6 +88,13 @@ flutter pub get --enforce-lockfile
 Push-Location tools/source_probe
 dart pub get --enforce-lockfile
 Pop-Location
+Push-Location tool/db_codegen
+dart pub get --enforce-lockfile
+Pop-Location
+New-Item -ItemType Directory -Force tool/db_codegen/lib | Out-Null
+./tool/generate_database.ps1
+git diff --exit-code -- lib/data/local/database pubspec.lock tools/source_probe/pubspec.lock tool/db_codegen/pubspec.lock
+dart tool/check_ci_yaml.dart
 flutter gen-l10n
 git diff --exit-code -- lib/l10n/generated
 dart format --output=none --set-exit-if-changed lib test
@@ -114,3 +137,30 @@ dart tool/check_ci_yaml.dart
 - 扩展 `.tooling/check-ci-yaml.dart` 校验 release.yml：两份 YAML 解析、tag-only 触发、`android-release` 依赖 `checks`、工作目录检查通过。
 - `build.gradle.kts` 签名改造后本地复验：无 `key.properties` 时 debug 构建 PASS（29.1s，回退 debug 签名路径）；用临时测试密钥库走 CI 同款路径（`key.properties` + `release-keystore.jks`）构建 release APK PASS（53.8s），`apksigner verify --print-certs` 确认签名者为测试证书 `CN=Shiori Local Test`。测试密钥库与 `key.properties` 验证后已删除，未提交；正式密钥库尚未生成，4 个仓库 secrets 尚未配置。
 - 未验证：GitHub Actions 上的实际运行（需提交并推送标签后观察）；iOS 发布链路不在本工作流范围。runner 上的 `gh release create` / base64 解码步骤仅为源码审查通过，无本机等价执行。
+
+## CI-002 验证记录（2026-09-08）
+
+状态：配置与本地验证完成，GitHub Linux 实跑待验收。未修改业务代码、发布工作流或应用依赖。
+
+| 本地检查 | 结果 |
+| --- | --- |
+| 工作流 YAML / 触发条件 / Linux / 只读权限与无 secrets 引用 / 发布 tag 边界 | PASS；`dart tool/check_ci_yaml.dart`，该脚本已加入 CI |
+| Bash 语法与 `pipefail` + `tee` 失败传播 | PASS；模拟失败返回非零 |
+| 数据库生成器 | 严格锁定安装后重新生成 Dart 与 User v3 / Cache v2 快照，与提交一致，无新增快照 |
+| 缓存安装 | 三个包使用已有 Pub 缓存执行 `pub get --offline --enforce-lockfile`，三份锁文件不变；这是本地缓存复验，不是 Actions cache restore 证据 |
+| 本地化与静态分析 | `flutter gen-l10n` 无 diff；`flutter analyze --no-pub` 无问题；工作流校验脚本单独 analyze 通过 |
+| Debug APK | PASS，45.8 秒，183855950 字节 |
+| Release smoke APK | PASS，66.0 秒，67697360 字节；`apksigner verify --print-certs` 为 `CN=Android Debug` |
+
+两次构建均在 macOS 使用固定 Flutter 3.38.4 / JDK 17，未限制 target-platform；APK 中确认包含 `armeabi-v7a`、`arm64-v8a`、`x86_64`。Release 构建仍提示本机 SDK `android-36/data/annotations.zip` ZIP 损坏，但最终退出码为 0；本轮未修改全局 SDK。没有安装到手机，也没有执行真实 Source 请求。本轮仅调整 CI / 工具 / 文档，未重复上一任务已通过的 393 项离线测试；CI 保留完整离线测试门禁。
+
+本地日志：`/tmp/shiori-ci002-debug.log`、`/tmp/shiori-ci002-release.log`、`/tmp/shiori-ci002-analyze.log`（临时文件，不提交）。APK SHA-256：
+
+- Debug：`9ded947397e39aa2cbaac55f335936b7b5281dcd40eb39387cb3c824e0119a45`
+- Release：`ac9def321c436ed15e1f9b3f5be98fa6978928bb34d855dd6130a5f775d13ed9`
+
+剩余：提交并推送本次配置后，记录 GitHub Linux 的 Debug 与 main / 手动 Release 成功 run URL；重跑观察 Pub 缓存命中，并确认锁文件 / 生成文件检查与 artifact 上传成功。当前没有可用的 GitHub CLI / 连接器，本轮未推送、触发远端运行或创建 Release；CI-001 的旧人工确认不替代本次 CI-002 运行证据。
+
+### 远端格式失败修正
+
+用户提供的 Actions 截图显示格式检查因 `test/data/media/persistent_image_repository_test.dart` 一处 `expect` 换行不符合格式而退出 1，后续静态分析与测试未执行。已使用固定 Dart 3.10.3 格式化该文件，仅调整换行，无逻辑改动；本地复跑同款 `dart format --output=none --set-exit-if-changed lib test`，220 个文件、0 changed，通过。本轮未重复运行行为测试。需提交并推送此修正后验证新提交，重跑旧提交仍会遇到相同问题；CI-002 继续保留远端待验状态。

@@ -12,10 +12,26 @@ void main() {
       !ciEvents.containsKey('workflow_dispatch')) {
     throw StateError('Missing expected events');
   }
-  if (ciJobs['android-build']['if'] !=
-          "github.event_name == 'workflow_dispatch'" ||
+  if (ciJobs['android-build']['if'] != null ||
       ciJobs['android-build']['needs'] != 'analyze-test') {
-    throw StateError('APK build must be manual and depend on checks');
+    throw StateError('Regular APK build must depend on checks');
+  }
+
+  final androidJob = ciJobs['android-build'] as YamlMap;
+  final androidSteps = androidJob['steps'] as YamlList;
+  final smoke = androidSteps.cast<YamlMap>().singleWhere(
+    (step) => step['name'] == '构建 release smoke APK',
+  );
+  if (androidJob['runs-on'] != 'ubuntu-latest' ||
+      smoke['if'] !=
+          "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')" ||
+      ci['permissions']['contents'] != 'read' ||
+      File(
+        '.github/workflows/ci.yml',
+      ).readAsStringSync().contains('secrets.')) {
+    throw StateError(
+      'Android smoke must be Linux, main/manual and secret-free',
+    );
   }
 
   final release =
@@ -41,7 +57,7 @@ void main() {
     }
   }
   stdout.writeln(
-    'Workflow YAML parsed; triggers, manual APK condition, tag-only release '
+    'Workflow YAML parsed; triggers, regular Debug, main/manual smoke, tag-only release '
     'and working directories verified.',
   );
 }

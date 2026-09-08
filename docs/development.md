@@ -141,7 +141,7 @@ CORE-001 结果：**DONE（2026-09-06，working tree，未提交 commit）**。A
 
 ## DB-001 / DB-002 存储与代码生成
 
-数据库路径、双库备份边界、固定依赖、隔离生成器和验证记录见 [本地存储](database.md)。首次代码生成前进入 `tool/db_codegen` 执行 `dart pub get`，返回根目录运行 `./tool/generate_database.ps1`；所有命令仍使用固定 Dart 3.10.3。不要在主工程加入生成器的 analyzer 约束或强制依赖覆盖。数据库 schema 快照属于源码，工具包工作目录和原生下载缓存不属于源码。
+数据库路径、双库备份边界、固定依赖、隔离生成器和验证记录见 [本地存储](database.md)。首次代码生成前进入 `tool/db_codegen` 执行 `dart pub get --enforce-lockfile`，返回根目录在 Windows 运行 `./tool/generate_database.ps1`，macOS / Linux 运行 `bash tool/generate_database.sh`（可用 `DART_BIN` 指定固定 Dart 可执行文件）；所有命令仍使用固定 Dart 3.10.3。不要在主工程加入生成器的 analyzer 约束或强制依赖覆盖。数据库 schema 快照属于源码，工具包工作目录和原生下载缓存不属于源码。
 
 
 ## LOCAL-002 双端原生接收配置
@@ -159,3 +159,9 @@ fvm flutter build apk --debug --target-platform android-arm64 --no-pub
 ```
 
 JDK 17 的当前进程配置仍须按上文设置。arm64 单架构构建用于本次 Apple Silicon Android 模拟器，不等同全架构发布包验收。
+
+## CI-002 Android 构建检查
+
+PR / develop 推送执行 Linux Debug 构建；main 推送或手动运行再执行 Release smoke。三份锁文件严格安装、数据库和本地化生成一致性检查先于构建。构建路径与排错日志见 [持续集成说明](ci.md)。本地等价命令为 `flutter build apk --debug --no-pub`、`flutter build apk --release --no-pub`，先完成锁定依赖安装并使用本页 JDK 17 配置；不限定 `--target-platform`，覆盖 Flutter 默认 Android 架构。
+
+CI smoke 使用 Debug 签名，不依赖发布 secrets，也不创建 GitHub Release。远端验收需查看本次提交的 Actions：PR Debug、main / 手动 Debug + Release 成功，以及重跑命中缓存后锁文件与生成代码仍通过；本机 macOS 构建不能替代 Linux runner 记录。

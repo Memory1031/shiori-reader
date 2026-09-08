@@ -98,10 +98,7 @@ void main() {
     while (source.calls == 0) {
       await Future<void>.delayed(Duration.zero);
     }
-    expect(
-      await LocalCacheManagement(db, owner, repo).clear(),
-      isA<Success>(),
-    );
+    expect(await LocalCacheManagement(db, owner, repo).clear(), isA<Success>());
     pending.complete(Success(Body()));
     expect(await result, isA<Failure>());
     expect(await db.customSelect('SELECT * FROM image_cache').get(), isEmpty);

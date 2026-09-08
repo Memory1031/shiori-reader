@@ -884,6 +884,7 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 
 #### CI-001 — 离线质量检查
 
+- Status：DONE（2026-09-08）。基础工作流及本地检查已具备；用户在本次会话确认已人工验证 GitHub Actions 成功运行，以及测试失败会使 job 失败。两项远端验收依据用户确认，本轮未由代理重跑或独立核查 run 链接。详见 [CI 验证记录](ci.md)。
 - Phase：1；Complexity：S。
 - Goal：每次变更都能自动检查静态质量和纯离线测试。
 - Input：第 28、30 节；Dependencies：CORE-004、DB-002。
@@ -1489,6 +1490,8 @@ Complexity：S 是单一边界内的小功能 / 验证；M 是一个可独立验
 - Test Requirements：完整离线套件、Android fixture integration、必要时一次 current live smoke；不重跑至偶然成功，不要求 iOS 运行证据。
 
 #### CI-002 — Android 构建检查
+
+- Status：IN_PROGRESS（2026-09-08；配置与本地验证完成，等待新工作流 GitHub Linux 运行及缓存命中记录）。已补齐常规 Debug、main / 手动 Release smoke、失败日志、三份锁文件缓存键和生成一致性检查；macOS 完整三架构 Debug / Release 构建、Debug 签名核验、缓存严格安装及静态分析 PASS。证据与远端待项见 [CI 说明](ci.md#ci-002-验证记录2026-09-08)。
 
 - Phase：8；Complexity：M。
 - Goal：在个人项目成本可控的条件下尽早发现原生构建问题。
