@@ -24,6 +24,21 @@
 
 OS 交集审查：锁定 SDK 内的 `packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt` 给出 Android min 24、compile/target 36、NDK 版本；其生成 iOS target 和 CocoaPods 模板的最低版本是 13.0，本项目主动选择 15.0，并同步 Xcode build settings 和 `AppFrameworkInfo.plist`。当前 [Flutter 支持平台页](https://docs.flutter.dev/reference/supported-platforms) 已针对 3.47.2 描述 Android 24 / iOS 15，**不能拿该页冒充 3.38.4 的历史矩阵**。此处锁定版本的证据采用已安装官方 SDK 的源码与模板。目前没有第三方 runtime/native 插件需要进一步抬高下限。
 
+## 使用 FVM 为项目单独选择 SDK
+
+已安装 FVM 的开发环境，在仓库根目录执行：
+
+```sh
+fvm install 3.38.4
+fvm use 3.38.4 --skip-pub-get
+fvm flutter --version
+env PUB_HOSTED_URL=https://pub.flutter-io.cn fvm flutter pub get --enforce-lockfile
+```
+
+项目命令统一使用 `fvm flutter` / `fvm dart`，例如 `fvm flutter run`、`fvm flutter analyze --no-pub`、`fvm flutter test --no-pub`。这不会切换 FVM 的全局默认版本；直接运行 `flutter` 仍可能使用 PATH 中的其他 SDK。编辑器的项目 Flutter SDK 路径使用 `.fvm/flutter_sdk`；该目录已被 Git 忽略，不提交 SDK 或宿主绝对路径。
+
+上述 `env` 写法适用于 macOS / Linux shell，仅对该命令使用锁文件中的包源；Windows PowerShell 写法见 [CI 依赖源说明](ci.md)。2026-09-08 已在 macOS 安装并启用 FVM 3.38.4，实测 Flutter 3.38.4 / revision `66dd93f9a2`、Dart 3.10.3，严格锁文件依赖安装通过，`pubspec.lock` 未改动。FVM 自动生成 VS Code 项目配置 `.fvm/versions/3.38.4`（同一 SDK 的链接），全局默认链接仍指向 3.32.5。本次仅验证工具链与依赖安装，未执行 Android / iOS 构建或运行；`pub get` 自动生成的 iOS CocoaPods 模板改动已撤回。
+
 ## Windows 本地准备
 
 初次调查识别到 Flutter 和 MuMu / MAA adb；`flutter doctor -v` 未找到 Android SDK，PATH 和当时检查的标准/软件目录未发现可用 JDK。随后构建复验发现 Flutter 选择了 `D:/Software/Android Studio/android.studio/jbr` 的 JBR **25.0.2**，这里不推断该目录何时安装。补齐的便携工具均放入 Git 忽略的 `.tooling/`，不修改系统 PATH、注册表或全局 Flutter 配置。
