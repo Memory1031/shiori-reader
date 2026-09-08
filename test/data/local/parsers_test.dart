@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:shiori/features/reader/viewport/block_style.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
@@ -384,6 +386,61 @@ void main() {
           (c.chapters.first.blocks.first as ParagraphBlock).text,
           'before middle after',
         );
+      },
+    );
+    for (final attribute in ['xlink:href', 'href']) {
+      test('SVG raster image resolves $attribute without a placeholder', () {
+        final files = epubFiles();
+        files['OPS/text/a.xhtml'] = utf8.encode(
+          '<html><body><figure><svg xmlns="http://www.w3.org/2000/svg" '
+          'xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">'
+          '<image $attribute="../images/星%20空.png" width="10" height="10"/>'
+          '</svg></figure></body></html>',
+        );
+        final parsed = EpubParser(zipFiles(files), key, 'svg.epub').parse();
+        final blocks = parsed.content.chapters.first.blocks;
+        expect(blocks, hasLength(1));
+        expect(blocks.single, isA<ImageBlock>());
+        expect(
+          (blocks.single as ImageBlock).media,
+          parsed.content.detail.summary.cover,
+        );
+      });
+    }
+    test(
+      'HTML source whitespace does not suppress CSS first-line indentation',
+      () {
+        final files = epubFiles();
+        files['OPS/text/a.xhtml'] = utf8.encode(
+          '<html><head><style>p {text-indent:2em}</style></head><body>'
+          '<p>\n    正文<strong>强调</strong> english words.\n </p>'
+          '<p>　　全角缩进</p><p>&nbsp;&nbsp;不换行空格</p>'
+          '<pre>  保留\n 空白  </pre></body></html>',
+        );
+        final blocks = EpubParser(zipFiles(files), key, 'indent.epub')
+            .parse()
+            .content
+            .chapters
+            .first
+            .blocks
+            .whereType<ParagraphBlock>()
+            .toList();
+        expect(blocks[0].text, '正文强调 english words.');
+        expect(blocks[0].leadingIndent, 2);
+        String indent(int i, bool first) => readerIndentPrefix(
+          blocks[i],
+          first,
+          350,
+          const TextStyle(fontSize: 20),
+          TextScaler.noScaling,
+          chapter: ChapterKey(novelKey: key, chapterId: 'test'),
+        );
+        expect(indent(0, true), '\u2003\u2003');
+        expect(indent(0, false), isEmpty);
+        expect(blocks[1].text, '　　全角缩进');
+        expect(indent(1, true), isEmpty);
+        expect(blocks[2].text, '\u00a0\u00a0不换行空格');
+        expect(blocks[3].text, '  保留\n 空白  ');
       },
     );
     test('missing and remote images isolate failure; scripts are not text', () {

@@ -343,7 +343,12 @@ class EpubParser {
     var buffer = StringBuffer();
     var pre = false;
     void flush({int? heading}) {
-      final value = buffer.toString();
+      // HTML source indentation is collapsible whitespace, not first-line
+      // indentation. Preserve authored NBSP / ideographic spaces and pre text.
+      final raw = buffer.toString();
+      final value = pre
+          ? raw
+          : raw.replaceAll(RegExp(r'^[ \t\r\n\f]+|[ \t\r\n\f]+$'), '');
       buffer = StringBuffer();
       if (value.trim().isEmpty) return;
       blocks.add(
@@ -397,7 +402,7 @@ class EpubParser {
     void walk(dom.Node node) {
       if (node is dom.Text) {
         buffer.write(
-          pre ? node.text : node.text.replaceAll(RegExp(r'\s+'), ' '),
+          pre ? node.text : node.text.replaceAll(RegExp(r'[ \t\r\n\f]+'), ' '),
         );
         return;
       }
@@ -438,7 +443,12 @@ class EpubParser {
         final href =
             node.attributes['src'] ??
             node.attributes['href'] ??
-            node.attributes['xlink:href'];
+            node.attributes['xlink:href'] ??
+            node.attributes[const dom.AttributeName(
+              'xlink',
+              'href',
+              'http://www.w3.org/1999/xlink',
+            )];
         final ref = href == null ? null : epubReference(path, href);
         final img = ref == null ? null : image(ref.$1);
         if (img != null) {

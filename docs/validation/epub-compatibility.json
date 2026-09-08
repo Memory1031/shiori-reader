@@ -1,0 +1,49 @@
+{
+  "date": "2026-09-08",
+  "scope": "Offline host parser, ordered image hashes and Flutter image decode; not device rendering",
+  "samples": [
+    {
+      "sha256": "1353a4f3fe3a24562189057b4e02701d83a4f80e8bb3c7f12d654bd1c75b3782",
+      "chapters": 16,
+      "images": 13,
+      "textMismatches": 0,
+      "indentParagraphs": 4015,
+      "suppressedIndents": 0,
+      "nav": 16,
+      "invalidParsedTargets": 0,
+      "presentations": 0
+    },
+    {
+      "sha256": "8f3b0484f6f5c016da00dd3405d1be2405cb2226e5c2b6c6426c20dd6af8c301",
+      "chapters": 32,
+      "images": 67,
+      "textMismatches": 0,
+      "indentParagraphs": 2153,
+      "suppressedIndents": 1,
+      "nav": 17,
+      "invalidParsedTargets": 0,
+      "presentations": 1
+    }
+  ],
+  "decodedUniqueImages": [
+    13,
+    32
+  ],
+  "sourceImageReferences": [
+    13,
+    67
+  ],
+  "missingSourceResources": [
+    0,
+    0
+  ],
+  "comparison": "Per-spine-file text comparison excludes whitespace and markup; image hashes compared in order",
+  "indentBefore": [
+    4014,
+    1
+  ],
+  "indentAfter": [
+    0,
+    1
+  ]
+}

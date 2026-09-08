@@ -53,3 +53,9 @@ BMH-AN10 / Android 12 / ARM64，Profile、约 60Hz、离线合成内容：500 �
 其他入口：[MVP](../../integration_test/README-mvp.md)、[在线验收](../../integration_test/live/README.md)、[Source 调查](../../tools/source_probe/README.md)。设备上的合成 Source 适配器测试（9 次适配调用、0 外部请求）不能当作实时书源可用性证明。在线报告只说明对应日期和样本，禁止据此自动扩大访问或重跑。
 
 尚待确认的产品 / 发布事项见[任务计划](../TASK_PLAN.md)，签名与许可见[发布说明](../release/README.md)。
+
+## EPUB SVG 封面引用
+
+2026-09-08：用户提供的 EPUB 首章在修复前解析为 ParagraphBlock 占位，修复带命名空间的 xlink:href 后解析为 ImageBlock。用户原件临时诊断加合成解析回归共 30 项通过，原件和正文未加入仓库；未运行设备验证。旧导入 manifest 不会自动更新，重复导入仍去重。
+
+EPUB 集中核查及缩进修复见[专项报告](epub-compatibility.md)，其中明确区分真实文件比对结果、已修问题和待修兼容缺口。
