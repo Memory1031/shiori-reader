@@ -112,7 +112,69 @@ void main() {
     throw StateError('Signing files need unconditional cleanup');
   }
 
-  for (final job in [...ciJobs.values, ...releaseJobs.values]) {
+  final ios =
+      loadYaml(File('.github/workflows/ios-release.yml').readAsStringSync())
+          as YamlMap;
+  final iosEvents = ios['on'] as YamlMap;
+  final iosJobs = ios['jobs'] as YamlMap;
+  // iOS 发布同样只由 tag 触发上传；手动入口仅允许构建冒烟与证书引导。
+  if ((iosEvents['push'] as YamlMap)['tags'] == null) {
+    throw StateError('iOS release must be tag-triggered');
+  }
+  if (iosJobs['bootstrap-signing']['if'] !=
+      "github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'bootstrap-cert'") {
+    throw StateError('iOS certificate bootstrap must stay manual and opt-in');
+  }
+  if (iosJobs['ios-release']['if'] !=
+      "github.event_name != 'workflow_dispatch' || github.event.inputs.mode == 'build'") {
+    throw StateError('iOS release job must not run for the bootstrap mode');
+  }
+  final iosSteps = iosJobs['ios-release']['steps'] as YamlList;
+  int iosIndex(String needle) => iosSteps.indexWhere(
+    (step) => ((step as YamlMap)['run']?.toString() ?? '').contains(needle),
+  );
+  final iosArchive = iosIndex('xcodebuild -workspace');
+  final iosExport = iosIndex('xcodebuild -exportArchive');
+  final iosUpload = iosIndex('xcrun altool --upload-app');
+  if (iosArchive < 0 || iosExport <= iosArchive || iosUpload <= iosExport) {
+    throw StateError('iOS release must archive, export, then upload');
+  }
+  const tagGate = "startsWith(github.ref, 'refs/tags/')";
+  final iosVersionStep = iosSteps.firstWhere(
+    (step) =>
+        (step as YamlMap)['run']?.toString().contains(
+          'release_android.py version',
+        ) ==
+        true,
+    orElse: () => null,
+  );
+  if (iosVersionStep == null ||
+      (iosVersionStep as YamlMap)['if'] != tagGate ||
+      iosSteps[iosUpload]['if'] != tagGate) {
+    throw StateError(
+      'iOS version check and TestFlight upload must be tag-gated',
+    );
+  }
+  if (!iosSteps.any(
+    (step) => ((step as YamlMap)['uses']?.toString() ?? '').startsWith(
+      'apple-actions/import-codesign-certs',
+    ),
+  )) {
+    throw StateError('iOS release must import the distribution certificate');
+  }
+  if (iosSteps.any(
+    (step) => RegExp(
+      r'flutter\s+(test|analyze)\b',
+    ).hasMatch((step as YamlMap)['run']?.toString() ?? ''),
+  )) {
+    throw StateError('iOS release must not duplicate develop quality checks');
+  }
+
+  for (final job in [
+    ...ciJobs.values,
+    ...releaseJobs.values,
+    ...iosJobs.values,
+  ]) {
     if ((job as YamlMap)['uses'] != null) continue;
     for (final step in job['steps'] as YamlList) {
       final dir = (step as YamlMap)['working-directory'];
@@ -122,7 +184,7 @@ void main() {
     }
   }
   stdout.writeln(
-    'Workflow YAML parsed; quality-only CI, tag-only release '
-    'and working directories verified.',
+    'Workflow YAML parsed; quality-only CI, tag-only releases '
+    '(Android + iOS), tag-gated uploads and working directories verified.',
   );
 }

@@ -1,0 +1,169 @@
+name: Release iOS
+
+# iOS 签名发布：推送 v* 标签时构建签名 IPA 并上传 App Store Connect（TestFlight）。
+# 签名材料为 App Store Connect API 密钥 + Apple Distribution 证书（p12）；
+# 证书一次性生成后存为 secret，不在 runner 上自动建证（每团队仅允许 2 张分发证书）。
+# 手动入口：build 模式只做签名构建冒烟，不上传 ASC；bootstrap-cert 模式一次性生成分发证书。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '运行模式：build 签名构建冒烟；bootstrap-cert 一次性生成分发证书'
+        required: true
+        default: 'build'
+        type: choice
+        options:
+          - build
+          - bootstrap-cert
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # 必须与 .fvmrc 和 pubspec.yaml 的 Flutter 约束保持一致
+  FLUTTER_VERSION: 3.38.4
+  # pubspec.lock 记录此镜像；源地址不同也会导致严格锁定校验失败。
+  PUB_HOSTED_URL: https://pub.flutter-io.cn
+
+jobs:
+  # 一次性任务：在没有 Mac 的情况下生成分发证书。
+  # 产物 p12 下载后 base64 存入 IOS_DIST_CERT_P12，之后不再需要本任务。
+  bootstrap-signing:
+    name: 一次性生成分发证书
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'bootstrap-cert'
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: 检查 API 密钥
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          if [ -z "$KEY_ID" ]; then
+            echo "::error::未配置 ASC_KEY_ID / ASC_ISSUER_ID / ASC_KEY_P8；配置见 docs/ci.md。"
+            exit 1
+          fi
+
+      - name: 生成证书
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          json.dump({
+              "key_id": os.environ["ASC_KEY_ID"],
+              "issuer_id": os.environ["ASC_ISSUER_ID"],
+              "key": os.environ["ASC_KEY_P8"],
+          }, open("key.json", "w"))
+          PY
+          fastlane cert --api_key_path key.json --platform ios --output_path dist
+
+      - name: 上传证书产物（保留 1 天）
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-distribution-cert
+          path: dist/*
+          retention-days: 1
+          if-no-files-found: error
+
+  ios-release:
+    name: iOS 签名构建并上传 TestFlight
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.mode == 'build'
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 安装依赖
+        run: flutter pub get --enforce-lockfile
+
+      # 与 Android 共用的 tag / pubspec 版本一致性预检；手动冒烟无标签上下文，跳过。
+      - name: 版本一致性检查
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python3 tool/release_android.py version
+
+      - name: 检查签名材料
+        env:
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          CERT: ${{ secrets.IOS_DIST_CERT_P12 }}
+        run: |
+          if [ -z "$KEY_ID" ] || [ -z "$CERT" ]; then
+            echo "::error::缺少 ASC_KEY_ID / ASC_ISSUER_ID / ASC_KEY_P8 / IOS_DIST_CERT_P12 / IOS_DIST_CERT_PASSWORD；发布流程见 docs/ci.md。"
+            exit 1
+          fi
+
+      # 证书导入临时钥匙串并解锁，否则 macOS runner 上签名步骤会挂起。
+      - name: 导入签名证书
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DIST_CERT_P12 }}
+          p12-password: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+
+      - name: 写入 App Store Connect API 密钥
+        env:
+          KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
+
+      # 版本号不在此处修改：发版时人工对齐 pubspec version / build number 与 tag
+      # （ASC 要求同一 versionName 下 CFBundleVersion 严格递增）。
+      - name: 准备工程配置与 Pods
+        run: |
+          flutter build ios --config-only --no-codesign --no-pub
+          cd ios && pod install
+
+      - name: 构建 archive（自动签名）
+        working-directory: ios
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild -workspace Runner.xcworkspace -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath ../build/ios/Shiori.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            archive
+
+      - name: 导出 IPA
+        working-directory: ios
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath ../build/ios/Shiori.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath ../build/ios/ipa \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      # 上传仅限 tag 发布；手动 build 模式止步于签名构建冒烟，不触碰 App Store Connect。
+      - name: 上传 TestFlight
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          xcrun altool --upload-app --type ios \
+            --file build/ios/ipa/*.ipa \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"

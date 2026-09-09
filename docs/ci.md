@@ -38,7 +38,28 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 
 本地缺少 `key.properties` 时构建配置可回退 Debug 签名，因此 **Release 编译不等于正式签名**。密钥和密码需自行安全备份，不提交 Git。换电脑需要恢复同一密钥才能保持 Android 更新身份。
 
-标签不会自动修改包内版本；发版时人工对齐 `pubspec.yaml`、build number、iOS 扩展版本和 tag。发布准备与许可边界见[发布说明](release/README.md)。当前没有 iOS CI 发布链路。
+标签不会自动修改包内版本；发版时人工对齐 `pubspec.yaml`、build number、iOS 扩展版本和 tag。发布准备与许可边界见[发布说明](release/README.md)。iOS 发布链路见[iOS TestFlight 发布](#ios-testflight-发布)。
+
+## iOS TestFlight 发布
+
+工作流：[`.github/workflows/ios-release.yml`](../.github/workflows/ios-release.yml)。推送 `v*` tag 时与 Android 发布并行，在 macOS runner 上构建签名 IPA 并上传 App Store Connect（TestFlight）。手动入口两种模式：`build` 只做签名构建冒烟（不上传 ASC，且无标签上下文时跳过版本预检）；`bootstrap-cert` 一次性生成分发证书。质量检查不在发布工作流重复；tag 与 pubspec 版本一致性复用 `release_android.py version` 预检（仅 tag 触发时执行）。
+
+签名链路：分发证书 p12 导入临时钥匙串（runner 钥匙串每次重建，不能依赖 xcodebuild 自动建证——Apple 每团队仅允许 2 张分发证书，重复建证第三次即失败）；profile 由 `xcodebuild -allowProvisioningUpdates` 配合 App Store Connect API 密钥现场下载。导出配置为 [`ios/ExportOptions.plist`](../ios/ExportOptions.plist)，teamID 与工程 `DEVELOPMENT_TEAM` 一致（个人团队）。共 5 个 secrets：
+
+| Secret | 内容 |
+| --- | --- |
+| `ASC_KEY_ID` / `ASC_ISSUER_ID` / `ASC_KEY_P8` | App Store Connect API 团队密钥（个人团队上下文生成，Admin 角色） |
+| `IOS_DIST_CERT_P12` | Apple Distribution 证书 p12 的 base64 |
+| `IOS_DIST_CERT_PASSWORD` | p12 口令（可为空） |
+
+Apple 侧一次性准备（都在个人团队上下文操作，注意右上角团队切换器）：
+
+1. 注册 App ID `dev.shiori.reader` 与 `dev.shiori.reader.ShareExtension`，均启用 App Groups 并分配 `group.dev.shiori.reader.import`；
+2. App Store Connect 新建 App（Bundle ID 选 `dev.shiori.reader`）；
+3. 生成 App Store Connect API 密钥（`.p8` 仅能下载一次）；
+4. 生成分发证书：在有 Xcode 的机器上创建 Apple Distribution 并从钥匙串导出 p12，或先配好前三个 secrets、运行本工作流的 `bootstrap-cert` 模式，从保留 1 天的 artifact 下载 p12，base64 后存入 secret。
+
+发版与安装：与 Android 相同，人工对齐版本后推 tag（ASC 要求同一 versionName 下 CFBundleVersion 严格递增）；构建经数分钟至一小时处理后出现在 TestFlight，内部测试不走 Beta 审核，构建 90 天未安装会过期。iOS runtime 证据从此具备来源（真机 TestFlight 使用），但 CI 构建成功不等于 runtime verified；对外分发前 RELEASE-001 审查同样适用。
 
 ## 已有证据
 
@@ -61,3 +82,8 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 本地验证：发布工具4项离线测试通过，覆盖tag/版本/非法build、缺Secret/错误Base64、密码转义、错误包身份/可调试包/错误或多个签名证书；工作流YAML与步骤顺序 / Secret绑定 / 清理检查通过，Dart检查工具分析通过。另用临时合成JKS和已有本地Release APK完成实际keytool → Java Properties读取 → apksigner签名与验证 → aapt版本检查 → 哈希文件生成冒烟，错误证书拒绝通过。未使用用户正式密钥，未重新构建并发修改中的应用，未推tag、未发布、未验证远端Secrets或runner。首次正式签名发布及设备安装仍待完成。
 
 参考：[apksigner](https://developer.android.com/tools/apksigner)、[GitHub job权限](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)。
+
+## iOS 发布工作流记录（2026-09-09）
+
+- `tool/check_ci_yaml.dart` 扩展并通过：ios-release.yml 解析、tag 触发、bootstrap 手动门控、`build` 模式门控、archive → export → upload 顺序、版本预检与 altool 上传的 tag 门控、分发证书导入步骤存在、无测试 / 分析步骤混入、工作目录存在。
+- 未验证：macOS runner 实际执行。`xcodebuild -allowProvisioningUpdates` 自动签名、`pod install`、`fastlane cert`、`altool` 上传均为官方 / 社区文档依据的源码审查；首次真实运行需 Apple 侧（App ID、App 记录、API 密钥、分发证书）与 5 个 secrets 就绪，可能需按实际报错微调（runner Xcode 版本、ExportOptions `method` 取值等）。本机为 Windows，无法本地执行 iOS 构建。
