@@ -16,7 +16,7 @@ final class ReaderSettings extends ValueModel {
     double fontSize = 20,
     double lineHeight = 1.6,
     double paragraphSpacing = 20,
-    double horizontalPadding = 40,
+    double horizontalPadding = 30,
     this.mode = ReaderMode.paged,
     this.themeMode = ReaderThemeMode.system,
     this.paper = ReaderPaper.paper,

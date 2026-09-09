@@ -91,3 +91,33 @@ double readerBlockSpacing(ContentBlock block, double paragraphSpacing) {
   if (block is HeadingBlock) return paragraphSpacing + 28;
   return paragraphSpacing;
 }
+
+/// Keep natural glyph spacing while sharing the unused CJK cell across margins.
+/// Measurement and painting must use the same width. Other alignments and
+/// headings retain their original layout.
+double readerBlockWidth(
+  ContentBlock block,
+  double available,
+  TextStyle style,
+  TextScaler scaler,
+  TextDirection direction,
+) {
+  if (block is! ParagraphBlock ||
+      block.alignment != ParagraphAlignment.start ||
+      _isChapterHeading(block) ||
+      !RegExp(r'[㐀-鿿]').hasMatch(block.text) ||
+      !available.isFinite) {
+    return available;
+  }
+  final painter = TextPainter(
+    text: TextSpan(text: '正文排版', style: readerBlockStyle(block, style)),
+    textScaler: scaler,
+    textDirection: direction,
+  )..layout();
+  final cell = painter.width / 4;
+  painter.dispose();
+  if (cell <= 0 || available < cell * 2) return available;
+  final cells = (available / cell).floor();
+  // A tiny tolerance avoids floating-point rounding moving the last glyph.
+  return (cells * cell + .01).clamp(0.0, available);
+}

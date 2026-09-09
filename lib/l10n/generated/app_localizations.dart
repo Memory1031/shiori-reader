@@ -1495,6 +1495,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Link depth limit reached. Return before opening another link.'**
   String get readerLinkDepth;
+
+  /// No description provided for @readerMarginVeryNarrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Narrowest'**
+  String get readerMarginVeryNarrow;
+
+  /// No description provided for @readerMarginNarrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Narrow'**
+  String get readerMarginNarrow;
+
+  /// No description provided for @readerMarginMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get readerMarginMedium;
+
+  /// No description provided for @readerMarginWide.
+  ///
+  /// In en, this message translates to:
+  /// **'Wide'**
+  String get readerMarginWide;
+
+  /// No description provided for @readerMarginVeryWide.
+  ///
+  /// In en, this message translates to:
+  /// **'Widest'**
+  String get readerMarginVeryWide;
+
+  /// No description provided for @readerDecrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease {label}'**
+  String readerDecrease(String label);
+
+  /// No description provided for @readerIncrease.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase {label}'**
+  String readerIncrease(String label);
 }
 
 class _AppLocalizationsDelegate

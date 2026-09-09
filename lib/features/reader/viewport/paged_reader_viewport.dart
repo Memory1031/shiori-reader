@@ -317,6 +317,14 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           }
         });
       }
+      double textWidth(PageFragment fragment) => readerBlockWidth(
+        widget.content.blocks[_layout!.index.chunks[fragment.unit].blockIndex],
+        constraints.maxWidth,
+        widget.textStyle,
+        scaler,
+        direction,
+      );
+
       Widget? buildPage(BuildContext context, int number) {
         final page = _page(number);
         if (page == null) return null;
@@ -341,6 +349,12 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                         : fragment.text != null
                         ? Padding(
                             padding: EdgeInsets.only(
+                              left:
+                                  (constraints.maxWidth - textWidth(fragment)) /
+                                  2,
+                              right:
+                                  (constraints.maxWidth - textWidth(fragment)) /
+                                  2,
                               top:
                                   readerBlockSpacing(
                                     widget.content.blocks[_layout!
@@ -372,7 +386,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                                 .start ==
                                             0 &&
                                         fragment.start == 0,
-                                    constraints.maxWidth,
+                                    textWidth(fragment),
                                     widget.textStyle,
                                     scaler,
                                     chapter: widget.content.key,

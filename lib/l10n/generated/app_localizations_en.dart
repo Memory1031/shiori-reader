@@ -773,4 +773,29 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get readerLinkDepth =>
       'Link depth limit reached. Return before opening another link.';
+
+  @override
+  String get readerMarginVeryNarrow => 'Narrowest';
+
+  @override
+  String get readerMarginNarrow => 'Narrow';
+
+  @override
+  String get readerMarginMedium => 'Medium';
+
+  @override
+  String get readerMarginWide => 'Wide';
+
+  @override
+  String get readerMarginVeryWide => 'Widest';
+
+  @override
+  String readerDecrease(String label) {
+    return 'Decrease $label';
+  }
+
+  @override
+  String readerIncrease(String label) {
+    return 'Increase $label';
+  }
 }

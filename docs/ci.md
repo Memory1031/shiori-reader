@@ -44,7 +44,7 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 
 2026-09-08 用户截图确认质量 job，以及旧工作流的「Android Debug 与 Release smoke」job 成功，CI-001 / CI-002 按调整范围完成。截图未包含 run URL / commit，不能定位到某次最终配置，也不能证明正式 tag 签名发布通过。
 
-本地曾验证 YAML、生成一致性、Debug / Release 构建；锁文件 hosted 源漂移修复后严格安装通过。正式 tag 工作流远端运行、签名产物安装仍待发版阶段验证，见[验收摘要](validation/README.md)。
+本地曾验证 YAML、生成一致性、Debug / Release 构建；锁文件 hosted 源漂移修复后严格安装通过。正式 tag 工作流远端运行、签名产物安装仍待发版阶段验证，见[验收摘要](release/README.md#110-验收范围)。
 
 ## RELEASE-002 工作流补齐（2026-09-08）
 

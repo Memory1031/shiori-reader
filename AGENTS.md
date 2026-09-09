@@ -14,9 +14,9 @@ Conventions for coding agents working in this repository. Keep this file focused
 - Keep domain logic pure Dart and independent of UI frameworks, networking, storage, and concrete data sources. Domain models remain immutable.
 - Presentation consumes domain contracts. Keep site-specific protocols, parsing, credentials, and transport/storage details behind the data layer boundaries.
 - Use explicit dependency injection and clear resource ownership. Avoid hidden global service dependencies; handle asynchronous cancellation and lifecycle cleanup deliberately.
-- Preserve existing model and contract semantics. Read [docs/domain.md](docs/domain.md) and [docs/contracts.md](docs/contracts.md) when affected, and update specifications and consumers together when contracts change.
+- Preserve existing model and contract semantics. Read [docs/architecture.md](docs/architecture.md) and [docs/contracts.md](docs/contracts.md) when affected, and update specifications and consumers together when contracts change.
 - Keep development fixtures and test infrastructure separate from production behavior.
-- Design user-facing UI for localization; currently support Chinese and English. Keep translatable copy in shared language resources and account for different text lengths. See [docs/app.md](docs/app.md) for the implementation convention.
+- Design user-facing UI for localization; currently support Chinese and English. Keep translatable copy in shared language resources and account for different text lengths. See [docs/architecture.md](docs/architecture.md) for the implementation convention.
 
 ## Platforms and dependencies
 

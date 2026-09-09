@@ -1,7 +1,7 @@
 name: shiori
 description: "Shiori mobile light novel reader."
 publish_to: 'none'
-version: 1.0.0+2
+version: 1.1.0+3
 
 environment:
   sdk: '>=3.10.3 <3.11.0'

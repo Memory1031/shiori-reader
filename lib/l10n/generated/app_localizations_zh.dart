@@ -722,4 +722,29 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerLinkDepth => '已达到链接层级上限，请先返回。';
+
+  @override
+  String get readerMarginVeryNarrow => '极窄';
+
+  @override
+  String get readerMarginNarrow => '窄';
+
+  @override
+  String get readerMarginMedium => '适中';
+
+  @override
+  String get readerMarginWide => '宽';
+
+  @override
+  String get readerMarginVeryWide => '极宽';
+
+  @override
+  String readerDecrease(String label) {
+    return '减小$label';
+  }
+
+  @override
+  String readerIncrease(String label) {
+    return '增大$label';
+  }
 }

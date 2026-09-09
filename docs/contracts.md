@@ -6,9 +6,9 @@
 
 `Result<T>` 是 sealed Success<T> / Failure<T>，以 switch 解构或 map 处理；Success(null) 与 Failure 明确不同，void 操作使用 Success<void>(null)。返回 Future 的操作及各数据流的预期失败都通过 Result 传递；数据层负责拦截、映射原始传输 / 文件 / SQL 异常，不让 server message、cause、stack 跨边界。构造参数不合法或已关闭资源继续使用属于调用方编程错误，不伪装成网络失败。
 
-AppFailure 包含 FailureKind、Operation、RetryPolicy、可选本地 diagnosticId、FailureContext 和可选 retryNotBefore。context 是供 UI 本地化的封闭枚举，不接受任意文本；diagnosticId 限定本地生成的 32 位小写十六进制关联 ID，不得取自响应或 secret。这个格式校验不是通用脱敏器，日志白名单见[网络](network.md)。
+AppFailure 包含 FailureKind、Operation、RetryPolicy、可选本地 diagnosticId、FailureContext 和可选 retryNotBefore。context 是供 UI 本地化的封闭枚举，不接受任意文本；diagnosticId 限定本地生成的 32 位小写十六进制关联 ID，不得取自响应或 secret。这个格式校验不是通用脱敏器，日志白名单见[网络](architecture.md)。
 
-- network / timeout / sourceUnavailable 才允许 boundedAutomatic；实际次数、deadline、退避见[网络](network.md)。
+- network / timeout / sourceUnavailable 才允许 boundedAutomatic；实际次数、deadline、退避见[网络](architecture.md)。
 - confirmedSessionRecovery 仅允许 session + sessionExpired；accessRestricted / cancelled / unsupported / tooLarge 必须 never。parse 可由用户明确重试，但不能自动循环。
 - rateLimited 不能自动重试，合法 Retry-After 转为 UTC retryNotBefore；缺少时间时网络层使用保守冷却，不能由 UI 直接马上重发。
 - cancelled 不作为刷新失败 badge 或弹窗；UI 丢弃已过时请求的结果。AppFailure 没有 raw message / URL / Header / exception 字段。
@@ -37,7 +37,7 @@ DiscoverSection 只有 label 与不可变 items；不支持 Discover 返回 Fail
 
 LoadResult 不允许 remote + isStale，不允许没有 stale 缓存却携带 refreshFailure，也不将 cancelled 包装为刷新错误。返回陈旧数据不改变它的 fetchedAt；本地写失败与是否已持久保存不能靠 origin 推断。
 
-刷新通知固定为按 Key 的 `detailUpdates` / `catalogUpdates` / `chapterUpdates`：广播、无初始事件、订阅本身无 IO，事件类型与对应 load 返回类型相同，预期失败是数据而非 Stream.addError(rawException)。Controller 必须先订阅再 load，销毁时 cancel 订阅；仓库发出新值而非偷偷修改旧对象。生产仓库只发布经过 generation 仲裁的当前结果，不发布已清理 / 已过时响应；去重、TTL 和清理竞态见[缓存](cache.md)。通知流取消仅移除该监听者，不取消其他读取者。
+刷新通知固定为按 Key 的 `detailUpdates` / `catalogUpdates` / `chapterUpdates`：广播、无初始事件、订阅本身无 IO，事件类型与对应 load 返回类型相同，预期失败是数据而非 Stream.addError(rawException)。Controller 必须先订阅再 load，销毁时 cancel 订阅；仓库发出新值而非偷偷修改旧对象。生产仓库只发布经过 generation 仲裁的当前结果，不发布已清理 / 已过时响应；去重、TTL 和清理竞态见[缓存](architecture.md)。通知流取消仅移除该监听者，不取消其他读取者。
 
 ## SourceMedia 与 ImageRepository 所有权
 
@@ -45,12 +45,12 @@ LoadResult 不允许 remote + isStale，不允许没有 stale 缓存却携带 re
 
 SourceMediaBody.chunks 是单消费者 `Stream<Result<List<int>>>`，成功块不可修改，累计不超过 maxBytes；读取失败、超限或取消发出一次终止 Failure，然后结束，不继续发送成功字节。成功获得 body 后消费者即拥有关闭责任，即便从未订阅也必须 finally close；读取完成、提前取消及重复 close 均须安全，底层请求最终释放。返回 Failure 前尚未交付的资源由生产者关闭；close 不抛原始 cleanup 异常，数据层自行记录安全诊断。
 
-`ImageRepository.load(ref, mode, cancellation)` 返回 `Result<LoadResult<MediaLease>>`，Phase 4 与 Phase 6 使用同一接口：
+`ImageRepository.load(ref, mode, cancellation)` 返回 `Result<LoadResult<MediaLease>>`：
 
-- MediaData 为 MemoryMedia（复制并只读的 Uint8List）或 LocalMedia（已验证 App 私有路径），不含 ImageProvider / File / Widget。路径包含性、非远端 URL 和文件有效性由 CACHE-003 保证，不把路径写入日志；Flutter 适配放 presentation。
-- 每次成功加载交付独立 lease，消费者 finally close；close 只释放自己的内存引用 / 文件 pin，不影响其他 lease。关闭后不能继续使用其 data。文件 lease 在存活期间应被保护免遭淘汰，归 CACHE-003 实现。
+- MediaData 为 MemoryMedia（复制并只读的 Uint8List）或 LocalMedia（已验证 App 私有路径），不含 ImageProvider / File / Widget。路径包含性、非远端 URL 和文件有效性由持久媒体仓库保证，不把路径写入日志；Flutter 适配放 presentation。
+- 每次成功加载交付独立 lease，消费者 finally close；close 只释放自己的内存引用 / 文件 pin，不影响其他 lease。关闭后不能继续使用其 data。文件 lease 在存活期间应被保护免遭淘汰，由持久媒体仓库实现。
 - persistence 独立于 LoadOrigin：内存结果不能自称已落盘；LocalMedia 必须 persistedLocal。写盘失败仍可交付可读 MemoryMedia + memoryOnly + persistenceFailure，不能宣称离线可用。只有完成数据层验证并成功持久化才设置 persistedLocal。
-- Phase 4 的 cacheOnly 可以命中 RAM；重启后的持久离线保证仍要等 Phase 6。读取新远端字节不等于平台图像 codec 验证，MEDIA-001 / TEST-001 / ANDROID-002 继续负责真实显示与资源上限。
+- cacheOnly 读取已有缓存；持久缓存支持重启后离线读取。远端字节读取成功不等于平台图像解码或实际显示已通过验证。
 
 媒体 lease 不经 NovelRepository 的广播通知传递，每个 load 单独交付所有权，避免多个订阅者误用同一可关闭资源。未来媒体刷新通过显式重新 load 获得新 lease，交替释放由 UI/image adapter 负责。
 
@@ -75,15 +75,15 @@ LocalNavigationRepository 返回嵌套目录与 ChapterKey / 可选 blockKey。L
 
 CacheManagement 提供 inspect、按书 / 全部 clear 和可释放 pin；ReadingPrefetch 提供目标选择、开关、暂停 / 恢复与生命周期通知。预取不创建阅读进度。ImageRepository 持久化失败可返回 memoryOnly + persistenceFailure，清理不破坏活动 lease，但阻止旧响应回填。
 
-应用根先关闭预取，再关闭媒体 / 小说仓库与调度器，最后关闭数据库。ReaderPreferences 读取或更新时将旧 scroll 归一化为 paged，保留排版；读取不为了模式迁移主动覆盖存储。详见[阅读器](reader.md)、[缓存](cache.md)与[数据库](database.md)。
+应用根先关闭预取，再关闭媒体 / 小说仓库与调度器，最后关闭数据库。ReaderPreferences 读取或更新时将旧 scroll 归一化为 paged，保留排版；读取不为了模式迁移主动覆盖存储。详见[阅读器](reader.md)、[缓存](architecture.md)与[数据库](architecture.md)。
 
 ## 显式重解析
 
 LocalBookReparse 接收书籍 Key、编码选择回调/可选 override 与 cancellation；返回 LocalReparseResult（approximate、cleanupPending）。失败前旧版本保持可读，提交后成功优先于取消；新旧正文及进度经同一 SQL 事务发布。LocalBookInvalidation 的 invalidations 在维护开始退役旧 Reader，changes 在提交后触发本地 detail/catalog/chapter 更新；两者广播、无初始事件，消费者取消订阅。
 
-维护期间不发新进度会话，saveProgress 返回 false；clearHistory 仍生效并阻止使用旧快照发布。已重解析书的保存还校验 catalog/content revision，旧正文即使申请到新 generation 也不能覆盖迁移位置。位置迁移不保留像素提示，近似结果供 UI 明示。内容可选 txtEncoding 只属于本地解析元数据，不进入正文身份摘要。详见[结果与边界](validation/parse-005.md)。
+维护期间不发新进度会话，saveProgress 返回 false；clearHistory 仍生效并阻止使用旧快照发布。已重解析书的保存还校验 catalog/content revision，旧正文即使申请到新 generation 也不能覆盖迁移位置。位置迁移不保留像素提示，近似结果供 UI 明示。内容可选 txtEncoding 只属于本地解析元数据，不进入正文身份摘要。详见[结果与边界](local-import.md)。
 
-## PARSE-008 链接与连续阅读合同
+## 书内链接与连续阅读合同
 
 LocalContentLink 是独立于 ContentBlock 的不可变侧表项：来源 ChapterKey/blockKey、标签、可选目标 ChapterKey/blockKey，以及封闭 unavailable 原因；没有原始 URL/路径，不改变正文摘要。LocalBookContent 可保存 auxiliaryChapters、links 和可空 readingOrder；旧 manifest 缺字段时 links/auxiliary 为空，readingOrder 默认为原目录顺序。
 

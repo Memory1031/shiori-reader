@@ -34,7 +34,7 @@
 
 MediaRef 保存无 secret 的 locator，不持久化当次 URL、m/t、Header 或浏览器会话。cover:v1 从详情重新取得封面；image:v1 从所属章节 body_snapshot 按 origin + path 摘要重新匹配。缺失 / 冲突 / 锁定 / preview-only 明确失败，不猜签名、不盲试 host。
 
-请求仅允许已配置 HTTPS 主机（www.lightnovel.fun / api.lightnovel.fun）；元数据与图片共用 45 秒 deadline。图片最多 20MiB 且服从调用方更小限制，接收超时 30 秒，限定已支持 MIME；MIME 通过不是图片解码通过，解码与 lease 见[缓存](../cache.md)。
+请求仅允许已配置 HTTPS 主机（www.lightnovel.fun / api.lightnovel.fun）；元数据与图片共用 45 秒 deadline。图片最多 20MiB 且服从调用方更小限制，接收超时 30 秒，限定已支持 MIME；MIME 通过不是图片解码通过，解码与 lease 见[缓存](../architecture.md)。
 
 ## 维护与复现
 
@@ -43,7 +43,7 @@ MediaRef 保存无 secret 的 locator，不持久化当次 URL、m/t、Header �
 - [样本清单](../../test/fixtures/lightnovel/README.md)：原始结构与派生样本边界。
 - [独立调查工具](../../tools/source_probe/README.md)：默认离线、显式 live 及预算。
 - [生产在线探针](../../integration_test/live/README.md)：设备单次执行与请求计数。
-- [网络约束](../network.md)：并发、重试、冷却与日志白名单。
+- [网络约束](../architecture.md)：并发、重试、冷却与日志白名单。
 
 第三方 `gholts/aidoku-source` 曾作为协议线索，不是运行依赖，也不替代直接证据；不沿用其 preview 回退等未经确认策略。
 
@@ -51,4 +51,4 @@ MediaRef 保存无 secret 的 locator，不持久化当次 URL、m/t、Header �
 
 2026-09-07 独立调查两轮合计 12 / 30 次 HTTP 尝试，图文链路成功；后续生产媒体跨两个 Windows Flutter test 进程重新定位并解码，共 10 / 10 次。Android MuMu 生产 Source HTTPS smoke 使用 10 / 12 次，无重试。请求均属于当次授权，不授权未来自动重跑。
 
-保留[媒体结构化报告](../validation/src010-live.json)和[验收摘要](../validation/README.md)。Android ARM64 的合成适配器 / 离线恢复测试另计，不能据此声称最新设备上的真实站点链路已验证。访问异常 schema、长期 locator 稳定性和未来服务可用性仍以新证据为准。
+历史媒体调查结果查 Git。Android ARM64 的合成适配器 / 离线恢复测试另计，不能据此声称最新设备上的真实站点链路已验证。访问异常 schema、长期 locator 稳定性和未来服务可用性仍以新证据为准。

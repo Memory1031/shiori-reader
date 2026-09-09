@@ -1,3 +1,4 @@
+import 'package:shiori/features/reader/reader_margin.dart';
 import '../../support/reader_actions.dart';
 import 'dart:async';
 
@@ -261,7 +262,18 @@ void main() {
       );
       expect(paged.textStyle.fontSize, 30);
       expect(paged.paragraphSpacing, 24);
-      expect(tester.getSize(find.byType(PagedReaderViewport)).width, 320);
+      expect(
+        tester.getSize(find.byType(PagedReaderViewport)).width,
+        400 -
+            2 *
+                readerHorizontalMargin(
+                  panel.preferences.value,
+                  MediaQuery.textScalerOf(
+                    tester.element(find.byType(PagedReaderViewport)),
+                  ),
+                  TextDirection.ltr,
+                ),
+      );
       expect(
         Theme.of(tester.element(find.byType(PagedReaderViewport))).brightness,
         Brightness.dark,

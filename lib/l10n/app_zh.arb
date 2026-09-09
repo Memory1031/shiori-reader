@@ -1,7 +1,13 @@
 {
   "shelfLocal": "本地",
   "shelfLocalFormat": "本地 · {format}",
-  "@shelfLocalFormat": {"placeholders": {"format": {"type": "String"}}},
+  "@shelfLocalFormat": {
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
   "localBookContents": "全书目录",
   "articleContents": "卷内目录",
   "articleContentsEmpty": "这篇正文没有可识别的章节标题。仍可通过分卷列表切换文章。",
@@ -274,5 +280,26 @@
   "readerLinks": "本章链接",
   "readerLinkReturn": "返回原位置",
   "readerLinkUnavailable": "此链接不可用，仅支持书内有效文档和锚点。",
-  "readerLinkDepth": "已达到链接层级上限，请先返回。"
+  "readerLinkDepth": "已达到链接层级上限，请先返回。",
+  "readerMarginVeryNarrow": "极窄",
+  "readerMarginNarrow": "窄",
+  "readerMarginMedium": "适中",
+  "readerMarginWide": "宽",
+  "readerMarginVeryWide": "极宽",
+  "readerDecrease": "减小{label}",
+  "readerIncrease": "增大{label}",
+  "@readerDecrease": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "@readerIncrease": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  }
 }

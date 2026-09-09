@@ -1,4 +1,4 @@
-# SRC-003 Source 调查包
+# Source 调查工具
 
 独立纯 Dart 包，只服务可重复的调查证据，不是生产 Source / Parser。依赖本仓库的 `test/fixtures/lightnovel/`，不依赖主 Flutter 包，也不修改 App 依赖。
 
@@ -17,9 +17,9 @@ dart bin/source_probe.dart
 dart bin/source_probe.dart --report reports/my-offline.json
 ```
 
-依赖安装需要网络；调查程序默认不创建 HttpClient，离线检查也不请求源站。`dart test` 全部使用本地 fixture / 内存传输，无 live 测试钩子。沙箱可能阻止访问用户 Pub 缓存或 Dart CLI 配置；本次通过宿主自动审批运行，未修改操作系统执行策略。
+依赖安装需要网络；调查程序默认不创建 HttpClient，离线检查也不请求源站。`dart test` 全部使用本地 fixture / 内存传输，无 live 测试钩子。
 
-`--suppress-analytics` 只抑制当次 CLI 的分析发送，不改用户全局配置；本次后期默认 CLI 初始化等待，使用该开关及直接 VM 测试入口完成验证。
+`--suppress-analytics` 只抑制当次 CLI 的分析发送，不改用户全局配置。
 
 只有明确需要重新验证源站时运行一次：
 
@@ -61,13 +61,7 @@ dart bin/source_probe.dart --live --max-requests 30 --report reports/my-live.jso
 }
 ```
 
-2026-09-07 Asia/Shanghai 的实际报告（时间戳采用 UTC）：
-
-- [offline-20260907.json](reports/offline-20260907.json)：PASS，0 次 HTTP。
-- [live-20260907.json](reports/live-20260907.json)：PASS，6 / 30 次尝试（5 POST + 1 GET），全部 200，无重定向/重试。正文 139,470 UTF-16 code units / 405,531 UTF-8 字节，4,084 个 p、14 个 img、17 个 ruby。仅获取和解码第一张正文图：JPEG，310,858 字节，2048×829。
-- [live-final-20260907.json](reports/live-final-20260907.json)：增加 JPEG 文件头保护后的最终复核，PASS，6 / 剩余 24 次尝试，结果和图片哈希一致。SRC-003 两轮合计 **12 / 30 次 HTTP**，没有自动重试；第二轮用于验证新准入条件。23 项离线测试通过，最终静态分析通过。
-
-纯 Dart 解码证明不等于 Flutter 平台 codec 通过。Android 留给 TEST-001 / ANDROID-002；iOS 留给 IOS-002（DEFERRED_NO_MAC）。Source Gate 仍待 SRC-004。
+历史运行报告查 Git。纯 Dart 解码不等于 Flutter 平台显示验证；每次在线调查均须取得新的明确授权。
 
 ## 依赖范围
 
@@ -75,4 +69,4 @@ dart bin/source_probe.dart --live --max-requests 30 --report reports/my-live.jso
 
 尺寸边界测试发现 `image 4.9.2` 的 JPEG `startDecode/readInfo` 已分配系数缓冲，不能在它返回后才检查上限。工具现在先检查 JPEG 帧头 / PNG IHDR，再调用库解码；超大 JPEG 合成测试覆盖这一停止点。多帧和未验证的格式/特殊 JPEG 采样布局直接停止，不扩展格式支持。
 
-图像解码是本次唯一媒体调查依赖；留在本包，不选择主 App 的渲染/缓存实现。官方 API 依据：[image decodeImage / decoder 文档](https://pub.dev/documentation/image/4.9.2/image/Decoder-class.html)、[html](https://pub.dev/packages/html/versions/0.15.7)、[Dart test](https://pub.dev/packages/test/versions/1.31.1)。依赖许可证保留在各包分发内；本包没有复制 Aidoku / 源站代码，内容与 fixture 许可的最终审查留给 SRC-004。
+图像解码是本次唯一媒体调查依赖；留在本包，不选择主 App 的渲染/缓存实现。官方 API 依据：[image decodeImage / decoder 文档](https://pub.dev/documentation/image/4.9.2/image/Decoder-class.html)、[html](https://pub.dev/packages/html/versions/0.15.7)、[Dart test](https://pub.dev/packages/test/versions/1.31.1)。依赖许可证保留在各包分发内；本包没有复制 Aidoku / 源站代码，内容与 fixture 许可边界见项目发布说明。

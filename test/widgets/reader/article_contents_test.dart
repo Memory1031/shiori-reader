@@ -11,6 +11,37 @@ import 'package:shiori/features/reader/viewport/reader_viewport.dart';
 
 void main() {
   test(
+    'CJK width balances spare space without changing explicit alignment',
+    () {
+      const style = TextStyle(fontSize: 20);
+      for (final scale in [1.0, 1.5, 2.0]) {
+        final scaler = TextScaler.linear(scale);
+        final body = ParagraphBlock(text: '自然字距的中文正文');
+        final width = readerBlockWidth(
+          body,
+          317,
+          style,
+          scaler,
+          TextDirection.ltr,
+        );
+        expect(width, lessThanOrEqualTo(317));
+        expect(width, greaterThan(317 - 20 * scale));
+        expect(readerBlockAlign(body), TextAlign.start);
+        for (final block in <ContentBlock>[
+          HeadingBlock(text: '章节标题', level: 1),
+          ParagraphBlock(text: '居中文本', alignment: ParagraphAlignment.center),
+          ParagraphBlock(text: 'English text'),
+        ]) {
+          expect(
+            readerBlockWidth(block, 317, style, scaler, TextDirection.ltr),
+            317,
+          );
+        }
+      }
+    },
+  );
+
+  test(
     'chapter typography centers major headings and preserves explicit alignment',
     () {
       const base = TextStyle(fontSize: 20, height: 1.6);
@@ -34,6 +65,22 @@ void main() {
         TextAlign.start,
       );
       expect(readerBlockAlign(ParagraphBlock(text: '普通正文')), TextAlign.start);
+      expect(
+        readerBlockAlign(ParagraphBlock(text: 'English prose')),
+        TextAlign.start,
+      );
+      expect(
+        readerBlockAlign(
+          ParagraphBlock(text: '中文署名', alignment: ParagraphAlignment.end),
+        ),
+        TextAlign.end,
+      );
+      expect(
+        readerBlockAlign(
+          ParagraphBlock(text: '中文题记', alignment: ParagraphAlignment.center),
+        ),
+        TextAlign.center,
+      );
       expect(readerBlockSpacing(ParagraphBlock(text: '普通正文'), 20), 20);
     },
   );

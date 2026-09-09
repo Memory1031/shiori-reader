@@ -31,6 +31,14 @@ Windows PowerShell 设置 `$env:PUB_HOSTED_URL = 'https://pub.flutter-io.cn'`，
 
 iOS 安装依赖后在 `ios` 目录执行 `pod install`，打开 `ios/Runner.xcworkspace`。不要打开单独的 `.xcodeproj` 来构建 CocoaPods 工程。选择实际设备，给 Runner 和 ShareExtension 配置自己的 Team、匹配的 App Group 与唯一 Bundle ID；不要借用公司 Team。签名及个人安装边界见[发布说明](release/README.md)。
 
+更改 pubspec 版本后，直接在 Xcode 构建前先同步本地 Flutter 参数，避免 Runner 使用旧构建号而 ShareExtension 已更新：
+
+```sh
+fvm flutter build ios --config-only --release --no-codesign --no-pub
+```
+
+此命令只准备配置和 Pods，不完成签名安装。生成的 `Generated.xcconfig` 与 `flutter_export_environment.sh` 保持忽略，不手工提交。
+
 ## 本地检查
 
 提交前按改动范围运行相关 UT；跨模块或发布准备时运行完整离线测试。日常 GitHub CI 不运行 UT，保留格式、分析及生成一致性检查；不要将 CI 成功当作本地测试证据。修改发布工具时另运行 `python3 -m unittest discover -s tool -p 'test_release_android.py'`（Windows 可使用本机 Python 命令）。
@@ -47,7 +55,7 @@ fvm flutter test --no-pub
 
 默认测试与 Source 调查工具不发真实书源请求；安装 SDK / 依赖本身需要网络。真实书源验收必须显式授权并限制请求，见[调查工具](../tools/source_probe/README.md)。
 
-改 ARB 后提交 `lib/l10n/generated/` 的对应生成变化。改数据库后执行 `bash tool/generate_database.sh`；Windows 用 `tool/generate_database.ps1`。Drift 生成器隔离在 `tool/db_codegen`，不要把它的 analyzer / build_runner 依赖加进主应用。生成结果与 schema 快照一起核对，见[数据库](database.md)。
+改 ARB 后提交 `lib/l10n/generated/` 的对应生成变化。改数据库后执行 `bash tool/generate_database.sh`；Windows 用 `tool/generate_database.ps1`。Drift 生成器隔离在 `tool/db_codegen`，不要把它的 analyzer / build_runner 依赖加进主应用。生成结果与 schema 快照一起核对，见[数据库](architecture.md)。
 
 原生改动按需构建 `fvm flutter build apk --debug --no-pub` 或 `fvm flutter build ios --release --no-pub`；构建成功不代表安装或运行通过。普通 CI 不打包，见[CI](ci.md)。
 
@@ -69,4 +77,4 @@ fvm flutter run --target lib/main_dev.dart --dart-define=SHIORI_SCENARIO=longCha
 
 已发布版本的 schema 快照必须保留；迁移用旧快照和自制数据测试，检查事务失败回滚与未知版本拒绝。不要删除用户数据库来处理升级失败。先退出应用，保全数据库及 WAL / SHM、preferences、托管原件和 manifest，在副本上检查。
 
-设备探针使用隔离目录，入口留在 `integration_test/`。已有测量与复跑入口见[验收摘要](validation/README.md)。本机 `.tooling/evidence/` 是忽略目录，不承诺随仓库提供；Git 中保留摘要与结构化报告。旧滚动性能数据不能作为新翻页动画的性能结果。
+设备探针使用隔离目录，入口留在 `integration_test/`。已有测量与复跑入口见[验收摘要](release/README.md#110-验收范围)。本机 `.tooling/evidence/` 是忽略目录，不承诺随仓库提供；发布说明保留本轮验收范围，历史报告查 Git。旧滚动性能数据不能作为新翻页动画的性能结果。

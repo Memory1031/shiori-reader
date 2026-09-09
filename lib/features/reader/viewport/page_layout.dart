@@ -107,10 +107,11 @@ final class PageLayout {
   }) {
     if (text.isEmpty) return (text: '', count: 0, height: 16);
     measuredChunks++;
+    final textWidth = readerBlockWidth(block, width, style, scaler, direction);
     final prefix = readerIndentPrefix(
       block,
       startsBlock,
-      width,
+      textWidth,
       style,
       scaler,
       chapter: index.content.key,
@@ -123,7 +124,7 @@ final class PageLayout {
       textDirection: direction,
       textScaler: scaler,
       textAlign: readerBlockAlign(block),
-    )..layout(maxWidth: width);
+    )..layout(maxWidth: textWidth);
     try {
       final lines = painter.computeLineMetrics();
       var used = readerBlockSpacing(block, paragraphSpacing);
@@ -142,7 +143,7 @@ final class PageLayout {
           : lines[count];
       final point = painter.getPositionForOffset(
         Offset(
-          direction == TextDirection.ltr ? 0 : width,
+          direction == TextDirection.ltr ? 0 : textWidth,
           boundaryLine.baseline - boundaryLine.ascent * .5,
         ),
       );

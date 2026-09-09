@@ -1,7 +1,13 @@
 {
   "shelfLocal": "Local",
   "shelfLocalFormat": "Local · {format}",
-  "@shelfLocalFormat": {"placeholders": {"format": {"type": "String"}}},
+  "@shelfLocalFormat": {
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
   "localBookContents": "Book contents",
   "articleContents": "In-volume contents",
   "articleContentsEmpty": "No recognisable section headings in this article. Use the volume list to switch articles.",
@@ -274,5 +280,26 @@
   "readerLinks": "Chapter links",
   "readerLinkReturn": "Return to reading",
   "readerLinkUnavailable": "Link unavailable. Only valid documents and anchors within this book can be opened.",
-  "readerLinkDepth": "Link depth limit reached. Return before opening another link."
+  "readerLinkDepth": "Link depth limit reached. Return before opening another link.",
+  "readerMarginVeryNarrow": "Narrowest",
+  "readerMarginNarrow": "Narrow",
+  "readerMarginMedium": "Medium",
+  "readerMarginWide": "Wide",
+  "readerMarginVeryWide": "Widest",
+  "readerDecrease": "Decrease {label}",
+  "readerIncrease": "Increase {label}",
+  "@readerDecrease": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "@readerIncrease": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  }
 }

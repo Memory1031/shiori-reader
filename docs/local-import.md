@@ -12,7 +12,7 @@
 
 `users/books/<hash>/` 保存 `original`、codec v1 的 `manifest.json` 和按内容哈希命名的媒体。暂存在 `users/import-staging/`：复制 / 哈希 → 解析与资源落盘 → 原子改名 → 数据库事务发布。失败不发布半本书；启动回收只处理确认未被用户库索引的暂存，不能把数据库读取失败当成空书库。
 
-`LocalImportSession` 拥有暂存，`LocalBookStore` 管理文件，`LocalBookManagement` 管理删除。已发布文件损坏时保留并报错，不自动删除用户数据。存储与迁移见[数据库](database.md)。
+`LocalImportSession` 拥有暂存，`LocalBookStore` 管理文件，`LocalBookManagement` 管理删除。已发布文件损坏时保留并报错，不自动删除用户数据。存储与迁移见[数据库](architecture.md)。
 
 身份不包含外部路径或临时 URI。TXT 章节以去 BOM 后、归一化前的原始 code point 起点派生；EPUB 首次资源章节以规范 spine href 派生，EPUB 3 后续重复 occurrence 使用独立摘要身份；目录 href 指向首次出现。目录条目可附 fragment 定位 blockKey，目录层级与物理章节文件不是同一概念。
 
@@ -58,32 +58,89 @@ XML 单项 4MiB、文本累计 12Mi UTF-16 单元，DOM 100000 节点 / 深度 1
 
 存储层另有限额：原件 128MiB、单媒体 32MiB、媒体总量 512MiB、manifest 32MiB、媒体写入 4096 项。解析限制和存储限制独立生效，不能用 ZIP 文件体积代表最终内存成本。
 
-平台与文件样本的实际覆盖见[验收摘要](validation/README.md)，不将上述支持列表解释为所有发行商 EPUB 都已验证。
+平台与文件样本的实际覆盖见[验收摘要](release/README.md#110-验收范围)，不将上述支持列表解释为所有发行商 EPUB 都已验证。
 
 已有导入记录保存解析结果；解析器修复不会自动重写旧 manifest，相同文件再次导入也会命中去重。可从本地文件管理菜单显式“重新解析”，保留原件并尽量恢复位置，近似恢复会提示；不要通过删除重导迁移，删除会清阅读进度。
 
-本轮已修复空章节、自闭合脚本吞正文、SVG 特殊页位图回退、隐藏内容、受限 CSS important 与注音降级等问题。35 个文件中 34 个解析成功，1 个因加密声明继续拒绝；逐文件结果、支持边界和未做的设备验证见[兼容性核查](validation/epub-compatibility.md)，不将样本通过理解为完整兼容。
+历史样本与结构核查见[验收摘要](release/README.md#110-验收范围)，当前能力以[支持矩阵](local-import.md#解析支持矩阵)为准。
 
-2026-09-09 结构核查新增命名空间隔离、XML 深度预算、目录分组修复与封面降级（cover-image / legacy meta / guide），231 项相关离线回归通过，详见[结构对照与支持矩阵](validation/parse-001.md)。
-
-样式表按文档顺序加载，原生正文与特殊短页共用屏幕筛选规则（空 media / screen / all），不启用打印、alternate 或 disabled 样式；复杂媒体条件不猜测。正文语义保真与 CFI 的剩余边界见[支持范围](validation/epub-support-profile.md)。
+样式表按文档顺序加载，原生正文与特殊短页共用屏幕筛选规则（空 media / screen / all），不启用打印、alternate 或 disabled 样式；复杂媒体条件不猜测。正文语义保真与 CFI 的剩余边界见[支持范围](local-import.md#解析支持矩阵)。
 
 ### 图片候选与 base 边界
 
-EPUB 支持包内 picture/source 与 srcset 候选，按固定顺序选择可用栅格图片；不根据 viewport/sizes 进行响应式选图。原生正文、guide 封面与特殊页共用候选规则。未声明在 manifest 的包内图片继续容忍；base/xml:base 仍不解释，包根绝对路径形式仍拒绝。完整规则和证据见[PARSE-006](validation/parse-006.md)。
+EPUB 支持包内 picture/source 与 srcset 候选，按固定顺序选择可用栅格图片；不根据 viewport/sizes 进行响应式选图。原生正文、guide 封面与特殊页共用候选规则。未声明在 manifest 的包内图片继续容忍；base/xml:base 仍不解释，包根绝对路径形式仍拒绝。详细候选上限见下方“图片选择细则”。
 
 ### 解析诊断
 
-EPUB 解析结果在 data 层附带最多 100 条固定原因码及截断标记。BookDecoder 可由调用方注入独立诊断 slot，读取最近成功解析报告；默认不保留，不写书籍文件或进度，不包含路径/正文。详见[PARSE-007](validation/parse-007.md)。
+EPUB 解析结果在 data 层附带最多 100 条固定原因码及截断标记。BookDecoder 可由调用方注入独立诊断 slot，读取最近成功解析报告；默认不保留，不写书籍文件或进度，不包含路径/正文。生命周期见下文。
 
 ### 显式重新解析
 
 原件保持不变，新 manifest/媒体/特殊页先写暂存，再发布到 `revisions/<bundle>/`。SQL 事务原子切换活动指针与阅读进度，失败或取消保持旧版本；成功后清理旧资源。无历史不创建历史，无法精确匹配的位置明确提示近似，清除旧像素布局提示。TXT 新记录保留选择编码，旧记录可预览重选。
 
-维护开始会退役已打开的 Reader，结束后从书架重新打开；旧会话及不匹配的新会话不能写旧正文进度。完整匹配、并发及崩溃恢复边界见[PARSE-005](validation/parse-005.md)。
+旧书升级后若特殊排版退回普通文字，可能是旧正文与重新派生的特殊页版本不匹配；使用此入口后重新打开即可应用新结果。当前没有自动提醒。
+
+维护开始会退役已打开的 Reader，结束后从书架重新打开；旧会话及不匹配的新会话不能写旧正文进度。匹配、并发及崩溃恢复边界见下文。
 
 ### 正文辅助链接
 
 新导入或重新解析后的 EPUB 可在阅读菜单“本章链接”查看包内链接。有效脚注/辅助文档进入临时阅读页，返回保留原页面，不写主阅读历史。同文档链接保留当前 occurrence，跨文档使用首次出现。缺失或外部目标不可用，不触发联网。
 
-非 spine XHTML 辅助文档独立保存；正文文本不内联添加交互，WebView 导航仍关闭。锚点为语义块级，隐藏目标不揭示；旧 manifest 不自动升级。范围与验收见[PARSE-008](validation/parse-008.md)。
+非 spine XHTML 辅助文档独立保存；正文文本不内联添加交互，WebView 导航仍关闭。锚点为语义块级，隐藏目标不揭示；旧 manifest 不自动升级。设备覆盖见[验收摘要](release/README.md#110-验收范围)。
+
+## 图片选择细则
+
+按 picture/source、img src 或 SVG href、img srcset 顺序寻找实际存在且字节可识别的 PNG/JPEG/GIF/WebP，候选按声明顺序。source 只接受支持的 type 和空 / all / screen media。w/x 描述符仅校验，不实现响应式布局；每个消费点最多 64KiB srcset 和 128 个候选。外部或缺失候选跳过，根越界仍拒绝。特殊页选定后移除 source/srcset 并内嵌资源，沿用特殊页 8MiB 资源预算。
+
+## 诊断生命周期
+
+诊断保持在 data 层：`ParsedEpub.diagnostics` 返回不可变 `EpubDiagnostics`，只有固定 `EpubDiagnosticCode` 列表和 truncated 标志。每次解析最多 100 条，超出只设置截断标志；不累计无界计数，不附带文件名、路径、URL、正文、书籍 ID 或原始异常。顺序表示发生顺序，重复原因可能来自不同候选，不等于受影响图片总数。
+
+`BookDecoder(epubDiagnostics: slot)` 可选接收调用方拥有的 `EpubDiagnosticSlot`，worker 成功返回且媒体写入、取消检查完成后替换最近一次报告。slot 不保留书籍身份；需要与单次操作对应时调用方使用独立 slot。`clear()` 显式释放；失败、取消和 TXT 不更新“最近一次成功 EPUB”报告，不能把旧报告当作本次结果。默认解码器不持有 slot，没有隐藏全局服务、自动日志或新 UI。
+
+不修改 LocalBookContent / LocalBookDecoder 的领域合同，不写入 manifest，也不改变正文摘要或 blockKey。派生特殊页重建没有自动发布到 slot。已有导入不会因增加诊断而重解析。
+
+## 重解析位置与并发
+
+本地文件管理菜单新增“重新解析”，确认后从托管原件解析。保留书籍 SHA-256、导入日期、书架加入日期和最后阅读时间；无阅读历史不会新建进度。旧 TXT 未记录编码时提供严格预览及手选；新 TXT manifest 保存已选编码，重解析入口允许覆盖。
+
+位置迁移为纯 Dart 函数：同 revision/块身份、唯一语义及邻近上下文、最多三个相邻块的文本窗口，最后降级到同章比例或最近可读章节起点。文本按 Unicode code points 计数。窗口最多 16384 code points，局部锚点最多前后各 32 个，重复候选不强行当作精确。拆分/合并窗口恢复及比例恢复均显示近似提示；近似结果清 completed，所有结果清像素提示。短文本、不唯一或窗口外的修改允许降级，不承诺原行位置。
+
+旧 EPUB 读取不再把新解析的 catalog/chapters/navigation 替换进内存记录。旧特殊页仅在对应正文 revision 相符时派生；新 bundle 内保存受限呈现 JSON，hash 进入受校验 manifest。原件与媒体仍各自校验 SHA-256。
+
+- 用户库 v4：local_books 增加 active_bundle、parser_version、maintenance，另增 local_chapter_revisions。NULL bundle 兼容旧根目录格式；升级不自动重新解析。
+- 原件长期只保留根目录一份。暂存副本用于解析，完成后删除副本，manifest/媒体/呈现进入不可变 revisions/bundle。
+- SQL 同一事务更新活动 bundle/hash、已有书架快照、进度与 generation、章节版本索引。提交前取消或 SQL 失败不切换；提交后返回真实成功，清理失败使用 cleanupPending。
+- 维护期间拒绝新进度会话及旧写，发 invalidation 退役 Reader。结束后本地仓库发布 detail/catalog/chapter 更新；目录和特殊页后续读取取当前版本。即使旧内容重新申请 generation，正文/catalog revision 校验也拒绝不匹配写入。
+- 迁移快照记录 generation/sequence，最终提交重新核对。期间 clearHistory 会改变 stamp 并阻止发布，不恢复用户刚清除的历史。普通进度保存被 maintenance 阻止，不覆盖待迁移快照。
+- 启动先读 SQL 再清 staging/未引用 revisions，并解除遗留 maintenance。活动 manifest 缺失或校验失败时保留已有文件，不因坏指针删除旧资料。不是提供历史版本回滚 UI；正常提交后回收旧资源，避免版本无限累积。
+- 文件发布仍依赖已有 flush + rename + SQLite 事务策略。测试覆盖人工构造崩溃遗留状态，未执行物理断电或真实磁盘耗尽，不宣称硬件掉电证明。
+
+## 重复资源身份
+
+EPUB 3 同一规范资源路径出现多次时逐次呈现；首次章键不变，后续以独立摘要 kind 和 `[path, occurrence]` 派生，避免与路径字符串冲突。复用资源块、媒体和呈现；额外重复块预算 100000、spine 条目 10000，超限拒绝。
+
+EPUB 2 重复引用保持拒绝；只有明确 package version=3.0 使用 EPUB 3 分支。nav/NCX href/fragment 指向首次出现，连续阅读按实际 spine 顺序。插入同资源 occurrence 可能改变后续身份，不承诺永久稳定。同文档辅助链接保留当前 occurrence，连续阅读跳过 linear=no。
+
+## 解析支持矩阵
+
+| 能力 | 当前支持与限制 | 回归入口（test/data/local 下） |
+| --- | --- | --- |
+| ZIP / container / OPF | 有界解包、CRC、路径校验、manifest/spine 顺序；多 rootfile 选择首个匹配项 | parsers、epub_structure、epub_boundary |
+| EPUB 2 / 3 目录 | NCX/nav、嵌套标签与 fragment；可选目录损坏可降级；内部存储章节以 spine 文档为单位 | epub_structure、epub_boundary |
+| 路径与 fragment | Unicode、百分号一次解码、大小写精确；目录缺锚点可回章首，正文链接缺锚点明确不可用 | epub_structure、epub_links |
+| 重复 spine | EPUB 3 occurrence 独立身份，同文档链接保留 occurrence；跨文档指向首个 occurrence；EPUB 2 重复拒绝 | reparse、epub_links |
+| 正文语义 | 段落、标题、br、缩进、对齐、ruby 文本降级；强调/上下标无完整富文本样式 | epub_compatibility、epub_prose_semantics |
+| CSS | 受限选择器、顺序/media、important、white-space 与 visibility；隐藏元素不保留原生几何占位，非完整 cascade | epub_stylesheet、epub_prose_semantics |
+| 图片 | PNG/JPEG/GIF/WebP 字节识别、SVG image 包装、srcset/picture 包内候选；确定性选图，不按 viewport/sizes 计算；缺图占位 | epub_compatibility、epub_resources |
+| 特殊页 | 受限静态 HTML；保留部分复杂排版，脚本/外链受限；不保证完整出版方布局 | epub_presentation |
+| base/xml:base | 不解释，按所在文档解析；这是明确未实现的兼容变体 | epub_resources |
+| 未声明图片 | 容忍包内可识别位图，不声称符合完整 manifest 规范 | epub_resources |
+| 辅助链接 | 通过“本章链接”菜单打开包内辅助页并返回；linear=no 不参与连续阅读；未开放正文内联/WebView 点击，隐藏目标不揭示 | epub_links、reparse；widget local_links |
+| 诊断 | 每次至多 100 条 data 层原因码快照，不存正文/本机路径；无持久化/UI | epub_diagnostics |
+| TXT | 严格 UTF-8/UTF-16/GB18030、BOM 优先、歧义预览、保守标题识别、原始 code point 身份；16MiB 上限 | txt 系列 |
+| 旧书与重解析 | 已发布 manifest 稳定读取；用户显式重解析，在暂存区生成并原子切换；精确或近似迁移位置，失败/取消保留旧书 | reparse；domain reparse_position；widget local_reparse |
+| 重启恢复 | schema v4、活动 bundle、进度和辅助资源恢复；旧会话晚写拒绝 | reparse、database migration |
+| DRM / 固定版式 / SMIL / 互动 | 拒绝或受限静态降级；无 DRM 解密、媒体同步、通用浏览器排版 | epub_boundary、epub_presentation |
+
+表中入口为文件名主题，不意味着每项已在手机验证。图像可解析不等于设备 codec、排版、裁剪均通过。

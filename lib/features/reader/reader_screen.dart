@@ -12,6 +12,7 @@ import 'reader_preferences.dart';
 import 'reader_theme.dart';
 import 'article_contents.dart';
 import 'settings_panel.dart';
+import 'reader_margin.dart';
 import 'reader_image.dart';
 import 'epub_layout_page.dart';
 import 'viewport/paged_reader_viewport.dart';
@@ -344,9 +345,17 @@ class _ReaderContentViewState extends State<ReaderContentView>
                       Positioned.fill(
                         child: Padding(
                           padding: EdgeInsets.fromLTRB(
-                            _settings.horizontalPadding,
+                            readerHorizontalMargin(
+                              _settings,
+                              MediaQuery.textScalerOf(context),
+                              Directionality.of(context),
+                            ),
                             56,
-                            _settings.horizontalPadding,
+                            readerHorizontalMargin(
+                              _settings,
+                              MediaQuery.textScalerOf(context),
+                              Directionality.of(context),
+                            ),
                             64,
                           ),
                           child: Align(
@@ -630,8 +639,16 @@ class _ReaderContentViewState extends State<ReaderContentView>
           children: [
             Positioned(
               top: 0,
-              left: _settings.horizontalPadding,
-              right: _settings.horizontalPadding,
+              left: readerHorizontalMargin(
+                _settings,
+                MediaQuery.textScalerOf(context),
+                Directionality.of(context),
+              ),
+              right: readerHorizontalMargin(
+                _settings,
+                MediaQuery.textScalerOf(context),
+                Directionality.of(context),
+              ),
               height: 48,
               child: Center(
                 child: Text(

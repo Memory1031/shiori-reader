@@ -11,4 +11,4 @@ python tool/epub_compare/run.py --samples <路径清单.json> --bin .tooling/epu
 
 每个文件、每个实现均启动独立进程，超时 60 秒，不重试。HTML 对比仅移除 UTF-8 BOM 后计算哈希；图片按原始字节计算。图片包括 AllFiles 中未归类进 Images 的资源。导航只检查目标文档是否存在，不验证 fragment、点击跳转或设备呈现。Shiori 的输出为阅读模型，第三方输出为 EPUB 容器模型，不能直接用耗时判定渲染性能优劣。
 
-结果与解释见 [比较报告](../../docs/validation/epub-library-comparison.md)。原件读取失败或不合法 ZIP 属于输入/参考提取问题；这不是用于不可信输入的安全沙箱。
+结果与解释见 [比较报告](../../docs/references/epub.md)。原件读取失败或不合法 ZIP 属于输入/参考提取问题；这不是用于不可信输入的安全沙箱。
