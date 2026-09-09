@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:html/dom.dart' as dom;
 import 'epub_text_styles.dart';
+import 'epub_image_candidates.dart';
 
 /// Builds a self-contained, inert document for short, authored layout pages.
 /// The caller resolves archive paths; no filesystem or network URLs survive.
@@ -14,14 +15,12 @@ String? epubPresentation(
 ) {
   final body = document.body;
   if (body == null || body.text.length > 2000) return null;
-  final sheets = <(String, String)>[];
-  for (final link in document.querySelectorAll('link[rel="stylesheet"]')) {
-    final ref = resolve(path, link.attributes['href'] ?? '');
-    if (ref != null) sheets.add((ref, readText(ref)));
-  }
-  for (final style in document.querySelectorAll('style')) {
-    sheets.add((path, style.text));
-  }
+  final sheets = epubDocumentStylesheets(
+    document,
+    path,
+    resolve,
+    readText,
+  ).toList();
   final layout = RegExp(
     r'(?:float\s*:\s*(?:left|right)|(?:^|[;{])\s*(?:-webkit-)?transform\s*:|writing-mode\s*:\s*vertical|position\s*:\s*absolute)',
     caseSensitive: false,
@@ -55,7 +54,7 @@ String? epubPresentation(
   if (body.querySelector('svg') != null) return null;
   var resourceBytes = 0;
   final resources = <String, String>{};
-  String resource(String base, String href) {
+  String resource(String base, String href, {bool rasterOnly = false}) {
     String? ref;
     try {
       ref = resolve(base, href.trim());
@@ -63,9 +62,10 @@ String? epubPresentation(
       return '';
     }
     if (ref == null) return '';
-    if (resources.containsKey(ref)) return resources[ref]!;
+    final cacheKey = '${rasterOnly ? 'image' : 'resource'}:$ref';
+    if (resources.containsKey(cacheKey)) return resources[cacheKey]!;
     final ext = ref.split('.').last.toLowerCase();
-    final mime = const {
+    var mime = const {
       'png': 'image/png',
       'jpg': 'image/jpeg',
       'jpeg': 'image/jpeg',
@@ -76,12 +76,14 @@ String? epubPresentation(
       'woff': 'font/woff',
       'woff2': 'font/woff2',
     }[ext];
-    if (mime == null) return '';
+    if (!rasterOnly && mime == null) return '';
     final bytes = readBytes(ref);
     if (bytes.isEmpty) return '';
+    if (rasterOnly) mime = epubRasterMime(bytes);
+    if (mime == null) return '';
     resourceBytes += bytes.length;
     if (resourceBytes > 8 * 1024 * 1024) return '';
-    return resources[ref] = 'data:$mime;base64,${base64Encode(bytes)}';
+    return resources[cacheKey] = 'data:$mime;base64,${base64Encode(bytes)}';
   }
 
   String css(String base, String value) => value
@@ -92,7 +94,18 @@ String? epubPresentation(
       )
       .replaceAll('</', r'<\/');
   final copy = body.clone(true);
+  // Resolve before sanitizing picture/source attributes or removing nodes.
+  final selectedImages = <dom.Element, String>{};
+  for (final img in copy.querySelectorAll('img')) {
+    var selected = '';
+    for (final href in epubImageCandidates(img).take(128)) {
+      selected = resource(path, href, rasterOnly: true);
+      if (selected.isNotEmpty) break;
+    }
+    selectedImages[img] = selected;
+  }
   const allowed = {
+    'picture',
     'div',
     'p',
     'span',
@@ -158,7 +171,7 @@ String? epubPresentation(
       e.attributes['style'] = css(path, value);
     }
     if (e.localName == 'img') {
-      e.attributes['src'] = resource(path, original['src'] ?? '');
+      e.attributes['src'] = selectedImages[e] ?? '';
       e.attributes['alt'] = original['alt'] ?? '';
     }
   }

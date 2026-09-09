@@ -1,3 +1,4 @@
+import '../../html/prose_semantics.dart';
 import 'package:html/parser.dart' as html;
 import 'package:html/dom.dart';
 import '../../../domain/content_identity.dart';
@@ -93,10 +94,10 @@ final class _Body {
   _Body(this.key);
   final ChapterKey key;
   final blocks = <ContentBlock>[];
-  var text = StringBuffer();
+  final text = ProseTextBuffer();
+  var whitespace = ProseWhiteSpace.normal;
   void flush({bool empty = false}) {
-    var value = text.toString().replaceAll(RegExp(r'^[ \t\n]+|[ \t\n]+$'), '');
-    text = StringBuffer();
+    var value = text.take();
     if (value.isEmpty && !empty) return;
     var indent = 0;
     while (value.startsWith('　') && indent < 8) {
@@ -115,7 +116,7 @@ final class _Body {
   void visit(Node node, int depth) {
     if (depth > 128) throw const FormatException('Nesting limit');
     if (node is Text) {
-      text.write(node.data.replaceAll(RegExp(r'[\t\r\n ]+'), ' '));
+      text.text(node.data, whitespace);
       return;
     }
     if (node is! Element) {
@@ -207,14 +208,11 @@ final class _Body {
       text.write('）');
       return;
     }
-    if (RegExp(r'^h[1-6]$').hasMatch(tag ?? '') &&
-        node.querySelector('img') == null) {
+    if (proseHeadingLevel(tag) != null && node.querySelector('img') == null) {
       flush();
       final value = plainDetailText(node.innerHtml);
       if (value.isNotEmpty) {
-        blocks.add(
-          HeadingBlock(text: value, level: int.parse(tag!.substring(1))),
-        );
+        blocks.add(HeadingBlock(text: value, level: proseHeadingLevel(tag)!));
       }
       return;
     }
@@ -229,11 +227,14 @@ final class _Body {
       'pre',
     }.contains(tag);
     if (boundary) flush();
+    final previousWhitespace = whitespace;
+    if (tag == 'pre') whitespace = ProseWhiteSpace.pre;
     final before = blocks.length;
     for (final child in node.nodes) {
       visit(child, depth + 1);
     }
     if (boundary) flush(empty: tag == 'p' && blocks.length == before);
+    whitespace = previousWhitespace;
     if (blocks.length > 20000) throw const FormatException('Block limit');
   }
 }

@@ -13,6 +13,8 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/shared/app_logger.dart';
 import '../../network/network_test_support.dart';
+import '../../local/epub_structure_test.dart' as epub;
+import '../../local/support/epub_fixtures.dart';
 
 void main() {
   late RequestScheduler scheduler;
@@ -48,6 +50,20 @@ void main() {
       (await source.getChapter(key, cancellation: token)
               as Success<ChapterContent>)
           .value;
+  test('EPUB and online adapters agree on common prose semantics', () async {
+    const body =
+        '<h2>Heading</h2><p>A <span>B</span><br/>C</p><pre>  D\n E  </pre><p>tail</p>';
+    data['body_snapshot']['body_html'] = body;
+    final online = await load();
+    final files = epubFiles();
+    files['OPS/text/a.xhtml'] = utf8.encode('<html><body>$body</body></html>');
+    final local = epub.parse(files).content.chapters.first;
+    expect(
+      online.blocks.map((e) => e.blockKey),
+      local.blocks.map((e) => e.blockKey),
+    );
+  });
+
   test(
     'existing synthetic fixture keeps paragraph image and ruby order',
     () async {

@@ -1,5 +1,36 @@
 import 'package:html/dom.dart' as dom;
 
+/// Shared screen-sheet selection for native prose and inert authored pages.
+/// Keep document order. Conditional media queries and alternate stylesheets
+/// require a viewport/style-set policy and are deliberately not guessed.
+Iterable<(String, String)> epubDocumentStylesheets(
+  dom.Document document,
+  String path,
+  String? Function(String, String) resolve,
+  String Function(String) readText,
+) sync* {
+  for (final node in document.querySelectorAll('style, link')) {
+    final media = (node.attributes['media'] ?? '').trim().toLowerCase();
+    if (media.isNotEmpty &&
+        !media.split(',').any((m) => {'all', 'screen'}.contains(m.trim()))) {
+      continue;
+    }
+    if (node.attributes.containsKey('disabled')) continue;
+    if (node.localName == 'style') {
+      yield (path, node.text);
+    } else {
+      final rel = (node.attributes['rel'] ?? '').toLowerCase().split(
+        RegExp(r'\s+'),
+      );
+      if (!rel.contains('stylesheet') || rel.contains('alternate')) continue;
+      final href = node.attributes['href'];
+      if (href == null || href.trim().isEmpty) continue;
+      final resolved = resolve(path, href);
+      if (resolved != null) yield (resolved, readText(resolved));
+    }
+  }
+}
+
 /// A bounded rule walker, not a general CSS engine. Unknown conditional groups
 /// are ignored rather than accidentally applying print/width-specific rules.
 Iterable<(String, String)> epubScreenRules(
@@ -47,7 +78,7 @@ Iterable<(String, String)> epubScreenRules(
   }
 }
 
-/// Bounded subset for native prose: alignment and em indentation only.
+/// Bounded native prose styles: alignment, indentation, whitespace and visibility.
 /// Reader preferences own body size, line height and paragraph spacing.
 Map<dom.Element, Map<String, String>> epubTextStyles(
   dom.Document doc,
@@ -79,9 +110,43 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
       final parts = declaration.split(':');
       if (parts.length != 2) continue;
       final name = parts[0].trim().toLowerCase();
-      if ({'text-align', 'text-indent', 'display'}.contains(name)) {
+      if ({
+        'text-align',
+        'text-indent',
+        'display',
+        'white-space',
+        'visibility',
+      }.contains(name)) {
         final raw = parts[1].trim().toLowerCase();
         final priority = RegExp(r'!\s*important\s*$').hasMatch(raw);
+        final value = raw
+            .replaceFirst(RegExp(r'\s*!\s*important\s*$'), '')
+            .trim();
+        if (name == 'white-space' &&
+            !{
+              'normal',
+              'nowrap',
+              'pre',
+              'pre-wrap',
+              'pre-line',
+              'inherit',
+              'initial',
+              'unset',
+            }.contains(value)) {
+          continue;
+        }
+        if (name == 'visibility' &&
+            !{
+              'visible',
+              'hidden',
+              'collapse',
+              'inherit',
+              'initial',
+              'unset',
+            }.contains(value)) {
+          continue;
+        }
+
         final priorities = important[element] ??= {};
         if (!priority && priorities.contains(name)) continue;
         if (priority) priorities.add(name);

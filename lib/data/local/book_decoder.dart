@@ -4,6 +4,7 @@ import '../../domain/contracts/local_books.dart';
 import '../../domain/contracts/cancellation.dart';
 import '../../domain/models/models.dart';
 import 'epub/epub_parser.dart';
+import 'epub/epub_diagnostics.dart';
 import 'local_guard.dart';
 import 'parser_worker.dart';
 import 'txt/txt_decoder.dart';
@@ -11,7 +12,8 @@ import 'txt/txt_parser.dart';
 
 /// Stateless production decoder; sessions remain on the storage-owning isolate.
 class BookDecoder implements LocalBookDecoder {
-  const BookDecoder();
+  const BookDecoder({this.epubDiagnostics});
+  final EpubDiagnosticSlot? epubDiagnostics;
   static const maxTxtBytes = 16 * 1024 * 1024;
   static const maxEpubBytes = 64 * 1024 * 1024;
   @override
@@ -64,6 +66,7 @@ class BookDecoder implements LocalBookDecoder {
       }
     }
     checkLocalCancellation(cancellation);
+    epubDiagnostics?.record(parsed.diagnostics);
     return parsed.content;
   }
 }

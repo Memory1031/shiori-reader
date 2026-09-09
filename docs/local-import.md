@@ -35,7 +35,7 @@ WHATWG 编码映射与许可保留在工程，生成工具位于 `tool/encoding/
 
 ## EPUB 普通正文
 
-支持无 DRM 的流式 EPUB 2/3，以 OPF manifest / spine 为阅读顺序；不按 nav / NCX 重排正文。目录可嵌套、可指向同文件 fragment，保留 `linear=no` 条目，不能把「一个文件」或「一个目录标题」直接当作用户卷数。
+支持无 DRM 的流式 EPUB 2/3，以 OPF manifest / spine 为阅读顺序；不支持的 spine 格式可沿包内 fallback 选择 XHTML 替代，循环/断链拒绝；不按 nav / NCX 重排正文。目录可嵌套、可指向同文件 fragment，保留 `linear=no` 条目，不能把「一个文件」或「一个目录标题」直接当作用户卷数。
 
 原生正文支持段落、标题、分隔线、换行、pre 文本、基础对齐与 em 缩进；普通 HTML 块去除源码边缘可折叠空白，保留 NBSP / 全角空格与 pre，不用源码缩进抵消正文缩进。支持 PNG / JPEG / GIF / WebP，SVG 包裹的位图可提取（支持 href 与带命名空间的 xlink:href），纯 SVG 不在兼容范围。图片缺失显示占位，不丢失前后正文。
 
@@ -60,6 +60,18 @@ XML 单项 4MiB、文本累计 12Mi UTF-16 单元，DOM 100000 节点 / 深度 1
 
 平台与文件样本的实际覆盖见[验收摘要](validation/README.md)，不将上述支持列表解释为所有发行商 EPUB 都已验证。
 
-已有导入记录保存解析结果；解析器修复不会自动重写旧 manifest，相同文件再次导入也会命中去重。需要重新解析时应先保全外部原件和阅读位置，再明确删除应用内记录并重新导入；删除会清阅读进度。
+已有导入记录保存解析结果；解析器修复不会自动重写旧 manifest，相同文件再次导入也会命中去重。保留进度的重新解析已纳入 PARSE-005，尚未实现；不要将删除重导作为自动迁移方案，删除会清阅读进度。
 
 本轮已修复空章节、自闭合脚本吞正文、SVG 特殊页位图回退、隐藏内容、受限 CSS important 与注音降级等问题。35 个文件中 34 个解析成功，1 个因加密声明继续拒绝；逐文件结果、支持边界和未做的设备验证见[兼容性核查](validation/epub-compatibility.md)，不将样本通过理解为完整兼容。
+
+2026-09-09 结构核查新增命名空间隔离、XML 深度预算、目录分组修复与封面降级（cover-image / legacy meta / guide），231 项相关离线回归通过，详见[结构对照与支持矩阵](validation/parse-001.md)。
+
+样式表按文档顺序加载，原生正文与特殊短页共用屏幕筛选规则（空 media / screen / all），不启用打印、alternate 或 disabled 样式；复杂媒体条件不猜测。正文语义保真与 CFI 的剩余边界见[支持范围](validation/epub-support-profile.md)。
+
+### 图片候选与 base 边界
+
+EPUB 支持包内 picture/source 与 srcset 候选，按固定顺序选择可用栅格图片；不根据 viewport/sizes 进行响应式选图。原生正文、guide 封面与特殊页共用候选规则。未声明在 manifest 的包内图片继续容忍；base/xml:base 仍不解释，包根绝对路径形式仍拒绝。完整规则和证据见[PARSE-006](validation/parse-006.md)。
+
+### 解析诊断
+
+EPUB 解析结果在 data 层附带最多 100 条固定原因码及截断标记。BookDecoder 可由调用方注入独立诊断 slot，读取最近成功解析报告；默认不保留，不写书籍文件或进度，不包含路径/正文。详见[PARSE-007](validation/parse-007.md)。

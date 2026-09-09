@@ -1,3 +1,4 @@
+import '../../html/prose_semantics.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
@@ -12,9 +13,12 @@ import '../txt/txt_parser.dart' show filenameTitle;
 import 'epub_zip.dart';
 import 'epub_presentation.dart';
 import 'epub_text_styles.dart';
+import 'epub_image_candidates.dart';
+import 'epub_diagnostics.dart';
 
 final class ParsedEpub {
-  ParsedEpub(this.content, this.media);
+  ParsedEpub(this.content, this.media, this.diagnostics);
+  final EpubDiagnostics diagnostics;
   final LocalBookContent content;
   final Map<String, Uint8List> media;
 }
@@ -60,9 +64,38 @@ Iterable<XmlElement> elements(XmlNode node, String name) =>
     node.descendants.whereType<XmlElement>().where((e) => e.name.local == name);
 String? attr(XmlElement e, String name) {
   for (final a in e.attributes) {
-    if (a.name.local == name) return a.value;
+    if (a.name.local == name && a.name.prefix == null) return a.value;
   }
   return null;
+}
+
+Iterable<XmlElement> packageChildren(XmlElement node, String name) =>
+    node.childElements.where(
+      (e) =>
+          e.name.local == name && e.name.namespaceUri == node.name.namespaceUri,
+    );
+
+bool isToc(dom.Element node) {
+  for (final entry in node.attributes.entries) {
+    final name = entry.key.toString();
+    final parts = name.split(':');
+    if (parts.length != 2 || parts.last != 'type') continue;
+    String? namespace;
+    for (
+      dom.Element? ancestor = node;
+      ancestor != null;
+      ancestor = ancestor.parent
+    ) {
+      namespace = ancestor.attributes['xmlns:${parts.first}'];
+      if (namespace != null) break;
+    }
+    if ((namespace == 'http://www.idpf.org/2007/ops' ||
+            namespace == null && parts.first == 'epub') &&
+        entry.value.split(RegExp(r'\s+')).contains('toc')) {
+      return true;
+    }
+  }
+  return (node.attributes['type'] ?? '').split(RegExp(r'\s+')).contains('toc');
 }
 
 class EpubParser {
@@ -77,6 +110,7 @@ class EpubParser {
   final NovelKey book;
   final String filename;
   late final zip = EpubZip(bytes);
+  final _diagnostics = EpubDiagnosticCollector();
   final media = <String, Uint8List>{};
   final mediaByPath = <String, MediaRef>{};
   final items = <String, _Item>{};
@@ -102,9 +136,17 @@ class EpubParser {
     ).hasMatch(input)) {
       invalidZip();
     }
-    return XmlDocument.parse(
+    final document = XmlDocument.parse(
       input.replaceAll(RegExp(r'<!DOCTYPE[^>]*>', caseSensitive: false), ''),
     );
+    var count = 0;
+    final stack = <(XmlNode, int)>[(document, 0)];
+    while (stack.isNotEmpty) {
+      final (node, depth) = stack.removeLast();
+      if (++count > 100000 || depth > 128) zipLimit();
+      stack.addAll(node.children.map((child) => (child, depth + 1)));
+    }
+    return document;
   }
 
   String requiredPath(String base, String href) =>
@@ -112,19 +154,17 @@ class EpubParser {
 
   MediaRef? image(String path) {
     if (mediaByPath.containsKey(path)) return mediaByPath[path];
-    if (!zip.entries.containsKey(path)) return null;
+    if (!zip.entries.containsKey(path)) {
+      _diagnostics.add(EpubDiagnosticCode.missingImage);
+      return null;
+    }
     final b = zip.read(path);
     // Native raster decoder supports these formats; SVG is deliberately not
     // passed to a browser, and a missing/unsupported image stays a local gap.
-    final raster =
-        b.length >= 4 &&
-        (b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4e && b[3] == 0x47 ||
-            b[0] == 0xff && b[1] == 0xd8 ||
-            b[0] == 0x47 && b[1] == 0x49 && b[2] == 0x46 ||
-            b.length >= 12 &&
-                ascii.decode(b.sublist(0, 4), allowInvalid: true) == 'RIFF' &&
-                ascii.decode(b.sublist(8, 12), allowInvalid: true) == 'WEBP');
-    if (!raster) return null;
+    if (epubRasterMime(b) == null) {
+      _diagnostics.add(EpubDiagnosticCode.unsupportedImage);
+      return null;
+    }
     final hash = sha256.convert(b).toString();
     if (!media.containsKey(hash)) {
       mediaSize += b.length;
@@ -165,15 +205,47 @@ class EpubParser {
       }
     }
     final container = xml('META-INF/container.xml');
-    final roots = elements(
-      container,
-      'rootfile',
-    ).where((e) => attr(e, 'media-type') == 'application/oebps-package+xml');
+    final root = container.rootElement;
+    if (root.name.local != 'container' ||
+        root.name.namespaceUri != null &&
+            root.name.namespaceUri !=
+                'urn:oasis:names:tc:opendocument:xmlns:container') {
+      invalidZip();
+    }
+    final roots = packageChildren(root, 'rootfiles')
+        .expand((node) => packageChildren(node, 'rootfile'))
+        .where((e) => attr(e, 'media-type') == 'application/oebps-package+xml');
     if (roots.isEmpty) invalidZip();
     final opfPath = requiredPath('', attr(roots.first, 'full-path') ?? '');
     final opf = xml(opfPath);
-    if (opf.rootElement.name.local != 'package') invalidZip();
-    for (final meta in elements(opf, 'meta')) {
+    if (opf.rootElement.name.local != 'package' ||
+        opf.rootElement.name.namespaceUri != null &&
+            opf.rootElement.name.namespaceUri !=
+                'http://www.idpf.org/2007/opf') {
+      invalidZip();
+    }
+    final package = opf.rootElement;
+    final manifests = packageChildren(package, 'manifest').toList();
+    final spines = packageChildren(package, 'spine').toList();
+    final metadataNodes = packageChildren(package, 'metadata').toList();
+    if (manifests.length != 1 ||
+        spines.length != 1 ||
+        metadataNodes.length > 1) {
+      invalidZip();
+    }
+    final metadata = metadataNodes.firstOrNull;
+    Iterable<XmlElement> metadataElements(String name) =>
+        metadata?.childElements.where(
+          (e) =>
+              e.name.local == name &&
+              (e.name.namespaceUri ==
+                      (name == 'meta'
+                          ? package.name.namespaceUri
+                          : 'http://purl.org/dc/elements/1.1/') ||
+                  e.name.namespaceUri == null),
+        ) ??
+        const <XmlElement>[];
+    for (final meta in metadataElements('meta')) {
       if (attr(meta, 'property') == 'rendition:layout' &&
               meta.innerText.trim() == 'pre-paginated' ||
           attr(meta, 'name') == 'fixed-layout' &&
@@ -181,25 +253,38 @@ class EpubParser {
         throw const LocalParseException(LocalParseProblem.fixedLayout);
       }
     }
-    for (final e in elements(opf, 'item')) {
+    for (final e in packageChildren(manifests.single, 'item')) {
       final id = attr(e, 'id'), href = attr(e, 'href');
-      if (id == null || href == null || items.containsKey(id)) invalidZip();
+      if (id == null ||
+          id.trim().isEmpty ||
+          href == null ||
+          href.trim().isEmpty ||
+          items.containsKey(id)) {
+        invalidZip();
+      }
       final path = epubReference(opfPath, href)?.$1;
       items[id] = _Item(
         path,
         attr(e, 'media-type') ?? '',
         (attr(e, 'properties') ?? '').split(RegExp(r'\s+')).toSet(),
+        attr(e, 'fallback'),
       );
     }
-    final spine = elements(opf, 'spine').firstOrNull;
-    if (spine == null) invalidZip();
-    for (final ref in elements(spine, 'itemref')) {
+    final spine = spines.single;
+    for (final ref in packageChildren(spine, 'itemref')) {
       if ((attr(ref, 'properties') ?? '').contains(
         'rendition:layout-pre-paginated',
       )) {
         throw const LocalParseException(LocalParseProblem.fixedLayout);
       }
-      final item = items[attr(ref, 'idref')];
+      final chain = <_Item>{};
+      var item = items[attr(ref, 'idref')];
+      while (item != null &&
+          !{'application/xhtml+xml', 'text/html'}.contains(item.type)) {
+        if (chain.contains(item)) invalidZip();
+        chain.add(item);
+        item = items[item.fallback];
+      }
       if (item == null ||
           item.path == null ||
           !{'application/xhtml+xml', 'text/html'}.contains(item.type)) {
@@ -209,67 +294,125 @@ class EpubParser {
           skippedEmptyPaths.contains(item.path)) {
         invalidZip();
       }
+      if (chain.isNotEmpty) _diagnostics.add(EpubDiagnosticCode.spineFallback);
       _chapter(item.path!);
+      for (final alias in chain) {
+        if (alias.path != null && byPath[item.path] != null) {
+          byPath[alias.path!] = byPath[item.path]!;
+          fragments[alias.path!] = fragments[item.path]!;
+        }
+      }
     }
     if (chapters.isEmpty) invalidZip();
     final navItem = items.values
         .where((e) => e.properties.contains('nav'))
         .firstOrNull;
     var navigation = <LocalNavigationEntry>[];
-    if (navItem?.path case final path?) {
+    if (navItem?.path case final path? when zip.entries.containsKey(path)) {
       final doc = _html(path);
-      final toc = doc
-          .querySelectorAll('nav')
-          .where(
-            (n) => (n.attributes['epub:type'] ?? n.attributes['type'] ?? '')
-                .split(RegExp(r'\s+'))
-                .contains('toc'),
-          )
-          .firstOrNull;
+      final toc = doc.querySelectorAll('nav').where(isToc).firstOrNull;
       final list = toc?.querySelector('ol');
       if (list != null) navigation = _nav(list, path, 0);
-    } else {
+      if (navigation.isEmpty) {
+        _diagnostics.add(EpubDiagnosticCode.unusableNavigation);
+      }
+    } else if (navItem != null) {
+      _diagnostics.add(EpubDiagnosticCode.missingNavigation);
+    }
+    if (navigation.isEmpty) {
       final ncx =
           items[attr(spine, 'toc')] ??
           items.values
               .where((e) => e.type == 'application/x-dtbncx+xml')
               .firstOrNull;
-      if (ncx?.path case final path?) {
-        final map = elements(xml(path), 'navMap').firstOrNull;
-        if (map != null) navigation = _ncx(map, path, 0);
+      if (ncx?.path case final path? when zip.entries.containsKey(path)) {
+        XmlElement? ncxRoot;
+        try {
+          ncxRoot = xml(path).rootElement;
+        } on XmlException {
+          // A malformed optional TOC must not discard valid spine content.
+          // ZIP integrity, entity and budget errors deliberately propagate.
+        }
+        if (ncxRoot != null &&
+            ncxRoot.name.local == 'ncx' &&
+            (ncxRoot.name.namespaceUri == null ||
+                ncxRoot.name.namespaceUri ==
+                    'http://www.daisy.org/z3986/2005/ncx/')) {
+          final map = packageChildren(ncxRoot, 'navMap').firstOrNull;
+          if (map != null) navigation = _ncx(map, path, 0);
+        }
+        if (navigation.isEmpty) {
+          _diagnostics.add(EpubDiagnosticCode.unusableNavigation);
+        }
+      } else if (ncx != null) {
+        _diagnostics.add(EpubDiagnosticCode.missingNavigation);
       }
     }
     if (navigation.isEmpty) {
+      _diagnostics.add(EpubDiagnosticCode.syntheticNavigation);
       navigation = [
         for (final c in chapters)
           LocalNavigationEntry(title: c.title, chapterKey: c.key),
       ];
     }
-    var coverItem = items.values
-        .where((e) => e.properties.contains('cover-image'))
-        .firstOrNull;
-    final coverMeta = elements(
-      opf,
+    MediaRef? cover;
+    final coverMeta = metadataElements(
       'meta',
     ).where((e) => attr(e, 'name') == 'cover').firstOrNull;
-    coverItem ??= items[coverMeta == null ? null : attr(coverMeta, 'content')];
-    final cover = coverItem?.path == null ? null : image(coverItem!.path!);
-    final titles = elements(
-      opf,
+    final candidates = <_Item>[
+      ...items.values.where((e) => e.properties.contains('cover-image')),
+      ?items[coverMeta == null ? null : attr(coverMeta, 'content')],
+    ];
+    for (final item in candidates) {
+      if (item.path != null) cover = image(item.path!);
+      if (cover != null) break;
+    }
+    if (cover == null) {
+      final guide = packageChildren(package, 'guide').firstOrNull;
+      final reference = guide == null
+          ? null
+          : packageChildren(guide, 'reference')
+                .where(
+                  (e) => (attr(e, 'type') ?? '')
+                      .split(RegExp(r'\s+'))
+                      .contains('cover'),
+                )
+                .firstOrNull;
+      final path = reference == null
+          ? null
+          : epubReference(opfPath, attr(reference, 'href') ?? '')?.$1;
+      if (path != null && zip.entries.containsKey(path)) {
+        final item = items.values.where((e) => e.path == path).firstOrNull;
+        if (item != null &&
+            {'application/xhtml+xml', 'text/html'}.contains(item.type)) {
+          final document = _html(path);
+          for (final node in document.querySelectorAll('img, image')) {
+            for (final href in epubImageCandidates(node).take(128)) {
+              final imagePath = epubReference(path, href)?.$1;
+              if (imagePath != null) cover = image(imagePath);
+              if (cover != null) break;
+            }
+            if (cover != null) break;
+          }
+        } else {
+          cover = image(path);
+        }
+      }
+    }
+    final titles = metadataElements(
       'title',
-    ).map((e) => e.innerText.trim()).where((e) => e.isNotEmpty);
+    ).map((e) => _labelWhitespace(e.innerText)).where((e) => e.isNotEmpty);
     final content = LocalBookContent(
       detail: NovelDetail(
         summary: NovelSummary(
           key: book,
           title: titles.firstOrNull ?? filenameTitle(filename),
           cover: cover,
-          authors: elements(
-            opf,
-            'creator',
-          ).map((e) => e.innerText.trim()).where((e) => e.isNotEmpty),
+          authors: metadataElements('creator')
+              .map((e) => _labelWhitespace(e.innerText))
+              .where((e) => e.isNotEmpty),
         ),
-        synopsis: elements(opf, 'description').firstOrNull?.innerText ?? '',
+        synopsis: metadataElements('description').firstOrNull?.innerText ?? '',
       ),
       catalog: Catalog(
         novelKey: book,
@@ -292,7 +435,7 @@ class EpubParser {
       chapters: chapters,
       navigation: navigation,
     );
-    return ParsedEpub(content, media);
+    return ParsedEpub(content, media, _diagnostics.snapshot());
   }
 
   dom.Document _html(String path) {
@@ -326,12 +469,15 @@ class EpubParser {
 
   void _chapter(String path) {
     final doc = _html(path);
-    final styles = epubTextStyles(doc, [
-      for (final link in doc.querySelectorAll('link[rel="stylesheet"]'))
-        if (epubReference(path, link.attributes['href'] ?? '') case final ref?)
-          if (zip.entries.containsKey(ref.$1)) text(ref.$1),
-      for (final style in doc.querySelectorAll('style')) style.text,
-    ]);
+    final styles = epubTextStyles(
+      doc,
+      epubDocumentStylesheets(
+        doc,
+        path,
+        (base, href) => epubReference(base, href)?.$1,
+        (p) => zip.entries.containsKey(p) ? text(p) : '',
+      ).map((sheet) => sheet.$2),
+    );
     dom.Element? paragraphOwner;
     String? property(String name) {
       for (var node = paragraphOwner; node != null; node = node.parent) {
@@ -358,16 +504,13 @@ class EpubParser {
 
     final blocks = <ContentBlock>[];
     final anchors = <String, int>{};
-    var buffer = StringBuffer();
-    var pre = false;
+    final buffer = ProseTextBuffer();
+    var whitespace = ProseWhiteSpace.normal;
+    var visible = true;
     void flush({int? heading}) {
       // HTML source indentation is collapsible whitespace, not first-line
       // indentation. Preserve authored NBSP / ideographic spaces and pre text.
-      final raw = buffer.toString();
-      final value = pre
-          ? raw
-          : raw.replaceAll(RegExp(r'^[ \t\r\n\f]+|[ \t\r\n\f]+$'), '');
-      buffer = StringBuffer();
+      final value = buffer.take();
       if (value.trim().isEmpty) return;
       blocks.add(
         heading == null
@@ -419,9 +562,7 @@ class EpubParser {
     const paragraphs = {'p', 'li', 'dt', 'dd', 'pre', 'figcaption', 'tr'};
     void walk(dom.Node node) {
       if (node is dom.Text) {
-        buffer.write(
-          pre ? node.text : node.text.replaceAll(RegExp(r'[ \t\r\n\f]+'), ' '),
-        );
+        if (visible) buffer.text(node.text, whitespace);
         return;
       }
       if (node is! dom.Element) return;
@@ -442,15 +583,29 @@ class EpubParser {
           styles[node]?['display'] == 'none') {
         return;
       }
-      final heading = RegExp(r'^h[1-6]$').hasMatch(tag)
-          ? int.parse(tag[1])
-          : null;
+      final heading = proseHeadingLevel(tag);
       final boundary =
           {'img', 'image', 'hr'}.contains(tag) ||
           containers.contains(tag) ||
           paragraphs.contains(tag) ||
           heading != null;
       if (boundary) flush();
+      final previousWhitespace = whitespace;
+      final previousVisible = visible;
+      whitespace = proseWhiteSpace(
+        styles[node]?['white-space'],
+        tag == 'pre' ? ProseWhiteSpace.pre : whitespace,
+      );
+      visible = switch (styles[node]?['visibility']) {
+        'visible' || 'initial' => true,
+        'hidden' || 'collapse' => false,
+        _ => visible,
+      };
+      if (!visible && {'img', 'image', 'hr', 'br', 'rt', 'rp'}.contains(tag)) {
+        whitespace = previousWhitespace;
+        visible = previousVisible;
+        return;
+      }
       final previousOwner = paragraphOwner;
       if (paragraphs.contains(tag) || heading != null) paragraphOwner = node;
       final id = node.id.isNotEmpty ? node.id : node.attributes['name'];
@@ -458,21 +613,19 @@ class EpubParser {
         anchors.putIfAbsent(id, () => blocks.length);
       }
       if (tag == 'img' || tag == 'image') {
+        whitespace = previousWhitespace;
+        visible = previousVisible;
         flush();
-        final href =
-            node.attributes['src'] ??
-            node.attributes['href'] ??
-            node.attributes['xlink:href'] ??
-            node.attributes[const dom.AttributeName(
-              'xlink',
-              'href',
-              'http://www.w3.org/1999/xlink',
-            )];
-        final ref = href == null ? null : epubReference(path, href);
-        final img = ref == null ? null : image(ref.$1);
+        MediaRef? img;
+        for (final href in epubImageCandidates(node).take(128)) {
+          final ref = epubReference(path, href);
+          if (ref != null) img = image(ref.$1);
+          if (img != null) break;
+        }
         if (img != null) {
           blocks.add(ImageBlock(media: img, alt: node.attributes['alt']));
         } else {
+          _diagnostics.add(EpubDiagnosticCode.noUsableImage);
           // Visible per-image gap; remaining text and images still import.
           final alt = node.attributes['alt']?.trim();
           blocks.add(
@@ -482,30 +635,39 @@ class EpubParser {
         return;
       }
       if (tag == 'hr') {
+        whitespace = previousWhitespace;
+        visible = previousVisible;
         flush();
         blocks.add(DividerBlock());
         return;
       }
       if (tag == 'br') {
+        whitespace = previousWhitespace;
+        visible = previousVisible;
         buffer.write('\n');
         return;
       }
-      if (tag == 'rp') return;
+      if (tag == 'rp') {
+        whitespace = previousWhitespace;
+        visible = previousVisible;
+        return;
+      }
       if (tag == 'rt') {
+        whitespace = previousWhitespace;
+        visible = previousVisible;
         final annotation = node.text
             .replaceAll(RegExp(r'[ \t\r\n\f]+'), ' ')
             .trim();
         if (annotation.isNotEmpty) buffer.write('（$annotation）');
         return;
       }
-      final wasPre = pre;
-      if (tag == 'pre') pre = true;
       for (final child in node.nodes) {
         walk(child);
       }
       if (boundary) flush(heading: heading);
       paragraphOwner = previousOwner;
-      pre = wasPre;
+      whitespace = previousWhitespace;
+      visible = previousVisible;
     }
 
     walk(doc.body!);
@@ -581,9 +743,12 @@ class EpubParser {
     List<LocalNavigationEntry> children,
   ) {
     if (++navCount > 10000) zipLimit();
-    final ref = epubReference(base, href);
+    final ref = href.isEmpty ? null : epubReference(base, href);
     final chapter = ref == null ? null : byPath[ref.$1];
     if (chapter == null) {
+      if (href.isNotEmpty) {
+        _diagnostics.add(EpubDiagnosticCode.missingNavigationTarget);
+      }
       if (children.isEmpty) return null;
       return LocalNavigationEntry(
         title: title.trim().isEmpty ? children.first.title : title.trim(),
@@ -592,12 +757,34 @@ class EpubParser {
         children: children,
       );
     }
+    if (ref!.$2?.isNotEmpty == true && fragments[ref.$1]?[ref.$2] == null) {
+      _diagnostics.add(EpubDiagnosticCode.missingFragment);
+    }
     return LocalNavigationEntry(
       title: title.trim().isEmpty ? chapter.title : title.trim(),
       chapterKey: chapter.key,
-      blockKey: fragments[ref!.$1]?[ref.$2],
+      blockKey: fragments[ref.$1]?[ref.$2],
       children: children,
     );
+  }
+
+  // XML whitespace only: preserve intentional NBSP and ideographic spaces.
+  static String _labelWhitespace(String value) => value
+      .replaceAll(RegExp(r'[ \t\r\n]+'), ' ')
+      .replaceAll(RegExp(r'^ | $'), '');
+
+  static String _navigationLabel(dom.Node node) {
+    if (node is dom.Text) return node.data;
+    if (node is dom.Element) {
+      final accessible = node.attributes['aria-label'];
+      if (accessible != null && _labelWhitespace(accessible).isNotEmpty) {
+        return _labelWhitespace(accessible);
+      }
+      if (node.localName == 'img') return node.attributes['alt'] ?? '';
+      if (node.localName == 'br') return ' ';
+      if (node.localName == 'script' || node.localName == 'style') return '';
+    }
+    return node.nodes.map(_navigationLabel).join();
   }
 
   List<LocalNavigationEntry> _nav(dom.Element ol, String base, int depth) {
@@ -614,7 +801,7 @@ class EpubParser {
       final entry = _target(
         base,
         a?.attributes['href'] ?? '',
-        a?.text ?? '',
+        a == null ? '' : _labelWhitespace(_navigationLabel(a)),
         children,
       );
       if (entry != null) result.add(entry);
@@ -622,24 +809,16 @@ class EpubParser {
     return result;
   }
 
-  List<LocalNavigationEntry> _ncx(XmlNode node, String base, int depth) {
+  List<LocalNavigationEntry> _ncx(XmlElement node, String base, int depth) {
     if (depth > 32) zipLimit();
     final result = <LocalNavigationEntry>[];
-    for (final point in node.children.whereType<XmlElement>().where(
-      (e) => e.name.local == 'navPoint',
-    )) {
-      final label = point.children
-          .whereType<XmlElement>()
-          .where((e) => e.name.local == 'navLabel')
-          .firstOrNull;
-      final source = point.children
-          .whereType<XmlElement>()
-          .where((e) => e.name.local == 'content')
-          .firstOrNull;
+    for (final point in packageChildren(node, 'navPoint')) {
+      final label = packageChildren(point, 'navLabel').firstOrNull;
+      final source = packageChildren(point, 'content').firstOrNull;
       final entry = _target(
         base,
         source == null ? '' : attr(source, 'src') ?? '',
-        label?.innerText ?? '',
+        _labelWhitespace(label?.innerText ?? ''),
         _ncx(point, base, depth + 1),
       );
       if (entry != null) result.add(entry);
@@ -649,7 +828,8 @@ class EpubParser {
 }
 
 class _Item {
-  _Item(this.path, this.type, this.properties);
+  _Item(this.path, this.type, this.properties, this.fallback);
+  final String? fallback;
   final String? path;
   final String type;
   final Set<String> properties;
