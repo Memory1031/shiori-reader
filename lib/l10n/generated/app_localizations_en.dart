@@ -759,4 +759,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get localReparseReaderClosed =>
       'This book is being reparsed. Return to the library and reopen it.';
+
+  @override
+  String get readerLinks => 'Chapter links';
+
+  @override
+  String get readerLinkReturn => 'Return to reading';
+
+  @override
+  String get readerLinkUnavailable =>
+      'Link unavailable. Only valid documents and anchors within this book can be opened.';
+
+  @override
+  String get readerLinkDepth =>
+      'Link depth limit reached. Return before opening another link.';
 }

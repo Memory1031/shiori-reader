@@ -141,7 +141,7 @@ Future<LocalReparseResult> _reparse(
         throw StateError('Progress changed');
       }
       await db.customUpdate(
-        'UPDATE local_books SET active_bundle=?,manifest_hash=?,parser_version=2,title=?,maintenance=0 WHERE digest=?',
+        'UPDATE local_books SET active_bundle=?,manifest_hash=?,parser_version=3,title=?,maintenance=0 WHERE digest=?',
         variables: [
           Variable(bundle),
           Variable(sha256.convert(manifest).toString()),

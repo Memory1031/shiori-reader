@@ -710,4 +710,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get localReparseReaderClosed => '这本书正在重新解析。请返回书架后重新打开。';
+
+  @override
+  String get readerLinks => '本章链接';
+
+  @override
+  String get readerLinkReturn => '返回原位置';
+
+  @override
+  String get readerLinkUnavailable => '此链接不可用，仅支持书内有效文档和锚点。';
+
+  @override
+  String get readerLinkDepth => '已达到链接层级上限，请先返回。';
 }

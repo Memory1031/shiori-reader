@@ -95,6 +95,8 @@ class ReaderContentView extends StatefulWidget {
     this.onNextChapter,
     this.onDetails,
     this.onPrefetch,
+    this.onLinks,
+    this.returnToOrigin = false,
   });
   final ImageRepository? images;
   final ChapterContent content;
@@ -107,6 +109,8 @@ class ReaderContentView extends StatefulWidget {
   final VoidCallback? onCatalog, onPreviousChapter, onNextChapter;
   final VoidCallback? onDetails;
   final VoidCallback? onPrefetch;
+  final VoidCallback? onLinks;
+  final bool returnToOrigin;
   @override
   State<ReaderContentView> createState() => _ReaderContentViewState();
 }
@@ -679,7 +683,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
             color: Theme.of(context).scaffoldBackgroundColor,
             child: Row(
               children: [
-                const BackButton(),
+                if (widget.returnToOrigin)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    child: Text(l.readerLinkReturn),
+                  )
+                else
+                  const BackButton(),
                 Expanded(
                   child: Text(
                     widget.content.title,
@@ -692,6 +702,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                   tooltip: l.moreActions,
                   icon: const Icon(Icons.more_horiz),
                   onSelected: (value) {
+                    if (value == 'links') widget.onLinks?.call();
                     if (value == 'details') widget.onDetails?.call();
                     if (value == 'prefetch') widget.onPrefetch?.call();
                     if (value == 'hide') _toggle();
@@ -699,6 +710,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
                     if (value == 'settings') _panel(context);
                   },
                   itemBuilder: (_) => [
+                    if (widget.onLinks != null)
+                      PopupMenuItem(value: 'links', child: Text(l.readerLinks)),
                     if (widget.onPrefetch != null)
                       PopupMenuItem(
                         value: 'prefetch',

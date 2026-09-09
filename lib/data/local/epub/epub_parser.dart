@@ -7,6 +7,7 @@ import 'package:html/parser.dart' as html;
 import 'package:xml/xml.dart';
 import '../../../domain/contracts/local_book_decoder.dart';
 import '../../../domain/contracts/local_books.dart';
+import '../../../domain/contracts/local_content_links.dart';
 import '../../../domain/models/models.dart';
 import '../txt/txt_decoder.dart';
 import '../txt/txt_parser.dart' show filenameTitle;
@@ -115,6 +116,13 @@ class EpubParser {
   final mediaByPath = <String, MediaRef>{};
   final items = <String, _Item>{};
   final chapters = <ChapterContent>[];
+  final auxiliary = <ChapterContent>[];
+  final primary = <ChapterKey>[];
+  final chapterPaths = <ChapterKey, String>{};
+  final requestedPaths = <String>[];
+  final rawLinks =
+      <String, List<(int, String, String?, String?, LocalLinkUnavailable?)>>{};
+  var linkCount = 0;
   final presentations = <String, String>{};
   final byPath = <String, ChapterContent>{};
   final skippedEmptyPaths = <String>{};
@@ -310,6 +318,7 @@ class EpubParser {
         repeatedBlocks += original.blocks.length;
         if (repeatedBlocks > 100000) zipLimit();
         final key = LocalBookIdentity.epubOccurrence(book, path, occurrence);
+        chapterPaths[key] = path;
         chapters.add(
           ChapterContent(
             key: key,
@@ -321,6 +330,10 @@ class EpubParser {
           presentations[key.chapterId] = html;
         }
       }
+      final current = LocalBookIdentity.epubOccurrence(book, path, occurrence);
+      if (chapterPaths.containsKey(current) && attr(ref, 'linear') != 'no') {
+        primary.add(current);
+      }
       for (final alias in chain) {
         if (alias.path != null && byPath[item.path] != null) {
           byPath[alias.path!] = byPath[item.path]!;
@@ -329,6 +342,71 @@ class EpubParser {
       }
     }
     if (chapters.isEmpty) invalidZip();
+    final manifestText = items.values
+        .where(
+          (i) =>
+              i.path != null &&
+              {'application/xhtml+xml', 'text/html'}.contains(i.type),
+        )
+        .map((i) => i.path!)
+        .toSet();
+    final attempted = <String>{};
+    var auxiliaryAttempts = 0;
+    for (var i = 0; i < requestedPaths.length; i++) {
+      final path = requestedPaths[i];
+      if (byPath.containsKey(path) ||
+          skippedEmptyPaths.contains(path) ||
+          !attempted.add(path) ||
+          !manifestText.contains(path) ||
+          !zip.entries.containsKey(path)) {
+        continue;
+      }
+      if (++auxiliaryAttempts > 64) zipLimit();
+      final before = chapters.length;
+      try {
+        _chapter(path);
+      } on LocalParseException catch (error) {
+        if (error.problem != LocalParseProblem.invalid) rethrow;
+        _diagnostics.add(EpubDiagnosticCode.unusableLinkTarget);
+      }
+      if (chapters.length > before) auxiliary.add(chapters.removeLast());
+    }
+    final links = <LocalContentLink>[];
+    for (final source in [...chapters, ...auxiliary]) {
+      final path = chapterPaths[source.key]!;
+      for (final raw
+          in rawLinks[path] ??
+              <(int, String, String?, String?, LocalLinkUnavailable?)>[]) {
+        if (raw.$1 >= source.blocks.length) continue;
+        var unavailable = raw.$5;
+        final destination = raw.$3 == path ? source : byPath[raw.$3];
+        String? block;
+        if (unavailable == null) {
+          if (destination == null) {
+            unavailable = manifestText.contains(raw.$3)
+                ? LocalLinkUnavailable.missingDocument
+                : LocalLinkUnavailable.unsupported;
+          } else if (raw.$4?.isNotEmpty == true) {
+            block = fragments[raw.$3]?[raw.$4];
+            if (block == null) unavailable = LocalLinkUnavailable.missingAnchor;
+          }
+        }
+        if (unavailable != null) {
+          _diagnostics.add(EpubDiagnosticCode.unusableLinkTarget);
+        }
+        links.add(
+          LocalContentLink(
+            source: source.key,
+            sourceBlockKey: source.blocks[raw.$1].blockKey,
+            label: raw.$2,
+            target: unavailable == null ? destination?.key : null,
+            targetBlockKey: unavailable == null ? block : null,
+            unavailable: unavailable,
+          ),
+        );
+        if (links.length > 10000) zipLimit();
+      }
+    }
     final navItem = items.values
         .where((e) => e.properties.contains('nav'))
         .firstOrNull;
@@ -428,6 +506,9 @@ class EpubParser {
       'title',
     ).map((e) => _labelWhitespace(e.innerText)).where((e) => e.isNotEmpty);
     final content = LocalBookContent(
+      auxiliaryChapters: auxiliary,
+      links: links,
+      readingOrder: primary,
       detail: NovelDetail(
         summary: NovelSummary(
           key: book,
@@ -634,8 +715,28 @@ class EpubParser {
       final previousOwner = paragraphOwner;
       if (paragraphs.contains(tag) || heading != null) paragraphOwner = node;
       final id = node.id.isNotEmpty ? node.id : node.attributes['name'];
-      if (id != null && id.isNotEmpty) {
+      if (id != null && id.isNotEmpty && visible) {
         anchors.putIfAbsent(id, () => blocks.length);
+      }
+      if (tag == 'a' && visible && node.attributes.containsKey('href')) {
+        if (++linkCount > 10000) zipLimit();
+        (String, String?)? ref;
+        LocalLinkUnavailable? unavailable;
+        try {
+          ref = epubReference(path, node.attributes['href']!);
+          if (ref == null) unavailable = LocalLinkUnavailable.external;
+        } on FormatException {
+          unavailable = LocalLinkUnavailable.unsupported;
+        }
+        final label = node.text.trim();
+        (rawLinks[path] ??= []).add((
+          blocks.length,
+          label.isEmpty ? '↗' : String.fromCharCodes(label.runes.take(200)),
+          ref?.$1,
+          ref?.$2,
+          unavailable,
+        ));
+        if (ref != null) requestedPaths.add(ref.$1);
       }
       if (tag == 'img' || tag == 'image') {
         whitespace = previousWhitespace;
@@ -752,6 +853,7 @@ class EpubParser {
       blocks: blocks,
     );
     chapters.add(chapter);
+    chapterPaths[chapter.key] = path;
     byPath[path] = chapter;
     fragments[path] = {
       for (final e in anchors.entries)

@@ -1471,6 +1471,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This book is being reparsed. Return to the library and reopen it.'**
   String get localReparseReaderClosed;
+
+  /// No description provided for @readerLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter links'**
+  String get readerLinks;
+
+  /// No description provided for @readerLinkReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to reading'**
+  String get readerLinkReturn;
+
+  /// No description provided for @readerLinkUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Link unavailable. Only valid documents and anchors within this book can be opened.'**
+  String get readerLinkUnavailable;
+
+  /// No description provided for @readerLinkDepth.
+  ///
+  /// In en, this message translates to:
+  /// **'Link depth limit reached. Return before opening another link.'**
+  String get readerLinkDepth;
 }
 
 class _AppLocalizationsDelegate

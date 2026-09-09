@@ -9,6 +9,7 @@ enum EpubDiagnosticCode {
   missingNavigationTarget,
   missingFragment,
   spineFallback,
+  unusableLinkTarget,
 }
 
 final class EpubDiagnostics {

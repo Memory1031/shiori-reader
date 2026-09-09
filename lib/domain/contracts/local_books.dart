@@ -4,6 +4,7 @@ import '../models/models.dart';
 import 'cancellation.dart';
 import 'result.dart';
 import 'local_book_decoder.dart';
+import 'local_content_links.dart';
 
 enum LocalBookFormat { txt, epub }
 
@@ -45,8 +46,19 @@ final class LocalBookContent {
     required Iterable<ChapterContent> chapters,
     Iterable<LocalNavigationEntry> navigation = const [],
     this.txtEncoding,
+    Iterable<ChapterContent> auxiliaryChapters = const [],
+    Iterable<LocalContentLink> links = const [],
+    Iterable<ChapterKey>? readingOrder,
   }) : chapters = List.unmodifiable(chapters),
-       navigation = List.unmodifiable(navigation);
+       navigation = List.unmodifiable(navigation),
+       auxiliaryChapters = List.unmodifiable(auxiliaryChapters),
+       links = List.unmodifiable(links),
+       readingOrder = readingOrder == null
+           ? null
+           : List.unmodifiable(readingOrder);
+  final List<ChapterContent> auxiliaryChapters;
+  final List<LocalContentLink> links;
+  final List<ChapterKey>? readingOrder;
   final TxtEncoding? txtEncoding;
   final NovelDetail detail;
   final Catalog catalog;

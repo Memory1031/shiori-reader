@@ -47,6 +47,7 @@ class ReaderController extends ScopedController {
   AppFailure? restoreFailure;
   ReaderPosition? initialPosition;
   String? pagePresentation;
+  List<LocalContentLink> contentLinks = const [];
   int restoreAttempt = 0;
   bool usedFallback = false;
   ReaderRestoreStatus restoreStatus = ReaderRestoreStatus.loading;
@@ -211,6 +212,7 @@ class ReaderController extends ScopedController {
     restoreFailure = null;
     initialPosition = null;
     pagePresentation = null;
+    contentLinks = const [];
     usedFallback = false;
     _sample = null;
     _restoring = true;
@@ -245,6 +247,17 @@ class ReaderController extends ScopedController {
             }
           }
 
+          if (repository is LocalContentLinkRepository &&
+              chapter.novelKey.sourceId == LocalBookIdentity.sourceId) {
+            final links = await (repository as LocalContentLinkRepository)
+                .loadContentLinks(chapter, cancellation: request.token);
+            if (isClosed || request != _request || request.token.isCancelled) {
+              return;
+            }
+            if (links case Success<List<LocalContentLink>>(:final value)) {
+              contentLinks = value;
+            }
+          }
           final saved = await library?.getProgress(
             chapter.novelKey,
             cancellation: request.token,

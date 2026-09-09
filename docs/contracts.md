@@ -82,3 +82,11 @@ CacheManagement 提供 inspect、按书 / 全部 clear 和可释放 pin；Readin
 LocalBookReparse 接收书籍 Key、编码选择回调/可选 override 与 cancellation；返回 LocalReparseResult（approximate、cleanupPending）。失败前旧版本保持可读，提交后成功优先于取消；新旧正文及进度经同一 SQL 事务发布。LocalBookInvalidation 的 invalidations 在维护开始退役旧 Reader，changes 在提交后触发本地 detail/catalog/chapter 更新；两者广播、无初始事件，消费者取消订阅。
 
 维护期间不发新进度会话，saveProgress 返回 false；clearHistory 仍生效并阻止使用旧快照发布。已重解析书的保存还校验 catalog/content revision，旧正文即使申请到新 generation 也不能覆盖迁移位置。位置迁移不保留像素提示，近似结果供 UI 明示。内容可选 txtEncoding 只属于本地解析元数据，不进入正文身份摘要。详见[结果与边界](validation/parse-005.md)。
+
+## PARSE-008 链接与连续阅读合同
+
+LocalContentLink 是独立于 ContentBlock 的不可变侧表项：来源 ChapterKey/blockKey、标签、可选目标 ChapterKey/blockKey，以及封闭 unavailable 原因；没有原始 URL/路径，不改变正文摘要。LocalBookContent 可保存 auxiliaryChapters、links 和可空 readingOrder；旧 manifest 缺字段时 links/auxiliary 为空，readingOrder 默认为原目录顺序。
+
+LocalContentLinkRepository 提供按来源章节的链接和主阅读顺序，所有请求仍携带取消 token。包内 href/fragment 在 data 层解析；远程、越界、缺文档或缺锚点只报告不可用，不能退到网络或错误地跳章首。同资源链接保留当前 occurrence，跨资源链接选择目标第一次出现。非 spine 的 manifest XHTML 可作为有界辅助文档加载；不进入主目录/连续阅读序列。
+
+Reader 的“本章链接”打开临时辅助阅读页（不注入 LibraryRepository），最多嵌套 8 层。原 Reader 保持挂载，返回使用原页/原 occurrence，不用保存/再读近似恢复来模拟返回。维护 invalidation 同时退役主页和辅助页。linear=no 仍在目录中、明确选择可阅读，但连续翻章只使用 readingOrder。

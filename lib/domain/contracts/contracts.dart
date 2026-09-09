@@ -8,3 +8,4 @@ export 'result.dart';
 export 'cache.dart';
 export 'prefetch.dart';
 export 'local_books.dart';
+export 'local_content_links.dart';

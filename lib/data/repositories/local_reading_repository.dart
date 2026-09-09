@@ -9,7 +9,8 @@ class LocalReadingRepository
         NovelRepository,
         LocalNavigationRepository,
         LocalPagePresentationRepository,
-        LocalBookInvalidation {
+        LocalBookInvalidation,
+        LocalContentLinkRepository {
   LocalReadingRepository({required this.local, required this.online});
   final LocalBookStore local;
   @override
@@ -86,9 +87,48 @@ class LocalReadingRepository
           key.novelKey,
           Operation.chapter,
           cancellation,
-          (r) => r.content.chapters.where((c) => c.key == key).firstOrNull,
+          (r) => [
+            ...r.content.chapters,
+            ...r.content.auxiliaryChapters,
+          ].where((c) => c.key == key).firstOrNull,
         )
       : online.loadChapter(key, mode: mode, cancellation: cancellation);
+  @override
+  Future<Result<List<LocalContentLink>>> loadContentLinks(
+    ChapterKey source, {
+    required CancellationToken cancellation,
+  }) async {
+    final result = await _read(
+      source.novelKey,
+      Operation.chapter,
+      cancellation,
+      (r) => r.content.links.where((l) => l.source == source).toList(),
+    );
+    return switch (result) {
+      Success(:final value) => Success(value.value),
+      Failure(:final failure) => Failure(failure),
+    };
+  }
+
+  @override
+  Future<Result<List<ChapterKey>>> loadReadingOrder(
+    NovelKey book, {
+    required CancellationToken cancellation,
+  }) async {
+    final result = await _read(
+      book,
+      Operation.catalog,
+      cancellation,
+      (r) =>
+          r.content.readingOrder ??
+          r.content.chapters.map((c) => c.key).toList(),
+    );
+    return switch (result) {
+      Success(:final value) => Success(value.value),
+      Failure(:final failure) => Failure(failure),
+    };
+  }
+
   @override
   Future<Result<List<LocalNavigationEntry>>> loadNavigation(
     NovelKey key, {

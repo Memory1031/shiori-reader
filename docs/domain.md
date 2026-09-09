@@ -56,3 +56,5 @@ CachedChapter / CacheOverview / PrefetchState 是不可变投影，预取目标�
 ## 本地重解析位置
 
 `migrateLocalPosition` 是纯 Dart 确定性迁移，输出不可变进度与 approximate 等级。使用章节/块身份、唯一文本/图片语义、受限邻近窗口，无法唯一匹配时回退比例/邻章并标记近似。跨块匹配按 code points；所有重解析位置清 layoutKey/pixelOffset，近似位置不保留 completed。EPUB 3 资源首次章键兼容旧规则，后续 occurrence 使用独立摘要 kind，与媒体资源身份分离。见[PARSE-005](validation/parse-005.md)。
+
+PARSE-008 的链接侧表与主阅读顺序仅属于本地书籍元数据；正文块文本及 blockKey/contentRevision 不因新增链接交互变化。辅助文档仍使用 ChapterContent 和本地资源身份，但不伪装成 spine occurrence 或推进主阅读进度。缺失目标必须为显式不可用项；不存储原始 URL 供 presentation 解释。

@@ -270,5 +270,9 @@
   "localReparseConfirm": "Reparse the saved original and restore your reading position where possible. Failure or cancellation keeps the previous content.",
   "localReparseDone": "Reparsed. Your reading position is preserved.",
   "localReparseApproximate": "Reparsed. Restored a nearby position; please check the current text.",
-  "localReparseReaderClosed": "This book is being reparsed. Return to the library and reopen it."
+  "localReparseReaderClosed": "This book is being reparsed. Return to the library and reopen it.",
+  "readerLinks": "Chapter links",
+  "readerLinkReturn": "Return to reading",
+  "readerLinkUnavailable": "Link unavailable. Only valid documents and anchors within this book can be opened.",
+  "readerLinkDepth": "Link depth limit reached. Return before opening another link."
 }

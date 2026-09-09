@@ -270,5 +270,9 @@
   "localReparseConfirm": "使用保留的原文件重新解析，并尽量恢复阅读位置。失败或取消会保留旧内容。",
   "localReparseDone": "重新解析完成，阅读位置已保留。",
   "localReparseApproximate": "重新解析完成，已恢复到附近位置，请检查当前内容。",
-  "localReparseReaderClosed": "这本书正在重新解析。请返回书架后重新打开。"
+  "localReparseReaderClosed": "这本书正在重新解析。请返回书架后重新打开。",
+  "readerLinks": "本章链接",
+  "readerLinkReturn": "返回原位置",
+  "readerLinkUnavailable": "此链接不可用，仅支持书内有效文档和锚点。",
+  "readerLinkDepth": "已达到链接层级上限，请先返回。"
 }

@@ -213,13 +213,14 @@ class ManagedLocalBooks
       await db.transaction(() async {
         checkLocalCancellation(cancellation);
         await db.customStatement(
-          'INSERT INTO local_books(digest,format,title,imported_at,manifest_hash) VALUES(?,?,?,?,?)',
+          'INSERT INTO local_books(digest,format,title,imported_at,manifest_hash,parser_version) VALUES(?,?,?,?,?,?)',
           [
             digest,
             format.name,
             content.detail.summary.title,
             importedAt.millisecondsSinceEpoch,
             sha256.convert(manifest).toString(),
+            BookDecoder.parserVersion,
           ],
         );
         if (addToShelf) {
@@ -274,7 +275,38 @@ class ManagedLocalBooks
       throw const FormatException('Local book identity mismatch');
     }
     var navigationCount = 0;
-    final byKey = {for (final c in content.chapters) c.key: c};
+    final allChapters = [...content.chapters, ...content.auxiliaryChapters];
+    final byKey = {for (final c in allChapters) c.key: c};
+    if (byKey.length != allChapters.length ||
+        content.auxiliaryChapters.length > 64 ||
+        content.links.length > 10000 ||
+        allChapters.any((c) => c.key.novelKey != key)) {
+      throw const FormatException('Invalid auxiliary chapters');
+    }
+    final mainKeys = content.chapters.map((c) => c.key).toSet();
+    final order = content.readingOrder;
+    if (order != null &&
+        (order.toSet().length != order.length ||
+            order.any((k) => !mainKeys.contains(k)))) {
+      throw const FormatException('Invalid reading order');
+    }
+    final blocksByChapter = {
+      for (final c in allChapters)
+        c.key: c.blocks.map((b) => b.blockKey).toSet(),
+    };
+    for (final link in content.links) {
+      if (!(blocksByChapter[link.source]?.contains(link.sourceBlockKey) ??
+              false) ||
+          link.target != null &&
+              (!byKey.containsKey(link.target) ||
+                  link.targetBlockKey != null &&
+                      !(blocksByChapter[link.target]?.contains(
+                            link.targetBlockKey,
+                          ) ??
+                          false))) {
+        throw const FormatException('Invalid local link');
+      }
+    }
     void validateNavigation(List<LocalNavigationEntry> entries, int depth) {
       if (depth > 32) throw const FormatException('Navigation too deep');
       for (final entry in entries) {
@@ -299,6 +331,9 @@ class ManagedLocalBooks
       refs.addAll(
         content.chapters[i].blocks.whereType<ImageBlock>().map((b) => b.media),
       );
+    }
+    for (final c in content.auxiliaryChapters) {
+      refs.addAll(c.blocks.whereType<ImageBlock>().map((b) => b.media));
     }
     for (final ref in refs) {
       if (ref.sourceId != LocalBookIdentity.sourceId ||
@@ -420,10 +455,17 @@ class ManagedLocalBooks
         // Legacy presentation may be derived, but never replace persisted
         // semantics or show a rendition for a different content revision.
         final revisions = {
-          for (final c in record.content.chapters) c.key: c.contentRevision,
+          for (final c in [
+            ...record.content.chapters,
+            ...record.content.auxiliaryChapters,
+          ])
+            c.key: c.contentRevision,
         };
         html = {
-          for (final c in extracted.$1.chapters)
+          for (final c in [
+            ...extracted.$1.chapters,
+            ...extracted.$1.auxiliaryChapters,
+          ])
             if (revisions[c.key] == c.contentRevision &&
                 extracted.$2.containsKey(c.key.chapterId))
               c.key.chapterId: extracted.$2[c.key.chapterId]!,
@@ -756,6 +798,11 @@ Future<List<int>> _encodeManifest(
       'presentationHash': presentationHash,
       'txtEncoding': content.txtEncoding?.name,
       'navigation': content.navigation.map((e) => e.toJson()).toList(),
+      'auxiliaryChapters': content.auxiliaryChapters
+          .map(RecordCodec.chapter)
+          .toList(),
+      'links': content.links.map((e) => e.toJson()).toList(),
+      'readingOrder': content.readingOrder?.map((k) => k.toJson()).toList(),
       'format': format.name,
       'importedAt': importedAt.toIso8601String(),
       'detail': RecordCodec.detail(content.detail),
@@ -778,6 +825,15 @@ Future<LocalBookRecord> _decodeManifest(
   final map = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
   if (map['version'] != 1) throw const FormatException('Unknown local codec');
   final content = LocalBookContent(
+    auxiliaryChapters: (map['auxiliaryChapters'] as List? ?? const [])
+        .cast<String>()
+        .map(RecordCodec.readChapter),
+    links: (map['links'] as List? ?? const []).map(
+      (e) => LocalContentLink.fromJson(e as Map<String, dynamic>),
+    ),
+    readingOrder: (map['readingOrder'] as List?)?.map(
+      (e) => ChapterKey.fromJson(e as Map<String, dynamic>),
+    ),
     txtEncoding: map['txtEncoding'] == null
         ? null
         : TxtEncoding.values.byName(map['txtEncoding'] as String),

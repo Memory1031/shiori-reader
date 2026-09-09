@@ -28,6 +28,7 @@ class BookReaderScreen extends StatefulWidget {
     this.offline = false,
     this.initialBlockKey,
     this.startAtBeginning = false,
+    this.linkDepth = 0,
   });
   final ChapterKey chapter;
   final NovelRepository repository;
@@ -40,6 +41,7 @@ class BookReaderScreen extends StatefulWidget {
   final bool offline;
   final String? initialBlockKey;
   final bool startAtBeginning;
+  final int linkDepth;
   @override
   State<BookReaderScreen> createState() => _BookReaderScreenState();
 }
@@ -63,6 +65,22 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   bool _changing = false, _canPop = false;
   final _titleRequest = CancellationSource();
   String? _bookTitle;
+  List<ChapterKey>? _readingOrder;
+  bool get _needsOrder =>
+      _local && widget.repository is LocalContentLinkRepository;
+  Future<void> _loadOrder() async {
+    if (!_needsOrder) return;
+    final result = await (widget.repository as LocalContentLinkRepository)
+        .loadReadingOrder(
+          widget.chapter.novelKey,
+          cancellation: _titleRequest.token,
+        );
+    if (!mounted || _invalidated || _titleRequest.token.isCancelled) return;
+    if (result case Success<List<ChapterKey>>(:final value)) {
+      setState(() => _readingOrder = value);
+    }
+  }
+
   Future<void> _loadBookTitle() async {
     final result = await widget.repository.loadDetail(
       widget.chapter.novelKey,
@@ -110,6 +128,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           ..onStart()
           ..addListener(_changed);
     unawaited(_loadBookTitle());
+    unawaited(_loadOrder());
     _reader = _create(
       widget.chapter,
       blockKey: widget.initialBlockKey,
@@ -151,7 +170,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           startAtBeginning: fromStart,
           startAtEnd: fromEnd,
           deferProgress: deferProgress,
-          library: widget.library,
+          library: widget.linkDepth > 0 ? null : widget.library,
           cache: _cache,
           readMode: widget.offline ? ReadMode.cacheOnly : ReadMode.cacheFirst,
           onPosition: widget.offline ? null : _cache?.prefetch?.position,
@@ -322,6 +341,86 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
+  Future<void> _links() async {
+    if (_changing || _invalidated) return;
+    final l = AppLocalizations.of(context);
+    final source = _reader;
+    final link = await showModalBottomSheet<LocalContentLink>(
+      context: context,
+      useSafeArea: true,
+      builder: (context) => ListView(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Text(l.readerLinks),
+          ),
+          for (final link in source.contentLinks)
+            ListTile(
+              title: Text(link.label),
+              subtitle: link.unavailable == null
+                  ? null
+                  : Text(l.readerLinkUnavailable),
+              trailing: Icon(
+                link.unavailable == null ? Icons.chevron_right : Icons.link_off,
+              ),
+              onTap: () => Navigator.pop(context, link),
+            ),
+        ],
+      ),
+    );
+    if (!mounted || _invalidated || source != _reader || link == null) return;
+    if (link.target == null || widget.linkDepth >= 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.linkDepth >= 8 ? l.readerLinkDepth : l.readerLinkUnavailable,
+          ),
+        ),
+      );
+      return;
+    }
+    await _openAuxiliary(link.target!, link.targetBlockKey);
+  }
+
+  Future<void> _openAuxiliary(ChapterKey target, String? block) async {
+    if (_invalidated ||
+        target.novelKey != widget.chapter.novelKey ||
+        widget.linkDepth >= 8) {
+      return;
+    }
+    // Validate before replacing any surface; failed targets leave origin intact.
+    final value = await widget.repository.loadChapter(
+      target,
+      mode: ReadMode.cacheOnly,
+      cancellation: _titleRequest.token,
+    );
+    if (!mounted || _invalidated) return;
+    if (value is! Success<LoadResult<ChapterContent>> ||
+        block != null &&
+            !value.value.value.blocks.any((b) => b.blockKey == block)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).readerLinkUnavailable),
+        ),
+      );
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: '/local-link'),
+        builder: (_) => BookReaderScreen(
+          chapter: target,
+          repository: widget.repository,
+          images: widget.images,
+          settings: widget.settings,
+          initialBlockKey: block,
+          startAtBeginning: true,
+          linkDepth: widget.linkDepth + 1,
+        ),
+      ),
+    );
+  }
+
   Future<void> _contents() async {
     final repository = widget.repository;
     if (_local && repository is LocalNavigationRepository) {
@@ -332,6 +431,15 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         current: _reader.chapter,
       );
       if (mounted && target != null) {
+        final main =
+            _catalog.loaded?.value.flatChapters.any(
+              (c) => c.key == target.chapterKey,
+            ) ??
+            false;
+        if (!main) {
+          await _openAuxiliary(target.chapterKey, target.blockKey);
+          return;
+        }
         await _switch(
           target.chapterKey,
           blockKey: target.blockKey,
@@ -388,7 +496,26 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   Widget _view(ReaderController reader) {
     final chapters =
         _catalog.loaded?.value.flatChapters.toList() ?? <Chapter>[];
+    final order = _needsOrder
+        ? _readingOrder ?? <ChapterKey>[]
+        : chapters.map((c) => c.key).toList();
     final index = chapters.indexWhere((c) => c.key == reader.chapter);
+    ChapterKey? previous, next;
+    if (index >= 0 && widget.linkDepth == 0) {
+      for (var i = index - 1; i >= 0; i--) {
+        if (order.contains(chapters[i].key)) {
+          previous = chapters[i].key;
+          break;
+        }
+      }
+      for (var i = index + 1; i < chapters.length; i++) {
+        if (order.contains(chapters[i].key)) {
+          next = chapters[i].key;
+          break;
+        }
+      }
+    }
+
     return ReaderContentView(
       key: ValueKey(reader),
       content: reader.content!,
@@ -404,7 +531,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       settings: widget.settings,
       session: reader,
       initialPosition: reader.initialPosition,
-      onCatalog: _changing ? null : _contents,
+      onCatalog: _changing || widget.linkDepth > 0 ? null : _contents,
+      onLinks: _changing || reader.contentLinks.isEmpty ? null : _links,
+      returnToOrigin: widget.linkDepth > 0,
       onPrefetch: !widget.offline && _cache?.prefetch != null
           ? () => showPrefetchSheet(
               context,
@@ -414,11 +543,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             )
           : null,
       onDetails: widget.onDetails == null || _changing ? null : _details,
-      onPreviousChapter: !_changing && index > 0
-          ? () => _switch(chapters[index - 1].key, fromEnd: true)
+      onPreviousChapter: !_changing && previous != null
+          ? () => _switch(previous!, fromEnd: true)
           : null,
-      onNextChapter: !_changing && index >= 0 && index + 1 < chapters.length
-          ? () => _switch(chapters[index + 1].key, fromStart: true)
+      onNextChapter: !_changing && next != null
+          ? () => _switch(next!, fromStart: true)
           : null,
     );
   }

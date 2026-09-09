@@ -16,6 +16,9 @@ import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
 import '../../domain/reparse_position_test.dart' as fixtures;
 import 'support/epub_fixtures.dart';
+import 'epub_links_test.dart' show linkedEpub;
+import 'package:shiori/data/repositories/local_reading_repository.dart';
+import 'local_reading_test.dart' show ForbiddenOnline;
 import 'package:shiori/data/local/epub/epub_parser.dart';
 
 T ok<T>(Result<T> r) {
@@ -478,6 +481,144 @@ void main() {
           ),
         ),
         isFalse,
+      );
+    },
+  );
+  test(
+    'link metadata and auxiliary content publish, reopen and reparse without implicit upgrades',
+    () async {
+      final old = ok(
+        await store.importBook(
+          bytes: Stream.value(zipFiles(linkedEpub())),
+          format: LocalBookFormat.epub,
+          cancellation: token(),
+          parse: (s) => const BookDecoder().decode(
+            s,
+            format: LocalBookFormat.epub,
+            filename: 'book.epub',
+            cancellation: token(),
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+          ),
+        ),
+      );
+      final key = old.content.detail.summary.key;
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      final repo = LocalReadingRepository(
+        local: store,
+        online: ForbiddenOnline(),
+      );
+      final links = ok(
+        await repo.loadContentLinks(
+          old.content.chapters.first.key,
+          cancellation: token(),
+        ),
+      );
+      expect(
+        links.map((l) => l.toJson()),
+        old.content.links
+            .where((l) => l.source == old.content.chapters.first.key)
+            .map((l) => l.toJson()),
+      );
+      expect(
+        ok(
+          await repo.loadChapter(
+            links.firstWhere((l) => l.label == 'note').target!,
+            mode: ReadMode.cacheOnly,
+            cancellation: token(),
+          ),
+        ).value,
+        old.content.auxiliaryChapters.single,
+      );
+      final generation = ok(
+        await library.beginProgressSession(key, cancellation: token()),
+      );
+      final priorProgress = fixtures.progress(old.content);
+      ok(
+        await library.saveProgress(
+          priorProgress,
+          stamp: ProgressWriteStamp(generation: generation, sequence: 0),
+          cancellation: token(),
+        ),
+      );
+      final f = File('${paths.localBooks.path}/${key.novelId}/manifest.json');
+      final json = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+      json.remove('links');
+      json.remove('auxiliaryChapters');
+      json.remove('readingOrder');
+      final bytes = utf8.encode(jsonEncode(json));
+      await f.writeAsBytes(bytes, flush: true);
+      await db.customStatement(
+        'UPDATE local_books SET manifest_hash=? WHERE digest=?',
+        [sha256.convert(bytes).toString(), key.novelId],
+      );
+      expect(
+        ok(
+          await repo.loadContentLinks(
+            old.content.chapters.first.key,
+            cancellation: token(),
+          ),
+        ),
+        isEmpty,
+      );
+      expect(
+        ok(await repo.loadReadingOrder(key, cancellation: token())).length,
+        3,
+      );
+      ok(
+        await store.reparseBook(
+          key,
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+          cancellation: token(),
+        ),
+      );
+      expect(
+        ok(
+          await repo.loadContentLinks(
+            old.content.chapters.first.key,
+            cancellation: token(),
+          ),
+        ),
+        isNotEmpty,
+      );
+      expect(
+        ok(await repo.loadReadingOrder(key, cancellation: token())).length,
+        2,
+      );
+      await store.close();
+      await db.close();
+      db = UserDatabase(NativeDatabase(paths.userDatabase));
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      library = LocalLibraryRepository(db);
+      final reopened = LocalReadingRepository(
+        local: store,
+        online: ForbiddenOnline(),
+      );
+      final restored = ok(
+        await library.getProgress(key, cancellation: token()),
+      )!;
+      expect(restored.chapterKey, priorProgress.chapterKey);
+      expect(restored.lastReadAt, priorProgress.lastReadAt);
+      final restoredLinks = ok(
+        await reopened.loadContentLinks(
+          old.content.chapters.first.key,
+          cancellation: token(),
+        ),
+      );
+      final note = restoredLinks.firstWhere((l) => l.label == 'note');
+      expect(
+        ok(
+          await reopened.loadChapter(
+            note.target!,
+            mode: ReadMode.cacheOnly,
+            cancellation: token(),
+          ),
+        ).value.blocks.any((b) => b.blockKey == note.targetBlockKey),
+        isTrue,
+      );
+      expect(
+        ok(await library.getProgress(key, cancellation: token())),
+        restored,
       );
     },
   );
