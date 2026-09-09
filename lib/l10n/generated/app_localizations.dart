@@ -1441,6 +1441,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not open the chapter. Your current page is still available.'**
   String get readerChapterLoadFailed;
+
+  /// No description provided for @localReparse.
+  ///
+  /// In en, this message translates to:
+  /// **'Reparse'**
+  String get localReparse;
+
+  /// No description provided for @localReparseConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Reparse the saved original and restore your reading position where possible. Failure or cancellation keeps the previous content.'**
+  String get localReparseConfirm;
+
+  /// No description provided for @localReparseDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Reparsed. Your reading position is preserved.'**
+  String get localReparseDone;
+
+  /// No description provided for @localReparseApproximate.
+  ///
+  /// In en, this message translates to:
+  /// **'Reparsed. Restored a nearby position; please check the current text.'**
+  String get localReparseApproximate;
+
+  /// No description provided for @localReparseReaderClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'This book is being reparsed. Return to the library and reopen it.'**
+  String get localReparseReaderClosed;
 }
 
 class _AppLocalizationsDelegate

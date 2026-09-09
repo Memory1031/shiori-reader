@@ -156,7 +156,7 @@ class LocalLibraryRepository implements LibraryRepository {
       key.sourceId != LocalBookIdentity.sourceId ||
       (await db
               .customSelect(
-                'SELECT 1 FROM local_books WHERE digest=?',
+                'SELECT 1 FROM local_books WHERE digest=? AND maintenance=0',
                 variables: [Variable(key.novelId)],
               )
               .get())
@@ -180,6 +180,28 @@ class LocalLibraryRepository implements LibraryRepository {
   }) => localWrite(db, Operation.progressWrite, cancellation, () async {
     final key = progress.novelKey;
     if (!await _available(key)) return false;
+    if (key.sourceId == LocalBookIdentity.sourceId) {
+      final row = await db
+          .customSelect(
+            'SELECT active_bundle FROM local_books WHERE digest=?',
+            variables: [Variable(key.novelId)],
+          )
+          .getSingle();
+      if (row.readNullable<String>('active_bundle') != null) {
+        final match = await db
+            .customSelect(
+              'SELECT 1 FROM local_chapter_revisions WHERE digest=? AND chapter_id=? AND content_revision=? AND catalog_revision=?',
+              variables: [
+                Variable(key.novelId),
+                Variable(progress.chapterKey.chapterId),
+                Variable(progress.position.contentRevision),
+                Variable(progress.catalogRevision),
+              ],
+            )
+            .get();
+        if (match.isEmpty) return false;
+      }
+    }
     final session = await db
         .customSelect(
           'SELECT generation,sequence FROM progress_sessions WHERE $_where',
@@ -191,30 +213,7 @@ class LocalLibraryRepository implements LibraryRepository {
         stamp.sequence <= session.read<int>('sequence')) {
       return false;
     }
-    final position = progress.position;
-    await db.customUpdate(
-      '''INSERT INTO reading_progress(source_id,novel_id,chapter_id,summary_json,chapter_ordinal,catalog_revision,content_revision,block_key,block_index,block_fraction,chapter_fraction,completed,pixel_offset,layout_key,position_version,last_read_at,updated_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?) ON CONFLICT(source_id,novel_id) DO UPDATE SET
-      chapter_id=excluded.chapter_id,summary_json=excluded.summary_json,chapter_ordinal=excluded.chapter_ordinal,catalog_revision=excluded.catalog_revision,content_revision=excluded.content_revision,block_key=excluded.block_key,block_index=excluded.block_index,block_fraction=excluded.block_fraction,chapter_fraction=excluded.chapter_fraction,completed=excluded.completed,pixel_offset=excluded.pixel_offset,layout_key=excluded.layout_key,position_version=excluded.position_version,last_read_at=excluded.last_read_at,updated_at=excluded.updated_at''',
-      variables: [
-        ..._key(key),
-        Variable(progress.chapterKey.chapterId),
-        Variable(RecordCodec.summary(progress.snapshot)),
-        Variable(progress.chapterOrdinalSnapshot),
-        Variable(progress.catalogRevision),
-        Variable(position.contentRevision),
-        Variable(position.blockKey),
-        Variable(position.blockIndex),
-        Variable(position.blockFraction),
-        Variable(position.chapterFraction),
-        Variable(progress.completed ? 1 : 0),
-        Variable<double>(position.pixelOffset),
-        Variable<String>(position.layoutKey),
-        Variable(progress.lastReadAt.millisecondsSinceEpoch),
-        Variable(now().millisecondsSinceEpoch),
-      ],
-      updates: {db.readingProgress},
-    );
+    await writeProgressRow(db, progress, now());
     await db.customUpdate(
       'UPDATE progress_sessions SET sequence=? WHERE $_where',
       variables: [Variable(stamp.sequence), ..._key(key)],

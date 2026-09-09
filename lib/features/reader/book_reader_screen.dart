@@ -47,6 +47,8 @@ class BookReaderScreen extends StatefulWidget {
 class _BookReaderScreenState extends State<BookReaderScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   late ReaderController _reader;
+  StreamSubscription<NovelKey>? _invalidation;
+  bool _invalidated = false;
   ReaderController? _pending;
   late final AnimationController _chapterTurn;
   int _turnDirection = 1;
@@ -113,6 +115,15 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       blockKey: widget.initialBlockKey,
       fromStart: widget.startAtBeginning,
     );
+    if (widget.repository case LocalBookInvalidation changes) {
+      _invalidation = changes.invalidations.listen((key) {
+        if (!mounted || key != widget.chapter.novelKey || _invalidated) return;
+        _chapterTurn.stop();
+        _reader.onDelete();
+        _pending?.onDelete();
+        setState(() => _invalidated = true);
+      });
+    }
     if (widget.chapterFallback) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -148,6 +159,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         ..onStart()
         ..addListener(_changed);
   void _changed() {
+    if (_invalidated) return;
     final pending = _pending;
     if (pending != null &&
         (pending.status == ReaderStatus.error ||
@@ -172,6 +184,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   void dispose() {
+    _invalidation?.cancel();
     _chapterTurn.dispose();
     _titleRequest.cancel();
     if (!widget.offline) _cache?.prefetch?.leave();
@@ -431,6 +444,18 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_invalidated) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(AppLocalizations.of(context).localReparseReaderClosed),
+          ),
+        ),
+      );
+    }
+
     return SourceImageDecodeScope(
       child: PopScope(
         // Cupertino's interactive back gesture requires canPop before it starts.

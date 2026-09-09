@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:drift/native.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 import 'package:shiori/data/local/database/user_database.dart'
@@ -99,6 +99,12 @@ class FaultUsers extends UserDatabase {
   Migrator createMigrator() => FaultMigrator(this, 'local_books');
 }
 
+class FaultV4 extends UserDatabase {
+  FaultV4(super.executor);
+  @override
+  Migrator createMigrator() => FaultMigrator(this, 'local_chapter_revisions');
+}
+
 class FaultCache extends CacheDatabase {
   FaultCache(super.executor);
   @override
@@ -113,7 +119,7 @@ void main() {
   tearDown(() async {
     await root.delete(recursive: true);
   });
-  for (final version in [1, 2]) {
+  for (final version in [1, 2, 3]) {
     test(
       'retained user v$version snapshot upgrades and preserves every old field',
       () async {
@@ -126,7 +132,7 @@ void main() {
               .data
               .values
               .single,
-          3,
+          4,
         );
         final library = LocalLibraryRepository(db);
         final shelf =
@@ -153,6 +159,42 @@ void main() {
       },
     );
   }
+  test('v3 ALTER operations roll back when v4 table creation fails', () async {
+    final file = File('${root.path}/users.sqlite');
+    seed(file, 'user', 3);
+    final before = rows(file);
+    final db = FaultV4(NativeDatabase(file));
+    await expectLater(db.customSelect('SELECT 1').get(), throwsA(anything));
+    await db.close();
+    expect(rows(file), before);
+    final raw = sql.sqlite3.open(file.path);
+    expect(raw.userVersion, 3);
+    raw.close();
+    final retry = UserDatabase(NativeDatabase(file));
+    await retry.customSelect('SELECT 1').get();
+    await retry.close();
+  });
+  test('v3 imported row fields survive v4 additions', () async {
+    final file = File('${root.path}/users.sqlite');
+    seed(file, 'user', 3);
+    final raw = sql.sqlite3.open(file.path);
+    raw.execute('INSERT INTO local_books VALUES(?,?,?,?,?)', [
+      'a' * 64,
+      'txt',
+      'Kept',
+      123,
+      'b' * 64,
+    ]);
+    raw.close();
+    final db = UserDatabase(NativeDatabase(file));
+    final row = await db.customSelect('SELECT * FROM local_books').getSingle();
+    expect(row.read<String>('title'), 'Kept');
+    expect(row.read<int>('imported_at'), 123);
+    expect(row.readNullable<String>('active_bundle'), isNull);
+    expect(row.read<int>('parser_version'), 1);
+    expect(row.read<int>('maintenance'), 0);
+    await db.close();
+  });
   test('retained cache v1 upgrades without replacing old payloads', () async {
     final file = File('${root.path}/cache.sqlite');
     seed(file, 'cache', 1);

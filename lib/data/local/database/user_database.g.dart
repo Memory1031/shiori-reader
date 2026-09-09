@@ -2359,6 +2359,41 @@ class LocalBooks extends Table with TableInfo<LocalBooks, LocalBook> {
     requiredDuringInsert: true,
     $customConstraints: 'NOT NULL CHECK (length(manifest_hash) = 64)',
   );
+  static const VerificationMeta _activeBundleMeta = const VerificationMeta(
+    'activeBundle',
+  );
+  late final GeneratedColumn<String> activeBundle = GeneratedColumn<String>(
+    'active_bundle',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _parserVersionMeta = const VerificationMeta(
+    'parserVersion',
+  );
+  late final GeneratedColumn<int> parserVersion = GeneratedColumn<int>(
+    'parser_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 1',
+    defaultValue: const CustomExpression('1'),
+  );
+  static const VerificationMeta _maintenanceMeta = const VerificationMeta(
+    'maintenance',
+  );
+  late final GeneratedColumn<int> maintenance = GeneratedColumn<int>(
+    'maintenance',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 0 CHECK (maintenance IN (0, 1))',
+    defaultValue: const CustomExpression('0'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     digest,
@@ -2366,6 +2401,9 @@ class LocalBooks extends Table with TableInfo<LocalBooks, LocalBook> {
     title,
     importedAt,
     manifestHash,
+    activeBundle,
+    parserVersion,
+    maintenance,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2422,6 +2460,33 @@ class LocalBooks extends Table with TableInfo<LocalBooks, LocalBook> {
     } else if (isInserting) {
       context.missing(_manifestHashMeta);
     }
+    if (data.containsKey('active_bundle')) {
+      context.handle(
+        _activeBundleMeta,
+        activeBundle.isAcceptableOrUnknown(
+          data['active_bundle']!,
+          _activeBundleMeta,
+        ),
+      );
+    }
+    if (data.containsKey('parser_version')) {
+      context.handle(
+        _parserVersionMeta,
+        parserVersion.isAcceptableOrUnknown(
+          data['parser_version']!,
+          _parserVersionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('maintenance')) {
+      context.handle(
+        _maintenanceMeta,
+        maintenance.isAcceptableOrUnknown(
+          data['maintenance']!,
+          _maintenanceMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2451,6 +2516,18 @@ class LocalBooks extends Table with TableInfo<LocalBooks, LocalBook> {
         DriftSqlType.string,
         data['${effectivePrefix}manifest_hash'],
       )!,
+      activeBundle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}active_bundle'],
+      ),
+      parserVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}parser_version'],
+      )!,
+      maintenance: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}maintenance'],
+      )!,
     );
   }
 
@@ -2469,12 +2546,18 @@ class LocalBook extends DataClass implements Insertable<LocalBook> {
   final String title;
   final int importedAt;
   final String manifestHash;
+  final String? activeBundle;
+  final int parserVersion;
+  final int maintenance;
   const LocalBook({
     required this.digest,
     required this.format,
     required this.title,
     required this.importedAt,
     required this.manifestHash,
+    this.activeBundle,
+    required this.parserVersion,
+    required this.maintenance,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2484,6 +2567,11 @@ class LocalBook extends DataClass implements Insertable<LocalBook> {
     map['title'] = Variable<String>(title);
     map['imported_at'] = Variable<int>(importedAt);
     map['manifest_hash'] = Variable<String>(manifestHash);
+    if (!nullToAbsent || activeBundle != null) {
+      map['active_bundle'] = Variable<String>(activeBundle);
+    }
+    map['parser_version'] = Variable<int>(parserVersion);
+    map['maintenance'] = Variable<int>(maintenance);
     return map;
   }
 
@@ -2494,6 +2582,11 @@ class LocalBook extends DataClass implements Insertable<LocalBook> {
       title: Value(title),
       importedAt: Value(importedAt),
       manifestHash: Value(manifestHash),
+      activeBundle: activeBundle == null && nullToAbsent
+          ? const Value.absent()
+          : Value(activeBundle),
+      parserVersion: Value(parserVersion),
+      maintenance: Value(maintenance),
     );
   }
 
@@ -2508,6 +2601,9 @@ class LocalBook extends DataClass implements Insertable<LocalBook> {
       title: serializer.fromJson<String>(json['title']),
       importedAt: serializer.fromJson<int>(json['imported_at']),
       manifestHash: serializer.fromJson<String>(json['manifest_hash']),
+      activeBundle: serializer.fromJson<String?>(json['active_bundle']),
+      parserVersion: serializer.fromJson<int>(json['parser_version']),
+      maintenance: serializer.fromJson<int>(json['maintenance']),
     );
   }
   @override
@@ -2519,6 +2615,9 @@ class LocalBook extends DataClass implements Insertable<LocalBook> {
       'title': serializer.toJson<String>(title),
       'imported_at': serializer.toJson<int>(importedAt),
       'manifest_hash': serializer.toJson<String>(manifestHash),
+      'active_bundle': serializer.toJson<String?>(activeBundle),
+      'parser_version': serializer.toJson<int>(parserVersion),
+      'maintenance': serializer.toJson<int>(maintenance),
     };
   }
 
@@ -2528,12 +2627,18 @@ class LocalBook extends DataClass implements Insertable<LocalBook> {
     String? title,
     int? importedAt,
     String? manifestHash,
+    Value<String?> activeBundle = const Value.absent(),
+    int? parserVersion,
+    int? maintenance,
   }) => LocalBook(
     digest: digest ?? this.digest,
     format: format ?? this.format,
     title: title ?? this.title,
     importedAt: importedAt ?? this.importedAt,
     manifestHash: manifestHash ?? this.manifestHash,
+    activeBundle: activeBundle.present ? activeBundle.value : this.activeBundle,
+    parserVersion: parserVersion ?? this.parserVersion,
+    maintenance: maintenance ?? this.maintenance,
   );
   LocalBook copyWithCompanion(LocalBooksCompanion data) {
     return LocalBook(
@@ -2546,6 +2651,15 @@ class LocalBook extends DataClass implements Insertable<LocalBook> {
       manifestHash: data.manifestHash.present
           ? data.manifestHash.value
           : this.manifestHash,
+      activeBundle: data.activeBundle.present
+          ? data.activeBundle.value
+          : this.activeBundle,
+      parserVersion: data.parserVersion.present
+          ? data.parserVersion.value
+          : this.parserVersion,
+      maintenance: data.maintenance.present
+          ? data.maintenance.value
+          : this.maintenance,
     );
   }
 
@@ -2556,14 +2670,25 @@ class LocalBook extends DataClass implements Insertable<LocalBook> {
           ..write('format: $format, ')
           ..write('title: $title, ')
           ..write('importedAt: $importedAt, ')
-          ..write('manifestHash: $manifestHash')
+          ..write('manifestHash: $manifestHash, ')
+          ..write('activeBundle: $activeBundle, ')
+          ..write('parserVersion: $parserVersion, ')
+          ..write('maintenance: $maintenance')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(digest, format, title, importedAt, manifestHash);
+  int get hashCode => Object.hash(
+    digest,
+    format,
+    title,
+    importedAt,
+    manifestHash,
+    activeBundle,
+    parserVersion,
+    maintenance,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2572,7 +2697,10 @@ class LocalBook extends DataClass implements Insertable<LocalBook> {
           other.format == this.format &&
           other.title == this.title &&
           other.importedAt == this.importedAt &&
-          other.manifestHash == this.manifestHash);
+          other.manifestHash == this.manifestHash &&
+          other.activeBundle == this.activeBundle &&
+          other.parserVersion == this.parserVersion &&
+          other.maintenance == this.maintenance);
 }
 
 class LocalBooksCompanion extends UpdateCompanion<LocalBook> {
@@ -2581,6 +2709,9 @@ class LocalBooksCompanion extends UpdateCompanion<LocalBook> {
   final Value<String> title;
   final Value<int> importedAt;
   final Value<String> manifestHash;
+  final Value<String?> activeBundle;
+  final Value<int> parserVersion;
+  final Value<int> maintenance;
   final Value<int> rowid;
   const LocalBooksCompanion({
     this.digest = const Value.absent(),
@@ -2588,6 +2719,9 @@ class LocalBooksCompanion extends UpdateCompanion<LocalBook> {
     this.title = const Value.absent(),
     this.importedAt = const Value.absent(),
     this.manifestHash = const Value.absent(),
+    this.activeBundle = const Value.absent(),
+    this.parserVersion = const Value.absent(),
+    this.maintenance = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalBooksCompanion.insert({
@@ -2596,6 +2730,9 @@ class LocalBooksCompanion extends UpdateCompanion<LocalBook> {
     required String title,
     required int importedAt,
     required String manifestHash,
+    this.activeBundle = const Value.absent(),
+    this.parserVersion = const Value.absent(),
+    this.maintenance = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : digest = Value(digest),
        format = Value(format),
@@ -2608,6 +2745,9 @@ class LocalBooksCompanion extends UpdateCompanion<LocalBook> {
     Expression<String>? title,
     Expression<int>? importedAt,
     Expression<String>? manifestHash,
+    Expression<String>? activeBundle,
+    Expression<int>? parserVersion,
+    Expression<int>? maintenance,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2616,6 +2756,9 @@ class LocalBooksCompanion extends UpdateCompanion<LocalBook> {
       if (title != null) 'title': title,
       if (importedAt != null) 'imported_at': importedAt,
       if (manifestHash != null) 'manifest_hash': manifestHash,
+      if (activeBundle != null) 'active_bundle': activeBundle,
+      if (parserVersion != null) 'parser_version': parserVersion,
+      if (maintenance != null) 'maintenance': maintenance,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2626,6 +2769,9 @@ class LocalBooksCompanion extends UpdateCompanion<LocalBook> {
     Value<String>? title,
     Value<int>? importedAt,
     Value<String>? manifestHash,
+    Value<String?>? activeBundle,
+    Value<int>? parserVersion,
+    Value<int>? maintenance,
     Value<int>? rowid,
   }) {
     return LocalBooksCompanion(
@@ -2634,6 +2780,9 @@ class LocalBooksCompanion extends UpdateCompanion<LocalBook> {
       title: title ?? this.title,
       importedAt: importedAt ?? this.importedAt,
       manifestHash: manifestHash ?? this.manifestHash,
+      activeBundle: activeBundle ?? this.activeBundle,
+      parserVersion: parserVersion ?? this.parserVersion,
+      maintenance: maintenance ?? this.maintenance,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2656,6 +2805,15 @@ class LocalBooksCompanion extends UpdateCompanion<LocalBook> {
     if (manifestHash.present) {
       map['manifest_hash'] = Variable<String>(manifestHash.value);
     }
+    if (activeBundle.present) {
+      map['active_bundle'] = Variable<String>(activeBundle.value);
+    }
+    if (parserVersion.present) {
+      map['parser_version'] = Variable<int>(parserVersion.value);
+    }
+    if (maintenance.present) {
+      map['maintenance'] = Variable<int>(maintenance.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2670,6 +2828,347 @@ class LocalBooksCompanion extends UpdateCompanion<LocalBook> {
           ..write('title: $title, ')
           ..write('importedAt: $importedAt, ')
           ..write('manifestHash: $manifestHash, ')
+          ..write('activeBundle: $activeBundle, ')
+          ..write('parserVersion: $parserVersion, ')
+          ..write('maintenance: $maintenance, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class LocalChapterRevisions extends Table
+    with TableInfo<LocalChapterRevisions, LocalChapterRevision> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  LocalChapterRevisions(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _digestMeta = const VerificationMeta('digest');
+  late final GeneratedColumn<String> digest = GeneratedColumn<String>(
+    'digest',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _chapterIdMeta = const VerificationMeta(
+    'chapterId',
+  );
+  late final GeneratedColumn<String> chapterId = GeneratedColumn<String>(
+    'chapter_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _contentRevisionMeta = const VerificationMeta(
+    'contentRevision',
+  );
+  late final GeneratedColumn<String> contentRevision = GeneratedColumn<String>(
+    'content_revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _catalogRevisionMeta = const VerificationMeta(
+    'catalogRevision',
+  );
+  late final GeneratedColumn<String> catalogRevision = GeneratedColumn<String>(
+    'catalog_revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    digest,
+    chapterId,
+    contentRevision,
+    catalogRevision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_chapter_revisions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalChapterRevision> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('digest')) {
+      context.handle(
+        _digestMeta,
+        digest.isAcceptableOrUnknown(data['digest']!, _digestMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_digestMeta);
+    }
+    if (data.containsKey('chapter_id')) {
+      context.handle(
+        _chapterIdMeta,
+        chapterId.isAcceptableOrUnknown(data['chapter_id']!, _chapterIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chapterIdMeta);
+    }
+    if (data.containsKey('content_revision')) {
+      context.handle(
+        _contentRevisionMeta,
+        contentRevision.isAcceptableOrUnknown(
+          data['content_revision']!,
+          _contentRevisionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_contentRevisionMeta);
+    }
+    if (data.containsKey('catalog_revision')) {
+      context.handle(
+        _catalogRevisionMeta,
+        catalogRevision.isAcceptableOrUnknown(
+          data['catalog_revision']!,
+          _catalogRevisionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_catalogRevisionMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {digest, chapterId};
+  @override
+  LocalChapterRevision map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalChapterRevision(
+      digest: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}digest'],
+      )!,
+      chapterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chapter_id'],
+      )!,
+      contentRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content_revision'],
+      )!,
+      catalogRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}catalog_revision'],
+      )!,
+    );
+  }
+
+  @override
+  LocalChapterRevisions createAlias(String alias) {
+    return LocalChapterRevisions(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'PRIMARY KEY(digest, chapter_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class LocalChapterRevision extends DataClass
+    implements Insertable<LocalChapterRevision> {
+  final String digest;
+  final String chapterId;
+  final String contentRevision;
+  final String catalogRevision;
+  const LocalChapterRevision({
+    required this.digest,
+    required this.chapterId,
+    required this.contentRevision,
+    required this.catalogRevision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['digest'] = Variable<String>(digest);
+    map['chapter_id'] = Variable<String>(chapterId);
+    map['content_revision'] = Variable<String>(contentRevision);
+    map['catalog_revision'] = Variable<String>(catalogRevision);
+    return map;
+  }
+
+  LocalChapterRevisionsCompanion toCompanion(bool nullToAbsent) {
+    return LocalChapterRevisionsCompanion(
+      digest: Value(digest),
+      chapterId: Value(chapterId),
+      contentRevision: Value(contentRevision),
+      catalogRevision: Value(catalogRevision),
+    );
+  }
+
+  factory LocalChapterRevision.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalChapterRevision(
+      digest: serializer.fromJson<String>(json['digest']),
+      chapterId: serializer.fromJson<String>(json['chapter_id']),
+      contentRevision: serializer.fromJson<String>(json['content_revision']),
+      catalogRevision: serializer.fromJson<String>(json['catalog_revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'digest': serializer.toJson<String>(digest),
+      'chapter_id': serializer.toJson<String>(chapterId),
+      'content_revision': serializer.toJson<String>(contentRevision),
+      'catalog_revision': serializer.toJson<String>(catalogRevision),
+    };
+  }
+
+  LocalChapterRevision copyWith({
+    String? digest,
+    String? chapterId,
+    String? contentRevision,
+    String? catalogRevision,
+  }) => LocalChapterRevision(
+    digest: digest ?? this.digest,
+    chapterId: chapterId ?? this.chapterId,
+    contentRevision: contentRevision ?? this.contentRevision,
+    catalogRevision: catalogRevision ?? this.catalogRevision,
+  );
+  LocalChapterRevision copyWithCompanion(LocalChapterRevisionsCompanion data) {
+    return LocalChapterRevision(
+      digest: data.digest.present ? data.digest.value : this.digest,
+      chapterId: data.chapterId.present ? data.chapterId.value : this.chapterId,
+      contentRevision: data.contentRevision.present
+          ? data.contentRevision.value
+          : this.contentRevision,
+      catalogRevision: data.catalogRevision.present
+          ? data.catalogRevision.value
+          : this.catalogRevision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalChapterRevision(')
+          ..write('digest: $digest, ')
+          ..write('chapterId: $chapterId, ')
+          ..write('contentRevision: $contentRevision, ')
+          ..write('catalogRevision: $catalogRevision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(digest, chapterId, contentRevision, catalogRevision);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalChapterRevision &&
+          other.digest == this.digest &&
+          other.chapterId == this.chapterId &&
+          other.contentRevision == this.contentRevision &&
+          other.catalogRevision == this.catalogRevision);
+}
+
+class LocalChapterRevisionsCompanion
+    extends UpdateCompanion<LocalChapterRevision> {
+  final Value<String> digest;
+  final Value<String> chapterId;
+  final Value<String> contentRevision;
+  final Value<String> catalogRevision;
+  final Value<int> rowid;
+  const LocalChapterRevisionsCompanion({
+    this.digest = const Value.absent(),
+    this.chapterId = const Value.absent(),
+    this.contentRevision = const Value.absent(),
+    this.catalogRevision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalChapterRevisionsCompanion.insert({
+    required String digest,
+    required String chapterId,
+    required String contentRevision,
+    required String catalogRevision,
+    this.rowid = const Value.absent(),
+  }) : digest = Value(digest),
+       chapterId = Value(chapterId),
+       contentRevision = Value(contentRevision),
+       catalogRevision = Value(catalogRevision);
+  static Insertable<LocalChapterRevision> custom({
+    Expression<String>? digest,
+    Expression<String>? chapterId,
+    Expression<String>? contentRevision,
+    Expression<String>? catalogRevision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (digest != null) 'digest': digest,
+      if (chapterId != null) 'chapter_id': chapterId,
+      if (contentRevision != null) 'content_revision': contentRevision,
+      if (catalogRevision != null) 'catalog_revision': catalogRevision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalChapterRevisionsCompanion copyWith({
+    Value<String>? digest,
+    Value<String>? chapterId,
+    Value<String>? contentRevision,
+    Value<String>? catalogRevision,
+    Value<int>? rowid,
+  }) {
+    return LocalChapterRevisionsCompanion(
+      digest: digest ?? this.digest,
+      chapterId: chapterId ?? this.chapterId,
+      contentRevision: contentRevision ?? this.contentRevision,
+      catalogRevision: catalogRevision ?? this.catalogRevision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (digest.present) {
+      map['digest'] = Variable<String>(digest.value);
+    }
+    if (chapterId.present) {
+      map['chapter_id'] = Variable<String>(chapterId.value);
+    }
+    if (contentRevision.present) {
+      map['content_revision'] = Variable<String>(contentRevision.value);
+    }
+    if (catalogRevision.present) {
+      map['catalog_revision'] = Variable<String>(catalogRevision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalChapterRevisionsCompanion(')
+          ..write('digest: $digest, ')
+          ..write('chapterId: $chapterId, ')
+          ..write('contentRevision: $contentRevision, ')
+          ..write('catalogRevision: $catalogRevision, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2693,6 +3192,8 @@ abstract class _$UserDatabase extends GeneratedDatabase {
   late final PrefetchChoices prefetchChoices = PrefetchChoices(this);
   late final PrefetchSettings prefetchSettings = PrefetchSettings(this);
   late final LocalBooks localBooks = LocalBooks(this);
+  late final LocalChapterRevisions localChapterRevisions =
+      LocalChapterRevisions(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2706,6 +3207,7 @@ abstract class _$UserDatabase extends GeneratedDatabase {
     prefetchChoices,
     prefetchSettings,
     localBooks,
+    localChapterRevisions,
   ];
 }
 
@@ -3888,6 +4390,9 @@ typedef $LocalBooksCreateCompanionBuilder =
       required String title,
       required int importedAt,
       required String manifestHash,
+      Value<String?> activeBundle,
+      Value<int> parserVersion,
+      Value<int> maintenance,
       Value<int> rowid,
     });
 typedef $LocalBooksUpdateCompanionBuilder =
@@ -3897,6 +4402,9 @@ typedef $LocalBooksUpdateCompanionBuilder =
       Value<String> title,
       Value<int> importedAt,
       Value<String> manifestHash,
+      Value<String?> activeBundle,
+      Value<int> parserVersion,
+      Value<int> maintenance,
       Value<int> rowid,
     });
 
@@ -3930,6 +4438,21 @@ class $LocalBooksFilterComposer extends Composer<_$UserDatabase, LocalBooks> {
 
   ColumnFilters<String> get manifestHash => $composableBuilder(
     column: $table.manifestHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get activeBundle => $composableBuilder(
+    column: $table.activeBundle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get parserVersion => $composableBuilder(
+    column: $table.parserVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get maintenance => $composableBuilder(
+    column: $table.maintenance,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3966,6 +4489,21 @@ class $LocalBooksOrderingComposer extends Composer<_$UserDatabase, LocalBooks> {
     column: $table.manifestHash,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get activeBundle => $composableBuilder(
+    column: $table.activeBundle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get parserVersion => $composableBuilder(
+    column: $table.parserVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get maintenance => $composableBuilder(
+    column: $table.maintenance,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $LocalBooksAnnotationComposer
@@ -3993,6 +4531,21 @@ class $LocalBooksAnnotationComposer
 
   GeneratedColumn<String> get manifestHash => $composableBuilder(
     column: $table.manifestHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get activeBundle => $composableBuilder(
+    column: $table.activeBundle,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get parserVersion => $composableBuilder(
+    column: $table.parserVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get maintenance => $composableBuilder(
+    column: $table.maintenance,
     builder: (column) => column,
   );
 }
@@ -4030,6 +4583,9 @@ class $LocalBooksTableManager
                 Value<String> title = const Value.absent(),
                 Value<int> importedAt = const Value.absent(),
                 Value<String> manifestHash = const Value.absent(),
+                Value<String?> activeBundle = const Value.absent(),
+                Value<int> parserVersion = const Value.absent(),
+                Value<int> maintenance = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalBooksCompanion(
                 digest: digest,
@@ -4037,6 +4593,9 @@ class $LocalBooksTableManager
                 title: title,
                 importedAt: importedAt,
                 manifestHash: manifestHash,
+                activeBundle: activeBundle,
+                parserVersion: parserVersion,
+                maintenance: maintenance,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4046,6 +4605,9 @@ class $LocalBooksTableManager
                 required String title,
                 required int importedAt,
                 required String manifestHash,
+                Value<String?> activeBundle = const Value.absent(),
+                Value<int> parserVersion = const Value.absent(),
+                Value<int> maintenance = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalBooksCompanion.insert(
                 digest: digest,
@@ -4053,6 +4615,9 @@ class $LocalBooksTableManager
                 title: title,
                 importedAt: importedAt,
                 manifestHash: manifestHash,
+                activeBundle: activeBundle,
+                parserVersion: parserVersion,
+                maintenance: maintenance,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -4077,6 +4642,201 @@ typedef $LocalBooksProcessedTableManager =
       LocalBook,
       PrefetchHooks Function()
     >;
+typedef $LocalChapterRevisionsCreateCompanionBuilder =
+    LocalChapterRevisionsCompanion Function({
+      required String digest,
+      required String chapterId,
+      required String contentRevision,
+      required String catalogRevision,
+      Value<int> rowid,
+    });
+typedef $LocalChapterRevisionsUpdateCompanionBuilder =
+    LocalChapterRevisionsCompanion Function({
+      Value<String> digest,
+      Value<String> chapterId,
+      Value<String> contentRevision,
+      Value<String> catalogRevision,
+      Value<int> rowid,
+    });
+
+class $LocalChapterRevisionsFilterComposer
+    extends Composer<_$UserDatabase, LocalChapterRevisions> {
+  $LocalChapterRevisionsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get digest => $composableBuilder(
+    column: $table.digest,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chapterId => $composableBuilder(
+    column: $table.chapterId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contentRevision => $composableBuilder(
+    column: $table.contentRevision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get catalogRevision => $composableBuilder(
+    column: $table.catalogRevision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $LocalChapterRevisionsOrderingComposer
+    extends Composer<_$UserDatabase, LocalChapterRevisions> {
+  $LocalChapterRevisionsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get digest => $composableBuilder(
+    column: $table.digest,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chapterId => $composableBuilder(
+    column: $table.chapterId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contentRevision => $composableBuilder(
+    column: $table.contentRevision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get catalogRevision => $composableBuilder(
+    column: $table.catalogRevision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $LocalChapterRevisionsAnnotationComposer
+    extends Composer<_$UserDatabase, LocalChapterRevisions> {
+  $LocalChapterRevisionsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get digest =>
+      $composableBuilder(column: $table.digest, builder: (column) => column);
+
+  GeneratedColumn<String> get chapterId =>
+      $composableBuilder(column: $table.chapterId, builder: (column) => column);
+
+  GeneratedColumn<String> get contentRevision => $composableBuilder(
+    column: $table.contentRevision,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get catalogRevision => $composableBuilder(
+    column: $table.catalogRevision,
+    builder: (column) => column,
+  );
+}
+
+class $LocalChapterRevisionsTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          LocalChapterRevisions,
+          LocalChapterRevision,
+          $LocalChapterRevisionsFilterComposer,
+          $LocalChapterRevisionsOrderingComposer,
+          $LocalChapterRevisionsAnnotationComposer,
+          $LocalChapterRevisionsCreateCompanionBuilder,
+          $LocalChapterRevisionsUpdateCompanionBuilder,
+          (
+            LocalChapterRevision,
+            BaseReferences<
+              _$UserDatabase,
+              LocalChapterRevisions,
+              LocalChapterRevision
+            >,
+          ),
+          LocalChapterRevision,
+          PrefetchHooks Function()
+        > {
+  $LocalChapterRevisionsTableManager(
+    _$UserDatabase db,
+    LocalChapterRevisions table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $LocalChapterRevisionsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $LocalChapterRevisionsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $LocalChapterRevisionsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> digest = const Value.absent(),
+                Value<String> chapterId = const Value.absent(),
+                Value<String> contentRevision = const Value.absent(),
+                Value<String> catalogRevision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalChapterRevisionsCompanion(
+                digest: digest,
+                chapterId: chapterId,
+                contentRevision: contentRevision,
+                catalogRevision: catalogRevision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String digest,
+                required String chapterId,
+                required String contentRevision,
+                required String catalogRevision,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalChapterRevisionsCompanion.insert(
+                digest: digest,
+                chapterId: chapterId,
+                contentRevision: contentRevision,
+                catalogRevision: catalogRevision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $LocalChapterRevisionsProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      LocalChapterRevisions,
+      LocalChapterRevision,
+      $LocalChapterRevisionsFilterComposer,
+      $LocalChapterRevisionsOrderingComposer,
+      $LocalChapterRevisionsAnnotationComposer,
+      $LocalChapterRevisionsCreateCompanionBuilder,
+      $LocalChapterRevisionsUpdateCompanionBuilder,
+      (
+        LocalChapterRevision,
+        BaseReferences<
+          _$UserDatabase,
+          LocalChapterRevisions,
+          LocalChapterRevision
+        >,
+      ),
+      LocalChapterRevision,
+      PrefetchHooks Function()
+    >;
 
 class $UserDatabaseManager {
   final _$UserDatabase _db;
@@ -4093,4 +4853,6 @@ class $UserDatabaseManager {
       $PrefetchSettingsTableManager(_db, _db.prefetchSettings);
   $LocalBooksTableManager get localBooks =>
       $LocalBooksTableManager(_db, _db.localBooks);
+  $LocalChapterRevisionsTableManager get localChapterRevisions =>
+      $LocalChapterRevisionsTableManager(_db, _db.localChapterRevisions);
 }

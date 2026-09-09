@@ -319,16 +319,9 @@ class ImportController extends ChangeNotifier {
         bytes[1] == 0x4b &&
         bytes[2] == 3 &&
         bytes[3] == 4;
-    final utf16 =
-        encoding == TxtEncoding.utf16le ||
-        encoding == TxtEncoding.utf16be ||
-        bytes.length >= 2 &&
-            ((bytes[0] == 255 && bytes[1] == 254) ||
-                (bytes[0] == 254 && bytes[1] == 255));
-    if (bytes.isEmpty ||
-        (format == LocalBookFormat.epub
-            ? !zip
-            : zip || (!utf16 && bytes.take(4096).contains(0)))) {
+    // Full strict decoding owns binary/encoding validation. Rejecting all NUL
+    // bytes here would prevent conservative unmarked UTF-16 candidates.
+    if (bytes.isEmpty || (format == LocalBookFormat.epub ? !zip : zip)) {
       problem = ImportProblem.invalidContent;
       throw const ImportSourceException(ImportProblem.invalidContent);
     }

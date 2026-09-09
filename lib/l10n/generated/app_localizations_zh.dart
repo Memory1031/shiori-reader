@@ -695,4 +695,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerChapterLoadFailed => '暂时无法打开目标章节，已保留当前页面。';
+
+  @override
+  String get localReparse => '重新解析';
+
+  @override
+  String get localReparseConfirm => '使用保留的原文件重新解析，并尽量恢复阅读位置。失败或取消会保留旧内容。';
+
+  @override
+  String get localReparseDone => '重新解析完成，阅读位置已保留。';
+
+  @override
+  String get localReparseApproximate => '重新解析完成，已恢复到附近位置，请检查当前内容。';
+
+  @override
+  String get localReparseReaderClosed => '这本书正在重新解析。请返回书架后重新打开。';
 }

@@ -76,3 +76,9 @@ LocalNavigationRepository 返回嵌套目录与 ChapterKey / 可选 blockKey。L
 CacheManagement 提供 inspect、按书 / 全部 clear 和可释放 pin；ReadingPrefetch 提供目标选择、开关、暂停 / 恢复与生命周期通知。预取不创建阅读进度。ImageRepository 持久化失败可返回 memoryOnly + persistenceFailure，清理不破坏活动 lease，但阻止旧响应回填。
 
 应用根先关闭预取，再关闭媒体 / 小说仓库与调度器，最后关闭数据库。ReaderPreferences 读取或更新时将旧 scroll 归一化为 paged，保留排版；读取不为了模式迁移主动覆盖存储。详见[阅读器](reader.md)、[缓存](cache.md)与[数据库](database.md)。
+
+## 显式重解析
+
+LocalBookReparse 接收书籍 Key、编码选择回调/可选 override 与 cancellation；返回 LocalReparseResult（approximate、cleanupPending）。失败前旧版本保持可读，提交后成功优先于取消；新旧正文及进度经同一 SQL 事务发布。LocalBookInvalidation 的 invalidations 在维护开始退役旧 Reader，changes 在提交后触发本地 detail/catalog/chapter 更新；两者广播、无初始事件，消费者取消订阅。
+
+维护期间不发新进度会话，saveProgress 返回 false；clearHistory 仍生效并阻止使用旧快照发布。已重解析书的保存还校验 catalog/content revision，旧正文即使申请到新 generation 也不能覆盖迁移位置。位置迁移不保留像素提示，近似结果供 UI 明示。内容可选 txtEncoding 只属于本地解析元数据，不进入正文身份摘要。详见[结果与边界](validation/parse-005.md)。

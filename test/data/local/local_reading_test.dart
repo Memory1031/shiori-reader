@@ -164,12 +164,13 @@ void main() {
           ok(await library.getProgress(key, cancellation: token()))!.position,
           progress(record).position,
         );
-        expect(
-          await novels
-              .chapterUpdates(record.content.chapters.first.key)
-              .isEmpty,
-          isTrue,
-        );
+        final updates = <Object>[];
+        final subscription = novels
+            .chapterUpdates(record.content.chapters.first.key)
+            .listen(updates.add);
+        await library.getProgress(key, cancellation: token());
+        expect(updates, isEmpty);
+        await subscription.cancel();
         expect(
           ok(await novels.loadNavigation(key, cancellation: token())),
           isNotEmpty,

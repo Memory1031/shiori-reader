@@ -265,5 +265,10 @@
   "appAccentBlueGrey": "蓝灰",
   "appAccentWarmBrown": "暖棕",
   "appAccentSoftPink": "淡粉",
-  "readerChapterLoadFailed": "暂时无法打开目标章节，已保留当前页面。"
+  "readerChapterLoadFailed": "暂时无法打开目标章节，已保留当前页面。",
+  "localReparse": "重新解析",
+  "localReparseConfirm": "使用保留的原文件重新解析，并尽量恢复阅读位置。失败或取消会保留旧内容。",
+  "localReparseDone": "重新解析完成，阅读位置已保留。",
+  "localReparseApproximate": "重新解析完成，已恢复到附近位置，请检查当前内容。",
+  "localReparseReaderClosed": "这本书正在重新解析。请返回书架后重新打开。"
 }

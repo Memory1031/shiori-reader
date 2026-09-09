@@ -112,11 +112,7 @@ class _ImportOverlayState extends State<ImportOverlay>
                                   for (final entry
                                       in preview.samples.entries) ...[
                                     const SizedBox(height: 12),
-                                    Text(
-                                      entry.value,
-                                      maxLines: 8,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                    Text(entry.value),
                                     OutlinedButton(
                                       onPressed: () =>
                                           c.confirmEncoding(entry.key),

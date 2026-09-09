@@ -740,4 +740,23 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get readerChapterLoadFailed =>
       'Could not open the chapter. Your current page is still available.';
+
+  @override
+  String get localReparse => 'Reparse';
+
+  @override
+  String get localReparseConfirm =>
+      'Reparse the saved original and restore your reading position where possible. Failure or cancellation keeps the previous content.';
+
+  @override
+  String get localReparseDone =>
+      'Reparsed. Your reading position is preserved.';
+
+  @override
+  String get localReparseApproximate =>
+      'Reparsed. Restored a nearby position; please check the current text.';
+
+  @override
+  String get localReparseReaderClosed =>
+      'This book is being reparsed. Return to the library and reopen it.';
 }

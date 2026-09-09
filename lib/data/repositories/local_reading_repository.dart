@@ -8,9 +8,19 @@ class LocalReadingRepository
     implements
         NovelRepository,
         LocalNavigationRepository,
-        LocalPagePresentationRepository {
+        LocalPagePresentationRepository,
+        LocalBookInvalidation {
   LocalReadingRepository({required this.local, required this.online});
   final LocalBookStore local;
+  @override
+  Stream<NovelKey> get invalidations => local is LocalBookInvalidation
+      ? (local as LocalBookInvalidation).invalidations
+      : const Stream.empty();
+
+  @override
+  Stream<NovelKey> get changes => local is LocalBookInvalidation
+      ? (local as LocalBookInvalidation).changes
+      : const Stream.empty();
   final NovelRepository online;
   @override
   Future<Result<String?>> loadPagePresentation(
@@ -103,13 +113,43 @@ class LocalReadingRepository
 
   @override
   Stream<Result<LoadResult<NovelDetail>>> detailUpdates(NovelKey key) =>
-      _local(key) ? const Stream.empty() : online.detailUpdates(key);
+      _local(key)
+      ? changes
+            .where((k) => k == key)
+            .asyncMap(
+              (_) => loadDetail(
+                key,
+                mode: ReadMode.cacheOnly,
+                cancellation: CancellationSource().token,
+              ),
+            )
+      : online.detailUpdates(key);
   @override
   Stream<Result<LoadResult<Catalog>>> catalogUpdates(NovelKey key) =>
-      _local(key) ? const Stream.empty() : online.catalogUpdates(key);
+      _local(key)
+      ? changes
+            .where((k) => k == key)
+            .asyncMap(
+              (_) => loadCatalog(
+                key,
+                mode: ReadMode.cacheOnly,
+                cancellation: CancellationSource().token,
+              ),
+            )
+      : online.catalogUpdates(key);
   @override
   Stream<Result<LoadResult<ChapterContent>>> chapterUpdates(ChapterKey key) =>
-      _local(key.novelKey) ? const Stream.empty() : online.chapterUpdates(key);
+      _local(key.novelKey)
+      ? changes
+            .where((k) => k == key.novelKey)
+            .asyncMap(
+              (_) => loadChapter(
+                key,
+                mode: ReadMode.cacheOnly,
+                cancellation: CancellationSource().token,
+              ),
+            )
+      : online.chapterUpdates(key);
   @override
   Future<Result<List<DiscoverSection>>> discover(
     SourceId id, {

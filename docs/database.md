@@ -4,7 +4,7 @@
 
 | 位置 | Schema | 内容 |
 | --- | --- | --- |
-| `users/users.sqlite` | v3 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books |
+| `users/users.sqlite` | v4 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions |
 | `disposable/cache.sqlite` | v2 | novel_cache、catalog_cache、chapter_cache、image_cache、image_owners |
 | 平台 preferences | 独立 codec | readerSettings v3、appSettings v2 |
 | `users/books/` | manifest v1 | 本地书托管原件、语义正文索引与媒体 |
@@ -27,7 +27,7 @@ preferences 使用独立 JSON key，Store 串行写入，读取等待已排队�
 
 ## 迁移与生成
 
-保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
+保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
 
 升级 DDL、完整性检查和 user_version 同事务提交；失败回滚，损坏或未知未来版本保留原文件并报错。不提供自动删用户库、drop/recreate 或生产 reset 来绕过故障。旧快照不能被当前 schema 重新导出覆盖。
 
@@ -45,3 +45,7 @@ Windows 用 `tool/generate_database.ps1`。生成 `.g.dart` 与 schema 快照一
 Android XML 排除 disposable、开发目录和导入暂存，用户数据可参与系统备份 / 换机。iOS 尚未完整验证缓存排除属性；目录分开本身不证明不会备份。系统备份恢复和整机磁盘耗尽按用户决定未执行。
 
 排障先退出应用，保全数据库、WAL / SHM、preferences、托管原件及 manifest，在副本上检查；不以卸载或删库作为默认恢复步骤。本地文件发布协议见[本地导入](local-import.md)，已有迁移 / 故障 / 设备结果见[验收摘要](validation/README.md)。
+
+## 重解析发布
+
+v4 仅添加活动 bundle、解析版本、维护标记及章节版本索引，旧记录 active_bundle=NULL 仍读根 manifest。DDL 与 user_version 同事务升级。重解析切换活动文件指针、位置及 generation 使用一个事务；文件先就绪再提交，未引用文件由管理器恢复清理。维护标记重启后解除；坏活动 manifest 不触发旧文件删除。详见[PARSE-005](validation/parse-005.md)。

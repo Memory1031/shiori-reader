@@ -271,6 +271,11 @@ class EpubParser {
       );
     }
     final spine = spines.single;
+    final occurrences = <String, int>{};
+    var spineCount = 0;
+    var repeatedBlocks = 0;
+    final epub3 = attr(package, 'version') == '3.0';
+
     for (final ref in packageChildren(spine, 'itemref')) {
       if ((attr(ref, 'properties') ?? '').contains(
         'rendition:layout-pre-paginated',
@@ -290,12 +295,32 @@ class EpubParser {
           !{'application/xhtml+xml', 'text/html'}.contains(item.type)) {
         invalidZip();
       }
-      if (byPath.containsKey(item.path) ||
-          skippedEmptyPaths.contains(item.path)) {
-        invalidZip();
-      }
+      final path = item.path!;
+      final occurrence = occurrences.update(
+        path,
+        (n) => n + 1,
+        ifAbsent: () => 0,
+      );
+      if (++spineCount > 10000) zipLimit();
+      if (occurrence > 0 && !epub3) invalidZip();
       if (chain.isNotEmpty) _diagnostics.add(EpubDiagnosticCode.spineFallback);
-      _chapter(item.path!);
+      if (occurrence == 0) {
+        _chapter(path);
+      } else if (byPath[path] case final original?) {
+        repeatedBlocks += original.blocks.length;
+        if (repeatedBlocks > 100000) zipLimit();
+        final key = LocalBookIdentity.epubOccurrence(book, path, occurrence);
+        chapters.add(
+          ChapterContent(
+            key: key,
+            title: original.title,
+            blocks: original.blocks,
+          ),
+        );
+        if (presentations[original.key.chapterId] case final html?) {
+          presentations[key.chapterId] = html;
+        }
+      }
       for (final alias in chain) {
         if (alias.path != null && byPath[item.path] != null) {
           byPath[alias.path!] = byPath[item.path]!;

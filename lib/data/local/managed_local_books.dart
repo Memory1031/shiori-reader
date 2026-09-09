@@ -1,12 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import '../../domain/reparse_position.dart';
+import '../repositories/library_repository.dart';
+import 'book_decoder.dart';
+
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
-import 'database/user_database.dart';
+import 'database/user_database.dart' show UserDatabase;
 import 'files/app_paths.dart';
 import 'local_guard.dart';
 import 'library_rows.dart';
@@ -15,16 +19,36 @@ import '../../domain/contracts/local_book_decoder.dart';
 import 'record_codec.dart';
 import 'epub/epub_parser.dart';
 
+part 'local_book_reparse.dart';
+
 /// Durable imported originals and normalized content. Never uses cache.db.
 /// Single owner, serialized operations; initialize/recover before exposure.
 class ManagedLocalBooks
     implements
         LocalBookStore,
         LocalBookManagement,
-        LocalPagePresentationRepository {
+        LocalPagePresentationRepository,
+        LocalBookReparse {
   ManagedLocalBooks._(this.paths, this.db);
   final AppPaths paths;
   final UserDatabase db;
+  final _invalidations = StreamController<NovelKey>.broadcast(sync: true);
+  final _changes = StreamController<NovelKey>.broadcast();
+  @override
+  Stream<NovelKey> get changes => _changes.stream;
+  @override
+  Stream<NovelKey> get invalidations => _invalidations.stream;
+  @override
+  Future<Result<LocalReparseResult>> reparseBook(
+    NovelKey key, {
+    required ChooseTxtEncoding chooseEncoding,
+    TxtEncoding? encoding,
+    required CancellationToken cancellation,
+  }) => _run(
+    Operation.libraryWrite,
+    () => _reparse(this, key, chooseEncoding, encoding, cancellation),
+  );
+
   (NovelKey, String, DateTime, int, LocalBookRecord)? _readCache;
   final _presentations = <NovelKey, (LocalBookContent, Map<String, String>)>{};
   @override
@@ -35,6 +59,7 @@ class ManagedLocalBooks
     checkLocalCancellation(cancellation);
     final record = await _read(chapter.novelKey, token: cancellation);
     if (record == null || record.format != LocalBookFormat.epub) return null;
+    await _loadPresentations(chapter.novelKey, record, cancellation);
     return _presentations[chapter.novelKey]?.$2[chapter.chapterId];
   });
 
@@ -54,7 +79,7 @@ class ManagedLocalBooks
     try {
       // Read DB before touching files: an unavailable index must not erase data.
       final rows = await db
-          .customSelect('SELECT digest FROM local_books')
+          .customSelect('SELECT digest,active_bundle FROM local_books')
           .get();
       final committed = rows.map((r) => r.read<String>('digest')).toSet();
       for (final dir in [paths.localBooks, paths.localImportStaging]) {
@@ -81,6 +106,13 @@ class ManagedLocalBooks
           await _deleteChild(paths.localBooks, entry.path);
         }
       }
+      for (final row in rows) {
+        await store._cleanRevisions(
+          row.read<String>('digest'),
+          row.readNullable<String>('active_bundle'),
+        );
+      }
+      await db.customStatement('UPDATE local_books SET maintenance=0');
       return Success(store);
     } catch (e) {
       return Failure(localFailure(Operation.libraryRead, e));
@@ -303,7 +335,8 @@ class ManagedLocalBooks
         )
         .getSingleOrNull();
     if (row == null) return null;
-    final file = await _file(key.novelId, 'manifest.json');
+    final bundle = row.readNullable<String>('active_bundle');
+    final file = await _file(key.novelId, 'manifest.json', bundle: bundle);
     final stat = await file.stat();
     final hash = row.read<String>('manifest_hash');
     final cached = _readCache;
@@ -327,33 +360,79 @@ class ManagedLocalBooks
       _readCache = (key, hash, stat.modified, stat.size, record);
       return record;
     }
-    var extracted = _presentations[key];
-    if (extracted == null) {
-      final original = await _file(key.novelId, 'original');
-      if (await original.length() > 64 * 1024 * 1024) {
-        throw const _LimitExceeded();
+    _readCache = (key, hash, stat.modified, stat.size, record);
+    return record;
+  }
+
+  Future<void> _loadPresentations(
+    NovelKey key,
+    LocalBookRecord record,
+    CancellationToken token,
+  ) async {
+    if (_presentations.containsKey(key)) return;
+    final row = await db
+        .customSelect(
+          'SELECT active_bundle,manifest_hash FROM local_books WHERE digest=?',
+          variables: [Variable(key.novelId)],
+        )
+        .getSingle();
+    final bundle = row.readNullable<String>('active_bundle');
+    if (!_presentations.containsKey(key)) {
+      Map<String, String> html;
+      if (bundle != null) {
+        final f = await _file(
+          key.novelId,
+          'presentations.json',
+          bundle: bundle,
+        );
+        if (await f.length() > 32 * 1024 * 1024) throw const _LimitExceeded();
+        final manifestFile = await _file(
+          key.novelId,
+          'manifest.json',
+          bundle: bundle,
+        );
+        if (await manifestFile.length() > maxManifestBytes) {
+          throw const _LimitExceeded();
+        }
+        final manifestBytes = await manifestFile.readAsBytes();
+        if (sha256.convert(manifestBytes).toString() !=
+            row.read<String>('manifest_hash')) {
+          throw const FormatException('Manifest checksum');
+        }
+        final manifest =
+            jsonDecode(utf8.decode(manifestBytes)) as Map<String, dynamic>;
+        final bytes = await f.readAsBytes();
+        if (sha256.convert(bytes).toString() != manifest['presentationHash']) {
+          throw const FormatException('Presentation checksum');
+        }
+        html = (jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>)
+            .cast<String, String>();
+      } else {
+        final original = await _file(key.novelId, 'original');
+        if (await original.length() > 64 * 1024 * 1024) {
+          throw const _LimitExceeded();
+        }
+        final extracted = await _extractPresentations(
+          await original.readAsBytes(),
+          key,
+          token,
+        );
+        // Legacy presentation may be derived, but never replace persisted
+        // semantics or show a rendition for a different content revision.
+        final revisions = {
+          for (final c in record.content.chapters) c.key: c.contentRevision,
+        };
+        html = {
+          for (final c in extracted.$1.chapters)
+            if (revisions[c.key] == c.contentRevision &&
+                extracted.$2.containsKey(c.key.chapterId))
+              c.key.chapterId: extracted.$2[c.key.chapterId]!,
+        };
       }
-      extracted = await _extractPresentations(
-        await original.readAsBytes(),
-        key,
-        token,
-      );
       checkLocalCancellation(token);
       _presentations.clear();
-      _presentations[key] = extracted;
+      _presentations[key] = (record.content, html);
     }
-    final upgraded = LocalBookRecord(
-      content: LocalBookContent(
-        detail: record.content.detail,
-        catalog: extracted.$1.catalog,
-        chapters: extracted.$1.chapters,
-        navigation: extracted.$1.navigation,
-      ),
-      format: record.format,
-      importedAt: record.importedAt,
-    );
-    _readCache = (key, hash, stat.modified, stat.size, upgraded);
-    return upgraded;
   }
 
   @override
@@ -413,6 +492,11 @@ class ManagedLocalBooks
         updates: {db.bookshelf},
       );
       await db.customUpdate(
+        'DELETE FROM local_chapter_revisions WHERE digest=?',
+        variables: [Variable(key.novelId)],
+        updates: {db.localChapterRevisions},
+      );
+      await db.customUpdate(
         'DELETE FROM local_books WHERE digest=?',
         variables: [Variable(key.novelId)],
         updates: {db.localBooks},
@@ -447,12 +531,16 @@ class ManagedLocalBooks
     }
     final published = await db
         .customSelect(
-          'SELECT 1 FROM local_books WHERE digest=?',
+          'SELECT active_bundle FROM local_books WHERE digest=?',
           variables: [Variable(parts[0])],
         )
         .get();
     if (published.isEmpty) throw const FormatException('Unpublished book');
-    final file = await _file(parts[0], parts[1]);
+    final file = await _file(
+      parts[0],
+      parts[1],
+      bundle: published.single.readNullable<String>('active_bundle'),
+    );
     if (await file.length() > maxMediaBytes) throw const _LimitExceeded();
     final bytes = await file.readAsBytes();
     if (sha256.convert(bytes).toString() != parts[1]) {
@@ -462,17 +550,73 @@ class ManagedLocalBooks
     return bytes.asUnmodifiableView();
   });
 
-  Future<File> _file(String digest, String name) async {
-    final file = File(p.join(paths.localBooks.path, digest, name));
+  Future<File> _file(String digest, String name, {String? bundle}) async {
+    if (bundle != null && !_digest.hasMatch(bundle)) {
+      throw const FormatException('Invalid bundle');
+    }
+    final relative = bundle == null ? name : p.join('revisions', bundle, name);
+    final file = File(p.join(paths.localBooks.path, digest, relative));
     final expected = p.join(
       await paths.localBooks.resolveSymbolicLinks(),
       digest,
-      name,
+      relative,
     );
     if (await file.resolveSymbolicLinks() != expected) {
       throw const FileSystemException('Linked local file');
     }
     return file;
+  }
+
+  Future<bool> _cleanRevisions(String digest, String? active) async {
+    try {
+      if (!_digest.hasMatch(digest) ||
+          active != null && !_digest.hasMatch(active)) {
+        return false;
+      }
+      if (active != null) {
+        final manifest = await _file(digest, 'manifest.json', bundle: active);
+        final row = await db
+            .customSelect(
+              'SELECT manifest_hash FROM local_books WHERE digest=?',
+              variables: [Variable(digest)],
+            )
+            .getSingle();
+        if (await manifest.length() > maxManifestBytes ||
+            sha256.convert(await manifest.readAsBytes()).toString() !=
+                row.read<String>('manifest_hash')) {
+          return false;
+        }
+      }
+      final root = Directory(p.join(paths.localBooks.path, digest));
+      if (await root.resolveSymbolicLinks() !=
+          p.join(await paths.localBooks.resolveSymbolicLinks(), digest)) {
+        return false;
+      }
+      final revisions = Directory(p.join(root.path, 'revisions'));
+      if (await revisions.exists()) {
+        if (await revisions.resolveSymbolicLinks() !=
+            p.join(await root.resolveSymbolicLinks(), 'revisions')) {
+          return false;
+        }
+        await for (final entry in revisions.list(followLinks: false)) {
+          if (_digest.hasMatch(p.basename(entry.path)) &&
+              p.basename(entry.path) != active) {
+            await _deleteChild(revisions, entry.path);
+          }
+        }
+      }
+      if (active != null) {
+        await for (final entry in root.list(followLinks: false)) {
+          final name = p.basename(entry.path);
+          if (name == 'manifest.json' || _digest.hasMatch(name)) {
+            await _deleteChild(root, entry.path);
+          }
+        }
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   static Future<void> _deleteChild(Directory root, String path) async {
@@ -494,6 +638,8 @@ class ManagedLocalBooks
   Future<void> close() async {
     _closed = true;
     await _tail;
+    await _invalidations.close();
+    await _changes.close();
     _presentations.clear();
     _readCache = null;
   }
@@ -600,12 +746,15 @@ Future<List<int>> _encodeManifest(
   Set<String> media,
   LocalBookFormat format,
   DateTime importedAt,
-  CancellationToken cancellation,
-) => runParserWorker(() {
+  CancellationToken cancellation, [
+  String? presentationHash,
+]) => runParserWorker(() {
   ManagedLocalBooks._validate(content, key, media);
   return utf8.encode(
     jsonEncode({
       'version': 1,
+      'presentationHash': presentationHash,
+      'txtEncoding': content.txtEncoding?.name,
       'navigation': content.navigation.map((e) => e.toJson()).toList(),
       'format': format.name,
       'importedAt': importedAt.toIso8601String(),
@@ -629,6 +778,9 @@ Future<LocalBookRecord> _decodeManifest(
   final map = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
   if (map['version'] != 1) throw const FormatException('Unknown local codec');
   final content = LocalBookContent(
+    txtEncoding: map['txtEncoding'] == null
+        ? null
+        : TxtEncoding.values.byName(map['txtEncoding'] as String),
     detail: RecordCodec.readDetail(map['detail'] as String),
     catalog: RecordCodec.readCatalog(map['catalog'] as String),
     navigation: (map['navigation'] as List? ?? const []).map(

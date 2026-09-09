@@ -200,7 +200,7 @@ void main() {
     test('ambiguous suffix is not hidden by identical preview prefixes', () {
       final preview = inspectTxt(utf8.encode('A' * 700 + '中文'), null);
       expect(preview.samples.length, 2);
-      expect(preview.samples.values.toSet().length, 1);
+      expect(preview.samples.values.toSet().length, 2);
       expect(preview.detected, isNull);
     });
     test('long paragraph is never split into render chunks', () {

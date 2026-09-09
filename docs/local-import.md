@@ -14,7 +14,7 @@
 
 `LocalImportSession` 拥有暂存，`LocalBookStore` 管理文件，`LocalBookManagement` 管理删除。已发布文件损坏时保留并报错，不自动删除用户数据。存储与迁移见[数据库](database.md)。
 
-身份不包含外部路径或临时 URI。TXT 章节以去 BOM 后、归一化前的原始 code point 起点派生；EPUB 章节以规范 spine href 派生。目录条目可附 fragment 定位 blockKey，目录层级与物理章节文件不是同一概念。
+身份不包含外部路径或临时 URI。TXT 章节以去 BOM 后、归一化前的原始 code point 起点派生；EPUB 首次资源章节以规范 spine href 派生，EPUB 3 后续重复 occurrence 使用独立摘要身份；目录 href 指向首次出现。目录条目可附 fragment 定位 blockKey，目录层级与物理章节文件不是同一概念。
 
 ## 平台接收
 
@@ -29,7 +29,7 @@ iOS Runner / ShareExtension 必须使用同一 App Group 配置（`SHIORI_IMPORT
 
 ## TXT
 
-支持严格 UTF-8（有 / 无 BOM）、带 BOM 的 UTF-16 LE / BE、GB18030 / GBK。存在编码歧义时提供预览确认，不用 replacement character 静默吞错。换行归一化，保留正文空白；保守识别章节标题，无可信标题则整文件作为正文。
+支持严格 UTF-8（有 / 无 BOM）、带 BOM 的 UTF-16 LE / BE、GB18030 / GBK。无 BOM UTF-16 在字节分布提供保守证据时列为候选，也可手动选择；候选均须全输入严格解码。存在编码歧义时提供头/中/尾合计最多 600 code points 的预览确认，不用 replacement character 静默吞错。换行归一化，保留正文空白；保守识别章节标题，无可信标题则整文件作为正文。
 
 WHATWG 编码映射与许可保留在工程，生成工具位于 `tool/encoding/`；不通过在线猜测编码。TXT 输入上限 16MiB，最多 100000 块、10000 章。
 
@@ -47,7 +47,7 @@ WHATWG 编码映射与许可保留在工程，生成工具位于 `tool/encoding/
 
 - 仅允许安全元素和样式，移除脚本、表单与 iframe，关闭 JavaScript，使用严格 CSP，禁止外部请求。
 - 本地图片、字体内嵌；字体单项上限 8MiB、单文档生成 HTML 上限 16MiB。
-- 已导入书可从保留原件按哈希校验后派生，不要求重新导入，不改写原件；派生缓存有界。
+- 旧格式可从原件校验后派生与已发布正文 revision 一致的特殊页；不会替换语义正文。重解析后呈现与 manifest 一起发布并校验；派生缓存有界。
 - 通过 `LocalPagePresentationRepository` 提供可选呈现，与 `LocalNavigationRepository` 的目录能力分开；标准阅读进度继续使用本地章节身份。
 
 ## 输入边界
@@ -60,7 +60,7 @@ XML 单项 4MiB、文本累计 12Mi UTF-16 单元，DOM 100000 节点 / 深度 1
 
 平台与文件样本的实际覆盖见[验收摘要](validation/README.md)，不将上述支持列表解释为所有发行商 EPUB 都已验证。
 
-已有导入记录保存解析结果；解析器修复不会自动重写旧 manifest，相同文件再次导入也会命中去重。保留进度的重新解析已纳入 PARSE-005，尚未实现；不要将删除重导作为自动迁移方案，删除会清阅读进度。
+已有导入记录保存解析结果；解析器修复不会自动重写旧 manifest，相同文件再次导入也会命中去重。可从本地文件管理菜单显式“重新解析”，保留原件并尽量恢复位置，近似恢复会提示；不要通过删除重导迁移，删除会清阅读进度。
 
 本轮已修复空章节、自闭合脚本吞正文、SVG 特殊页位图回退、隐藏内容、受限 CSS important 与注音降级等问题。35 个文件中 34 个解析成功，1 个因加密声明继续拒绝；逐文件结果、支持边界和未做的设备验证见[兼容性核查](validation/epub-compatibility.md)，不将样本通过理解为完整兼容。
 
@@ -75,3 +75,9 @@ EPUB 支持包内 picture/source 与 srcset 候选，按固定顺序选择可用
 ### 解析诊断
 
 EPUB 解析结果在 data 层附带最多 100 条固定原因码及截断标记。BookDecoder 可由调用方注入独立诊断 slot，读取最近成功解析报告；默认不保留，不写书籍文件或进度，不包含路径/正文。详见[PARSE-007](validation/parse-007.md)。
+
+### 显式重新解析
+
+原件保持不变，新 manifest/媒体/特殊页先写暂存，再发布到 `revisions/<bundle>/`。SQL 事务原子切换活动指针与阅读进度，失败或取消保持旧版本；成功后清理旧资源。无历史不创建历史，无法精确匹配的位置明确提示近似，清除旧像素布局提示。TXT 新记录保留选择编码，旧记录可预览重选。
+
+维护开始会退役已打开的 Reader，结束后从书架重新打开；旧会话及不匹配的新会话不能写旧正文进度。完整匹配、并发及崩溃恢复边界见[PARSE-005](validation/parse-005.md)。

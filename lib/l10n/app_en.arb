@@ -265,5 +265,10 @@
   "appAccentBlueGrey": "Blue grey",
   "appAccentWarmBrown": "Warm brown",
   "appAccentSoftPink": "Soft pink",
-  "readerChapterLoadFailed": "Could not open the chapter. Your current page is still available."
+  "readerChapterLoadFailed": "Could not open the chapter. Your current page is still available.",
+  "localReparse": "Reparse",
+  "localReparseConfirm": "Reparse the saved original and restore your reading position where possible. Failure or cancellation keeps the previous content.",
+  "localReparseDone": "Reparsed. Your reading position is preserved.",
+  "localReparseApproximate": "Reparsed. Restored a nearby position; please check the current text.",
+  "localReparseReaderClosed": "This book is being reparsed. Return to the library and reopen it."
 }

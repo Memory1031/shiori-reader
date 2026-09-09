@@ -1,0 +1,145 @@
+{
+  "host": "macOS 26.3.1 arm64",
+  "dart": "3.10.3",
+  "mode": "Dart VM JIT; separate process per case; single observation",
+  "budget": {
+    "eachStageMs": 5000,
+    "peakRssBytes": 536870912
+  },
+  "before": [
+    {
+      "mib": 1,
+      "shape": "lines",
+      "decodeMs": 32,
+      "probeMs": 40,
+      "parseMs": 53,
+      "peakRssBytes": 202506240,
+      "blocks": 2077,
+      "chapters": 1
+    },
+    {
+      "mib": 10,
+      "shape": "lines",
+      "decodeMs": 350,
+      "probeMs": 901,
+      "parseMs": 326,
+      "peakRssBytes": 265437184,
+      "blocks": 20764,
+      "chapters": 1
+    },
+    {
+      "mib": 16,
+      "shape": "lines",
+      "decodeMs": 700,
+      "probeMs": 1079,
+      "parseMs": 407,
+      "peakRssBytes": 309936128,
+      "blocks": 33223,
+      "chapters": 1
+    },
+    {
+      "mib": 1,
+      "shape": "single",
+      "decodeMs": 30,
+      "probeMs": 37,
+      "parseMs": 33,
+      "peakRssBytes": 208093184,
+      "blocks": 1,
+      "chapters": 1
+    },
+    {
+      "mib": 10,
+      "shape": "single",
+      "decodeMs": 287,
+      "probeMs": 338,
+      "parseMs": 206,
+      "peakRssBytes": 273825792,
+      "blocks": 1,
+      "chapters": 1
+    },
+    {
+      "mib": 16,
+      "shape": "single",
+      "decodeMs": 477,
+      "probeMs": 1008,
+      "parseMs": 308,
+      "peakRssBytes": 321585152,
+      "blocks": 1,
+      "chapters": 1
+    }
+  ],
+  "after": [
+    {
+      "mib": 1,
+      "shape": "lines",
+      "decodeMs": 32,
+      "probeMs": 55,
+      "parseMs": 54,
+      "peakRssBytes": 208715776,
+      "chapters": 1,
+      "blocks": 2077,
+      "decodedUnits": 1048576,
+      "candidates": 2
+    },
+    {
+      "mib": 10,
+      "shape": "lines",
+      "decodeMs": 311,
+      "probeMs": 782,
+      "parseMs": 260,
+      "peakRssBytes": 276103168,
+      "chapters": 1,
+      "blocks": 20764,
+      "decodedUnits": 10485760,
+      "candidates": 2
+    },
+    {
+      "mib": 16,
+      "shape": "lines",
+      "decodeMs": 497,
+      "probeMs": 1243,
+      "parseMs": 419,
+      "peakRssBytes": 324321280,
+      "chapters": 1,
+      "blocks": 33223,
+      "decodedUnits": 16777216,
+      "candidates": 2
+    },
+    {
+      "mib": 1,
+      "shape": "single",
+      "decodeMs": 30,
+      "probeMs": 51,
+      "parseMs": 33,
+      "peakRssBytes": 208060416,
+      "chapters": 1,
+      "blocks": 1,
+      "decodedUnits": 1048576,
+      "candidates": 2
+    },
+    {
+      "mib": 10,
+      "shape": "single",
+      "decodeMs": 427,
+      "probeMs": 783,
+      "parseMs": 211,
+      "peakRssBytes": 260554752,
+      "chapters": 1,
+      "blocks": 1,
+      "decodedUnits": 10485760,
+      "candidates": 2
+    },
+    {
+      "mib": 16,
+      "shape": "single",
+      "decodeMs": 468,
+      "probeMs": 1197,
+      "parseMs": 327,
+      "peakRssBytes": 292978688,
+      "chapters": 1,
+      "blocks": 1,
+      "decodedUnits": 16777216,
+      "candidates": 2
+    }
+  ]
+}

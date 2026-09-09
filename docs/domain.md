@@ -52,3 +52,7 @@ AppSettings 独立 schemaVersion=2，包含 system / light / dark 和 teal / blu
 CachedChapter / CacheOverview / PrefetchState 是不可变投影，预取目标是既有 ChapterKey，不代表已读或未经确认的续卷关系。见[契约](contracts.md)与[缓存](cache.md)。
 
 模型与摘要测试位于 `test/domain/`；`fvm dart tool/domain_example.dart` 使用自制内容演示跨进程确定性。平台证据见[验收摘要](validation/README.md)。
+
+## 本地重解析位置
+
+`migrateLocalPosition` 是纯 Dart 确定性迁移，输出不可变进度与 approximate 等级。使用章节/块身份、唯一文本/图片语义、受限邻近窗口，无法唯一匹配时回退比例/邻章并标记近似。跨块匹配按 code points；所有重解析位置清 layoutKey/pixelOffset，近似位置不保留 completed。EPUB 3 资源首次章键兼容旧规则，后续 occurrence 使用独立摘要 kind，与媒体资源身份分离。见[PARSE-005](validation/parse-005.md)。

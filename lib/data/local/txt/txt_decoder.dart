@@ -110,6 +110,41 @@ String decodeGb18030(List<int> bytes) {
   return out.toString();
 }
 
+/// Only a byte-order hint, never a detected truth. Sparse ASCII/newline NUL
+/// lanes qualify; unmarked all-CJK text without this evidence needs override.
+TxtEncoding? txtUtf16Hint(List<int> bytes) {
+  if (bytes.length < 8 || bytes.length.isOdd) return null;
+  final count = (bytes.length ~/ 2).clamp(0, 2048);
+  var even = 0, odd = 0;
+  for (var i = 0; i < count; i++) {
+    if (bytes[i * 2] == 0) even++;
+    if (bytes[i * 2 + 1] == 0) odd++;
+  }
+  if (odd >= 4 && odd >= count * .3 && even <= count * .15) {
+    return TxtEncoding.utf16le;
+  }
+  if (even >= 4 && even >= count * .3 && odd <= count * .15) {
+    return TxtEncoding.utf16be;
+  }
+  return null;
+}
+
+String txtPreviewSample(String text) {
+  final length = text.runes.length;
+  if (length <= 600) return text;
+  final middle = length ~/ 2 - 99;
+  final tail = length - 198;
+  final chunks = [StringBuffer(), StringBuffer(), StringBuffer()];
+  var index = 0;
+  for (final point in text.runes) {
+    if (index < 198) chunks[0].writeCharCode(point);
+    if (index >= middle && index < middle + 198) chunks[1].writeCharCode(point);
+    if (index >= tail) chunks[2].writeCharCode(point);
+    index++;
+  }
+  return chunks.map((b) => b.toString()).join('\n⋯\n');
+}
+
 /// Full input is validated before presenting its bounded sample. No heuristic
 /// can prove an unmarked legacy encoding, so legacy choices need confirmation.
 TxtEncodingPreview inspectTxt(List<int> bytes, TxtEncoding? requested) {
@@ -118,7 +153,7 @@ TxtEncodingPreview inspectTxt(List<int> bytes, TxtEncoding? requested) {
       ? [requested]
       : bom != null
       ? [bom]
-      : [TxtEncoding.utf8, TxtEncoding.gb18030];
+      : [TxtEncoding.utf8, ?txtUtf16Hint(bytes), TxtEncoding.gb18030];
   final samples = <TxtEncoding, String>{};
   String? utf8Text;
   var sameText = true;
@@ -131,7 +166,7 @@ TxtEncodingPreview inspectTxt(List<int> bytes, TxtEncoding? requested) {
       } else if (text != utf8Text) {
         sameText = false;
       }
-      samples[encoding] = String.fromCharCodes(text.runes.take(600));
+      samples[encoding] = txtPreviewSample(text);
     } on LocalParseException {
       /* Invalid candidates are never selectable. */
     }

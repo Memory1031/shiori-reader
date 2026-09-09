@@ -19,6 +19,19 @@ abstract final class LocalBookIdentity {
 
   /// TXT: original section start code-point offset; EPUB: normalized spine href.
   /// Parser versions must preserve this policy, never use rendered pages.
+  static ChapterKey epubOccurrence(NovelKey book, String path, int occurrence) {
+    if (occurrence < 0) throw ArgumentError('Negative occurrence');
+    return occurrence == 0
+        ? chapter(book, 'epub:$path')
+        : ChapterKey(
+            novelKey: book,
+            chapterId: ContentIdentity.digest('local-epub-occurrence', [
+              path,
+              occurrence,
+            ]),
+          );
+  }
+
   static ChapterKey chapter(NovelKey book, String locator) => ChapterKey(
     novelKey: book,
     chapterId: ContentIdentity.digest('local-chapter', [locator]),
@@ -31,8 +44,10 @@ final class LocalBookContent {
     required this.catalog,
     required Iterable<ChapterContent> chapters,
     Iterable<LocalNavigationEntry> navigation = const [],
+    this.txtEncoding,
   }) : chapters = List.unmodifiable(chapters),
        navigation = List.unmodifiable(navigation);
+  final TxtEncoding? txtEncoding;
   final NovelDetail detail;
   final Catalog catalog;
   final List<ChapterContent> chapters;
@@ -122,6 +137,30 @@ abstract interface class LocalNavigationRepository {
 abstract interface class LocalPagePresentationRepository {
   Future<Result<String?>> loadPagePresentation(
     ChapterKey chapter, {
+    required CancellationToken cancellation,
+  });
+}
+
+/// Emitted before maintenance; consumers must retire old reading controllers.
+abstract interface class LocalBookInvalidation {
+  Stream<NovelKey> get invalidations;
+  Stream<NovelKey> get changes;
+}
+
+final class LocalReparseResult {
+  const LocalReparseResult({
+    required this.approximate,
+    this.cleanupPending = false,
+  });
+  final bool approximate;
+  final bool cleanupPending;
+}
+
+abstract interface class LocalBookReparse implements LocalBookInvalidation {
+  Future<Result<LocalReparseResult>> reparseBook(
+    NovelKey key, {
+    required ChooseTxtEncoding chooseEncoding,
+    TxtEncoding? encoding,
     required CancellationToken cancellation,
   });
 }

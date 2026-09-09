@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -25,11 +26,13 @@ class LocalBooksScreen extends StatefulWidget {
 class _LocalBooksScreenState extends State<LocalBooksScreen> {
   final _request = CancellationSource();
   late final _books = widget.management.watchBooks();
+  CancellationSource? _reparseRequest;
   bool _busy = false;
   AppFailure? _failure;
   @override
   void dispose() {
     _request.cancel();
+    _reparseRequest?.cancel();
     super.dispose();
   }
 
@@ -116,6 +119,118 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     setState(() => _busy = false);
   }
 
+  Future<void> _reparse(LocalBookInfo info) async {
+    final service = widget.store;
+    if (_busy || service is! LocalBookReparse) return;
+    final l = AppLocalizations.of(context);
+    TxtEncoding? encoding;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, change) => AlertDialog(
+          title: Text(l.localReparse),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l.localReparseConfirm),
+              if (info.format == LocalBookFormat.txt)
+                DropdownButton<TxtEncoding>(
+                  isExpanded: true,
+                  value: encoding,
+                  hint: Text(l.importEncodingAuto),
+                  items: [
+                    for (final e in TxtEncoding.values)
+                      DropdownMenuItem(
+                        value: e,
+                        child: Text(e.name.toUpperCase()),
+                      ),
+                  ],
+                  onChanged: (e) => change(() => encoding = e),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(l.importCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(l.localReparse),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final request = CancellationSource();
+    _reparseRequest = request;
+    setState(() {
+      _busy = true;
+      _failure = null;
+    });
+    final result = await (service as LocalBookReparse).reparseBook(
+      info.key,
+      encoding: encoding,
+      cancellation: request.token,
+      chooseEncoding: (preview) async {
+        if (!mounted || request.token.isCancelled) {
+          throw const LocalParseException(LocalParseProblem.encoding);
+        }
+        final chosen = await showDialog<TxtEncoding>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(l.importEncodingHint),
+            content: SizedBox(
+              width: 420,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final entry in preview.samples.entries)
+                      ListTile(
+                        title: Text(entry.key.name.toUpperCase()),
+                        subtitle: Text(entry.value),
+                        onTap: () => Navigator.pop(context, entry.key),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l.importCancel),
+              ),
+            ],
+          ),
+        );
+        if (chosen == null) {
+          request.cancel();
+          throw const LocalParseException(LocalParseProblem.encoding);
+        }
+        return chosen;
+      },
+    );
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _reparseRequest = null;
+    });
+    switch (result) {
+      case Success(:final value):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${value.approximate ? l.localReparseApproximate : l.localReparseDone}${value.cleanupPending ? '\n${l.localCleanupPending}' : ''}',
+            ),
+          ),
+        );
+      case Failure(:final failure):
+        if (!request.token.isCancelled) setState(() => _failure = failure);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -138,6 +253,11 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
               child: Text(l.localBooksHint),
             ),
             if (_busy) const LinearProgressIndicator(),
+            if (_reparseRequest != null)
+              TextButton(
+                onPressed: () => _reparseRequest?.cancel(),
+                child: Text(l.importCancel),
+              ),
             if (_failure != null) Text(failureMessage(l, _failure!)),
             Expanded(
               child: StreamBuilder(
@@ -167,11 +287,18 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                           onSelected: (action) {
                             if (action == 'add') {
                               _add(book);
+                            } else if (action == 'reparse') {
+                              _reparse(book);
                             } else if (action == 'delete') {
                               _delete(book);
                             }
                           },
                           itemBuilder: (_) => [
+                            if (widget.store is LocalBookReparse)
+                              PopupMenuItem(
+                                value: 'reparse',
+                                child: Text(l.localReparse),
+                              ),
                             PopupMenuItem(
                               value: 'add',
                               child: Text(l.detailAddShelf),

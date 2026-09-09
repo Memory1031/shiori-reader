@@ -208,6 +208,36 @@ void main() {
     },
   );
   test(
+    'unmarked UTF16 reaches preview without manually selecting encoding',
+    () async {
+      source.bytes = [
+        for (final c in 'Chapter 1\n中文😀𠮷'.codeUnits) ...[c & 255, c >> 8],
+      ];
+      source.receive();
+      await controller.start();
+      final submit = controller.submit();
+      await until(() => controller.choosingEncoding);
+      expect(
+        controller.encodingPreview!.samples[TxtEncoding.utf16le],
+        'Chapter 1\n中文😀𠮷',
+      );
+      controller.confirmEncoding(TxtEncoding.utf16le);
+      await submit;
+      expect(controller.phase, ImportPhase.succeeded);
+    },
+  );
+  test(
+    'binary NUL data is rejected by strict decoder without publication',
+    () async {
+      source.bytes = List.filled(32, 0);
+      source.receive();
+      await controller.start();
+      await controller.submit();
+      expect(controller.problem, ImportProblem.encoding);
+      expect(await db.customSelect('SELECT * FROM local_books').get(), isEmpty);
+    },
+  );
+  test(
     'manual UTF16 without BOM is previewed through intake validation',
     () async {
       source.bytes = [
