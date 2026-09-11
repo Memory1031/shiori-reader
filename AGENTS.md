@@ -4,7 +4,7 @@ Conventions for coding agents working in this repository. Keep this file focused
 
 ## Working conventions
 
-- Follow the user's current task and constraints. Consult [docs/TASK_PLAN.md](docs/TASK_PLAN.md) for scope, dependencies, architecture decisions, and acceptance criteria before implementation. Do not automatically start subsequent tasks.
+- Follow the user's current task and constraints. Consult [docs/README.md](docs/README.md) for relevant module documentation before implementation and [docs/release/README.md](docs/release/README.md) for release operations. Do not automatically start subsequent tasks.
 - Inspect the working tree and preserve user / other agent changes, including staged and untracked files. Coordinate shared files when parallel work is authorized.
 - Prefer small, reviewable changes and the simplest design that meets the task. Avoid speculative abstractions, premature optimization, and unrelated refactoring.
 - Use Chinese for project explanations and task documentation unless requested otherwise; preserve established code naming and the English commit convention below.

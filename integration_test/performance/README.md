@@ -26,4 +26,4 @@ python3 integration_test/performance/run_android.py \
 
 `--suite-only` 只复跑阅读部分，`--images-only` 只复跑图片部分，`--scroll-only` 只复跑正文滚动与深恢复。计时器、VM service 请求、合成数据和报告只存在探针中。Trace 为 VM `getVMTimeline` 的 Dart/GC 流；逐帧 UI/raster 数据另存 `report.json` 中的 `timingsUs`（vsync 时间、UI、raster，单位微秒）。Trace 缓冲区有界，不保证保存整个运行的全部历史；GC 与图片生成位于滚动计时窗口之外。
 
-脚本保留 `cold.json`、`report.json`、`timeline.json`、`meminfo.txt`；超时也尽量复制部分报告并恢复应用。结论与平台限制见 [验收摘要](../../docs/release/README.md#110-验收范围)。
+脚本保留 `cold.json`、`report.json`、`timeline.json`、`meminfo.txt`；超时也尽量复制部分报告并恢复应用。测量结果仅适用于当次设备与场景，不代表其他平台表现。

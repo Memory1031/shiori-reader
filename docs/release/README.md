@@ -1,91 +1,50 @@
-# 发布状态与私下测试
+# 发布操作
 
-更新：2026-09-09。用户已在另一台电脑完成 1.0.0 发布；本轮不重新核验其远端状态。当前 **1.1.0+3 已获用户授权发布**，更新说明见 [v1.1.0](notes/v1.1.0.md)。当前执行提交与发布；远端产物结果以 Actions / Release 为准。
+本文件只维护通用流程，不记录当前版本进度。版本变化写入 `notes/vX.Y.Z.md`，测试结果在提交 / PR 或发布操作反馈中说明，不单独维护历史验收文档。
 
-分发范围仍为个人 / 私下测试，仓库为 private。解析功能提交为 `20eaddb`；该提交之后还调整了中文正文宽度和阅读设置交互，并准备文档与版本配置。自动与设备验收见下文，验收用 1.0.0+2 APK 不是最终 1.1.0 签名产物。
+## 每次先读
 
-## 本次发布内容
+| 文件 | 核对内容 |
+| --- | --- |
+| [pubspec.yaml](../../pubspec.yaml)、[iOS 工程](../../ios/Runner.xcodeproj/project.pbxproj) | 当前版本、内部构建号、ShareExtension 一致性；Runner 使用 Flutter 变量 |
+| `notes/vX.Y.Z.md`、上个 tag 到 develop 的 Git diff | 实际变更、升级提醒、已知限制 |
+| [开发说明](../development.md) | 固定工具链和本地验证命令 |
+| [CI](../ci.md)、Android / iOS 工作流 | 签名配置、触发规则和上传方式 |
+| [依赖与分发边界](dependencies.md) | 依赖变化时更新许可清单；分发范围变化时核对许可与隐私 |
+| [发布脚本](../../tool/publish_release.dart) | prepare / publish 检查与行为 |
 
-- pubspec 与三处 ShareExtension 均为 1.1.0+3；Runner 使用 Flutter 版本变量。
-- README、更新说明中的重解析入口、脚注入口与已知限制。
-- 用户已授权提交准备改动、推送 develop、预览并执行 v1.1.0；不需要再次运行 prepare，否则版本会再次递增。
-- 远端签名产物、SHA-256、签名一致性和覆盖安装仍需在发布后核验。
+## 1. 准备
 
-## 版本与安装身份
-
-正式发布前对齐 `pubspec.yaml` 的版本 / 递增 build number、原生扩展版本及 tag，确认产物来自预期提交。`v*` tag 会启动现有 Android 发布流程，配置见[CI](../ci.md)，不能仅为了查看结果随意创建发布标签。
-
-Android 发布需保管自己的密钥库、别名和密码，并设置仓库 secrets。换电脑可以恢复同一密钥；丢失或换签名可能影响覆盖更新。现有本地 Release 曾使用 Debug 签名，不能将「构建成功」等同正式候选包。为安装新包直接卸载会丢应用数据，应先核对签名与数据保留方式。
-
-iOS 当前使用用户自己的 Personal Team 进行个人设备安装，已有 Release arm64 构建、签名校验及安装 / 启动证据。Runner 和 ShareExtension 需匹配自己的签名与 App Group；不要使用公司 Team。个人开发安装仍受 Xcode 显示的描述文件有效期与能力限制，不是 App Store / TestFlight 分发证据；换电脑需重新配置个人签名环境。
-
-## 发版时核对
-
-- 对最终提交运行质量检查；确认生产入口 `lib/main.dart`，没有开发场景或秘密进入产物。
-- 对最终锁文件更新[依赖许可清单](dependencies.md)，核对原生依赖与随包声明。
-- 记录 tag / commit、包版本、SHA-256、签名证书标识；检查权限与扩展配置。
-- 在目标设备安装 / 覆盖更新、冷启动，检查书架、导入文件、阅读进度与关键翻页行为。
-- 确认当前分发范围；公开分发时重新处理以下许可事项。
-
-这些是发版时的检查，不表示本轮文档治理已执行构建、签名或设备验收。
-
-## 许可与隐私边界
-
-代码尚未选定项目许可证。角色品牌素材参考《更衣人偶坠入爱河》的**乾纱寿叶**，用户确认来源，但当前没有授权证明。在线书源接入和小说内容许可尚未确认。private 仓库、隐藏书源品牌名或使用生成图片都不等于取得再分发授权。
-
-应用不附带小说；在线查询与媒体请求会发送给对应第三方服务。书架、进度、偏好和导入原件存于应用本地，Android 系统备份 / 换机迁移可能包含用户数据；缓存与导入暂存按配置排除。iOS 备份排除行为未完成全面验证，因此不承诺所有数据永远只在单台设备上。
-
-## develop → master 发布脚本
-
-最新发布约定：tag 直接进入 Android 构建，不等待 develop CI，也不在 Release 内重复 UT / analyze。下文“确认 CI”作为日常质量建议，不是发布门禁；版本、工具、签名及 APK 校验仍强制执行。
-
-Release notes 优先读取 `docs/release/notes/<tag>.md`，本次为 [v1.1.0](notes/v1.1.0.md)；没有对应文件时使用 GitHub 自动生成说明。说明随 develop 一起提交，tag 指向的内容即发布正文。重复运行已有 Release 只更新附件，保留在 GitHub 上编辑过的说明；需要修改已发布正文时在 GitHub Release 的 Edit 页面操作。
-
-本次版本和标签使用 `1.1.0` / `v1.1.0`。pubspec 的 `+3` 是平台内部构建编号，不进入发布标签。后续支持 `patch`（1.0.0 → 1.0.1）、`minor`（1.0.0 → 1.1.0）、`major`（1.0.0 → 2.0.0）；minor 清零 patch，major 清零 minor / patch，内部构建编号每次递增。
+在干净的 develop 上使用项目 Dart SDK：
 
 ```sh
-# 下一版：在干净的 develop 上预览，再应用版本变化。
 dart tool/publish_release.dart prepare patch
 dart tool/publish_release.dart prepare patch --apply
-# patch 可替换成 minor 或 major。
 ```
 
-准备命令同步 pubspec 和全部 ShareExtension 配置，不提交、不推送、不打标签。审阅并提交版本改动、推送 develop、确认 CI 后，使用工具输出的版本执行发布。重复运行会因未提交改动而停止；版本改动提交后再执行 prepare 则会再次递增。当前已准备好 1.1.0，无需再次运行 prepare。
+支持 patch / minor / major，内部构建号递增，同步 pubspec 与全部 ShareExtension 配置。已 prepare 的版本不要重复执行，先检查 diff；提交后再次 prepare 会继续递增。
 
-使用项目 Dart SDK，macOS / Windows 命令相同（安装 FVM 时可将 `dart` 换成 `fvm dart`）：
+按输出版本编写 `notes/vX.Y.Z.md`，执行与改动相关的本地测试及必要分析、构建，记录实际结果和未测项。prepare 不提交、不推送、不打标签。
+
+## 2. 提交和发布
+
+审阅并提交必要文件、推送 develop，再将 `vX.Y.Z` 替换为已准备版本：
 
 ```sh
-# 先将本次发布的完整改动提交并推送到 origin/develop，确认 CI 通过。
-# 预览：只读取本地状态和远端 refs，不切换分支或创建标签。
-dart tool/publish_release.dart v1.1.0
-
-# 执行：合并、附注标签、原子推送，触发 Android Release 工作流。
-dart tool/publish_release.dart v1.1.0 --publish
+dart tool/publish_release.dart vX.Y.Z
+dart tool/publish_release.dart vX.Y.Z --publish
 ```
 
-[脚本](../../tool/publish_release.dart)固定使用 `origin`、`develop`、`master` 和稳定版 `vX.Y.Z`。要求当前在 develop、工作区干净、本地 develop 与远端一致、标签不存在，且提交中的 pubspec 和所有 ShareExtension 配置版本 / build 一致。不自动提交、修改版本、运行应用测试或查询 CI 状态；应先确认 develop 对应提交的 CI。
+第一条只预览；第二条用于已获授权的正式发布。要求工作区干净、develop 与 origin/develop 一致、标签不存在、包内与扩展版本一致。脚本优先快进 master，创建附注标签并原子推送 master / tag，成功后回到 develop。
 
-- 首次没有 master 时，从 develop 创建 master；已有 master 时优先快进合并以保持已验证提交的 SHA；仅分支分叉时产生合并提交，标签指向 master 的最终提交。已有本地 master 必须与远端一致。
-- 执行前 fetch 并核对分支没有变化，合并后再次检查版本配置。附注标签与 master 使用一次 `--atomic` 推送；master 使用明确旧提交的 lease 防止并发覆盖，并要求旧 master 是新提交的祖先，不用于改写历史。不支持 atomic push 或保护规则拒绝时停止，不降级为分开推送。
-- 成功后回到 develop；不自动将 master 合并回 develop。后续版本继续在 develop 开发并递增版本 / build。
-- 合并冲突时保留 master 冲突现场，不打标签、不推送；检查后可手动 `git merge --abort`。推送失败时保留本地 master / tag，不自动删除或重建；先检查远端 refs（网络中断可能发生在服务端已接收后），核对后再重试同一发布。原脚本会拒绝已有标签，不会重复发布或覆盖。
-- 标签触发 Android 签名 APK 工作流；脚本退出成功表示 Git 推送成功，不能代替 Actions 产物、签名和设备验收，也不会发布 iOS 包。
+master 仅是发布中间分支。tag 同时触发 Android 签名 APK 与 iOS 签名 / TestFlight 上传，不等待日常 CI，也不重复 UT / analyze。CI 绿色不能替代本地测试记录。
 
-验证：12 项临时本地 Git 仓库测试覆盖三种版本递增及扩展同步、准备失败不写入、只读预览、首次发布、双亲合并提交、重复标签、脏工作区、版本 / 扩展不一致、未推送 develop、master 不一致、冲突及远端拒绝标签的原子性。测试不接触真实 origin。
+GitHub Release 优先读取 `notes/<tag>.md`，缺失时自动生成；已有 Release 重跑只更新附件，手动编辑过的正文需在 GitHub 单独更新。
 
-## 本次发布准备检查
+## 3. 验收
 
-2026-09-09：清理后完整离线 556 项通过；发布工具专项 12 项通过（包含在全量中，不相加）；静态分析无问题，249 个 Dart 文件格式无改动，CI YAML 检查通过，改动文档文件链接和 diff 空白检查通过。依赖锁版本及摘要未变，已恢复工具运行时被本机环境改写的镜像 URL。未构建 1.1.0 最终签名包，未推送、未创建标签。
+- Android：核对 Actions、APK、SHA256SUMS、release-info、版本与签名，验证覆盖安装保留数据。
+- iOS：核对上传、App Store Connect 处理和 TestFlight 分发，再验证设备安装。构建成功不代表测试者已可安装。
+- 在发布操作反馈中说明实际结果和未测项。脚本成功仅表示 Git 推送成功。
 
-## 1.1.0 验收范围
-
-- 完整离线测试 556 项、静态分析和格式检查通过；构建与设备结果不由测试数量代替。
-- Android 12 真机通过导入、目录与图文、重解析保留位置、脚注返回、连续阅读跳过辅助页及重启续读。验收版本为 1.0.0+2，功能改动随后提交为 `20eaddb`，不是最终 1.1.0 签名包。
-- iPhone 由用户手动验收：旧书特殊排版在重新解析后恢复，用户确认本轮整体收口；未逐项提供的结果不记为独立通过。
-- 取消、动画性能和完整系统生命周期矩阵未实测；整机磁盘写满与系统备份恢复由用户明确跳过。最终签名产物和覆盖安装仍待发布后检查。
-
-历史阶段报告不再随工作树维护，可查 Git 历史。当前支持与限制见[本地导入](../local-import.md)。
-
-阅读排版与设置补充：用户已确认本次调整可以；阅读器及领域回归 137 项、档位专项 1 项通过，静态分析无问题。这是增量验证，不与此前全量 556 项相加；最终发布提交仍需质量检查。更新说明已包含正文留白、五档页边距、加减按钮及旧设置映射。
-
-发布提交前复核：完整离线 558 项通过，静态分析无问题，251 个 Dart 文件格式无改动，CI YAML 检查通过。用户已授权发布 v1.1.0。
+失败先核对远端 refs 与工作流。冲突时不打标签；网络失败可能已被远端接收，不直接重建或覆盖标签。不要通过卸载或换签名解决升级问题。

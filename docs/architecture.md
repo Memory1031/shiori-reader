@@ -55,7 +55,7 @@ AppSettings 独立 schemaVersion=2，包含 system / light / dark 和 teal / blu
 
 CachedChapter / CacheOverview / PrefetchState 是不可变投影，预取目标是既有 ChapterKey，不代表已读或未经确认的续卷关系。见[契约](contracts.md)与[缓存](architecture.md)。
 
-模型与摘要测试位于 `test/domain/`；`fvm dart tool/domain_example.dart` 使用自制内容演示跨进程确定性。平台证据见[验收摘要](release/README.md#110-验收范围)。
+模型与摘要测试位于 `test/domain/`；`fvm dart tool/domain_example.dart` 使用自制内容演示跨进程确定性。
 
 ### 本地重解析位置
 
@@ -137,7 +137,7 @@ Windows 用 `tool/generate_database.ps1`。生成 `.g.dart` 与 schema 快照一
 
 Android XML 排除 disposable、开发目录和导入暂存，用户数据可参与系统备份 / 换机。iOS 尚未完整验证缓存排除属性；目录分开本身不证明不会备份。系统备份恢复和整机磁盘耗尽按用户决定未执行。
 
-排障先退出应用，保全数据库、WAL / SHM、preferences、托管原件及 manifest，在副本上检查；不以卸载或删库作为默认恢复步骤。本地文件发布协议见[本地导入](local-import.md)，已有迁移 / 故障 / 设备结果见[验收摘要](release/README.md#110-验收范围)。
+排障先退出应用，保全数据库、WAL / SHM、preferences、托管原件及 manifest，在副本上检查；不以卸载或删库作为默认恢复步骤。本地文件发布协议见[本地导入](local-import.md)。
 
 ### 重解析发布
 
@@ -172,7 +172,7 @@ v4 仅添加活动 bundle、解析版本、维护标记及章节版本索引，�
 
 缓存管理页按书或全部清理需要确认；书架 / 详情中在线书移出先清该书缓存，无撤销；本地书经确认后走托管文件完整删除流程，见[本地导入](local-import.md)。清理推进 generation、停止旧预取，晚响应不得回填已清数据；已有活动 lease 在关闭前仍可读取，新读取看到 cache miss。按书清理保留其他书共享的资源。
 
-本地导入走独立文件层，清在线缓存不会删除原件、书架、进度或设置。离线列表必须同时校验外层 codec 与内部数据，不兼容记录不能列为可读。验证与故障注入见[验收摘要](release/README.md#110-验收范围)。
+本地导入走独立文件层，清在线缓存不会删除原件、书架、进度或设置。离线列表必须同时校验外层 codec 与内部数据，不兼容记录不能列为可读。
 
 
 ## 请求预算与诊断
@@ -183,7 +183,7 @@ Source 各自拥有 NetworkTransport / Dio，注入允许的 HTTPS URI 和私有
 
 AppLogger 只接受类型化摘要字段，内存最多 200 条；Release 不保存成功请求明细。不接收 URL / body / Header / exception / 自由文本。opaque SourceId 用 SHA-256 标识，requestId 为本地随机 ID；取消不产生错误事件。Source 原始响应只留在 data 层，状态与 Dio 异常映射为既有 AppFailure。
 
-依赖：精确锁定 Dio 5.11.1，官方 [包元数据](https://pub.dev/api/packages/dio/versions/5.11.1) 与本机下载包均声明 Dart >=2.18.0 <4.0.0，满足本项目 Dart 3.10.3；使用默认 IO adapter，未增移动平台插件、修改最低 OS 或放宽 TLS 校验。fake_async 1.3.3 从既有传递依赖提升为直接 dev 依赖。iOS TLS 运行边界见[验收摘要](release/README.md#110-验收范围)。
+依赖：精确锁定 Dio 5.11.1，官方 [包元数据](https://pub.dev/api/packages/dio/versions/5.11.1) 与本机下载包均声明 Dart >=2.18.0 <4.0.0，满足本项目 Dart 3.10.3；使用默认 IO adapter，未增移动平台插件、修改最低 OS 或放宽 TLS 校验。fake_async 1.3.3 从既有传递依赖提升为直接 dev 依赖。
 
 离线复验：`fvm flutter test --no-pub test/data/network --reporter expanded`。使用 FakeAdapter 和秘密哨兵检查字节 / MIME / 长度、超时、取消、错误映射与日志；未以 fake 宣称真实网站 HTTPS / 会话有效。
 
@@ -204,4 +204,4 @@ Transport.attempt 是内部“单次 HTTP 尝试”边界：3xx / 4xx / 5xx 可�
 
 ### Source 收紧规则
 
-NetworkRequest.maxRedirects 为 0..5，Source 可以收紧。当前 LightNovel JSON API 设为 0，POST 不自动重放、不恢复未经确认的会话。网络替身测试不等于真实 TLS 或实时书源可用性，证据见[验收摘要](release/README.md#110-验收范围)。
+NetworkRequest.maxRedirects 为 0..5，Source 可以收紧。当前 LightNovel JSON API 设为 0，POST 不自动重放、不恢复未经确认的会话。网络替身测试不等于真实 TLS 或实时书源可用性。

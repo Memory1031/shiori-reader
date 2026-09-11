@@ -2,7 +2,7 @@ name: Release
 
 # 正式发布工作流：仅在推送 v* 标签时触发。日常质量检查由 ci.yml 负责，
 # 按用户约定直接构建 Android；完整检查由 develop CI 独立执行。
-# 对外公开分发前需完成 TASK_PLAN 的 RELEASE-001 渠道 / 许可审查。
+# 对外公开分发前需完成 docs/release/dependencies.md 中的渠道 / 许可核对。
 on:
   push:
     tags: ['v*']

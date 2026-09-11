@@ -77,4 +77,4 @@ fvm flutter run --target lib/main_dev.dart --dart-define=SHIORI_SCENARIO=longCha
 
 已发布版本的 schema 快照必须保留；迁移用旧快照和自制数据测试，检查事务失败回滚与未知版本拒绝。不要删除用户数据库来处理升级失败。先退出应用，保全数据库及 WAL / SHM、preferences、托管原件和 manifest，在副本上检查。
 
-设备探针使用隔离目录，入口留在 `integration_test/`。已有测量与复跑入口见[验收摘要](release/README.md#110-验收范围)。本机 `.tooling/evidence/` 是忽略目录，不承诺随仓库提供；发布说明保留本轮验收范围，历史报告查 Git。旧滚动性能数据不能作为新翻页动画的性能结果。
+设备探针使用隔离目录，入口留在 `integration_test/`。本机 `.tooling/evidence/` 是忽略目录，不承诺随仓库提供；历史测量查 Git 或对应操作记录。旧滚动性能数据不能作为新翻页动画的性能结果。
