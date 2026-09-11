@@ -1,3 +1,4 @@
+import 'lightnovel_media_uri.dart';
 import '../../html/prose_semantics.dart';
 import 'package:html/parser.dart' as html;
 import 'package:html/dom.dart';
@@ -160,25 +161,26 @@ final class _Body {
           : node.attributes['data-original']?.trim().isNotEmpty == true
           ? node.attributes['data-original']
           : node.attributes['src'];
-      if (src == null || src.trim().isEmpty) {
-        throw const FormatException('Missing image');
+      MediaRef media;
+      try {
+        final uri = lightNovelMediaUri(src);
+        final locator = ContentIdentity.digest('lightnovel-image-locator', [
+          uri.origin,
+          uri.path,
+        ]);
+        media = MediaRef(
+          sourceId: lightNovelSourceId,
+          mediaId: 'image:v1:${key.novelKey.novelId}:${key.chapterId}:$locator',
+        );
+      } on LightNovelImageException {
+        // A source-local placeholder, never an address to fetch. Preserve the
+        // image position and surrounding prose without persisting the bad URL.
+        media = MediaRef(
+          sourceId: lightNovelSourceId,
+          mediaId:
+              'unavailable:v1:${key.novelKey.novelId}:${key.chapterId}:${blocks.length}',
+        );
       }
-      final uri = Uri.parse('https://www.lightnovel.fun/').resolve(src);
-      if (uri.scheme != 'https' ||
-          uri.userInfo.isNotEmpty ||
-          uri.port != 443 ||
-          uri.hasFragment ||
-          !{'www.lightnovel.fun', 'api.lightnovel.fun'}.contains(uri.host)) {
-        throw const FormatException('Invalid image');
-      }
-      final locator = ContentIdentity.digest('lightnovel-image-locator', [
-        uri.origin,
-        uri.path,
-      ]);
-      final media = MediaRef(
-        sourceId: lightNovelSourceId,
-        mediaId: 'image:v1:${key.novelKey.novelId}:${key.chapterId}:$locator',
-      );
       int? dimension(String name) {
         final n = int.tryParse(node.attributes[name] ?? '');
         return n != null && n > 0 ? n : null;

@@ -1,3 +1,4 @@
+import 'lightnovel_media_uri.dart';
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
@@ -12,19 +13,6 @@ import '../../network/network_types.dart';
 import '../../network/request_scheduler.dart';
 import 'lightnovel_api.dart';
 import 'lightnovel_identity.dart';
-
-Uri _uri(String raw) {
-  final uri = Uri.parse('https://www.lightnovel.fun/').resolve(raw);
-  if (raw.trim().isEmpty ||
-      uri.scheme != 'https' ||
-      uri.userInfo.isNotEmpty ||
-      uri.port != 443 ||
-      uri.hasFragment ||
-      !{'www.lightnovel.fun', 'api.lightnovel.fun'}.contains(uri.host)) {
-    throw const FormatException('Invalid media locator');
-  }
-  return uri;
-}
 
 class _MediaPolicy implements SourceNetworkPolicy {
   _MediaPolicy(this.uri);
@@ -125,7 +113,7 @@ final class LightNovelMedia implements SourceMedia {
       if (cover != null) {
         final raw = data['cover_url'];
         if (raw is! String || raw.isEmpty) return fail(FailureKind.notFound);
-        target = _uri(raw);
+        target = lightNovelMediaUri(raw);
       } else {
         if (lightNovelRemoteId(data['chapter_id']) != image!.group(2)) {
           return fail(
@@ -158,7 +146,13 @@ final class LightNovelMedia implements SourceMedia {
               ? img.attributes['data-original']
               : img.attributes['src'];
           if (raw == null) continue;
-          final uri = _uri(raw);
+          Uri uri;
+          try {
+            uri = lightNovelMediaUri(raw);
+          } on LightNovelImageException {
+            // An unrelated rejected image must not poison valid locators.
+            continue;
+          }
           if (ContentIdentity.digest('lightnovel-image-locator', [
                 uri.origin,
                 uri.path,
@@ -229,6 +223,8 @@ final class LightNovelMedia implements SourceMedia {
           cancellation,
         ),
       );
+    } on LightNovelImageException {
+      return fail(FailureKind.parse, context: FailureContext.invalidContent);
     } on FormatException {
       return fail(FailureKind.parse, context: FailureContext.invalidContent);
     } on ArgumentError {

@@ -119,6 +119,7 @@ void main() {
       final ref = (chapter.blocks.single as ImageBlock).media;
       source.close();
       metadata['body_snapshot']['body_html'] =
+          '<img src="https://evil.test/bad"><img src="https://[invalid">'
           '<img src="https://api.lightnovel.fun/a.png?m=new">';
       create();
       final body = await open(ref);
@@ -145,6 +146,10 @@ void main() {
       expect(media.requests.single.uri.host, 'www.lightnovel.fun');
       for (final raw in [
         'https://evil.test/a',
+        'https://evillightnovel.fun/a',
+        'https://lightnovel.fun.evil.test/a',
+        'https://res.lightnovel.fun:444/a',
+        'https://res.lightnovel.fun/a#fragment',
         'http://api.lightnovel.fun/a',
         'https://u:p@api.lightnovel.fun/a',
       ]) {
@@ -155,6 +160,40 @@ void main() {
         );
       }
       expect(media.requests.length, 1);
+    },
+  );
+  test(
+    'root and subdomain images resolve and fetch through media policy',
+    () async {
+      for (final host in [
+        'lightnovel.fun',
+        'res.lightnovel.fun',
+        'img.cdn.lightnovel.fun',
+      ]) {
+        metadata = {
+          'book_id': 31607,
+          'chapter_id': 309556,
+          'title': 'Synthetic',
+          'locked': 0,
+          'body_snapshot': {
+            'body_html': '<img src="https://$host/a.png?m=secret">',
+          },
+        };
+        final chapter =
+            (await source.getChapter(
+                      lightNovelChapterKey(lightNovelKey(31607), 309556),
+                      cancellation: token,
+                    )
+                    as Success<ChapterContent>)
+                .value;
+        final ref = (chapter.blocks.single as ImageBlock).media;
+        expect(ref.mediaId, startsWith('image:v1:'));
+        expect(jsonEncode(ref.toJson()), isNot(contains('secret')));
+        final body = await open(ref);
+        await body.close();
+        expect(media.requests.last.uri.host, host);
+      }
+      expect(media.requests.length, 3);
     },
   );
   test('redirect, bad MIME and byte limit stop without retries', () async {

@@ -1,3 +1,4 @@
+import 'lightnovel_media_uri.dart';
 import 'package:html/parser.dart' as html;
 import 'package:html/dom.dart';
 import '../../../domain/contracts/contracts.dart';
@@ -44,14 +45,7 @@ final class LightNovelDetail {
       }
       MediaRef? coverRef;
       if (cover is String && cover.trim().isNotEmpty) {
-        final uri = Uri.parse('https://www.lightnovel.fun/').resolve(cover);
-        if (uri.scheme != 'https' ||
-            uri.userInfo.isNotEmpty ||
-            uri.port != 443 ||
-            !{'www.lightnovel.fun', 'api.lightnovel.fun'}.contains(uri.host) ||
-            uri.hasFragment) {
-          return _invalid();
-        }
+        lightNovelMediaUri(cover);
         // SRC-010 resolves the book's cover role by rereading its detail.
         // No expiring URL or query parameter enters this durable identity.
         coverRef = MediaRef(
@@ -79,6 +73,8 @@ final class LightNovelDetail {
           ),
         ),
       );
+    } on LightNovelImageException {
+      return _invalid();
     } on FormatException {
       return _invalid();
     } on ArgumentError {

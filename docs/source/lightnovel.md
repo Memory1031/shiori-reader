@@ -34,7 +34,9 @@
 
 MediaRef 保存无 secret 的 locator，不持久化当次 URL、m/t、Header 或浏览器会话。cover:v1 从详情重新取得封面；image:v1 从所属章节 body_snapshot 按 origin + path 摘要重新匹配。缺失 / 冲突 / 锁定 / preview-only 明确失败，不猜签名、不盲试 host。
 
-请求仅允许已配置 HTTPS 主机（www.lightnovel.fun / api.lightnovel.fun）；元数据与图片共用 45 秒 deadline。图片最多 20MiB 且服从调用方更小限制，接收超时 30 秒，限定已支持 MIME；MIME 通过不是图片解码通过，解码与 lease 见[缓存](../architecture.md)。
+正文中的单张图片缺失地址、URI 格式错误或不符合媒体地址规则时，保留图片位置、alt / caption 和前后正文，使用 `unavailable:v1` 源内占位引用；该引用在媒体入口直接失败，不请求网络、不持久化异常 URL。媒体重新定位时跳过无效候选，仍校验目标身份及重复 locator 冲突，不让无关坏图阻断正常图。正文身份、锁定与 snapshot 校验仍作用于整章，不通过全局 catch 放过访问限制。
+
+图片（包括封面）允许 HTTPS 的 lightnovel.fun 根域与以 .lightnovel.fun 结尾的子域，仍禁止非 443 端口、用户凭据与 fragment；API 仍只允许既定端点，重定向仍禁用。元数据与图片共用 45 秒 deadline。图片最多 20MiB 且服从调用方更小限制，接收超时 30 秒，限定已支持 MIME；MIME 通过不是图片解码通过，解码与 lease 见[缓存](../architecture.md)。
 
 ## 维护与复现
 

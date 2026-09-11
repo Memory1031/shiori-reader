@@ -150,33 +150,60 @@ void main() {
       expect((result.blocks.last as ParagraphBlock).text, 'Afterlink');
     },
   );
-  test(
-    'locked, preview-only, blank, malformed and hostile images fail',
-    () async {
-      data['locked'] = 1;
-      expect(
-        (await source.getChapter(key, cancellation: token) as Failure)
-            .failure
-            .kind,
-        FailureKind.accessRestricted,
-      );
-      data['locked'] = 0;
-      final snapshot = data.remove('body_snapshot');
-      data['render_preview'] = snapshot;
+  test('locked, preview-only, blank and login forms fail', () async {
+    data['locked'] = 1;
+    expect(
+      (await source.getChapter(key, cancellation: token) as Failure)
+          .failure
+          .kind,
+      FailureKind.accessRestricted,
+    );
+    data['locked'] = 0;
+    final snapshot = data.remove('body_snapshot');
+    data['render_preview'] = snapshot;
+    expect(await source.getChapter(key, cancellation: token), isA<Failure>());
+    for (final body in [
+      '   ',
+      '<p> </p>',
+      '<script>only</script>',
+      '<form>Login</form>',
+    ]) {
+      data['body_snapshot'] = {'body_html': body};
       expect(await source.getChapter(key, cancellation: token), isA<Failure>());
-      for (final body in [
-        '   ',
-        '<p> </p>',
-        '<script>only</script>',
+    }
+  });
+  test(
+    'bad images preserve prose and become non-fetchable placeholders',
+    () async {
+      for (final image in [
         '<img>',
-        '<img src="https://evil.test/x">',
-        '<form>Login</form>',
+        '<img src="http://api.lightnovel.fun/x">',
+        '<img src="https://evil.test/x?secret=private">',
+        '<img src="https://api.lightnovel.fun:444/x">',
+        '<img src="https://api.lightnovel.fun/x#">',
+        '<img src="https://[invalid">',
       ]) {
-        data['body_snapshot'] = {'body_html': body};
+        data['body_snapshot'] = {
+          'body_html': '<p>before</p>$image<p>after</p>',
+        };
+        final chapter = await load();
+        expect(chapter.blocks.map((b) => b.kind), [
+          'paragraph',
+          'image',
+          'paragraph',
+        ]);
+        expect((chapter.blocks.first as ParagraphBlock).text, 'before');
+        expect((chapter.blocks.last as ParagraphBlock).text, 'after');
+        final ref = (chapter.blocks[1] as ImageBlock).media;
+        expect(ref.mediaId, startsWith('unavailable:v1:'));
+        expect(jsonEncode(chapter.toJson()), isNot(contains('secret=private')));
+        final before = adapter.requests.length;
         expect(
-          await source.getChapter(key, cancellation: token),
+          await source.openMedia(ref, maxBytes: 1024, cancellation: token),
           isA<Failure>(),
         );
+        expect(adapter.requests.length, before);
+        expect(ChapterContent.fromJson(chapter.toJson()), chapter);
       }
     },
   );
