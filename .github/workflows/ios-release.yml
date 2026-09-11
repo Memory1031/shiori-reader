@@ -57,10 +57,12 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, os
+          # fastlane 无法通过 API 判定团队类型，个人 / App Store 团队必须显式 in_house: false。
           json.dump({
               "key_id": os.environ["ASC_KEY_ID"],
               "issuer_id": os.environ["ASC_ISSUER_ID"],
               "key": os.environ["ASC_KEY_P8"],
+              "in_house": False,
           }, open("key.json", "w"))
           PY
           fastlane cert --api_key_path key.json --platform ios --output_path dist
