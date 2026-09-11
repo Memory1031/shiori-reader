@@ -83,6 +83,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: 选择 Xcode 26.3 并检查上传 SDK
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+          SDK_VERSION=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "iOS SDK: $SDK_VERSION"
+          if [ "${SDK_VERSION%%.*}" -lt 26 ]; then
+            echo "::error::App Store Connect 要求 iOS 26 SDK 或更高版本。"
+            exit 1
+          fi
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}

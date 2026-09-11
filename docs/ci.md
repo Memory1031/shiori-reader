@@ -42,6 +42,8 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 
 ## iOS TestFlight 发布
 
+签名构建显式选择 runner 上的 Xcode 26.3，并在安装依赖前验证 iOS SDK 主版本至少为 26，避免默认 Xcode 变化或旧 SDK 到上传阶段才失败。最低运行系统仍由 deployment target 决定，不随构建 SDK 提高到 iOS 26。要求来源：[Apple 上传要求](https://developer.apple.com/news/upcoming-requirements/)。
+
 工作流：[`.github/workflows/ios-release.yml`](../.github/workflows/ios-release.yml)。推送 `v*` tag 时与 Android 发布并行，在 macOS runner 上构建签名 IPA 并上传 App Store Connect（TestFlight）。手动入口两种模式：`build` 只做签名构建冒烟（不上传 ASC，且无标签上下文时跳过版本预检）；`bootstrap-cert` 一次性生成分发证书。质量检查不在发布工作流重复；tag 与 pubspec 版本一致性复用 `release_android.py version` 预检（仅 tag 触发时执行）。
 
 签名链路：分发证书 p12 导入临时钥匙串（runner 钥匙串每次重建，不能依赖 xcodebuild 自动建证——Apple 每团队仅允许 2 张分发证书，重复建证第三次即失败）；profile 由 `xcodebuild -allowProvisioningUpdates` 配合 App Store Connect API 密钥现场下载。导出配置为 [`ios/ExportOptions.plist`](../ios/ExportOptions.plist)，teamID 与工程 `DEVELOPMENT_TEAM` 一致（个人团队）。共 5 个 secrets：
