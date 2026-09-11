@@ -33,7 +33,9 @@ env:
 
 jobs:
   # 一次性任务：在没有 Mac 的情况下生成分发证书。
-  # 产物 p12 下载后 base64 存入 IOS_DIST_CERT_P12，之后不再需要本任务。
+  # 产物含未加密私钥：公开仓库的 Actions artifact 任何登录用户都可下载，
+  # 因此本任务仅在仓库私有时运行，下载后立即在运行页删除产物。
+  # p12 下载后 base64 存入 IOS_DIST_CERT_P12，之后不再需要本任务。
   bootstrap-signing:
     name: 一次性生成分发证书
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'bootstrap-cert'
@@ -128,9 +130,10 @@ jobs:
       - name: 写入 App Store Connect API 密钥
         env:
           KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
         run: |
           mkdir -p "$HOME/.appstoreconnect/private_keys"
-          printf '%s' "$KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8"
+          printf '%s' "$KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${KEY_ID}.p8"
 
       # 版本号不在此处修改：发版时人工对齐 pubspec version / build number 与 tag
       # （ASC 要求同一 versionName 下 CFBundleVersion 严格递增）。

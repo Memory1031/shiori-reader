@@ -59,7 +59,7 @@ Apple 侧一次性准备（都在个人团队上下文操作，注意右上角�
 1. 注册 App ID `dev.shiori.reader` 与 `dev.shiori.reader.ShareExtension`，均启用 App Groups 并分配 `group.dev.shiori.reader.import`；
 2. App Store Connect 新建 App（Bundle ID 选 `dev.shiori.reader`）；
 3. 生成 App Store Connect API 密钥（`.p8` 仅能下载一次）；
-4. 生成分发证书：在有 Xcode 的机器上创建 Apple Distribution 并从钥匙串导出 p12，或先配好前三个 secrets、运行本工作流的 `bootstrap-cert` 模式，从保留 1 天的 artifact 下载 p12，base64 后存入 secret。
+4. 生成分发证书：在有 Xcode 的机器上创建 Apple Distribution 并从钥匙串导出 p12，或先配好前三个 secrets、运行本工作流的 `bootstrap-cert` 模式，从保留 1 天的 artifact 下载 p12，base64 后存入 secret。**artifact 中的私钥未加密，而公开仓库的 Actions 产物任何登录用户都能下载**——`bootstrap-cert` 仅在仓库私有时运行，下载后立即在该次运行页删除产物。
 
 发版与安装：与 Android 相同，人工对齐版本后推 tag（ASC 要求同一 versionName 下 CFBundleVersion 严格递增）；构建经数分钟至一小时处理后出现在 TestFlight，内部测试不走 Beta 审核，构建 90 天未安装会过期。iOS runtime 证据从此具备来源（真机 TestFlight 使用），但 CI 构建成功不等于 runtime verified；对外分发前 RELEASE-001 审查同样适用。
 
