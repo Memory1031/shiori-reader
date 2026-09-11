@@ -10,6 +10,52 @@ import 'package:shiori/features/reader/viewport/render_chunk.dart';
 import 'viewport_test.dart' show at;
 
 void main() {
+  testWidgets('chapter-end entry survives delayed image size and rebuilds', (
+    tester,
+  ) async {
+    final controller = PagedReaderController();
+    final content = ChapterContent(
+      key: fixtureChapterKey(FixtureScenario.shortChapter),
+      title: 'Synthetic chapter ending with an illustration',
+      blocks: [
+        ParagraphBlock(text: 'Last paragraph before the illustration.'),
+        ImageBlock(media: fixtureMediaRef(0)),
+      ],
+    );
+    Widget view(double imageHeight) => MaterialApp(
+      home: Center(
+        child: SizedBox(
+          width: 300,
+          height: 600,
+          child: PagedReaderViewport(
+            content: content,
+            controller: controller,
+            startAtEnd: true,
+            imageHeights: {fixtureMediaRef(0): imageHeight},
+            imageBuilder: (_, _) => const SizedBox(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpWidget(view(180));
+    await tester.pumpAndSettle();
+    expect(controller.capture()!.blockIndex, 0);
+    await tester.pumpWidget(view(426));
+    await tester.pumpAndSettle();
+    expect(controller.capture()!.blockIndex, 1);
+    await tester.pumpWidget(view(426));
+    await tester.pumpAndSettle();
+    expect(controller.capture()!.blockIndex, 1);
+
+    final turn = controller.previous();
+    await tester.pumpAndSettle();
+    await turn;
+    expect(controller.capture()!.blockIndex, 0);
+    await tester.pumpWidget(view(430));
+    await tester.pumpAndSettle();
+    expect(controller.capture()!.blockIndex, 0);
+  });
+
   testWidgets('heading moves with body and large illustration stays alone', (
     tester,
   ) async {

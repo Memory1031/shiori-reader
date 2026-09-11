@@ -83,7 +83,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   bool _userScrolling = false;
   bool _deferredLayout = false;
   bool _restoring = false;
-  bool _openAtEnd = false;
+  // Keep chapter-end entry anchored through late image dimensions and other
+  // reflows. A committed turn or explicit restore establishes a new anchor.
+  bool _anchorAtEnd = false;
   @override
   void initState() {
     super.initState();
@@ -94,7 +96,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           );
     _attach();
     _position = widget.initialPosition;
-    _openAtEnd = widget.startAtEnd;
+    _anchorAtEnd = widget.startAtEnd;
   }
 
   void _attach() {
@@ -130,6 +132,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     _restoring = true;
     widget.onRestoreStart?.call();
     setState(() {
+      _anchorAtEnd = false;
       _position = position;
       _signature = null;
     });
@@ -181,7 +184,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     }
     if (!mounted || epoch != _epoch) return;
     setState(() {
-      if (commit) _current = target;
+      if (commit) {
+        _current = target;
+        _anchorAtEnd = false;
+      }
       _target = null;
       _userScrolling = false;
       _turnAnimation.value = 0;
@@ -290,12 +296,11 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           imageHeights: widget.imageHeights,
           imageExtent: widget.imageExtent,
         );
-        final first = _openAtEnd
+        final first = _anchorAtEnd
             ? _layout!.backward(PageCursor(index.chunks.length, 0))
             : _layout!.forward(_layout!.cursor(_position));
         // No clipping a text line into a viewport shorter than that line.
         if (first == null) return const SizedBox.shrink();
-        _openAtEnd = false;
         _turnAnimation.stop(canceled: true);
         _turnAnimation.value = 0;
         _target = null;
