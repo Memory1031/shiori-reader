@@ -223,17 +223,72 @@
   "cacheMissMessage": "No cached content is available. Connect to the internet and try again.",
   "importIncoming": "A file is ready to import",
   "importReview": "Review",
-  "importLater": "Later",
+  "importCancel": "Cancel",
   "importReceiving": "Copying file…",
   "importProcessing": "Importing book…",
   "importSuccess": "The book has been saved.",
-  "importHint": "Choose one TXT or EPUB file, up to 128 MiB.",
+  "importHint": "Choose TXT or EPUB files, up to 128 MiB each.",
   "importChoose": "Choose file",
   "importStart": "Import",
   "importRetry": "Retry",
-  "importCancel": "Cancel",
   "importDone": "Done",
+  "importImportAll": "Import all",
+  "importRetryFailed": "Retry failed",
+  "importResume": "Continue importing",
+  "importStop": "Stop importing",
+  "importWaiting": "Waiting",
+  "importItemImporting": "Importing",
+  "importItemImported": "Imported",
+  "importBatchReady": "Ready to import {count} books",
+  "@importBatchReady": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importBatchProgress": "Importing {current} of {total}",
+  "@importBatchProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "importBatchFinished": "Finished importing",
+  "importBatchDone": "Imported {count} books",
+  "@importBatchDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importBatchStopped": "Import stopped",
+  "importBatchSummary": "{succeeded} imported · {failed} failed",
+  "@importBatchSummary": {
+    "placeholders": {
+      "succeeded": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "importBatchRemaining": "{count} not imported yet",
+  "@importBatchRemaining": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "importTooLarge": "The file exceeds 128 MiB. Choose a smaller file.",
+  "importBatchLimit": "The selection exceeds the batch import limit. Choose fewer or smaller files.",
   "importMultiple": "Only one file can be received at a time. Select again.",
   "importBusy": "Handle the pending file first, then open or share this file again.",
   "importUnsupported": "Choose a TXT or EPUB file. Web links cannot be imported.",
@@ -248,7 +303,7 @@
   "importDrm": "This EPUB contains protected or encrypted content and cannot be imported.",
   "importFixedLayout": "Fixed-layout EPUB is not supported. Use a reflowable edition.",
   "importParseLimit": "Parsing limits exceeded: TXT 16 MiB, EPUB 64 MiB. Oversized chapters, images, or expanded content are also unsupported.",
-  "importEpubSupport": "Supports ordinary reflowable EPUB text and images. Styling is simplified; scripts, external resources, and custom fonts are not loaded. Missing images keep a placeholder.",
+  "importEpubSupport": "Supports EPUB text and images.",
   "localBooksTitle": "Local files",
   "localBooksHint": "Manage imported books. Removing a local book deletes its in-app files and reading progress. The original external file is unaffected.",
   "localBooksEmpty": "No local books imported yet.",

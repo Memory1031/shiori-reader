@@ -10,7 +10,9 @@ class PlatformImportSource implements ImportSource {
       _events = events ?? const EventChannel('dev.shiori.reader/import_events');
   final MethodChannel _channel;
   final EventChannel _events;
-  String? _id, _path;
+  // Android and iOS return ordered lists; legacy map/null remains readable.
+  // Paths stay in this adapter, bound independently to each opaque receipt id.
+  final _paths = <String, String>{};
   @override
   late final Stream<ImportSourceEvent> changes = _events
       .receiveBroadcastStream()
@@ -40,26 +42,62 @@ class PlatformImportSource implements ImportSource {
   @override
   Future<void> pick() => _call<void>('pick');
   @override
-  Future<ImportCandidate?> pending() async {
-    final value = await _call<Map<Object?, Object?>>('pending');
-    if (value == null) return null;
-    _id = value['id']! as String;
-    _path = value['path'] as String?;
-    return ImportCandidate(
-      id: _id!,
-      name: value['name'] as String? ?? '',
-      size: value['size'] as int? ?? 0,
-      error: value['error'] == null ? null : _problem(value['error'] as String),
-    );
+  Future<List<ImportCandidate>> pending() async {
+    final response = await _call<Object?>('pending');
+    final List<Object?> values = switch (response) {
+      null => const [],
+      Map<Object?, Object?> value => [value],
+      List<Object?> values => values,
+      _ => throw const ImportSourceException(ImportProblem.storage),
+    };
+    final nextCandidates = <ImportCandidate>[];
+    final nextPaths = <String, String>{};
+    final ids = <String>{};
+    for (final value in values) {
+      if (value is! Map<Object?, Object?>) {
+        throw const ImportSourceException(ImportProblem.storage);
+      }
+      final id = value['id'];
+      final name = value['name'];
+      final size = value['size'];
+      final path = value['path'];
+      final error = value['error'];
+      if (id is! String ||
+          id.isEmpty ||
+          !ids.add(id) ||
+          name is! String ||
+          size is! int ||
+          size < 0 ||
+          (error != null && error is! String) ||
+          (path != null && (path is! String || path.isEmpty)) ||
+          (error == null && path == null)) {
+        throw const ImportSourceException(ImportProblem.storage);
+      }
+      if (path is String) nextPaths[id] = path;
+      nextCandidates.add(
+        ImportCandidate(
+          id: id,
+          name: name,
+          size: size,
+          error: error == null ? null : _problem(error as String),
+        ),
+      );
+    }
+    // A malformed later item must not replace even part of the old bindings.
+    _paths
+      ..clear()
+      ..addAll(nextPaths);
+    return List.unmodifiable(nextCandidates);
   }
 
   @override
   Stream<List<int>> read(ImportCandidate candidate) async* {
-    if (_id != candidate.id || _path == null) {
+    final path = _paths[candidate.id];
+    if (path == null) {
       throw const ImportSourceException(ImportProblem.unreadable);
     }
     try {
-      yield* File(_path!).openRead();
+      yield* File(path).openRead();
     } on FileSystemException {
       throw const ImportSourceException(ImportProblem.unreadable);
     }
@@ -68,10 +106,7 @@ class PlatformImportSource implements ImportSource {
   @override
   Future<void> acknowledge(String id) async {
     await _call<void>('ack', {'id': id});
-    if (_id == id) {
-      _id = null;
-      _path = null;
-    }
+    _paths.remove(id);
   }
 
   @override

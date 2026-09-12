@@ -597,7 +597,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importReview => 'Review';
 
   @override
-  String get importLater => 'Later';
+  String get importCancel => 'Cancel';
 
   @override
   String get importReceiving => 'Copying file…';
@@ -609,7 +609,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importSuccess => 'The book has been saved.';
 
   @override
-  String get importHint => 'Choose one TXT or EPUB file, up to 128 MiB.';
+  String get importHint => 'Choose TXT or EPUB files, up to 128 MiB each.';
 
   @override
   String get importChoose => 'Choose file';
@@ -621,14 +621,67 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importRetry => 'Retry';
 
   @override
-  String get importCancel => 'Cancel';
+  String get importDone => 'Done';
 
   @override
-  String get importDone => 'Done';
+  String get importImportAll => 'Import all';
+
+  @override
+  String get importRetryFailed => 'Retry failed';
+
+  @override
+  String get importResume => 'Continue importing';
+
+  @override
+  String get importStop => 'Stop importing';
+
+  @override
+  String get importWaiting => 'Waiting';
+
+  @override
+  String get importItemImporting => 'Importing';
+
+  @override
+  String get importItemImported => 'Imported';
+
+  @override
+  String importBatchReady(int count) {
+    return 'Ready to import $count books';
+  }
+
+  @override
+  String importBatchProgress(int current, int total) {
+    return 'Importing $current of $total';
+  }
+
+  @override
+  String get importBatchFinished => 'Finished importing';
+
+  @override
+  String importBatchDone(int count) {
+    return 'Imported $count books';
+  }
+
+  @override
+  String get importBatchStopped => 'Import stopped';
+
+  @override
+  String importBatchSummary(int succeeded, int failed) {
+    return '$succeeded imported · $failed failed';
+  }
+
+  @override
+  String importBatchRemaining(int count) {
+    return '$count not imported yet';
+  }
 
   @override
   String get importTooLarge =>
       'The file exceeds 128 MiB. Choose a smaller file.';
+
+  @override
+  String get importBatchLimit =>
+      'The selection exceeds the batch import limit. Choose fewer or smaller files.';
 
   @override
   String get importMultiple =>
@@ -685,8 +738,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Parsing limits exceeded: TXT 16 MiB, EPUB 64 MiB. Oversized chapters, images, or expanded content are also unsupported.';
 
   @override
-  String get importEpubSupport =>
-      'Supports ordinary reflowable EPUB text and images. Styling is simplified; scripts, external resources, and custom fonts are not loaded. Missing images keep a placeholder.';
+  String get importEpubSupport => 'Supports EPUB text and images.';
 
   @override
   String get localBooksTitle => 'Local files';

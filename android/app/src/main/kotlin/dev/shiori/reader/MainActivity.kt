@@ -8,11 +8,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
-import org.json.JSONObject
 import java.io.File
-import java.io.FileNotFoundException
-import java.io.RandomAccessFile
-import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -23,21 +19,16 @@ class MainActivity : FlutterActivity() {
     private var cancelled = AtomicBoolean(false)
     private var copying = false
     private var deferredError: String? = null
-    private val root get() = File(noBackupFilesDir, "import-inbox").apply { mkdirs() }
-    private class Issue(val code: String) : Exception()
-    private fun <T> locked(block: () -> T): T {
-        RandomAccessFile(File(root, "lock"), "rw").use { file ->
-            val lock = file.channel.tryLock() ?: throw Issue("busy")
-            try { return block() } finally { lock.release() }
-        }
-    }
+    private val inbox by lazy { ImportInbox(File(noBackupFilesDir, "import-inbox")) }
+
     override fun configureFlutterEngine(engine: FlutterEngine) {
         super.configureFlutterEngine(engine)
         EventChannel(engine.dartExecutor.binaryMessenger, "dev.shiori.reader/import_events")
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(args: Any?, sink: EventChannel.EventSink) {
                     events = sink
-                    deferredError?.let { sink.success(mapOf("error" to it)) }; deferredError = null
+                    deferredError?.let { sink.success(mapOf("error" to it)) }
+                    deferredError = null
                     sink.success(emptyMap<String, Any>())
                 }
                 override fun onCancel(args: Any?) { events = null }
@@ -45,115 +36,181 @@ class MainActivity : FlutterActivity() {
         MethodChannel(engine.dartExecutor.binaryMessenger, "dev.shiori.reader/import")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "pick" -> {
-                        if (selection != null || copying) result.error("busy", null, null)
-                        else {
-                            selection = result
-                            val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                                addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
-                                putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/plain", "application/epub+zip"))
-                                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false)
-                            }
-                            try { startActivityForResult(picker, 6202) }
-                            catch (_: Exception) { selection = null; result.error("unreadable", null, null) }
+                    "pick" -> pick(result)
+                    "cancel" -> {
+                        cancelled.set(true)
+                        if (!copying && selection != null) {
+                            finishActivity(PICK_REQUEST)
+                            selection?.success(null)
+                            selection = null
                         }
+                        // Queued behind the copy: success means its streams are closed
+                        // and unpublished working data has been removed.
+                        worker.execute { runOnUiThread { result.success(null) } }
                     }
-                    "cancel" -> { cancelled.set(true); if (!copying && selection != null) { finishActivity(6202); selection?.success(null); selection = null }; worker.execute { runOnUiThread { result.success(null) } } }
                     "pending", "ack" -> worker.execute {
                         try {
-                            val value = locked {
-                                File(root, "working").deleteRecursively()
-                                val dir = File(root, "pending")
-                                if (!dir.exists()) null else {
-                                    val json = JSONObject(File(dir, "receipt.json").readText())
-                                    if (call.method == "ack") {
-                                        if (json.getString("id") == call.argument<String>("id") && !dir.deleteRecursively()) throw Issue("storage")
-                                        null
-                                    } else mapOf("id" to json.getString("id"), "name" to json.optString("name"),
-                                        "size" to json.optLong("size"), "path" to File(dir, "payload").absolutePath)
-                                }
+                            val value = if (call.method == "pending") inbox.pending() else {
+                                inbox.acknowledge(call.argument<String>("id") ?: throw ImportInbox.Issue("storage"))
+                                null
                             }
                             runOnUiThread { result.success(value) }
-                        } catch (_: Exception) { runOnUiThread { result.error("storage", null, null) } }
+                        } catch (e: Exception) {
+                            runOnUiThread { result.error(issueCode(e), null, null) }
+                        }
                     }
                     else -> result.notImplemented()
                 }
             }
         accept(intent)
     }
-    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); accept(intent) }
+
+    private fun pick(result: MethodChannel.Result) {
+        if (selection != null || copying) {
+            result.error("busy", null, null)
+            return
+        }
+        selection = result
+        worker.execute {
+            val error = try {
+                if (inbox.pending().isNotEmpty()) "busy" else null
+            } catch (e: Exception) { issueCode(e) }
+            runOnUiThread {
+                if (selection !== result) return@runOnUiThread // Cancelled while checking.
+                if (error != null) {
+                    selection = null
+                    result.error(error, null, null)
+                } else {
+                    try { startActivityForResult(pickerIntent(), PICK_REQUEST) }
+                    catch (_: Exception) {
+                        selection = null
+                        result.error("unreadable", null, null)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        accept(intent)
+    }
     override fun onResume() { super.onResume(); events?.success(emptyMap<String, Any>()) }
     private fun problem(code: String) {
+        if (code == "cancelled") return
         if (events == null) deferredError = code else events?.success(mapOf("error" to code))
     }
-    @Suppress("DEPRECATION")
     private fun accept(input: Intent?) {
-        if (input == null) return
-        val action = input.action
-        if (action !in listOf(Intent.ACTION_VIEW, Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE)) return
-        val uris = mutableListOf<Uri>()
-        if (action == Intent.ACTION_VIEW) input.data?.let { uris.add(it) }
-        else if (action == Intent.ACTION_SEND) (input.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))?.let { uris.add(it) }
-        else input.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)?.let { uris.addAll(it) }
-        if (uris.isEmpty()) input.clipData?.let { clip -> for (i in 0 until clip.itemCount) clip.getItemAt(i).uri?.let { uris.add(it) } }
-        input.action = null // Do not process the same Activity intent twice.
-        if (uris.size != 1 || (input.clipData?.itemCount ?: 0) > 1) { problem(if (uris.size > 1 || (input.clipData?.itemCount ?: 0) > 1) "multiple" else "unsupported"); return }
-        receive(uris[0], false)
+        if (input == null || input.action !in listOf(Intent.ACTION_VIEW, Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE)) return
+        try { receive(incomingUris(input), false) }
+        catch (e: Exception) { problem(issueCode(e)) }
+        finally { input.action = null } // Do not consume this delivery twice.
     }
+
     @Deprecated("Activity callback required by FlutterActivity")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != 6202) return
+        if (requestCode != PICK_REQUEST || selection == null) return
         if (resultCode != Activity.RESULT_OK) {
-            selection?.success(null); selection = null; return
+            selection?.success(null)
+            selection = null
+            return
         }
-        if ((data?.clipData?.itemCount ?: 0) > 1) { selection?.error("multiple", null, null); selection = null; return }
-        val uri = data?.data ?: data?.clipData?.getItemAt(0)?.uri
-        if (uri == null) { selection?.error("unreadable", null, null); selection = null; return }
-        receive(uri, true)
+        try { receive(pickerUris(data), true) }
+        catch (e: Exception) {
+            selection?.error(issueCode(e), null, null)
+            selection = null
+        }
     }
-    private fun receive(uri: Uri, picked: Boolean) {
-        if (copying) { if (picked) { selection?.error("busy", null, null); selection = null } else problem("busy"); return }
-        copying = true; cancelled = AtomicBoolean(false); val token = cancelled
+
+    private fun prepare(uri: Uri): ImportInbox.Input {
+        if (uri.scheme != "content") throw ImportInbox.Issue("unsupported")
+        val name = try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                if (it.moveToFirst()) it.getString(0) else null
+            }
+        } catch (e: Exception) { throw ImportInbox.Issue("unreadable", e) }
+        if (name.isNullOrEmpty()) throw ImportInbox.Issue("unreadable")
+        // Providers may omit or lie about SIZE. The inbox enforces actual bytes.
+        return ImportInbox.Input(name) {
+            contentResolver.openInputStream(uri) ?: throw ImportInbox.Issue("unreadable")
+        }
+    }
+
+    private fun receive(uris: List<Uri>, picked: Boolean) {
+        if (copying || (!picked && selection != null)) {
+            if (picked) {
+                selection?.error("busy", null, null)
+                selection = null
+            } else problem("busy")
+            return
+        }
+        copying = true
+        cancelled = AtomicBoolean(false)
+        val token = cancelled
+        events?.success(mapOf("bytes" to 0L))
         worker.execute {
-            var error: String? = null
-            try { locked {
-                if (uri.scheme != "content") throw Issue("unsupported")
-                val final = File(root, "pending")
-                if (final.exists()) throw Issue("busy")
-                val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-                    if (it.moveToFirst()) it.getString(0) else null
-                } ?: throw Issue("unreadable")
-                if (name.substringAfterLast('.', "").lowercase() !in listOf("txt", "epub")) throw Issue("unsupported")
-                val dir = File(root, "working"); dir.deleteRecursively(); dir.mkdirs()
-                try {
-                    var size = 0L
-                    contentResolver.openInputStream(uri)?.use { input ->
-                        File(dir, "payload").outputStream().use { output ->
-                            val buffer = ByteArray(65536)
-                            while (true) {
-                                if (token.get()) throw Issue("cancelled")
-                                val n = input.read(buffer); if (n < 0) break
-                                size += n; if (size > 128L * 1024 * 1024) throw Issue("tooLarge")
-                                output.write(buffer, 0, n)
-                                if (size % (1024 * 1024) < 65536) { val progress = size; runOnUiThread { events?.success(mapOf("bytes" to progress)) } }
-                            }
-                            output.fd.sync()
-                        }
-                    } ?: throw Issue("unreadable")
-                    if (size == 0L) throw Issue("unreadable")
-                    if (token.get()) throw Issue("cancelled")
-                    File(dir, "receipt.json").writeText(JSONObject(mapOf("id" to UUID.randomUUID().toString(), "name" to name, "size" to size)).toString())
-                    if (!dir.renameTo(final)) throw Issue("storage")
-                } finally { dir.deleteRecursively() }
-            } } catch (e: Exception) { error = (e as? Issue)?.code ?: if (e is SecurityException || e is FileNotFoundException) "unreadable" else "storage" }
+            val error = try {
+                inbox.stage(uris.map { uri -> { prepare(uri) } }, token::get) { bytes ->
+                    runOnUiThread { events?.success(mapOf("bytes" to bytes)) }
+                }
+                null
+            } catch (e: Exception) { issueCode(e) }
             runOnUiThread {
                 copying = false
-                if (picked) { if (error == null) selection?.success(null) else selection?.error(error!!, null, null); selection = null }
-                else error?.let { problem(it) }
+                if (picked) {
+                    if (error == null || error == "cancelled") selection?.success(null)
+                    else selection?.error(error, null, null)
+                    selection = null
+                } else error?.let { problem(it) }
                 events?.success(mapOf("done" to true))
             }
         }
     }
-    override fun onDestroy() { cancelled.set(true); events = null; worker.shutdown(); super.onDestroy() }
+
+    override fun onDestroy() {
+        cancelled.set(true)
+        events = null
+        worker.shutdown()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val PICK_REQUEST = 6202
+        private fun issueCode(error: Exception) = (error as? ImportInbox.Issue)?.code ?: "storage"
+
+        internal fun pickerIntent() = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("text/plain", "application/epub+zip"))
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+
+        private fun clipUris(input: Intent): List<Uri> {
+            val clip = input.clipData ?: return emptyList()
+            if (clip.itemCount > ImportInbox.MAX_FILES) throw ImportInbox.Issue("batchLimit")
+            return (0 until clip.itemCount).map {
+                clip.getItemAt(it).uri ?: throw ImportInbox.Issue("unreadable")
+            }
+        }
+        private fun checked(uris: List<Uri>): List<Uri> {
+            if (uris.isEmpty()) throw ImportInbox.Issue("unreadable")
+            if (uris.size > ImportInbox.MAX_FILES) throw ImportInbox.Issue("batchLimit")
+            return uris
+        }
+        internal fun pickerUris(input: Intent?): List<Uri> {
+            if (input == null) throw ImportInbox.Issue("unreadable")
+            return checked(if (input.clipData != null) clipUris(input) else listOfNotNull(input.data))
+        }
+        @Suppress("DEPRECATION")
+        internal fun incomingUris(input: Intent): List<Uri> = checked(when (input.action) {
+            Intent.ACTION_VIEW -> listOfNotNull(input.data)
+            Intent.ACTION_SEND -> input.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.let { listOf(it) }
+                ?: clipUris(input)
+            Intent.ACTION_SEND_MULTIPLE -> input.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+                ?.takeIf { it.isNotEmpty() } ?: clipUris(input)
+            else -> throw ImportInbox.Issue("unsupported")
+        })
+    }
 }

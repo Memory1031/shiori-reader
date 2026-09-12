@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        B00500000000000000000005 /* ImportProviderBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00500000000000000000004 /* ImportProviderBatchTests.swift */; };
+        B00500000000000000000002 /* ImportProviderBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00500000000000000000001 /* ImportProviderBatch.swift */; };
+        B00500000000000000000003 /* ImportProviderBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00500000000000000000001 /* ImportProviderBatch.swift */; };
 		116AF7243DBA7D14C4348C1C /* ImportInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65535308BB97C80C1EAC0933 /* ImportInbox.swift */; };
 		13C748B3E1C6AF5CA30ADFB6 /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = E2680F65CFFC6F10CA9EB0AA /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
@@ -67,6 +70,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+        B00500000000000000000004 /* ImportProviderBatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportProviderBatchTests.swift; sourceTree = "<group>"; };
+        B00500000000000000000001 /* ImportProviderBatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportProviderBatch.swift; sourceTree = "<group>"; };
 		09DE50DF7925D857668E1C5D /* ShareExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
 		0C1EA1B18E9D1F67F2203EB6 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
@@ -144,6 +149,7 @@
 			isa = PBXGroup;
 			children = (
 				331C807B294A618700263BE5 /* RunnerTests.swift */,
+				B00500000000000000000004 /* ImportProviderBatchTests.swift */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -214,6 +220,7 @@
 		AE1096B0912BFC5505B40092 /* SharedImport */ = {
 			isa = PBXGroup;
 			children = (
+				B00500000000000000000001 /* ImportProviderBatch.swift */,
 				65535308BB97C80C1EAC0933 /* ImportInbox.swift */,
 			);
 			path = SharedImport;
@@ -474,6 +481,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */,
+				B00500000000000000000005 /* ImportProviderBatchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -483,6 +491,7 @@
 			files = (
 				BEF1714A95294F3E156BEF18 /* ShareViewController.swift in Sources */,
 				41C74532AC9F303A6EECD695 /* ImportInbox.swift in Sources */,
+				B00500000000000000000003 /* ImportProviderBatch.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -493,6 +502,7 @@
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 				116AF7243DBA7D14C4348C1C /* ImportInbox.swift in Sources */,
+				B00500000000000000000002 /* ImportProviderBatch.swift in Sources */,
 				E0343B58AB5F90B360C5F99A /* ImportBridge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

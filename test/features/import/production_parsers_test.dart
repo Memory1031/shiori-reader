@@ -77,7 +77,7 @@ void main() {
       controller.setEncoding(TxtEncoding.utf8);
       await controller.submit();
       expect(controller.problem, ImportProblem.encoding);
-      expect(source.acks, 0);
+      expect(source.acked, isEmpty);
       controller.setEncoding(TxtEncoding.gb18030);
       final submit = controller.submit();
       await until(() => controller.choosingEncoding);
@@ -121,20 +121,20 @@ void main() {
       await controller.cancel().timeout(const Duration(seconds: 3));
       await submit;
       expect(controller.phase, ImportPhase.idle);
-      expect(source.input, isNull);
+      // Cancellation no longer acknowledges: the receipt stays durable.
+      expect(source.inbox.map((c) => c.id), ['receipt-1']);
+      expect(source.acked, isEmpty);
       expect(
         (await db.customSelect('SELECT * FROM local_books').get()),
         isEmpty,
       );
       expect(await paths.localImportStaging.list().toList(), isEmpty);
-      source.receive(id: 'next');
-      await controller.refresh();
       final retry = controller.submit();
       await until(() => controller.choosingEncoding);
       await controller.shutdown().timeout(const Duration(seconds: 3));
       await retry;
       // Shutdown keeps native pending for next launch but publishes no half book.
-      expect(source.input, isNotNull);
+      expect(source.inbox.map((c) => c.id), ['receipt-1']);
       expect(
         (await db.customSelect('SELECT * FROM local_books').get()),
         isEmpty,
@@ -199,7 +199,7 @@ void main() {
       await controller.start();
       await controller.submit();
       expect(controller.problem, ImportProblem.drm);
-      expect(source.acks, 0);
+      expect(source.acked, isEmpty);
       expect(await paths.localImportStaging.list().toList(), isEmpty);
       expect(
         (await db.customSelect('SELECT * FROM local_books').get()),

@@ -1190,11 +1190,11 @@ abstract class AppLocalizations {
   /// **'Review'**
   String get importReview;
 
-  /// No description provided for @importLater.
+  /// No description provided for @importCancel.
   ///
   /// In en, this message translates to:
-  /// **'Later'**
-  String get importLater;
+  /// **'Cancel'**
+  String get importCancel;
 
   /// No description provided for @importReceiving.
   ///
@@ -1217,7 +1217,7 @@ abstract class AppLocalizations {
   /// No description provided for @importHint.
   ///
   /// In en, this message translates to:
-  /// **'Choose one TXT or EPUB file, up to 128 MiB.'**
+  /// **'Choose TXT or EPUB files, up to 128 MiB each.'**
   String get importHint;
 
   /// No description provided for @importChoose.
@@ -1238,23 +1238,107 @@ abstract class AppLocalizations {
   /// **'Retry'**
   String get importRetry;
 
-  /// No description provided for @importCancel.
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel'**
-  String get importCancel;
-
   /// No description provided for @importDone.
   ///
   /// In en, this message translates to:
   /// **'Done'**
   String get importDone;
 
+  /// No description provided for @importImportAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Import all'**
+  String get importImportAll;
+
+  /// No description provided for @importRetryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry failed'**
+  String get importRetryFailed;
+
+  /// No description provided for @importResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue importing'**
+  String get importResume;
+
+  /// No description provided for @importStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop importing'**
+  String get importStop;
+
+  /// No description provided for @importWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting'**
+  String get importWaiting;
+
+  /// No description provided for @importItemImporting.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing'**
+  String get importItemImporting;
+
+  /// No description provided for @importItemImported.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported'**
+  String get importItemImported;
+
+  /// No description provided for @importBatchReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to import {count} books'**
+  String importBatchReady(int count);
+
+  /// No description provided for @importBatchProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing {current} of {total}'**
+  String importBatchProgress(int current, int total);
+
+  /// No description provided for @importBatchFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished importing'**
+  String get importBatchFinished;
+
+  /// No description provided for @importBatchDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} books'**
+  String importBatchDone(int count);
+
+  /// No description provided for @importBatchStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Import stopped'**
+  String get importBatchStopped;
+
+  /// No description provided for @importBatchSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{succeeded} imported · {failed} failed'**
+  String importBatchSummary(int succeeded, int failed);
+
+  /// No description provided for @importBatchRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} not imported yet'**
+  String importBatchRemaining(int count);
+
   /// No description provided for @importTooLarge.
   ///
   /// In en, this message translates to:
   /// **'The file exceeds 128 MiB. Choose a smaller file.'**
   String get importTooLarge;
+
+  /// No description provided for @importBatchLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'The selection exceeds the batch import limit. Choose fewer or smaller files.'**
+  String get importBatchLimit;
 
   /// No description provided for @importMultiple.
   ///
@@ -1343,7 +1427,7 @@ abstract class AppLocalizations {
   /// No description provided for @importEpubSupport.
   ///
   /// In en, this message translates to:
-  /// **'Supports ordinary reflowable EPUB text and images. Styling is simplified; scripts, external resources, and custom fonts are not loaded. Missing images keep a placeholder.'**
+  /// **'Supports EPUB text and images.'**
   String get importEpubSupport;
 
   /// No description provided for @localBooksTitle.

@@ -1,4 +1,8 @@
 "receiving" = "Receiving file…";
+"receiving_progress" = "Receiving %d / %d";
+"received_multiple" = "%d files received. Open Shiori to confirm the import.";
+"cancelling" = "Cancelling…";
+"batchLimit" = "Select up to 64 files, totalling no more than 512 MiB.";
 "received" = "File saved. Open Shiori to confirm the import.";
 "cancel" = "Cancel";
 "done" = "Done";

@@ -39,6 +39,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        testInstrumentationRunner = "android.test.InstrumentationTestRunner"
     }
 
     signingConfigs {
@@ -65,4 +66,11 @@ android {
 
 flutter {
     source = "../.."
+}
+
+// Platform-provided JUnit3 instrumentation only; no downloaded test framework.
+// Compile-only keeps these libraries out of both production and test APK dex.
+dependencies {
+    val optional = "${android.sdkDirectory}/platforms/android-${android.compileSdk}/optional"
+    androidTestCompileOnly(files("$optional/android.test.base.jar", "$optional/android.test.runner.jar"))
 }

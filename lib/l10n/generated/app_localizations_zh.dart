@@ -567,7 +567,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importReview => '查看';
 
   @override
-  String get importLater => '稍后处理';
+  String get importCancel => '取消';
 
   @override
   String get importReceiving => '正在复制文件…';
@@ -579,7 +579,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importSuccess => '书籍已保存。';
 
   @override
-  String get importHint => '选择一个 TXT 或 EPUB 文件，最大 128 MiB。';
+  String get importHint => '选择 TXT 或 EPUB 文件，每个文件最大 128 MiB。';
 
   @override
   String get importChoose => '选择文件';
@@ -591,13 +591,65 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importRetry => '重试';
 
   @override
-  String get importCancel => '取消';
-
-  @override
   String get importDone => '完成';
 
   @override
+  String get importImportAll => '导入全部';
+
+  @override
+  String get importRetryFailed => '重试失败项';
+
+  @override
+  String get importResume => '继续导入';
+
+  @override
+  String get importStop => '停止导入';
+
+  @override
+  String get importWaiting => '等待导入';
+
+  @override
+  String get importItemImporting => '正在导入';
+
+  @override
+  String get importItemImported => '已导入';
+
+  @override
+  String importBatchReady(int count) {
+    return '准备导入 $count 本书';
+  }
+
+  @override
+  String importBatchProgress(int current, int total) {
+    return '正在导入 $current / $total';
+  }
+
+  @override
+  String get importBatchFinished => '导入完成';
+
+  @override
+  String importBatchDone(int count) {
+    return '已导入 $count 本书';
+  }
+
+  @override
+  String get importBatchStopped => '导入已停止';
+
+  @override
+  String importBatchSummary(int succeeded, int failed) {
+    return '成功 $succeeded 本 · 失败 $failed 本';
+  }
+
+  @override
+  String importBatchRemaining(int count) {
+    return '剩余 $count 本未处理';
+  }
+
+  @override
   String get importTooLarge => '文件超过 128 MiB，请选择较小的文件。';
+
+  @override
+  String get importBatchLimit => '选择的文件过多或总大小超过批量导入限制，请减少文件后重试。';
 
   @override
   String get importMultiple => '每次仅支持一个文件，请重新选择。';
@@ -643,8 +695,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '文件超过解析限制：TXT 16 MiB、EPUB 64 MiB；过大的章节、图片或解压内容也无法导入。';
 
   @override
-  String get importEpubSupport =>
-      '支持普通流式 EPUB 图文。文字样式简化；脚本、外部资源和自定义字体不加载，缺失图片保留占位。';
+  String get importEpubSupport => '支持 EPUB 图文阅读。';
 
   @override
   String get localBooksTitle => '本地文件';

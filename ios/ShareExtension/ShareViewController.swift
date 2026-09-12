@@ -4,8 +4,9 @@ import UniformTypeIdentifiers
 final class ShareViewController: UIViewController {
   private let label = UILabel()
   private let button = UIButton(type: .system)
-  private let cancellation = ImportCancellation()
-  private var started = false
+  private enum State { case idle, receiving, cancelling, finished }
+  private var state = State.idle
+  private var batch: ImportProviderBatch?
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .systemBackground
@@ -28,50 +29,58 @@ final class ShareViewController: UIViewController {
   }
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
-    guard !started else { return }
-    started = true
+    guard state == .idle else { return }
+    state = .receiving
     let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).flatMap {
       $0.attachments ?? []
     }
-    guard providers.count == 1 else {
-      finish("multiple")
-      return
-    }
-    let provider = providers[0]
-    let epub = UTType(filenameExtension: "epub")?.identifier ?? "org.idpf.epub-container"
-    guard
-      let type = [epub, UTType.plainText.identifier].first(where: {
-        provider.hasItemConformingToTypeIdentifier($0)
-      })
-    else {
-      finish("unsupported")
-      return
-    }
-    provider.loadFileRepresentation(forTypeIdentifier: type) { url, error in
-      // The provider URL only lives for this callback: finish the streaming
-      // copy here before returning, never dispatch the URL elsewhere.
-      guard let url = url else {
-        self.finish("unreadable")
-        return
+    let batch = ImportProviderBatch()
+    self.batch = batch
+    batch.start(providers, progress: { [weak self] index, count in
+      DispatchQueue.main.async {
+        guard let self = self, self.state == .receiving else { return }
+        self.label.text = String(format: NSLocalizedString("receiving_progress", comment: ""), index, count)
       }
-      do {
-        let name =
-          ["txt", "epub"].contains(url.pathExtension.lowercased())
-          ? url.lastPathComponent : provider.suggestedName
-        try ImportInbox().stage(url, displayName: name, cancellation: self.cancellation) { _ in }
-        self.finish("received")
-      } catch { self.finish((error as? ImportIssue)?.rawValue ?? "unreadable") }
-    }
-  }
-  private func finish(_ key: String) {
-    DispatchQueue.main.async {
-      self.label.text = NSLocalizedString(key, comment: "")
-      self.button.setTitle(NSLocalizedString("done", comment: ""), for: .normal)
-    }
+    }, completion: { [weak self] outcome in
+      DispatchQueue.main.async {
+        guard let self = self else { return }
+        let wasCancelling = self.state == .cancelling
+        self.state = .finished
+        self.batch = nil
+        // Completion follows session cleanup and flock release, never the tap.
+        if wasCancelling {
+          switch outcome {
+          case .success, .failure(.cancelled):
+            self.extensionContext?.completeRequest(returningItems: nil)
+            return
+          case .failure: break // Keep cleanup/storage failures visible.
+          }
+        }
+        switch outcome {
+        case .success(let count):
+          self.label.text = count == 1
+            ? NSLocalizedString("received", comment: "")
+            : String(format: NSLocalizedString("received_multiple", comment: ""), count)
+        case .failure(let issue):
+          self.label.text = NSLocalizedString(issue.rawValue, comment: "")
+        }
+        self.button.isEnabled = true
+        self.button.setTitle(NSLocalizedString("done", comment: ""), for: .normal)
+      }
+    })
   }
   @objc private func close() {
-    cancellation.cancel()
-    // Never try to force-open the host app; it consumes the receipt on resume.
-    extensionContext?.completeRequest(returningItems: nil)
+    switch state {
+    case .receiving:
+      state = .cancelling
+      label.text = NSLocalizedString("cancelling", comment: "")
+      button.isEnabled = false
+      batch?.cancel()
+    case .cancelling: break
+    case .idle, .finished:
+      state = .finished
+      // Never force-open Runner; it consumes the batch on its next resume.
+      extensionContext?.completeRequest(returningItems: nil)
+    }
   }
 }

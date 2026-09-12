@@ -10,6 +10,7 @@
 | [接口合同](contracts.md) | Repository、会话、取消和所有权 |
 | [阅读器](reader.md) | 排版、分页、动画和阅读位置 |
 | [本地导入](local-import.md) | EPUB/TXT、资源、诊断与重解析 |
+| [上游同步记录](upstream-sync.md) | shiori-local-reader 已同步提交与移植规则 |
 | [CI](ci.md) | 日常质量检查与 tag 构建 |
 | [书源](source/lightnovel.md) | Source 协议及访问边界 |
 | [解析支持矩阵](local-import.md#解析支持矩阵) | 能力、限制和回归入口 |
