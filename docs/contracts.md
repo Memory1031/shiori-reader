@@ -67,11 +67,11 @@ SettingsStore.load/save 使用 ReaderSettings；取消前提交规则同上。�
 
 ## 本地与缓存能力
 
-ImportSource 只接收候选副本：不透明 ID、显示名、字节大小、封闭错误码及进度事件；pending 返回有序待确认回执列表，是重启恢复依据。Android 支持 picker 多选及 SEND_MULTIPLE，iOS 支持 UIDocumentPicker 多选及 ShareExtension 多附件，Runner 与扩展共用 App Group 批量 inbox。两平台每批最多 64 项、单文件 128 MiB、累计 512 MiB，只保留一个 pending batch。两平台均在 lock 内整批 working → pending 原子发布，任一复制失败或取消不暴露部分回执；逐 ID ack 先原子 detach 到墓碑再清理，重启保持剩余 order，兼容旧单回执 pending。完整 Native 协议见[平台接收](local-import.md#平台接收)。
+ImportSource 只接收候选副本：不透明 ID、显示名、字节大小、封闭错误码及进度事件；pending 返回有序待确认回执列表，是重启恢复依据。acknowledge(id) 是按 ID 幂等的确认消费回执，只消费指定回执，不影响其他项；cancelCopy 等待 Native 接收结束（复制、流关闭与暂存清理完成）后才返回，不在写入尚未停止时声称完成。回执对应的路径与平台文件结构保留在 native / data 层私有，不进入 ImportCandidate 或领域模型。Native 批次发布是原子的：任一复制失败或取消不暴露部分回执；该原子性不改变此后 Dart 逐书入库可部分成功的语义。平台入口、目录结构与 durable inbox 协议见[本地导入](local-import.md#平台接收)。
 
-PlatformImportSource 完整验证两平台 List<Map> 或 legacy Map/null 后才替换 ID → path 缓存，malformed 响应报告 storage 并保留旧绑定；路径不进入 ImportCandidate。ImportProblem.batchLimit 只表示选择超过 64 项或实际整批超过 512 MiB，单文件超限仍使用 tooLarge；不扩大控制器 fatal policy，也不增加进度事件字段。
+PlatformImportSource 完整验证两平台 List<Map> 或 legacy Map/null 后才替换 ID → path 缓存，malformed 响应报告 storage 并保留旧绑定；路径不进入 ImportCandidate。ImportProblem.batchLimit 只表示原生选择 / 接收超过批量上限（项数或整批实际字节数，限额见[本地导入](local-import.md#公共收件箱协议)），单文件超限仍使用 tooLarge；不扩大控制器 fatal policy，也不增加进度事件字段。
 
-导入控制器按回执顺序严格串行处理：单文件失败只标记该项并继续；storage / parserUnavailable 视为全局失败停止后续项；成功项提交后立即按 ID ack 并从 inbox 删除，失败与未处理回执保留待重试（dedup 命中仍视为成功）；「停止导入」停止当前处理，不回滚已成功、不 ack 未完成项；非运行态的「取消」显式放弃当前批次，逐 ID ack inbox 副本，不删除原文件或已入库书籍。取消清理期间禁止重新选择或提交；部分 ack 失败只移除已确认项，保留剩余项和 storage 错误供重试；旧 pending 查询不得重新加入已取消回执。ack 按 ID 幂等且只删除指定回执，cancelCopy 等待复制结束，平台路径和权限留在 native / data。Native 整批接收原子性不改变此后逐书入库可部分成功的语义。
+导入控制器按回执顺序严格串行处理：单文件失败只标记该项并继续；storage / parserUnavailable 视为全局失败停止后续项；成功项提交后立即按 ID ack 并从 inbox 删除，失败与未处理回执保留待重试（dedup 命中仍视为成功）。「停止导入」停止当前处理，不回滚已成功项、不 ack 未完成回执；非运行态的「取消 / 放弃导入」显式放弃当前批次，逐条 ack 并 discard 剩余 inbox 副本，不删除用户原文件或已入库书籍。取消清理期间禁止重新选择或提交；部分 ack 失败只移除已 ack 项，保留剩余项和 storage 错误供重试；旧 pending 查询不得重新加入已取消回执。
 
 LocalBookDecoder 接收导入 session、格式、文件名、token 和编码确认回调，严格解码后才提供有界预览。LocalBookStore 唯一负责发布，生产使用 addToShelf 同事务加入书架；LocalBookManagement 删除后失效旧会话，cleanupPending 表示 SQL 已提交但文件待回收。
 

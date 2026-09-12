@@ -4,7 +4,7 @@
 
 文件选择、系统「打开」或分享只接收文件；应用内确认后才发布到书库。导入会保存托管副本、加入书架，并用完整文件 SHA-256 去重。同名不同内容是不同书籍，相同字节重复导入不重复建书。
 
-待确认回执按 inbox 顺序组成批次：一次确认后严格串行导入，单个文件失败只标记该项并继续后续文件；成功项提交后立即确认（ack）并从待处理 inbox 删除，失败与未处理项保留供重试（应用重启后仍可见）；「取消」显式放弃当前批次，按 ID 确认并清理 inbox 副本，不删除用户原文件或已入库书籍；清理失败保留未确认项和错误供重试，成功后可以重新选择文件。批量确认面板按回执顺序列出文件、逐本显示导入状态，结束后显示成功/失败汇总并可重试失败项；「停止导入」仅停止当前处理，不删除任何待导入文件。Dart 侧 `ImportSource.pending()` 返回有序回执列表；Android 和 iOS 均支持一次多选或多文件分享。
+待确认回执按 inbox 顺序组成批次：用户在应用内确认一次后严格串行导入，单个文件失败只标记该项并继续后续文件；成功项提交后立即发送 ack 回执（确认消费），对应项从待处理 inbox 删除，失败与未处理项保留供重试（应用重启后仍可见）；非运行态的「取消 / 放弃导入」显式放弃当前批次，逐条 ack 并清理 inbox 副本，不删除用户原文件或已入库书籍；清理失败保留未 ack 项和错误供重试，成功后可以重新选择文件。批量确认面板按回执顺序列出文件、逐本显示导入状态，结束后显示成功/失败汇总并可重试失败项；运行中的「停止导入」仅停止当前处理，不回滚已成功项，保留全部未完成回执。Dart 侧 `ImportSource.pending()` 返回有序回执列表；Android 和 iOS 均支持一次多选或多文件分享。
 
 本地书从书架或详情移除，与本地文件管理中的删除使用同一流程；确认后删除应用内原件和解析资源，不提供撤销。单独清缓存不删除用户托管文件。删除操作清理该书托管数据、书架和进度，并失效旧会话晚写；外部原文件不动。
 
@@ -20,16 +20,11 @@
 
 ## 平台接收
 
-| 平台 | 机制 |
-| --- | --- |
-| Android | ACTION_OPEN_DOCUMENT 多选、VIEW、SEND / SEND_MULTIPLE；content URI 临时授权期间复制到 no-backup inbox，不请求所有文件权限 |
-| iOS | UIDocumentPicker 多选、安全作用域协调读取；ShareExtension 串行接收多附件，在 NSItemProvider 临时资源有效期内复制到共享 inbox |
+Android 与 iOS 通过各自系统入口接收文件，落到同一套 durable inbox 协议；平台差异只体现在入口、授权模型和目录位置。
 
-两平台均限制每批最多 64 个文件、单文件 128 MiB、实际累计复制量 512 MiB；同一时刻最多一个 pending batch，不追加、不合并、不覆盖已有批次。恢复通过 inbox 实际状态和应用恢复前台检查，不只依赖一次事件通知。`PlatformImportSource` 接受两平台的有序 `List<Map>`（空为 `[]`），并兼容旧 `Map/null`；完整校验后一次性替换 ID → 私有路径缓存，路径不进入领域模型。
+### 公共收件箱协议
 
-### Android 批量收件箱（BATCH-004）
-
-`MainActivity` 负责 picker、Intent、ContentResolver 和 channel；`ImportInbox` 负责持久化协议。目录位于 `noBackupFilesDir/import-inbox/`：
+两平台的收件箱子结构相同（Android 位于 `noBackupFilesDir/import-inbox/`，iOS 位于共享 App Group 的 `ImportInbox/`）：
 
 ```text
 import-inbox/
@@ -42,28 +37,49 @@ import-inbox/
     item-0000-<uuid>/payload
     item-0000-<uuid>/receipt.json
     item-0001-<uuid>/...
-  ack-trash-<uuid>/                 # 已确认项的可回收墓碑
+  ack-trash-<uuid>/                 # 已 ack 项的可回收墓碑
 ```
 
-回执包含不透明 `id`、展示 `name`、实际 `size` 和从 0 开始的 `order`。恢复按 order 排序，ack 后允许序号有缺口但相对顺序保持；目录名来自内部序号和 UUID，不使用外部文件名、URI path 或调用方传入的 ID。读取时验证元数据、重复 ID/order、payload 长度及符号链接；损坏的 published pending 返回 `storage` 并保留原数据。
+回执包含不透明 `id`、展示 `name`、实际 `size` 和从 0 开始的 `order`；恢复按 order 排序，ack 后允许序号有缺口但相对顺序保持。目录名来自内部序号和 UUID，不使用外部文件名、URI path 或调用方传入的 ID。读取时验证元数据、重复 ID/order、payload 长度及符号链接；损坏的已发布 pending 返回 `storage` 并保留原数据。
 
-stage、pending、ack 共用 `lock` 文件锁；持锁期间可以复制整批，其他访问不会读到 working。创建 working 和打开任何 InputStream 前，先 prepare 全部 Input 并逐项检查取消、扩展名及可用的声明单文件大小；后项元数据失败时不复制任何 payload。每个文件只接受 content URI 和大小写不敏感的 `.txt` / `.epub` 展示名，通过临时授权立即读取；64 KiB 流式复制每块检查取消、单文件与整批实际字节数，不依赖 provider 声称的大小。任一文件不可读、空、扩展名不支持、超限或取消，都清理 working，不发布部分回执。每个 payload 和 receipt 写入后同步，目录同步完成并做最后取消检查后，只执行一次 working → pending rename。rename 后的已发布数据不再作为 working 回滚；极端的发布后同步错误保留 pending 并报告 storage。此协议覆盖进程中断恢复，不宣称已验证物理断电。
+同一时刻最多一个 pending batch，不追加、不合并、不覆盖已有批次。每批最多 64 个文件、单文件 128 MiB、实际累计复制量 512 MiB；超过 64 个文件或整批超过 512 MiB 返回 `batchLimit`，单文件超过 128 MiB 返回 `tooLarge`。128 MiB / 512 MiB 是 Native inbox 暂存上限，不等于 TXT / EPUB 解析器接受该体量输入；[TXT](#txt) 与[输入边界](#输入边界)各自的解析限制仍独立生效。`batchLimit` 仅是原生选择 / 接收拒绝，不加入控制器 fatal 策略。
 
-ack 通过元数据定位匹配 ID，在锁内将该 item 原子 rename 为根目录的 `ack-trash-<uuid>`，同步目录后清理空 pending，再尽力删除墓碑。不存在的 ID 可重复确认，不影响其他回执。若进程在 detach 后、递归清理中退出，剩余 pending 仍完整；下次 pending/stage/ack 清理 working、墓碑和空 pending，避免永久 busy。只清理明确的临时/墓碑目录，不静默删除损坏的已发布数据。
+接收在 `lock` 上整批进行：stage、pending、ack 共用同一锁，持锁期间可以复制整批，其他访问不会读到 working。创建 working 和打开任何输入前，先 prepare 全部输入并逐项检查取消、大小写不敏感的 `.txt` / `.epub` 展示名及可用的声明大小；后项元数据失败时不复制任何 payload。按块流式复制（64 KiB）检查取消、单文件与整批实际字节数，不依赖声明的文件大小。任一文件不可读、空、扩展名不支持、超限或取消，都清理 working，不发布部分回执——Native 接收是 all-or-nothing。每个 payload 和 receipt 写入后同步，目录同步完成并做最后取消检查后，只执行一次 working → pending 原子发布。rename 后的已发布数据不再作为 working 回滚；极端的发布后同步错误保留 pending 并报告 storage。协议覆盖进程中断恢复，不宣称已验证物理断电。
 
-升级兼容旧 `pending/{payload,receipt.json}`：作为一项批次读取，不要求迁移；已有合法旧回执仍返回 busy，匹配 ID 的 ack 原子移走整个 legacy pending 后清理。
+ack（确认消费回执）通过元数据定位匹配 ID，在锁内将该 item 原子 rename 为根目录的 `ack-trash-<uuid>`，同步目录后清理空 pending，再尽力删除墓碑。ack 按 ID 幂等，只消费指定回执：不存在的 ID 可重复 ack，不影响其他回执。若进程在 detach 后、递归清理中退出，剩余 pending 仍完整；下次 pending/stage/ack 清理 working、墓碑和空 pending，避免永久 busy。恢复只回收暂存、墓碑和空 pending，只清理明确的临时 / 墓碑目录，不静默删除损坏的已发布数据。
 
-picker 设置 `EXTRA_ALLOW_MULTIPLE=true`，优先按 ClipData 顺序接收，否则读取单个 data URI。VIEW 使用 data URI；SEND 优先 EXTRA_STREAM；SEND_MULTIPLE 优先有序 EXTRA_STREAM 列表，两种分享缺 stream 时兼容 ClipData。不会将 stream 与 ClipData 重复拼接，也不按 URI 或同名去重；相同字节的书籍仍由 Dart 存储层 SHA-256 去重。空选择返回 unreadable，系统取消保持静默。
+升级兼容旧单文件 `pending/{payload,receipt.json}`：作为一项批次读取，不要求迁移；已有合法旧回执仍返回 busy，匹配 ID 的 ack 原子移走整个 legacy pending 后清理。
 
-文件数超过 64 或实际整批超过 512 MiB 返回 `batchLimit`，单文件超过 128 MiB 仍为 `tooLarge`。`batchLimit` 仅是原生选择/接收拒绝，不加入控制器 fatal 策略。进度沿用 `{bytes}`，约每累计 1 MiB 发一次，跨文件不归零；结束仍发送 `{done:true}`。cancel 只设置取消标记，并通过同一 worker 排队等待复制、流关闭和 working 清理完成再回复；不在写入尚未停止时声称完成。Native 整批接收的 all-or-nothing 与之后 Dart 逐书入库的 partial success 是两层独立语义。
+进度事件沿用 `{bytes}`，约每累计 1 MiB 发一次，跨文件不归零，结束发送 `{done:true}`。取消只设置取消标记，并通过同一 worker 排队等待复制、流关闭和 working 清理完成再回复，不在写入尚未停止时声称完成。Native 整批接收的 all-or-nothing 与之后 Dart 逐书入库的 partial success 是两层独立语义。
 
-### iOS 批量收件箱
+三种取消类行为互不相同，不混用：
 
-Runner 与 ShareExtension 共用 App Group 下的 `ImportInbox/`，采用相同的 working/pending item 结构、有序回执和逐 ID 确认协议，兼容旧单文件 pending。批次 session 从开始到发布或回滚持续持有跨进程 flock；整批只执行一次 working → pending 原子发布。ack 先原子移走对应项再清理；恢复只回收暂存、墓碑和空 pending，损坏的已发布数据保留并报错。
+1. 系统 picker 取消：接收侧静默结束，不产生任何回执、不发布批次。
+2. 运行中的「停止导入」：停止当前处理，不回滚已成功项，不 ack 未完成回执，剩余回执留在 inbox 供重试。
+3. 非运行态的「取消 / 放弃导入」：逐条 ack 并 discard 剩余 inbox 副本；不删除用户原文件，也不删除已经入库的书。
 
-Runner 在复制前验证全部 URL 元数据。Share 先验证全部附件数量与类型，优先选择 EPUB，再严格串行加载 provider，在各自回调返回前完成临时文件复制。取消等待当前回调、复制清理及锁释放后自动关闭扩展，无需再次点击完成；清理失败则保留错误提示。扩展只接收文件，用户回到主应用确认入库。
+恢复通过 inbox 实际状态和应用恢复前台检查，不只依赖一次事件通知。Dart 侧 `PlatformImportSource` 接受两平台的有序 `List<Map>`（空为 `[]`），并兼容旧 `Map/null`；完整校验后一次性替换 ID → 私有路径缓存，路径不进入领域模型。
 
-iOS Runner / ShareExtension 必须使用同一 App Group 配置（`SHIORI_IMPORT_GROUP`）及兼容签名。扩展只复制文件，不解析整本、不写 SQLite，使用跨进程锁协调；用户回到主应用确认。临时权限和共享容器能力需要真实平台配置，见[开发说明](development.md)。
+### Android
+
+`MainActivity` 负责 picker、Intent、ContentResolver 和 channel；`ImportInbox` 实现公共协议，inbox 位于 `noBackupFilesDir/import-inbox/`。
+
+- `ACTION_OPEN_DOCUMENT`：设置 `EXTRA_ALLOW_MULTIPLE=true`，优先按 ClipData 顺序接收，否则读取单个 data URI。
+- `ACTION_VIEW`：使用 data URI。
+- `ACTION_SEND` 优先 `EXTRA_STREAM`；`ACTION_SEND_MULTIPLE` 优先有序 `EXTRA_STREAM` 列表；两种分享缺 stream 时兼容 ClipData。
+- 每个文件只接受 content URI，在临时授权期间立即读取并复制到 no-backup inbox，不请求所有文件权限。
+- 不将 stream 与 ClipData 重复拼接，也不按 URI 或同名去重；相同字节的书籍仍由 Dart 存储层 SHA-256 去重。
+- 空选择返回 unreadable；系统取消保持静默，不产生回执。
+
+### iOS
+
+Runner 与 ShareExtension 必须使用同一 App Group 配置（`SHIORI_IMPORT_GROUP`）及兼容签名，共用其下的 `ImportInbox/` 实现公共协议。两个进程间的批次 session 从开始到发布或回滚持续持有跨进程 flock。
+
+- UIDocumentPicker 多选：按 security-scoped resource 读取，经 NSFileCoordinator 协调；Runner 在复制前验证全部 URL 元数据。
+- ShareExtension：先验证全部附件数量与类型，优先选择 EPUB，再严格串行加载 NSItemProvider；provider 提供的临时 URL 只在各自 callback 内有效，必须在 callback 返回前完成复制。
+- 取消等待当前回调、复制清理及锁释放后自动关闭扩展，无需再次点击完成；清理失败则保留错误提示。
+- 扩展只复制文件，不解析整本、不写 SQLite，跨进程锁协调；用户回到主应用确认入库。
+- 临时权限和共享容器能力需要真实平台配置，见[开发说明](development.md)。
 
 ## TXT
 
