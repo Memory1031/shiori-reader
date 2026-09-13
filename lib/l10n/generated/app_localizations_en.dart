@@ -9,6 +9,11 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String readerFootnote(String number) {
+    return 'Footnote $number';
+  }
+
+  @override
   String get shelfLocal => 'Local';
 
   @override

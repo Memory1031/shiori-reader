@@ -91,6 +91,8 @@ LocalBookReparse 接收书籍 Key、编码选择回调/可选 override 与 cance
 
 LocalContentLink 是独立于 ContentBlock 的不可变侧表项：来源 ChapterKey/blockKey、标签、可选目标 ChapterKey/blockKey，以及封闭 unavailable 原因；没有原始 URL/路径，不改变正文摘要。LocalBookContent 可保存 auxiliaryChapters、links 和可空 readingOrder；旧 manifest 缺字段时 links/auxiliary 为空，readingOrder 默认为原目录顺序。
 
+
+脚注项另含 sourceOffset（来源块内 Unicode code point 偏移）和可空 footnoteText（纯文本）；sourceOffset 非空即脚注入口，label 对应正文中的数字上标。可用脚注的 target 指向来源章，面板直接消费 footnoteText，不进行章节导航；不可用项保留入口位置及原因。旧侧表缺这些字段时仍视为普通链接。解析器替换脚注入口并移除注释正文会正常产生新的正文 revision；交互本身不修改内容身份。
 LocalContentLinkRepository 提供按来源章节的链接和主阅读顺序，所有请求仍携带取消 token。包内 href/fragment 在 data 层解析；远程、越界、缺文档或缺锚点只报告不可用，不能退到网络或错误地跳章首。同资源链接保留当前 occurrence，跨资源链接选择目标第一次出现。非 spine 的 manifest XHTML 可作为有界辅助文档加载；不进入主目录/连续阅读序列。
 
 Reader 的“本章链接”打开临时辅助阅读页（不注入 LibraryRepository），最多嵌套 8 层。原 Reader 保持挂载，返回使用原页/原 occurrence，不用保存/再读近似恢复来模拟返回。维护 invalidation 同时退役主页和辅助页。linear=no 仍在目录中、明确选择可阅读，但连续翻章只使用 readingOrder。

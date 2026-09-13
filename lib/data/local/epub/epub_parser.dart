@@ -16,6 +16,7 @@ import 'epub_presentation.dart';
 import 'epub_text_styles.dart';
 import 'epub_image_candidates.dart';
 import 'epub_diagnostics.dart';
+import 'epub_footnotes.dart';
 
 final class ParsedEpub {
   ParsedEpub(this.content, this.media, this.diagnostics);
@@ -123,6 +124,10 @@ class EpubParser {
   final rawLinks =
       <String, List<(int, String, String?, String?, LocalLinkUnavailable?)>>{};
   var linkCount = 0;
+  final _footnotes =
+      <String, List<(int, String, String?, LocalLinkUnavailable?)>>{};
+  final _noteDocuments = <String, Map<String, dom.Element>?>{};
+  var _noteChars = 0;
   final presentations = <String, String>{};
   final byPath = <String, ChapterContent>{};
   final skippedEmptyPaths = <String>{};
@@ -374,6 +379,30 @@ class EpubParser {
     final links = <LocalContentLink>[];
     for (final source in [...chapters, ...auxiliary]) {
       final path = chapterPaths[source.key]!;
+      for (final note
+          in _footnotes[path] ??
+              <(int, String, String?, LocalLinkUnavailable?)>[]) {
+        if (note.$1 >= source.blocks.length) continue;
+        final sourceBlock = source.blocks[note.$1];
+        final text = switch (sourceBlock) {
+          ParagraphBlock(:final text) || HeadingBlock(:final text) => text,
+          _ => '',
+        };
+        final offset = text.indexOf(note.$2);
+        if (offset < 0) continue;
+        links.add(
+          LocalContentLink(
+            source: source.key,
+            sourceBlockKey: sourceBlock.blockKey,
+            label: note.$2,
+            sourceOffset: text.substring(0, offset).runes.length,
+            footnoteText: note.$3,
+            target: note.$4 == null ? source.key : null,
+            unavailable: note.$4,
+          ),
+        );
+        if (links.length > 10000) zipLimit();
+      }
       for (final raw
           in rawLinks[path] ??
               <(int, String, String?, String?, LocalLinkUnavailable?)>[]) {
@@ -575,6 +604,12 @@ class EpubParser {
 
   void _chapter(String path) {
     final doc = _html(path);
+    var noteNumber = 0;
+    final noteTargets = epubNoteTargets(doc);
+    final authoredMarkers = RegExp(r'⁽[⁰¹²³⁴⁵⁶⁷⁸⁹]+⁾')
+        .allMatches(doc.documentElement?.text ?? '')
+        .map((match) => match.group(0)!)
+        .toSet();
     final styles = epubTextStyles(
       doc,
       epubDocumentStylesheets(
@@ -673,6 +708,7 @@ class EpubParser {
       }
       if (node is! dom.Element) return;
       final tag = node.localName ?? '';
+      if (epubFootnote(node)) return;
       if ({
             'script',
             'style',
@@ -727,6 +763,65 @@ class EpubParser {
           if (ref == null) unavailable = LocalLinkUnavailable.external;
         } on FormatException {
           unavailable = LocalLinkUnavailable.unsupported;
+        }
+        if (epubNoteref(node)) {
+          String? noteText;
+          if (ref != null) {
+            Map<String, dom.Element>? target;
+            if (ref.$1 == path) {
+              target = noteTargets;
+            } else if (items.values.any(
+                  (item) =>
+                      item.path == ref!.$1 &&
+                      {
+                        'application/xhtml+xml',
+                        'text/html',
+                      }.contains(item.type),
+                ) &&
+                zip.entries.containsKey(ref.$1)) {
+              if (!_noteDocuments.containsKey(ref.$1)) {
+                if (_noteDocuments.length >= 64) zipLimit();
+                try {
+                  _noteDocuments[ref.$1] = epubNoteTargets(_html(ref.$1));
+                } on LocalParseException catch (error) {
+                  if (error.problem != LocalParseProblem.invalid) rethrow;
+                  _noteDocuments[ref.$1] = null;
+                }
+              }
+              target = _noteDocuments[ref.$1];
+            }
+            final element = ref.$2 == null ? null : target?[ref.$2];
+            if (target == null) {
+              unavailable = LocalLinkUnavailable.missingDocument;
+            } else if (element == null) {
+              unavailable = LocalLinkUnavailable.missingAnchor;
+            } else if (!epubFootnote(element)) {
+              unavailable = LocalLinkUnavailable.unsupported;
+            } else {
+              noteText = epubFootnoteText(element);
+              if (noteText == null) {
+                unavailable = LocalLinkUnavailable.unsupported;
+              }
+            }
+          }
+          String marker;
+          do {
+            if (++noteNumber > 10000) zipLimit();
+            marker = epubFootnoteMarker(noteNumber);
+          } while (authoredMarkers.contains(marker));
+          _noteChars += noteText?.length ?? 0;
+          if (_noteChars > 1024 * 1024) zipLimit();
+          (_footnotes[path] ??= []).add((
+            blocks.length,
+            marker,
+            noteText,
+            unavailable,
+          ));
+          buffer.write(marker);
+          whitespace = previousWhitespace;
+          visible = previousVisible;
+          paragraphOwner = previousOwner;
+          return;
         }
         final label = node.text.trim();
         (rawLinks[path] ??= []).add((

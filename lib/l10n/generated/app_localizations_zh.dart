@@ -9,6 +9,11 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String readerFootnote(String number) {
+    return '脚注 $number';
+  }
+
+  @override
   String get shelfLocal => '本地';
 
   @override

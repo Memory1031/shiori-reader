@@ -5,6 +5,8 @@ import 'page_layout.dart';
 import 'render_chunk.dart';
 import 'block_style.dart';
 import 'paper_turn.dart';
+import '../../../domain/contracts/local_content_links.dart';
+import '../reader_footnote_text.dart';
 
 class PagedReaderController {
   _PagedReaderViewportState? _state;
@@ -42,6 +44,7 @@ class PagedReaderViewport extends StatefulWidget {
     this.pageSize,
     this.contentOrigin = Offset.zero,
     this.startAtEnd = false,
+    this.footnotes = const [],
   });
   final ChapterContent content;
   final PagedReaderController controller;
@@ -61,6 +64,7 @@ class PagedReaderViewport extends StatefulWidget {
   final Size? pageSize;
   final Offset contentOrigin;
   final bool startAtEnd;
+  final List<LocalContentLink> footnotes;
   @override
   State<PagedReaderViewport> createState() => _PagedReaderViewportState();
 }
@@ -379,24 +383,34 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                   ) /
                                   2,
                             ),
-                            child: Text(
-                              readerIndentPrefix(
-                                    widget.content.blocks[_layout!
-                                        .index
-                                        .chunks[fragment.unit]
-                                        .blockIndex],
-                                    _layout!
-                                                .index
-                                                .chunks[fragment.unit]
-                                                .start ==
-                                            0 &&
-                                        fragment.start == 0,
-                                    textWidth(fragment),
-                                    widget.textStyle,
-                                    scaler,
-                                    chapter: widget.content.key,
-                                  ) +
-                                  fragment.text!,
+                            child: ReaderFootnoteText(
+                              text: fragment.text!,
+                              blockOffset:
+                                  _layout!.index.chunks[fragment.unit].start +
+                                  fragment.start,
+                              notes: widget.footnotes
+                                  .where(
+                                    (note) =>
+                                        note.sourceBlockKey ==
+                                        _layout!
+                                            .index
+                                            .chunks[fragment.unit]
+                                            .blockKey,
+                                  )
+                                  .toList(),
+                              prefix: readerIndentPrefix(
+                                widget.content.blocks[_layout!
+                                    .index
+                                    .chunks[fragment.unit]
+                                    .blockIndex],
+                                _layout!.index.chunks[fragment.unit].start ==
+                                        0 &&
+                                    fragment.start == 0,
+                                textWidth(fragment),
+                                widget.textStyle,
+                                scaler,
+                                chapter: widget.content.key,
+                              ),
                               style: readerBlockStyle(
                                 widget.content.blocks[_layout!
                                     .index
@@ -404,13 +418,13 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                     .blockIndex],
                                 widget.textStyle,
                               ),
-                              textAlign: readerBlockAlign(
+                              align: readerBlockAlign(
                                 widget.content.blocks[_layout!
                                     .index
                                     .chunks[fragment.unit]
                                     .blockIndex],
                               ),
-                              textScaler: scaler,
+                              scaler: scaler,
                             ),
                           )
                         : _object(context, fragment),

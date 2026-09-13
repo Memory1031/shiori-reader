@@ -1,4 +1,6 @@
 {
+  "readerFootnote": "Footnote {number}",
+  "@readerFootnote": {"placeholders": {"number": {"type": "String"}}},
   "shelfLocal": "Local",
   "shelfLocalFormat": "Local · {format}",
   "@shelfLocalFormat": {

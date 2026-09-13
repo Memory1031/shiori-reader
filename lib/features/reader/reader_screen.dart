@@ -474,6 +474,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                     onRestoreStart:
                                         widget.session?.restoringProgress,
                                     controller: _paged,
+                                    footnotes:
+                                        widget.session?.contentLinks
+                                            .where((link) => link.isFootnote)
+                                            .toList() ??
+                                        const [],
                                     initialPosition: _position,
                                     textStyle: style,
                                     paragraphSpacing:

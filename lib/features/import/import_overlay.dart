@@ -182,7 +182,7 @@ class _ImportOverlayState extends State<ImportOverlay>
         Text(_problemText(l, problem), key: const ValueKey('import-error'))
       else if (!c.busy)
         Text(l.importHint),
-      if (!c.busy && c.problem != null) const SizedBox(height: 16),
+      if (!c.busy) const SizedBox(height: 16),
       if (!c.busy)
         Align(
           alignment: Alignment.centerLeft,

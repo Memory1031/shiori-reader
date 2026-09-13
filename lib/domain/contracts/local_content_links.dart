@@ -17,12 +17,18 @@ final class LocalContentLink {
     this.target,
     this.targetBlockKey,
     this.unavailable,
+    this.sourceOffset,
+    this.footnoteText,
   }) {
     if (sourceBlockKey.isEmpty ||
         label.trim().isEmpty ||
         (target == null) != (unavailable != null) ||
         target == null && targetBlockKey != null ||
-        target != null && target!.novelKey != source.novelKey) {
+        target != null && target!.novelKey != source.novelKey ||
+        sourceOffset != null && sourceOffset! < 0 ||
+        sourceOffset != null && unavailable == null && footnoteText == null ||
+        footnoteText != null &&
+            (sourceOffset == null || footnoteText!.trim().isEmpty)) {
       throw ArgumentError('Invalid local link');
     }
   }
@@ -31,6 +37,11 @@ final class LocalContentLink {
   final ChapterKey? target;
   final String? targetBlockKey;
   final LocalLinkUnavailable? unavailable;
+
+  /// Footnote marker start in source-block Unicode code points.
+  final int? sourceOffset;
+  final String? footnoteText;
+  bool get isFootnote => sourceOffset != null;
   Map<String, Object?> toJson() => {
     'source': source.toJson(),
     'block': sourceBlockKey,
@@ -38,12 +49,16 @@ final class LocalContentLink {
     'target': target?.toJson(),
     'targetBlock': targetBlockKey,
     'unavailable': unavailable?.name,
+    if (sourceOffset != null) 'sourceOffset': sourceOffset,
+    if (footnoteText != null) 'footnoteText': footnoteText,
   };
   factory LocalContentLink.fromJson(Map<String, dynamic> json) =>
       LocalContentLink(
         source: ChapterKey.fromJson(json['source'] as Map<String, dynamic>),
         sourceBlockKey: json['block'] as String,
         label: json['label'] as String,
+        sourceOffset: json['sourceOffset'] as int?,
+        footnoteText: json['footnoteText'] as String?,
         target: json['target'] == null
             ? null
             : ChapterKey.fromJson(json['target'] as Map<String, dynamic>),

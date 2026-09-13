@@ -98,6 +98,12 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @readerFootnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Footnote {number}'**
+  String readerFootnote(String number);
+
   /// No description provided for @shelfLocal.
   ///
   /// In en, this message translates to:
