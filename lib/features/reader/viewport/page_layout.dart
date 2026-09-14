@@ -107,7 +107,14 @@ final class PageLayout {
   }) {
     if (text.isEmpty) return (text: '', count: 0, height: 16);
     measuredChunks++;
-    final textWidth = readerBlockWidth(block, width, style, scaler, direction);
+    final textWidth = readerBlockWidth(
+      block,
+      width,
+      style,
+      scaler,
+      direction,
+      chapter: index.content.key,
+    );
     final prefix = readerIndentPrefix(
       block,
       startsBlock,
@@ -119,15 +126,19 @@ final class PageLayout {
     final painter = TextPainter(
       text: TextSpan(
         text: prefix + text,
-        style: readerBlockStyle(block, style),
+        style: readerBlockStyle(block, style, chapter: index.content.key),
       ),
       textDirection: direction,
       textScaler: scaler,
-      textAlign: readerBlockAlign(block),
+      textAlign: readerBlockAlign(block, chapter: index.content.key),
     )..layout(maxWidth: textWidth);
     try {
       final lines = painter.computeLineMetrics();
-      var used = readerBlockSpacing(block, paragraphSpacing);
+      var used = readerBlockSpacing(
+        block,
+        paragraphSpacing,
+        chapter: index.content.key,
+      );
       var count = 0;
       for (final line in backwards ? lines.reversed : lines) {
         if (used + line.height > available + .01) break;
@@ -224,7 +235,11 @@ final class PageLayout {
               nextBlock is ParagraphBlock) {
             final firstLines =
                 scaler.scale(style.fontSize ?? 18) * (style.height ?? 1.7) * 2 +
-                readerBlockSpacing(nextBlock, paragraphSpacing);
+                readerBlockSpacing(
+                  nextBlock,
+                  paragraphSpacing,
+                  chapter: index.content.key,
+                );
             final required = heading.height + firstLines;
             if (required <= height && required > remaining) break;
           }

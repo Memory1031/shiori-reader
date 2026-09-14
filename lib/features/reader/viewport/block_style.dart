@@ -4,16 +4,23 @@ import '../../../domain/models/models.dart';
 import '../../../domain/contracts/local_books.dart';
 import '../article_heading.dart';
 
-bool _isChapterHeading(ContentBlock block) =>
+bool _isChapterHeading(ContentBlock block, ChapterKey? chapter) =>
     block is HeadingBlock && block.level <= 2 ||
-    block is ParagraphBlock && isArticleHeading(block.text);
+    chapter?.novelKey.sourceId != LocalBookIdentity.sourceId &&
+        block is ParagraphBlock &&
+        isArticleHeading(block.text);
 
 /// Shared by text measurement and rendering in both reading modes.
-TextStyle readerBlockStyle(ContentBlock block, TextStyle base) {
-  final title = _isChapterHeading(block);
+TextStyle readerBlockStyle(
+  ContentBlock block,
+  TextStyle base, {
+  ChapterKey? chapter,
+}) {
+  final title = _isChapterHeading(block, chapter);
   final subtitle =
       block is HeadingBlock ||
-      block is ParagraphBlock &&
+      chapter?.novelKey.sourceId != LocalBookIdentity.sourceId &&
+          block is ParagraphBlock &&
           RegExp(
             r'^(?:[^\n。！？!?]{1,48}\s*)?[（(]Day\s*[0-9０-９]+[）)]$',
             caseSensitive: false,
@@ -37,7 +44,7 @@ TextStyle readerBlockStyle(ContentBlock block, TextStyle base) {
   return base;
 }
 
-TextAlign readerBlockAlign(ContentBlock block) {
+TextAlign readerBlockAlign(ContentBlock block, {ChapterKey? chapter}) {
   final alignment = switch (block) {
     ParagraphBlock(:final alignment) => alignment,
     HeadingBlock(:final alignment) => alignment,
@@ -47,7 +54,7 @@ TextAlign readerBlockAlign(ContentBlock block) {
     ParagraphAlignment.center => TextAlign.center,
     ParagraphAlignment.end => TextAlign.end,
     ParagraphAlignment.start =>
-      _isChapterHeading(block) ? TextAlign.center : TextAlign.start,
+      _isChapterHeading(block, chapter) ? TextAlign.center : TextAlign.start,
   };
 }
 
@@ -64,7 +71,7 @@ String readerIndentPrefix(
       !startsBlock ||
       block.text.trim().isEmpty ||
       block.alignment != ParagraphAlignment.start ||
-      isArticleHeading(block.text) ||
+      _isChapterHeading(block, chapter) ||
       RegExp(r'^[\s　]').hasMatch(block.text)) {
     return '';
   }
@@ -86,8 +93,12 @@ String readerIndentPrefix(
 }
 
 /// Shared vertical rhythm; measurement must reserve the same space as painting.
-double readerBlockSpacing(ContentBlock block, double paragraphSpacing) {
-  if (_isChapterHeading(block)) return paragraphSpacing + 64;
+double readerBlockSpacing(
+  ContentBlock block,
+  double paragraphSpacing, {
+  ChapterKey? chapter,
+}) {
+  if (_isChapterHeading(block, chapter)) return paragraphSpacing + 64;
   if (block is HeadingBlock) return paragraphSpacing + 28;
   return paragraphSpacing;
 }
@@ -100,17 +111,21 @@ double readerBlockWidth(
   double available,
   TextStyle style,
   TextScaler scaler,
-  TextDirection direction,
-) {
+  TextDirection direction, {
+  ChapterKey? chapter,
+}) {
   if (block is! ParagraphBlock ||
       block.alignment != ParagraphAlignment.start ||
-      _isChapterHeading(block) ||
+      _isChapterHeading(block, chapter) ||
       !RegExp(r'[㐀-鿿]').hasMatch(block.text) ||
       !available.isFinite) {
     return available;
   }
   final painter = TextPainter(
-    text: TextSpan(text: '正文排版', style: readerBlockStyle(block, style)),
+    text: TextSpan(
+      text: '正文排版',
+      style: readerBlockStyle(block, style, chapter: chapter),
+    ),
     textScaler: scaler,
     textDirection: direction,
   )..layout();

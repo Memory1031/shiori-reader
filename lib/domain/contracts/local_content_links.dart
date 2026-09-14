@@ -18,6 +18,7 @@ final class LocalContentLink {
     this.targetBlockKey,
     this.unavailable,
     this.sourceOffset,
+    this.sourceLength,
     this.footnoteText,
   }) {
     if (sourceBlockKey.isEmpty ||
@@ -26,7 +27,11 @@ final class LocalContentLink {
         target == null && targetBlockKey != null ||
         target != null && target!.novelKey != source.novelKey ||
         sourceOffset != null && sourceOffset! < 0 ||
-        sourceOffset != null && unavailable == null && footnoteText == null ||
+        sourceLength != null && (sourceOffset == null || sourceLength! <= 0) ||
+        sourceOffset != null &&
+            sourceLength == null &&
+            unavailable == null &&
+            footnoteText == null ||
         footnoteText != null &&
             (sourceOffset == null || footnoteText!.trim().isEmpty)) {
       throw ArgumentError('Invalid local link');
@@ -40,8 +45,11 @@ final class LocalContentLink {
 
   /// Footnote marker start in source-block Unicode code points.
   final int? sourceOffset;
+
+  /// Ordinary inline links carry a range; older footnotes omit this field.
+  final int? sourceLength;
   final String? footnoteText;
-  bool get isFootnote => sourceOffset != null;
+  bool get isFootnote => sourceOffset != null && sourceLength == null;
   Map<String, Object?> toJson() => {
     'source': source.toJson(),
     'block': sourceBlockKey,
@@ -50,6 +58,7 @@ final class LocalContentLink {
     'targetBlock': targetBlockKey,
     'unavailable': unavailable?.name,
     if (sourceOffset != null) 'sourceOffset': sourceOffset,
+    if (sourceLength != null) 'sourceLength': sourceLength,
     if (footnoteText != null) 'footnoteText': footnoteText,
   };
   factory LocalContentLink.fromJson(Map<String, dynamic> json) =>
@@ -58,6 +67,7 @@ final class LocalContentLink {
         sourceBlockKey: json['block'] as String,
         label: json['label'] as String,
         sourceOffset: json['sourceOffset'] as int?,
+        sourceLength: json['sourceLength'] as int?,
         footnoteText: json['footnoteText'] as String?,
         target: json['target'] == null
             ? null

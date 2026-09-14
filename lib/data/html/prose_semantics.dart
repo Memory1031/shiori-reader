@@ -17,6 +17,9 @@ int? proseHeadingLevel(String? tag) =>
 /// Keep authored wide spaces and NBSP. Explicit br is written separately from
 /// source whitespace so normal mode never collapses a requested line break.
 class ProseTextBuffer {
+  ProseTextBuffer({this.onWrite});
+  final void Function(int start, int end)? onWrite;
+  String get rawText => _buffer.toString();
   final _buffer = StringBuffer();
   bool _preserved = false;
   bool _pendingSpace = false;
@@ -45,10 +48,12 @@ class ProseTextBuffer {
 
   void write(String value) {
     if (value.isEmpty) return;
+    final start = _buffer.length;
     if (_pendingSpace && !value.startsWith('\n')) _buffer.write(' ');
     _pendingSpace = false;
     _buffer.write(value);
     _lineStart = value.endsWith('\n');
+    onWrite?.call(start, _buffer.length);
   }
 
   String take() {

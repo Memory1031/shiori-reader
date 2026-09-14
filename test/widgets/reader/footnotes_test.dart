@@ -42,7 +42,7 @@ void main() {
                 child: PagedReaderViewport(
                   content: content,
                   controller: controller,
-                  footnotes: [note],
+                  contentLinks: [note],
                   onBoundary: (_) => turns++,
                   onCenterTap: () => centerTaps++,
                 ),
@@ -118,7 +118,7 @@ void main() {
                 child: PagedReaderViewport(
                   content: content,
                   controller: controller,
-                  footnotes: [note],
+                  contentLinks: [note],
                   onBoundary: (_) {},
                   onCenterTap: () {},
                 ),

@@ -175,9 +175,12 @@ class _ReaderViewportState extends State<ReaderViewport> {
   TextStyle _style(RenderChunk chunk) => readerBlockStyle(
     widget.content.blocks[chunk.blockIndex],
     widget.textStyle,
+    chapter: widget.content.key,
   );
-  TextAlign _align(RenderChunk chunk) =>
-      readerBlockAlign(widget.content.blocks[chunk.blockIndex]);
+  TextAlign _align(RenderChunk chunk) => readerBlockAlign(
+    widget.content.blocks[chunk.blockIndex],
+    chapter: widget.content.key,
+  );
   TextPainter _painter(RenderChunk chunk, double width) => TextPainter(
     text: TextSpan(
       text: _prefix(chunk, width) + (chunk.text ?? ''),
@@ -210,6 +213,7 @@ class _ReaderViewportState extends State<ReaderViewport> {
                         readerBlockSpacing(
                               widget.content.blocks[chunk.blockIndex],
                               widget.paragraphSpacing,
+                              chapter: widget.content.key,
                             ) /
                             2)
                     .clamp(0, double.infinity) +
@@ -283,6 +287,7 @@ class _ReaderViewportState extends State<ReaderViewport> {
                 readerBlockSpacing(
                       widget.content.blocks[chunk.blockIndex],
                       widget.paragraphSpacing,
+                      chapter: widget.content.key,
                     ) /
                     2 +
                 painter
@@ -335,12 +340,14 @@ class _ReaderViewportState extends State<ReaderViewport> {
               readerBlockSpacing(
                 widget.content.blocks[chunk.blockIndex],
                 widget.paragraphSpacing,
+                chapter: widget.content.key,
               ) /
               2,
           bottom:
               readerBlockSpacing(
                 widget.content.blocks[chunk.blockIndex],
                 widget.paragraphSpacing,
+                chapter: widget.content.key,
               ) /
               2,
         ),

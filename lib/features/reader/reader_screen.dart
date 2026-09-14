@@ -97,6 +97,8 @@ class ReaderContentView extends StatefulWidget {
     this.onDetails,
     this.onPrefetch,
     this.onLinks,
+    this.onContentLink,
+    this.viewportController,
     this.returnToOrigin = false,
   });
   final ImageRepository? images;
@@ -111,6 +113,8 @@ class ReaderContentView extends StatefulWidget {
   final VoidCallback? onDetails;
   final VoidCallback? onPrefetch;
   final void Function(BuildContext readerContext)? onLinks;
+  final ValueChanged<LocalContentLink>? onContentLink;
+  final PagedReaderController? viewportController;
   final bool returnToOrigin;
   @override
   State<ReaderContentView> createState() => _ReaderContentViewState();
@@ -200,7 +204,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _paged.restore(target);
   }
 
-  final _paged = PagedReaderController();
+  late final _paged = widget.viewportController ?? PagedReaderController();
   final _chrome = ValueNotifier(true);
   final _readingPosition = ValueNotifier<ReaderPosition?>(null);
   ReaderPosition? _latestReadingPosition;
@@ -474,10 +478,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                     onRestoreStart:
                                         widget.session?.restoringProgress,
                                     controller: _paged,
-                                    footnotes:
-                                        widget.session?.contentLinks
-                                            .where((link) => link.isFootnote)
-                                            .toList() ??
+                                    onLink: widget.onContentLink,
+                                    contentLinks:
+                                        widget.session?.contentLinks.toList() ??
                                         const [],
                                     initialPosition: _position,
                                     textStyle: style,

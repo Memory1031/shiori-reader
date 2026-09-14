@@ -6,7 +6,7 @@ import 'render_chunk.dart';
 import 'block_style.dart';
 import 'paper_turn.dart';
 import '../../../domain/contracts/local_content_links.dart';
-import '../reader_footnote_text.dart';
+import '../reader_linked_text.dart';
 
 class PagedReaderController {
   _PagedReaderViewportState? _state;
@@ -44,7 +44,8 @@ class PagedReaderViewport extends StatefulWidget {
     this.pageSize,
     this.contentOrigin = Offset.zero,
     this.startAtEnd = false,
-    this.footnotes = const [],
+    this.contentLinks = const [],
+    this.onLink,
   });
   final ChapterContent content;
   final PagedReaderController controller;
@@ -64,7 +65,8 @@ class PagedReaderViewport extends StatefulWidget {
   final Size? pageSize;
   final Offset contentOrigin;
   final bool startAtEnd;
-  final List<LocalContentLink> footnotes;
+  final List<LocalContentLink> contentLinks;
+  final ValueChanged<LocalContentLink>? onLink;
   @override
   State<PagedReaderViewport> createState() => _PagedReaderViewportState();
 }
@@ -332,6 +334,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         widget.textStyle,
         scaler,
         direction,
+        chapter: widget.content.key,
       );
 
       Widget? buildPage(BuildContext context, int number) {
@@ -371,6 +374,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                         .chunks[fragment.unit]
                                         .blockIndex],
                                     widget.paragraphSpacing,
+                                    chapter: widget.content.key,
                                   ) /
                                   2,
                               bottom:
@@ -380,15 +384,17 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                         .chunks[fragment.unit]
                                         .blockIndex],
                                     widget.paragraphSpacing,
+                                    chapter: widget.content.key,
                                   ) /
                                   2,
                             ),
-                            child: ReaderFootnoteText(
+                            child: ReaderLinkedText(
+                              onLink: widget.onLink,
                               text: fragment.text!,
                               blockOffset:
                                   _layout!.index.chunks[fragment.unit].start +
                                   fragment.start,
-                              notes: widget.footnotes
+                              links: widget.contentLinks
                                   .where(
                                     (note) =>
                                         note.sourceBlockKey ==
@@ -417,12 +423,14 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                     .chunks[fragment.unit]
                                     .blockIndex],
                                 widget.textStyle,
+                                chapter: widget.content.key,
                               ),
                               align: readerBlockAlign(
                                 widget.content.blocks[_layout!
                                     .index
                                     .chunks[fragment.unit]
                                     .blockIndex],
+                                chapter: widget.content.key,
                               ),
                               scaler: scaler,
                             ),

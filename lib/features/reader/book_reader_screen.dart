@@ -11,7 +11,8 @@ import 'reader_screen.dart';
 import 'viewport/paper_turn.dart';
 import '../cache/prefetch_sheet.dart';
 import '../../shared/source_image.dart';
-import 'reader_footnote_text.dart';
+import 'reader_linked_text.dart';
+import 'viewport/paged_reader_viewport.dart';
 import '../local_books/local_catalog.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
@@ -50,6 +51,7 @@ class BookReaderScreen extends StatefulWidget {
 class _BookReaderScreenState extends State<BookReaderScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   late ReaderController _reader;
+  final _viewports = <ReaderController, PagedReaderController>{};
   StreamSubscription<NovelKey>? _invalidation;
   bool _invalidated = false;
   ReaderController? _pending;
@@ -197,6 +199,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   void _close(ReaderController reader) {
+    _viewports.remove(reader);
     reader.removeListener(_changed);
     reader.onDelete();
     reader.dispose();
@@ -380,20 +383,70 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       await showReaderFootnote(readerContext, link);
       return;
     }
-    if (link.target == null || widget.linkDepth >= 8) {
+    await _followContentLink(link);
+  }
+
+  Future<void> _followContentLink(LocalContentLink link) async {
+    if (_changing || _invalidated) return;
+    if (link.target == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            widget.linkDepth >= 8 ? l.readerLinkDepth : l.readerLinkUnavailable,
+          content: Text(AppLocalizations.of(context).readerLinkUnavailable),
+        ),
+      );
+      return;
+    }
+    await _followContentTarget(link.target!, link.targetBlockKey);
+  }
+
+  Future<void> _followContentTarget(ChapterKey target, String? blockKey) async {
+    if (_changing ||
+        _invalidated ||
+        target.novelKey != widget.chapter.novelKey) {
+      return;
+    }
+    if (target == _reader.chapter) {
+      final content = _reader.content!;
+      final index = blockKey == null
+          ? 0
+          : content.blocks.indexWhere((b) => b.blockKey == blockKey);
+      if (index < 0) return;
+      _viewports[_reader]?.restore(
+        ReaderPosition(
+          contentRevision: content.contentRevision,
+          blockKey: content.blocks[index].blockKey,
+          blockIndex: index,
+          blockFraction: 0,
+          chapterFraction: ReaderPosition.fractionFor(
+            blockIndex: index,
+            blockFraction: 0,
+            blockCount: content.blocks.length,
           ),
         ),
       );
       return;
     }
-    await _openAuxiliary(link.target!, link.targetBlockKey);
+    final source = _reader;
+    if (_needsOrder && _readingOrder == null) await _loadOrder();
+    if (!mounted || _invalidated || _changing || source != _reader) return;
+    final main = _needsOrder
+        ? _readingOrder?.contains(target) == true
+        : _catalog.loaded?.value.flatChapters.any((c) => c.key == target) ==
+              true;
+    if (main) {
+      await _switch(target, blockKey: blockKey, fromStart: true);
+    } else {
+      await _openAuxiliary(target, blockKey);
+    }
   }
 
   Future<void> _openAuxiliary(ChapterKey target, String? block) async {
+    if (widget.linkDepth >= 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).readerLinkDepth)),
+      );
+      return;
+    }
     if (_invalidated ||
         target.novelKey != widget.chapter.novelKey ||
         widget.linkDepth >= 8) {
@@ -442,20 +495,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         current: _reader.chapter,
       );
       if (mounted && target != null) {
-        final main =
-            _catalog.loaded?.value.flatChapters.any(
-              (c) => c.key == target.chapterKey,
-            ) ??
-            false;
-        if (!main) {
-          await _openAuxiliary(target.chapterKey, target.blockKey);
-          return;
-        }
-        await _switch(
-          target.chapterKey,
-          blockKey: target.blockKey,
-          fromStart: true,
-        );
+        await _followContentTarget(target.chapterKey, target.blockKey);
       }
       return;
     }
@@ -541,6 +581,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       images: _displayImages,
       settings: widget.settings,
       session: reader,
+      viewportController: _viewports.putIfAbsent(
+        reader,
+        PagedReaderController.new,
+      ),
+      onContentLink: _changing ? null : _followContentLink,
       initialPosition: reader.initialPosition,
       onCatalog: _changing || widget.linkDepth > 0 ? null : _contents,
       onLinks: _changing || reader.contentLinks.isEmpty ? null : _links,

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:shiori/domain/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/local/epub/epub_parser.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
@@ -40,6 +41,49 @@ Map<String, List<int>> linkedEpub({bool repeated = false}) {
 }
 
 void main() {
+  test(
+    'authored links cover each paragraph and preserve inline Unicode ranges',
+    () {
+      final files = linkedEpub();
+      files['OPS/text/a.xhtml'] = utf8.encode('''<html><body>
+      <a href="b.xhtml#b"><p>【第三话】</p><p>Subtitle</p></a>
+      <p>😀before <a href="b.xhtml#b">same <em>label</em></a> after <a href="#anchor">same label</a>.</p>
+      <p id="anchor">Target</p></body></html>''');
+      final content = EpubParser(
+        zipFiles(files),
+        linkBookKey,
+        'book',
+      ).parse().content;
+      final chapter = content.chapters.first;
+      final links = content.links
+          .where((l) => l.source == chapter.key)
+          .toList();
+      expect(links, hasLength(4));
+      final ranges = links.map((link) {
+        final block =
+            chapter.blocks.firstWhere((b) => b.blockKey == link.sourceBlockKey)
+                as ParagraphBlock;
+        return String.fromCharCodes(
+          block.text.runes.skip(link.sourceOffset!).take(link.sourceLength!),
+        );
+      }).toList();
+      expect(
+        ranges,
+        containsAll(['【第三话】', 'Subtitle', 'same label', 'same label']),
+      );
+      expect(links.every((l) => !l.isFootnote), isTrue);
+      final inline = links
+          .where((l) => l.sourceBlockKey == chapter.blocks[2].blockKey)
+          .toList();
+      expect(inline.map((l) => l.sourceOffset), [8, 25]);
+      expect(inline.last.target, chapter.key);
+      final restored = LocalContentLink.fromJson(
+        jsonDecode(jsonEncode(inline.first.toJson())) as Map<String, dynamic>,
+      );
+      expect(restored.sourceLength, 10);
+      expect(restored.isFootnote, isFalse);
+    },
+  );
   test(
     'manifest auxiliary document is outside catalog and continuous order skips linear=no',
     () {

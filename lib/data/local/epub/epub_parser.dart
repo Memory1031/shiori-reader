@@ -124,7 +124,10 @@ class EpubParser {
   final chapterPaths = <ChapterKey, String>{};
   final requestedPaths = <String>[];
   final rawLinks =
-      <String, List<(int, String, String?, String?, LocalLinkUnavailable?)>>{};
+      <
+        String,
+        List<(int, String, String?, String?, LocalLinkUnavailable?, int?, int?)>
+      >{};
   var linkCount = 0;
   final _footnotes =
       <String, List<(int, String, String?, LocalLinkUnavailable?)>>{};
@@ -409,7 +412,17 @@ class EpubParser {
       }
       for (final raw
           in rawLinks[path] ??
-              <(int, String, String?, String?, LocalLinkUnavailable?)>[]) {
+              <
+                (
+                  int,
+                  String,
+                  String?,
+                  String?,
+                  LocalLinkUnavailable?,
+                  int?,
+                  int?,
+                )
+              >[]) {
         if (raw.$1 >= source.blocks.length) continue;
         var unavailable = raw.$5;
         final destination = raw.$3 == path ? source : byPath[raw.$3];
@@ -432,6 +445,8 @@ class EpubParser {
             source: source.key,
             sourceBlockKey: source.blocks[raw.$1].blockKey,
             label: raw.$2,
+            sourceOffset: raw.$6,
+            sourceLength: raw.$7,
             target: unavailable == null ? destination?.key : null,
             targetBlockKey: unavailable == null ? block : null,
             unavailable: unavailable,
@@ -649,13 +664,55 @@ class EpubParser {
 
     final blocks = <ContentBlock>[];
     final anchors = <String, int>{};
-    final buffer = ProseTextBuffer();
+    int? activeLink;
+    final spans = <(int, int, int)>[];
+    final buffer = ProseTextBuffer(
+      onWrite: (start, end) {
+        final link = activeLink;
+        if (link == null) return;
+        if (spans.isNotEmpty &&
+            spans.last.$1 == link &&
+            spans.last.$3 == start) {
+          final last = spans.removeLast();
+          spans.add((link, last.$2, end));
+        } else {
+          spans.add((link, start, end));
+        }
+      },
+    );
     var whitespace = ProseWhiteSpace.normal;
     var visible = true;
     void flush({int? heading}) {
       // HTML source indentation is collapsible whitespace, not first-line
       // indentation. Preserve authored NBSP / ideographic spaces and pre text.
+      final rawText = buffer.rawText;
       final value = buffer.take();
+      final trimStart = rawText.indexOf(value);
+      for (final span in spans) {
+        final start = (span.$2 - trimStart).clamp(0, value.length);
+        final end = (span.$3 - trimStart).clamp(0, value.length);
+        if (end <= start || value.substring(start, end).trim().isEmpty) {
+          continue;
+        }
+        final records = rawLinks[path]!;
+        final original = records[span.$1];
+        final range = (
+          blocks.length,
+          original.$2,
+          original.$3,
+          original.$4,
+          original.$5,
+          value.substring(0, start).runes.length,
+          value.substring(start, end).runes.length,
+        );
+        if (original.$6 == null) {
+          records[span.$1] = range;
+        } else {
+          records.add(range);
+          if (++linkCount > 10000) zipLimit();
+        }
+      }
+      spans.clear();
       if (value.trim().isEmpty) return;
       blocks.add(
         heading == null
@@ -753,6 +810,7 @@ class EpubParser {
         return;
       }
       final previousOwner = paragraphOwner;
+      final previousLink = activeLink;
       if (paragraphs.contains(tag) || heading != null) paragraphOwner = node;
       final id = node.id.isNotEmpty ? node.id : node.attributes['name'];
       if (id != null && id.isNotEmpty && visible) {
@@ -828,12 +886,15 @@ class EpubParser {
           return;
         }
         final label = node.text.trim();
+        activeLink = (rawLinks[path] ??= []).length;
         (rawLinks[path] ??= []).add((
           blocks.length,
           label.isEmpty ? '↗' : String.fromCharCodes(label.runes.take(200)),
           ref?.$1,
           ref?.$2,
           unavailable,
+          null,
+          null,
         ));
         if (ref != null) requestedPaths.add(ref.$1);
       }
@@ -898,6 +959,7 @@ class EpubParser {
         walk(child);
       }
       if (boundary) flush(heading: heading);
+      activeLink = previousLink;
       paragraphOwner = previousOwner;
       whitespace = previousWhitespace;
       visible = previousVisible;

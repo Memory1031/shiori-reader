@@ -44,28 +44,30 @@ Future<void> showReaderFootnote(BuildContext context, LocalContentLink note) =>
 
 /// Uses identical glyphs and metrics to PageLayout; only marker color and
 /// interaction differ. Offsets stay in source-block Unicode code points.
-class ReaderFootnoteText extends StatefulWidget {
-  const ReaderFootnoteText({
+class ReaderLinkedText extends StatefulWidget {
+  const ReaderLinkedText({
     super.key,
     required this.text,
     required this.prefix,
     required this.blockOffset,
-    required this.notes,
+    required this.links,
     required this.style,
     required this.align,
     required this.scaler,
+    this.onLink,
   });
   final String text, prefix;
   final int blockOffset;
-  final List<LocalContentLink> notes;
+  final List<LocalContentLink> links;
   final TextStyle style;
   final TextAlign align;
   final TextScaler scaler;
+  final ValueChanged<LocalContentLink>? onLink;
   @override
-  State<ReaderFootnoteText> createState() => _ReaderFootnoteTextState();
+  State<ReaderLinkedText> createState() => _ReaderLinkedTextState();
 }
 
-class _ReaderFootnoteTextState extends State<ReaderFootnoteText> {
+class _ReaderLinkedTextState extends State<ReaderLinkedText> {
   final _recognizers = <TapGestureRecognizer>[];
   void _clear() {
     for (final recognizer in _recognizers) {
@@ -86,28 +88,37 @@ class _ReaderFootnoteTextState extends State<ReaderFootnoteText> {
     final runes = widget.text.runes.toList();
     final spans = <InlineSpan>[TextSpan(text: widget.prefix)];
     var cursor = 0;
-    for (final note in widget.notes) {
+    final orderedLinks = [...widget.links]
+      ..sort((a, b) => (a.sourceOffset ?? -1).compareTo(b.sourceOffset ?? -1));
+    for (final note in orderedLinks) {
       final offset = note.sourceOffset;
       if (offset == null) continue;
       final start = (offset - widget.blockOffset).clamp(0, runes.length);
-      final end = (offset + note.label.runes.length - widget.blockOffset).clamp(
-        0,
-        runes.length,
-      );
+      final end =
+          (offset +
+                  (note.sourceLength ?? note.label.runes.length) -
+                  widget.blockOffset)
+              .clamp(0, runes.length);
       if (end <= start || start < cursor) continue;
       spans.add(
         TextSpan(text: String.fromCharCodes(runes.sublist(cursor, start))),
       );
       final recognizer = TapGestureRecognizer()
-        ..onTap = () => showReaderFootnote(context, note);
+        ..onTap = () {
+          if (note.isFootnote) {
+            showReaderFootnote(context, note);
+          } else {
+            widget.onLink?.call(note);
+          }
+        };
       _recognizers.add(recognizer);
       spans.add(
         TextSpan(
           text: String.fromCharCodes(runes.sublist(start, end)),
           style: TextStyle(color: Theme.of(context).colorScheme.primary),
-          semanticsLabel: AppLocalizations.of(
-            context,
-          ).readerFootnote(note.label),
+          semanticsLabel: note.isFootnote
+              ? AppLocalizations.of(context).readerFootnote(note.label)
+              : null,
           recognizer: recognizer,
         ),
       );

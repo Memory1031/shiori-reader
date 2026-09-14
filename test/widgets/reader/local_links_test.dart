@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:flutter/rendering.dart';
+import 'package:shiori/features/reader/viewport/block_style.dart';
+import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
+import 'package:shiori/domain/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/routes.dart';
@@ -14,6 +19,125 @@ import '../../data/local/local_reading_test.dart' show ForbiddenOnline;
 import 'local_reading_test.dart' show MemoryBooks;
 
 void main() {
+  testWidgets(
+    'authored TOC lines navigate directly and same-chapter links retain session',
+    (tester) async {
+      final files = linkedEpub();
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '<html><body><a href="../last.xhtml"><p>【第三话】</p><p>Subtitle</p></a><p><a href="#end">Within chapter</a></p>${List.filled(20, '<p>Filler text.</p>').join()}<p id="end">Destination</p></body></html>',
+      );
+      final c = EpubParser(
+        zipFiles(files),
+        linkBookKey,
+        'book',
+      ).parse().content;
+      final repo = LocalReadingRepository(
+        online: ForbiddenOnline(),
+        local: MemoryBooks(
+          LocalBookRecord(
+            content: c,
+            format: LocalBookFormat.epub,
+            importedAt: DateTime.utc(2025),
+          ),
+        ),
+      );
+      final library = FixtureLibraryRepository();
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          routes: AppRoutes(
+            home: (_) => BookReaderScreen(
+              chapter: c.chapters.first.key,
+              repository: repo,
+              library: library,
+              settings: FixtureSettingsStore(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      ReaderContentView view() =>
+          tester.widget<ReaderContentView>(find.byType(ReaderContentView));
+      final session = view().session;
+      final links = c.links
+          .where((l) => l.source == c.chapters.first.key)
+          .toList();
+      expect(links.where((l) => l.target == c.chapters.last.key), hasLength(2));
+      Future<void> click(String text) async {
+        final finder = find.byWidgetPredicate(
+          (w) => w is RichText && w.text.toPlainText() == text,
+        );
+        final render = tester.renderObject<RenderParagraph>(finder);
+        final box = render
+            .getBoxesForSelection(
+              TextSelection(baseOffset: 0, extentOffset: text.length),
+            )
+            .first;
+        await tester.tapAt(render.localToGlobal(box.toRect().center));
+        await tester.pumpAndSettle();
+      }
+
+      await click('Within chapter');
+      expect(view().session, same(session));
+      final viewport = tester.widget<PagedReaderViewport>(
+        find.byType(PagedReaderViewport),
+      );
+      expect(
+        viewport.controller.capture()!.blockKey,
+        c.chapters.first.blocks.last.blockKey,
+      );
+      viewport.controller.restore(
+        ReaderPosition(
+          contentRevision: c.chapters.first.contentRevision,
+          blockKey: c.chapters.first.blocks.first.blockKey,
+          blockIndex: 0,
+          blockFraction: 0,
+          chapterFraction: 0,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await click('Subtitle');
+      expect(view().content.key, c.chapters.last.key);
+      expect(view().session!.library, same(library));
+      expect(find.byType(BookReaderScreen), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      await library.close();
+    },
+  );
+
+  test(
+    'local paragraphs retain authored style while semantic headings remain large',
+    () {
+      final chapter = LocalBookIdentity.chapter(linkBookKey, 'epub:toc');
+      final paragraph = ParagraphBlock(text: '【第三话】', leadingIndent: 2);
+      const style = TextStyle(fontSize: 20);
+      expect(readerBlockStyle(paragraph, style, chapter: chapter), style);
+      expect(readerBlockAlign(paragraph, chapter: chapter), TextAlign.start);
+      expect(readerBlockSpacing(paragraph, 20, chapter: chapter), 20);
+      expect(
+        readerIndentPrefix(
+          paragraph,
+          true,
+          300,
+          style,
+          TextScaler.noScaling,
+          chapter: chapter,
+        ),
+        '\u2003\u2003',
+      );
+      expect(
+        readerBlockStyle(
+          HeadingBlock(text: '【第三话】', level: 1),
+          style,
+          chapter: chapter,
+        ).fontSize,
+        28,
+      );
+    },
+  );
   for (final lang in ['en', 'zh']) {
     testWidgets(
       'auxiliary return preserves origin state and history in $lang',
