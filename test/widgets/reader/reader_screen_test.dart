@@ -91,6 +91,39 @@ void main() {
     },
   );
 
+  testWidgets('progress panel surface follows the reader paper', (
+    tester,
+  ) async {
+    final env = FixtureEnvironment(scenario: FixtureScenario.shortChapter);
+    await tester.pumpWidget(
+      ShioriApp(
+        locale: const Locale('zh'),
+        routes: AppRoutes(
+          home: (_) => ReaderScreen(
+            chapter: fixtureChapterKey(FixtureScenario.shortChapter),
+            repository: env.novels,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('进度 0%'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Slider), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Material && widget.color == const Color(0xfffffcf8),
+        ),
+      ),
+      findsOneWidget,
+    );
+    await tester.pumpWidget(const SizedBox());
+    await env.close();
+  });
+
   test(
     'controller rejects old completions and cancels owned requests on close',
     () async {

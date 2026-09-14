@@ -217,6 +217,24 @@ void main() {
     }
   });
 
+  test('bottom sheets adopt the reading paper in every palette', () {
+    for (final settings in [
+      ReaderSettings(),
+      ReaderSettings(paper: ReaderPaper.warm),
+      ReaderSettings(themeMode: ReaderThemeMode.dark),
+    ]) {
+      final theme = readerTheme(settings, Brightness.light);
+      expect(
+        theme.bottomSheetTheme.backgroundColor,
+        theme.scaffoldBackgroundColor,
+      );
+      expect(
+        theme.bottomSheetTheme.dragHandleColor,
+        theme.colorScheme.onSurfaceVariant,
+      );
+    }
+  });
+
   testWidgets(
     'app dark does not force reader dark; paper/system selection and width preserve anchor',
     (tester) async {

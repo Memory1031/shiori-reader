@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/local_content_links.dart';
 import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/features/reader/reader_theme.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 
@@ -81,4 +82,78 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+  testWidgets('footnote sheet surface follows the reader theme', (
+    tester,
+  ) async {
+    final theme = readerTheme(
+      ReaderSettings(paper: ReaderPaper.warm),
+      Brightness.light,
+    );
+    final content = ChapterContent(
+      key: fixtureChapterKey(FixtureScenario.shortChapter),
+      title: 'Notes',
+      blocks: [ParagraphBlock(text: 'Before⁽¹⁾after.')],
+    );
+    final note = LocalContentLink(
+      source: content.key,
+      sourceBlockKey: content.blocks.single.blockKey,
+      label: '⁽¹⁾',
+      sourceOffset: 6,
+      target: content.key,
+      footnoteText: 'Annotation.',
+    );
+    final controller = PagedReaderController();
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 300,
+              height: 400,
+              child: Theme(
+                data: theme,
+                child: PagedReaderViewport(
+                  content: content,
+                  controller: controller,
+                  footnotes: [note],
+                  onBoundary: (_) {},
+                  onCenterTap: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final rich = find.byWidgetPredicate(
+      (widget) =>
+          widget is RichText &&
+          widget.text.toPlainText(includeSemanticsLabels: false) ==
+              'Before⁽¹⁾after.',
+    );
+    final paragraph = tester.renderObject<RenderParagraph>(rich);
+    final box = paragraph
+        .getBoxesForSelection(
+          const TextSelection(baseOffset: 6, extentOffset: 9),
+        )
+        .first;
+    await tester.tapAt(paragraph.localToGlobal(box.toRect().center));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Material &&
+              widget.color == theme.scaffoldBackgroundColor,
+        ),
+      ),
+      findsOneWidget,
+    );
+    await tester.pumpWidget(const SizedBox());
+  });
 }

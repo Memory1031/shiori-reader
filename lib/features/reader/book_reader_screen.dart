@@ -342,7 +342,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
-  Future<void> _links() async {
+  Future<void> _links(BuildContext readerContext) async {
     if (_changing || _invalidated) return;
     final l = AppLocalizations.of(context);
     final source = _reader;
@@ -369,9 +369,15 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         ],
       ),
     );
-    if (!mounted || _invalidated || source != _reader || link == null) return;
+    if (!mounted ||
+        !readerContext.mounted ||
+        _invalidated ||
+        source != _reader ||
+        link == null) {
+      return;
+    }
     if (link.isFootnote) {
-      await showReaderFootnote(context, link);
+      await showReaderFootnote(readerContext, link);
       return;
     }
     if (link.target == null || widget.linkDepth >= 8) {

@@ -135,9 +135,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      tester
-          .widget<ReaderContentView>(find.byType(ReaderContentView))
-          .onLinks!();
+      tester.widget<ReaderContentView>(find.byType(ReaderContentView)).onLinks!(
+        tester.element(find.byType(ReaderContentView)),
+      );
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('external'),
@@ -200,7 +200,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     final state = tester.state(find.byType(ReaderContentView));
-    tester.widget<ReaderContentView>(find.byType(ReaderContentView)).onLinks!();
+    tester.widget<ReaderContentView>(find.byType(ReaderContentView)).onLinks!(
+      tester.element(find.byType(ReaderContentView)),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('note'));
     await tester.pumpAndSettle();
