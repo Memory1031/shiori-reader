@@ -32,6 +32,24 @@ void expectImage((ParsedEpub, Map<String, String>) result) {
 }
 
 void main() {
+  test(
+    'import persists intrinsic dimensions without changing image identity',
+    () {
+      final result = book('<img src="../images/%E6%98%9F%20%E7%A9%BA.png"/>');
+      final chapter = result.$1.content.chapters.first;
+      final image = chapter.blocks.whereType<ImageBlock>().single;
+      expect(image.width, 1);
+      expect(image.height, 1);
+      final restored = ChapterContent.fromJson(chapter.toJson());
+      expect(restored.blocks.whereType<ImageBlock>().single.width, 1);
+      expect(restored.blocks.whereType<ImageBlock>().single.height, 1);
+      expect(
+        image.blockKey,
+        ImageBlock(media: image.media, alt: image.alt).blockKey,
+      );
+    },
+  );
+
   test('candidate processing is bounded and preserves a placeholder', () {
     final candidates = List.filled(128, 'missing.png 1x').join(', ');
     final result = book(

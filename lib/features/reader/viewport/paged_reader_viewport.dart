@@ -464,20 +464,25 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (_target case final target?)
-                    ExcludeSemantics(child: buildPage(context, target)!),
-                  ClipPath(
-                    clipper: PaperTurnClipper(
-                      _turnAnimation.value,
-                      _direction,
-                      pageSize: widget.pageSize,
-                      contentOrigin: widget.contentOrigin,
+                  for (final number in [?_target, _current])
+                    ExcludeSemantics(
+                      key: ValueKey((widget.content.key, number)),
+                      excluding: number != _current,
+                      child: ClipPath(
+                        clipper: number == _current
+                            ? PaperTurnClipper(
+                                _turnAnimation.value,
+                                _direction,
+                                pageSize: widget.pageSize,
+                                contentOrigin: widget.contentOrigin,
+                              )
+                            : null,
+                        child: ColoredBox(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          child: buildPage(context, number)!,
+                        ),
+                      ),
                     ),
-                    child: ColoredBox(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      child: buildPage(context, _current)!,
-                    ),
-                  ),
                   if (widget.onTurnVisual == null)
                     PaperTurnFold(
                       progress: _turnAnimation.value,

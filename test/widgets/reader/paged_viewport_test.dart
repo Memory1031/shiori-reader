@@ -10,6 +10,59 @@ import 'package:shiori/features/reader/viewport/render_chunk.dart';
 import 'viewport_test.dart' show at;
 
 void main() {
+  testWidgets('target image state survives turn commit and reverse turn', (
+    tester,
+  ) async {
+    final controller = PagedReaderController();
+    var mounts = 0;
+    var disposals = 0;
+    final content = ChapterContent(
+      key: fixtureChapterKey(FixtureScenario.shortChapter),
+      title: 'Image turn',
+      blocks: [
+        ParagraphBlock(text: 'Before the picture'),
+        ImageBlock(media: fixtureMediaRef(0), width: 400, height: 900),
+        ParagraphBlock(text: 'After the picture'),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: SizedBox(
+            width: 300,
+            height: 600,
+            child: PagedReaderViewport(
+              content: content,
+              controller: controller,
+              imageHeights: {fixtureMediaRef(0): 580},
+              imageBuilder: (_, _) => _ImageMountProbe(
+                onMount: () => mounts++,
+                onDispose: () => disposals++,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(mounts, 0);
+    final next = controller.next();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(mounts, 1);
+    expect(disposals, 0);
+    await tester.pumpAndSettle();
+    await next;
+    expect(controller.capture()!.blockIndex, 1);
+    expect(mounts, 1);
+    expect(disposals, 0);
+    final previous = controller.previous();
+    await tester.pumpAndSettle();
+    await previous;
+    expect(mounts, 1);
+    expect(disposals, 1);
+  });
+
   testWidgets('chapter-end entry survives delayed image size and rebuilds', (
     tester,
   ) async {
@@ -400,4 +453,29 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+class _ImageMountProbe extends StatefulWidget {
+  const _ImageMountProbe({required this.onMount, required this.onDispose});
+  final VoidCallback onMount;
+  final VoidCallback onDispose;
+  @override
+  State<_ImageMountProbe> createState() => _ImageMountProbeState();
+}
+
+class _ImageMountProbeState extends State<_ImageMountProbe> {
+  @override
+  void initState() {
+    super.initState();
+    widget.onMount();
+  }
+
+  @override
+  void dispose() {
+    widget.onDispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const ColoredBox(color: Colors.blue);
 }

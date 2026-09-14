@@ -12,6 +12,7 @@ import '../../../domain/models/models.dart';
 import '../txt/txt_decoder.dart';
 import '../txt/txt_parser.dart' show filenameTitle;
 import 'epub_zip.dart';
+import 'epub_image_dimensions.dart';
 import 'epub_presentation.dart';
 import 'epub_text_styles.dart';
 import 'epub_image_candidates.dart';
@@ -115,6 +116,7 @@ class EpubParser {
   final _diagnostics = EpubDiagnosticCollector();
   final media = <String, Uint8List>{};
   final mediaByPath = <String, MediaRef>{};
+  final imageSizes = <MediaRef, ({int width, int height})?>{};
   final items = <String, _Item>{};
   final chapters = <ChapterContent>[];
   final auxiliary = <ChapterContent>[];
@@ -184,10 +186,12 @@ class EpubParser {
       if (mediaSize > 128 * 1024 * 1024) zipLimit();
       media[hash] = b;
     }
-    return mediaByPath[path] = MediaRef(
+    final ref = mediaByPath[path] = MediaRef(
       sourceId: book.sourceId,
       mediaId: '${book.novelId}/$hash',
     );
+    imageSizes.putIfAbsent(ref, () => epubImageDimensions(b));
+    return ref;
   }
 
   ParsedEpub parse() {
@@ -844,7 +848,15 @@ class EpubParser {
           if (img != null) break;
         }
         if (img != null) {
-          blocks.add(ImageBlock(media: img, alt: node.attributes['alt']));
+          final size = imageSizes[img];
+          blocks.add(
+            ImageBlock(
+              media: img,
+              alt: node.attributes['alt'],
+              width: size?.width,
+              height: size?.height,
+            ),
+          );
         } else {
           _diagnostics.add(EpubDiagnosticCode.noUsableImage);
           // Visible per-image gap; remaining text and images still import.

@@ -63,7 +63,12 @@ class ReaderImage extends StatelessWidget {
             media: block.media,
             repository: repository,
             semanticLabel: block.alt,
-            onIntrinsicSize: onIntrinsicSize,
+            onIntrinsicSize: (size) {
+              if (block.width == size.width && block.height == size.height) {
+                return;
+              }
+              onIntrinsicSize(size);
+            },
           ),
         ),
       ),
