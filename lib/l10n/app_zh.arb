@@ -1,4 +1,5 @@
 {
+  "readerImagePreview": "查看图片",
   "readerFootnote": "脚注 {number}",
   "@readerFootnote": {"placeholders": {"number": {"type": "String"}}},
   "shelfLocal": "本地",

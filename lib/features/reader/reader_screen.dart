@@ -14,6 +14,7 @@ import 'article_contents.dart';
 import 'settings_panel.dart';
 import 'reader_margin.dart';
 import 'reader_image.dart';
+import 'reader_image_preview.dart';
 import 'epub_layout_page.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'viewport/paper_turn.dart';
@@ -388,6 +389,12 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                       child: widget.images == null
                                           ? _image(context, block)
                                           : ReaderImage(
+                                              onTap: () =>
+                                                  showReaderImagePreview(
+                                                    context,
+                                                    block: block,
+                                                    repository: widget.images!,
+                                                  ),
                                               block: block,
                                               repository: widget.images!,
                                               captionHeight: geometry.caption,

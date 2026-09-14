@@ -98,6 +98,12 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @readerImagePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'View image'**
+  String get readerImagePreview;
+
   /// No description provided for @readerFootnote.
   ///
   /// In en, this message translates to:

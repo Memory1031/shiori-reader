@@ -9,6 +9,9 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get readerImagePreview => 'View image';
+
+  @override
   String readerFootnote(String number) {
     return 'Footnote $number';
   }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../shared/source_image.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 const readerCaptionStyle = TextStyle(fontSize: 14, height: 1.4);
 
@@ -48,27 +49,40 @@ class ReaderImage extends StatelessWidget {
     required this.repository,
     required this.captionHeight,
     required this.onIntrinsicSize,
+    this.onTap,
   });
   final ImageBlock block;
   final ImageRepository repository;
   final double captionHeight;
   final ValueChanged<Size> onIntrinsicSize;
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => Column(
     children: [
       Expanded(
-        child: SizedBox(
-          width: double.infinity,
-          child: SourceImage(
-            media: block.media,
-            repository: repository,
-            semanticLabel: block.alt,
-            onIntrinsicSize: (size) {
-              if (block.width == size.width && block.height == size.height) {
-                return;
-              }
-              onIntrinsicSize(size);
-            },
+        child: Semantics(
+          button: onTap != null,
+          label: onTap == null
+              ? null
+              : AppLocalizations.of(context).readerImagePreview,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: SizedBox(
+              width: double.infinity,
+              child: SourceImage(
+                media: block.media,
+                repository: repository,
+                semanticLabel: block.alt,
+                onIntrinsicSize: (size) {
+                  if (block.width == size.width &&
+                      block.height == size.height) {
+                    return;
+                  }
+                  onIntrinsicSize(size);
+                },
+              ),
+            ),
           ),
         ),
       ),

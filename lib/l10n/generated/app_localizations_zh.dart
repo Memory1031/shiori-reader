@@ -9,6 +9,9 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get readerImagePreview => '查看图片';
+
+  @override
   String readerFootnote(String number) {
     return '脚注 $number';
   }

@@ -28,50 +28,53 @@ Future<void> frames(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets(
-    'DPR sets decode width and late decoder completion releases its lease',
-    (tester) async {
-      final env = FixtureEnvironment();
-      final repo = MemoryImageRepository(resolve: (_) => env.source);
-      final pending = Completer<DecodedSourceImage>();
-      var requestedWidth = 0;
-      late MediaData data;
-      await tester.pumpWidget(
-        app(
-          MediaQuery(
-            data: const MediaQueryData(devicePixelRatio: 3),
-            child: Center(
-              child: SizedBox(
-                width: 120,
-                height: 200,
-                child: SourceImage(
-                  media: fixtureMediaRef(0),
-                  repository: repo,
-                  decoder: (value, width) {
-                    data = value;
-                    requestedWidth = width;
-                    return pending.future;
-                  },
+  for (final decodeScale in [1.0, 2.0]) {
+    testWidgets(
+      'DPR and scale $decodeScale set decode width; late completion releases lease',
+      (tester) async {
+        final env = FixtureEnvironment();
+        final repo = MemoryImageRepository(resolve: (_) => env.source);
+        final pending = Completer<DecodedSourceImage>();
+        var requestedWidth = 0;
+        late MediaData data;
+        await tester.pumpWidget(
+          app(
+            MediaQuery(
+              data: const MediaQueryData(devicePixelRatio: 3),
+              child: Center(
+                child: SizedBox(
+                  width: 120,
+                  height: 200,
+                  child: SourceImage(
+                    decodeScale: decodeScale,
+                    media: fixtureMediaRef(0),
+                    repository: repo,
+                    decoder: (value, width) {
+                      data = value;
+                      requestedWidth = width;
+                      return pending.future;
+                    },
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
-      await frames(tester);
-      expect(requestedWidth, 360);
-      expect(repo.retainedBytes, greaterThan(0));
-      await tester.pumpWidget(const SizedBox());
-      await tester.runAsync(() async {
-        pending.complete(await decodeSourceImage(data, requestedWidth));
-      });
-      await frames(tester);
-      expect(repo.retainedBytes, 0);
-      expect(tester.takeException(), isNull);
-      repo.close();
-      await env.close();
-    },
-  );
+        );
+        await frames(tester);
+        expect(requestedWidth, (360 * decodeScale).toInt());
+        expect(repo.retainedBytes, greaterThan(0));
+        await tester.pumpWidget(const SizedBox());
+        await tester.runAsync(() async {
+          pending.complete(await decodeSourceImage(data, requestedWidth));
+        });
+        await frames(tester);
+        expect(repo.retainedBytes, 0);
+        expect(tester.takeException(), isNull);
+        repo.close();
+        await env.close();
+      },
+    );
+  }
   test(
     'decode budget caps both axes without upscaling and rejects extreme originals',
     () {

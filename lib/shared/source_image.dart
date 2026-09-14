@@ -185,12 +185,14 @@ class SourceImage extends StatefulWidget {
     this.semanticLabel,
     this.onIntrinsicSize,
     this.decoder = decodeSourceImage,
-  });
+    this.decodeScale = 1,
+  }) : assert(decodeScale > 0 && decodeScale <= 4);
   final MediaRef media;
   final ImageRepository repository;
   final String? semanticLabel;
   final ValueChanged<Size>? onIntrinsicSize;
   final SourceImageDecoder decoder;
+  final double decodeScale;
   @override
   State<SourceImage> createState() => _SourceImageState();
 }
@@ -346,7 +348,8 @@ class _SourceImageState extends State<SourceImage> {
           ((bounds.hasBoundedWidth
                       ? bounds.maxWidth
                       : MediaQuery.sizeOf(context).width) *
-                  MediaQuery.devicePixelRatioOf(context))
+                  MediaQuery.devicePixelRatioOf(context) *
+                  widget.decodeScale)
               .ceil()
               .clamp(1, 32768);
       if (width != _width) {
