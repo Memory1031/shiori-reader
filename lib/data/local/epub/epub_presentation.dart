@@ -11,14 +11,15 @@ String? epubPresentation(
   String path,
   String Function(String) readText,
   Uint8List Function(String) readBytes,
-  String? Function(String, String) resolve,
-) {
+  String? Function(String, String) resolve, {
+  String? Function(String, String)? resolveStyle,
+}) {
   final body = document.body;
   if (body == null || body.text.length > 2000) return null;
   final sheets = epubDocumentStylesheets(
     document,
     path,
-    resolve,
+    resolveStyle ?? resolve,
     readText,
   ).toList();
   final layout = RegExp(
@@ -57,7 +58,7 @@ String? epubPresentation(
   String resource(String base, String href, {bool rasterOnly = false}) {
     String? ref;
     try {
-      ref = resolve(base, href.trim());
+      ref = (rasterOnly ? resolve : resolveStyle ?? resolve)(base, href.trim());
     } on FormatException {
       return '';
     }

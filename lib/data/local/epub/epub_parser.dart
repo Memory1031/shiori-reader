@@ -64,6 +64,20 @@ final class ParsedEpub {
   );
 }
 
+/// Optional styles may be malformed; never reinterpret an escaping path as
+/// package-local. Structural and content references still use epubReference.
+String? optionalEpubStyleReference(String base, String reference) {
+  try {
+    return epubReference(base, reference)?.$1;
+  } on LocalParseException catch (error) {
+    if (error.problem != LocalParseProblem.invalid) rethrow;
+    return null;
+  } on FormatException {
+    // Invalid percent encoding is also an unusable optional reference.
+    return null;
+  }
+}
+
 Iterable<XmlElement> elements(XmlNode node, String name) =>
     node.descendants.whereType<XmlElement>().where((e) => e.name.local == name);
 String? attr(XmlElement e, String name) {
@@ -631,7 +645,7 @@ class EpubParser {
       epubDocumentStylesheets(
         doc,
         path,
-        (base, href) => epubReference(base, href)?.$1,
+        optionalEpubStyleReference,
         (p) => zip.entries.containsKey(p) ? text(p) : '',
       ).map((sheet) => sheet.$2),
     );
@@ -688,7 +702,7 @@ class EpubParser {
       epubDocumentStylesheets(
         doc,
         path,
-        (base, href) => epubReference(base, href)?.$1,
+        optionalEpubStyleReference,
         (p) => zip.entries.containsKey(p) ? text(p) : '',
       ).map((sheet) => sheet.$2),
     );
@@ -709,6 +723,7 @@ class EpubParser {
                 ? zip.read(p, limit: 8 * 1024 * 1024)
                 : Uint8List(0),
             (base, href) => epubReference(base, href)?.$1,
+            resolveStyle: optionalEpubStyleReference,
           )
         : null;
     if (presentation != null) {

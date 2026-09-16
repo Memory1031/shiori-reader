@@ -124,6 +124,8 @@ XML 单项 4MiB、文本累计 12Mi UTF-16 单元，DOM 100000 节点 / 深度 1
 
 样式表按文档顺序加载，原生正文与特殊短页共用屏幕筛选规则（空 media / screen / all），不启用打印、alternate 或 disabled 样式；复杂媒体条件不猜测。正文语义保真与 CFI 的剩余边界见[支持范围](local-import.md#解析支持矩阵)。
 
+可选 stylesheet、CSS `@import` 与 presentation 样式依赖的非法包路径按缺失资源跳过，不猜测或修正目标路径；读取资源时仍执行大小限制。container、manifest、spine 与正文图片引用保持严格包内路径校验。
+
 ### 图片候选与 base 边界
 
 EPUB 支持包内 picture/source 与 srcset 候选，按固定顺序选择可用栅格图片；不根据 viewport/sizes 进行响应式选图。原生正文、guide 封面与特殊页共用候选规则。未声明在 manifest 的包内图片继续容忍；base/xml:base 仍不解释，包根绝对路径形式仍拒绝。详细候选上限见下方“图片选择细则”。
