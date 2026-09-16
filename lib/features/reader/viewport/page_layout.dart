@@ -42,6 +42,8 @@ final class PageLayout {
     required this.direction,
     this.imageHeights = const {},
     this.imageExtent,
+    this.locale,
+    this.textHeightBehavior,
     this.paragraphSpacing = 16,
   }) {
     if (width < 1 || height < 1) {
@@ -55,6 +57,8 @@ final class PageLayout {
   final double paragraphSpacing;
   final TextScaler scaler;
   final TextDirection direction;
+  final Locale? locale;
+  final TextHeightBehavior? textHeightBehavior;
   final Map<MediaRef, double> imageHeights;
   final double Function(ImageBlock)? imageExtent;
   int measuredChunks = 0;
@@ -116,6 +120,7 @@ final class PageLayout {
       scaler,
       direction,
       chapter: index.content.key,
+      locale: locale,
     );
     final prefix = readerIndentPrefix(
       block,
@@ -145,6 +150,8 @@ final class PageLayout {
               style: blockStyle,
             ),
             textDirection: direction,
+            locale: locale,
+            textHeightBehavior: textHeightBehavior,
             textScaler: scaler,
             textAlign: readerBlockAlign(block, chapter: index.content.key),
           )

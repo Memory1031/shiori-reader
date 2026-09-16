@@ -274,13 +274,25 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final scaler = MediaQuery.textScalerOf(context);
+      // Text.rich inherits typography. Resolve it once so pagination measures
+      // the exact same font, spacing, locale and height behavior it paints.
+      final defaults = DefaultTextStyle.of(context);
+      final textStyle = defaults.style
+          .merge(widget.textStyle)
+          .copyWith(inherit: false);
+      final locale = Localizations.maybeLocaleOf(context);
+      final heightBehavior =
+          defaults.textHeightBehavior ??
+          DefaultTextHeightBehavior.maybeOf(context);
       final direction = Directionality.of(context);
       final signature = (
         constraints.maxWidth,
         constraints.maxHeight,
         scaler,
         direction,
-        widget.textStyle,
+        textStyle,
+        locale,
+        heightBehavior,
         widget.content,
         widget.maxChunkCodePoints,
         widget.paragraphSpacing,
@@ -297,7 +309,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           index: index,
           width: constraints.maxWidth,
           height: constraints.maxHeight,
-          style: widget.textStyle,
+          style: textStyle,
+          locale: locale,
+          textHeightBehavior: heightBehavior,
           paragraphSpacing: widget.paragraphSpacing,
           scaler: scaler,
           direction: direction,
@@ -333,10 +347,11 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       double textWidth(PageFragment fragment) => readerBlockWidth(
         widget.content.blocks[_layout!.index.chunks[fragment.unit].blockIndex],
         constraints.maxWidth,
-        widget.textStyle,
+        textStyle,
         scaler,
         direction,
         chapter: widget.content.key,
+        locale: locale,
       );
 
       Widget? buildPage(BuildContext context, int number) {
@@ -391,6 +406,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                   2,
                             ),
                             child: ReaderLinkedText(
+                              locale: locale,
+                              textHeightBehavior: heightBehavior,
                               images: widget.images,
                               inlineImages: widget
                                   .content
@@ -423,7 +440,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                         0 &&
                                     fragment.start == 0,
                                 textWidth(fragment),
-                                widget.textStyle,
+                                textStyle,
                                 scaler,
                                 chapter: widget.content.key,
                               ),
@@ -432,7 +449,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                     .index
                                     .chunks[fragment.unit]
                                     .blockIndex],
-                                widget.textStyle,
+                                textStyle,
                                 chapter: widget.content.key,
                               ),
                               align: readerBlockAlign(

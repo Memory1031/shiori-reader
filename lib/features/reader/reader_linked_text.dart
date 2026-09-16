@@ -60,10 +60,14 @@ class ReaderLinkedText extends StatefulWidget {
     this.onLink,
     this.inlineImages = const [],
     this.images,
+    this.locale,
+    this.textHeightBehavior,
   });
   final String text, prefix;
   final List<InlineImage> inlineImages;
   final ImageRepository? images;
+  final Locale? locale;
+  final TextHeightBehavior? textHeightBehavior;
   final int blockOffset;
   final List<LocalContentLink> links;
   final TextStyle style;
@@ -162,6 +166,8 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
       style: widget.style,
       textAlign: widget.align,
       textScaler: widget.scaler,
+      locale: widget.locale,
+      textHeightBehavior: widget.textHeightBehavior,
     );
   }
 }

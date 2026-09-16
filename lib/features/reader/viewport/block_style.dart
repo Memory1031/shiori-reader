@@ -113,6 +113,7 @@ double readerBlockWidth(
   TextScaler scaler,
   TextDirection direction, {
   ChapterKey? chapter,
+  Locale? locale,
 }) {
   if (block is! ParagraphBlock ||
       block.alignment != ParagraphAlignment.start ||
@@ -127,6 +128,7 @@ double readerBlockWidth(
       style: readerBlockStyle(block, style, chapter: chapter),
     ),
     textScaler: scaler,
+    locale: locale,
     textDirection: direction,
   )..layout();
   final cell = painter.width / 4;
