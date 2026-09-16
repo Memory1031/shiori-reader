@@ -184,6 +184,7 @@ class SourceImage extends StatefulWidget {
     required this.repository,
     this.semanticLabel,
     this.placeholder,
+    this.backgroundColor,
     this.onIntrinsicSize,
     this.decoder = decodeSourceImage,
     this.decodeScale = 1,
@@ -192,6 +193,7 @@ class SourceImage extends StatefulWidget {
   final ImageRepository repository;
   final String? semanticLabel;
   final Widget? placeholder;
+  final Color? backgroundColor;
   final ValueChanged<Size>? onIntrinsicSize;
   final SourceImageDecoder decoder;
   final double decodeScale;
@@ -433,7 +435,9 @@ class _SourceImageState extends State<SourceImage> {
       return SizedBox(
         height: bounds.hasBoundedHeight ? null : 180,
         child: ColoredBox(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          color:
+              widget.backgroundColor ??
+              Theme.of(context).colorScheme.surfaceContainerHighest,
           child: body,
         ),
       );

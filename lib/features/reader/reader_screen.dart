@@ -456,6 +456,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                     );
                                   }
                                   return PagedReaderViewport(
+                                    images: widget.images,
                                     content: widget.content,
                                     pageSize: pageBounds.biggest,
                                     contentOrigin: Offset(

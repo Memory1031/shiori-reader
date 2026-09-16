@@ -295,6 +295,8 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
       if (parts.length != 2) continue;
       final name = parts[0].trim().toLowerCase();
       if ({
+        'height',
+        'width',
         'text-align',
         'text-indent',
         'display',

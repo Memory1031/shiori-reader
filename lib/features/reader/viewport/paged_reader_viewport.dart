@@ -5,8 +5,8 @@ import 'page_layout.dart';
 import 'render_chunk.dart';
 import 'block_style.dart';
 import 'paper_turn.dart';
-import '../../../domain/contracts/local_content_links.dart';
 import '../reader_linked_text.dart';
+import '../../../domain/contracts/contracts.dart';
 
 class PagedReaderController {
   _PagedReaderViewportState? _state;
@@ -46,8 +46,10 @@ class PagedReaderViewport extends StatefulWidget {
     this.startAtEnd = false,
     this.contentLinks = const [],
     this.onLink,
+    this.images,
   });
   final ChapterContent content;
+  final ImageRepository? images;
   final PagedReaderController controller;
   final ReaderPosition? initialPosition;
   final TextStyle textStyle;
@@ -389,6 +391,14 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                   2,
                             ),
                             child: ReaderLinkedText(
+                              images: widget.images,
+                              inlineImages: widget
+                                  .content
+                                  .blocks[_layout!
+                                      .index
+                                      .chunks[fragment.unit]
+                                      .blockIndex]
+                                  .inlineImages,
                               onLink: widget.onLink,
                               text: fragment.text!,
                               blockOffset:

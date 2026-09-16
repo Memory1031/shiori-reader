@@ -720,6 +720,7 @@ class EpubParser {
     final anchors = <String, int>{};
     int? activeLink;
     final spans = <(int, int, int)>[];
+    final inlineImages = <InlineImage>[];
     final buffer = ProseTextBuffer(
       onWrite: (start, end) {
         final link = activeLink;
@@ -766,11 +767,29 @@ class EpubParser {
           if (++linkCount > 10000) zipLimit();
         }
       }
+      final images = inlineImages
+          .map(
+            (image) => InlineImage(
+              offset:
+                  image.offset -
+                  rawText
+                      .substring(0, trimStart.clamp(0, rawText.length))
+                      .runes
+                      .length,
+              media: image.media,
+              widthEm: image.widthEm,
+              heightEm: image.heightEm,
+              alt: image.alt,
+            ),
+          )
+          .toList();
+      inlineImages.clear();
       spans.clear();
       if (value.trim().isEmpty) return;
       blocks.add(
         heading == null
             ? ParagraphBlock(
+                inlineImages: images,
                 text: value,
                 alignment: switch (property('text-align')) {
                   'center' => ParagraphAlignment.center,
@@ -789,6 +808,7 @@ class EpubParser {
                 })(),
               )
             : HeadingBlock(
+                inlineImages: images,
                 text: value,
                 level: heading,
                 alignment: switch (property('text-align')) {
@@ -842,7 +862,7 @@ class EpubParser {
       }
       final heading = proseHeadingLevel(tag);
       final boundary =
-          {'img', 'image', 'hr'}.contains(tag) ||
+          tag == 'hr' ||
           containers.contains(tag) ||
           paragraphs.contains(tag) ||
           heading != null;
@@ -955,13 +975,53 @@ class EpubParser {
       if (tag == 'img' || tag == 'image') {
         whitespace = previousWhitespace;
         visible = previousVisible;
-        flush();
         MediaRef? img;
         for (final href in epubImageCandidates(node).take(128)) {
           final ref = epubReference(path, href);
           if (ref != null) img = image(ref.$1);
           if (img != null) break;
         }
+        if (img != null &&
+            tag == 'img' &&
+            paragraphOwner != null &&
+            !{
+              'block',
+              'none',
+              'flex',
+              'grid',
+            }.contains(styles[node]?['display'])) {
+          double? em(String? value) {
+            if (value == null || !RegExp(r'^\d*\.?\d+em$').hasMatch(value)) {
+              return null;
+            }
+            return double.tryParse(value.substring(0, value.length - 2));
+          }
+
+          final size = imageSizes[img];
+          final authoredHeight = em(styles[node]?['height']);
+          final authoredWidth = em(styles[node]?['width']);
+          if (size != null &&
+              (authoredHeight != null || authoredWidth != null)) {
+            final h =
+                authoredHeight ?? authoredWidth! * size.height / size.width;
+            final w = authoredWidth ?? h * size.width / size.height;
+            if (h > 0 && h <= 4 && w > 0 && w <= 8) {
+              buffer.write('\uFFFC');
+              inlineImages.add(
+                InlineImage(
+                  offset: buffer.rawText.runes.length - 1,
+                  media: img,
+                  widthEm: w,
+                  heightEm: h,
+                  alt: node.attributes['alt'],
+                ),
+              );
+              return;
+            }
+          }
+        }
+        flush();
+        if (id != null && id.isNotEmpty) anchors[id] = blocks.length;
         if (img != null) {
           final size = imageSizes[img];
           blocks.add(
@@ -1026,7 +1086,11 @@ class EpubParser {
     )) {
       for (var i = 0; i < blocks.length; i++) {
         if (blocks[i] case HeadingBlock(:final text, :final alignment)) {
-          blocks[i] = ParagraphBlock(text: text, alignment: alignment);
+          blocks[i] = ParagraphBlock(
+            text: text,
+            alignment: alignment,
+            inlineImages: blocks[i].inlineImages,
+          );
         }
       }
     }
@@ -1048,7 +1112,12 @@ class EpubParser {
     )) {
       if (level > 2 &&
           !blocks.whereType<HeadingBlock>().any((h) => h.level < level)) {
-        blocks[0] = HeadingBlock(text: text, level: 2, alignment: alignment);
+        blocks[0] = HeadingBlock(
+          text: text,
+          level: 2,
+          alignment: alignment,
+          inlineImages: blocks[0].inlineImages,
+        );
       }
     }
     final title = doc

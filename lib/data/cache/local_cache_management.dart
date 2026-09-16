@@ -72,10 +72,7 @@ class LocalCacheManagement implements CacheManagement {
         } catch (_) {
           continue;
         }
-        final refs = content.blocks
-            .whereType<ImageBlock>()
-            .map((b) => b.media)
-            .toSet();
+        final refs = content.blocks.expand((b) => b.mediaRefs).toSet();
         var saved = 0;
         for (final ref in refs) {
           final result = await images.load(

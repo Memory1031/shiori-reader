@@ -258,7 +258,7 @@ class LocalReadingPrefetch implements ReadingPrefetch {
     final before = <MediaRef>[], after = <MediaRef>[];
     for (var i = 0; i < content.blocks.length; i++) {
       final item = content.blocks[i];
-      if (item is ImageBlock) (i < block ? before : after).add(item.media);
+      (i < block ? before : after).addAll(item.mediaRefs);
     }
     return [
       ...after.take(4),

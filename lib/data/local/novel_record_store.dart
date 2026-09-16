@@ -82,9 +82,7 @@ class NovelRecordStore {
             ],
           );
           final refs = switch (value) {
-            ChapterContent(:final blocks) => blocks.whereType<ImageBlock>().map(
-              (b) => b.media,
-            ),
+            ChapterContent(:final blocks) => blocks.expand((b) => b.mediaRefs),
             NovelDetail(:final summary) => [
               if (summary.cover != null) summary.cover!,
             ],
@@ -167,9 +165,7 @@ class NovelRecordStore {
       final refs = <MediaRef>[];
       if (table == 'chapter_cache') {
         refs.addAll(
-          RecordCodec.readChapter(
-            payload,
-          ).blocks.whereType<ImageBlock>().map((b) => b.media),
+          RecordCodec.readChapter(payload).blocks.expand((b) => b.mediaRefs),
         );
       }
       if (table == 'novel_cache') {

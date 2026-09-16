@@ -1,7 +1,10 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../../domain/models/models.dart';
+import '../../domain/contracts/contracts.dart';
+import '../../shared/source_image.dart';
+import 'reader_inline_images.dart';
 
-import '../../domain/contracts/local_content_links.dart';
 import '../../l10n/generated/app_localizations.dart';
 
 Future<void> showReaderFootnote(BuildContext context, LocalContentLink note) =>
@@ -55,8 +58,12 @@ class ReaderLinkedText extends StatefulWidget {
     required this.align,
     required this.scaler,
     this.onLink,
+    this.inlineImages = const [],
+    this.images,
   });
   final String text, prefix;
+  final List<InlineImage> inlineImages;
+  final ImageRepository? images;
   final int blockOffset;
   final List<LocalContentLink> links;
   final TextStyle style;
@@ -87,6 +94,27 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
     _clear();
     final runes = widget.text.runes.toList();
     final spans = <InlineSpan>[TextSpan(text: widget.prefix)];
+    List<InlineSpan> segment(int start, int end, {VoidCallback? onTap}) =>
+        readerInlineSpans(
+          text: String.fromCharCodes(runes.sublist(start, end)),
+          offset: widget.blockOffset + start,
+          images: widget.inlineImages,
+          style: widget.style,
+          imageBuilder: (image) => GestureDetector(
+            onTap: onTap,
+            child: widget.images == null
+                ? const SizedBox.shrink()
+                : SourceImage(
+                    media: image.media,
+                    repository: widget.images!,
+                    semanticLabel: image.alt,
+                    backgroundColor: Colors.transparent,
+                    placeholder: const Center(
+                      child: Icon(Icons.image_outlined, size: 12),
+                    ),
+                  ),
+          ),
+        );
     var cursor = 0;
     final orderedLinks = [...widget.links]
       ..sort((a, b) => (a.sourceOffset ?? -1).compareTo(b.sourceOffset ?? -1));
@@ -100,9 +128,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
                   widget.blockOffset)
               .clamp(0, runes.length);
       if (end <= start || start < cursor) continue;
-      spans.add(
-        TextSpan(text: String.fromCharCodes(runes.sublist(cursor, start))),
-      );
+      spans.add(TextSpan(children: segment(cursor, start)));
       final recognizer = TapGestureRecognizer()
         ..onTap = () {
           if (note.isFootnote) {
@@ -112,19 +138,25 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
           }
         };
       _recognizers.add(recognizer);
-      spans.add(
-        TextSpan(
-          text: String.fromCharCodes(runes.sublist(start, end)),
-          style: TextStyle(color: Theme.of(context).colorScheme.primary),
-          semanticsLabel: note.isFootnote
-              ? AppLocalizations.of(context).readerFootnote(note.label)
-              : null,
-          recognizer: recognizer,
-        ),
-      );
+      for (final span in segment(start, end, onTap: recognizer.onTap)) {
+        spans.add(
+          span is TextSpan
+              ? TextSpan(
+                  text: span.text,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  semanticsLabel: note.isFootnote
+                      ? AppLocalizations.of(context).readerFootnote(note.label)
+                      : null,
+                  recognizer: recognizer,
+                )
+              : span,
+        );
+      }
       cursor = end;
     }
-    spans.add(TextSpan(text: String.fromCharCodes(runes.sublist(cursor))));
+    spans.add(TextSpan(children: segment(cursor, runes.length)));
     return Text.rich(
       TextSpan(children: spans),
       style: widget.style,

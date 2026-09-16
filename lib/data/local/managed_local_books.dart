@@ -328,12 +328,10 @@ class ManagedLocalBooks
       if (content.chapters[i].key != chapters[i].key) {
         throw const FormatException('Local chapter mismatch');
       }
-      refs.addAll(
-        content.chapters[i].blocks.whereType<ImageBlock>().map((b) => b.media),
-      );
+      refs.addAll(content.chapters[i].blocks.expand((b) => b.mediaRefs));
     }
     for (final c in content.auxiliaryChapters) {
-      refs.addAll(c.blocks.whereType<ImageBlock>().map((b) => b.media));
+      refs.addAll(c.blocks.expand((b) => b.mediaRefs));
     }
     for (final ref in refs) {
       if (ref.sourceId != LocalBookIdentity.sourceId ||

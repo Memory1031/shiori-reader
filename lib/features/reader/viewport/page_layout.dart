@@ -4,6 +4,7 @@ import '../../../domain/models/models.dart';
 import 'render_chunk.dart';
 import '../position/position_resolver.dart';
 import 'block_style.dart';
+import '../reader_inline_images.dart';
 
 /// A cursor in transient chunks; exposed/persisted positions always use Domain.
 final class PageCursor {
@@ -104,6 +105,7 @@ final class PageLayout {
     required bool backwards,
     required ContentBlock block,
     required bool startsBlock,
+    required int blockOffset,
   }) {
     if (text.isEmpty) return (text: '', count: 0, height: 16);
     measuredChunks++;
@@ -123,15 +125,40 @@ final class PageLayout {
       scaler,
       chapter: index.content.key,
     );
-    final painter = TextPainter(
-      text: TextSpan(
-        text: prefix + text,
-        style: readerBlockStyle(block, style, chapter: index.content.key),
-      ),
-      textDirection: direction,
-      textScaler: scaler,
-      textAlign: readerBlockAlign(block, chapter: index.content.key),
-    )..layout(maxWidth: textWidth);
+    final blockStyle = readerBlockStyle(
+      block,
+      style,
+      chapter: index.content.key,
+    );
+    final painter =
+        TextPainter(
+            text: TextSpan(
+              children: [
+                TextSpan(text: prefix),
+                ...readerInlineSpans(
+                  text: text,
+                  offset: blockOffset,
+                  images: block.inlineImages,
+                  style: blockStyle,
+                ),
+              ],
+              style: blockStyle,
+            ),
+            textDirection: direction,
+            textScaler: scaler,
+            textAlign: readerBlockAlign(block, chapter: index.content.key),
+          )
+          ..setPlaceholderDimensions(
+            readerInlineDimensions(
+              offset: blockOffset,
+              length: text.runes.length,
+              images: block.inlineImages,
+              style: blockStyle,
+              scaler: scaler,
+              maxWidth: textWidth,
+            ),
+          )
+          ..layout(maxWidth: textWidth);
     try {
       final lines = painter.computeLineMetrics();
       var used = readerBlockSpacing(
@@ -226,6 +253,7 @@ final class PageLayout {
             backwards: false,
             block: block,
             startsBlock: chunk.start == 0,
+            blockOffset: chunk.start + cursor.offset,
           );
           final next = index.chunks[cursor.unit + 1];
           final nextBlock = index.content.blocks[next.blockIndex];
@@ -250,6 +278,7 @@ final class PageLayout {
           backwards: false,
           block: index.content.blocks[chunk.blockIndex],
           startsBlock: chunk.start == 0 && cursor.offset == 0,
+          blockOffset: chunk.start + cursor.offset,
         );
         if (fitted == null) break;
         fragments.add(
@@ -301,6 +330,7 @@ final class PageLayout {
           backwards: true,
           block: index.content.blocks[chunk.blockIndex],
           startsBlock: chunk.start == 0,
+          blockOffset: chunk.start,
         );
         if (fitted == null) break;
         final start = cursor.offset - fitted.count;
