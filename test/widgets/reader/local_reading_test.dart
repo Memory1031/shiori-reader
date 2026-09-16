@@ -1,5 +1,9 @@
 import 'dart:async';
+import 'source_image_test.dart' show frames;
 import 'dart:convert';
+import 'package:shiori/data/media/local_image_repository.dart';
+import 'package:shiori/features/reader/reader_image_preview.dart';
+import 'package:shiori/shared/source_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,10 +18,17 @@ import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/local_books/local_catalog.dart';
 import '../../data/local/support/epub_fixtures.dart';
+import '../../data/local/support/mixed_epub_fixture.dart';
 import '../../data/local/local_reading_test.dart' show ForbiddenOnline;
 
 class MemoryBooks implements LocalBookStore {
-  MemoryBooks(this.record);
+  MemoryBooks(this.record, {this.media = const {}});
+  final Map<String, Uint8List> media;
+  @override
+  Future<Result<Uint8List>> readMedia(
+    MediaRef ref, {
+    required CancellationToken cancellation,
+  }) async => Success(media[ref.mediaId.split('/').last]!);
   final LocalBookRecord record;
   Completer<void>? delay;
   @override
@@ -39,6 +50,97 @@ class MemoryBooks implements LocalBookStore {
 }
 
 void main() {
+  testWidgets(
+    'mixed fixed image pages participate in next and previous navigation',
+    (tester) async {
+      final key = LocalBookIdentity.book('b' * 64);
+      final parsed = EpubParser(
+        zipFiles(
+          mixedEpub(
+            body:
+                '<main id="one"><svg><image href="../images/星 空.png"/>'
+                '<a href="b.xhtml"><rect fill-opacity="0"/></a></svg></main>',
+          ),
+        ),
+        key,
+        'mixed.epub',
+      ).parse();
+      final content = parsed.content;
+      final store = MemoryBooks(
+        LocalBookRecord(
+          content: content,
+          format: LocalBookFormat.epub,
+          importedAt: DateTime.now(),
+        ),
+        media: parsed.media,
+      );
+      final repository = LocalReadingRepository(
+        local: store,
+        online: ForbiddenOnline(),
+      );
+      final images = LocalImageRepository(
+        local: store,
+        online: ForbiddenOnline(),
+      );
+      final library = FixtureLibraryRepository();
+      final settings = FixtureSettingsStore();
+      await settings.save(
+        ReaderSettings(mode: ReaderMode.paged, controlsHintSeen: true),
+        cancellation: CancellationSource().token,
+      );
+      Widget app() => ShioriApp(
+        locale: const Locale('en'),
+        routes: AppRoutes(
+          home: (_) => BookReaderScreen(
+            chapter: content.chapters.first.key,
+            repository: repository,
+            images: images,
+            library: library,
+            settings: settings,
+          ),
+        ),
+      );
+      await tester.pumpWidget(app());
+      await frames(tester);
+      ReaderContentView view() =>
+          tester.widget<ReaderContentView>(find.byType(ReaderContentView));
+      final before = view().viewportController!.capture();
+      await tester.tap(find.byType(SourceImage).first);
+      await frames(tester);
+      expect(find.byType(ReaderImagePreview), findsOneWidget);
+      await tester.tap(find.byType(CloseButton));
+      await frames(tester);
+      expect(view().viewportController!.capture(), before);
+      await tester.pump(const Duration(seconds: 1));
+      await view().session!.flushProgress();
+      final saved =
+          (await library.getProgress(
+                    key,
+                    cancellation: CancellationSource().token,
+                  )
+                  as Success<ReadingProgress?>)
+              .value!;
+      expect(saved.chapterKey, content.chapters.first.key);
+      await tester.pumpWidget(const SizedBox());
+      await frames(tester);
+      await tester.pumpWidget(app());
+      await frames(tester);
+      expect(view().initialPosition!.blockKey, saved.position.blockKey);
+      for (final index in [1, 2]) {
+        view().onNextChapter!();
+        await frames(tester);
+        expect(view().content.key, content.chapters[index].key);
+      }
+      for (final index in [1, 0]) {
+        view().onPreviousChapter!();
+        await frames(tester);
+        expect(view().content.key, content.chapters[index].key);
+      }
+      await tester.pumpWidget(const SizedBox());
+      await frames(tester);
+    },
+  );
+
   for (final mode in [ReaderMode.paged]) {
     testWidgets(
       'local nested fragment, same chapter jump, previous/next and resume in ${mode.name}',

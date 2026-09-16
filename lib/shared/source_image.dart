@@ -183,6 +183,7 @@ class SourceImage extends StatefulWidget {
     required this.media,
     required this.repository,
     this.semanticLabel,
+    this.placeholder,
     this.onIntrinsicSize,
     this.decoder = decodeSourceImage,
     this.decodeScale = 1,
@@ -190,6 +191,7 @@ class SourceImage extends StatefulWidget {
   final MediaRef media;
   final ImageRepository repository;
   final String? semanticLabel;
+  final Widget? placeholder;
   final ValueChanged<Size>? onIntrinsicSize;
   final SourceImageDecoder decoder;
   final double decodeScale;
@@ -388,6 +390,8 @@ class _SourceImageState extends State<SourceImage> {
               ),
           ],
         );
+      } else if (widget.placeholder != null) {
+        body = widget.placeholder!;
       } else if (_failure != null) {
         body = Center(
           child: FittedBox(

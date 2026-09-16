@@ -985,6 +985,89 @@ void main() {
     },
   );
 
+  for (final locale in [const Locale('zh'), const Locale('en')]) {
+    testWidgets(
+      'empty import panel closes from backdrop after reopening in $locale',
+      (tester) async {
+        await controller.start();
+        controller.open();
+        await pumpImportPanel(tester, locale: locale);
+        await tester.pumpAndSettle();
+        await tester.tapAt(const Offset(10, 10));
+        await tester.pumpAndSettle();
+        expect(controller.panelOpen, isFalse);
+        expect(
+          find.byKey(const ValueKey('import-dismiss-barrier')),
+          findsNothing,
+        );
+        controller.open();
+        await tester.pumpAndSettle();
+        await tester.tapAt(const Offset(10, 10));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('import-dismiss-barrier')),
+          findsNothing,
+        );
+        expect(find.text('Reader position unchanged'), findsOneWidget);
+      },
+    );
+  }
+  testWidgets(
+    'dismissing staged files preserves receipts and survives refresh',
+    (tester) async {
+      source.receive();
+      await controller.start();
+      controller.open();
+      await pumpImportPanel(tester);
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      await controller.refresh();
+      await tester.pumpAndSettle();
+      expect(source.inbox, hasLength(1));
+      expect(source.acked, isEmpty);
+      expect(
+        find.byKey(const ValueKey('import-dismiss-barrier')),
+        findsNothing,
+      );
+      controller.open();
+      await tester.pumpAndSettle();
+      expect(find.text('Book.txt'), findsOneWidget);
+    },
+  );
+  testWidgets(
+    'receiving cannot accidentally dismiss but has an explicit stop',
+    (tester) async {
+      await controller.start();
+      controller.open();
+      await pumpImportPanel(tester);
+      await tester.pumpAndSettle();
+      Future<void>? pick;
+      await tester.runAsync(() async {
+        source.picking = Completer<void>();
+        pick = controller.pick();
+      });
+      await tester.pump();
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pump();
+      expect(controller.panelOpen, isTrue);
+      expect(
+        find.byKey(const ValueKey('import-dismiss-barrier')),
+        findsOneWidget,
+      );
+      await tester.runAsync(() async {
+        await tester.tap(find.text('停止导入'));
+        await pick!.timeout(const Duration(seconds: 10));
+        await untilImport(() => !controller.panelOpen);
+      });
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('import-dismiss-barrier')),
+        findsNothing,
+      );
+    },
+  );
+
   group('overlay batch', () {
     for (final count in [1, 3]) {
       testWidgets('cancel $count selected files allows a fresh selection', (

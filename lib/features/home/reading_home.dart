@@ -213,6 +213,7 @@ class _ReadingHomeState extends State<ReadingHome> {
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => LocalBooksScreen(
+                      images: widget.images,
                       store: widget.localBooks!,
                       management: widget.localManagement!,
                       library: widget.library,

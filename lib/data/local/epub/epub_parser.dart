@@ -18,6 +18,7 @@ import 'epub_text_styles.dart';
 import 'epub_image_candidates.dart';
 import 'epub_diagnostics.dart';
 import 'epub_footnotes.dart';
+import 'epub_fixed_image.dart';
 
 final class ParsedEpub {
   ParsedEpub(this.content, this.media, this.diagnostics);
@@ -121,6 +122,7 @@ class EpubParser {
   final chapters = <ChapterContent>[];
   final auxiliary = <ChapterContent>[];
   final primary = <ChapterKey>[];
+  final _fixedChapters = <ChapterKey>{};
   final chapterPaths = <ChapterKey, String>{};
   final requestedPaths = <String>[];
   final rawLinks =
@@ -297,11 +299,9 @@ class EpubParser {
     final epub3 = attr(package, 'version') == '3.0';
 
     for (final ref in packageChildren(spine, 'itemref')) {
-      if ((attr(ref, 'properties') ?? '').contains(
-        'rendition:layout-pre-paginated',
-      )) {
-        throw const LocalParseException(LocalParseProblem.fixedLayout);
-      }
+      final fixed = (attr(ref, 'properties') ?? '')
+          .split(RegExp(r'\s+'))
+          .contains('rendition:layout-pre-paginated');
       final chain = <_Item>{};
       var item = items[attr(ref, 'idref')];
       while (item != null &&
@@ -324,7 +324,9 @@ class EpubParser {
       if (++spineCount > 10000) zipLimit();
       if (occurrence > 0 && !epub3) invalidZip();
       if (chain.isNotEmpty) _diagnostics.add(EpubDiagnosticCode.spineFallback);
-      if (occurrence == 0) {
+      if (fixed) {
+        _fixedImageChapter(path, occurrence);
+      } else if (occurrence == 0) {
         _chapter(path);
       } else if (byPath[path] case final original?) {
         repeatedBlocks += original.blocks.length;
@@ -385,6 +387,7 @@ class EpubParser {
     }
     final links = <LocalContentLink>[];
     for (final source in [...chapters, ...auxiliary]) {
+      if (_fixedChapters.contains(source.key)) continue;
       final path = chapterPaths[source.key]!;
       for (final note
           in _footnotes[path] ??
@@ -619,6 +622,57 @@ class EpubParser {
       stack.addAll(node.nodes.map((n) => (n, depth + 1)));
     }
     return document;
+  }
+
+  void _fixedImageChapter(String path, int occurrence) {
+    final doc = _html(path);
+    final node = epubFixedImage(
+      doc,
+      epubDocumentStylesheets(
+        doc,
+        path,
+        (base, href) => epubReference(base, href)?.$1,
+        (p) => zip.entries.containsKey(p) ? text(p) : '',
+      ).map((sheet) => sheet.$2),
+    );
+    MediaRef? media;
+    for (final href in epubImageCandidates(node).take(128)) {
+      final ref = epubReference(path, href);
+      if (ref != null) media = image(ref.$1);
+      if (media != null) break;
+    }
+    if (media == null) {
+      throw const LocalParseException(LocalParseProblem.fixedLayout);
+    }
+    final size = imageSizes[media];
+    final title = doc.querySelector('title')?.text.trim();
+    final chapter = ChapterContent(
+      key: LocalBookIdentity.epubOccurrence(book, path, occurrence),
+      title: title?.isNotEmpty == true ? title! : filenameTitle(path),
+      blocks: [
+        ImageBlock(
+          media: media,
+          alt: node.attributes['alt'],
+          width: size?.width,
+          height: size?.height,
+        ),
+      ],
+    );
+    _fixedChapters.add(chapter.key);
+    chapters.add(chapter);
+    chapterPaths[chapter.key] = path;
+    if (!byPath.containsKey(path)) {
+      byPath[path] = chapter;
+      // Only the image and its containers are navigable anchors. Discarded
+      // hotspot geometry must not create prose links or auxiliary chapters.
+      final anchors = <String, String>{};
+      for (dom.Element? e = node; e != null; e = e.parent) {
+        if (e.id.isNotEmpty) {
+          anchors.putIfAbsent(e.id, () => chapter.blocks.single.blockKey);
+        }
+      }
+      fragments[path] = anchors;
+    }
   }
 
   void _chapter(String path) {

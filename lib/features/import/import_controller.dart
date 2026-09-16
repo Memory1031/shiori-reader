@@ -119,6 +119,14 @@ class ImportController extends ChangeNotifier {
     _emit();
   }
 
+  /// Hides the panel without consuming pending receipts or cancelling work.
+  void dismiss() {
+    if (_closed || busy) return;
+    panelOpen = false;
+    snoozed = true;
+    _emit();
+  }
+
   /// Explicitly releases this batch's remaining inbox copies, never stored books.
   Future<void> discard() async {
     if (_closed || busy) return;

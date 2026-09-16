@@ -69,7 +69,206 @@ class ReparseStore
   dynamic noSuchMethod(Invocation i) => throw UnimplementedError();
 }
 
+class BatchReparseStore extends ReparseStore {
+  final books = List.generate(
+    3,
+    (i) => LocalBookInfo(
+      key: LocalBookIdentity.book('${i + 1}' * 64),
+      title: 'Book ${i + 1}',
+      format: i == 1 ? LocalBookFormat.txt : LocalBookFormat.epub,
+      importedAt: DateTime.utc(2025),
+    ),
+  );
+  final calls = <NovelKey>[];
+  final overrides = <TxtEncoding?>[];
+  final gates = List.generate(
+    3,
+    (_) => Completer<Result<LocalReparseResult>>(),
+  );
+  bool promptEncoding = false;
+  @override
+  Stream<Result<List<LocalBookInfo>>> watchBooks() =>
+      Stream.value(Success(books));
+  @override
+  Future<Result<LocalReparseResult>> reparseBook(
+    NovelKey key, {
+    required ChooseTxtEncoding chooseEncoding,
+    TxtEncoding? encoding,
+    required CancellationToken cancellation,
+  }) async {
+    final index = calls.length;
+    calls.add(key);
+    overrides.add(encoding);
+    if (promptEncoding) {
+      await chooseEncoding(TxtEncodingPreview({TxtEncoding.utf8: 'Sample'}));
+    }
+    return Future.any([
+      gates[index].future,
+      cancellation.whenCancelled.then((_) {
+        cancelled = true;
+        return Failure<LocalReparseResult>(
+          AppFailure.cancelled(Operation.libraryWrite),
+        );
+      }),
+    ]);
+  }
+}
+
 void main() {
+  Future<void> openBatch(
+    WidgetTester tester,
+    BatchReparseStore store, {
+    String lang = 'en',
+  }) async {
+    await tester.pumpWidget(
+      ShioriApp(
+        locale: Locale(lang),
+        routes: AppRoutes(
+          home: (_) => LocalBooksScreen(
+            store: store,
+            management: store,
+            library: FixtureLibraryRepository(),
+            onRead: (_) {},
+            onImport: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('local-books-actions')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(lang == 'en' ? 'Reparse all' : '全部重新解析'));
+    await tester.pumpAndSettle();
+    expect(store.calls, isEmpty);
+    await tester.tap(
+      find.widgetWithText(
+        FilledButton,
+        lang == 'en' ? 'Reparse all' : '全部重新解析',
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  for (final lang in ['en', 'zh']) {
+    testWidgets(
+      'batch reparse serializes, continues after failure and reports results in $lang',
+      (tester) async {
+        final store = BatchReparseStore();
+        await openBatch(tester, store, lang: lang);
+        expect(store.calls, [store.books[0].key]);
+        expect(
+          tester
+              .widget<PopupMenuButton<String>>(
+                find.byKey(const ValueKey('local-books-actions')),
+              )
+              .enabled,
+          isFalse,
+        );
+        store.gates[0].complete(Success(LocalReparseResult(approximate: true)));
+        await tester.pump();
+        expect(store.calls, [store.books[0].key, store.books[1].key]);
+        store.gates[1].complete(
+          Failure(
+            AppFailure(
+              kind: FailureKind.parse,
+              operation: Operation.libraryWrite,
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(store.calls, store.books.map((b) => b.key));
+        store.gates[2].complete(
+          Success(LocalReparseResult(approximate: false, cleanupPending: true)),
+        );
+        await tester.pumpAndSettle();
+        expect(store.overrides, [null, null, null]);
+        expect(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.textContaining(
+              lang == 'en' ? 'Succeeded: 2' : '成功 2 本',
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining(
+            lang == 'en' ? 'nearby positions for 1' : '1 本书恢复到了附近位置',
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Book 2\n'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await store.events.close();
+      },
+    );
+  }
+  testWidgets(
+    'stop batch preserves prior success and never starts remaining books',
+    (tester) async {
+      final store = BatchReparseStore();
+      await openBatch(tester, store);
+      store.gates[0].complete(Success(LocalReparseResult(approximate: false)));
+      await tester.pump();
+      await tester.tap(find.text('Stop reparsing'));
+      await tester.pumpAndSettle();
+      expect(store.cancelled, isTrue);
+      expect(store.calls, hasLength(2));
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.textContaining(
+            'Succeeded: 1 · Failed: 0 · Not processed: 2',
+          ),
+        ),
+        findsOneWidget,
+      );
+      await tester.pumpWidget(const SizedBox());
+      await store.events.close();
+    },
+  );
+  testWidgets('cancelling per-book encoding stops the batch without hanging', (
+    tester,
+  ) async {
+    final store = BatchReparseStore()..promptEncoding = true;
+    await openBatch(tester, store);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Book 1'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+    expect(store.calls, hasLength(1));
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.textContaining('Not processed: 3'),
+      ),
+      findsOneWidget,
+    );
+    await tester.pumpWidget(const SizedBox());
+    await store.events.close();
+  });
+  testWidgets(
+    'leaving management cancels the batch and avoids late UI updates',
+    (tester) async {
+      final store = BatchReparseStore();
+      await openBatch(tester, store);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      expect(store.cancelled, isTrue);
+      expect(store.calls, hasLength(1));
+      expect(tester.takeException(), isNull);
+      await store.events.close();
+    },
+  );
+
   for (final lang in ['en', 'zh']) {
     testWidgets(
       'reparse menu confirms and reports approximate position in $lang',
@@ -90,7 +289,12 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.byType(PopupMenuButton<String>));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(ListTile),
+            matching: find.byType(PopupMenuButton<String>),
+          ),
+        );
         await tester.pumpAndSettle();
         final label = lang == 'en' ? 'Reparse' : '重新解析';
         await tester.tap(find.text(label));
@@ -128,7 +332,12 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(ListTile),
+        matching: find.byType(PopupMenuButton<String>),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Reparse'));
     await tester.pumpAndSettle();

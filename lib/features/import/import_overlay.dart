@@ -84,6 +84,16 @@ class _ImportOverlayState extends State<ImportOverlay>
         children: [
           widget.child,
           if (show)
+            ModalBarrier(
+              key: const ValueKey('import-dismiss-barrier'),
+              color: Colors.black26,
+              dismissible: !c.busy,
+              onDismiss: c.dismiss,
+              semanticsLabel: MaterialLocalizations.of(
+                context,
+              ).modalBarrierDismissLabel,
+            ),
+          if (show)
             Positioned.fill(
               child: Align(
                 alignment: Alignment.bottomCenter,

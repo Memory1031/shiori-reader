@@ -706,6 +706,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importEpubSupport => '支持 EPUB 图文阅读。';
 
   @override
+  String localBooksCount(int count) {
+    return '$count 本书';
+  }
+
+  @override
+  String get localBooksSubtitle => '已导入的书籍，随时离线阅读。';
+
+  @override
+  String localBooksImportedOn(String date) {
+    return '$date 导入';
+  }
+
+  @override
   String get localBooksTitle => '本地文件';
 
   @override
@@ -754,6 +767,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerChapterLoadFailed => '暂时无法打开目标章节，已保留当前页面。';
+
+  @override
+  String get localReparseAll => '全部重新解析';
+
+  @override
+  String localReparseAllConfirm(int count) {
+    return '将依次重新解析全部 $count 本本地书籍，并尽量恢复阅读位置。失败会保留原内容并继续下一本，可随时停止。';
+  }
+
+  @override
+  String localReparseAllProgress(int current, int total, String title) {
+    return '正在解析 $current/$total：$title';
+  }
+
+  @override
+  String get localReparseStop => '停止重新解析';
+
+  @override
+  String localReparseAllSummary(int succeeded, int failed, int remaining) {
+    return '成功 $succeeded 本 · 失败 $failed 本 · 未处理 $remaining 本';
+  }
+
+  @override
+  String localReparseAllApproximate(int count) {
+    return '$count 本书恢复到了附近位置，请在继续阅读时检查。';
+  }
 
   @override
   String get localReparse => '重新解析';

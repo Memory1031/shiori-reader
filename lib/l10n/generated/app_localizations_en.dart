@@ -749,6 +749,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importEpubSupport => 'Supports EPUB text and images.';
 
   @override
+  String localBooksCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count books',
+      one: '1 book',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get localBooksSubtitle =>
+      'Your imported books, ready to read offline.';
+
+  @override
+  String localBooksImportedOn(String date) {
+    return 'Imported $date';
+  }
+
+  @override
   String get localBooksTitle => 'Local files';
 
   @override
@@ -800,6 +820,32 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get readerChapterLoadFailed =>
       'Could not open the chapter. Your current page is still available.';
+
+  @override
+  String get localReparseAll => 'Reparse all';
+
+  @override
+  String localReparseAllConfirm(int count) {
+    return 'Reparse all $count local books one at a time and restore reading positions where possible. Failures keep the previous content and do not stop other books. You can stop at any time.';
+  }
+
+  @override
+  String localReparseAllProgress(int current, int total, String title) {
+    return 'Reparsing $current of $total: $title';
+  }
+
+  @override
+  String get localReparseStop => 'Stop reparsing';
+
+  @override
+  String localReparseAllSummary(int succeeded, int failed, int remaining) {
+    return 'Succeeded: $succeeded · Failed: $failed · Not processed: $remaining';
+  }
+
+  @override
+  String localReparseAllApproximate(int count) {
+    return 'Restored nearby positions for $count books. Please check them when you resume reading.';
+  }
 
   @override
   String get localReparse => 'Reparse';

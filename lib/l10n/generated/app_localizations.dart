@@ -1442,6 +1442,24 @@ abstract class AppLocalizations {
   /// **'Supports EPUB text and images.'**
   String get importEpubSupport;
 
+  /// No description provided for @localBooksCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 book} other{{count} books}}'**
+  String localBooksCount(int count);
+
+  /// No description provided for @localBooksSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your imported books, ready to read offline.'**
+  String get localBooksSubtitle;
+
+  /// No description provided for @localBooksImportedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {date}'**
+  String localBooksImportedOn(String date);
+
   /// No description provided for @localBooksTitle.
   ///
   /// In en, this message translates to:
@@ -1537,6 +1555,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not open the chapter. Your current page is still available.'**
   String get readerChapterLoadFailed;
+
+  /// No description provided for @localReparseAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Reparse all'**
+  String get localReparseAll;
+
+  /// No description provided for @localReparseAllConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Reparse all {count} local books one at a time and restore reading positions where possible. Failures keep the previous content and do not stop other books. You can stop at any time.'**
+  String localReparseAllConfirm(int count);
+
+  /// No description provided for @localReparseAllProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Reparsing {current} of {total}: {title}'**
+  String localReparseAllProgress(int current, int total, String title);
+
+  /// No description provided for @localReparseStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop reparsing'**
+  String get localReparseStop;
+
+  /// No description provided for @localReparseAllSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Succeeded: {succeeded} · Failed: {failed} · Not processed: {remaining}'**
+  String localReparseAllSummary(int succeeded, int failed, int remaining);
+
+  /// No description provided for @localReparseAllApproximate.
+  ///
+  /// In en, this message translates to:
+  /// **'Restored nearby positions for {count} books. Please check them when you resume reading.'**
+  String localReparseAllApproximate(int count);
 
   /// No description provided for @localReparse.
   ///

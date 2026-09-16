@@ -94,6 +94,10 @@ void main() {
         ),
       );
       expect(result.approximate, isFalse);
+      expect(
+        (await db.select(db.localBooks).getSingle()).parserVersion,
+        BookDecoder.parserVersion,
+      );
       expect(await original.readAsBytes(), bytes);
       final next = ok(await store.read(key, cancellation: token()))!;
       expect(next.importedAt, old.importedAt);

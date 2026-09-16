@@ -307,6 +307,23 @@
   "importFixedLayout": "Fixed-layout EPUB is not supported. Use a reflowable edition.",
   "importParseLimit": "Parsing limits exceeded: TXT 16 MiB, EPUB 64 MiB. Oversized chapters, images, or expanded content are also unsupported.",
   "importEpubSupport": "Supports EPUB text and images.",
+  "localBooksCount": "{count, plural, =1{1 book} other{{count} books}}",
+  "@localBooksCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localBooksSubtitle": "Your imported books, ready to read offline.",
+  "localBooksImportedOn": "Imported {date}",
+  "@localBooksImportedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "localBooksTitle": "Local files",
   "localBooksHint": "Manage imported books. Removing a local book deletes its in-app files and reading progress. The original external file is unaffected.",
   "localBooksEmpty": "No local books imported yet.",
@@ -330,6 +347,52 @@
   "appAccentWarmBrown": "Warm brown",
   "appAccentSoftPink": "Soft pink",
   "readerChapterLoadFailed": "Could not open the chapter. Your current page is still available.",
+  "localReparseAll": "Reparse all",
+  "localReparseAllConfirm": "Reparse all {count} local books one at a time and restore reading positions where possible. Failures keep the previous content and do not stop other books. You can stop at any time.",
+  "@localReparseAllConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localReparseAllProgress": "Reparsing {current} of {total}: {title}",
+  "@localReparseAllProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "localReparseStop": "Stop reparsing",
+  "localReparseAllSummary": "Succeeded: {succeeded} · Failed: {failed} · Not processed: {remaining}",
+  "@localReparseAllSummary": {
+    "placeholders": {
+      "succeeded": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      },
+      "remaining": {
+        "type": "int"
+      }
+    }
+  },
+  "localReparseAllApproximate": "Restored nearby positions for {count} books. Please check them when you resume reading.",
+  "@localReparseAllApproximate": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "localReparse": "Reparse",
   "localReparseConfirm": "Reparse the saved original and restore your reading position where possible. Failure or cancellation keeps the previous content.",
   "localReparseDone": "Reparsed. Your reading position is preserved.",

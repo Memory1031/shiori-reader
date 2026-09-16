@@ -307,6 +307,23 @@
   "importFixedLayout": "暂不支持固定版式 EPUB，请使用流式排版版本。",
   "importParseLimit": "文件超过解析限制：TXT 16 MiB、EPUB 64 MiB；过大的章节、图片或解压内容也无法导入。",
   "importEpubSupport": "支持 EPUB 图文阅读。",
+  "localBooksCount": "{count} 本书",
+  "@localBooksCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localBooksSubtitle": "已导入的书籍，随时离线阅读。",
+  "localBooksImportedOn": "{date} 导入",
+  "@localBooksImportedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "localBooksTitle": "本地文件",
   "localBooksHint": "管理已导入的书籍。移除本地书籍会删除应用内文件及阅读进度，外部原文件不受影响。",
   "localBooksEmpty": "还没有导入本地书籍。",
@@ -330,6 +347,52 @@
   "appAccentWarmBrown": "暖棕",
   "appAccentSoftPink": "淡粉",
   "readerChapterLoadFailed": "暂时无法打开目标章节，已保留当前页面。",
+  "localReparseAll": "全部重新解析",
+  "localReparseAllConfirm": "将依次重新解析全部 {count} 本本地书籍，并尽量恢复阅读位置。失败会保留原内容并继续下一本，可随时停止。",
+  "@localReparseAllConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localReparseAllProgress": "正在解析 {current}/{total}：{title}",
+  "@localReparseAllProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "localReparseStop": "停止重新解析",
+  "localReparseAllSummary": "成功 {succeeded} 本 · 失败 {failed} 本 · 未处理 {remaining} 本",
+  "@localReparseAllSummary": {
+    "placeholders": {
+      "succeeded": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      },
+      "remaining": {
+        "type": "int"
+      }
+    }
+  },
+  "localReparseAllApproximate": "{count} 本书恢复到了附近位置，请在继续阅读时检查。",
+  "@localReparseAllApproximate": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "localReparse": "重新解析",
   "localReparseConfirm": "使用保留的原文件重新解析，并尽量恢复阅读位置。失败或取消会保留旧内容。",
   "localReparseDone": "重新解析完成，阅读位置已保留。",
