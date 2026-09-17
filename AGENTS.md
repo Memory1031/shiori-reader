@@ -64,6 +64,7 @@ If unsure whether a documentation change is necessary, do not make it.
 ## Validation and evidence
 
 - Run checks appropriate to the change and the task's acceptance criteria. Default tests to offline, deterministic fixtures; live Source checks require explicit opt-in and documented request limits.
+- Format Dart changes with the pinned FVM toolchain before committing (`fvm dart format` on touched files, or `fvm dart format lib test`); CI runs `dart format --set-exit-if-changed lib test` and rejects unformatted files. Full local check commands: [docs/development.md](docs/development.md).
 - Report what was actually validated. Distinguish unit tests, widget tests, builds, emulator runs, device runs, and release checks; document skipped or blocked verification without claiming success.
 - Review iOS compatibility for shared changes. Track unavailable iOS runtime validation separately from Android completion; documentation or compile success does not establish device/runtime success.
 - Treat Source behavior as evidence-based and time-sensitive. Consult [docs/source/lightnovel.md](docs/source/lightnovel.md), preserve unresolved assumptions, respect access boundaries, and sanitize logs and fixtures.
