@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/models.dart';
 import 'page_layout.dart';
+import 'page_boundaries.dart';
 import 'render_chunk.dart';
 import 'block_style.dart';
 import 'paper_turn.dart';
@@ -22,7 +24,7 @@ class PagedReaderController {
 
 /// Native pages with a shared blank-back paper fold. Pages before/after the
 /// semantic pivot are computed only when requested; no fictitious global page
-/// number, no full-prefix layout, and no stored page index.
+/// number. Only explicit chapter-end entry scans the forward chain, in batches.
 class PagedReaderViewport extends StatefulWidget {
   const PagedReaderViewport({
     super.key,
@@ -82,6 +84,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   double _dragDistance = 0;
   final _pages = <int, ReaderPage>{};
   PageLayout? _layout;
+  PageBoundaries? _boundaries;
+  List<double>? _imageGeometry;
+  bool _positionReset = false;
+  bool _seekingEnd = false;
   Object? _signature;
   ReaderPosition? _position;
   int _epoch = 0;
@@ -121,11 +127,6 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       oldWidget.controller._state = null;
       _attach();
     }
-    if (!_userScrolling) {
-      _signature = null;
-    } else {
-      _deferredLayout = true;
-    }
   }
 
   @override
@@ -142,7 +143,56 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     setState(() {
       _anchorAtEnd = false;
       _position = position;
-      _signature = null;
+      _positionReset = true;
+      _seekingEnd = false;
+      _epoch++;
+    });
+  }
+
+  void _readyAfterFrame(int epoch) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || epoch != _epoch || !_restoring) return;
+      _restoring = false;
+      _sample();
+    });
+  }
+
+  void _seekEnd(int epoch, PageCursor cursor, ReaderPage? last) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || epoch != _epoch || !_seekingEnd) return;
+      final watch = Stopwatch()..start();
+      var next = cursor;
+      var latest = last;
+      var done = false;
+      for (var count = 0; count < 8; count++) {
+        final page = _boundaries!.forward(next);
+        if (page == null) {
+          done = true;
+          break;
+        }
+        latest = page;
+        next = page.end;
+        if (next.unit >= _layout!.index.chunks.length) {
+          done = true;
+          break;
+        }
+        if (watch.elapsedMicroseconds >= 4000) break;
+      }
+      setState(() {
+        if (done) {
+          _seekingEnd = false;
+          if (latest != null) {
+            _pages[0] = latest;
+            _position = _layout!.position(latest.start);
+            _last = 0;
+          }
+        }
+      });
+      if (done) {
+        if (latest != null) _readyAfterFrame(epoch);
+      } else {
+        _seekEnd(epoch, next, latest);
+      }
     });
   }
 
@@ -153,6 +203,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         (_last != null && number > _last!)) {
       return null;
     }
+    if (_pages.isEmpty) return null;
     final nearest = _pages.keys.reduce(
       (a, b) => (a - number).abs() < (b - number).abs() ? a : b,
     );
@@ -160,8 +211,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     while (current != number) {
       final forward = number > current;
       final page = forward
-          ? _layout!.forward(_pages[current]!.end)
-          : _layout!.backward(_pages[current]!.start);
+          ? _boundaries!.forward(_pages[current]!.end)
+          : _boundaries!.backward(_pages[current]!.start);
       if (page == null) {
         if (forward) {
           _last = current;
@@ -297,53 +348,68 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         widget.maxChunkCodePoints,
         widget.paragraphSpacing,
       );
-      if (_signature != signature) {
+      final imageGeometry = [
+        for (final block in widget.content.blocks.whereType<ImageBlock>())
+          widget.imageExtent?.call(block) ??
+              widget.imageHeights[block.media] ??
+              (block.width != null && block.height != null
+                  ? constraints.maxWidth * block.height! / block.width!
+                  : 180.0),
+      ];
+      final changed =
+          _signature != signature || !listEquals(_imageGeometry, imageGeometry);
+      if (changed && _userScrolling) _deferredLayout = true;
+      if ((changed && !_userScrolling) || _positionReset) {
         _restoring = true;
         widget.onRestoreStart?.call();
-        final index = ChunkIndex(
-          widget.content,
-          maxCodePoints: widget.maxChunkCodePoints,
-        );
-        _usedFallback = index.resolve(_position).usedFallback;
-        _layout = PageLayout(
-          index: index,
-          width: constraints.maxWidth,
-          height: constraints.maxHeight,
-          style: textStyle,
-          locale: locale,
-          textHeightBehavior: heightBehavior,
-          paragraphSpacing: widget.paragraphSpacing,
-          scaler: scaler,
-          direction: direction,
-          imageHeights: widget.imageHeights,
-          imageExtent: widget.imageExtent,
-        );
-        final first = _anchorAtEnd
-            ? _layout!.backward(PageCursor(index.chunks.length, 0))
-            : _layout!.forward(_layout!.cursor(_position));
-        // No clipping a text line into a viewport shorter than that line.
-        if (first == null) return const SizedBox.shrink();
+        if (changed) {
+          final index = ChunkIndex(
+            widget.content,
+            maxCodePoints: widget.maxChunkCodePoints,
+          );
+          _layout = PageLayout(
+            index: index,
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
+            style: textStyle,
+            locale: locale,
+            textHeightBehavior: heightBehavior,
+            paragraphSpacing: widget.paragraphSpacing,
+            scaler: scaler,
+            direction: direction,
+            imageHeights: widget.imageHeights,
+            imageExtent: widget.imageExtent,
+          );
+          _boundaries = PageBoundaries(_layout!);
+          _imageGeometry = imageGeometry;
+          _signature = signature;
+        }
+        _usedFallback = _layout!.index.resolve(_position).usedFallback;
         _turnAnimation.stop(canceled: true);
         _turnAnimation.value = 0;
         _target = null;
         _userScrolling = false;
         _deferredLayout = false;
+        _positionReset = false;
         _current = 0;
         _pages.clear();
-        _pages[0] = first;
         _first = null;
         _last = null;
-        _position = _layout!.position(first.start);
-        _epoch++;
-        _signature = signature;
-        final epoch = _epoch;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && epoch == _epoch && _restoring) {
-            _restoring = false;
-            _sample();
+        final epoch = ++_epoch;
+        _seekingEnd = _anchorAtEnd;
+        if (_seekingEnd) {
+          _seekEnd(epoch, const PageCursor(0, 0), null);
+        } else {
+          final first = _boundaries!.forward(_layout!.cursor(_position));
+          if (first != null) {
+            _pages[0] = first;
+            _position = _layout!.position(first.start);
+            _readyAfterFrame(epoch);
           }
-        });
+        }
       }
+      // Pending chapter-end seeks must not expose a provisional page or progress.
+      if (_seekingEnd || _pages.isEmpty) return const SizedBox.shrink();
       double textWidth(PageFragment fragment) => readerBlockWidth(
         widget.content.blocks[_layout!.index.chunks[fragment.unit].blockIndex],
         constraints.maxWidth,
