@@ -25,7 +25,7 @@ class PagedReaderController {
 
 /// Native pages with a shared blank-back paper fold. Pages before/after the
 /// semantic pivot are computed only when requested; no fictitious global page
-/// number. Only explicit chapter-end entry scans the forward chain, in batches.
+/// number. Explicit seeks scan unknown forward boundaries in batches; ordinary turns stay lazy.
 class PagedReaderViewport extends StatefulWidget {
   const PagedReaderViewport({
     super.key,
@@ -88,9 +88,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   PageBoundaries? _boundaries;
   List<double>? _imageGeometry;
   bool _positionReset = false;
-  bool _seekingEnd = false;
+  bool _seeking = false;
   Object? _signature;
   ReaderPosition? _position;
+  ReaderPosition? _restoreAnchor;
   int _epoch = 0;
   int? _first;
   int? _last;
@@ -145,7 +146,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       _anchorAtEnd = false;
       _position = position;
       _positionReset = true;
-      _seekingEnd = false;
+      _seeking = false;
       _epoch++;
     });
   }
@@ -158,9 +159,14 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     });
   }
 
-  void _seekEnd(int epoch, PageCursor cursor, ReaderPage? last) {
+  void _seekPage(
+    int epoch,
+    PageCursor cursor,
+    ReaderPage? last, {
+    PageCursor? target,
+  }) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || epoch != _epoch || !_seekingEnd) return;
+      if (!mounted || epoch != _epoch || !_seeking) return;
       final watch = Stopwatch()..start();
       var next = cursor;
       var latest = last;
@@ -173,7 +179,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         }
         latest = page;
         next = page.end;
-        if (next.unit >= _layout!.index.chunks.length) {
+        if (next.unit >= _layout!.index.chunks.length ||
+            target != null && PageBoundaries.compare(next, target) > 0) {
           done = true;
           break;
         }
@@ -181,18 +188,18 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       }
       setState(() {
         if (done) {
-          _seekingEnd = false;
+          _seeking = false;
           if (latest != null) {
             _pages[0] = latest;
             _position = _layout!.position(latest.start);
-            _last = 0;
+            if (latest.end.unit >= _layout!.index.chunks.length) _last = 0;
           }
         }
       });
       if (done) {
         if (latest != null) _readyAfterFrame(epoch);
       } else {
-        _seekEnd(epoch, next, latest);
+        _seekPage(epoch, next, latest, target: target);
       }
     });
   }
@@ -314,7 +321,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     final number = _current;
     final page = _page(number);
     if (page == null) return;
-    _position = _layout!.position(page.start);
+    _position = _current == 0 && _restoreAnchor != null
+        ? _restoreAnchor
+        : _layout!.position(page.start);
     widget.onPosition?.call(
       _position!,
       page.end.unit >= _layout!.index.chunks.length,
@@ -397,20 +406,26 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         _first = null;
         _last = null;
         final epoch = ++_epoch;
-        _seekingEnd = _anchorAtEnd;
-        if (_seekingEnd) {
-          _seekEnd(epoch, const PageCursor(0, 0), null);
-        } else {
-          final first = _boundaries!.forward(_layout!.cursor(_position));
+        _restoreAnchor = _anchorAtEnd || _usedFallback ? null : _position;
+        final target = _anchorAtEnd ? null : _layout!.cursor(_position);
+        final start = _boundaries!.seekStart(
+          target ?? PageCursor(_layout!.index.chunks.length, 0),
+        );
+        if (target != null && PageBoundaries.compare(start, target) == 0) {
+          _seeking = false;
+          final first = _boundaries!.forward(start);
           if (first != null) {
             _pages[0] = first;
             _position = _layout!.position(first.start);
             _readyAfterFrame(epoch);
           }
+        } else {
+          _seeking = true;
+          _seekPage(epoch, start, null, target: target);
         }
       }
       // Pending chapter-end seeks must not expose a provisional page or progress.
-      if (_seekingEnd || _pages.isEmpty) return const SizedBox.shrink();
+      if (_seeking || _pages.isEmpty) return const SizedBox.shrink();
       double textWidth(PageFragment fragment) => readerBlockWidth(
         widget.content.blocks[_layout!.index.chunks[fragment.unit].blockIndex],
         constraints.maxWidth,

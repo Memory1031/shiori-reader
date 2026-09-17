@@ -9,6 +9,23 @@ class PageBoundaries {
   final _starts = <(int, int), _Boundary>{};
   final _ends = <(int, int), _Boundary>{};
 
+  static int compare(PageCursor a, PageCursor b) => a.unit == b.unit
+      ? a.offset.compareTo(b.offset)
+      : a.unit.compareTo(b.unit);
+
+  /// Reuse a known forward anchor, never invent a page at the target character.
+  PageCursor seekStart(PageCursor target) {
+    var best = const PageCursor(0, 0);
+    for (final boundary in _starts.values) {
+      if (boundary.forward &&
+          compare(boundary.start, target) <= 0 &&
+          compare(boundary.start, best) > 0) {
+        best = boundary.start;
+      }
+    }
+    return best;
+  }
+
   ReaderPage? forward(PageCursor start) {
     final known = _starts[(start.unit, start.offset)];
     if (known != null) return _rebuild(known);

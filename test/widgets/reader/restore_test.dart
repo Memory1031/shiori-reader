@@ -391,7 +391,7 @@ void main() {
       );
       final library = ObservedLibrary(env.library);
       await tester.pumpWidget(reader(env, library));
-      await tester.pumpAndSettle();
+      await tester.pumpAndSettle(const Duration(milliseconds: 16));
       expect(
         find.text('Content changed. Restored to a nearby position.'),
         findsOneWidget,

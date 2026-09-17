@@ -47,6 +47,7 @@ Widget view(
   ChapterContent content,
   PagedReaderController controller, {
   bool end = false,
+  ReaderPosition? initial,
   double height = 200,
   void Function(ReaderPosition, bool)? onPosition,
 }) => MaterialApp(
@@ -58,6 +59,7 @@ Widget view(
         content: content,
         controller: controller,
         startAtEnd: end,
+        initialPosition: initial,
         textStyle: style,
         paragraphSpacing: 0,
         onPosition: onPosition,
@@ -82,6 +84,70 @@ Future<void> turn(
 }
 
 void main() {
+  testWidgets(
+    'seek inside text after a full-page image uses canonical containing page',
+    (tester) async {
+      final content = ChapterContent(
+        key: fixtureChapterKey(FixtureScenario.shortChapter),
+        title: 'Seek',
+        blocks: [
+          ...chapter(false, count: 35).blocks,
+          ImageBlock(media: fixtureMediaRef(0), width: 300, height: 400),
+          ParagraphBlock(text: 'Dialogue before request.'),
+          ParagraphBlock(
+            text: 'Here is the request followed by more prose. ' * 4,
+          ),
+          ...chapter(false, count: 20).blocks,
+        ],
+      );
+      final l = layout(content);
+      final pages = canonical(l);
+      final target = l.position(const PageCursor(37, 5));
+      final expectedIndex = pages.indexWhere(
+        (p) =>
+            p.fragments.any((f) => f.unit == 37 && f.start <= 5 && f.end > 5),
+      );
+      expect(expectedIndex, greaterThan(0));
+      final c = PagedReaderController();
+      await tester.pumpWidget(view(content, c));
+      await tester.pumpAndSettle();
+      c.restore(target);
+      await tester.pumpAndSettle();
+      expect(visible(tester), expected(pages[expectedIndex]));
+      for (var i = expectedIndex - 1; i >= 0; i--) {
+        await turn(tester, c, false);
+        expect(c.capture(), l.position(pages[i].start));
+      }
+      final measured = c.measuredChunks;
+      c.restore(target);
+      await tester.pumpAndSettle();
+      expect(visible(tester), expected(pages[expectedIndex]));
+      expect(c.measuredChunks - measured, lessThan(10));
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(view(content, c, initial: target));
+      await tester.pumpAndSettle();
+      expect(visible(tester), expected(pages[expectedIndex]));
+    },
+  );
+  testWidgets('normal entry stays lazy and a later seek cancels pending seek', (
+    tester,
+  ) async {
+    final content = chapter(false, count: 503);
+    final l = layout(content);
+    final c = PagedReaderController();
+    await tester.pumpWidget(view(content, c));
+    await tester.pumpAndSettle();
+    expect(c.measuredChunks, lessThan(50));
+    c.restore(l.position(const PageCursor(490, 2)));
+    await tester.pump();
+    expect(c.isRestoring, isTrue);
+    c.restore(l.position(const PageCursor(21, 2)));
+    await tester.pumpAndSettle();
+    final page = canonical(
+      l,
+    ).firstWhere((p) => p.fragments.any((f) => f.unit == 21));
+    expect(visible(tester), expected(page));
+  });
   for (final headings in [false, true]) {
     testWidgets(
       'end entry and every reverse page equal forward chain (headings=$headings)',
