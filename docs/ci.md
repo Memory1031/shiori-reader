@@ -44,7 +44,7 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 
 签名构建显式选择 runner 上的 Xcode 26.3，并在安装依赖前验证 iOS SDK 主版本至少为 26，避免默认 Xcode 变化或旧 SDK 到上传阶段才失败。最低运行系统仍由 deployment target 决定，不随构建 SDK 提高到 iOS 26。要求来源：[Apple 上传要求](https://developer.apple.com/news/upcoming-requirements/)。
 
-工作流：[`.github/workflows/ios-release.yml`](../.github/workflows/ios-release.yml)。推送 `v*` tag 时与 Android 发布并行，在 macOS runner 上构建签名 IPA 并上传 App Store Connect（TestFlight）。手动入口两种模式：`build` 只做签名构建冒烟（不上传 ASC，且无标签上下文时跳过版本预检）；`bootstrap-cert` 一次性生成分发证书。质量检查不在发布工作流重复；tag 与 pubspec 版本一致性复用 `release_android.py version` 预检（仅 tag 触发时执行）。
+工作流：[`.github/workflows/ios-release.yml`](../.github/workflows/ios-release.yml)。推送 `v*` tag 时与 Android 发布并行，在 macOS runner 上构建签名 IPA 并上传 App Store Connect（TestFlight）。手动入口只做签名构建冒烟（不上传 ASC，且无标签上下文时跳过版本预检）。质量检查不在发布工作流重复；tag 与 pubspec 版本一致性复用 `release_android.py version` 预检（仅 tag 触发时执行）。
 
 签名链路：分发证书 p12 导入临时钥匙串（runner 钥匙串每次重建，不能依赖 xcodebuild 自动建证——Apple 每团队仅允许 2 张分发证书，重复建证第三次即失败）；profile 由 `xcodebuild -allowProvisioningUpdates` 配合 App Store Connect API 密钥现场下载。导出配置为 [`ios/ExportOptions.plist`](../ios/ExportOptions.plist)，teamID 与工程 `DEVELOPMENT_TEAM` 一致（个人团队）。共 5 个 secrets：
 
@@ -59,7 +59,7 @@ Apple 侧一次性准备（都在个人团队上下文操作，注意右上角�
 1. 注册 App ID `dev.shiori.reader` 与 `dev.shiori.reader.ShareExtension`，均启用 App Groups 并分配 `group.dev.shiori.reader.import`；
 2. App Store Connect 新建 App（Bundle ID 选 `dev.shiori.reader`）；
 3. 生成 App Store Connect API 密钥（`.p8` 仅能下载一次）；
-4. 生成分发证书：在有 Xcode 的机器上创建 Apple Distribution 并从钥匙串导出 p12，或先配好前三个 secrets、运行本工作流的 `bootstrap-cert` 模式，从保留 1 天的 artifact 下载 p12，base64 后存入 secret。**artifact 中的私钥未加密，而公开仓库的 Actions 产物任何登录用户都能下载**——`bootstrap-cert` 仅在仓库私有时运行，下载后立即在该次运行页删除产物。
+4. 生成分发证书：在有 Xcode 的机器上创建 Apple Distribution 并从钥匙串导出 p12，base64 后存入 secret。工作流不在 runner 上自动建证——证书产物含未加密私钥，而公开仓库的 Actions 产物任何登录用户都能下载。
 
 发版与安装：与 Android 相同，人工对齐版本后推 tag（ASC 要求同一 versionName 下 CFBundleVersion 严格递增）；构建经数分钟至一小时处理后出现在 TestFlight，内部测试不走 Beta 审核，构建 90 天未安装会过期。iOS runtime 证据从此具备来源（真机 TestFlight 使用），但 CI 构建成功不等于 runtime verified；对外分发前 RELEASE-001 审查同样适用。
 
@@ -87,5 +87,5 @@ Apple 侧一次性准备（都在个人团队上下文操作，注意右上角�
 
 ## iOS 发布工作流记录（2026-09-09）
 
-- `tool/check_ci_yaml.dart` 扩展并通过：ios-release.yml 解析、tag 触发、bootstrap 手动门控、`build` 模式门控、archive → export → upload 顺序、版本预检与 altool 上传的 tag 门控、分发证书导入步骤存在、无测试 / 分析步骤混入、工作目录存在。
+- `tool/check_ci_yaml.dart` 扩展并通过：ios-release.yml 解析、tag 触发、证书引导任务不存在、archive → export → upload 顺序、版本预检与 altool 上传的 tag 门控、分发证书导入步骤存在、无测试 / 分析步骤混入、工作目录存在。
 - 未验证：macOS runner 实际执行。`xcodebuild -allowProvisioningUpdates` 自动签名、`pod install`、`fastlane cert`、`altool` 上传均为官方 / 社区文档依据的源码审查；首次真实运行需 Apple 侧（App ID、App 记录、API 密钥、分发证书）与 5 个 secrets 就绪，可能需按实际报错微调（runner Xcode 版本、ExportOptions `method` 取值等）。本机为 Windows，无法本地执行 iOS 构建。

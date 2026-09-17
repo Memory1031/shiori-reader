@@ -1,22 +1,14 @@
 name: Release iOS
 
 # iOS 签名发布：推送 v* 标签时构建签名 IPA 并上传 App Store Connect（TestFlight）。
-# 签名材料为 App Store Connect API 密钥 + Apple Distribution 证书（p12）；
-# 证书一次性生成后存为 secret，不在 runner 上自动建证（每团队仅允许 2 张分发证书）。
-# 手动入口：build 模式只做签名构建冒烟，不上传 ASC；bootstrap-cert 模式一次性生成分发证书。
+# 签名材料为 App Store Connect API 密钥 + Apple Distribution 证书（p12），全部存为
+# repository secrets，不在 runner 上自动建证（每团队仅允许 2 张分发证书）。
+# 手动入口仅做签名构建冒烟，不上传 ASC；公开仓库的 Actions 产物任何登录用户都可
+# 下载，因此不在工作流中生成分发证书（其产物含未加密私钥）。
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      mode:
-        description: '运行模式：build 签名构建冒烟；bootstrap-cert 一次性生成分发证书'
-        required: true
-        default: 'build'
-        type: choice
-        options:
-          - build
-          - bootstrap-cert
 
 permissions:
   contents: read
@@ -32,54 +24,8 @@ env:
   PUB_HOSTED_URL: https://pub.flutter-io.cn
 
 jobs:
-  # 一次性任务：在没有 Mac 的情况下生成分发证书。
-  # 产物含未加密私钥：公开仓库的 Actions artifact 任何登录用户都可下载，
-  # 因此本任务仅在仓库私有时运行，下载后立即在运行页删除产物。
-  # p12 下载后 base64 存入 IOS_DIST_CERT_P12，之后不再需要本任务。
-  bootstrap-signing:
-    name: 一次性生成分发证书
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'bootstrap-cert'
-    runs-on: macos-15
-    timeout-minutes: 20
-    steps:
-      - name: 检查 API 密钥
-        env:
-          KEY_ID: ${{ secrets.ASC_KEY_ID }}
-        run: |
-          if [ -z "$KEY_ID" ]; then
-            echo "::error::未配置 ASC_KEY_ID / ASC_ISSUER_ID / ASC_KEY_P8；配置见 docs/ci.md。"
-            exit 1
-          fi
-
-      - name: 生成证书
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
-        run: |
-          python3 - <<'PY'
-          import json, os
-          # fastlane 无法通过 API 判定团队类型，个人 / App Store 团队必须显式 in_house: false。
-          json.dump({
-              "key_id": os.environ["ASC_KEY_ID"],
-              "issuer_id": os.environ["ASC_ISSUER_ID"],
-              "key": os.environ["ASC_KEY_P8"],
-              "in_house": False,
-          }, open("key.json", "w"))
-          PY
-          fastlane cert --api_key_path key.json --platform ios --output_path dist
-
-      - name: 上传证书产物（保留 1 天）
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-distribution-cert
-          path: dist/*
-          retention-days: 1
-          if-no-files-found: error
-
   ios-release:
     name: iOS 签名构建并上传 TestFlight
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.mode == 'build'
     runs-on: macos-15
     timeout-minutes: 60
     steps:
@@ -173,7 +119,7 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
-      # 上传仅限 tag 发布；手动 build 模式止步于签名构建冒烟，不触碰 App Store Connect。
+      # 上传仅限 tag 发布；手动触发止步于签名构建冒烟，不触碰 App Store Connect。
       - name: 上传 TestFlight
         if: startsWith(github.ref, 'refs/tags/')
         env:

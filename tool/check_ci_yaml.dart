@@ -117,17 +117,20 @@ void main() {
           as YamlMap;
   final iosEvents = ios['on'] as YamlMap;
   final iosJobs = ios['jobs'] as YamlMap;
-  // iOS 发布同样只由 tag 触发上传；手动入口仅允许构建冒烟与证书引导。
+  // iOS 发布同样只由 tag 触发上传；手动入口仅允许构建冒烟。
   if ((iosEvents['push'] as YamlMap)['tags'] == null) {
     throw StateError('iOS release must be tag-triggered');
   }
-  if (iosJobs['bootstrap-signing']['if'] !=
-      "github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'bootstrap-cert'") {
-    throw StateError('iOS certificate bootstrap must stay manual and opt-in');
+  // 公开仓库的 Actions 产物任何登录用户都可下载；
+  // 含未加密私钥的证书引导任务不得回归。
+  if (iosJobs.containsKey('bootstrap-signing')) {
+    throw StateError(
+      'iOS certificate bootstrap must not exist: its artifact would expose '
+      'the unencrypted private key to any logged-in user of a public repo',
+    );
   }
-  if (iosJobs['ios-release']['if'] !=
-      "github.event_name != 'workflow_dispatch' || github.event.inputs.mode == 'build'") {
-    throw StateError('iOS release job must not run for the bootstrap mode');
+  if (iosJobs.length != 1 || !iosJobs.containsKey('ios-release')) {
+    throw StateError('iOS release must contain only the release job');
   }
   final iosSteps = iosJobs['ios-release']['steps'] as YamlList;
   int iosIndex(String needle) => iosSteps.indexWhere(
