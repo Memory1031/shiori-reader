@@ -89,6 +89,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   List<double>? _imageGeometry;
   bool _positionReset = false;
   bool _seeking = false;
+  Widget? _lastReadyPage;
+  Widget? _seekPreview;
   Object? _signature;
   ReaderPosition? _position;
   ReaderPosition? _restoreAnchor;
@@ -143,6 +145,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     _restoring = true;
     widget.onRestoreStart?.call();
     setState(() {
+      _seekPreview = _lastReadyPage;
       _anchorAtEnd = false;
       _position = position;
       _positionReset = true;
@@ -373,6 +376,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         _restoring = true;
         widget.onRestoreStart?.call();
         if (changed) {
+          _seekPreview = null;
           final index = ChunkIndex(
             widget.content,
             maxCodePoints: widget.maxChunkCodePoints,
@@ -425,7 +429,26 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         }
       }
       // Pending chapter-end seeks must not expose a provisional page or progress.
-      if (_seeking || _pages.isEmpty) return const SizedBox.shrink();
+      if (_seeking) {
+        return ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (_seekPreview != null)
+                ExcludeSemantics(child: AbsorbPointer(child: _seekPreview!)),
+              const Center(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      if (_pages.isEmpty) return const SizedBox.shrink();
       double textWidth(PageFragment fragment) => readerBlockWidth(
         widget.content.blocks[_layout!.index.chunks[fragment.unit].blockIndex],
         constraints.maxWidth,
@@ -580,6 +603,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         );
       }
 
+      _lastReadyPage = buildPage(context, _current);
+      _seekPreview = null;
       return Semantics(
         key: const ValueKey('paper-reader-pages'),
         container: true,
@@ -624,7 +649,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                             : null,
                         child: ColoredBox(
                           color: Theme.of(context).scaffoldBackgroundColor,
-                          child: buildPage(context, number)!,
+                          child: number == _current
+                              ? _lastReadyPage!
+                              : buildPage(context, number)!,
                         ),
                       ),
                     ),

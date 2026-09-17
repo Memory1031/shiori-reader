@@ -84,6 +84,32 @@ Future<void> turn(
 }
 
 void main() {
+  testWidgets('deep seek shows loading and retains old page during restore', (
+    tester,
+  ) async {
+    final content = chapter(false, count: 2000);
+    final controller = PagedReaderController();
+    await tester.pumpWidget(view(content, controller));
+    await tester.pumpAndSettle();
+    final old = visible(tester);
+    final target = layout(content).position(const PageCursor(1900, 0));
+    controller.restore(target);
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(visible(tester), old);
+    await tester.pumpAndSettle();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(visible(tester), contains('Line 1900'));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(
+      view(content, PagedReaderController(), initial: target),
+    );
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(visible(tester), contains('Line 1900'));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'seek inside text after a full-page image uses canonical containing page',
     (tester) async {
