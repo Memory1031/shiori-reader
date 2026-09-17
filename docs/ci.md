@@ -21,11 +21,11 @@ CI 检查工作流结构、锁文件变化、数据库生成与新 schema、gen-
 
 ## Android tag 发布
 
-APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前执行 `release_android.py tools` 预检，不依赖 PATH 中的 sdkmanager，也不自动选 runner 上最高版本。2026-09-08 的 v1.0.0 首次发布已构建出 68.6 MB APK，但校验失败：runner 预装 37.0.0，其 `apksigner --print-certs` 输出 `V2 Signer: certificate SHA-256 digest`，与校验器预期的 `Signer #1 certificate SHA-256 digest` 不同。已用官方 37 Windows 工具和同一测试 APK 复现格式差异；固定 35 后合成密钥签名 / 校验 / 元数据冒烟通过，6 项 Python 回归通过。未绕过签名检查；真实 v1.0.0 Release 尚未产出，修复待新的发布运行验证。
+APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前执行 `release_android.py tools` 预检，不依赖 PATH 中的 sdkmanager，也不自动选 runner 上最高版本：更高预装版本的 `apksigner --print-certs` 输出 `V2 Signer: certificate SHA-256 digest`，与校验器预期的 `Signer #1 certificate SHA-256 digest` 格式不同，会导致校验失败。该差异已用官方工具复现确认；固定版本是规避手段，未绕过签名检查。
 
 已知校验错误现在输出受控原因（版本、证书、工具），不会输出工具参数、原始 stderr 或签名秘密；未知异常仍使用通用提示。
 
-按用户最新约定，tag 发布直接进入 `android-release`，不查询或等待 CI、不重复执行格式 / 分析 / UT。develop 日常 CI 保持独立；master 仅作为发布中间分支，不因推送触发 CI 或 Release。发布脚本优先快进 master，保留最终提交与标签的可追溯性。Android 构建仍保留工具预检、版本一致性、签名和 APK 校验；失败时不上传 Release。签名需要四个仓库 Actions secrets：
+按用户约定，tag 发布直接进入 `android-release`，不查询或等待 CI、不重复执行格式 / 分析 / UT。develop 日常 CI 保持独立；master 仅作为发布中间分支，不因推送触发 CI 或 Release。发布脚本优先快进 master，保留最终提交与标签的可追溯性。Android 构建仍保留工具预检、版本一致性、签名和 APK 校验；失败时不上传 Release。签名需要四个仓库 Actions secrets：
 
 | Secret | 内容 |
 | --- | --- |

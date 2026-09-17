@@ -17,5 +17,3 @@
 | [解析器参考来源](references/epub.md) | 固定版本、许可和采纳理由 |
 | [发布说明](release/README.md) | 版本、签名、分发与发布步骤 |
 | [依赖许可](release/dependencies.md) | 当前依赖清单与许可边界 |
-
-版本变化：[1.0.0](release/notes/v1.0.0.md)、[1.1.0](release/notes/v1.1.0.md)。
