@@ -119,6 +119,6 @@ iOS Podfile.lock 当前包含 Flutter、shared_preferences_foundation 与 webvie
 
 ## 许可与隐私边界
 
-本项目源码与自有品牌素材以根目录 [MIT License](../../LICENSE) 授权；该许可不授予第三方小说内容、第三方商标、LightNovel.fun 的名称 / 服务 / 内容及其他第三方资产的任何权利。Shiori 是非官方第三方客户端，与 LightNovel.fun 及其运营方无关联，也未获得其官方认可。
+本项目源码以根目录 [MIT License](../../LICENSE) 授权；Shiori 名称、Logo、应用图标等品牌素材不随源码 MIT 许可授予，该许可也不授予第三方小说内容、第三方商标、LightNovel.fun 的名称 / 服务 / 内容及其他第三方资产的任何权利。Shiori 是非官方第三方客户端，与 LightNovel.fun 及其运营方无关联，也未获得其官方认可。
 
 应用不附带小说；在线查询与媒体请求会发送给对应第三方服务。书架、进度、偏好和导入原件存于应用本地，Android 系统备份 / 换机迁移可能包含用户数据；缓存与导入暂存按配置排除。iOS 备份排除行为未完成全面验证，因此不承诺所有数据永远只在单台设备上。

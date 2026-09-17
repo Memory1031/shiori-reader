@@ -93,4 +93,4 @@ EPUB 兼容性问题请尽量提供最小可复现样本或结构说明；不要
 
 Shiori 是非官方第三方客户端，与 LightNovel.fun 及其运营方无关联，也未获得其官方认可。Shiori 不附带小说内容，也不提供绕过认证、访问控制、付费机制或 DRM 的功能。在线内容由相应第三方服务提供，相关内容与商标权利归各自权利人所有；第三方 API 或页面变化可能使在线功能暂时不可用。
 
-本项目源码与自有品牌素材以 [MIT License](LICENSE) 授权。该许可不授予第三方小说内容、第三方商标、LightNovel.fun 的名称 / 服务 / 内容及其他第三方资产的任何权利；依赖许可清单见[发布文档](docs/release/dependencies.md)。
+本项目源码以 [MIT License](LICENSE) 授权。该许可不授予 Shiori 名称、Logo、应用图标等品牌素材，也不授予第三方小说内容、第三方商标、LightNovel.fun 的名称 / 服务 / 内容及其他第三方资产的任何权利；依赖许可清单见[发布文档](docs/release/dependencies.md)。
