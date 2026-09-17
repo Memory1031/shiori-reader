@@ -70,7 +70,7 @@ jobs:
 
       # 证书导入临时钥匙串并解锁，否则 macOS runner 上签名步骤会挂起。
       - name: 导入签名证书
-        uses: apple-actions/import-codesign-certs@63fff01cd422d4b7b855d40ca1e9d34d2de9427d # v3
+        uses: apple-actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466 # v7.0.0
         with:
           p12-file-base64: ${{ secrets.IOS_DIST_CERT_P12 }}
           p12-password: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
