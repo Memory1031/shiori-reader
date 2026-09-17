@@ -15,6 +15,7 @@ import 'epub_zip.dart';
 import 'epub_image_dimensions.dart';
 import 'epub_presentation.dart';
 import 'epub_text_styles.dart';
+import 'epub_rich_styles.dart';
 import 'epub_image_candidates.dart';
 import 'epub_diagnostics.dart';
 import 'epub_footnotes.dart';
@@ -706,6 +707,11 @@ class EpubParser {
         (p) => zip.entries.containsKey(p) ? text(p) : '',
       ).map((sheet) => sheet.$2),
     );
+    final richStyles = epubRichStyles(doc, styles);
+    var activeStyle = const EpubRichStyle();
+    BlockBox? activeBox;
+    var boxGroup = 0;
+    final styleSpans = <(EpubRichStyle, int, int)>[];
     dom.Element? paragraphOwner;
     String? property(String name) {
       for (var node = paragraphOwner; node != null; node = node.parent) {
@@ -738,6 +744,16 @@ class EpubParser {
     final inlineImages = <InlineImage>[];
     final buffer = ProseTextBuffer(
       onWrite: (start, end) {
+        if (!activeStyle.isDefault) {
+          if (styleSpans.isNotEmpty &&
+              identical(styleSpans.last.$1, activeStyle) &&
+              styleSpans.last.$3 == start) {
+            final last = styleSpans.removeLast();
+            styleSpans.add((activeStyle, last.$2, end));
+          } else {
+            styleSpans.add((activeStyle, start, end));
+          }
+        }
         final link = activeLink;
         if (link == null) return;
         if (spans.isNotEmpty &&
@@ -798,6 +814,21 @@ class EpubParser {
             ),
           )
           .toList();
+      final textStyles = <InlineTextStyle>[];
+      for (final span in styleSpans) {
+        final start = (span.$2 - trimStart).clamp(0, value.length);
+        final end = (span.$3 - trimStart).clamp(0, value.length);
+        if (end > start) {
+          textStyles.add(
+            span.$1.range(
+              value.substring(0, start).runes.length,
+              value.substring(start, end).runes.length,
+              preserveNeutral: activeBox?.backgroundColor != null,
+            ),
+          );
+        }
+      }
+      styleSpans.clear();
       inlineImages.clear();
       spans.clear();
       if (value.trim().isEmpty) return;
@@ -805,6 +836,8 @@ class EpubParser {
         heading == null
             ? ParagraphBlock(
                 inlineImages: images,
+                inlineStyles: textStyles,
+                box: activeBox,
                 text: value,
                 alignment: switch (property('text-align')) {
                   'center' => ParagraphAlignment.center,
@@ -824,6 +857,8 @@ class EpubParser {
               )
             : HeadingBlock(
                 inlineImages: images,
+                inlineStyles: textStyles,
+                box: activeBox,
                 text: value,
                 level: heading,
                 alignment: switch (property('text-align')) {
@@ -851,12 +886,15 @@ class EpubParser {
       'figure',
     };
     const paragraphs = {'p', 'li', 'dt', 'dd', 'pre', 'figcaption', 'tr'};
-    void walk(dom.Node node) {
+    late void Function(dom.Node) walk;
+    void visit(dom.Node node) {
       if (node is dom.Text) {
+        activeStyle = richStyles[node.parent] ?? const EpubRichStyle();
         if (visible) buffer.text(node.text, whitespace);
         return;
       }
       if (node is! dom.Element) return;
+      activeStyle = richStyles[node] ?? const EpubRichStyle();
       final tag = node.localName ?? '';
       if (epubFootnote(node)) return;
       if ({
@@ -900,7 +938,11 @@ class EpubParser {
       }
       final previousOwner = paragraphOwner;
       final previousLink = activeLink;
-      if (paragraphs.contains(tag) || heading != null) paragraphOwner = node;
+      if (paragraphs.contains(tag) ||
+          containers.contains(tag) ||
+          heading != null) {
+        paragraphOwner = node;
+      }
       final id = node.id.isNotEmpty ? node.id : node.attributes['name'];
       if (id != null && id.isNotEmpty && visible) {
         anchors.putIfAbsent(id, () => blocks.length);
@@ -1061,7 +1103,7 @@ class EpubParser {
         whitespace = previousWhitespace;
         visible = previousVisible;
         flush();
-        blocks.add(DividerBlock());
+        blocks.add(DividerBlock(box: activeBox));
         return;
       }
       if (tag == 'br') {
@@ -1094,6 +1136,30 @@ class EpubParser {
       visible = previousVisible;
     }
 
+    walk = (node) {
+      final previousBox = activeBox;
+      // A single decorated container is shared across its flattened blocks.
+      // Nested decorated boxes remain outside this first native subset.
+      if (node is dom.Element &&
+          activeBox == null &&
+          (containers.contains(node.localName) ||
+              paragraphs.contains(node.localName) ||
+              proseHeadingLevel(node.localName) != null) &&
+          node.localName != 'body') {
+        final box = epubBlockBox(
+          styles[node] ?? const {},
+          boxGroup,
+          richStyles[node] ?? const EpubRichStyle(),
+        );
+        if (box != null) {
+          flush();
+          activeBox = box;
+          boxGroup++;
+        }
+      }
+      visit(node);
+      activeBox = previousBox;
+    };
     walk(doc.body!);
     flush();
     if (!blocks.any(
@@ -1105,6 +1171,8 @@ class EpubParser {
             text: text,
             alignment: alignment,
             inlineImages: blocks[i].inlineImages,
+            inlineStyles: blocks[i].inlineStyles,
+            box: blocks[i].box,
           );
         }
       }
@@ -1132,6 +1200,8 @@ class EpubParser {
           level: 2,
           alignment: alignment,
           inlineImages: blocks[0].inlineImages,
+          inlineStyles: blocks[0].inlineStyles,
+          box: blocks[0].box,
         );
       }
     }

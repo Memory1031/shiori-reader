@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'reader_box.dart';
 
 import '../../../domain/models/models.dart';
 import '../../../domain/contracts/local_books.dart';
@@ -115,6 +116,8 @@ double readerBlockWidth(
   ChapterKey? chapter,
   Locale? locale,
 }) {
+  available = readerBoxInnerWidth(block, available);
+  if (block.inlineStyles.isNotEmpty) return available;
   if (block is! ParagraphBlock ||
       block.alignment != ParagraphAlignment.start ||
       _isChapterHeading(block, chapter) ||

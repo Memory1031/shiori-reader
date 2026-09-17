@@ -295,6 +295,19 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
       if (parts.length != 2) continue;
       final name = parts[0].trim().toLowerCase();
       if ({
+        'color',
+        'font-size',
+        'font-weight',
+        'font-style',
+        'max-width',
+        'padding',
+        'border',
+        'border-width',
+        'border-color',
+        'border-style',
+        'background-color',
+        'position',
+        'float',
         'height',
         'width',
         'text-align',

@@ -4,6 +4,7 @@ import '../../domain/models/models.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../shared/source_image.dart';
 import 'reader_inline_images.dart';
+import 'reader_authored_colors.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 
@@ -59,12 +60,16 @@ class ReaderLinkedText extends StatefulWidget {
     required this.scaler,
     this.onLink,
     this.inlineImages = const [],
+    this.inlineStyles = const [],
+    this.authoredBackground,
     this.images,
     this.locale,
     this.textHeightBehavior,
   });
   final String text, prefix;
   final List<InlineImage> inlineImages;
+  final List<InlineTextStyle> inlineStyles;
+  final int? authoredBackground;
   final ImageRepository? images;
   final Locale? locale;
   final TextHeightBehavior? textHeightBehavior;
@@ -96,6 +101,21 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
   @override
   Widget build(BuildContext context) {
     _clear();
+    final colors = ReaderAuthoredColors(Theme.of(context));
+    final background = widget.authoredBackground == null
+        ? colors.paper
+        : colors.resolve(
+            Color(widget.authoredBackground!),
+            ReaderColorRole.background,
+          );
+    Color foreground(Color color) => colors.resolve(
+      color,
+      ReaderColorRole.foreground,
+      background: background,
+    );
+    final displayStyle = widget.style.copyWith(
+      color: foreground(widget.style.color ?? colors.ink),
+    );
     final runes = widget.text.runes.toList();
     final spans = <InlineSpan>[TextSpan(text: widget.prefix)];
     List<InlineSpan> segment(int start, int end, {VoidCallback? onTap}) =>
@@ -103,7 +123,9 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
           text: String.fromCharCodes(runes.sublist(start, end)),
           offset: widget.blockOffset + start,
           images: widget.inlineImages,
-          style: widget.style,
+          styles: widget.inlineStyles,
+          resolveColor: foreground,
+          style: displayStyle,
           imageBuilder: (image) => GestureDetector(
             onTap: onTap,
             child: widget.images == null
@@ -147,8 +169,8 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
           span is TextSpan
               ? TextSpan(
                   text: span.text,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
+                  style: (span.style ?? displayStyle).copyWith(
+                    color: foreground(Theme.of(context).colorScheme.primary),
                   ),
                   semanticsLabel: note.isFootnote
                       ? AppLocalizations.of(context).readerFootnote(note.label)
@@ -163,7 +185,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
     spans.add(TextSpan(children: segment(cursor, runes.length)));
     return Text.rich(
       TextSpan(children: spans),
-      style: widget.style,
+      style: displayStyle,
       textAlign: widget.align,
       textScaler: widget.scaler,
       locale: widget.locale,

@@ -31,7 +31,6 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.disabled)
-      ..setBackgroundColor(Colors.transparent)
       ..setOverScrollMode(WebViewOverScrollMode.never)
       ..setNavigationDelegate(
         NavigationDelegate(
@@ -66,17 +65,20 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
 
   void _load() {
     final theme = Theme.of(context);
+    final paper = theme.scaffoldBackgroundColor;
+    final background = paper.toARGB32().toRadixString(16).substring(2);
     final foreground = theme.colorScheme.onSurface
         .toARGB32()
         .toRadixString(16)
         .substring(2);
     final document = widget.html.replaceFirst('</head>', '''<style>
-html,body{background:transparent!important;color:#$foreground;margin:0!important;}
+html,body{background:#$background!important;color:#$foreground;margin:0!important;}
 body{font-size:clamp(12px,5.7vw,20px);padding:8px!important;box-sizing:border-box;display:flow-root;overflow-wrap:break-word;}
 img{max-width:100%;height:auto;}
 </style></head>''');
     if (document == _document) return;
     _document = document;
+    _controller.setBackgroundColor(paper);
     _controller.loadHtmlString(document);
   }
 

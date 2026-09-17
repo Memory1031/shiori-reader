@@ -6,6 +6,7 @@ import 'page_layout.dart';
 import 'page_boundaries.dart';
 import 'render_chunk.dart';
 import 'block_style.dart';
+import 'reader_box.dart';
 import 'paper_turn.dart';
 import '../reader_linked_text.dart';
 import '../../../domain/contracts/contracts.dart';
@@ -420,6 +421,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         locale: locale,
       );
 
+      ContentBlock fragmentBlock(PageFragment f) =>
+          widget.content.blocks[_layout!.index.chunks[f.unit].blockIndex];
+      double fragmentInnerWidth(PageFragment f) =>
+          readerBoxInnerWidth(fragmentBlock(f), constraints.maxWidth);
       Widget? buildPage(BuildContext context, int number) {
         final page = _page(number);
         if (page == null) return null;
@@ -437,98 +442,122 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                               .chunks[fragment.unit]
                               .blockIndex]
                           is HeadingBlock,
-                  child: SizedBox(
-                    height: fragment.height,
-                    child: fragment.text == ''
-                        ? const SizedBox.shrink()
-                        : fragment.text != null
-                        ? Padding(
-                            padding: EdgeInsets.only(
-                              left:
-                                  (constraints.maxWidth - textWidth(fragment)) /
-                                  2,
-                              right:
-                                  (constraints.maxWidth - textWidth(fragment)) /
-                                  2,
-                              top:
-                                  readerBlockSpacing(
-                                    widget.content.blocks[_layout!
+                  child: ReaderBoxFrame(
+                    box: fragmentBlock(fragment).box,
+                    width: readerBoxOuterWidth(
+                      fragmentBlock(fragment),
+                      constraints.maxWidth,
+                    ),
+                    top: fragment.boxTop,
+                    bottom: fragment.boxBottom,
+                    child: SizedBox(
+                      height:
+                          fragment.height -
+                          fragment.boxTop -
+                          fragment.boxBottom,
+                      child: fragment.text == ''
+                          ? const SizedBox.shrink()
+                          : fragment.text != null
+                          ? Padding(
+                              padding: EdgeInsets.only(
+                                left:
+                                    (fragmentInnerWidth(fragment) -
+                                        textWidth(fragment)) /
+                                    2,
+                                right:
+                                    (fragmentInnerWidth(fragment) -
+                                        textWidth(fragment)) /
+                                    2,
+                                top:
+                                    readerBlockSpacing(
+                                      widget.content.blocks[_layout!
+                                          .index
+                                          .chunks[fragment.unit]
+                                          .blockIndex],
+                                      widget.paragraphSpacing,
+                                      chapter: widget.content.key,
+                                    ) /
+                                    2,
+                                bottom:
+                                    readerBlockSpacing(
+                                      widget.content.blocks[_layout!
+                                          .index
+                                          .chunks[fragment.unit]
+                                          .blockIndex],
+                                      widget.paragraphSpacing,
+                                      chapter: widget.content.key,
+                                    ) /
+                                    2,
+                              ),
+                              child: ReaderLinkedText(
+                                locale: locale,
+                                textHeightBehavior: heightBehavior,
+                                images: widget.images,
+                                authoredBackground: fragmentBlock(
+                                  fragment,
+                                ).box?.backgroundColor,
+                                inlineStyles: widget
+                                    .content
+                                    .blocks[_layout!
                                         .index
                                         .chunks[fragment.unit]
-                                        .blockIndex],
-                                    widget.paragraphSpacing,
-                                    chapter: widget.content.key,
-                                  ) /
-                                  2,
-                              bottom:
-                                  readerBlockSpacing(
-                                    widget.content.blocks[_layout!
+                                        .blockIndex]
+                                    .inlineStyles,
+                                inlineImages: widget
+                                    .content
+                                    .blocks[_layout!
                                         .index
                                         .chunks[fragment.unit]
-                                        .blockIndex],
-                                    widget.paragraphSpacing,
-                                    chapter: widget.content.key,
-                                  ) /
-                                  2,
-                            ),
-                            child: ReaderLinkedText(
-                              locale: locale,
-                              textHeightBehavior: heightBehavior,
-                              images: widget.images,
-                              inlineImages: widget
-                                  .content
-                                  .blocks[_layout!
+                                        .blockIndex]
+                                    .inlineImages,
+                                onLink: widget.onLink,
+                                text: fragment.text!,
+                                blockOffset:
+                                    _layout!.index.chunks[fragment.unit].start +
+                                    fragment.start,
+                                links: widget.contentLinks
+                                    .where(
+                                      (note) =>
+                                          note.sourceBlockKey ==
+                                          _layout!
+                                              .index
+                                              .chunks[fragment.unit]
+                                              .blockKey,
+                                    )
+                                    .toList(),
+                                prefix: readerIndentPrefix(
+                                  widget.content.blocks[_layout!
                                       .index
                                       .chunks[fragment.unit]
-                                      .blockIndex]
-                                  .inlineImages,
-                              onLink: widget.onLink,
-                              text: fragment.text!,
-                              blockOffset:
-                                  _layout!.index.chunks[fragment.unit].start +
-                                  fragment.start,
-                              links: widget.contentLinks
-                                  .where(
-                                    (note) =>
-                                        note.sourceBlockKey ==
-                                        _layout!
-                                            .index
-                                            .chunks[fragment.unit]
-                                            .blockKey,
-                                  )
-                                  .toList(),
-                              prefix: readerIndentPrefix(
-                                widget.content.blocks[_layout!
-                                    .index
-                                    .chunks[fragment.unit]
-                                    .blockIndex],
-                                _layout!.index.chunks[fragment.unit].start ==
-                                        0 &&
-                                    fragment.start == 0,
-                                textWidth(fragment),
-                                textStyle,
-                                scaler,
-                                chapter: widget.content.key,
+                                      .blockIndex],
+                                  _layout!.index.chunks[fragment.unit].start ==
+                                          0 &&
+                                      fragment.start == 0,
+                                  textWidth(fragment),
+                                  textStyle,
+                                  scaler,
+                                  chapter: widget.content.key,
+                                ),
+                                style: readerBlockStyle(
+                                  widget.content.blocks[_layout!
+                                      .index
+                                      .chunks[fragment.unit]
+                                      .blockIndex],
+                                  textStyle,
+                                  chapter: widget.content.key,
+                                ),
+                                align: readerBlockAlign(
+                                  widget.content.blocks[_layout!
+                                      .index
+                                      .chunks[fragment.unit]
+                                      .blockIndex],
+                                  chapter: widget.content.key,
+                                ),
+                                scaler: scaler,
                               ),
-                              style: readerBlockStyle(
-                                widget.content.blocks[_layout!
-                                    .index
-                                    .chunks[fragment.unit]
-                                    .blockIndex],
-                                textStyle,
-                                chapter: widget.content.key,
-                              ),
-                              align: readerBlockAlign(
-                                widget.content.blocks[_layout!
-                                    .index
-                                    .chunks[fragment.unit]
-                                    .blockIndex],
-                                chapter: widget.content.key,
-                              ),
-                              scaler: scaler,
-                            ),
-                          )
-                        : _object(context, fragment),
+                            )
+                          : _object(context, fragment),
+                    ),
                   ),
                 ),
             ],

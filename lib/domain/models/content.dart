@@ -1,13 +1,17 @@
 import '../content_identity.dart';
 import 'identity.dart';
 import 'value_model.dart';
+import 'content_style.dart';
+export 'content_style.dart';
 
 enum ParagraphAlignment { start, center, end }
 
 sealed class ContentBlock extends ValueModel {
-  ContentBlock(int occurrence)
+  ContentBlock(int occurrence, {this.box})
     : occurrence = nonNegative(occurrence, 'occurrence');
   final int occurrence;
+  final BlockBox? box;
+  List<InlineTextStyle> get inlineStyles => const [];
   List<InlineImage> get inlineImages => const [];
   Iterable<MediaRef> get mediaRefs sync* {
     if (this case ImageBlock(:final media)) yield media;
@@ -33,14 +37,23 @@ sealed class ContentBlock extends ValueModel {
   Map<String, Object?> toJson() => {
     'type': kind,
     ...fieldsJson,
+    if (box != null) 'box': box!.toJson(),
     'occurrence': occurrence,
     'blockKey': blockKey,
   };
 
   static ContentBlock fromJson(Map<String, dynamic> json) {
     final occurrence = json['occurrence'] as int;
+    final box = json['box'] == null
+        ? null
+        : BlockBox.fromJson(json['box'] as Map<String, dynamic>);
+    final styles = (json['inlineStyles'] as List? ?? const []).map(
+      (v) => InlineTextStyle.fromJson(v as Map<String, dynamic>),
+    );
     final ContentBlock block = switch (json['type']) {
       'paragraph' => ParagraphBlock(
+        inlineStyles: styles,
+        box: box,
         inlineImages: (json['inlineImages'] as List? ?? const []).map(
           (v) => InlineImage.fromJson(v as Map<String, dynamic>),
         ),
@@ -52,6 +65,7 @@ sealed class ContentBlock extends ValueModel {
         occurrence: occurrence,
       ),
       'image' => ImageBlock(
+        box: box,
         media: MediaRef.fromJson(json['media'] as Map<String, dynamic>),
         width: json['width'] as int?,
         height: json['height'] as int?,
@@ -60,6 +74,8 @@ sealed class ContentBlock extends ValueModel {
         occurrence: occurrence,
       ),
       'heading' => HeadingBlock(
+        inlineStyles: styles,
+        box: box,
         inlineImages: (json['inlineImages'] as List? ?? const []).map(
           (v) => InlineImage.fromJson(v as Map<String, dynamic>),
         ),
@@ -70,7 +86,7 @@ sealed class ContentBlock extends ValueModel {
             : ParagraphAlignment.values.byName(json['alignment'] as String),
         occurrence: occurrence,
       ),
-      'divider' => DividerBlock(occurrence: occurrence),
+      'divider' => DividerBlock(occurrence: occurrence, box: box),
       _ => throw const FormatException('Unknown content block type'),
     };
     if (json['blockKey'] != block.blockKey) {
@@ -139,12 +155,16 @@ final class ParagraphBlock extends ContentBlock {
   ParagraphBlock({
     required String text,
     Iterable<InlineImage> inlineImages = const [],
+    Iterable<InlineTextStyle> inlineStyles = const [],
+    BlockBox? box,
     this.alignment = ParagraphAlignment.start,
     this.leadingIndent = 0,
     int occurrence = 0,
-  }) : inlineImages = List.unmodifiable(inlineImages),
+  }) : inlineStyles = List.unmodifiable(inlineStyles),
+       inlineImages = List.unmodifiable(inlineImages),
        text = ContentIdentity.normalizeText(text),
-       super(occurrence) {
+       super(occurrence, box: box) {
+    validateInlineStyles(this.text, this.inlineStyles);
     validateInlineImages(this.text, this.inlineImages);
     if (leadingIndent < 0 || leadingIndent > 8) {
       throw ArgumentError('Indent must be 0..8 em');
@@ -153,6 +173,8 @@ final class ParagraphBlock extends ContentBlock {
   final String text;
   @override
   final List<InlineImage> inlineImages;
+  @override
+  final List<InlineTextStyle> inlineStyles;
   final ParagraphAlignment alignment;
 
   /// Semantic leading indent in em; presentation resolves actual pixels.
@@ -172,6 +194,8 @@ final class ParagraphBlock extends ContentBlock {
   @override
   Map<String, Object?> get fieldsJson => {
     'text': text,
+    if (inlineStyles.isNotEmpty)
+      'inlineStyles': inlineStyles.map((s) => s.toJson()).toList(),
     if (inlineImages.isNotEmpty)
       'inlineImages': inlineImages.map((i) => i.toJson()).toList(),
     'alignment': alignment.name,
@@ -181,17 +205,26 @@ final class ParagraphBlock extends ContentBlock {
   ParagraphBlock withOccurrence(int occurrence) => ParagraphBlock(
     text: text,
     inlineImages: inlineImages,
+    inlineStyles: inlineStyles,
+    box: box,
     alignment: alignment,
     leadingIndent: leadingIndent,
     occurrence: occurrence,
   );
   @override
-  List<Object?> get values => [...semanticFields, inlineImages, occurrence];
+  List<Object?> get values => [
+    ...semanticFields,
+    inlineImages,
+    inlineStyles,
+    box,
+    occurrence,
+  ];
 }
 
 final class ImageBlock extends ContentBlock {
   ImageBlock({
     required this.media,
+    BlockBox? box,
     this.width,
     this.height,
     String? alt,
@@ -201,7 +234,7 @@ final class ImageBlock extends ContentBlock {
        caption = caption == null
            ? null
            : ContentIdentity.normalizeText(caption),
-       super(occurrence) {
+       super(occurrence, box: box) {
     if ((width != null && width! <= 0) || (height != null && height! <= 0)) {
       throw ArgumentError('Known image dimensions must be positive');
     }
@@ -227,6 +260,7 @@ final class ImageBlock extends ContentBlock {
   @override
   ImageBlock withOccurrence(int occurrence) => ImageBlock(
     media: media,
+    box: box,
     width: width,
     height: height,
     alt: alt,
@@ -234,19 +268,31 @@ final class ImageBlock extends ContentBlock {
     occurrence: occurrence,
   );
   @override
-  List<Object?> get values => [media, width, height, alt, caption, occurrence];
+  List<Object?> get values => [
+    media,
+    width,
+    height,
+    alt,
+    caption,
+    box,
+    occurrence,
+  ];
 }
 
 final class HeadingBlock extends ContentBlock {
   HeadingBlock({
     required String text,
     Iterable<InlineImage> inlineImages = const [],
+    Iterable<InlineTextStyle> inlineStyles = const [],
+    BlockBox? box,
     this.level = 1,
     this.alignment = ParagraphAlignment.start,
     int occurrence = 0,
-  }) : inlineImages = List.unmodifiable(inlineImages),
+  }) : inlineStyles = List.unmodifiable(inlineStyles),
+       inlineImages = List.unmodifiable(inlineImages),
        text = nonBlank(ContentIdentity.normalizeText(text), 'heading'),
-       super(occurrence) {
+       super(occurrence, box: box) {
+    validateInlineStyles(this.text, this.inlineStyles);
     validateInlineImages(this.text, this.inlineImages);
     if (level < 1 || level > 6) {
       throw ArgumentError('Heading level must be 1..6');
@@ -255,6 +301,8 @@ final class HeadingBlock extends ContentBlock {
   final String text;
   @override
   final List<InlineImage> inlineImages;
+  @override
+  final List<InlineTextStyle> inlineStyles;
   final int level;
   final ParagraphAlignment alignment;
   @override
@@ -272,6 +320,8 @@ final class HeadingBlock extends ContentBlock {
   @override
   Map<String, Object?> get fieldsJson => {
     'text': text,
+    if (inlineStyles.isNotEmpty)
+      'inlineStyles': inlineStyles.map((s) => s.toJson()).toList(),
     if (inlineImages.isNotEmpty)
       'inlineImages': inlineImages.map((i) => i.toJson()).toList(),
     'level': level,
@@ -281,16 +331,25 @@ final class HeadingBlock extends ContentBlock {
   HeadingBlock withOccurrence(int occurrence) => HeadingBlock(
     text: text,
     inlineImages: inlineImages,
+    inlineStyles: inlineStyles,
+    box: box,
     level: level,
     alignment: alignment,
     occurrence: occurrence,
   );
   @override
-  List<Object?> get values => [...semanticFields, inlineImages, occurrence];
+  List<Object?> get values => [
+    ...semanticFields,
+    inlineImages,
+    inlineStyles,
+    box,
+    occurrence,
+  ];
 }
 
 final class DividerBlock extends ContentBlock {
-  DividerBlock({int occurrence = 0}) : super(occurrence);
+  DividerBlock({int occurrence = 0, BlockBox? box})
+    : super(occurrence, box: box);
   @override
   String get kind => 'divider';
   @override
@@ -299,9 +358,9 @@ final class DividerBlock extends ContentBlock {
   Map<String, Object?> get fieldsJson => const {};
   @override
   DividerBlock withOccurrence(int occurrence) =>
-      DividerBlock(occurrence: occurrence);
+      DividerBlock(occurrence: occurrence, box: box);
   @override
-  List<Object?> get values => [occurrence];
+  List<Object?> get values => [box, occurrence];
 }
 
 final class ChapterContent extends ValueModel {

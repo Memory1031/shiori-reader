@@ -15,6 +15,7 @@
 - ChapterContent 接受 Paragraph / Image / Heading / Divider，保留段落顺序和单段完整文本。可读正文至少有一个非空 Paragraph 或 Image；纯图片章有效，只有空白 / 标题 / 分隔符无效。空 Paragraph 可在有效正文中表达已确认的语义空白。
 - Paragraph 的 alignment 为 start / center / end，leadingIndent 为整数 0–8 em，表示段落首行缩进，不是整段左内边距；展示用前缀不计入原文位置。当前不启用 text runs / 嵌套 AST；Source 的 Ruby 初始降级为基字加括注、强调保留文字，不在 Domain 处理站点标签。
 - Paragraph / Heading 可携带有序的 inlineImages：每项用 Unicode 码点偏移引用文本中的单个 U+FFFC，保存 MediaRef、alt 和 em 宽高；图片参与相同的资源校验与生命周期。无行内图片的旧记录及内容身份保持兼容，em 尺寸只影响布局，不改变语义身份。
+- Paragraph / Heading 可携带按 Unicode 码点定位的有序、不重叠 inlineStyles，保存颜色与相对字号、粗斜体；相邻块可通过 BlockBox.group 共享简单容器。两者均为纯 Dart、可序列化的排版元数据，不改变 blockKey / contentRevision，旧记录缺字段时使用默认值。排版缓存通过完整内容值变化失效。
 - 图片尺寸各自可未知；已知值须正数。封面和正文图片必须属于相同 Source。ImageBlock 尺寸为后续可发现的布局元数据，更新尺寸不改变 blockKey / contentRevision；mediaId、alt、caption 的改变会改变语义身份。
 - ReadingProgress 持有 NovelSummary 快照以保留离线标题 / 封面，并检查 ChapterKey 与快照属于同一本书；是否收藏由独立 BookshelfEntry 表示。lastReadAt 统一为 UTC 毫秒，写入先后由持久化 sequence 控制。
 

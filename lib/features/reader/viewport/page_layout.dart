@@ -4,6 +4,7 @@ import '../../../domain/models/models.dart';
 import 'render_chunk.dart';
 import '../position/position_resolver.dart';
 import 'block_style.dart';
+import 'reader_box.dart';
 import '../reader_inline_images.dart';
 
 /// A cursor in transient chunks; exposed/persisted positions always use Domain.
@@ -14,12 +15,21 @@ final class PageCursor {
 }
 
 final class PageFragment {
-  const PageFragment(this.unit, this.start, this.end, this.height, this.text);
+  const PageFragment(
+    this.unit,
+    this.start,
+    this.end,
+    this.height,
+    this.text, {
+    this.boxTop = 0,
+    this.boxBottom = 0,
+  });
   final int unit;
   final int start;
   final int end;
   final double height;
   final String? text;
+  final double boxTop, boxBottom;
 }
 
 final class ReaderPage {
@@ -103,15 +113,19 @@ final class PageLayout {
 
   String _slice(String text, int start, int end) =>
       String.fromCharCodes(text.runes.skip(start).take(end - start));
-  ({String text, int count, double height})? _fit(
+  ({String text, int count, double height, double boxTop, double boxBottom})?
+  _fit(
     String text,
     double available, {
     required bool backwards,
     required ContentBlock block,
     required bool startsBlock,
     required int blockOffset,
+    required int blockIndex,
   }) {
-    if (text.isEmpty) return (text: '', count: 0, height: 16);
+    if (text.isEmpty) {
+      return (text: '', count: 0, height: 16, boxTop: 0, boxBottom: 0);
+    }
     measuredChunks++;
     final textWidth = readerBlockWidth(
       block,
@@ -144,6 +158,7 @@ final class PageLayout {
                   text: text,
                   offset: blockOffset,
                   images: block.inlineImages,
+                  styles: block.inlineStyles,
                   style: blockStyle,
                 ),
               ],
@@ -160,6 +175,7 @@ final class PageLayout {
               offset: blockOffset,
               length: text.runes.length,
               images: block.inlineImages,
+              styles: block.inlineStyles,
               style: blockStyle,
               scaler: scaler,
               maxWidth: textWidth,
@@ -168,11 +184,39 @@ final class PageLayout {
           ..layout(maxWidth: textWidth);
     try {
       final lines = painter.computeLineMetrics();
-      var used = readerBlockSpacing(
+      final edges = readerBoxEdges(index.content, blockIndex);
+      final blockLength = switch (block) {
+        ParagraphBlock(:final text) ||
+        HeadingBlock(:final text) => text.runes.length,
+        _ => 0,
+      };
+      final top = startsBlock ? edges.top : 0.0;
+      final bottom = blockOffset + text.runes.length == blockLength
+          ? edges.bottom
+          : 0.0;
+      final spacing = readerBlockSpacing(
         block,
         paragraphSpacing,
         chapter: index.content.key,
       );
+      final fullHeight =
+          lines.fold<double>(0, (sum, line) => sum + line.height) +
+          spacing +
+          top +
+          bottom;
+      if (fullHeight <= available + .01) {
+        return (
+          text: text,
+          count: text.runes.length,
+          height: fullHeight,
+          boxTop: top,
+          boxBottom: bottom,
+        );
+      }
+      // A split box keeps only its outermost top/bottom edges, like CSS slice.
+      final keptTop = backwards ? 0.0 : top;
+      final keptBottom = backwards ? bottom : 0.0;
+      var used = spacing + keptTop + keptBottom;
       var count = 0;
       for (final line in backwards ? lines.reversed : lines) {
         if (used + line.height > available + .01) break;
@@ -181,7 +225,10 @@ final class PageLayout {
       }
       if (count == 0) return null;
       if (count == lines.length) {
-        return (text: text, count: text.runes.length, height: used);
+        // Text fits but the terminating box padding does not; move one line.
+        count--;
+        if (count == 0) return null;
+        used -= (backwards ? lines.first : lines.last).height;
       }
       final boundaryLine = backwards
           ? lines[lines.length - count]
@@ -205,7 +252,13 @@ final class PageLayout {
           ? text.substring(boundary)
           : text.substring(0, boundary);
       if (selected.isEmpty) return null;
-      return (text: selected, count: selected.runes.length, height: used);
+      return (
+        text: selected,
+        count: selected.runes.length,
+        height: used,
+        boxTop: keptTop,
+        boxBottom: keptBottom,
+      );
     } finally {
       painter.dispose();
     }
@@ -222,7 +275,9 @@ final class PageLayout {
               : 180.0);
       return known.clamp(1.0, height);
     }
-    return (block is ParagraphBlock ? 16.0 : 24.0).clamp(1.0, height);
+    final edges = readerBoxEdges(index.content, index.chunks[unit].blockIndex);
+    return ((block is ParagraphBlock ? 16.0 : 24.0) + edges.top + edges.bottom)
+        .clamp(1.0, height);
   }
 
   ReaderPage? forward(PageCursor from) {
@@ -241,7 +296,18 @@ final class PageLayout {
         if (extent > remaining + .01 || fullPageImage && fragments.isNotEmpty) {
           break;
         }
-        fragments.add(PageFragment(cursor.unit, 0, 1, extent, text));
+        final edges = readerBoxEdges(index.content, chunk.blockIndex);
+        fragments.add(
+          PageFragment(
+            cursor.unit,
+            0,
+            1,
+            extent,
+            text,
+            boxTop: edges.top,
+            boxBottom: edges.bottom,
+          ),
+        );
         remaining -= extent;
         cursor = PageCursor(cursor.unit + 1, 0);
         if (fullPageImage) break;
@@ -261,6 +327,7 @@ final class PageLayout {
             block: block,
             startsBlock: chunk.start == 0,
             blockOffset: chunk.start + cursor.offset,
+            blockIndex: chunk.blockIndex,
           );
           final next = index.chunks[cursor.unit + 1];
           final nextBlock = index.content.blocks[next.blockIndex];
@@ -286,6 +353,7 @@ final class PageLayout {
           block: index.content.blocks[chunk.blockIndex],
           startsBlock: chunk.start == 0 && cursor.offset == 0,
           blockOffset: chunk.start + cursor.offset,
+          blockIndex: chunk.blockIndex,
         );
         if (fitted == null) break;
         fragments.add(
@@ -295,6 +363,8 @@ final class PageLayout {
             cursor.offset + fitted.count,
             fitted.height,
             fitted.text,
+            boxTop: fitted.boxTop,
+            boxBottom: fitted.boxBottom,
           ),
         );
         remaining -= fitted.height;
@@ -325,7 +395,18 @@ final class PageLayout {
         if (extent > remaining + .01 || fullPageImage && fragments.isNotEmpty) {
           break;
         }
-        fragments.add(PageFragment(cursor.unit, 0, 1, extent, text));
+        final edges = readerBoxEdges(index.content, chunk.blockIndex);
+        fragments.add(
+          PageFragment(
+            cursor.unit,
+            0,
+            1,
+            extent,
+            text,
+            boxTop: edges.top,
+            boxBottom: edges.bottom,
+          ),
+        );
         remaining -= extent;
         cursor = PageCursor(cursor.unit, 0);
         if (fullPageImage) break;
@@ -338,6 +419,7 @@ final class PageLayout {
           block: index.content.blocks[chunk.blockIndex],
           startsBlock: chunk.start == 0,
           blockOffset: chunk.start,
+          blockIndex: chunk.blockIndex,
         );
         if (fitted == null) break;
         final start = cursor.offset - fitted.count;
@@ -348,6 +430,8 @@ final class PageLayout {
             cursor.offset,
             fitted.height,
             fitted.text,
+            boxTop: fitted.boxTop,
+            boxBottom: fitted.boxBottom,
           ),
         );
         remaining -= fitted.height;
