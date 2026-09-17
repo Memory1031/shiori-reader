@@ -22,6 +22,7 @@ final class InlineTextStyle extends ValueModel {
   final int start, length;
   final int? color;
   final double fontScale;
+
   /// Null inherits the reader base; false is an explicit authored reset.
   final bool? bold, italic;
   bool get isNoOp =>

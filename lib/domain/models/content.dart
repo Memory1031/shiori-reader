@@ -180,6 +180,7 @@ final class ParagraphBlock extends ContentBlock {
     }
   }
   final String text;
+
   /// Relative height of explicit blank lines in an authored container.
   final double? authoredGapEm;
   @override
