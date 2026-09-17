@@ -7,8 +7,8 @@ final class InlineTextStyle extends ValueModel {
     required this.length,
     this.color,
     this.fontScale = 1,
-    this.bold = false,
-    this.italic = false,
+    this.bold,
+    this.italic,
   }) {
     if (start < 0 ||
         length <= 0 ||
@@ -22,7 +22,10 @@ final class InlineTextStyle extends ValueModel {
   final int start, length;
   final int? color;
   final double fontScale;
-  final bool bold, italic;
+  /// Null inherits the reader base; false is an explicit authored reset.
+  final bool? bold, italic;
+  bool get isNoOp =>
+      color == null && fontScale == 1 && bold == null && italic == null;
   Map<String, Object?> toJson() => {
     'start': start,
     'length': length,
@@ -36,8 +39,8 @@ final class InlineTextStyle extends ValueModel {
     length: j['length'] as int,
     color: j['color'] as int?,
     fontScale: (j['fontScale'] as num).toDouble(),
-    bold: j['bold'] as bool,
-    italic: j['italic'] as bool,
+    bold: j['bold'] as bool?,
+    italic: j['italic'] as bool?,
   );
   @override
   List<Object?> get values => [start, length, color, fontScale, bold, italic];

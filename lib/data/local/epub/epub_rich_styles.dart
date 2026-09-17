@@ -49,16 +49,12 @@ double? _length(String? value, double em) {
 }
 
 class EpubRichStyle {
-  const EpubRichStyle({
-    this.color,
-    this.scale = 1,
-    this.bold = false,
-    this.italic = false,
-  });
+  const EpubRichStyle({this.color, this.scale = 1, this.bold, this.italic});
   final int? color;
   final double scale;
-  final bool bold, italic;
-  bool get isDefault => color == null && scale == 1 && !bold && !italic;
+  final bool? bold, italic;
+  bool get isDefault =>
+      color == null && scale == 1 && bold == null && italic == null;
   InlineTextStyle range(
     int start,
     int length, {
@@ -100,12 +96,15 @@ Map<dom.Element, EpubRichStyle> epubRichStyles(
                 weight == 'bolder' ||
                 (int.tryParse(weight ?? '') ?? 0) >= 600
           ? true
-          : {'b', 'strong'}.contains(e.localName) || parent.bold,
+          : {'b', 'strong'}.contains(e.localName)
+          ? true
+          : parent.bold,
       italic: fontStyle == 'normal'
           ? false
           : {'italic', 'oblique'}.contains(fontStyle) ||
-                {'i', 'em'}.contains(e.localName) ||
-                parent.italic,
+                {'i', 'em'}.contains(e.localName)
+          ? true
+          : parent.italic,
     );
   }
   return result;

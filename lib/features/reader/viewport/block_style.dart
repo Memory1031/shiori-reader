@@ -99,6 +99,7 @@ double readerBlockSpacing(
   double paragraphSpacing, {
   ChapterKey? chapter,
 }) {
+  if (block.box != null) return 0;
   if (_isChapterHeading(block, chapter)) return paragraphSpacing + 64;
   if (block is HeadingBlock) return paragraphSpacing + 28;
   return paragraphSpacing;
@@ -140,4 +141,16 @@ double readerBlockWidth(
   final cells = (available / cell).floor();
   // A tiny tolerance avoids floating-point rounding moving the last glyph.
   return (cells * cell + .01).clamp(0.0, available);
+}
+
+/// Explicit blank lines inside authored boxes use their own relative font size.
+double readerBlankHeight(
+  ContentBlock block,
+  TextStyle style,
+  TextScaler scaler,
+) {
+  final em = block is ParagraphBlock ? block.authoredGapEm : null;
+  return em == null
+      ? 16
+      : scaler.scale((style.fontSize ?? 20) * em) * (style.height ?? 1);
 }

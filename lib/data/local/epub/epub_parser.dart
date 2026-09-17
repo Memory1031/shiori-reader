@@ -742,6 +742,7 @@ class EpubParser {
     int? activeLink;
     final spans = <(int, int, int)>[];
     final inlineImages = <InlineImage>[];
+    var explicitGapEm = 0.0;
     final buffer = ProseTextBuffer(
       onWrite: (start, end) {
         if (!activeStyle.isDefault) {
@@ -828,10 +829,25 @@ class EpubParser {
           );
         }
       }
+      textStyles.removeWhere((s) => s.isNoOp);
       styleSpans.clear();
       inlineImages.clear();
       spans.clear();
-      if (value.trim().isEmpty) return;
+      final gap = explicitGapEm;
+      explicitGapEm = 0;
+      if (value.trim().isEmpty) {
+        if (activeBox != null && gap > 0) {
+          blocks.add(
+            ParagraphBlock(
+              text: '',
+              box: activeBox,
+              authoredGapEm: gap.clamp(0, 16),
+            ),
+          );
+          if (blocks.length > 100000) invalidZip();
+        }
+        return;
+      }
       blocks.add(
         heading == null
             ? ParagraphBlock(
@@ -1107,6 +1123,7 @@ class EpubParser {
         return;
       }
       if (tag == 'br') {
+        explicitGapEm += (richStyles[node] ?? const EpubRichStyle()).scale;
         whitespace = previousWhitespace;
         visible = previousVisible;
         buffer.write('\n');

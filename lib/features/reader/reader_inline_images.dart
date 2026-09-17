@@ -34,13 +34,19 @@ List<InlineSpan> readerInlineSpans({
       if (pictures[ordered[i]] case final image?)
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
+          // Flutter scales the child once using this authored font size.
+          style: readerAuthoredStyle(style, styles, ordered[i]),
           child: SizedBox(
-            width:
-                image.widthEm *
-                (readerAuthoredStyle(style, styles, ordered[i]).fontSize ?? 20),
-            height:
-                image.heightEm *
-                (readerAuthoredStyle(style, styles, ordered[i]).fontSize ?? 20),
+            width: readerInlineSize(
+              image,
+              readerAuthoredStyle(style, styles, ordered[i]),
+              TextScaler.noScaling,
+            ).width,
+            height: readerInlineSize(
+              image,
+              readerAuthoredStyle(style, styles, ordered[i]),
+              TextScaler.noScaling,
+            ).height,
             child: imageBuilder?.call(image),
           ),
         )
@@ -74,8 +80,16 @@ TextStyle readerAuthoredStyle(
         ? base.color
         : (resolveColor?.call(Color(range.color!)) ?? Color(range.color!)),
     fontSize: (base.fontSize ?? 20) * range.fontScale,
-    fontWeight: range.bold ? FontWeight.bold : FontWeight.normal,
-    fontStyle: range.italic ? FontStyle.italic : FontStyle.normal,
+    fontWeight: switch (range.bold) {
+      true => FontWeight.bold,
+      false => FontWeight.normal,
+      null => base.fontWeight,
+    },
+    fontStyle: switch (range.italic) {
+      true => FontStyle.italic,
+      false => FontStyle.normal,
+      null => base.fontStyle,
+    },
   );
 }
 
@@ -91,18 +105,23 @@ List<PlaceholderDimensions> readerInlineDimensions({
   for (final image in images)
     if (image.offset >= offset && image.offset < offset + length)
       PlaceholderDimensions(
-        size: Size(
-          (image.widthEm *
-                  scaler.scale(
-                    readerAuthoredStyle(style, styles, image.offset).fontSize ??
-                        20,
-                  ))
-              .clamp(0.0, maxWidth),
-          image.heightEm *
-              scaler.scale(
-                readerAuthoredStyle(style, styles, image.offset).fontSize ?? 20,
-              ),
+        size: readerInlineSize(
+          image,
+          readerAuthoredStyle(style, styles, image.offset),
+          scaler,
+          maxWidth: maxWidth,
         ),
         alignment: PlaceholderAlignment.middle,
       ),
 ];
+
+/// WidgetSpan uses unscaled child geometry and applies the same scaler itself.
+Size readerInlineSize(
+  InlineImage image,
+  TextStyle style,
+  TextScaler scaler, {
+  double maxWidth = double.infinity,
+}) {
+  final em = scaler.scale(style.fontSize ?? 20);
+  return Size((image.widthEm * em).clamp(0, maxWidth), image.heightEm * em);
+}

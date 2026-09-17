@@ -332,7 +332,9 @@ class _ReaderViewportState extends State<ReaderViewport> {
     final block = widget.content.blocks[chunk.blockIndex];
     Widget body;
     if (chunk.text == '') {
-      body = const SizedBox(height: 16);
+      body = SizedBox(
+        height: readerBlankHeight(block, widget.textStyle, _scaler),
+      );
     } else if (chunk.text != null) {
       body = Padding(
         padding: EdgeInsets.only(

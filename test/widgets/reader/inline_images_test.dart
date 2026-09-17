@@ -4,11 +4,99 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/reader_linked_text.dart';
+import 'package:shiori/features/reader/reader_inline_images.dart';
 import 'package:shiori/features/reader/viewport/block_style.dart';
 import 'package:shiori/features/reader/viewport/page_layout.dart';
 import 'package:shiori/features/reader/viewport/render_chunk.dart';
 
+class _NonlinearScaler extends TextScaler {
+  const _NonlinearScaler();
+  @override
+  double scale(double size) => size <= 20 ? size * 2 : size * 1.5;
+  @override
+  double get textScaleFactor => 2;
+}
+
 void main() {
+  test(
+    'unspecified inline weight inherits reader style; explicit reset wins',
+    () {
+      const base = TextStyle(
+        fontWeight: FontWeight.w700,
+        fontStyle: FontStyle.italic,
+      );
+      final inherited = readerAuthoredStyle(base, [
+        InlineTextStyle(start: 0, length: 1, color: 0xff880088),
+      ], 0);
+      expect(inherited.fontWeight, FontWeight.w700);
+      expect(inherited.fontStyle, FontStyle.italic);
+      final reset = readerAuthoredStyle(base, [
+        InlineTextStyle(start: 0, length: 1, bold: false, italic: false),
+      ], 0);
+      expect(reset.fontWeight, FontWeight.normal);
+      expect(reset.fontStyle, FontStyle.normal);
+    },
+  );
+  for (final scaler in [TextScaler.linear(2), const _NonlinearScaler()]) {
+    testWidgets('painted inline image matches placeholder with $scaler', (
+      tester,
+    ) async {
+      const base = TextStyle(fontSize: 20);
+      final picture = InlineImage(
+        offset: 0,
+        media: fixtureMediaRef(0),
+        widthEm: .75,
+        heightEm: 1,
+      );
+      final styles = [InlineTextStyle(start: 0, length: 1, fontScale: 1.3)];
+      const imageKey = ValueKey('inline-picture');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 300,
+              child: Text.rich(
+                TextSpan(
+                  style: base,
+                  children: readerInlineSpans(
+                    text: '\uFFFC',
+                    offset: 0,
+                    images: [picture],
+                    styles: styles,
+                    style: base,
+                    imageBuilder: (_) =>
+                        const ColoredBox(key: imageKey, color: Colors.red),
+                  ),
+                ),
+                textScaler: scaler,
+              ),
+            ),
+          ),
+        ),
+      );
+      final painted = tester.renderObject<RenderBox>(find.byKey(imageKey));
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.byType(RichText).first,
+      );
+      final rect = MatrixUtils.transformRect(
+        painted.getTransformTo(paragraph),
+        Offset.zero & painted.size,
+      );
+      final measured = readerInlineDimensions(
+        maxWidth: 300,
+        offset: 0,
+        length: 1,
+        images: [picture],
+        styles: styles,
+        style: base,
+        scaler: scaler,
+      ).single.size;
+      expect(rect.width, closeTo(measured.width, .001));
+      expect(rect.height, closeTo(measured.height, .001));
+      expect(rect.height, closeTo(scaler.scale(26), .001));
+    });
+  }
+
   for (final scale in [1.0, 2.0]) {
     testWidgets('inline images fit measured pages at text scale $scale', (
       tester,

@@ -52,6 +52,7 @@ sealed class ContentBlock extends ValueModel {
     );
     final ContentBlock block = switch (json['type']) {
       'paragraph' => ParagraphBlock(
+        authoredGapEm: (json['authoredGapEm'] as num?)?.toDouble(),
         inlineStyles: styles,
         box: box,
         inlineImages: (json['inlineImages'] as List? ?? const []).map(
@@ -159,11 +160,19 @@ final class ParagraphBlock extends ContentBlock {
     BlockBox? box,
     this.alignment = ParagraphAlignment.start,
     this.leadingIndent = 0,
+    this.authoredGapEm,
     int occurrence = 0,
   }) : inlineStyles = List.unmodifiable(inlineStyles),
        inlineImages = List.unmodifiable(inlineImages),
        text = ContentIdentity.normalizeText(text),
        super(occurrence, box: box) {
+    if (authoredGapEm != null &&
+        (!authoredGapEm!.isFinite ||
+            authoredGapEm! <= 0 ||
+            authoredGapEm! > 16 ||
+            this.text.isNotEmpty)) {
+      throw ArgumentError('Invalid authored gap');
+    }
     validateInlineStyles(this.text, this.inlineStyles);
     validateInlineImages(this.text, this.inlineImages);
     if (leadingIndent < 0 || leadingIndent > 8) {
@@ -171,6 +180,8 @@ final class ParagraphBlock extends ContentBlock {
     }
   }
   final String text;
+  /// Relative height of explicit blank lines in an authored container.
+  final double? authoredGapEm;
   @override
   final List<InlineImage> inlineImages;
   @override
@@ -194,6 +205,7 @@ final class ParagraphBlock extends ContentBlock {
   @override
   Map<String, Object?> get fieldsJson => {
     'text': text,
+    if (authoredGapEm != null) 'authoredGapEm': authoredGapEm,
     if (inlineStyles.isNotEmpty)
       'inlineStyles': inlineStyles.map((s) => s.toJson()).toList(),
     if (inlineImages.isNotEmpty)
@@ -204,6 +216,7 @@ final class ParagraphBlock extends ContentBlock {
   @override
   ParagraphBlock withOccurrence(int occurrence) => ParagraphBlock(
     text: text,
+    authoredGapEm: authoredGapEm,
     inlineImages: inlineImages,
     inlineStyles: inlineStyles,
     box: box,
@@ -216,6 +229,7 @@ final class ParagraphBlock extends ContentBlock {
     ...semanticFields,
     inlineImages,
     inlineStyles,
+    authoredGapEm,
     box,
     occurrence,
   ];

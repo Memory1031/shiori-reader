@@ -74,7 +74,7 @@ void main() {
         '<p style="color:black">普通</p><div style="width:80%;max-width:90%;padding:4px;border:1px solid red;background-color:white;color:black">框内</div>',
         '',
       ).chapters.first;
-      expect(chapter.blocks.first.inlineStyles.single.color, isNull);
+      expect(chapter.blocks.first.inlineStyles, isEmpty);
       final box = chapter.blocks.last.box!;
       expect(box.width, isNull);
       expect(box.widthFraction, .8);
@@ -83,6 +83,22 @@ void main() {
       expect(ChapterContent.fromJson(chapter.toJson()), chapter);
     },
   );
+  test('neutral inherited color is no-op, explicit resets and gaps survive', () {
+    final chapter = parse(
+      '<h1>Title</h1><p><strong>A<span style="font-weight:normal">B</span></strong></p>'
+          '<div class="card"><div>One</div><div style="font-size:.4em"><br/></div><div>Two</div></div>',
+      'body {color:black} .card {border:1px solid red}',
+    ).chapters.first;
+    expect(chapter.blocks.first.inlineStyles, isEmpty);
+    expect(chapter.blocks[1].inlineStyles.first.bold, isTrue);
+    expect(chapter.blocks[1].inlineStyles.last.bold, isFalse);
+    expect(chapter.blocks[1].inlineStyles.last.italic, isNull);
+    final gap = chapter.blocks[3] as ParagraphBlock;
+    expect(gap.authoredGapEm, .4);
+    expect(gap.text, isEmpty);
+    expect(gap.box!.group, chapter.blocks[2].box!.group);
+    expect(ChapterContent.fromJson(chapter.toJson()), chapter);
+  });
   test('document backgrounds never become authored block backgrounds', () {
     final chapter = parse(
       '<div>Plain</div><div class="card">Card</div>',

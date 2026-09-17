@@ -276,7 +276,11 @@ final class PageLayout {
       return known.clamp(1.0, height);
     }
     final edges = readerBoxEdges(index.content, index.chunks[unit].blockIndex);
-    return ((block is ParagraphBlock ? 16.0 : 24.0) + edges.top + edges.bottom)
+    return ((block is ParagraphBlock
+                ? readerBlankHeight(block, style, scaler)
+                : 24.0) +
+            edges.top +
+            edges.bottom)
         .clamp(1.0, height);
   }
 

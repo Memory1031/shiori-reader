@@ -16,6 +16,39 @@ import 'package:shiori/features/reader/viewport/render_chunk.dart';
 import 'package:shiori/features/reader/viewport/reader_box.dart';
 
 void main() {
+  test(
+    'box children use authored gaps instead of reader paragraph spacing',
+    () {
+      final box = BlockBox(group: 0, padding: 5, borderWidth: 1);
+      final content = ChapterContent(
+        key: fixtureChapterKey(FixtureScenario.shortChapter),
+        title: 'Box',
+        blocks: [
+          ParagraphBlock(text: 'First', box: box),
+          ParagraphBlock(text: '', box: box, authoredGapEm: .4),
+          ParagraphBlock(text: 'Last', box: box),
+        ],
+      );
+      PageLayout make(double spacing) => PageLayout(
+        index: ChunkIndex(content),
+        width: 300,
+        height: 500,
+        style: const TextStyle(fontSize: 20, height: 1),
+        scaler: TextScaler.linear(2),
+        direction: TextDirection.ltr,
+        paragraphSpacing: spacing,
+      );
+      final compact = make(0).forward(const PageCursor(0, 0))!;
+      final spaced = make(40).forward(const PageCursor(0, 0))!;
+      expect(
+        spaced.fragments.map((f) => f.height),
+        compact.fragments.map((f) => f.height),
+      );
+      expect(spaced.fragments[1].height, 16);
+      expect(readerBlockSpacing(ParagraphBlock(text: 'Outside'), 40), 40);
+    },
+  );
+
   testWidgets(
     'reader paper fills the page while authored background stays inside its box',
     (tester) async {
@@ -259,7 +292,7 @@ void main() {
               paragraph.size.height,
               lessThanOrEqualTo(
                 fragment.height -
-                    16 -
+                    readerBlockSpacing(block, 16) -
                     fragment.boxTop -
                     fragment.boxBottom +
                     .01,
