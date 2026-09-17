@@ -173,6 +173,67 @@ void main() {
     throw StateError('iOS release must not duplicate develop quality checks');
   }
 
+  // ---- Security regressions shared across all workflows ----
+  final workflows = {
+    'ci.yml': ci,
+    'release.yml': release,
+    'ios-release.yml': ios,
+  };
+  final shaPinned = RegExp(
+    r'^[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-fA-F]{40}$',
+  );
+  for (final entry in workflows.entries) {
+    // pull_request_target runs workflow code from the target branch with
+    // base-repo context; fork PRs must only use the plain pull_request CI.
+    if ((entry.value['on'] as YamlMap).containsKey('pull_request_target')) {
+      throw StateError('${entry.key} must not use pull_request_target');
+    }
+    for (final job in (entry.value['jobs'] as YamlMap).values) {
+      final jobMap = job as YamlMap;
+      if (jobMap['uses'] != null) continue;
+      for (final step in jobMap['steps'] as YamlList) {
+        final stepMap = step as YamlMap;
+        final uses = stepMap['uses']?.toString() ?? '';
+        if (uses.isEmpty || uses.startsWith('./')) continue;
+        // Mutable refs (@v4, @main) let a moved tag change the code CI runs.
+        if (!shaPinned.hasMatch(uses)) {
+          throw StateError(
+            'External action must be pinned to a full 40-hex commit SHA '
+            '(${entry.key}): $uses',
+          );
+        }
+        if (uses.startsWith('actions/checkout@') &&
+            (stepMap['with'] as YamlMap?)?['persist-credentials'] != false) {
+          throw StateError(
+            'actions/checkout must disable persist-credentials '
+            '(${entry.key}): $uses',
+          );
+        }
+      }
+    }
+  }
+
+  // Fork PRs execute regular CI; it must never touch release credentials.
+  final ciText = File('.github/workflows/ci.yml').readAsStringSync();
+  for (final secret in [
+    'ASC_KEY_ID',
+    'ASC_ISSUER_ID',
+    'ASC_KEY_P8',
+    'IOS_DIST_CERT_P12',
+    'IOS_DIST_CERT_PASSWORD',
+    'ANDROID_KEYSTORE_BASE64',
+    'ANDROID_STORE_PASSWORD',
+    'ANDROID_KEY_ALIAS',
+    'ANDROID_KEY_PASSWORD',
+  ]) {
+    if (ciText.contains(secret)) {
+      throw StateError('Regular CI must not reference signing secret: $secret');
+    }
+  }
+  if ((ci['permissions'] as YamlMap)['contents'] != 'read') {
+    throw StateError('Regular CI must stay read-only (contents: read)');
+  }
+
   for (final job in [
     ...ciJobs.values,
     ...releaseJobs.values,
@@ -188,6 +249,7 @@ void main() {
   }
   stdout.writeln(
     'Workflow YAML parsed; quality-only CI, tag-only releases '
-    '(Android + iOS), tag-gated uploads and working directories verified.',
+    '(Android + iOS), tag-gated uploads, SHA-pinned actions, no persisted '
+    'checkout credentials and working directories verified.',
   );
 }

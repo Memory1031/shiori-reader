@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # Workflows pin actions to commit SHAs; this is the only channel that
+  # surfaces new upstream releases as PRs against those pins.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
