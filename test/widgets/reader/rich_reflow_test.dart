@@ -16,6 +16,67 @@ import 'package:shiori/features/reader/viewport/render_chunk.dart';
 import 'package:shiori/features/reader/viewport/reader_box.dart';
 
 void main() {
+  for (final width in [240.0, 800.0]) {
+    for (final centered in [false, true]) {
+      testWidgets('box placement at width $width, centered=$centered', (
+        tester,
+      ) async {
+        final content = ChapterContent(
+          key: fixtureChapterKey(FixtureScenario.shortChapter),
+          title: 'Contents',
+          blocks: [
+            for (final text in ['CONTENTS', 'Chapter'])
+              ParagraphBlock(
+                text: text,
+                alignment: ParagraphAlignment.center,
+                box: BlockBox(
+                  group: 0,
+                  width: 304,
+                  maxWidthFraction: 1,
+                  centered: centered,
+                ),
+              ),
+          ],
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Center(
+              child: SizedBox(
+                width: width,
+                height: 400,
+                child: PagedReaderViewport(
+                  content: content,
+                  controller: PagedReaderController(),
+                  textStyle: const TextStyle(fontSize: 20),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final frames = find.byWidgetPredicate(
+          (w) => w is ReaderBoxFrame && w.box != null,
+        );
+        expect(frames, findsNWidgets(2));
+        for (final frame in frames.evaluate()) {
+          final frameFinder = find.byWidget(frame.widget);
+          final text = find.descendant(
+            of: frameFinder,
+            matching: find.byType(ReaderLinkedText),
+          );
+          final outer = tester.getRect(frameFinder);
+          final inner = tester.getRect(text);
+          expect(inner.width, closeTo(outer.width.clamp(0, 304), .01));
+          if (centered) {
+            expect(inner.center.dx, closeTo(outer.center.dx, .01));
+          } else {
+            expect(inner.left, closeTo(outer.left, .01));
+          }
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
   test(
     'box children use authored gaps instead of reader paragraph spacing',
     () {

@@ -9,6 +9,7 @@ import 'block_style.dart';
 import 'reader_box.dart';
 import 'paper_turn.dart';
 import '../reader_linked_text.dart';
+import '../reader_margin.dart';
 import '../../../domain/contracts/contracts.dart';
 
 class PagedReaderController {
@@ -50,8 +51,13 @@ class PagedReaderViewport extends StatefulWidget {
     this.contentLinks = const [],
     this.onLink,
     this.images,
-  });
+    this.columns = 1,
+    this.columnGap = readerColumnGap,
+  }) : assert(columns == 1 || columns == 2),
+       assert(columnGap >= 0);
   final ChapterContent content;
+  final int columns;
+  final double columnGap;
   final ImageRepository? images;
   final PagedReaderController controller;
   final ReaderPosition? initialPosition;
@@ -349,6 +355,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           defaults.textHeightBehavior ??
           DefaultTextHeightBehavior.maybeOf(context);
       final direction = Directionality.of(context);
+      final columnWidth =
+          (constraints.maxWidth - (widget.columns - 1) * widget.columnGap) /
+          widget.columns;
       final signature = (
         constraints.maxWidth,
         constraints.maxHeight,
@@ -360,13 +369,15 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         widget.content,
         widget.maxChunkCodePoints,
         widget.paragraphSpacing,
+        widget.columns,
+        widget.columnGap,
       );
       final imageGeometry = [
         for (final block in widget.content.blocks.whereType<ImageBlock>())
           widget.imageExtent?.call(block) ??
               widget.imageHeights[block.media] ??
               (block.width != null && block.height != null
-                  ? constraints.maxWidth * block.height! / block.width!
+                  ? columnWidth * block.height! / block.width!
                   : 180.0),
       ];
       final changed =
@@ -383,7 +394,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           );
           _layout = PageLayout(
             index: index,
-            width: constraints.maxWidth,
+            width: columnWidth,
+            columns: widget.columns,
             height: constraints.maxHeight,
             style: textStyle,
             locale: locale,
@@ -451,7 +463,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       if (_pages.isEmpty) return const SizedBox.shrink();
       double textWidth(PageFragment fragment) => readerBlockWidth(
         widget.content.blocks[_layout!.index.chunks[fragment.unit].blockIndex],
-        constraints.maxWidth,
+        columnWidth,
         textStyle,
         scaler,
         direction,
@@ -462,144 +474,186 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       ContentBlock fragmentBlock(PageFragment f) =>
           widget.content.blocks[_layout!.index.chunks[f.unit].blockIndex];
       double fragmentInnerWidth(PageFragment f) =>
-          readerBoxInnerWidth(fragmentBlock(f), constraints.maxWidth);
+          readerBoxInnerWidth(fragmentBlock(f), columnWidth);
       Widget? buildPage(BuildContext context, int number) {
         final page = _page(number);
         if (page == null) return null;
+        Widget column(List<PageFragment> fragments, double width) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final fragment in fragments)
+              Semantics(
+                header:
+                    widget.content.blocks[_layout!
+                            .index
+                            .chunks[fragment.unit]
+                            .blockIndex]
+                        is HeadingBlock,
+                child: ReaderBoxFrame(
+                  box: fragmentBlock(fragment).box,
+                  width: readerBoxOuterWidth(fragmentBlock(fragment), width),
+                  top: fragment.boxTop,
+                  bottom: fragment.boxBottom,
+                  child: SizedBox(
+                    height:
+                        fragment.height - fragment.boxTop - fragment.boxBottom,
+                    child: fragment.text == ''
+                        ? const SizedBox.shrink()
+                        : fragment.text != null
+                        ? Padding(
+                            padding: EdgeInsets.only(
+                              left:
+                                  (fragmentInnerWidth(fragment) -
+                                      textWidth(fragment)) /
+                                  2,
+                              right:
+                                  (fragmentInnerWidth(fragment) -
+                                      textWidth(fragment)) /
+                                  2,
+                              top:
+                                  readerBlockSpacing(
+                                    widget.content.blocks[_layout!
+                                        .index
+                                        .chunks[fragment.unit]
+                                        .blockIndex],
+                                    widget.paragraphSpacing,
+                                    chapter: widget.content.key,
+                                  ) /
+                                  2,
+                              bottom:
+                                  readerBlockSpacing(
+                                    widget.content.blocks[_layout!
+                                        .index
+                                        .chunks[fragment.unit]
+                                        .blockIndex],
+                                    widget.paragraphSpacing,
+                                    chapter: widget.content.key,
+                                  ) /
+                                  2,
+                            ),
+                            child: ReaderLinkedText(
+                              locale: locale,
+                              textHeightBehavior: heightBehavior,
+                              images: widget.images,
+                              authoredBackground: fragmentBlock(
+                                fragment,
+                              ).box?.backgroundColor,
+                              inlineStyles: widget
+                                  .content
+                                  .blocks[_layout!
+                                      .index
+                                      .chunks[fragment.unit]
+                                      .blockIndex]
+                                  .inlineStyles,
+                              inlineImages: widget
+                                  .content
+                                  .blocks[_layout!
+                                      .index
+                                      .chunks[fragment.unit]
+                                      .blockIndex]
+                                  .inlineImages,
+                              onLink: widget.onLink,
+                              text: fragment.text!,
+                              blockOffset:
+                                  _layout!.index.chunks[fragment.unit].start +
+                                  fragment.start,
+                              links: widget.contentLinks
+                                  .where(
+                                    (note) =>
+                                        note.sourceBlockKey ==
+                                        _layout!
+                                            .index
+                                            .chunks[fragment.unit]
+                                            .blockKey,
+                                  )
+                                  .toList(),
+                              prefix: readerIndentPrefix(
+                                widget.content.blocks[_layout!
+                                    .index
+                                    .chunks[fragment.unit]
+                                    .blockIndex],
+                                _layout!.index.chunks[fragment.unit].start ==
+                                        0 &&
+                                    fragment.start == 0,
+                                textWidth(fragment),
+                                textStyle,
+                                scaler,
+                                chapter: widget.content.key,
+                              ),
+                              style: readerBlockStyle(
+                                widget.content.blocks[_layout!
+                                    .index
+                                    .chunks[fragment.unit]
+                                    .blockIndex],
+                                textStyle,
+                                chapter: widget.content.key,
+                              ),
+                              align: readerBlockAlign(
+                                widget.content.blocks[_layout!
+                                    .index
+                                    .chunks[fragment.unit]
+                                    .blockIndex],
+                                chapter: widget.content.key,
+                              ),
+                              scaler: scaler,
+                            ),
+                          )
+                        : _object(context, fragment),
+                  ),
+                ),
+              ),
+          ],
+        );
         return Semantics(
           container: true,
           explicitChildNodes: true,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final fragment in page.fragments)
-                Semantics(
-                  header:
-                      widget.content.blocks[_layout!
-                              .index
-                              .chunks[fragment.unit]
-                              .blockIndex]
-                          is HeadingBlock,
-                  child: ReaderBoxFrame(
-                    box: fragmentBlock(fragment).box,
-                    width: readerBoxOuterWidth(
-                      fragmentBlock(fragment),
-                      constraints.maxWidth,
-                    ),
-                    top: fragment.boxTop,
-                    bottom: fragment.boxBottom,
-                    child: SizedBox(
-                      height:
-                          fragment.height -
-                          fragment.boxTop -
-                          fragment.boxBottom,
-                      child: fragment.text == ''
-                          ? const SizedBox.shrink()
-                          : fragment.text != null
-                          ? Padding(
-                              padding: EdgeInsets.only(
-                                left:
-                                    (fragmentInnerWidth(fragment) -
-                                        textWidth(fragment)) /
-                                    2,
-                                right:
-                                    (fragmentInnerWidth(fragment) -
-                                        textWidth(fragment)) /
-                                    2,
-                                top:
-                                    readerBlockSpacing(
-                                      widget.content.blocks[_layout!
-                                          .index
-                                          .chunks[fragment.unit]
-                                          .blockIndex],
-                                      widget.paragraphSpacing,
-                                      chapter: widget.content.key,
-                                    ) /
-                                    2,
-                                bottom:
-                                    readerBlockSpacing(
-                                      widget.content.blocks[_layout!
-                                          .index
-                                          .chunks[fragment.unit]
-                                          .blockIndex],
-                                      widget.paragraphSpacing,
-                                      chapter: widget.content.key,
-                                    ) /
-                                    2,
-                              ),
-                              child: ReaderLinkedText(
-                                locale: locale,
-                                textHeightBehavior: heightBehavior,
-                                images: widget.images,
-                                authoredBackground: fragmentBlock(
-                                  fragment,
-                                ).box?.backgroundColor,
-                                inlineStyles: widget
-                                    .content
-                                    .blocks[_layout!
-                                        .index
-                                        .chunks[fragment.unit]
-                                        .blockIndex]
-                                    .inlineStyles,
-                                inlineImages: widget
-                                    .content
-                                    .blocks[_layout!
-                                        .index
-                                        .chunks[fragment.unit]
-                                        .blockIndex]
-                                    .inlineImages,
-                                onLink: widget.onLink,
-                                text: fragment.text!,
-                                blockOffset:
-                                    _layout!.index.chunks[fragment.unit].start +
-                                    fragment.start,
-                                links: widget.contentLinks
-                                    .where(
-                                      (note) =>
-                                          note.sourceBlockKey ==
-                                          _layout!
-                                              .index
-                                              .chunks[fragment.unit]
-                                              .blockKey,
-                                    )
-                                    .toList(),
-                                prefix: readerIndentPrefix(
-                                  widget.content.blocks[_layout!
-                                      .index
-                                      .chunks[fragment.unit]
-                                      .blockIndex],
-                                  _layout!.index.chunks[fragment.unit].start ==
-                                          0 &&
-                                      fragment.start == 0,
-                                  textWidth(fragment),
-                                  textStyle,
-                                  scaler,
-                                  chapter: widget.content.key,
-                                ),
-                                style: readerBlockStyle(
-                                  widget.content.blocks[_layout!
-                                      .index
-                                      .chunks[fragment.unit]
-                                      .blockIndex],
-                                  textStyle,
-                                  chapter: widget.content.key,
-                                ),
-                                align: readerBlockAlign(
-                                  widget.content.blocks[_layout!
-                                      .index
-                                      .chunks[fragment.unit]
-                                      .blockIndex],
-                                  chapter: widget.content.key,
-                                ),
-                                scaler: scaler,
-                              ),
-                            )
-                          : _object(context, fragment),
+          child: widget.columns == 1 || page.fullWidth
+              ? Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    width: page.fullWidth
+                        ? constraints.maxWidth.clamp(0, readerMaxPageWidth)
+                        : constraints.maxWidth,
+                    child: column(
+                      page.fragments,
+                      page.fullWidth
+                          ? constraints.maxWidth.clamp(0, readerMaxPageWidth)
+                          : constraints.maxWidth,
                     ),
                   ),
+                )
+              : Row(
+                  textDirection: TextDirection.ltr,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: column(
+                        page.fragments
+                            .take(page.columnBreak ?? page.fragments.length)
+                            .toList(),
+                        columnWidth,
+                      ),
+                    ),
+                    VerticalDivider(
+                      key: const ValueKey('reader-spread-gutter'),
+                      width: widget.columnGap,
+                      thickness: 1,
+                      indent: 24,
+                      endIndent: 24,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: .10),
+                    ),
+                    Expanded(
+                      child: column(
+                        page.columnBreak == null
+                            ? []
+                            : page.fragments.skip(page.columnBreak!).toList(),
+                        columnWidth,
+                      ),
+                    ),
+                  ],
                 ),
-            ],
-          ),
         );
       }
 

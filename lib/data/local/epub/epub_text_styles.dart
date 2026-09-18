@@ -301,6 +301,9 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
         'font-style',
         'max-width',
         'padding',
+        'margin',
+        'margin-left',
+        'margin-right',
         'border',
         'border-width',
         'border-color',
@@ -346,12 +349,37 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
           continue;
         }
 
+        var properties = {name: value};
+        if (name.startsWith('margin')) {
+          final tokens = value.split(RegExp(r'\s+'));
+          if (tokens.isEmpty ||
+              tokens.length > (name == 'margin' ? 4 : 1) ||
+              tokens.any(
+                (t) => !RegExp(
+                  r'^(auto|initial|inherit|unset|0|[+-]?(?:\d*\.)?\d+(?:px|em|rem|%))$',
+                ).hasMatch(t),
+              )) {
+            continue;
+          }
+          // Expand before cascading so shorthand, longhand and !important
+          // compete per side. Vertical margins remain reader-owned.
+          if (name == 'margin') {
+            properties = {
+              'margin-left': tokens.length == 4
+                  ? tokens[3]
+                  : tokens.length >= 2
+                  ? tokens[1]
+                  : tokens[0],
+              'margin-right': tokens.length >= 2 ? tokens[1] : tokens[0],
+            };
+          }
+        }
         final priorities = important[element] ??= {};
-        if (!priority && priorities.contains(name)) continue;
-        if (priority) priorities.add(name);
-        (values[element] ??= {})[name] = raw
-            .replaceFirst(RegExp(r'\s*!\s*important\s*$'), '')
-            .trim();
+        for (final property in properties.entries) {
+          if (!priority && priorities.contains(property.key)) continue;
+          if (priority) priorities.add(property.key);
+          (values[element] ??= {})[property.key] = property.value;
+        }
       }
     }
   }

@@ -33,11 +33,18 @@ final class PageFragment {
 }
 
 final class ReaderPage {
-  ReaderPage(this.start, this.end, List<PageFragment> fragments)
-    : fragments = List.unmodifiable(fragments);
+  ReaderPage(
+    this.start,
+    this.end,
+    List<PageFragment> fragments, {
+    this.columnBreak,
+    this.fullWidth = false,
+  }) : fragments = List.unmodifiable(fragments);
   final PageCursor start;
   final PageCursor end;
   final List<PageFragment> fragments;
+  final int? columnBreak;
+  final bool fullWidth;
 }
 
 /// Only lays out bounded chunks around a requested semantic anchor. It does not
@@ -55,8 +62,9 @@ final class PageLayout {
     this.locale,
     this.textHeightBehavior,
     this.paragraphSpacing = 16,
+    this.columns = 1,
   }) {
-    if (width < 1 || height < 1) {
+    if (width < 1 || height < 1 || (columns != 1 && columns != 2)) {
       throw ArgumentError('Page needs positive dimensions');
     }
   }
@@ -65,6 +73,7 @@ final class PageLayout {
   final double height;
   final TextStyle style;
   final double paragraphSpacing;
+  final int columns;
   final TextScaler scaler;
   final TextDirection direction;
   final Locale? locale;
@@ -199,11 +208,9 @@ final class PageLayout {
         paragraphSpacing,
         chapter: index.content.key,
       );
-      final fullHeight =
-          lines.fold<double>(0, (sum, line) => sum + line.height) +
-          spacing +
-          top +
-          bottom;
+      // Placeholder-only lines can report shorter line metrics than their
+      // paragraph: Flutter still reserves leading around the inline image.
+      final fullHeight = painter.height + spacing + top + bottom;
       if (fullHeight <= available + .01) {
         return (
           text: text,
@@ -252,6 +259,22 @@ final class PageLayout {
           ? text.substring(boundary)
           : text.substring(0, boundary);
       if (selected.isEmpty) return null;
+      if (block.inlineImages.isNotEmpty) {
+        // A new fragment has its own leading and placeholder baselines.
+        // Measure the strictly shorter slice instead of summing line heights.
+        if (selected.length >= text.length) return null;
+        return _fit(
+          selected,
+          available,
+          backwards: backwards,
+          block: block,
+          startsBlock: !backwards && startsBlock,
+          blockOffset: backwards
+              ? blockOffset + text.runes.length - selected.runes.length
+              : blockOffset,
+          blockIndex: blockIndex,
+        );
+      }
       return (
         text: selected,
         count: selected.runes.length,
@@ -284,7 +307,51 @@ final class PageLayout {
         .clamp(1.0, height);
   }
 
+  bool _standaloneImage(ReaderPage page) =>
+      page.fragments.length == 1 &&
+      index.content.blocks[index.chunks[page.fragments.single.unit].blockIndex]
+          is ImageBlock &&
+      page.fragments.single.height >= height * .6;
+
   ReaderPage? forward(PageCursor from) {
+    final first = _forwardColumn(from);
+    if (first == null || columns == 1) return first;
+    if (_standaloneImage(first)) {
+      return ReaderPage(
+        first.start,
+        first.end,
+        first.fragments,
+        fullWidth: true,
+      );
+    }
+    final second = _forwardColumn(first.end);
+    if (second == null || _standaloneImage(second)) return first;
+    return ReaderPage(first.start, second.end, [
+      ...first.fragments,
+      ...second.fragments,
+    ], columnBreak: first.fragments.length);
+  }
+
+  ReaderPage? backward(PageCursor until) {
+    final second = _backwardColumn(until);
+    if (second == null || columns == 1) return second;
+    if (_standaloneImage(second)) {
+      return ReaderPage(
+        second.start,
+        second.end,
+        second.fragments,
+        fullWidth: true,
+      );
+    }
+    final first = _backwardColumn(second.start);
+    if (first == null || _standaloneImage(first)) return second;
+    return ReaderPage(first.start, second.end, [
+      ...first.fragments,
+      ...second.fragments,
+    ], columnBreak: first.fragments.length);
+  }
+
+  ReaderPage? _forwardColumn(PageCursor from) {
     final start = normalize(from);
     var cursor = start;
     var remaining = height;
@@ -380,7 +447,7 @@ final class PageLayout {
     return fragments.isEmpty ? null : ReaderPage(start, cursor, fragments);
   }
 
-  ReaderPage? backward(PageCursor until) {
+  ReaderPage? _backwardColumn(PageCursor until) {
     var cursor = normalize(until);
     final end = cursor;
     var remaining = height;

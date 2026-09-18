@@ -2,7 +2,7 @@
 
 按当前 pubspec.lock 对应包的 LICENSE / NOTICE 文本列出；含开发及传递依赖，不表示全部进入产物。类别为文本识别，不替代原始完整声明。
 
-锁文件 SHA-256：`8b59f351287f7f6cfecc5ffcb3a7ab8633fd8affc73ff86a065fd51e521e729b`。
+锁文件 SHA-256：`e09cb22db378b0cbba1ece892359510bc42c02167e165075d4cf2091d0d68546`。
 
 | 包 | 锁定版本 | 依赖关系 | 许可文本类别 | 文件 |
 | --- | --- | --- | --- | --- |
@@ -37,6 +37,14 @@
 | file_selector_web | 0.9.5 | transitive | BSD 类 | LICENSE |
 | file_selector_windows | 0.9.3+6 | transitive | BSD 类 | LICENSE |
 | flutter | 0.0.0 | direct main | BSD 类 | LICENSE |
+| flutter_inappwebview | 6.1.5 | direct main | Apache 类 | LICENSE |
+| flutter_inappwebview_android | 1.1.3 | transitive | Apache 类 | LICENSE |
+| flutter_inappwebview_internal_annotations | 1.3.0 | transitive | Apache 类 | LICENSE |
+| flutter_inappwebview_ios | 1.1.2 | transitive | Apache 类 | LICENSE |
+| flutter_inappwebview_macos | 1.1.2 | transitive | Apache 类 | LICENSE |
+| flutter_inappwebview_platform_interface | 1.3.0+1 | transitive | Apache 类 | LICENSE |
+| flutter_inappwebview_web | 1.1.2 | transitive | Apache 类 | LICENSE |
+| flutter_inappwebview_windows | 0.6.0 | transitive | Apache 类 | LICENSE |
 | flutter_lints | 6.0.0 | direct dev | BSD 类 | LICENSE |
 | flutter_localizations | 0.0.0 | direct main | BSD 类 | LICENSE |
 | flutter_test | 0.0.0 | direct dev | BSD 类 | LICENSE |
@@ -113,17 +121,13 @@
 | web_socket | 1.0.1 | transitive | BSD 类 | LICENSE |
 | web_socket_channel | 3.0.3 | transitive | BSD 类 | LICENSE |
 | webkit_inspection_protocol | 1.2.1 | transitive | BSD 类 | LICENSE |
-| webview_flutter | 4.13.1 | direct main | BSD 类 | LICENSE |
-| webview_flutter_android | 4.12.0 | transitive | BSD 类 | LICENSE |
-| webview_flutter_platform_interface | 2.15.1 | transitive | BSD 类 | LICENSE |
-| webview_flutter_wkwebview | 3.25.1 | transitive | BSD 类 | LICENSE |
 | xdg_directories | 1.1.0 | transitive | BSD 类 | LICENSE |
 | xml | 6.6.1 | direct main | MIT 类 | LICENSE |
 | yaml | 3.1.4 | direct dev | MIT 类 | LICENSE |
 
 ## 原生与产物边界
 
-iOS Podfile.lock 当前包含 Flutter、shared_preferences_foundation 与 webview_flutter_wkwebview；具体原生声明随包及 SDK 保留。Android 原生传递依赖与最终 APK 的 NOTICES、签名、摘要仍须随最终发布产物核对；旧 APK 的依赖列表不作为 1.1.0 完整结论。WHATWG 编码附加声明保留在 assets/licenses/whatwg-encoding.txt。
+Apple 平台的原生依赖由 CocoaPods 解析，`flutter_inappwebview` 还依赖 OrderedSet；Windows 插件通过 NuGet 引入 WebView2 SDK、Windows Implementation Library 与 nlohmann.json。具体原生声明随包及 SDK 保留，分发时须与实际锁文件和产物核对。Android 原生传递依赖与最终 APK 的 NOTICES、签名、摘要仍须随最终发布产物核对。WHATWG 编码附加声明保留在 assets/licenses/whatwg-encoding.txt。
 
 本文件是 Dart 锁定依赖文本快照，未宣称原生/产物许可全部审查通过。分发范围与其他素材边界见[发布说明](README.md)。
 

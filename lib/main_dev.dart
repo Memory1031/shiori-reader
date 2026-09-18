@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'features/reader/epub_webview_host.dart';
 
 import 'dev/ui/dev_app.dart';
 import 'app/app.dart';
@@ -51,15 +52,18 @@ Future<void> main() async {
     (database as Success<LocalDatabases>).value.users,
   );
   runApp(
-    createDevApp(
-      appSettings: PreferencesAppSettingsStore(
-        preferences: SharedPreferencesAsync(),
-        paths: paths,
-        logger: AppLogger(),
+    EpubWebViewHost(
+      userDataDirectory: paths.webView,
+      child: createDevApp(
+        appSettings: PreferencesAppSettingsStore(
+          preferences: SharedPreferencesAsync(),
+          paths: paths,
+          logger: AppLogger(),
+        ),
+        settings: settings,
+        library: library,
+        scenarioId: const String.fromEnvironment('SHIORI_SCENARIO'),
       ),
-      settings: settings,
-      library: library,
-      scenarioId: const String.fromEnvironment('SHIORI_SCENARIO'),
     ),
   );
 }

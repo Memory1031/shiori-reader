@@ -1,5 +1,5 @@
 import 'dart:async';
-import '../data/import/platform_import_source.dart';
+import '../features/reader/epub_webview_host.dart';
 import '../data/local/book_decoder.dart';
 import '../data/repositories/local_reading_repository.dart';
 import '../data/media/local_image_repository.dart';
@@ -15,6 +15,7 @@ import '../data/local/preferences_app_settings_store.dart';
 import '../data/local/preferences_settings_store.dart';
 import '../data/repositories/library_repository.dart';
 import '../domain/contracts/contracts.dart';
+import '../domain/contracts/import_source.dart';
 import '../features/home/reading_home.dart';
 import '../shared/app_logger.dart';
 import '../shared/widgets/state_views.dart';
@@ -24,6 +25,7 @@ import 'appearance_panel.dart';
 import 'routes.dart';
 import 'source_services.dart';
 import 'launch_view.dart';
+import 'import_source.dart';
 
 /// Process root owns databases and source services. Initial home does no HTTP.
 class ProductionApp extends StatefulWidget {
@@ -47,6 +49,7 @@ class _ProductionAppState extends State<ProductionApp> {
   LocalLibraryRepository? _library;
   AppFailure? _failure;
   bool _opening = false;
+  AppPaths? _paths;
   @override
   void initState() {
     super.initState();
@@ -55,6 +58,7 @@ class _ProductionAppState extends State<ProductionApp> {
 
   Future<void> _open() async {
     if (_opening) return;
+    ImportSource? unownedImports;
     setState(() {
       _opening = true;
       _failure = null;
@@ -63,6 +67,8 @@ class _ProductionAppState extends State<ProductionApp> {
       final paths =
           await (widget.resolvePaths?.call() ??
               AppPaths.resolve(StorageEnvironment.production));
+      unownedImports = createImportSource(paths);
+      _paths = paths;
       final result = await LocalDatabases.open(paths);
       if (!mounted) {
         if (result case Success(:final value)) await value.close();
@@ -78,11 +84,12 @@ class _ProductionAppState extends State<ProductionApp> {
       final databases = (result as Success<LocalDatabases>).value;
       _databases = databases;
       _imports = ImportController(
-        source: PlatformImportSource(),
+        source: unownedImports,
         store: databases.localBooks,
         decoder: const BookDecoder(),
         addToShelf: true,
       );
+      unownedImports = null; // ImportController now owns shutdown.
       unawaited(_imports!.start());
       _services = SourceServices(
         cache: databases.cache,
@@ -120,6 +127,8 @@ class _ProductionAppState extends State<ProductionApp> {
           );
         });
       }
+    } finally {
+      await unownedImports?.close();
     }
   }
 
@@ -169,10 +178,13 @@ class _ProductionAppState extends State<ProductionApp> {
       : ShioriApp(
           key: const ValueKey('production-ready'),
           navigatorKey: _navigator,
-          overlayBuilder: (context, child) => ImportOverlay(
-            controller: _imports!,
-            onRead: _readImported,
-            child: child,
+          overlayBuilder: (context, child) => EpubWebViewHost(
+            userDataDirectory: _paths!.webView,
+            child: ImportOverlay(
+              controller: _imports!,
+              onRead: _readImported,
+              child: child,
+            ),
           ),
           createController: () => AppController(settingsStore: _appearance),
           homeBuilder: (context, app) => ReadingHome(

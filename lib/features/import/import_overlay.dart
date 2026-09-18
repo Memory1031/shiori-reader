@@ -294,6 +294,7 @@ class _ImportOverlayState extends State<ImportOverlay>
     final total = c.items.length;
     final pending = total - succeeded - failed;
     final importing = c.phase == ImportPhase.importing;
+    final current = c.importingItem;
     final allDone = succeeded == total;
     final fatalReason =
         c.batchProblem == ImportProblem.storage ||
@@ -305,8 +306,11 @@ class _ImportOverlayState extends State<ImportOverlay>
     final String title;
     final String? counts;
     if (importing) {
-      final index = c.items.indexOf(c.importingItem!) + 1;
-      title = l.importBatchProgress(index, total);
+      // A committed item has no active parser while its receipt is being
+      // acknowledged. Keep the panel busy until that asynchronous work ends.
+      title = current == null
+          ? l.importProcessing
+          : l.importBatchProgress(c.items.indexOf(current) + 1, total);
       counts = null;
     } else if (allDone) {
       title = l.importBatchDone(total);
@@ -327,7 +331,6 @@ class _ImportOverlayState extends State<ImportOverlay>
       counts = null;
     }
 
-    final current = c.importingItem;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,

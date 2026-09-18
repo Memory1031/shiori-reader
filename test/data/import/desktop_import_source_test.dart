@@ -56,6 +56,7 @@ void main() {
 
   DesktopImportSource source({
     Future<List<XFile>> Function()? select,
+    Stream<List<XFile>>? drops,
     int maxFiles = 64,
     int maxFileBytes = 128 * 1024 * 1024,
     int maxBatchBytes = 512 * 1024 * 1024,
@@ -63,6 +64,7 @@ void main() {
     final result = DesktopImportSource(
       inbox: inbox,
       selectFiles: select ?? () async => selection,
+      droppedFiles: drops,
       maxFiles: maxFiles,
       maxFileBytes: maxFileBytes,
       maxBatchBytes: maxBatchBytes,
@@ -487,47 +489,149 @@ void main() {
     },
   );
 
-  test(
-    'selected TXT and EPUB pass through the real controller, parser and managed store',
-    () async {
-      selection = [
-        await file('测试.TXT', utf8.encode('\ufeff第一章\n\n这是桌面导入的离线测试正文。')),
-        await file('测试.EPUB', zipFiles(epubFiles())),
-      ];
-      final paths = AppPaths(
-        support: temp,
-        temporary: temp,
-        environment: StorageEnvironment.development,
-      );
-      inbox = paths.importInbox;
-      final databases =
-          ((await LocalDatabases.open(paths)) as Success<LocalDatabases>).value;
-      final adapter = source();
-      final controller = ImportController(
-        source: adapter,
-        store: databases.localBooks,
-        decoder: const BookDecoder(),
-        addToShelf: true,
-      );
-      try {
-        await controller.start();
-        await controller.pick();
-        expect(controller.items, hasLength(2));
-        await controller.submit();
-        expect(controller.succeededCount, 2);
-        expect(controller.failedCount, 0);
-        expect(await adapter.pending(), isEmpty);
-        expect(
-          await databases.users.customSelect('SELECT * FROM bookshelf').get(),
-          hasLength(2),
+  for (final dropped in [false, true]) {
+    test(
+      '${dropped ? 'dropped' : 'selected'} TXT and EPUB use the real controller, parser and managed store',
+      () async {
+        selection = [
+          await file('测试.TXT', utf8.encode('\ufeff第一章\n\n这是桌面导入的离线测试正文。')),
+          await file('测试.EPUB', zipFiles(epubFiles())),
+        ];
+        final paths = AppPaths(
+          support: temp,
+          temporary: temp,
+          environment: StorageEnvironment.development,
         );
-        expect(await File(selection.first.path).exists(), isTrue);
-        expect(await File(selection.last.path).exists(), isTrue);
+        inbox = paths.importInbox;
+        final databases =
+            ((await LocalDatabases.open(paths)) as Success<LocalDatabases>)
+                .value;
+        final drops = StreamController<List<XFile>>.broadcast();
+        final adapter = source(drops: dropped ? drops.stream : null);
+        final controller = ImportController(
+          source: adapter,
+          store: databases.localBooks,
+          decoder: const BookDecoder(),
+          addToShelf: true,
+        );
+        try {
+          await controller.start();
+          if (dropped) {
+            final ready = Completer<void>();
+            controller.addListener(() {
+              if (controller.phase == ImportPhase.ready && !ready.isCompleted) {
+                ready.complete();
+              }
+            });
+            drops.add(selection);
+            await ready.future.timeout(const Duration(seconds: 5));
+            expect(controller.panelOpen, isFalse);
+            expect(controller.snoozed, isFalse);
+            expect(controller.busy, isFalse);
+            expect(controller.succeededCount, 0);
+            expect(
+              await databases.users
+                  .customSelect('SELECT * FROM bookshelf')
+                  .get(),
+              isEmpty,
+            );
+          } else {
+            await controller.pick();
+          }
+          expect(controller.items, hasLength(2));
+          await controller.submit();
+          expect(controller.succeededCount, 2);
+          expect(controller.failedCount, 0);
+          expect(await adapter.pending(), isEmpty);
+          expect(
+            await databases.users.customSelect('SELECT * FROM bookshelf').get(),
+            hasLength(2),
+          );
+          expect(await File(selection.first.path).exists(), isTrue);
+          expect(await File(selection.last.path).exists(), isTrue);
+        } finally {
+          await controller.shutdown();
+          expect(drops.hasListener, isFalse);
+          await drops.close();
+          controller.dispose();
+          await databases.close();
+        }
+      },
+    );
+  }
+
+  test(
+    'invalid drops finish receiving and preserve an existing batch',
+    () async {
+      final drops = StreamController<List<XFile>>();
+      final adapter = source(drops: drops.stream);
+      final events = <ImportSourceEvent>[];
+      final subscription = adapter.changes.listen(events.add);
+      Future<void> drop(List<XFile> files) async {
+        final done = adapter.changes.firstWhere((event) => event.completed);
+        drops.add(files);
+        await done.timeout(const Duration(seconds: 5));
+      }
+
+      try {
+        await drop([
+          input('bad.pdf', [1]),
+        ]);
+        expect(
+          events.map((e) => e.problem),
+          contains(ImportProblem.unsupported),
+        );
+        expect(await adapter.pending(), isEmpty);
+        await drop([
+          input('first.txt', [1, 2]),
+        ]);
+        final first = (await adapter.pending()).single;
+        events.clear();
+        await drop([
+          input('second.epub', [3]),
+        ]);
+        expect(events.map((e) => e.problem), contains(ImportProblem.busy));
+        expect((await adapter.pending()).single.id, first.id);
+        expect(await read(adapter, first), [1, 2]);
       } finally {
-        await controller.shutdown();
-        controller.dispose();
-        await databases.close();
+        await adapter.close();
+        await subscription.cancel();
+        expect(drops.hasListener, isFalse);
+        await drops.close();
       }
     },
   );
+
+  test('cancelling a drop removes staging and permits another drop', () async {
+    final drops = StreamController<List<XFile>>();
+    final chunks = StreamController<Uint8List>();
+    final opened = Completer<void>();
+    final adapter = source(drops: drops.stream);
+    final subscription = adapter.changes.listen((_) {});
+    final finished = adapter.changes.firstWhere((event) => event.completed);
+    try {
+      drops.add([
+        Input('slow.txt', 10, () {
+          opened.complete();
+          return chunks.stream;
+        }),
+      ]);
+      await opened.future.timeout(const Duration(seconds: 5));
+      await adapter.cancelCopy();
+      await finished.timeout(const Duration(seconds: 5));
+      expect(await adapter.pending(), isEmpty);
+      expect(await Directory(p.join(inbox.path, 'working')).exists(), isFalse);
+      final next = adapter.changes.firstWhere((event) => event.completed);
+      drops.add([
+        input('retry.txt', [1]),
+      ]);
+      await next.timeout(const Duration(seconds: 5));
+      expect((await adapter.pending()).single.name, 'retry.txt');
+    } finally {
+      await adapter.close();
+      await subscription.cancel();
+      await chunks.close();
+      await drops.close();
+    }
+  });
 }

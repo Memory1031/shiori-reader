@@ -77,6 +77,7 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
           actions: [CloseButton(onPressed: () => Navigator.pop(context))],
         ),
         body: SafeArea(
+          minimum: const EdgeInsets.only(bottom: 24),
           child: Column(
             children: [
               Expanded(

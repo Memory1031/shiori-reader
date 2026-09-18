@@ -28,6 +28,7 @@ class MemorySource implements ImportSource {
   bool readFails = false;
   int pickCalls = 0;
   Completer<void>? ackGate;
+  void Function(String)? onAcknowledge;
   Completer<List<ImportCandidate>>? pendingGate;
   Completer<void>? picking;
   @override
@@ -53,6 +54,7 @@ class MemorySource implements ImportSource {
 
   @override
   Future<void> acknowledge(String id) async {
+    onAcknowledge?.call(id);
     await ackGate?.future;
     if (failAckIds.remove(id)) {
       throw const ImportSourceException(ImportProblem.storage);
@@ -1295,6 +1297,56 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('已导入 3 本书'), findsOneWidget);
     });
+
+    for (final pausedId in ['a', 'b']) {
+      testWidgets('batch remains usable while acknowledging $pausedId', (
+        tester,
+      ) async {
+        late Completer<void> entered, resume;
+        await tester.runAsync(() async {
+          entered = Completer<void>();
+          resume = Completer<void>();
+        });
+        source.onAcknowledge = (id) {
+          if (id == pausedId) {
+            source.ackGate = resume;
+            entered.complete();
+          }
+        };
+        source.receive(id: 'a', name: 'a.txt', content: utf8.encode('alpha'));
+        source.receive(id: 'b', name: 'b.txt', content: utf8.encode('beta'));
+        await controller.start();
+        controller.open();
+        await pumpImportPanel(tester);
+        await tester.pumpAndSettle();
+        Future<void>? run;
+        try {
+          await tester.runAsync(() async {
+            run = controller.submit();
+            await entered.future.timeout(const Duration(seconds: 10));
+          });
+          expect(controller.phase, ImportPhase.importing);
+          expect(controller.importingItem, isNull);
+          expect(controller.succeededCount, pausedId == 'a' ? 1 : 2);
+          await tester.pump();
+          expect(tester.takeException(), isNull);
+          final l = AppLocalizations.of(tester.element(find.byType(Scaffold)));
+          expect(find.text(l.importProcessing), findsOneWidget);
+          expect(find.text(l.importDone), findsNothing);
+          expect(find.text(l.importStop), findsOneWidget);
+        } finally {
+          await tester.runAsync(() async {
+            resume.complete();
+            await run?.timeout(const Duration(seconds: 10));
+          });
+        }
+        await tester.pumpAndSettle();
+        expect(controller.phase, ImportPhase.succeeded);
+        expect(find.text('已导入 2 本书'), findsOneWidget);
+        expect(find.text('完成'), findsOneWidget);
+        expect(source.acked, ['a', 'b']);
+      });
+    }
 
     testWidgets('partial failure shows summary and retry entry', (
       tester,

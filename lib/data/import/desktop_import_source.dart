@@ -15,11 +15,13 @@ class DesktopImportSource implements ImportSource {
   DesktopImportSource({
     required Directory inbox,
     Future<List<XFile>> Function()? selectFiles,
+    Stream<List<XFile>>? droppedFiles,
     this.maxFiles = 64,
     this.maxFileBytes = 128 * 1024 * 1024,
     this.maxBatchBytes = 512 * 1024 * 1024,
   }) : _root = Directory(p.normalize(inbox.absolute.path)),
-       _selectFiles = selectFiles ?? _openFiles {
+       _selectFiles = selectFiles ?? _openFiles,
+       _droppedFiles = droppedFiles {
     if (maxFiles < 1 ||
         maxFiles > 64 ||
         maxFileBytes < 1 ||
@@ -32,8 +34,17 @@ class DesktopImportSource implements ImportSource {
 
   final Directory _root;
   final Future<List<XFile>> Function() _selectFiles;
+  final Stream<List<XFile>>? _droppedFiles;
+  StreamSubscription<List<XFile>>? _dropSubscription;
   final int maxFiles, maxFileBytes, maxBatchBytes;
-  final _events = StreamController<ImportSourceEvent>.broadcast();
+  late final _events = StreamController<ImportSourceEvent>.broadcast(
+    onListen: () {
+      _dropSubscription ??= _droppedFiles?.listen(
+        (files) => unawaited(_receiveDrop(files)),
+        onError: _dropError,
+      );
+    },
+  );
   final _random = Random.secure();
   Future<void> _tail = Future.value();
   Future<void>? _picking, _closing;
@@ -62,19 +73,53 @@ class DesktopImportSource implements ImportSource {
   }
 
   @override
-  Future<void> pick() {
+  Future<void> pick() => _receive(_selectFiles);
+
+  void _dropError(Object error) {
+    if (_closed) return;
+    _events.add(
+      ImportSourceEvent(
+        problem: error is ImportSourceException
+            ? error.problem
+            : ImportProblem.unreadable,
+      ),
+    );
+  }
+
+  Future<void> _receiveDrop(List<XFile> files) async {
+    if (_closed || files.isEmpty) return;
+    if (_picking != null) {
+      _dropError(const ImportSourceException(ImportProblem.busy));
+      return;
+    }
+    _events.add(const ImportSourceEvent(copiedBytes: 0));
+    try {
+      await _receive(() async => files);
+    } catch (error) {
+      if (error is! ImportSourceException ||
+          error.problem != ImportProblem.cancelled) {
+        _dropError(error);
+      }
+      if (!_closed) _events.add(const ImportSourceEvent(completed: true));
+    }
+  }
+
+  Future<void> _receive(Future<List<XFile>> Function() selectFiles) {
     _checkOpen();
     if (_picking != null) {
       return Future.error(const ImportSourceException(ImportProblem.busy));
     }
     final cancellation = _cancellation = Completer<void>();
-    return _picking = _pick(cancellation).whenComplete(() {
+    return _picking = _pick(cancellation, selectFiles).whenComplete(() {
       _picking = null;
       _cancellation = null;
     });
   }
 
-  Future<void> _pick(Completer<void> cancellation) async {
+  Future<void> _pick(
+    Completer<void> cancellation,
+    Future<List<XFile>> Function() selectFiles,
+  ) async {
     void checkCancelled() {
       if (cancellation.isCompleted) {
         throw const ImportSourceException(ImportProblem.cancelled);
@@ -93,7 +138,7 @@ class DesktopImportSource implements ImportSource {
       // The OS dialog cannot be dismissed by file_selector. Stop waiting on
       // cancellation and ignore any later selection, without starting a copy.
       files = await Future.any([
-        _selectFiles(),
+        selectFiles(),
         cancellation.future.then<List<XFile>>((_) {
           throw const ImportSourceException(ImportProblem.cancelled);
         }),
@@ -292,6 +337,7 @@ class DesktopImportSource implements ImportSource {
   Future<void> _close() async {
     _closed = true;
     try {
+      await _dropSubscription?.cancel();
       await cancelCopy();
       await _tail;
     } finally {

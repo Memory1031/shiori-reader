@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../domain/models/models.dart';
 
+const readerMaxPageWidth = 680.0;
+const readerMinColumnWidth = 500.0;
+const readerColumnGap = 72.0;
+
 // Preserve the existing preference codec; legacy values select the nearest tier.
 const readerMarginValues = <double>[12, 21, 30, 39, 48];
 int readerMarginTier(double value) => ((value - 12) / 9).round().clamp(0, 4);

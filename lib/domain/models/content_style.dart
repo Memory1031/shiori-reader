@@ -73,6 +73,7 @@ final class BlockBox extends ValueModel {
     this.borderColor,
     this.backgroundColor,
     this.dashed = false,
+    this.centered = false,
   }) {
     if ([
           widthFraction,
@@ -101,6 +102,9 @@ final class BlockBox extends ValueModel {
   final double padding, borderWidth;
   final int? borderColor, backgroundColor;
   final bool dashed;
+
+  /// Both horizontal CSS margins are auto; independent of text alignment.
+  final bool centered;
   Map<String, Object?> toJson() => {
     'group': group,
     'width': width,
@@ -112,6 +116,7 @@ final class BlockBox extends ValueModel {
     'borderColor': borderColor,
     'backgroundColor': backgroundColor,
     'dashed': dashed,
+    'centered': centered,
   };
   factory BlockBox.fromJson(Map<String, dynamic> j) => BlockBox(
     group: j['group'] as int,
@@ -124,6 +129,7 @@ final class BlockBox extends ValueModel {
     borderColor: j['borderColor'] as int?,
     backgroundColor: j['backgroundColor'] as int?,
     dashed: j['dashed'] as bool,
+    centered: j['centered'] as bool? ?? false,
   );
   @override
   List<Object?> get values => [
@@ -137,5 +143,6 @@ final class BlockBox extends ValueModel {
     borderColor,
     backgroundColor,
     dashed,
+    centered,
   ];
 }

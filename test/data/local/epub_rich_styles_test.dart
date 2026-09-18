@@ -52,6 +52,74 @@ void main() {
     expect(box.backgroundColor, 0xfffefafb);
     expect(ChapterContent.fromJson(chapter.toJson()), chapter);
   });
+  test('contents container keeps auto centering independently of its text', () {
+    const body =
+        '<div class="box" style="margin:0 auto"><div>'
+        '<p>CONTENTS</p><p><a href="#start">序章</a></p>'
+        '</div></div><p id="start">正文</p>';
+    const css =
+        '.box {width:19em;max-width:100%;margin:auto}'
+        '.box p {text-align:center}';
+    final content = parse(body, css);
+    final chapter = content.chapters.first;
+    final box = chapter.blocks.first.box!;
+    expect(box.centered, isTrue);
+    expect(box.width, 304);
+    expect(box.maxWidthFraction, 1);
+    expect(chapter.blocks[1].box, box);
+    expect(
+      (chapter.blocks.first as ParagraphBlock).alignment,
+      ParagraphAlignment.center,
+    );
+    expect(chapter.blocks.last.box, isNull);
+    expect(content.links.single.label, '序章');
+    expect(ChapterContent.fromJson(chapter.toJson()), chapter);
+    final left = parse(
+      body.replaceAll('margin:0 auto', 'margin:0'),
+      css,
+    ).chapters.first;
+    expect(left.blocks.first.box!.centered, isFalse);
+    expect(left.contentRevision, chapter.contentRevision);
+    expect(left, isNot(chapter));
+  });
+  for (final (style, centered) in [
+    ('margin:auto', true),
+    ('margin:1em auto', true),
+    ('margin:1em auto 2em', true),
+    ('margin:1em auto 2em auto', true),
+    ('margin-left:auto;margin-right:auto', true),
+    ('margin:auto;margin-left:0', false),
+    ('margin-left:0;margin:auto', true),
+    ('margin:auto!important;margin-right:0', true),
+    ('margin-right:0!important;margin:auto', false),
+    ('margin:auto;margin:invalid', true),
+    ('margin:auto;margin:0 0 0 0 0', true),
+    ('margin:auto;margin:initial', false),
+    ('margin-left:auto', false),
+    ('margin:0 auto 0 1em', false),
+    ('text-align:center', false),
+  ]) {
+    test('box centering follows margin cascade: $style', () {
+      final block = parse(
+        '<div style="width:200px;$style">Content</div>',
+        '',
+      ).chapters.first.blocks.single;
+      expect(block.box!.centered, centered);
+    });
+  }
+  test('stylesheet priority survives inline margin shorthand', () {
+    final block = parse(
+      '<div class="box" style="margin:0 auto">Content</div>',
+      '.box {width:200px;margin-left:0!important}',
+    ).chapters.first.blocks.single;
+    expect(block.box!.centered, isFalse);
+  });
+  test('old box JSON defaults to left alignment', () {
+    final box = BlockBox(group: 0, width: 304);
+    final old = box.toJson()..remove('centered');
+    expect(BlockBox.fromJson(old), box);
+    expect(BlockBox.fromJson(old).centered, isFalse);
+  });
   test(
     'CSS cascade, normal reset, px sizes and invalid values remain bounded',
     () {

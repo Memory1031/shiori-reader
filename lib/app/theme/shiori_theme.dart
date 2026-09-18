@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../domain/models/app_settings.dart';
 
@@ -118,6 +119,14 @@ ThemeData shioriTheme(
   Brightness brightness, {
   AppAccent accent = AppAccent.teal,
 }) {
+  // Windows' implicit CJK fallback can render small Chinese labels unevenly.
+  // Prefer the installed UI face; other platforms keep their native defaults.
+  final fontFamily = defaultTargetPlatform == TargetPlatform.windows
+      ? 'Microsoft YaHei UI'
+      : null;
+  final fontFamilyFallback = defaultTargetPlatform == TargetPlatform.windows
+      ? const ['Microsoft YaHei']
+      : null;
   final p =
       (brightness == Brightness.light
               ? ShioriPalette.light
@@ -148,6 +157,8 @@ ThemeData shioriTheme(
     FontWeight weight = FontWeight.w400,
     Color? color,
   }) => TextStyle(
+    fontFamily: fontFamily,
+    fontFamilyFallback: fontFamilyFallback,
     fontSize: size,
     fontWeight: weight,
     height: 1.5,
@@ -156,6 +167,8 @@ ThemeData shioriTheme(
   );
   return ThemeData(
     useMaterial3: true,
+    fontFamily: fontFamily,
+    fontFamilyFallback: fontFamilyFallback,
     brightness: brightness,
     colorScheme: scheme,
     scaffoldBackgroundColor: p.paper,

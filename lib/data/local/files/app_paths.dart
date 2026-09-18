@@ -25,6 +25,7 @@ class AppPaths {
   Directory get localImportStaging =>
       Directory(p.join(users.path, 'import-staging'));
   Directory get disposable => Directory(p.join(root.path, 'disposable'));
+  Directory get webView => Directory(p.join(disposable.path, 'webview'));
   Directory get staging => Directory(p.join(disposable.path, 'staging'));
   Directory get images => Directory(p.join(disposable.path, 'images'));
   Directory get chapters => Directory(p.join(disposable.path, 'chapters'));

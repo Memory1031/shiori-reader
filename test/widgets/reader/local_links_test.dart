@@ -30,8 +30,9 @@ void main() {
         final targetHref = route == 'auxiliary'
             ? 'notes.xhtml'
             : 'text/a.xhtml';
+        // Keep the target beyond the first spread even on a wide desktop.
         final body =
-            '<p>PARAGRAPH_START ${'正文😀跨页内容。' * 180}<a id="b5" href="#note">MARKER5</a>${'后文。' * 50}</p>';
+            '<p>PARAGRAPH_START ${'正文😀跨页内容。' * 480}<a id="b5" href="#note">MARKER5</a>${'后文。' * 50}</p>';
         files[targetPath] = utf8.encode(
           '<html><body>$body<p id="note"><a href="#b5">BACK</a></p></body></html>',
         );
@@ -56,6 +57,11 @@ void main() {
             ),
           ),
         );
+        final settings = FixtureSettingsStore();
+        await settings.save(
+          ReaderSettings(controlsHintSeen: true),
+          cancellation: CancellationSource().token,
+        );
         await tester.pumpWidget(
           ShioriApp(
             locale: const Locale('en'),
@@ -65,7 +71,7 @@ void main() {
                 repository: repo,
                 initialBlockKey: source.blocks.last.blockKey,
                 startAtBeginning: true,
-                settings: FixtureSettingsStore(),
+                settings: settings,
               ),
             ),
           ),

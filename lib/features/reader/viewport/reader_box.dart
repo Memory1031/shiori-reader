@@ -68,7 +68,7 @@ class ReaderBoxFrame extends StatelessWidget {
       background: background,
     );
     return Align(
-      alignment: Alignment.topLeft,
+      alignment: b.centered ? Alignment.topCenter : Alignment.topLeft,
       child: SizedBox(
         width: width,
         child: CustomPaint(

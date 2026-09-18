@@ -8,6 +8,7 @@
 | Android | JDK 17、AGP 8.11.1、Gradle 8.14、Kotlin 2.2.20 |
 | Android SDK | compile / target 36、min 24、NDK 28.2.13676358 |
 | iOS | macOS / Xcode，deployment target 15.0 |
+| Windows | Visual Studio C++ 桌面构建工具、Windows SDK、PATH 中可用的 NuGet CLI；特殊 EPUB HTML 页使用 WebView2 Runtime |
 
 不通过 `flutter upgrade` 或删除 lockfile 修复环境。FVM 可让本仓库使用独立 Flutter；Android SDK 的 NDK 可并存。机器路径只放忽略的本地配置，不提交到应用配置。
 

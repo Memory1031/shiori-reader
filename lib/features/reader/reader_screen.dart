@@ -128,6 +128,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
   final _paperTurn = ValueNotifier<(double, int)>((0, 1));
   bool _settingsReady = false;
   bool _hintVisible = false;
+  String? _failedPresentation;
+  bool get _usesPresentation =>
+      widget.session?.pagePresentation != null &&
+      widget.session?.pagePresentation != _failedPresentation;
   @override
   void initState() {
     super.initState();
@@ -312,11 +316,33 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
     widget.onPageAppearance?.call(Theme.of(context).scaffoldBackgroundColor);
     final pageInsets = MediaQuery.paddingOf(context);
+    final theme = Theme.of(context);
+    final bodyTypography = theme.platform == TargetPlatform.windows
+        ? theme.textTheme.bodyLarge
+        : null;
     final style = TextStyle(
+      fontFamily: bodyTypography?.fontFamily,
+      fontFamilyFallback: bodyTypography?.fontFamilyFallback,
       fontSize: _settings.fontSize,
       height: _settings.lineHeight,
-      color: Theme.of(context).colorScheme.onSurface,
+      color: theme.colorScheme.onSurface,
     );
+    final margin = readerHorizontalMargin(
+      _settings,
+      MediaQuery.textScalerOf(context),
+      Directionality.of(context),
+    );
+    final prose = widget.content.blocks.whereType<ParagraphBlock>().any(
+      (block) =>
+          block.box == null &&
+          block.alignment == ParagraphAlignment.start &&
+          block.text.replaceAll('\uFFFC', '').trim().isNotEmpty,
+    );
+    bool spreadFor(BoxConstraints bounds) =>
+        !_usesPresentation &&
+        prose &&
+        bounds.maxWidth - pageInsets.horizontal - 2 * margin >=
+            2 * readerMinColumnWidth + readerColumnGap;
     return LayoutBuilder(
       builder: (context, pageBounds) => Stack(
         fit: StackFit.expand,
@@ -326,14 +352,14 @@ class _ReaderContentViewState extends State<ReaderContentView>
               bindings: {
                 const SingleActivator(LogicalKeyboardKey.f2): _toggle,
                 const SingleActivator(LogicalKeyboardKey.arrowRight): () {
-                  if (widget.session?.pagePresentation != null) {
+                  if (_usesPresentation) {
                     widget.onNextChapter?.call();
                   } else {
                     _paged.next();
                   }
                 },
                 const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
-                  if (widget.session?.pagePresentation != null) {
+                  if (_usesPresentation) {
                     widget.onPreviousChapter?.call();
                   } else {
                     _paged.previous();
@@ -349,23 +375,14 @@ class _ReaderContentViewState extends State<ReaderContentView>
                       // Stable gutters keep showing/hiding controls from repaginating content.
                       Positioned.fill(
                         child: Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            readerHorizontalMargin(
-                              _settings,
-                              MediaQuery.textScalerOf(context),
-                              Directionality.of(context),
-                            ),
-                            56,
-                            readerHorizontalMargin(
-                              _settings,
-                              MediaQuery.textScalerOf(context),
-                              Directionality.of(context),
-                            ),
-                            64,
-                          ),
+                          padding: EdgeInsets.fromLTRB(margin, 56, margin, 64),
                           child: Align(
                             child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 680),
+                              constraints: BoxConstraints(
+                                maxWidth: spreadFor(pageBounds)
+                                    ? 2 * readerMaxPageWidth + readerColumnGap
+                                    : readerMaxPageWidth,
+                              ),
                               child: LayoutBuilder(
                                 builder: (context, bounds) {
                                   final maxHeight = bounds.maxHeight;
@@ -373,7 +390,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                     ImageBlock block,
                                   ) => readerImageExtent(
                                     block,
-                                    width: bounds.maxWidth,
+                                    width: bounds.maxWidth.clamp(
+                                      0,
+                                      readerMaxPageWidth,
+                                    ),
                                     maxHeight: maxHeight,
                                     scaler: MediaQuery.textScalerOf(context),
                                     direction: Directionality.of(context),
@@ -412,10 +432,17 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
                                   final presentation =
                                       widget.session?.pagePresentation;
-                                  if (presentation != null) {
+                                  if (_usesPresentation) {
                                     return EpubLayoutPage(
-                                      html: presentation,
-                                      onFailed: widget.onLoadFailure,
+                                      html: presentation!,
+                                      onFailed: () {
+                                        if (mounted) {
+                                          setState(
+                                            () => _failedPresentation =
+                                                presentation,
+                                          );
+                                        }
+                                      },
                                       onCenterTap: _toggle,
                                       onPrevious: widget.onPreviousChapter,
                                       onNext: () {
@@ -456,6 +483,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                     );
                                   }
                                   return PagedReaderViewport(
+                                    columns: spreadFor(pageBounds) ? 2 : 1,
                                     images: widget.images,
                                     content: widget.content,
                                     pageSize: pageBounds.biggest,

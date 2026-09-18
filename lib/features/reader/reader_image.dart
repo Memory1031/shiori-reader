@@ -73,6 +73,7 @@ class ReaderImage extends StatelessWidget {
               child: SourceImage(
                 media: block.media,
                 repository: repository,
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                 semanticLabel: block.alt,
                 onIntrinsicSize: (size) {
                   if (block.width == size.width &&

@@ -22,7 +22,7 @@
 
 ## 平台接收
 
-Android 与 iOS 通过各自系统入口接收文件；DesktopImportSource 使用 Dart 与 file_selector 接收桌面选择。各适配器均先保存 durable inbox 副本，再提供待确认回执；平台差异体现在入口、授权模型和目录位置。
+Android 与 iOS 通过各自系统入口接收文件；DesktopImportSource 使用 Dart 与 file_selector 接收桌面选择，Windows 还支持将一个或多个 TXT / EPUB 文件拖入应用窗口。拖放与文件选择共用待确认批次，已有批次未处理完时不接收新批次。各适配器均先保存 durable inbox 副本，再提供待确认回执；平台差异体现在入口、授权模型和目录位置。
 
 ### 公共收件箱协议
 
@@ -116,6 +116,7 @@ WHATWG 编码映射与许可保留在工程，生成工具位于 `tool/encoding/
 对实际应用了浮动、定位、变换或竖排等样式、且文本不超过 2000 字符的短页，提供受限静态 HTML 展示，适配扉页与标题设计。普通长正文仍走原生分页，不承诺完整 CSS / 固定版式支持。
 
 - 仅允许安全元素和样式，移除脚本、表单与 iframe，关闭 JavaScript，使用严格 CSP，禁止外部请求。
+- Android / iOS / Windows / macOS 共用 `flutter_inappwebview` 呈现封装；初始化、页面加载失败或超时后切回该章的原生语义正文。Windows 在首次使用时检查 WebView2 Runtime，浏览器数据写入环境隔离的应用可写目录。
 - 本地图片、字体内嵌；字体单项上限 8MiB、单文档生成 HTML 上限 16MiB。
 - 旧格式可从原件校验后派生与已发布正文 revision 一致的特殊页；不会替换语义正文。重解析后呈现与 manifest 一起发布并校验；派生缓存有界。
 - 通过 `LocalPagePresentationRepository` 提供可选呈现，与 `LocalNavigationRepository` 的目录能力分开；标准阅读进度继续使用本地章节身份。

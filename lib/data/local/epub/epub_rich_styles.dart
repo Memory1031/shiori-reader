@@ -168,5 +168,6 @@ BlockBox? epubBlockBox(
     borderColor: borderColor,
     backgroundColor: background,
     dashed: (css['border-style'] ?? border).contains('dashed'),
+    centered: css['margin-left'] == 'auto' && css['margin-right'] == 'auto',
   );
 }

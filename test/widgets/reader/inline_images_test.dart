@@ -18,6 +18,113 @@ class _NonlinearScaler extends TextScaler {
 }
 
 void main() {
+  for (final scale in [1.0, 1.5]) {
+    for (final text in ['\uFFFC', List.filled(8, '\uFFFC').join(' ')]) {
+      testWidgets(
+        'image-only lines reserve their full paragraph height ($scale, ${text.length})',
+        (tester) async {
+          final block = ParagraphBlock(
+            text: text,
+            alignment: ParagraphAlignment.center,
+            inlineStyles: [
+              InlineTextStyle(
+                start: 0,
+                length: text.length,
+                fontScale: 1.1,
+                bold: true,
+              ),
+            ],
+            inlineImages: [
+              for (var i = 0; i < text.length; i++)
+                if (text[i] == '\uFFFC')
+                  InlineImage(
+                    offset: i,
+                    media: fixtureMediaRef(0),
+                    widthEm: 5,
+                    heightEm: .8313,
+                  ),
+            ],
+          );
+          const style = TextStyle(fontSize: 20, height: 1.6);
+          final scaler = TextScaler.linear(scale);
+          final content = ChapterContent(
+            key: fixtureChapterKey(FixtureScenario.shortChapter),
+            title: 'Images',
+            blocks: [block],
+          );
+          final layout = PageLayout(
+            index: ChunkIndex(content),
+            width: 300,
+            height: 100,
+            style: style,
+            scaler: scaler,
+            direction: TextDirection.ltr,
+            paragraphSpacing: 16,
+          );
+          var cursor = const PageCursor(0, 0);
+          final seen = StringBuffer();
+          while (true) {
+            final page = layout.forward(cursor);
+            if (page == null) break;
+            for (final fragment in page.fragments) {
+              seen.write(fragment.text);
+              await tester.pumpWidget(
+                MaterialApp(
+                  home: Center(
+                    child: SizedBox(
+                      width: 300,
+                      child: ReaderLinkedText(
+                        text: fragment.text!,
+                        prefix: '',
+                        blockOffset: fragment.start,
+                        inlineImages: block.inlineImages,
+                        inlineStyles: block.inlineStyles,
+                        links: const [],
+                        style: style,
+                        align: TextAlign.center,
+                        scaler: scaler,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+              final paragraph = tester.renderObject<RenderParagraph>(
+                find.descendant(
+                  of: find.byType(ReaderLinkedText),
+                  matching: find.byType(RichText),
+                ),
+              );
+              expect(
+                paragraph.size.height,
+                lessThanOrEqualTo(fragment.height - 16 + .01),
+              );
+              for (final rect in paragraph.getBoxesForSelection(
+                TextSelection(
+                  baseOffset: 0,
+                  extentOffset: fragment.text!.length,
+                ),
+              )) {
+                expect(
+                  rect.bottom,
+                  lessThanOrEqualTo(fragment.height - 16 + .01),
+                );
+              }
+            }
+            cursor = page.end;
+          }
+          expect(seen.toString(), text);
+          final reverse = <String>[];
+          while (true) {
+            final page = layout.backward(cursor);
+            if (page == null) break;
+            reverse.add(page.fragments.map((f) => f.text ?? '').join());
+            cursor = page.start;
+          }
+          expect(reverse.reversed.join(), text);
+        },
+      );
+    }
+  }
   test(
     'unspecified inline weight inherits reader style; explicit reset wins',
     () {
