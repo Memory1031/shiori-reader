@@ -21,7 +21,7 @@ Windows v1 目标：
 - Windows 与未来 macOS 共用 `DesktopImportSource`
 - 宽屏布局、键盘翻页、Esc、鼠标 / 滚轮等按 desktop capability 设计，不散落 `Platform.isWindows` 分支
 - Parser、Reader、Repository、SQLite、缓存与在线书源继续保持平台无关
-- WebView 保留平台差异：macOS 可继续使用官方 `webview_flutter`，Windows v1 使用 fallback，不让少量特殊 HTML 页面阻塞桌面支持
+- 特殊 EPUB HTML 页统一使用 `flutter_inappwebview`，覆盖 Android / iOS / macOS / Windows；共用页面封装，平台差异集中在初始化和能力配置，初始化失败时保留 fallback
 
 首版不纳入：
 
@@ -31,7 +31,7 @@ Windows v1 目标：
 - macOS runner、签名、公证与正式发布
 - 多窗口
 - 完整桌面三栏 UI
-- 为少量特殊 EPUB HTML 页面单独升级 Flutter 或引入复杂 WebView2 方案
+- 为 WebView 单独升级 Flutter，或自行维护原生 WebView2 bridge
 
 ## 计划表
 
@@ -42,7 +42,7 @@ Windows v1 目标：
 | 2. 依赖兼容审计 | 检查 direct dependencies 和平台调用 | 区分 shared / desktop / Windows-only 边界；重点检查 `webview_flutter`、MethodChannel、文件系统、SQLite、`path_provider` | 除已知平台边界外无 Windows compile blocker | P0 |
 | 3. Desktop 文件导入 | Windows 支持选择 TXT / EPUB，同时为 macOS 留复用路径 | 保留 `ImportSource` contract；新增 `DesktopImportSource`，优先使用 Dart + `file_selector`；Android / iOS 继续原生桥接 | Windows 可选择 TXT / EPUB 并进入现有 import → managed copy → parse 流程；实现不依赖 Windows 专属 API | P0 |
 | 4. App 组装 | 根据平台选择 ImportSource | Android / iOS 使用 `PlatformImportSource`；Windows / macOS 使用 `DesktopImportSource` | 平台组装边界清晰，共享层不引用不存在的平台实现 | P0 |
-| 5. WebView 隔离 | 隔离 desktop 平台差异 | `EpubLayoutPage` 做平台实现分离；macOS 保留官方 WebView 路径，Windows v1 对特殊 authored HTML page 提供明确 fallback | Windows 不因 WebView 初始化崩溃；普通 EPUB / TXT 阅读可用；不破坏 Android / iOS / macOS 可用实现 | P0 |
+| 5. WebView 统一迁移 | 特殊 EPUB HTML 页统一迁移至 `flutter_inappwebview` | 保持固定 Flutter 工具链，移除现有 `webview_flutter` 依赖；共用 `EpubLayoutPage` 封装，保留禁用脚本、导航限制、主题及翻页行为；Windows 检测 WebView2 Runtime，并使用应用可写的数据目录 | Android / Windows 完成构建与页面运行验证；iOS / macOS 单独记录可用环境下的验收；Runtime 缺失或初始化失败可降级，不阻塞普通 EPUB / TXT / 在线阅读 | P0 |
 | 6. 核心阅读验证 | 验证现有 Reader 在桌面 viewport 下行为 | 复用 rich reflow、inline image、fixed-image、links、pagination、restore | TXT、EPUB、在线章节均可正常翻页和恢复位置 | P0 |
 | 7. Desktop 阅读体验 | 做可复用于 Windows / macOS 的最低限度桌面适配 | 正文限制最大宽度；方向键 / PageUp / PageDown 翻页；Esc 关闭弹层；鼠标滚轮；窗口 resize 后重新分页 | 1080p / 1440p 窗口布局自然，键盘与鼠标可完成主要阅读操作 | P1 |
 | 8. Desktop 书库 UI | 检查宽屏布局 | 基于 viewport / breakpoint 限制内容宽度，必要时自适应双列；避免 Windows 专属布局条件 | 1280px+ 窗口无超宽卡片或明显移动端拉伸感 | P1 |
@@ -62,7 +62,7 @@ Windows runner
     ↓
 DesktopImportSource
     ↓
-WebView 平台隔离
+WebView 统一迁移
     ↓
 启动 + 导入一本 EPUB / TXT
     ↓
@@ -86,5 +86,5 @@ ZIP Release
 - 桌面文件导入统一实现为 `DesktopImportSource`，放在 data/platform 边界，不改变 `ImportSource` 的领域语义。
 - Android / iOS 的现有 MethodChannel / EventChannel 导入桥保持不变；桌面端不为文件选择另写 Windows C++ 或 macOS Swift bridge，优先使用 Flutter/Dart 桌面插件与 `dart:io`。
 - UI 以 mobile / desktop capability 或 viewport breakpoint 分层，避免在共享 Widget 中散落大量 `Platform.isWindows` / `Platform.isMacOS` 条件。
-- WebView 是允许保留平台差异的边界：支持的平台继续使用官方实现，Windows v1 可以降级特殊 authored HTML page，但不得阻塞普通 EPUB / TXT / 在线阅读。
+- WebView 共用 `flutter_inappwebview` 页面封装，允许在该边界集中处理各平台初始化、能力和生命周期差异；保留初始化失败时的降级，不改变普通 EPUB / TXT / 在线阅读的原生渲染路径。
 - Windows 相关共享改动必须继续检查 Android / iOS 兼容性；Desktop 层设计同时考虑未来 macOS 复用。

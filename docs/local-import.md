@@ -22,7 +22,7 @@
 
 ## 平台接收
 
-Android 与 iOS 通过各自系统入口接收文件，落到同一套 durable inbox 协议；平台差异只体现在入口、授权模型和目录位置。
+Android 与 iOS 通过各自系统入口接收文件；DesktopImportSource 使用 Dart 与 file_selector 接收桌面选择。各适配器均先保存 durable inbox 副本，再提供待确认回执；平台差异体现在入口、授权模型和目录位置。
 
 ### 公共收件箱协议
 
@@ -82,6 +82,14 @@ Runner 与 ShareExtension 必须使用同一 App Group 配置（`SHIORI_IMPORT_G
 - 取消等待当前回调、复制清理及锁释放后自动关闭扩展，无需再次点击完成；清理失败则保留错误提示。
 - 扩展只复制文件，不解析整本、不写 SQLite，跨进程锁协调；用户回到主应用确认入库。
 - 临时权限和共享容器能力需要真实平台配置，见[开发说明](development.md)。
+
+### DesktopImportSource
+
+桌面适配器共用于 Windows / macOS，由调用方注入环境隔离的 `AppPaths.importInbox`（`users/import-inbox/`）并负责关闭。选择器支持 TXT / EPUB 多选；原始路径仅用于接收时读取，不进入领域模型或持久回执。macOS sandbox 需要 `com.apple.security.files.user-selected.read-only` entitlement。
+
+接收沿用公共协议的批量与大小上限、按 order 恢复、整批暂存后原子发布及按 ID ack；文件内容和回执在发布前 flush。每个进程对同一 inbox 只持有一个适配器，实例内请求串行执行，文件锁用于进程间协调；关闭只取消未发布的接收，保留待确认批次。恢复只回收 working、ack 墓碑和空 pending，损坏的已发布批次报告 storage 并保留文件。此实现不承诺目录 fsync 或物理断电恢复，也不读取移动端 legacy 单文件 inbox。
+
+取消等待输入流关闭及暂存清理完成；file_selector 无主动关闭系统对话框的 API，取消或关闭适配器后忽略该对话框的晚到选择，不再复制文件。选择器自身取消保持静默。
 
 ## TXT
 

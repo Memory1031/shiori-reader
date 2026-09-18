@@ -47,7 +47,7 @@ final class ImportSourceEvent {
   final int? copiedBytes;
 }
 
-/// Native copies are durable before pending() exposes them. pending returns
+/// Staged copies are durable before pending() exposes them. pending returns
 /// the ordered receipts still awaiting confirmation; a single staged file is a
 /// batch of one. acknowledge is idempotent and must only remove the named
 /// receipt, never a newer arrival or another pending receipt.

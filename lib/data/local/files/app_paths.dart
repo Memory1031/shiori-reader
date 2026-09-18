@@ -21,6 +21,7 @@ class AppPaths {
   final Directory temporary;
   Directory get users => Directory(p.join(root.path, 'users'));
   Directory get localBooks => Directory(p.join(users.path, 'books'));
+  Directory get importInbox => Directory(p.join(users.path, 'import-inbox'));
   Directory get localImportStaging =>
       Directory(p.join(users.path, 'import-staging'));
   Directory get disposable => Directory(p.join(root.path, 'disposable'));

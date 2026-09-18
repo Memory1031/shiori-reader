@@ -1,8 +1,8 @@
 # 锁定依赖许可清单
 
-更新：2026-09-09，1.1.0 准备。按当前 pubspec.lock 和本机 package_config 对应包的 LICENSE / NOTICE 文本核对；含开发及传递依赖，不表示全部进入产物。类别为文本识别，不替代原始完整声明。未新增或升级依赖。
+按当前 pubspec.lock 对应包的 LICENSE / NOTICE 文本列出；含开发及传递依赖，不表示全部进入产物。类别为文本识别，不替代原始完整声明。
 
-锁文件 SHA-256：`fdb7d192375bcc5a952bb602327ed67ab9c0f647e6bd1fec0c80433de67e5329`。
+锁文件 SHA-256：`8b59f351287f7f6cfecc5ffcb3a7ab8633fd8affc73ff86a065fd51e521e729b`。
 
 | 包 | 锁定版本 | 依赖关系 | 许可文本类别 | 文件 |
 | --- | --- | --- | --- | --- |
@@ -19,6 +19,7 @@
 | collection | 1.19.1 | transitive | BSD 类 | LICENSE |
 | convert | 3.1.2 | transitive | BSD 类 | LICENSE |
 | coverage | 1.15.1 | transitive | BSD 类 | LICENSE |
+| cross_file | 0.3.5+5 | transitive | BSD 类 | LICENSE |
 | crypto | 3.0.7 | direct main | BSD 类 | LICENSE |
 | csslib | 1.0.2 | transitive | BSD 类 | LICENSE |
 | dio | 5.11.1 | direct main | MIT 类 | LICENSE |
@@ -27,6 +28,14 @@
 | fake_async | 1.3.3 | direct dev | Apache 类 | LICENSE |
 | ffi | 2.2.0 | transitive | BSD 类 | LICENSE |
 | file | 7.0.1 | transitive | BSD 类 | LICENSE |
+| file_selector | 1.1.0 | direct main | BSD 类 | LICENSE |
+| file_selector_android | 0.5.2+6 | transitive | BSD 类 | LICENSE |
+| file_selector_ios | 0.5.3+6 | transitive | BSD 类 | LICENSE |
+| file_selector_linux | 0.9.4+1 | transitive | BSD 类 | LICENSE |
+| file_selector_macos | 0.9.5+1 | transitive | BSD 类 | LICENSE |
+| file_selector_platform_interface | 2.7.0 | transitive | BSD 类 | LICENSE |
+| file_selector_web | 0.9.5 | transitive | BSD 类 | LICENSE |
+| file_selector_windows | 0.9.3+6 | transitive | BSD 类 | LICENSE |
 | flutter | 0.0.0 | direct main | BSD 类 | LICENSE |
 | flutter_lints | 6.0.0 | direct dev | BSD 类 | LICENSE |
 | flutter_localizations | 0.0.0 | direct main | BSD 类 | LICENSE |
@@ -37,6 +46,7 @@
 | glob | 2.2.0 | transitive | BSD 类 | LICENSE |
 | hooks | 2.0.2 | transitive | BSD 类 | LICENSE |
 | html | 0.15.7 | direct main | MIT 类 | LICENSE |
+| http | 1.6.0 | transitive | BSD 类 | LICENSE |
 | http_multi_server | 3.2.2 | transitive | BSD 类 | LICENSE |
 | http_parser | 4.1.2 | transitive | BSD 类 | LICENSE |
 | intl | 0.20.2 | direct main | BSD 类 | LICENSE |
