@@ -48,7 +48,7 @@ Windows v1 目标：
 | 4. App 组装 | 根据平台选择 ImportSource | Android / iOS 使用 `PlatformImportSource`；Windows / macOS 使用 `DesktopImportSource` | 平台组装边界清晰，共享层不引用不存在的平台实现 | P0 | ✅ 已完成平台分流 |
 | 5. WebView 统一迁移 | 特殊 EPUB HTML 页统一迁移至 `flutter_inappwebview` | 保持固定 Flutter 工具链，移除现有 `webview_flutter` 依赖；共用 `EpubLayoutPage` 封装，保留禁用脚本、导航限制、主题及翻页行为；Windows 检测 WebView2 Runtime，并使用应用可写的数据目录 | Android / Windows 完成构建与页面运行验证；iOS / macOS 单独记录可用环境下的验收；Runtime 缺失或初始化失败可降级，不阻塞普通 EPUB / TXT / 在线阅读 | P0 | ✅ 迁移及 Windows / Android 基础运行验收完成；iOS / macOS 待独立验收 |
 | 6. 核心阅读验证 | 验证现有 Reader 在桌面 viewport 下行为 | 复用 rich reflow、inline image、fixed-image、links、pagination、restore | TXT、EPUB、在线章节均可正常翻页和恢复位置 | P0 | ✅ Windows 原生 smoke 与阅读器回归通过；TXT、EPUB、在线章节离线样本的翻页和恢复已验收，真实联网流程见第 10 项 |
-| 7. Desktop 阅读体验 | 做可复用于 Windows / macOS 的最低限度桌面适配 | 正文限制最大宽度；方向键 / PageUp / PageDown 翻页；Esc 关闭弹层；鼠标滚轮；窗口 resize 后重新分页 | 1080p / 1440p 窗口布局自然，键盘与鼠标可完成主要阅读操作 | P1 | ◐ 实现完成，含限宽、自动双页、键鼠与 resize；桌面交互专项验收待完成 |
+| 7. Desktop 阅读体验 | 做可复用于 Windows / macOS 的最低限度桌面适配 | 正文限制最大宽度；方向键 / PageUp / PageDown 翻页；Esc 关闭弹层；鼠标滚轮；窗口 resize 后重新分页；双页为宽度驱动，大屏平板横屏同样启用，属预期而非桌面专属 | 1080p / 1440p 窗口布局自然，键盘与鼠标可完成主要阅读操作 | P1 | ◐ 限宽、自动双页、左右方向键与 resize 已完成；PageUp / PageDown、Esc 关闭弹层、鼠标滚轮未实现；桌面交互专项验收待完成 |
 | 8. Desktop 书库 UI | 检查宽屏布局 | 基于 viewport / breakpoint 限制内容宽度，必要时自适应双列；避免 Windows 专属布局条件 | 1280px+ 窗口无超宽卡片或明显移动端拉伸感 | P1 | ◐ 实现完成，含内容限宽、自适应网格及交互反馈；宽屏布局专项验收待完成 |
 | 9. 数据持久化 | Windows SQLite / AppSupport smoke | 复用现有 Drift `NativeDatabase`、Application Support 与缓存目录 | 重启后书架、进度、设置和缓存正常保留 | P0 | ☐ 共用实现已接入；Windows 重启专项验收待完成 |
 | 10. 在线书源 | Windows 网络能力 smoke | 复用现有 `NovelSource` / LightNovel.fun adapter | 搜索 → 详情 → 目录 → 阅读完整走通 | P0 | ☐ 共用 adapter 已接入；Windows 真实在线全流程待验收 |
@@ -57,6 +57,7 @@ Windows v1 目标：
 | 13. 发布前回归 | Windows 专项验收 | 覆盖启动、导入、重启、在线阅读、EPUB 阅读、resize、键盘 / 鼠标操作 | 无阻止 Windows beta 发布的问题 | P0 | ☐ 待前置项完成后统一验收 |
 | 后续专项：Desktop UI 重设计 | 核心能力稳定后，设计适合桌面的应用界面与阅读工作区 | 先确定交互原型，再实现桌面导航、书库、阅读器与设置面板；加入独立的正文字体选择与导入 | 鼠标、键盘和宽窗口下的主要流程自然；移动端体验保持独立适配；字体切换不丢失阅读位置 | P2 | ☐ 已列入计划，尚未开始；含字体自由选择 |
 | 14. macOS 跟进 | Windows 稳定后补齐第二个 Desktop target | 生成 macOS runner，复用 `DesktopImportSource` 与 Desktop UI；补 sandbox entitlement、签名 / notarization 与 macOS CI | 核心阅读逻辑不再做结构性重构即可支持 macOS | P2 | ☐ 未开始 |
+| 15. 合并收尾 | 合入 develop 前同步对外表述 | README 定位语句与安装表补 Windows；`pubspec.yaml` description 去除 "mobile" 限定；AGENTS.md 平台目标已更新为 Android / iOS / Windows | 合并后仓库对外描述与实际支持平台一致 | P0 | ◐ AGENTS.md 已改；README 与 pubspec 待合并前更新 |
 
 ## 推荐实现顺序
 

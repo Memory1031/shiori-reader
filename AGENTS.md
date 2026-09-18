@@ -57,7 +57,7 @@ If unsure whether a documentation change is necessary, do not make it.
 
 ## Platforms and dependencies
 
-- Android and iOS are the application targets; Windows is a development host. Preserve shared-code compatibility and respect platform conventions.
+- Android, iOS and Windows are the application targets. Preserve shared-code compatibility and respect platform conventions.
 - Follow the toolchain pins and [docs/development.md](docs/development.md). Add or upgrade dependencies only when needed for the task, checking SDK and target-platform compatibility.
 - Keep machine-specific paths, downloaded toolchains, credentials, and generated build artifacts out of tracked application configuration.
 
