@@ -1,3 +1,8 @@
+# Checkouts match generator output (gen-l10n, dart format, CI) byte-for-byte
+# instead of relying on per-machine core.autocrlf.
+*.dart text eol=lf
+*.arb text eol=lf
+
 # Fixtures are hashed byte-for-byte; keep identical text bytes on every OS.
 test/fixtures/lightnovel/**/*.json text eol=lf
 test/fixtures/lightnovel/**/*.html text eol=lf
