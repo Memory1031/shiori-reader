@@ -29,48 +29,62 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
   Offset? _down;
   Duration? _downTime;
 
-  // Inlined documents can reach ~10 MiB, so identity stays on the inputs and
-  // the string itself is rebuilt only when one of them changes.
-  ({int html, Color paper, Color foreground, TargetPlatform platform})? _inputs;
+  // Inlined documents can reach ~10 MiB. The source string is held by
+  // reference and compared with identical(), so no multi-MiB hashing or
+  // equality ever runs; the generation keys the webview owner instead of the
+  // document itself. identity hashes are avoided on purpose: they are not
+  // unique and can be reused after the old string is collected.
+  String? _sourceHtml;
+  Color? _paper;
+  Color? _foreground;
+  TargetPlatform? _platform;
+  int _generation = 0;
   String? _document;
 
-  ({int html, Color paper, Color foreground, TargetPlatform platform})
-  _inputsOf(BuildContext context) => (
-    html: identityHashCode(widget.html),
-    paper: Theme.of(context).scaffoldBackgroundColor,
-    foreground: Theme.of(context).colorScheme.onSurface,
-    platform: defaultTargetPlatform,
-  );
-
   String _documentOf(
-    ({int html, Color paper, Color foreground, TargetPlatform platform}) inputs,
+    String html,
+    Color paper,
+    Color foreground,
+    TargetPlatform platform,
   ) {
     final cached = _document;
-    if (cached != null && _inputs == inputs) return cached;
-    final background = inputs.paper.toARGB32().toRadixString(16).substring(2);
-    final foreground = inputs.foreground
-        .toARGB32()
-        .toRadixString(16)
-        .substring(2);
-    final interactionStyle = inputs.platform == TargetPlatform.windows
+    if (cached != null &&
+        identical(_sourceHtml, html) &&
+        _paper == paper &&
+        _foreground == foreground &&
+        _platform == platform) {
+      return cached;
+    }
+    final background = paper.toARGB32().toRadixString(16).substring(2);
+    final ink = foreground.toARGB32().toRadixString(16).substring(2);
+    final interactionStyle = platform == TargetPlatform.windows
         ? 'html,body,body *{-webkit-user-select:none!important;user-select:none!important;-webkit-user-drag:none!important;}'
         : '';
-    final document = widget.html.replaceFirst('</head>', '''<style>
-html,body{background:#$background!important;color:#$foreground;margin:0!important;}
+    final document = html.replaceFirst('</head>', '''<style>
+html,body{background:#$background!important;color:#$ink;margin:0!important;}
 html,body{scrollbar-width:none;}
 ::-webkit-scrollbar{display:none;}
 body{font-size:clamp(12px,5.7vw,20px);padding:8px!important;box-sizing:border-box;display:flow-root;overflow-wrap:break-word;}
 img{max-width:100%;height:auto;}
 $interactionStyle
 </style></head>''');
-    _inputs = inputs;
+    _sourceHtml = html;
+    _paper = paper;
+    _foreground = foreground;
+    _platform = platform;
+    _generation++;
     return _document = document;
   }
 
   @override
   Widget build(BuildContext context) {
-    final inputs = _inputsOf(context);
-    final document = _documentOf(inputs);
+    final theme = Theme.of(context);
+    final document = _documentOf(
+      widget.html,
+      theme.scaffoldBackgroundColor,
+      theme.colorScheme.onSurface,
+      defaultTargetPlatform,
+    );
     return LayoutBuilder(
       builder: (context, bounds) => Listener(
         behavior: HitTestBehavior.opaque,
@@ -100,7 +114,7 @@ $interactionStyle
           }
         },
         child: _StaticWebView(
-          key: ValueKey(inputs),
+          key: ValueKey(_generation),
           document: document,
           onReady: widget.onReady,
           onFailed: widget.onFailed,
