@@ -160,6 +160,7 @@ class DesktopImportSource implements ImportSource {
         throw const ImportSourceException(ImportProblem.batchLimit);
       }
       // Validate every input before opening any payload stream.
+      var declared = 0;
       for (final file in files) {
         checkCancelled();
         _validateName(file.name);
@@ -176,6 +177,11 @@ class DesktopImportSource implements ImportSource {
         if (size <= 0) {
           throw const ImportSourceException(ImportProblem.unreadable);
         }
+        declared += size;
+      }
+      // The copy still counts actual bytes: a file can grow after length().
+      if (declared > maxBatchBytes) {
+        throw const ImportSourceException(ImportProblem.batchLimit);
       }
       await _working.create();
       try {

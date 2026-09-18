@@ -193,6 +193,21 @@ void main() {
     expect(first.opens, 0);
   });
 
+  test('declared batch size is rejected before copying any payload', () async {
+    final adapter = source(maxFiles: 2, maxFileBytes: 4, maxBatchBytes: 6);
+    final first = input('one.txt', [1, 2, 3]);
+    final second = input('two.txt', [1, 2, 3, 4]);
+    selection = [first, second];
+    await expectLater(
+      adapter.pick(),
+      throwsA(problem(ImportProblem.batchLimit)),
+    );
+    expect(first.opens, 0);
+    expect(second.opens, 0);
+    expect(await adapter.pending(), isEmpty);
+    expect(await Directory(p.join(inbox.path, 'working')).exists(), isFalse);
+  });
+
   test(
     'actual streamed lengths enforce file and batch limits and roll back the whole batch',
     () async {
