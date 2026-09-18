@@ -153,7 +153,7 @@ class EpubParser {
   final presentations = <String, String>{};
   final byPath = <String, ChapterContent>{};
   final skippedEmptyPaths = <String>{};
-  final fragments = <String, Map<String, String>>{};
+  final fragments = <String, Map<String, (String, int)>>{};
   int mediaSize = 0, textSize = 0;
 
   String text(String path, {int limit = 4 * 1024 * 1024}) {
@@ -444,15 +444,17 @@ class EpubParser {
         if (raw.$1 >= source.blocks.length) continue;
         var unavailable = raw.$5;
         final destination = raw.$3 == path ? source : byPath[raw.$3];
-        String? block;
+        (String, int)? anchor;
         if (unavailable == null) {
           if (destination == null) {
             unavailable = manifestText.contains(raw.$3)
                 ? LocalLinkUnavailable.missingDocument
                 : LocalLinkUnavailable.unsupported;
           } else if (raw.$4?.isNotEmpty == true) {
-            block = fragments[raw.$3]?[raw.$4];
-            if (block == null) unavailable = LocalLinkUnavailable.missingAnchor;
+            anchor = fragments[raw.$3]?[raw.$4];
+            if (anchor == null) {
+              unavailable = LocalLinkUnavailable.missingAnchor;
+            }
           }
         }
         if (unavailable != null) {
@@ -466,7 +468,8 @@ class EpubParser {
             sourceOffset: raw.$6,
             sourceLength: raw.$7,
             target: unavailable == null ? destination?.key : null,
-            targetBlockKey: unavailable == null ? block : null,
+            targetBlockKey: unavailable == null ? anchor?.$1 : null,
+            targetOffset: unavailable == null ? anchor?.$2 : null,
             unavailable: unavailable,
           ),
         );
@@ -680,10 +683,10 @@ class EpubParser {
       byPath[path] = chapter;
       // Only the image and its containers are navigable anchors. Discarded
       // hotspot geometry must not create prose links or auxiliary chapters.
-      final anchors = <String, String>{};
+      final anchors = <String, (String, int)>{};
       for (dom.Element? e = node; e != null; e = e.parent) {
         if (e.id.isNotEmpty) {
-          anchors.putIfAbsent(e.id, () => chapter.blocks.single.blockKey);
+          anchors.putIfAbsent(e.id, () => (chapter.blocks.single.blockKey, 0));
         }
       }
       fragments[path] = anchors;
@@ -738,7 +741,8 @@ class EpubParser {
     }
 
     final blocks = <ContentBlock>[];
-    final anchors = <String, int>{};
+    final anchors = <String, (int, int)>{};
+    final pendingAnchors = <String>[];
     int? activeLink;
     final spans = <(int, int, int)>[];
     final inlineImages = <InlineImage>[];
@@ -775,6 +779,13 @@ class EpubParser {
       final rawText = buffer.rawText;
       final value = buffer.take();
       final trimStart = rawText.indexOf(value);
+      // Normalize against the emitted block, then convert UTF-16 to code points.
+      for (final id in pendingAnchors) {
+        final anchor = anchors[id]!;
+        final offset = (anchor.$2 - trimStart).clamp(0, value.length);
+        anchors[id] = (anchor.$1, value.substring(0, offset).runes.length);
+      }
+      pendingAnchors.clear();
       for (final span in spans) {
         final start = (span.$2 - trimStart).clamp(0, value.length);
         final end = (span.$3 - trimStart).clamp(0, value.length);
@@ -961,7 +972,10 @@ class EpubParser {
       }
       final id = node.id.isNotEmpty ? node.id : node.attributes['name'];
       if (id != null && id.isNotEmpty && visible) {
-        anchors.putIfAbsent(id, () => blocks.length);
+        if (!anchors.containsKey(id)) {
+          anchors[id] = (blocks.length, buffer.length);
+          pendingAnchors.add(id);
+        }
       }
       if (tag == 'a' && visible && node.attributes.containsKey('href')) {
         if (++linkCount > 10000) zipLimit();
@@ -1094,7 +1108,7 @@ class EpubParser {
           }
         }
         flush();
-        if (id != null && id.isNotEmpty) anchors[id] = blocks.length;
+        if (id != null && id.isNotEmpty) anchors[id] = (blocks.length, 0);
         if (img != null) {
           final size = imageSizes[img];
           blocks.add(
@@ -1251,8 +1265,8 @@ class EpubParser {
     byPath[path] = chapter;
     fragments[path] = {
       for (final e in anchors.entries)
-        if (e.value < chapter.blocks.length)
-          e.key: chapter.blocks[e.value].blockKey,
+        if (e.value.$1 < chapter.blocks.length)
+          e.key: (chapter.blocks[e.value.$1].blockKey, e.value.$2),
     };
   }
 
@@ -1284,7 +1298,7 @@ class EpubParser {
     return LocalNavigationEntry(
       title: title.trim().isEmpty ? chapter.title : title.trim(),
       chapterKey: chapter.key,
-      blockKey: fragments[ref.$1]?[ref.$2],
+      blockKey: fragments[ref.$1]?[ref.$2]?.$1,
       children: children,
     );
   }

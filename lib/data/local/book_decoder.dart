@@ -14,7 +14,7 @@ import 'txt/txt_parser.dart';
 class BookDecoder implements LocalBookDecoder {
   const BookDecoder({this.epubDiagnostics});
   final EpubDiagnosticSlot? epubDiagnostics;
-  static const parserVersion = 9;
+  static const parserVersion = 10;
   static const maxTxtBytes = 16 * 1024 * 1024;
   static const maxEpubBytes = 64 * 1024 * 1024;
   @override

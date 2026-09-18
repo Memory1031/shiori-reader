@@ -42,6 +42,61 @@ Map<String, List<int>> linkedEpub({bool repeated = false}) {
 
 void main() {
   test(
+    'fragment targets retain normalized code-point offsets and legacy JSON',
+    () {
+      final files = linkedEpub(repeated: true);
+      files['OPS/text/a.xhtml'] = utf8.encode('''<html><body>
+      <p>  😀前文<sup><a id="b5" href="../notes.xhtml#a5">5</a></sup>后文
+      <a href="#b5">same</a><span hidden id="hidden">hidden</span></p>
+      <p><a href="#hidden">unavailable</a></p>
+      <pre> 😀 <span id="pre">kept</span></pre>
+      <p><a href="#pre">pre</a><a href="#empty">empty</a></p>
+      <p>前😀<a id="empty"></a>后</p></body></html>''');
+      files['OPS/notes.xhtml'] = utf8.encode('''<html><body>
+      <p>注释<a id="a5" href="text/a.xhtml#b5">back</a></p>
+      </body></html>''');
+      final c = EpubParser(
+        zipFiles(files),
+        linkBookKey,
+        'book',
+      ).parse().content;
+      final same = c.links.where((l) => l.label == 'same').toList();
+      expect(same, hasLength(2));
+      for (final link in same) {
+        expect(link.target, link.source);
+        expect(link.targetOffset, 3); // 😀 is one code point, not two.
+      }
+      final back = c.links.firstWhere((l) => l.label == 'back');
+      expect(back.target, c.chapters.first.key);
+      expect(back.targetOffset, 3);
+      expect(c.links.firstWhere((l) => l.label == '5').targetOffset, 2);
+      expect(c.links.firstWhere((l) => l.label == 'pre').targetOffset, 3);
+      expect(c.links.firstWhere((l) => l.label == 'empty').targetOffset, 2);
+      expect(
+        c.links.firstWhere((l) => l.label == 'unavailable').targetOffset,
+        isNull,
+      );
+      final json =
+          jsonDecode(jsonEncode(back.toJson())) as Map<String, dynamic>;
+      expect(LocalContentLink.fromJson(json).targetOffset, 3);
+      json.remove('targetOffset');
+      expect(LocalContentLink.fromJson(json).targetOffset, isNull);
+      expect(
+        () => LocalContentLink.fromJson({...json, 'targetOffset': -1}),
+        throwsArgumentError,
+      );
+      expect(
+        () => LocalContentLink.fromJson({
+          ...json,
+          'targetBlock': null,
+          'targetOffset': 1,
+        }),
+        throwsArgumentError,
+      );
+    },
+  );
+
+  test(
     'authored links cover each paragraph and preserve inline Unicode ranges',
     () {
       final files = linkedEpub();

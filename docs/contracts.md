@@ -89,7 +89,7 @@ LocalBookReparse 接收书籍 Key、编码选择回调/可选 override 与 cance
 
 ## 书内链接与连续阅读合同
 
-LocalContentLink 是独立于 ContentBlock 的不可变侧表项：来源 ChapterKey/blockKey、标签、可选目标 ChapterKey/blockKey，以及封闭 unavailable 原因；没有原始 URL/路径，不改变正文摘要。LocalBookContent 可保存 auxiliaryChapters、links 和可空 readingOrder；旧 manifest 缺字段时 links/auxiliary 为空，readingOrder 默认为原目录顺序。
+LocalContentLink 是独立于 ContentBlock 的不可变侧表项：来源 ChapterKey/blockKey、标签、可选目标 ChapterKey/blockKey，以及封闭 unavailable 原因；没有原始 URL/路径，不改变正文摘要。目标可附非负 targetOffset，以目标块内 Unicode code points 计数，必须同时有目标块；旧记录缺省时定位块首。同章、跨章和辅助页导航均保留该偏移。LocalBookContent 可保存 auxiliaryChapters、links 和可空 readingOrder；旧 manifest 缺字段时 links/auxiliary 为空，readingOrder 默认为原目录顺序。
 
 
 可点击范围使用 sourceOffset / sourceLength，均按来源块内 Unicode code points 计数；跨块链接逐块保存范围，不改正文。sourceOffset 非空且 sourceLength 为空的项兼容旧脚注合同，label 对应数字上标，并有可空 footnoteText（纯文本）。可用脚注的 target 指向来源章，面板直接消费 footnoteText，不进行章节导航；不可用项保留入口位置及原因。旧侧表缺范围字段时仍可通过菜单访问普通链接。解析器替换脚注入口并移除注释正文会正常产生新的正文 revision；交互本身不修改内容身份。

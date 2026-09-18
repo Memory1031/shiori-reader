@@ -16,6 +16,7 @@ final class LocalContentLink {
     required this.label,
     this.target,
     this.targetBlockKey,
+    this.targetOffset,
     this.unavailable,
     this.sourceOffset,
     this.sourceLength,
@@ -25,6 +26,7 @@ final class LocalContentLink {
         label.trim().isEmpty ||
         (target == null) != (unavailable != null) ||
         target == null && targetBlockKey != null ||
+        targetOffset != null && (targetBlockKey == null || targetOffset! < 0) ||
         target != null && target!.novelKey != source.novelKey ||
         sourceOffset != null && sourceOffset! < 0 ||
         sourceLength != null && (sourceOffset == null || sourceLength! <= 0) ||
@@ -41,6 +43,9 @@ final class LocalContentLink {
   final String sourceBlockKey, label;
   final ChapterKey? target;
   final String? targetBlockKey;
+
+  /// Target-block Unicode code-point offset; absent in older manifests.
+  final int? targetOffset;
   final LocalLinkUnavailable? unavailable;
 
   /// Footnote marker start in source-block Unicode code points.
@@ -56,6 +61,7 @@ final class LocalContentLink {
     'label': label,
     'target': target?.toJson(),
     'targetBlock': targetBlockKey,
+    if (targetOffset != null) 'targetOffset': targetOffset,
     'unavailable': unavailable?.name,
     if (sourceOffset != null) 'sourceOffset': sourceOffset,
     if (sourceLength != null) 'sourceLength': sourceLength,
@@ -73,6 +79,7 @@ final class LocalContentLink {
             ? null
             : ChapterKey.fromJson(json['target'] as Map<String, dynamic>),
         targetBlockKey: json['targetBlock'] as String?,
+        targetOffset: json['targetOffset'] as int?,
         unavailable: json['unavailable'] == null
             ? null
             : LocalLinkUnavailable.values.byName(json['unavailable'] as String),

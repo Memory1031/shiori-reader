@@ -1,5 +1,15 @@
 import '../../../domain/models/models.dart';
 
+/// Convert a parsed fragment's code-point offset to the reader's position unit.
+double readerTargetFraction(ContentBlock block, int? offset) {
+  final text = switch (block) {
+    ParagraphBlock(:final text) || HeadingBlock(:final text) => text,
+    _ => '',
+  };
+  final length = text.runes.length;
+  return length == 0 ? 0 : (offset ?? 0).clamp(0, length) / length;
+}
+
 /// Undo only floating-point round-trip noise at an integer character boundary.
 /// Flooring e.g. 63000 / total * total must not drift to the preceding line on
 /// every reopen. Genuine fractional offsets still round down.

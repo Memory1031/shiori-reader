@@ -20,6 +20,7 @@ class ProseTextBuffer {
   ProseTextBuffer({this.onWrite});
   final void Function(int start, int end)? onWrite;
   String get rawText => _buffer.toString();
+  int get length => _buffer.length;
   final _buffer = StringBuffer();
   bool _preserved = false;
   bool _pendingSpace = false;

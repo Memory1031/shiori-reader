@@ -19,6 +19,86 @@ import '../../data/local/local_reading_test.dart' show ForbiddenOnline;
 import 'local_reading_test.dart' show MemoryBooks;
 
 void main() {
+  for (final route in ['same', 'main', 'auxiliary']) {
+    testWidgets(
+      'fragment backlink seeks the page containing an inline anchor: $route',
+      (tester) async {
+        final files = linkedEpub();
+        final targetPath = route == 'auxiliary'
+            ? 'OPS/notes.xhtml'
+            : 'OPS/text/a.xhtml';
+        final targetHref = route == 'auxiliary'
+            ? 'notes.xhtml'
+            : 'text/a.xhtml';
+        final body =
+            '<p>PARAGRAPH_START ${'正文😀跨页内容。' * 180}<a id="b5" href="#note">MARKER5</a>${'后文。' * 50}</p>';
+        files[targetPath] = utf8.encode(
+          '<html><body>$body<p id="note"><a href="#b5">BACK</a></p></body></html>',
+        );
+        if (route != 'same') {
+          files['OPS/last.xhtml'] = utf8.encode(
+            '<html><body><p><a href="$targetHref#b5">BACK</a></p></body></html>',
+          );
+        }
+        final c = EpubParser(
+          zipFiles(files),
+          linkBookKey,
+          'book',
+        ).parse().content;
+        final source = route == 'same' ? c.chapters.first : c.chapters.last;
+        final repo = LocalReadingRepository(
+          online: ForbiddenOnline(),
+          local: MemoryBooks(
+            LocalBookRecord(
+              content: c,
+              format: LocalBookFormat.epub,
+              importedAt: DateTime.utc(2025),
+            ),
+          ),
+        );
+        await tester.pumpWidget(
+          ShioriApp(
+            locale: const Locale('en'),
+            routes: AppRoutes(
+              home: (_) => BookReaderScreen(
+                chapter: source.key,
+                repository: repo,
+                initialBlockKey: source.blocks.last.blockKey,
+                startAtBeginning: true,
+                settings: FixtureSettingsStore(),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final back = find.byWidgetPredicate(
+          (w) => w is RichText && w.text.toPlainText() == 'BACK',
+        );
+        final render = tester.renderObject<RenderParagraph>(back);
+        final rect = render
+            .getBoxesForSelection(
+              const TextSelection(baseOffset: 0, extentOffset: 4),
+            )
+            .first
+            .toRect();
+        await tester.tapAt(render.localToGlobal(rect.center));
+        await tester.pumpAndSettle();
+        final displayed = tester
+            .widgetList<RichText>(find.byType(RichText))
+            .map((w) => w.text.toPlainText())
+            .join();
+        expect(displayed, contains('MARKER5'));
+        expect(displayed, isNot(contains('PARAGRAPH_START')));
+        final viewport = tester.widget<PagedReaderViewport>(
+          find.byType(PagedReaderViewport),
+        );
+        expect(viewport.controller.capture()!.blockFraction, greaterThan(0));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      },
+    );
+  }
   testWidgets(
     'authored TOC lines navigate directly and same-chapter links retain session',
     (tester) async {

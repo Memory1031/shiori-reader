@@ -21,6 +21,7 @@ class ReaderController extends ScopedController {
     this.readMode = ReadMode.cacheFirst,
     this.onPosition,
     this.initialBlockKey,
+    this.initialBlockOffset,
     this.startAtBeginning = false,
     this.startAtEnd = false,
     bool deferProgress = false,
@@ -38,6 +39,7 @@ class ReaderController extends ScopedController {
   final CacheManagement? cache;
   final ReadMode readMode;
   final String? initialBlockKey;
+  final int? initialBlockOffset;
   final bool startAtBeginning;
   final bool startAtEnd;
   final void Function(int)? onPosition;
@@ -282,12 +284,22 @@ class ReaderController extends ScopedController {
               );
               final index = found < 0 ? 0 : found;
               usedFallback = initialBlockKey != null && found < 0;
+              final fraction = found < 0
+                  ? 0.0
+                  : readerTargetFraction(
+                      content!.blocks[index],
+                      initialBlockOffset,
+                    );
               initialPosition = ReaderPosition(
                 contentRevision: content!.contentRevision,
                 blockKey: content!.blocks[index].blockKey,
                 blockIndex: index,
-                blockFraction: 0,
-                chapterFraction: index / content!.blocks.length,
+                blockFraction: fraction,
+                chapterFraction: ReaderPosition.fractionFor(
+                  blockIndex: index,
+                  blockFraction: fraction,
+                  blockCount: content!.blocks.length,
+                ),
               );
             }
             if (startAtEnd) {

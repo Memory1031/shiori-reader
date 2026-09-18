@@ -7,6 +7,7 @@ import '../../shared/widgets/state_views.dart';
 import '../novel_detail/catalog_controller.dart';
 import '../novel_detail/catalog_view.dart';
 import 'reader_controller.dart';
+import 'position/position_resolver.dart';
 import 'reader_screen.dart';
 import 'viewport/paper_turn.dart';
 import '../cache/prefetch_sheet.dart';
@@ -29,6 +30,7 @@ class BookReaderScreen extends StatefulWidget {
     this.cache,
     this.offline = false,
     this.initialBlockKey,
+    this.initialBlockOffset,
     this.startAtBeginning = false,
     this.linkDepth = 0,
   });
@@ -42,6 +44,7 @@ class BookReaderScreen extends StatefulWidget {
   final CacheManagement? cache;
   final bool offline;
   final String? initialBlockKey;
+  final int? initialBlockOffset;
   final bool startAtBeginning;
   final int linkDepth;
   @override
@@ -135,6 +138,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _reader = _create(
       widget.chapter,
       blockKey: widget.initialBlockKey,
+      blockOffset: widget.initialBlockOffset,
       fromStart: widget.startAtBeginning,
     );
     if (widget.repository case LocalBookInvalidation changes) {
@@ -162,6 +166,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   ReaderController _create(
     ChapterKey key, {
     String? blockKey,
+    int? blockOffset,
     bool fromStart = false,
     bool fromEnd = false,
     bool deferProgress = false,
@@ -170,6 +175,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           repository: widget.repository,
           chapter: key,
           initialBlockKey: blockKey,
+          initialBlockOffset: blockOffset,
           startAtBeginning: fromStart,
           startAtEnd: fromEnd,
           deferProgress: deferProgress,
@@ -249,6 +255,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   Future<void> _switch(
     ChapterKey chapter, {
     String? blockKey,
+    int? blockOffset,
     bool fromStart = false,
     bool fromEnd = false,
   }) async {
@@ -270,6 +277,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         chapter,
         deferProgress: true,
         blockKey: blockKey,
+        blockOffset: blockOffset,
         fromStart: fromStart,
         fromEnd: fromEnd,
       );
@@ -306,6 +314,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _committing = false;
     final target = reader.chapter;
     final blockKey = reader.initialBlockKey;
+    final blockOffset = reader.initialBlockOffset;
     final fromStart = reader.startAtBeginning, fromEnd = reader.startAtEnd;
     setState(() {
       _pending = null;
@@ -321,6 +330,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           onPressed: () => _switch(
             target,
             blockKey: blockKey,
+            blockOffset: blockOffset,
             fromStart: fromStart,
             fromEnd: fromEnd,
           ),
@@ -396,10 +406,18 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       );
       return;
     }
-    await _followContentTarget(link.target!, link.targetBlockKey);
+    await _followContentTarget(
+      link.target!,
+      link.targetBlockKey,
+      link.targetOffset,
+    );
   }
 
-  Future<void> _followContentTarget(ChapterKey target, String? blockKey) async {
+  Future<void> _followContentTarget(
+    ChapterKey target,
+    String? blockKey, [
+    int? blockOffset,
+  ]) async {
     if (_changing ||
         _invalidated ||
         target.novelKey != widget.chapter.novelKey) {
@@ -411,15 +429,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           ? 0
           : content.blocks.indexWhere((b) => b.blockKey == blockKey);
       if (index < 0) return;
+      final fraction = readerTargetFraction(content.blocks[index], blockOffset);
       _viewports[_reader]?.restore(
         ReaderPosition(
           contentRevision: content.contentRevision,
           blockKey: content.blocks[index].blockKey,
           blockIndex: index,
-          blockFraction: 0,
+          blockFraction: fraction,
           chapterFraction: ReaderPosition.fractionFor(
             blockIndex: index,
-            blockFraction: 0,
+            blockFraction: fraction,
             blockCount: content.blocks.length,
           ),
         ),
@@ -434,13 +453,22 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         : _catalog.loaded?.value.flatChapters.any((c) => c.key == target) ==
               true;
     if (main) {
-      await _switch(target, blockKey: blockKey, fromStart: true);
+      await _switch(
+        target,
+        blockKey: blockKey,
+        blockOffset: blockOffset,
+        fromStart: true,
+      );
     } else {
-      await _openAuxiliary(target, blockKey);
+      await _openAuxiliary(target, blockKey, blockOffset);
     }
   }
 
-  Future<void> _openAuxiliary(ChapterKey target, String? block) async {
+  Future<void> _openAuxiliary(
+    ChapterKey target,
+    String? block,
+    int? blockOffset,
+  ) async {
     if (widget.linkDepth >= 8) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).readerLinkDepth)),
@@ -478,6 +506,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           images: widget.images,
           settings: widget.settings,
           initialBlockKey: block,
+          initialBlockOffset: blockOffset,
           startAtBeginning: true,
           linkDepth: widget.linkDepth + 1,
         ),
