@@ -29,18 +29,33 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
   Offset? _down;
   Duration? _downTime;
 
-  String _document(BuildContext context) {
-    final theme = Theme.of(context);
-    final paper = theme.scaffoldBackgroundColor;
-    final background = paper.toARGB32().toRadixString(16).substring(2);
-    final foreground = theme.colorScheme.onSurface
+  // Inlined documents can reach ~10 MiB, so identity stays on the inputs and
+  // the string itself is rebuilt only when one of them changes.
+  ({int html, Color paper, Color foreground, TargetPlatform platform})? _inputs;
+  String? _document;
+
+  ({int html, Color paper, Color foreground, TargetPlatform platform})
+  _inputsOf(BuildContext context) => (
+    html: identityHashCode(widget.html),
+    paper: Theme.of(context).scaffoldBackgroundColor,
+    foreground: Theme.of(context).colorScheme.onSurface,
+    platform: defaultTargetPlatform,
+  );
+
+  String _documentOf(
+    ({int html, Color paper, Color foreground, TargetPlatform platform}) inputs,
+  ) {
+    final cached = _document;
+    if (cached != null && _inputs == inputs) return cached;
+    final background = inputs.paper.toARGB32().toRadixString(16).substring(2);
+    final foreground = inputs.foreground
         .toARGB32()
         .toRadixString(16)
         .substring(2);
-    final interactionStyle = defaultTargetPlatform == TargetPlatform.windows
+    final interactionStyle = inputs.platform == TargetPlatform.windows
         ? 'html,body,body *{-webkit-user-select:none!important;user-select:none!important;-webkit-user-drag:none!important;}'
         : '';
-    return widget.html.replaceFirst('</head>', '''<style>
+    final document = widget.html.replaceFirst('</head>', '''<style>
 html,body{background:#$background!important;color:#$foreground;margin:0!important;}
 html,body{scrollbar-width:none;}
 ::-webkit-scrollbar{display:none;}
@@ -48,45 +63,51 @@ body{font-size:clamp(12px,5.7vw,20px);padding:8px!important;box-sizing:border-bo
 img{max-width:100%;height:auto;}
 $interactionStyle
 </style></head>''');
+    _inputs = inputs;
+    return _document = document;
   }
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, bounds) => Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerDown: (e) {
-        _down = e.localPosition;
-        _downTime = e.timeStamp;
-      },
-      onPointerCancel: (_) {
-        _down = null;
-      },
-      onPointerUp: (e) {
-        final down = _down;
-        _down = null;
-        if (down == null) return;
-        final delta = e.localPosition - down;
-        if (delta.dx.abs() >= 48 && delta.dx.abs() > delta.dy.abs() * 1.5) {
-          (delta.dx < 0 ? widget.onNext : widget.onPrevious)?.call();
-        } else if (delta.distance < 8 &&
-            e.timeStamp - _downTime! < const Duration(milliseconds: 350)) {
-          if (down.dx < bounds.maxWidth * .25) {
-            widget.onPrevious?.call();
-          } else if (down.dx > bounds.maxWidth * .75) {
-            widget.onNext?.call();
-          } else {
-            widget.onCenterTap();
+  Widget build(BuildContext context) {
+    final inputs = _inputsOf(context);
+    final document = _documentOf(inputs);
+    return LayoutBuilder(
+      builder: (context, bounds) => Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: (e) {
+          _down = e.localPosition;
+          _downTime = e.timeStamp;
+        },
+        onPointerCancel: (_) {
+          _down = null;
+        },
+        onPointerUp: (e) {
+          final down = _down;
+          _down = null;
+          if (down == null) return;
+          final delta = e.localPosition - down;
+          if (delta.dx.abs() >= 48 && delta.dx.abs() > delta.dy.abs() * 1.5) {
+            (delta.dx < 0 ? widget.onNext : widget.onPrevious)?.call();
+          } else if (delta.distance < 8 &&
+              e.timeStamp - _downTime! < const Duration(milliseconds: 350)) {
+            if (down.dx < bounds.maxWidth * .25) {
+              widget.onPrevious?.call();
+            } else if (down.dx > bounds.maxWidth * .75) {
+              widget.onNext?.call();
+            } else {
+              widget.onCenterTap();
+            }
           }
-        }
-      },
-      child: _StaticWebView(
-        key: ValueKey(_document(context)),
-        document: _document(context),
-        onReady: widget.onReady,
-        onFailed: widget.onFailed,
+        },
+        child: _StaticWebView(
+          key: ValueKey(inputs),
+          document: document,
+          onReady: widget.onReady,
+          onFailed: widget.onFailed,
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// A fresh owner per document/theme rejects callbacks from retired native views.
