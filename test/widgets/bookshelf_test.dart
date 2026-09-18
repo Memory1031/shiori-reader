@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
@@ -240,6 +242,37 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(ValueKey(book.key)));
       expect(reads, 1);
+      final card = find.byKey(ValueKey(book.key));
+      final title = find.descendant(
+        of: card,
+        matching: find.byType(AnimatedDefaultTextStyle),
+      );
+      Color? titleColor() =>
+          tester.widget<AnimatedDefaultTextStyle>(title).style.color;
+      final restingColor = titleColor();
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(tester.getCenter(card));
+      await tester.pumpAndSettle();
+      expect(titleColor(), isNot(restingColor));
+      await mouse.removePointer();
+      await tester.pumpAndSettle();
+      expect(titleColor(), restingColor);
+      final press = await tester.startGesture(tester.getCenter(card));
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(titleColor(), isNot(restingColor));
+      await press.cancel();
+      await tester.pumpAndSettle();
+      expect(titleColor(), restingColor);
+      final focus = Focus.of(tester.element(title));
+      focus.requestFocus();
+      await tester.pumpAndSettle();
+      expect(titleColor(), isNot(restingColor));
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      expect(reads, 2);
+      focus.unfocus();
+      await tester.pumpAndSettle();
+      expect(titleColor(), restingColor);
       await tester.longPress(find.byKey(ValueKey(book.key)));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Novel details'));

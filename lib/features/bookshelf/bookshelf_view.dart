@@ -244,44 +244,13 @@ class _BookshelfViewState extends State<BookshelfView> {
               ),
             );
           }
-          return InkWell(
+          return _ShelfGridCard(
             key: ValueKey(book.key),
             onTap: () => widget.onOpen(book.key),
             onLongPress: () => _actions(book),
-            borderRadius: BorderRadius.circular(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AspectRatio(
-                  aspectRatio: 2 / 3,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.shadow.withValues(alpha: .12),
-                          blurRadius: 12,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: cover,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  book.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
-                ),
-                if (local) ...[const SizedBox(height: 4), provenance()],
-              ],
-            ),
+            cover: cover,
+            title: book.title,
+            provenance: local ? provenance() : null,
           );
         }
 
@@ -387,6 +356,103 @@ class _BookshelfViewState extends State<BookshelfView> {
           ],
         );
       },
+    );
+  }
+}
+
+class _ShelfGridCard extends StatefulWidget {
+  const _ShelfGridCard({
+    super.key,
+    required this.cover,
+    required this.title,
+    required this.onTap,
+    required this.onLongPress,
+    this.provenance,
+  });
+
+  final Widget cover;
+  final String title;
+  final Widget? provenance;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  @override
+  State<_ShelfGridCard> createState() => _ShelfGridCardState();
+}
+
+class _ShelfGridCardState extends State<_ShelfGridCard> {
+  bool _hovered = false;
+  bool _pressed = false;
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final active = _hovered || _pressed || _focused;
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
+    final radius = BorderRadius.circular(8);
+
+    return InkWell(
+      onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
+      onHover: (value) => setState(() => _hovered = value),
+      onHighlightChanged: (value) => setState(() => _pressed = value),
+      onFocusChange: (value) => setState(() => _focused = value),
+      borderRadius: radius,
+      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+      splashFactory: NoSplash.splashFactory,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 2 / 3,
+            child: AnimatedContainer(
+              duration: duration,
+              curve: Curves.easeOut,
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.shadow.withValues(alpha: active ? .18 : .12),
+                    blurRadius: active && !_pressed ? 16 : 12,
+                    offset: Offset(0, _pressed ? 2 : (active ? 7 : 5)),
+                  ),
+                ],
+              ),
+              foregroundDecoration: BoxDecoration(
+                borderRadius: radius,
+                border: Border.all(
+                  color: colors.primary.withValues(
+                    alpha: _focused || _pressed ? .9 : (_hovered ? .55 : 0),
+                  ),
+                  width: 2,
+                ),
+              ),
+              child: widget.cover,
+            ),
+          ),
+          const SizedBox(height: 10),
+          AnimatedDefaultTextStyle(
+            duration: duration,
+            style: (theme.textTheme.titleSmall ?? const TextStyle()).copyWith(
+              fontWeight: FontWeight.w500,
+              color: active ? colors.primary : colors.onSurface,
+            ),
+            child: Text(
+              widget.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (widget.provenance != null) ...[
+            const SizedBox(height: 4),
+            widget.provenance!,
+          ],
+        ],
+      ),
     );
   }
 }
