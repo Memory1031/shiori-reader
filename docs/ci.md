@@ -21,7 +21,7 @@ CI 检查工作流结构、锁文件变化、数据库生成与新 schema、gen-
 
 ## Windows 构建
 
-Windows 构建 job 与质量检查独立运行，使用 `windows-latest`、同一固定 Flutter 版本及严格锁文件安装。Git 长路径配置覆盖检出和 Pub 子进程，以支持固定提交的 WebView fork；仅缓存 SDK 和 Pub 依赖，不复用本机构建目录。构建入口固定为 `lib/main.dart`，检查 EXE、Flutter / WebView DLL、AOT 与资源文件是否存在且非空。CI 不启动应用或执行在线探针，编译成功不代表运行验收通过。
+Windows 构建 job 与质量检查独立运行，使用 `windows-2022` / Visual Studio 2022、同一固定 Flutter 版本及严格锁文件安装；构建前检查 VS 主版本。Git 长路径配置覆盖检出和 Pub 子进程，以支持固定提交的 WebView fork；仅缓存 SDK 和 Pub 依赖，不复用本机构建目录。构建入口固定为 `lib/main.dart`，检查 EXE、Flutter / WebView DLL、AOT 与资源文件是否存在且非空。CI 不启动应用或执行在线探针，编译成功不代表运行验收通过。
 
 ## Android tag 发布
 

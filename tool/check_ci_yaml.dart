@@ -28,7 +28,7 @@ void main() {
   final flutterVersion =
       (jsonDecode(File('.fvmrc').readAsStringSync()) as Map)['flutter'];
   if (ci['env']['FLUTTER_VERSION'].toString() != flutterVersion ||
-      windows['runs-on'] != 'windows-latest' ||
+      windows['runs-on'] != 'windows-2022' ||
       windows['defaults']['run']['shell'] != 'pwsh' ||
       windowsEnv['GIT_CONFIG_COUNT'] != '1' ||
       windowsEnv['GIT_CONFIG_KEY_0'] != 'core.longpaths' ||

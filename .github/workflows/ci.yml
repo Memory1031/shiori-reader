@@ -87,7 +87,8 @@ jobs:
 
   windows-build:
     name: Windows x64 Release 构建
-    runs-on: windows-latest
+    # 固定 VS 2022 工具链；WebView 0.6.x 的 /await 不兼容 VS 2026。
+    runs-on: windows-2022
     timeout-minutes: 30
     defaults:
       run:
@@ -112,6 +113,11 @@ jobs:
       - name: 检查 Windows 构建工具
         run: |
           Get-Command nuget -ErrorAction Stop | Select-Object Source
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vsVersion = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion
+          if ($LASTEXITCODE -ne 0 -or !$vsVersion -or ([version]$vsVersion).Major -ne 17) {
+            throw 'Windows build requires Visual Studio 2022 with C++ tools'
+          }
           flutter doctor -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
