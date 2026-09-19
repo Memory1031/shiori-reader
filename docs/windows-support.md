@@ -37,7 +37,7 @@ Windows v1 目标：
 
 状态：✅ 表示本阶段所述实现或基础适配已完成；◐ 表示部分完成、验收未闭环；☐ 表示尚未完成。Windows 本地构建或组件测试通过不等于 Android / iOS / macOS 运行验收通过。
 
-目前核心阅读、桌面阅读交互与书库宽屏布局已完成验收。下一步验收 Windows 重启持久化，再补齐真实在线流程，再接入 Windows CI、ZIP 发布及发布前回归；完整桌面 UI 重设计和字体自由选择仍是后续专项。
+目前核心阅读、桌面阅读交互、书库宽屏布局与 Windows 真进程重启持久化已完成验收。Windows WebView 使用固定提交的 fork 补丁处理退出生命周期；后续仍需补齐真实在线流程、Windows CI、ZIP 发布及发布前回归。完整桌面 UI 重设计和字体自由选择仍是后续专项。
 
 | 阶段 | 工作内容 | 实现方向 | 验收标准 | 优先级 | 状态 |
 | --- | --- | --- | --- | --- | --- |
@@ -50,7 +50,7 @@ Windows v1 目标：
 | 6. 核心阅读验证 | 验证现有 Reader 在桌面 viewport 下行为 | 复用 rich reflow、inline image、fixed-image、links、pagination、restore | TXT、EPUB、在线章节均可正常翻页和恢复位置 | P0 | ✅ Windows 原生 smoke 与阅读器回归通过；TXT、EPUB、在线章节离线样本的翻页和恢复已验收，真实联网流程见第 10 项 |
 | 7. Desktop 阅读体验 | 做可复用于 Windows / macOS 的最低限度桌面适配 | 正文限制最大宽度；方向键 / PageUp / PageDown 翻页；Esc 关闭弹层；鼠标滚轮；窗口 resize 后重新分页；双页为宽度驱动，大屏平板横屏同样启用，属预期而非桌面专属 | 1080p / 1440p 窗口布局自然，键盘与鼠标可完成主要阅读操作 | P1 | ✅ 实现与专项验收完成；1080p / 1440p 组件回归通过，用户确认 Windows 原生键鼠翻页、Esc 关闭弹层及图片预览、单双页 resize 恢复和 WebView 页内滚动均通过 |
 | 8. Desktop 书库 UI | 检查宽屏布局 | 基于 viewport / breakpoint 限制内容宽度，必要时自适应双列；避免 Windows 专属布局条件 | 1280px+ 窗口无超宽卡片或明显移动端拉伸感 | P1 | ✅ 宽屏组件验收通过，覆盖 1280 / 1920 / 2560、显示缩放、中英文、长书名、滚轮及网格 / 列表 resize；用户确认 Windows 原生窗口布局、悬停反馈和阅读返回均通过 |
-| 9. 数据持久化 | Windows SQLite / AppSupport smoke | 复用现有 Drift `NativeDatabase`、Application Support 与缓存目录 | 重启后书架、进度、设置和缓存正常保留 | P0 | ☐ 共用实现已接入；Windows 重启专项验收待完成 |
+| 9. 数据持久化 | Windows SQLite / AppSupport smoke | 复用现有 Drift `NativeDatabase`、Application Support 与缓存目录 | 重启后书架、进度、设置和缓存正常保留 | P0 | ✅ 隔离数据目录下，正常退出重启及强制终止后的书架、设置、ContinueReading 位置、缓存与本地媒体恢复通过；采用固定提交的 Windows WebView fork，普通关闭、特殊页关闭、重复开关及 Release ZIP 验收通过 |
 | 10. 在线书源 | Windows 网络能力 smoke | 复用现有 `NovelSource` / LightNovel.fun adapter | 搜索 → 详情 → 目录 → 阅读完整走通 | P0 | ☐ 共用 adapter 已接入；Windows 真实在线全流程待验收 |
 | 11. CI | 增加 Windows build CI | `windows-latest` + 项目固定 Flutter 版本；外部 Actions 继续完整 SHA pin | Windows release build 可在 CI 稳定完成 | P1 | ☐ 未开始 Windows 构建工作流 |
 | 12. 发布产物 | GitHub Release 增加 Windows | 第一版直接发布 `shiori-reader-vX.Y.Z-windows-x64.zip` | Release 同时提供 Android APK 与 Windows ZIP | P1 | ☐ 未开始 Windows ZIP 发布接入 |

@@ -2,7 +2,9 @@
 
 按当前 pubspec.lock 对应包的 LICENSE / NOTICE 文本列出；含开发及传递依赖，不表示全部进入产物。类别为文本识别，不替代原始完整声明。
 
-锁文件 SHA-256：`e09cb22db378b0cbba1ece892359510bc42c02167e165075d4cf2091d0d68546`。
+锁文件 SHA-256：`7237fe7e76401b68d484a8db8f90020488628ed0276d6d19c0c9601778ea413d`。
+
+Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Memory1031/flutter_inappwebview/tree/3e48253e4c03beb49fe020fb1168ab1fb2be4818/flutter_inappwebview_windows)，按完整提交 SHA 锁定，保留上游 LICENSE 与源码许可声明。仅 Windows 子包使用 Git override，其余平台包仍取自锁定的 hosted 版本。
 
 | 包 | 锁定版本 | 依赖关系 | 许可文本类别 | 文件 |
 | --- | --- | --- | --- | --- |
@@ -44,7 +46,7 @@
 | flutter_inappwebview_macos | 1.1.2 | transitive | Apache 类 | LICENSE |
 | flutter_inappwebview_platform_interface | 1.3.0+1 | transitive | Apache 类 | LICENSE |
 | flutter_inappwebview_web | 1.1.2 | transitive | Apache 类 | LICENSE |
-| flutter_inappwebview_windows | 0.6.0 | transitive | Apache 类 | LICENSE |
+| flutter_inappwebview_windows | 0.6.0（fork 补丁） | direct overridden | Apache 类 | LICENSE |
 | flutter_lints | 6.0.0 | direct dev | BSD 类 | LICENSE |
 | flutter_localizations | 0.0.0 | direct main | BSD 类 | LICENSE |
 | flutter_test | 0.0.0 | direct dev | BSD 类 | LICENSE |

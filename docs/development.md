@@ -30,6 +30,8 @@ fvm flutter run --target lib/main.dart
 
 Windows PowerShell 设置 `$env:PUB_HOSTED_URL = 'https://pub.flutter-io.cn'`，用 `Push-Location` / `Pop-Location` 切换工具目录；已有本地 Android 工具环境可通过 [android-env.ps1](../tool/android-env.ps1) 加载。macOS 选择 JDK 17，Android SDK 路径由 `android/local.properties` 的 `sdk.dir` 指定，不覆盖全局配置。
 
+Windows 拉取固定提交的 WebView Git 依赖需要 Git 支持长路径；可用 `git config --global core.longpaths true` 启用，以完整检出包含多个平台的仓库。
+
 iOS 安装依赖后在 `ios` 目录执行 `pod install`，打开 `ios/Runner.xcworkspace`。不要打开单独的 `.xcodeproj` 来构建 CocoaPods 工程。选择实际设备，给 Runner 和 ShareExtension 配置自己的 Team、匹配的 App Group 与唯一 Bundle ID；不要借用公司 Team。签名及个人安装边界见[发布说明](release/README.md)。
 
 更改 pubspec 版本后，直接在 Xcode 构建前先同步本地 Flutter 参数，避免 Runner 使用旧构建号而 ShareExtension 已更新：

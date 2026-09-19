@@ -127,7 +127,8 @@ class _ProbeState extends State<_Probe> {
             cancellation: token,
           );
           if (loaded is! Success<LoadResult<MediaLease>> ||
-              loaded.value.value.persistence != MediaPersistence.persistedLocal) {
+              loaded.value.value.persistence !=
+                  MediaPersistence.persistedLocal) {
             throw StateError('Fixture persistence failed');
           }
           await loaded.value.value.close();
