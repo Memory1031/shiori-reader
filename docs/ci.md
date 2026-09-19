@@ -4,10 +4,10 @@
 
 | 事件 | 工作流与行为 |
 | --- | --- |
-| PR、推送 main / develop、手动 CI | [ci.yml](../.github/workflows/ci.yml)：质量检查，不打包 APK |
+| PR、推送 main / develop、手动 CI | [ci.yml](../.github/workflows/ci.yml)：质量检查与 Windows x64 Release 构建，不打包 APK |
 | 推送 `v*` tag | [release.yml](../.github/workflows/release.yml)：检查后构建签名 Release APK，创建 / 更新 GitHub Release |
 
-用户已取消日常 Android Debug / Release smoke。手动运行普通 CI 也不打包。tag 流程会实际发布仓库 Release 资产，不是临时构建检查。
+用户已取消日常 Android Debug / Release smoke。普通 CI 的 Windows 构建只验证编译与运行目录，不发布 GitHub Release 资产；tag 流程会实际发布仓库 Release 资产。
 
 ## 质量检查
 
@@ -18,6 +18,10 @@ CI 检查工作流结构、锁文件变化、数据库生成与新 schema、gen-
 按用户约定，应用单元 / 组件测试、调查包 UT、Python 发布工具 UT 均在提交前本地执行，日常 CI（含 PR 和手动运行）不再重复运行。测试代码仍保留，格式和静态分析仍覆盖测试文件；远端 CI 绿色不代表 UT 已通过，应在提交或 PR 中记录实际本地验证。未添加强制 Git hook。
 
 本地命令见[开发说明](development.md)。工作流结构校验入口为 [check_ci_yaml.dart](../tool/check_ci_yaml.dart)。样本哈希按原始字节计算，`.gitattributes` 固定 LF；哈希失败先修样本完整性，不放宽校验或把网络请求数为零误判为网络故障。
+
+## Windows 构建
+
+Windows 构建 job 与质量检查独立运行，使用 `windows-latest`、同一固定 Flutter 版本及严格锁文件安装。Git 长路径配置覆盖检出和 Pub 子进程，以支持固定提交的 WebView fork；仅缓存 SDK 和 Pub 依赖，不复用本机构建目录。构建入口固定为 `lib/main.dart`，检查 EXE、Flutter / WebView DLL、AOT 与资源文件是否存在且非空。CI 不启动应用或执行在线探针，编译成功不代表运行验收通过。
 
 ## Android tag 发布
 
@@ -71,7 +75,7 @@ Apple 侧一次性准备（都在个人团队上下文操作，注意右上角�
 
 ## RELEASE-002 工作流补齐（2026-09-08）
 
-发布工具为 `tool/release_android.py`（Python3标准库，无额外包）；普通CI与tag检查均运行 `tool/test_release_android.py`。普通CI仍不打包，发布仍仅推送 `v*` tag触发。仅发布job获得 contents:write。
+发布工具为 `tool/release_android.py`（Python3标准库，无额外包）；`tool/test_release_android.py` 在提交前本地执行。普通 CI 只做质量检查与 Windows 构建，发布仍仅推送 `v*` tag 触发。仅发布 job 获得 contents:write。
 
 正式入口明确为 `lib/main.dart`。构建后用 Android SDK apksigner 验证签名有效，再对比配置密钥导出的证书SHA-256；aapt检查 applicationId=dev.shiori.reader、versionName / versionCode与pubspec一致且不可调试。检查通过才生成并上传：
 
