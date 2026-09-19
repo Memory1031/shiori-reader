@@ -6,6 +6,7 @@
 #include <flutter/event_stream_handler_functions.h>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "launch_view.h"
 #include "utils.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -20,6 +21,13 @@ bool FlutterWindow::OnCreate() {
 
   RECT frame = GetClientArea();
 
+  launch_view_ = CreateLaunchView(GetHandle());
+  if (launch_view_) {
+    Show();
+    // Paint before synchronous engine/plugin initialization occupies this thread.
+    UpdateWindow(launch_view_);
+  }
+
   // The size here must match the window dimensions to avoid unnecessary surface
   // creation / destruction in the startup path.
   flutter_controller_ = std::make_unique<flutter::FlutterViewController>(
@@ -30,6 +38,10 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  if (launch_view_) {
+    SetWindowPos(launch_view_, HWND_TOP, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+  }
 
   drop_channel_ =
       std::make_unique<flutter::EventChannel<flutter::EncodableValue>>(
@@ -52,19 +64,28 @@ bool FlutterWindow::OnCreate() {
             return nullptr;
           }));
 
-  flutter_controller_->engine()->SetNextFrameCallback([&]() {
-    this->Show();
+  flutter_controller_->engine()->SetNextFrameCallback([this]() {
+    if (launch_view_) {
+      DestroyWindow(launch_view_);
+      launch_view_ = nullptr;
+    } else {
+      Show();
+    }
   });
 
-  // Flutter can complete the first frame before the "show window" callback is
+  // Flutter can complete the first frame before the launch-cover callback is
   // registered. The following call ensures a frame is pending to ensure the
-  // window is shown. It is a no-op if the first frame hasn't completed yet.
+  // Flutter view is revealed. It is a no-op if the first frame hasn't completed yet.
   flutter_controller_->ForceRedraw();
 
   return true;
 }
 
 void FlutterWindow::OnDestroy() {
+  if (launch_view_) {
+    DestroyWindow(launch_view_);
+    launch_view_ = nullptr;
+  }
   DragAcceptFiles(GetHandle(), FALSE);
   drop_sink_.reset();
   drop_channel_.reset();
@@ -79,6 +100,10 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_SIZE && launch_view_) {
+    RECT bounds = GetClientArea();
+    MoveWindow(launch_view_, 0, 0, bounds.right, bounds.bottom, TRUE);
+  }
   if (message == WM_DROPFILES) {
     const auto drop = reinterpret_cast<HDROP>(wparam);
     const UINT count = DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
@@ -125,7 +150,9 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
 
   switch (message) {
     case WM_FONTCHANGE:
-      flutter_controller_->engine()->ReloadSystemFonts();
+      if (flutter_controller_) {
+        flutter_controller_->engine()->ReloadSystemFonts();
+      }
       break;
   }
 

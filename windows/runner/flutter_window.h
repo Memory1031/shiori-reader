@@ -11,7 +11,7 @@
 
 #include "win32_window.h"
 
-// A window that does nothing but host a Flutter view.
+// Hosts a native launch cover until the Flutter view has rendered its first frame.
 class FlutterWindow : public Win32Window {
  public:
   // Creates a new FlutterWindow hosting a Flutter view running |project|.
@@ -28,6 +28,8 @@ class FlutterWindow : public Win32Window {
  private:
   // The project to run.
   flutter::DartProject project_;
+
+  HWND launch_view_ = nullptr;
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
