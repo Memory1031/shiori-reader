@@ -4,10 +4,10 @@
 
 | 事件 | 工作流与行为 |
 | --- | --- |
-| PR、推送 main / develop、手动 CI | [ci.yml](../.github/workflows/ci.yml)：质量检查与 Windows x64 Release 构建，不打包 APK |
+| PR、推送 main / develop、手动 CI | [ci.yml](../.github/workflows/ci.yml)：仅质量检查，不构建应用或打包 |
 | 推送 `v*` tag | [release.yml](../.github/workflows/release.yml)：并行构建签名 APK 与 Windows ZIP，二者通过后统一创建 / 更新 GitHub Release |
 
-用户已取消日常 Android Debug / Release smoke。普通 CI 的 Windows 构建验证编译与运行目录；手动 CI 还提供保留 7 天的 Windows ZIP artifact，不发布 GitHub Release 资产；tag 流程会实际发布仓库 Release 资产。
+普通 CI 不执行 Android / Windows 完整构建，也不上传临时验包产物。完整构建与发布资产由 tag 流程负责。
 
 ## 质量检查
 
@@ -19,9 +19,9 @@ CI 检查工作流结构、锁文件变化、数据库生成与新 schema、gen-
 
 本地命令见[开发说明](development.md)。工作流结构校验入口为 [check_ci_yaml.dart](../tool/check_ci_yaml.dart)。样本哈希按原始字节计算，`.gitattributes` 固定 LF；哈希失败先修样本完整性，不放宽校验或把网络请求数为零误判为网络故障。
 
-## Windows 构建
+## Windows tag 构建
 
-Windows 构建 job 与质量检查独立运行，使用 `windows-2022` / Visual Studio 2022、同一固定 Flutter 版本及严格锁文件安装；构建前检查 VS 主版本。Git 长路径配置覆盖检出和 Pub 子进程，以支持固定提交的 WebView fork；仅缓存 SDK 和 Pub 依赖，不复用本机构建目录。构建入口固定为 `lib/main.dart`，检查 EXE、Flutter / WebView DLL、AOT 与资源文件是否存在且非空。CI 不启动应用或执行在线探针，编译成功不代表运行验收通过。
+Windows 构建 job 仅在 tag 发布工作流运行，使用 `windows-2022` / Visual Studio 2022、同一固定 Flutter 版本及严格锁文件安装；构建前检查 VS 主版本。Git 长路径配置覆盖检出和 Pub 子进程，以支持固定提交的 WebView fork；仅缓存 SDK 和 Pub 依赖，不复用本机构建目录。构建入口固定为 `lib/main.dart`，检查 EXE、Flutter / WebView DLL、AOT 与资源文件是否存在且非空。CI 不启动应用或执行在线探针，编译成功不代表运行验收通过。
 
 ## Windows ZIP 与统一发布
 
@@ -29,7 +29,7 @@ Windows 构建 job 与质量检查独立运行，使用 `windows-2022` / Visual 
 
 Windows 产物为 `shiori-reader-<tag>-windows-x64.zip`、`SHA256SUMS-windows-x64.txt` 和 `release-info-windows-x64.json`（版本、commit、摘要及未签名状态），与 Android 文件名分开。tag 构建产物保留 14 天；`publish` job 等待两个平台构建成功，下载当前运行的两个 artifact、核对两份 SHA-256 后统一上传同一 GitHub Release。只有该 job 获得 Release 写权限。任一构建或校验失败，都不进入发布。
 
-手动 CI 调用同一打包入口，使用 pubspec 对应版本与当前提交，仅上传 Actions artifact。此产物用于发版前验包；不代表正式 tag 发布已通过。Windows 使用方式与分发边界见[发布说明](release/README.md)。
+本地可在正式入口 Release 构建后调用 `tool/package_windows.ps1 -Tag <tag> -Commit <完整提交 SHA>` 验包。Windows 使用方式与分发边界见[发布说明](release/README.md)。
 
 ## Android tag 发布
 
@@ -83,7 +83,7 @@ Apple 侧一次性准备（都在个人团队上下文操作，注意右上角�
 
 ## RELEASE-002 工作流补齐（2026-09-08）
 
-发布工具为 `tool/release_android.py`（Python3标准库，无额外包）；`tool/test_release_android.py` 在提交前本地执行。普通 CI 只做质量检查与 Windows 构建，发布仍仅推送 `v*` tag 触发。仅发布 job 获得 contents:write。
+发布工具为 `tool/release_android.py`（Python3标准库，无额外包）；`tool/test_release_android.py` 在提交前本地执行。普通 CI 只做质量检查，发布仍仅推送 `v*` tag 触发。仅发布 job 获得 contents:write。
 
 正式入口明确为 `lib/main.dart`。构建后用 Android SDK apksigner 验证签名有效，再对比配置密钥导出的证书SHA-256；aapt检查 applicationId=dev.shiori.reader、versionName / versionCode与pubspec一致且不可调试。检查通过才生成并上传：
 

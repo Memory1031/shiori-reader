@@ -13,57 +13,22 @@ void main() {
       !ciEvents.containsKey('workflow_dispatch')) {
     throw StateError('Missing expected events');
   }
-  if (ciJobs.keys.length != 2 ||
-      !ciJobs.containsKey('quality') ||
-      !ciJobs.containsKey('windows-build')) {
-    throw StateError('Regular CI needs quality and Windows build jobs');
+  if (ciJobs.length != 1 || !ciJobs.containsKey('quality')) {
+    throw StateError('Regular CI must contain only the quality job');
   }
-
-  final windows = ciJobs['windows-build'] as YamlMap;
-  final windowsSteps = windows['steps'] as YamlList;
-  final windowsCommands = windowsSteps
-      .map((step) => step['run']?.toString() ?? '')
-      .join('\n');
-  final windowsEnv = windows['env'] as YamlMap;
   final flutterVersion =
       (jsonDecode(File('.fvmrc').readAsStringSync()) as Map)['flutter'];
-  if (ci['env']['FLUTTER_VERSION'].toString() != flutterVersion ||
-      windows['runs-on'] != 'windows-2022' ||
-      windows['defaults']['run']['shell'] != 'pwsh' ||
-      windowsEnv['GIT_CONFIG_COUNT'] != '1' ||
-      windowsEnv['GIT_CONFIG_KEY_0'] != 'core.longpaths' ||
-      windowsEnv['GIT_CONFIG_VALUE_0'] != 'true') {
-    throw StateError('Windows CI needs the pinned SDK and Git long paths');
-  }
-  int windowsIndex(String command) => windowsSteps.indexWhere(
-    (step) => (step['run']?.toString() ?? '').contains(command),
-  );
-  final windowsDependencies = windowsIndex(
-    'flutter pub get --enforce-lockfile',
-  );
-  final windowsBuild = windowsIndex(
-    'flutter build windows --release --no-pub --target lib/main.dart',
-  );
-  if (windowsDependencies < 0 ||
-      windowsIndex('git diff --exit-code -- pubspec.lock') <=
-          windowsDependencies ||
-      windowsBuild <= windowsIndex('git diff --exit-code -- pubspec.lock') ||
-      windowsIndex('data/app.so') <= windowsBuild ||
-      windows['needs'] != null) {
-    throw StateError(
-      'Windows CI must install locked dependencies and build the production entry',
-    );
-  }
-  if (RegExp(
-    r'\b(flutter|dart)\s+(?:--suppress-analytics\s+)?test\b|\bpython3?\s+-m\s+unittest\b|gh\s+release\b|--dart-define=.*LIVE=true',
-  ).hasMatch(windowsCommands)) {
-    throw StateError(
-      'Windows CI must not run tests, live probes or publish releases',
-    );
+  if (ci['env']['FLUTTER_VERSION'].toString() != flutterVersion) {
+    throw StateError('CI must use the pinned Flutter SDK');
   }
   for (final step in ciJobs['quality']['steps'] as YamlList) {
     final command = (step as YamlMap)['run']?.toString() ?? '';
-    if (RegExp(r'flutter\s+build\s').hasMatch(command)) {
+    if (RegExp(
+          r'flutter\s+build\s|package_windows\.ps1|gh\s+release\b',
+        ).hasMatch(command) ||
+        (step['uses']?.toString() ?? '').startsWith(
+          'actions/upload-artifact@',
+        )) {
       throw StateError('Packaging is reserved for the tag release workflow');
     }
     if (RegExp(
@@ -167,20 +132,6 @@ void main() {
     throw StateError('Signing files need unconditional cleanup');
   }
 
-  const manualGate = "github.event_name == 'workflow_dispatch'";
-  final manualPackage = windowsIndex('./tool/package_windows.ps1');
-  final manualUpload = windowsSteps.indexWhere(
-    (step) =>
-        (step['uses']?.toString() ?? '').startsWith('actions/upload-artifact@'),
-  );
-  if (manualPackage <= windowsBuild ||
-      manualUpload <= manualPackage ||
-      windowsSteps[manualPackage]['if'] != manualGate ||
-      windowsSteps[manualUpload]['if'] != manualGate) {
-    throw StateError(
-      'CI ZIP packaging and artifact upload must be manual-only',
-    );
-  }
   final windowsRelease = releaseJobs['windows-release'] as YamlMap;
   final zipSteps = windowsRelease['steps'] as YamlList;
   int zipIndex(String command) => zipSteps.indexWhere(
@@ -199,6 +150,9 @@ void main() {
   );
   if (release['env']['FLUTTER_VERSION'].toString() != flutterVersion ||
       windowsRelease['runs-on'] != 'windows-2022' ||
+      windowsRelease['defaults']['run']['shell'] != 'pwsh' ||
+      windowsRelease['env']['GIT_CONFIG_COUNT'] != '1' ||
+      windowsRelease['env']['GIT_CONFIG_KEY_0'] != 'core.longpaths' ||
       windowsRelease['env']['GIT_CONFIG_VALUE_0'] != 'true' ||
       zipVersion < 0 ||
       zipDependencies <= zipVersion ||
@@ -386,7 +340,7 @@ void main() {
     }
   }
   stdout.writeln(
-    'Workflow YAML parsed; quality and Windows build CI, tag-only releases '
+    'Workflow YAML parsed; quality-only CI, tag-only releases '
     '(Android + Windows + iOS), tag-gated uploads, SHA-pinned actions, no persisted '
     'checkout credentials and working directories verified.',
   );
