@@ -2,7 +2,7 @@
   <img src="assets/branding/shiori-chibi-logo-v1.png" alt="Shiori Logo" width="112" />
   <h1>Shiori</h1>
   <p>把喜欢的故事，留在手边。</p>
-  <p>面向 Android 与 iOS 的开源轻小说阅读器 · Flutter · TXT / EPUB · 在线书源 · 中文 / English</p>
+  <p>面向 Android、iOS 与 Windows 的开源轻小说阅读器 · Flutter · TXT / EPUB · 在线书源 · 中文 / English</p>
   <p>
     <a href="#功能亮点">功能</a> ·
     <a href="#安装">安装</a> ·
@@ -25,6 +25,7 @@ Shiori 以书架和阅读为中心，支持在线搜索与阅读，也可以导�
 - **重新解析** — 从应用内原件更新旧书解析结果，尽量保留阅读位置，近似恢复会提示。
 - **书内链接** — EPUB 可通过阅读菜单打开脚注与辅助文档，再返回原页。
 - **舒适翻页** — 点按或拖动左右翻页，连续切换章节，调整排版后恢复阅读位置。
+- **桌面阅读** — Windows 支持文件拖入、键盘 / 滚轮翻页与宽屏正文双页；封面、整页插图和原版式页面保持限宽居中。
 - **个性排版** — 调整字号、行距、段距、页边距与纸张主题，支持插图和部分 EPUB 特殊页面。
 - **外观与语言** — 浅色、深色、跟随系统，多种强调色，中文与英文界面。
 - **缓存管理** — 图片缓存、有限预取，以及按书或统一清理缓存。
@@ -35,6 +36,7 @@ Shiori 以书架和阅读为中心，支持在线搜索与阅读，也可以导�
 | --- | --- |
 | Android 7.0+（API 24） | 在 [Releases](https://github.com/Memory1031/shiori-reader/releases) 查看可用的签名 APK。若尚无附件，可按开发说明本地构建。 |
 | iOS 15.0+ | 当前通过 macOS / Xcode 使用自己的开发者签名安装，配置见[开发说明](docs/development.md)。 |
+| Windows x64 | 在 [Releases](https://github.com/Memory1031/shiori-reader/releases) 下载 Windows ZIP，完整解压后运行 `shiori.exe`。当前为未签名便携包；原版式 EPUB 页面需要系统安装 WebView2 Runtime。 |
 
 Android 覆盖安装需要签名一致；从 Debug 包切换到正式签名包前，请先保全数据。版本、签名与分发方式见[发布说明](docs/release/README.md)。
 
@@ -58,7 +60,7 @@ Android 覆盖安装需要签名一致；从 Debug 包切换到正式签名包�
 
 ## 本地开发
 
-使用固定的 **Flutter 3.38.4 / Dart 3.10.3**。Android 构建需要 JDK 17、SDK 36 和 NDK 28.2.13676358；iOS 构建需要 macOS / Xcode。
+使用固定的 **Flutter 3.38.4 / Dart 3.10.3**。Android 构建需要 JDK 17、SDK 36 和 NDK 28.2.13676358；iOS 构建需要 macOS / Xcode；Windows 构建需要 Visual Studio 2022 C++ 工具、Windows SDK 与 NuGet CLI，详见[开发说明](docs/development.md)。
 
 以下命令适用于已安装 FVM 的 macOS / Linux 环境：
 
