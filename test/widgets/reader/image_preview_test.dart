@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/media/memory_image_repository.dart';
 import 'package:shiori/dev/fixtures.dart';
@@ -104,6 +105,12 @@ void main() {
       expect(find.byType(ReaderImagePreview), findsNothing);
       expect(controller.capture(), position);
       expect(boundaries, 0);
+      await tester.tap(find.byType(SourceImage).first);
+      await frames(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await frames(tester);
+      expect(find.byType(ReaderImagePreview), findsNothing);
+      expect(controller.capture(), position);
       await tester.tap(find.byType(SourceImage).first);
       await frames(tester);
       await tester.binding.handlePopRoute();

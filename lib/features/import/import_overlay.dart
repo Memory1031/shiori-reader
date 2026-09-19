@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../domain/contracts/import_source.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
@@ -50,6 +51,29 @@ class ImportOverlay extends StatefulWidget {
 
 class _ImportOverlayState extends State<ImportOverlay>
     with WidgetsBindingObserver {
+  bool _showing = false;
+  FocusNode? _previousFocus;
+
+  void _updateFocus(bool show) {
+    if (_showing == show) return;
+    _showing = show;
+    if (show) {
+      _previousFocus = FocusManager.instance.primaryFocus;
+    } else {
+      final previous = _previousFocus;
+      _previousFocus = null;
+      // Wait until ExcludeFocus has enabled the underlying route again.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            !_showing &&
+            previous?.context != null &&
+            previous!.canRequestFocus) {
+          previous.requestFocus();
+        }
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -80,9 +104,10 @@ class _ImportOverlayState extends State<ImportOverlay>
           c.batchProblem != null ||
           c.items.any((item) => item.phase != ImportItemPhase.succeeded);
       final show = c.panelOpen || !c.snoozed && hasOpenWork;
+      _updateFocus(show);
       return Stack(
         children: [
-          widget.child,
+          ExcludeFocus(excluding: show, child: widget.child),
           if (show)
             ModalBarrier(
               key: const ValueKey('import-dismiss-barrier'),
@@ -95,27 +120,37 @@ class _ImportOverlayState extends State<ImportOverlay>
             ),
           if (show)
             Positioned.fill(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: 560,
-                        maxHeight: MediaQuery.sizeOf(context).height * .7,
-                      ),
-                      child: Material(
-                        elevation: 8,
-                        borderRadius: BorderRadius.circular(20),
-                        color: Theme.of(context).colorScheme.surfaceContainer,
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: c.discarding
-                              ? const LinearProgressIndicator()
-                              : c.panelOpen
-                              ? _panel(context, c, l)
-                              : _banner(context, c, l),
+              child: FocusScope(
+                autofocus: true,
+                onKeyEvent: (_, event) {
+                  if (event.logicalKey != LogicalKeyboardKey.escape) {
+                    return KeyEventResult.ignored;
+                  }
+                  if (event is KeyDownEvent) c.dismiss();
+                  return KeyEventResult.handled;
+                },
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: 560,
+                          maxHeight: MediaQuery.sizeOf(context).height * .7,
+                        ),
+                        child: Material(
+                          elevation: 8,
+                          borderRadius: BorderRadius.circular(20),
+                          color: Theme.of(context).colorScheme.surfaceContainer,
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: c.discarding
+                                ? const LinearProgressIndicator()
+                                : c.panelOpen
+                                ? _panel(context, c, l)
+                                : _banner(context, c, l),
+                          ),
                         ),
                       ),
                     ),

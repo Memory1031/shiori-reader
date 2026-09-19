@@ -10,6 +10,7 @@ Future<void> showReaderImagePreview(
   required ImageRepository repository,
 }) => Navigator.of(context).push<void>(
   PageRouteBuilder<void>(
+    barrierDismissible: true,
     settings: const RouteSettings(name: '/reader-image'),
     transitionDuration: MediaQuery.disableAnimationsOf(context)
         ? Duration.zero

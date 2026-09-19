@@ -3,7 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shiori/app/app.dart';
+import 'package:shiori/app/routes.dart';
 import 'package:shiori/data/local/database/user_database.dart';
 import 'package:shiori/data/local/files/app_paths.dart';
 import 'package:shiori/data/local/managed_local_books.dart';
@@ -11,9 +14,14 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/contracts/import_source.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/features/import/import_controller.dart';
 import 'package:shiori/features/import/import_overlay.dart';
+import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
+
+import '../../widgets/reader/settings_test.dart' show Store;
 
 /// Fake durable inbox: receipts survive until acknowledged, order is stable.
 class MemorySource implements ImportSource {
@@ -1071,6 +1079,97 @@ void main() {
   );
 
   group('overlay batch', () {
+    for (final expanded in [false, true]) {
+      testWidgets(
+        'import modal isolates reader focus with expanded=$expanded',
+        (tester) async {
+          await controller.start();
+          final pages = PagedReaderController();
+          final content = ChapterContent(
+            key: fixtureChapterKey(FixtureScenario.longChapter),
+            title: 'Keyboard isolation',
+            blocks: [
+              for (var i = 0; i < 40; i++)
+                ParagraphBlock(text: '$i ${'阅读器键盘焦点测试。' * 40}'),
+            ],
+          );
+          await tester.pumpWidget(
+            ShioriApp(
+              overlayBuilder: (_, child) =>
+                  ImportOverlay(controller: controller, child: child),
+              routes: AppRoutes(
+                home: (_) => ReaderContentView(
+                  content: content,
+                  viewportController: pages,
+                  settings: Store()
+                    ..value = ReaderSettings(controlsHintSeen: true),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+          await tester.pumpAndSettle();
+          final position = pages.capture()!;
+          expect(position.chapterFraction, greaterThan(0));
+          final readerFocus = FocusManager.instance.primaryFocus;
+          source.receive();
+          await tester.pumpAndSettle();
+          if (expanded) {
+            controller.open();
+            await tester.pumpAndSettle();
+          }
+          expect(
+            find.byKey(const ValueKey('import-dismiss-barrier')),
+            findsOneWidget,
+          );
+          for (final key in [
+            LogicalKeyboardKey.pageDown,
+            LogicalKeyboardKey.arrowRight,
+            LogicalKeyboardKey.pageUp,
+            LogicalKeyboardKey.arrowLeft,
+          ]) {
+            await tester.sendKeyEvent(key);
+            await tester.pumpAndSettle();
+            expect(pages.capture(), position);
+          }
+          // Escape must neither dismiss nor cancel an active incoming copy.
+          source.events.add(const ImportSourceEvent(copiedBytes: 0));
+          await tester.pump();
+          expect(controller.busy, isTrue);
+          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+          await tester.pump();
+          expect(controller.busy, isTrue);
+          expect(
+            find.byKey(const ValueKey('import-dismiss-barrier')),
+            findsOneWidget,
+          );
+          source.events.add(const ImportSourceEvent(completed: true));
+          await tester.pumpAndSettle();
+          expect(controller.busy, isFalse);
+          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('import-dismiss-barrier')),
+            findsNothing,
+          );
+          expect(source.acked, isEmpty);
+          expect(controller.items, hasLength(1));
+          expect(FocusManager.instance.primaryFocus, readerFocus);
+          await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+          await tester.pumpAndSettle();
+          expect(
+            pages.capture()!.chapterFraction,
+            greaterThan(position.chapterFraction),
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpAndSettle();
+        },
+        variant: TargetPlatformVariant.only(TargetPlatform.windows),
+      );
+    }
+
     for (final count in [1, 3]) {
       testWidgets('cancel $count selected files allows a fresh selection', (
         tester,
