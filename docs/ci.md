@@ -5,9 +5,9 @@
 | 事件 | 工作流与行为 |
 | --- | --- |
 | PR、推送 main / develop、手动 CI | [ci.yml](../.github/workflows/ci.yml)：质量检查与 Windows x64 Release 构建，不打包 APK |
-| 推送 `v*` tag | [release.yml](../.github/workflows/release.yml)：检查后构建签名 Release APK，创建 / 更新 GitHub Release |
+| 推送 `v*` tag | [release.yml](../.github/workflows/release.yml)：并行构建签名 APK 与 Windows ZIP，二者通过后统一创建 / 更新 GitHub Release |
 
-用户已取消日常 Android Debug / Release smoke。普通 CI 的 Windows 构建只验证编译与运行目录，不发布 GitHub Release 资产；tag 流程会实际发布仓库 Release 资产。
+用户已取消日常 Android Debug / Release smoke。普通 CI 的 Windows 构建验证编译与运行目录；手动 CI 还提供保留 7 天的 Windows ZIP artifact，不发布 GitHub Release 资产；tag 流程会实际发布仓库 Release 资产。
 
 ## 质量检查
 
@@ -23,13 +23,21 @@ CI 检查工作流结构、锁文件变化、数据库生成与新 schema、gen-
 
 Windows 构建 job 与质量检查独立运行，使用 `windows-2022` / Visual Studio 2022、同一固定 Flutter 版本及严格锁文件安装；构建前检查 VS 主版本。Git 长路径配置覆盖检出和 Pub 子进程，以支持固定提交的 WebView fork；仅缓存 SDK 和 Pub 依赖，不复用本机构建目录。构建入口固定为 `lib/main.dart`，检查 EXE、Flutter / WebView DLL、AOT 与资源文件是否存在且非空。CI 不启动应用或执行在线探针，编译成功不代表运行验收通过。
 
+## Windows ZIP 与统一发布
+
+`tool/package_windows.ps1` 查找 Visual Studio 2022 的 x64 VC++ 运行库，调用标准库脚本 `tool/release_windows.py` 打包。脚本核对 tag / pubspec、EXE 的 x64 架构、产品身份、版本与非 Debug 标志，验证必需 DLL / AOT / 资源文件，保留完整 data 目录及许可声明。ZIP 根目录直接包含 `shiori.exe`；不带 PDB 或包含构建机路径的 native_assets.json。
+
+Windows 产物为 `shiori-reader-<tag>-windows-x64.zip`、`SHA256SUMS-windows-x64.txt` 和 `release-info-windows-x64.json`（版本、commit、摘要及未签名状态），与 Android 文件名分开。tag 构建产物保留 14 天；`publish` job 等待两个平台构建成功，下载当前运行的两个 artifact、核对两份 SHA-256 后统一上传同一 GitHub Release。只有该 job 获得 Release 写权限。任一构建或校验失败，都不进入发布。
+
+手动 CI 调用同一打包入口，使用 pubspec 对应版本与当前提交，仅上传 Actions artifact。此产物用于发版前验包；不代表正式 tag 发布已通过。Windows 使用方式与分发边界见[发布说明](release/README.md)。
+
 ## Android tag 发布
 
 APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前执行 `release_android.py tools` 预检，不依赖 PATH 中的 sdkmanager，也不自动选 runner 上最高版本：更高预装版本的 `apksigner --print-certs` 输出 `V2 Signer: certificate SHA-256 digest`，与校验器预期的 `Signer #1 certificate SHA-256 digest` 格式不同，会导致校验失败。该差异已用官方工具复现确认；固定版本是规避手段，未绕过签名检查。
 
 已知校验错误现在输出受控原因（版本、证书、工具），不会输出工具参数、原始 stderr 或签名秘密；未知异常仍使用通用提示。
 
-按用户约定，tag 发布直接进入 `android-release`，不查询或等待 CI、不重复执行格式 / 分析 / UT。develop 日常 CI 保持独立；master 仅作为发布中间分支，不因推送触发 CI 或 Release。发布脚本优先快进 master，保留最终提交与标签的可追溯性。Android 构建仍保留工具预检、版本一致性、签名和 APK 校验；失败时不上传 Release。签名需要四个仓库 Actions secrets：
+按用户约定，tag 发布直接并行进入 `android-release` 与 `windows-release`，不查询或等待 CI、不重复执行格式 / 分析 / UT。develop 日常 CI 保持独立；master 仅作为发布中间分支，不因推送触发 CI 或 Release。发布脚本优先快进 master，保留最终提交与标签的可追溯性。Android 构建仍保留工具预检、版本一致性、签名和 APK 校验；失败时不上传 Release。签名需要四个仓库 Actions secrets：
 
 | Secret | 内容 |
 | --- | --- |

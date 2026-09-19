@@ -1,7 +1,7 @@
 name: Release
 
 # 正式发布工作流：仅在推送 v* 标签时触发。日常质量检查由 ci.yml 负责，
-# 按用户约定直接构建 Android；完整检查由 develop CI 独立执行。
+# Android 与 Windows 并行构建后统一发布；完整检查由 develop CI 独立执行。
 # 对外公开分发前需完成 docs/release/dependencies.md 中的渠道 / 许可核对。
 on:
   push:
@@ -24,8 +24,6 @@ env:
 jobs:
   android-release:
     name: Android 签名发布构建
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -83,6 +81,89 @@ jobs:
           path: build/release-assets/
           if-no-files-found: error
           retention-days: 14
+
+  windows-release:
+    name: Windows x64 ZIP
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.longpaths
+      GIT_CONFIG_VALUE_0: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+          pub-cache-key: "flutter-pub-:os:-:version:-:arch:-${{ hashFiles('pubspec.lock') }}"
+
+      - name: 检查 Windows 工具链
+        run: |
+          Get-Command nuget -ErrorAction Stop | Select-Object Source
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vsVersion = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion
+          if ($LASTEXITCODE -ne 0 -or !$vsVersion -or ([version]$vsVersion).Major -ne 17) {
+            throw 'Windows release requires Visual Studio 2022'
+          }
+
+      - name: 校验 tag 与包版本
+        run: python tool/release_android.py version
+
+      - name: 严格安装依赖
+        run: flutter pub get --enforce-lockfile
+
+      - name: 检查锁文件
+        run: git diff --exit-code -- pubspec.lock
+
+      - name: 构建 Windows Release
+        run: flutter build windows --release --no-pub --target lib/main.dart
+
+      - name: 校验并打包 Windows ZIP
+        run: ./tool/package_windows.ps1
+
+      - name: 保存已验证 Windows 产物
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-release-${{ github.ref_name }}
+          path: build/windows-release-assets/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: 发布 Android 与 Windows 产物
+    needs: [android-release, windows-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: android-release-${{ github.ref_name }}
+          path: build/release-assets/
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: windows-release-${{ github.ref_name }}
+          path: build/release-assets/
+
+      - name: 核对合并后的产物校验和
+        run: |
+          cd build/release-assets
+          sha256sum --check SHA256SUMS.txt
+          sha256sum --check SHA256SUMS-windows-x64.txt
 
       - name: 创建 GitHub Release 并附上产物
         env:

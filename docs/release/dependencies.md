@@ -131,6 +131,8 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 
 Apple 平台的原生依赖由 CocoaPods 解析，`flutter_inappwebview` 还依赖 OrderedSet；Windows 插件通过 NuGet 引入 WebView2 SDK、Windows Implementation Library 与 nlohmann.json。具体原生声明随包及 SDK 保留，分发时须与实际锁文件和产物核对。Android 原生传递依赖与最终 APK 的 NOTICES、签名、摘要仍须随最终发布产物核对。WHATWG 编码附加声明保留在 assets/licenses/whatwg-encoding.txt。
 
+Windows ZIP 保留 Flutter 的 `data/flutter_assets/NOTICES.Z` 与根 LICENSE，并在 `licenses/` 附带 NuGet 的 WebView2 LICENSE / NOTICE、WIL LICENSE 和 nlohmann.json 3.11.2 的官方 MIT 许可原文。原生依赖升级时需同步打包脚本中的版本目录与许可文件。
+
 本文件是 Dart 锁定依赖文本快照，未宣称原生/产物许可全部审查通过。分发范围与其他素材边界见[发布说明](README.md)。
 
 ## 许可与隐私边界

@@ -85,10 +85,20 @@ void main() {
       (releaseEvents['push'] as YamlMap)['tags'] == null) {
     throw StateError('Release workflow must be tag-triggered only');
   }
-  if (releaseJobs.length != 1 ||
+  if (releaseJobs.length != 3 ||
       !releaseJobs.containsKey('android-release') ||
-      releaseJobs['android-release']['needs'] != null) {
-    throw StateError('Tag release must enter Android packaging directly');
+      !releaseJobs.containsKey('windows-release') ||
+      !releaseJobs.containsKey('publish') ||
+      releaseJobs['android-release']['needs'] != null ||
+      releaseJobs['windows-release']['needs'] != null ||
+      (releaseJobs['publish']['needs'] as YamlList).toSet().difference({
+        'android-release',
+        'windows-release',
+      }).isNotEmpty ||
+      (releaseJobs['publish']['needs'] as YamlList).length != 2) {
+    throw StateError(
+      'Release needs parallel builders and one dependent publisher',
+    );
   }
   final releaseChecks = ciJobs['quality']['steps'] as YamlList;
   final releaseCommands = releaseChecks
@@ -131,8 +141,7 @@ void main() {
   }
   final build = commandIndex('flutter build apk --release');
   final verify = commandIndex('release_android.py verify');
-  final publish = commandIndex('gh release create');
-  if (signing < 0 || build <= signing || verify <= build || publish <= verify) {
+  if (signing < 0 || build <= signing || verify <= build) {
     throw StateError(
       'Release must prepare signing, build, verify, then publish',
     );
@@ -156,6 +165,89 @@ void main() {
         ),
   )) {
     throw StateError('Signing files need unconditional cleanup');
+  }
+
+  const manualGate = "github.event_name == 'workflow_dispatch'";
+  final manualPackage = windowsIndex('./tool/package_windows.ps1');
+  final manualUpload = windowsSteps.indexWhere(
+    (step) =>
+        (step['uses']?.toString() ?? '').startsWith('actions/upload-artifact@'),
+  );
+  if (manualPackage <= windowsBuild ||
+      manualUpload <= manualPackage ||
+      windowsSteps[manualPackage]['if'] != manualGate ||
+      windowsSteps[manualUpload]['if'] != manualGate) {
+    throw StateError(
+      'CI ZIP packaging and artifact upload must be manual-only',
+    );
+  }
+  final windowsRelease = releaseJobs['windows-release'] as YamlMap;
+  final zipSteps = windowsRelease['steps'] as YamlList;
+  int zipIndex(String command) => zipSteps.indexWhere(
+    (step) => (step['run']?.toString() ?? '').contains(command),
+  );
+  final zipVersion = zipIndex('release_android.py version');
+  final zipDependencies = zipIndex('flutter pub get --enforce-lockfile');
+  final zipLock = zipIndex('git diff --exit-code -- pubspec.lock');
+  final zipBuild = zipIndex(
+    'flutter build windows --release --no-pub --target lib/main.dart',
+  );
+  final zipPackage = zipIndex('./tool/package_windows.ps1');
+  final zipUpload = zipSteps.indexWhere(
+    (step) =>
+        (step['uses']?.toString() ?? '').startsWith('actions/upload-artifact@'),
+  );
+  if (release['env']['FLUTTER_VERSION'].toString() != flutterVersion ||
+      windowsRelease['runs-on'] != 'windows-2022' ||
+      windowsRelease['env']['GIT_CONFIG_VALUE_0'] != 'true' ||
+      zipVersion < 0 ||
+      zipDependencies <= zipVersion ||
+      zipLock <= zipDependencies ||
+      zipBuild <= zipLock ||
+      zipPackage <= zipBuild ||
+      zipUpload <= zipPackage) {
+    throw StateError(
+      'Windows release must check version, lock, build and package before upload',
+    );
+  }
+  final publisher = releaseJobs['publish'] as YamlMap;
+  final publisherSteps = publisher['steps'] as YamlList;
+  final downloads = publisherSteps
+      .where(
+        (step) => (step['uses']?.toString() ?? '').startsWith(
+          'actions/download-artifact@',
+        ),
+      )
+      .toList();
+  if (downloads.length != 2 ||
+      downloads.map((step) => step['with']['name']).toSet().difference({
+        r'android-release-${{ github.ref_name }}',
+        r'windows-release-${{ github.ref_name }}',
+      }).isNotEmpty ||
+      downloads.any(
+        (step) =>
+            step['with']['path'] != 'build/release-assets/' ||
+            step['with']['run-id'] != null,
+      ) ||
+      publisher['permissions']['contents'] != 'write' ||
+      release['permissions']['contents'] != 'read') {
+    throw StateError(
+      'Only publisher may write releases using both current-run artifacts',
+    );
+  }
+  int publisherIndex(String command) => publisherSteps.indexWhere(
+    (step) => (step['run']?.toString() ?? '').contains(command),
+  );
+  final sums = publisherIndex('sha256sum --check SHA256SUMS.txt');
+  if (sums <= publisherSteps.indexOf(downloads.last) ||
+      publisherIndex('sha256sum --check SHA256SUMS-windows-x64.txt') != sums ||
+      publisherIndex('gh release create') <= sums) {
+    throw StateError('Both artifact checksums must pass before publishing');
+  }
+  for (final builder in ['android-release', 'windows-release']) {
+    if (releaseJobs[builder]['permissions']?['contents'] == 'write') {
+      throw StateError('Build jobs must not have release write permissions');
+    }
   }
 
   final ios =
@@ -295,7 +387,7 @@ void main() {
   }
   stdout.writeln(
     'Workflow YAML parsed; quality and Windows build CI, tag-only releases '
-    '(Android + iOS), tag-gated uploads, SHA-pinned actions, no persisted '
+    '(Android + Windows + iOS), tag-gated uploads, SHA-pinned actions, no persisted '
     'checkout credentials and working directories verified.',
   );
 }
