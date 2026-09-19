@@ -52,7 +52,7 @@ Windows v1 目标：
 | 8. Desktop 书库 UI | 检查宽屏布局 | 基于 viewport / breakpoint 限制内容宽度，必要时自适应双列；避免 Windows 专属布局条件 | 1280px+ 窗口无超宽卡片或明显移动端拉伸感 | P1 | ✅ 宽屏组件验收通过，覆盖 1280 / 1920 / 2560、显示缩放、中英文、长书名、滚轮及网格 / 列表 resize；用户确认 Windows 原生窗口布局、悬停反馈和阅读返回均通过 |
 | 9. 数据持久化 | Windows SQLite / AppSupport smoke | 复用现有 Drift `NativeDatabase`、Application Support 与缓存目录 | 重启后书架、进度、设置和缓存正常保留 | P0 | ✅ 隔离数据目录下，正常退出重启及强制终止后的书架、设置、ContinueReading 位置、缓存与本地媒体恢复通过；采用固定提交的 Windows WebView fork，普通关闭、特殊页关闭、重复开关及 Release ZIP 验收通过 |
 | 10. 在线书源 | Windows 网络能力 smoke | 复用现有 `NovelSource` / LightNovel.fun adapter | 搜索 → 详情 → 目录 → 阅读完整走通 | P0 | ✅ Windows Release 真进程通过生产页面回调完成真实在线搜索、详情、目录、正文、往返翻页及首张插图显示验收；搜索封面与其余插图未纳入本轮 |
-| 11. CI | Windows 构建仅保留在 tag 发布 | `windows-2022` / VS 2022 + 项目固定 Flutter 版本；外部 Actions 继续完整 SHA pin | 日常 develop / PR 只检查质量，tag 构建 Windows Release | P1 | ✅ 已完成托管 runner 构建验证；按发布范围移除日常 Windows 完整构建及临时 ZIP 验包入口，保留 tag 构建 |
+| 11. CI | Windows tag 发布构建 | `windows-2022` / VS 2022 + 项目固定 Flutter 版本；外部 Actions 继续完整 SHA pin | 日常 develop / PR 检查质量，tag 构建 Windows Release | P1 | ✅ 托管 runner 构建验证通过，日常质量检查与 tag 构建配置已对齐 |
 | 12. 发布产物 | GitHub Release 增加 Windows | 第一版直接发布 `shiori-reader-vX.Y.Z-windows-x64.zip` | Release 同时提供 Android APK 与 Windows ZIP | P1 | ◐ ZIP 打包与双平台统一发布已接入；远端 CI ZIP 校验、解压启动和正常退出通过；真实 tag 的 APK + ZIP 发布待验证 |
 | 13. 发布前回归 | Windows 专项验收 | 覆盖启动、导入、重启、在线阅读、EPUB 阅读、resize、键盘 / 鼠标操作 | 无阻止 Windows beta 发布的问题 | P0 | ✅ 完整离线回归、Windows 原生阅读与重启回归、真实在线流程通过；resize / 键鼠组件回归及此前用户原生操作验收通过；iOS 运行验收独立保留 |
 | 后续专项：Desktop UI 重设计 | 核心能力稳定后，设计适合桌面的应用界面与阅读工作区 | 先确定交互原型，再实现桌面导航、书库、阅读器与设置面板；加入独立的正文字体选择与导入 | 鼠标、键盘和宽窗口下的主要流程自然；移动端体验保持独立适配；字体切换不丢失阅读位置 | P2 | ☐ 已列入计划，尚未开始；含字体自由选择 |

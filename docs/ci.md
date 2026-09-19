@@ -4,10 +4,10 @@
 
 | 事件 | 工作流与行为 |
 | --- | --- |
-| PR、推送 main / develop、手动 CI | [ci.yml](../.github/workflows/ci.yml)：仅质量检查，不构建应用或打包 |
+| PR、推送 main / develop、手动 CI | [ci.yml](../.github/workflows/ci.yml)：质量检查 |
 | 推送 `v*` tag | [release.yml](../.github/workflows/release.yml)：并行构建签名 APK 与 Windows ZIP，二者通过后统一创建 / 更新 GitHub Release |
 
-普通 CI 不执行 Android / Windows 完整构建，也不上传临时验包产物。完整构建与发布资产由 tag 流程负责。
+日常 CI 负责质量检查，tag 工作流负责应用构建与发布。
 
 ## 质量检查
 
