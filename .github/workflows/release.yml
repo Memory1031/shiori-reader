@@ -172,10 +172,13 @@ jobs:
           set -euo pipefail
           # 已有 Release 才走覆盖上传；创建失败不再被无条件 fallback 掩盖。
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+              gh release edit "$GITHUB_REF_NAME" --prerelease --latest=false
+            fi
             gh release upload "$GITHUB_REF_NAME" build/release-assets/* --clobber
           else
             RELEASE_FLAGS=()
-            if [[ "$GITHUB_REF_NAME" == *-* ]]; then RELEASE_FLAGS+=(--prerelease); fi
+            if [[ "$GITHUB_REF_NAME" == *-* ]]; then RELEASE_FLAGS+=(--prerelease --latest=false); fi
             NOTES_FILE="docs/release/notes/${GITHUB_REF_NAME}.md"
             if [[ -f "$NOTES_FILE" ]]; then
               RELEASE_FLAGS+=(--notes-file "$NOTES_FILE")

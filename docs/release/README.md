@@ -15,7 +15,7 @@
 
 ## 1. 准备
 
-在干净的 develop 上使用项目 Dart SDK：
+正式版本在干净的 develop 上使用项目 Dart SDK：
 
 ```sh
 dart tool/publish_release.dart prepare patch
@@ -25,6 +25,31 @@ dart tool/publish_release.dart prepare patch --apply
 支持 patch / minor / major，内部构建号递增，同步 pubspec 与全部 ShareExtension 配置。已 prepare 的版本不要重复执行，先检查 diff；提交后再次 prepare 会继续递增。
 
 按输出版本编写 `notes/vX.Y.Z.md`，执行与改动相关的本地测试及必要分析、构建，记录实际结果和未测项。prepare 不提交、不推送、不打标签。
+
+### 同版本 beta
+
+日常测试版本使用 `prepare beta`，保留当前 `X.Y.Z`，递增内部构建号并同步全部 ShareExtension 配置：
+
+```sh
+dart tool/publish_release.dart prepare beta
+dart tool/publish_release.dart prepare beta --apply
+```
+
+脚本读取当前版本的本地及 origin 标签，选择下一个 beta 序号。每个版本从 `beta.1` 开始，beta 序号与内部构建号独立，例如：
+
+| 标签 | 包版本与内部构建号 |
+| --- | --- |
+| `v1.2.1-beta.1` | `1.2.1+11` |
+| `v1.2.1-beta.2` | `1.2.1+12` |
+
+切换到新的 `X.Y.Z` 后，beta 序号从 1 开始，内部构建号继续递增。预览会显示建议标签；审阅、提交并推送 develop，通过质量检查后，使用输出标签发布：
+
+```sh
+dart tool/publish_release.dart v1.2.1-beta.1
+dart tool/publish_release.dart v1.2.1-beta.1 --publish
+```
+
+beta 附注标签直接指向已同步的 develop 提交。Android APK 与 Windows ZIP 进入 GitHub 预发布，Latest 指向正式发布；iOS 使用相同版本号和递增构建号上传 TestFlight。可在 `notes/<beta-tag>.md` 提供说明，缺失时由 GitHub 自动生成。
 
 ## 2. 提交和发布
 
@@ -39,7 +64,7 @@ dart tool/publish_release.dart vX.Y.Z --publish
 
 master 仅是发布中间分支。tag 同时触发 Android 签名 APK、Windows x64 ZIP 与 iOS 签名 / TestFlight 上传；APK 和 ZIP 均构建成功后统一发布到 GitHub Release，不等待日常 CI，也不重复 UT / analyze。CI 绿色不能替代本地测试记录。
 
-GitHub Release 优先读取 `notes/<tag>.md`，缺失时自动生成；已有 Release 重跑只更新附件，手动编辑过的正文需在 GitHub 单独更新。
+GitHub Release 优先读取 `notes/<tag>.md`，缺失时自动生成；已有 Release 重跑更新附件并保持 beta 的预发布标记，手动编辑过的正文需在 GitHub 单独更新。
 
 ## 3. 验收
 

@@ -4,7 +4,8 @@ import 'dart:io';
 void main(List<String> args) {
   const usage =
       'dart tool/publish_release.dart v1.0.0 [--publish]\n'
-      'dart tool/publish_release.dart prepare patch|minor|major [--apply]';
+      'dart tool/publish_release.dart v1.0.0-beta.1 [--publish]\n'
+      'dart tool/publish_release.dart prepare beta|patch|minor|major [--apply]';
   if (args.contains('--help')) {
     stdout.writeln(usage);
     return;
@@ -60,9 +61,13 @@ void publishRelease(String directory, String tag, {bool publish = false}) {
       ], workingDirectory: directory).exitCode ==
       0;
 
-  if (!RegExp(r'^v\d+\.\d+\.\d+$').hasMatch(tag)) {
-    throw StateError('Expected a stable version tag such as v1.0.0');
+  final tagVersion = RegExp(
+    r'^v(\d+\.\d+\.\d+)(?:-beta\.([1-9]\d*))?$',
+  ).firstMatch(tag);
+  if (tagVersion == null) {
+    throw StateError('Expected vX.Y.Z or vX.Y.Z-beta.N');
   }
+  final beta = tagVersion[2] != null;
   directory = git(['rev-parse', '--show-toplevel']);
   if (git(['status', '--porcelain']).isNotEmpty) {
     throw StateError(
@@ -79,7 +84,7 @@ void publishRelease(String directory, String tag, {bool publish = false}) {
     multiLine: true,
   ).firstMatch(pubspec);
   if (version == null ||
-      'v${version[1]}' != tag ||
+      version[1] != tagVersion[1] ||
       int.parse(version[2]!) > 2100000000) {
     throw StateError(
       'Tag must match the committed pubspec version and a valid build number.',
@@ -121,6 +126,33 @@ void publishRelease(String directory, String tag, {bool publish = false}) {
   }
   if (exists('refs/tags/$tag') || refs.containsKey('refs/tags/$tag')) {
     throw StateError('Tag $tag already exists; tags are never overwritten.');
+  }
+  if (beta) {
+    stdout.writeln(
+      'develop: $source\nbeta: $tag\ninternal build: ${version[2]}\n'
+      'Plan: annotated beta tag on develop; push tag for all platforms.',
+    );
+    if (!publish) {
+      stdout.writeln(
+        'Preview only; use --publish to execute. No refs changed.',
+      );
+      return;
+    }
+    git([
+      'fetch',
+      '--no-tags',
+      'origin',
+      '+refs/heads/develop:refs/remotes/origin/develop',
+    ]);
+    if (git(['rev-parse', 'refs/remotes/origin/develop']) != source) {
+      throw StateError('Remote develop changed during preparation; run again.');
+    }
+    git(['tag', '-a', tag, source, '-m', 'Beta $tag']);
+    git(['push', 'origin', 'refs/tags/$tag:refs/tags/$tag']);
+    stdout.writeln(
+      'Published $tag at $source. Platform beta workflows will run.',
+    );
+    return;
   }
   final master = refs['refs/heads/master'];
   if (exists('refs/heads/master') &&
@@ -186,7 +218,7 @@ void publishRelease(String directory, String tag, {bool publish = false}) {
     'refs/tags/$tag:refs/tags/$tag',
   ]);
   stdout.writeln(
-    'Published $tag at ${git(['rev-parse', 'HEAD'])}. Android release workflow will run.',
+    'Published $tag at ${git(['rev-parse', 'HEAD'])}. Platform release workflows will run.',
   );
   git(['switch', 'develop']);
 }
@@ -197,8 +229,8 @@ String prepareRelease(
   String increment, {
   bool apply = false,
 }) {
-  if (!['patch', 'minor', 'major'].contains(increment)) {
-    throw StateError('Expected patch, minor or major.');
+  if (!['beta', 'patch', 'minor', 'major'].contains(increment)) {
+    throw StateError('Expected beta, patch, minor or major.');
   }
   String git(List<String> args) {
     final result = Process.runSync('git', args, workingDirectory: directory);
@@ -226,14 +258,38 @@ String prepareRelease(
     );
   }
   final parts = [for (var i = 1; i <= 3; i++) int.parse(match[i]!)];
-  final index = {'major': 0, 'minor': 1, 'patch': 2}[increment]!;
-  parts[index]++;
-  for (var i = index + 1; i < 3; i++) {
-    parts[i] = 0;
+  if (increment != 'beta') {
+    final index = {'major': 0, 'minor': 1, 'patch': 2}[increment]!;
+    parts[index]++;
+    for (var i = index + 1; i < 3; i++) {
+      parts[i] = 0;
+    }
   }
   final next = parts.join('.');
   final build = int.parse(match[4]!) + 1;
   if (build > 2100000000) throw StateError('Build number limit reached.');
+  var tag = 'v$next';
+  if (increment == 'beta') {
+    // Beta sequence is per app version; the platform build number is global.
+    final candidates = [
+      ...git(['tag', '--list', 'v$next-beta.*']).split('\n'),
+      ...git(['ls-remote', '--tags', 'origin', 'refs/tags/v$next-beta.*'])
+          .split('\n')
+          .where((line) => line.isNotEmpty)
+          .map((line) => line.split(RegExp(r'\s+')).last),
+    ];
+    final pattern = RegExp(
+      '^(?:refs/tags/)?v${RegExp.escape(next)}-beta\\.([1-9]\\d*)\$',
+    );
+    var highest = 0;
+    for (final candidate in candidates) {
+      final found = pattern.firstMatch(candidate);
+      if (found == null) continue;
+      final sequence = int.parse(found[1]!);
+      if (sequence > highest) highest = sequence;
+    }
+    tag = 'v$next-beta.${highest + 1}';
+  }
   final project = File('$directory/ios/Runner.xcodeproj/project.pbxproj');
   final projectOriginal = project.readAsStringSync();
   var count = 0;
@@ -257,7 +313,7 @@ String prepareRelease(
   );
   if (count == 0) throw StateError('ShareExtension configuration missing.');
   stdout.writeln(
-    'Version: ${match[1]}.${match[2]}.${match[3]} -> $next\nInternal build: ${match[4]} -> $build',
+    'Version: ${match[1]}.${match[2]}.${match[3]} -> $next\nInternal build: ${match[4]} -> $build\nRelease tag: $tag',
   );
   if (apply) {
     pubspec.writeAsStringSync(
@@ -265,7 +321,7 @@ String prepareRelease(
     );
     project.writeAsStringSync(updated);
     stdout.writeln(
-      'Prepared v$next. Review, commit and push develop; after CI passes run:\ndart tool/publish_release.dart v$next --publish',
+      'Prepared $tag. Review, commit and push develop; after CI passes run:\ndart tool/publish_release.dart $tag --publish',
     );
   } else {
     stdout.writeln('Preview only. Add --apply to update version files.');

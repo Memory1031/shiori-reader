@@ -23,8 +23,12 @@ def version(pubspec, tag):
     match = re.search(r"^version:\s*(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\+([1-9]\d*)\s*$", pubspec, re.M)
     if not match or int(match[2]) > 2100000000:
         raise ReleaseCheckError("pubspec must have an Android-compatible version and positive build number")
-    if tag != "v" + match[1]:
-        raise ReleaseCheckError("Release tag must equal v + pubspec version (without build number)")
+    beta = re.fullmatch(r"v(\d+\.\d+\.\d+)-beta\.([1-9]\d*)", tag)
+    if beta:
+        if match[1] != beta[1]:
+            raise ReleaseCheckError("Beta tag base version must match pubspec")
+    elif '-beta.' in tag or tag != "v" + match[1]:
+        raise ReleaseCheckError("Release tag must match pubspec version or vX.Y.Z-beta.N")
     return match[1], match[2]
 
 

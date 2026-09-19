@@ -70,6 +70,17 @@ class WindowsReleaseTest(unittest.TestCase):
         with self.assertRaises(ReleaseCheckError):
             self.package()
 
+    def test_beta_archive_preserves_numeric_executable_version(self):
+        archive = self.package(tag='v1.2.0-beta.1')
+        self.assertEqual(archive.name, 'shiori-reader-v1.2.0-beta.1-windows-x64.zip')
+        metadata = json.loads((self.output / 'release-info-windows-x64.json').read_text())
+        self.assertEqual(metadata['tag'], 'v1.2.0-beta.1')
+        self.assertEqual(metadata['versionName'], '1.2.0')
+        self.assertEqual(str(metadata['versionCode']), '9')
+        self.assertIn(archive.name, (self.output / 'SHA256SUMS-windows-x64.txt').read_text())
+        with self.assertRaises(ReleaseCheckError):
+            self.package(tag='v1.2.1-beta.1')
+
     def test_tag_and_architecture_rejected(self):
         with self.assertRaises(ReleaseCheckError):
             self.package(tag='v1.3.0')

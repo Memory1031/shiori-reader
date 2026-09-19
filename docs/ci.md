@@ -9,6 +9,8 @@
 
 日常 CI 负责质量检查，tag 工作流负责应用构建与发布。
 
+正式标签为 `vX.Y.Z`，beta 标签为 `vX.Y.Z-beta.N`。三端共用版本预检：标签基础版本与 pubspec 的 `X.Y.Z` 一致，包内使用 `X.Y.Z+build`；每个版本的 beta 序号从 1 开始，内部构建号独立递增。beta 的 APK / ZIP 标记为 GitHub 预发布，Latest 保持正式发布；iOS 上传 TestFlight。准备与发布命令见[发布操作](release/README.md)。
+
 ## 质量检查
 
 固定 Flutter 3.38.4，应用、`tools/source_probe`、`tool/db_codegen` 三份依赖严格按 lockfile 安装。统一 `PUB_HOSTED_URL=https://pub.flutter-io.cn`，缓存只加速安装，不能替代锁文件校验。

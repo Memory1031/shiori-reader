@@ -4,6 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/publish_release.dart';
 
+class _CapturedStdout implements Stdout {
+  final text = StringBuffer();
+
+  @override
+  void writeln([Object? object = '']) => text.writeln(object);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   late Directory temporary;
   late String repo;
@@ -46,6 +56,7 @@ void main() {
   tearDown(() => temporary.deleteSync(recursive: true));
 
   for (final entry in {
+    'beta': '1.2.3',
     'patch': '1.2.4',
     'minor': '1.3.0',
     'major': '2.0.0',
@@ -73,6 +84,68 @@ void main() {
       );
     });
   }
+
+  test('beta sequence uses local and remote tags independently of build', () {
+    String preview() {
+      final output = _CapturedStdout();
+      IOOverrides.runZoned(
+        () => prepareRelease(repo, 'beta'),
+        stdout: () => output,
+      );
+      return output.text.toString();
+    }
+
+    expect(preview(), contains('Release tag: v1.0.0-beta.1'));
+    git(['tag', 'v1.0.0-beta.2']);
+    git(['tag', '-a', 'v1.0.0-beta.10', '-m', 'remote beta']);
+    git(['push', 'origin', 'v1.0.0-beta.10']);
+    git(['tag', '-d', 'v1.0.0-beta.10']);
+    git(['tag', 'v1.0.0-beta.99-extra']);
+    expect(preview(), contains('Release tag: v1.0.0-beta.11'));
+    git(['tag', 'v1.0.0-beta.12']);
+    expect(preview(), contains('Release tag: v1.0.0-beta.13'));
+    expect(git(['status', '--porcelain']), isEmpty);
+
+    prepareRelease(repo, 'patch', apply: true);
+    commit('next-version');
+    final next = preview();
+    expect(next, contains('Release tag: v1.0.1-beta.1'));
+    expect(next, contains('Internal build: 3 -> 4'));
+  });
+
+  test('beta tags develop and preserves a diverged master', () {
+    git(['switch', '-c', 'master']);
+    commit('master-only');
+    git(['push', 'origin', 'master']);
+    final master = git(['rev-parse', 'master']);
+    git(['switch', 'develop']);
+    commit('beta-change');
+    git(['push', 'origin', 'develop']);
+    final source = git(['rev-parse', 'develop']);
+    final before = git(['show-ref']);
+    publishRelease(repo, 'v1.0.0-beta.1');
+    expect(git(['show-ref']), before);
+    publishRelease(repo, 'v1.0.0-beta.1', publish: true);
+    expect(git(['cat-file', '-t', 'v1.0.0-beta.1']), 'tag');
+    expect(git(['rev-parse', 'v1.0.0-beta.1^{}'], cwd: remote), source);
+    expect(git(['rev-parse', 'master']), master);
+    expect(git(['rev-parse', 'master'], cwd: remote), master);
+    expect(git(['branch', '--show-current']), 'develop');
+    expect(
+      () => publishRelease(repo, 'v1.0.0-beta.1', publish: true),
+      throwsStateError,
+    );
+  });
+
+  test('beta rejects invalid tags, dirty tree and unpushed develop', () {
+    for (final tag in ['v1.0.1-beta.1', 'v1.0.0-beta.0', 'v1.0.0-beta.01']) {
+      expect(() => publishRelease(repo, tag), throwsStateError);
+    }
+    File('$repo/dirty').writeAsStringSync('unfinished');
+    expect(() => publishRelease(repo, 'v1.0.0-beta.1'), throwsStateError);
+    commit('unpushed-beta');
+    expect(() => publishRelease(repo, 'v1.0.0-beta.1'), throwsStateError);
+  });
 
   test(
     'prepare rejects invalid increment and malformed extension before writing',

@@ -47,7 +47,8 @@ void main() {
   final releaseJobs = release['jobs'] as YamlMap;
   // 发布工作流只允许 tag 触发：普通推送 / PR / 手动入口不得产出发布包。
   if (releaseEvents.keys.length != 1 ||
-      (releaseEvents['push'] as YamlMap)['tags'] == null) {
+      ((releaseEvents['push'] as YamlMap)['tags'] as YamlList?)?.single !=
+          'v*') {
     throw StateError('Release workflow must be tag-triggered only');
   }
   if (releaseJobs.length != 3 ||
@@ -198,6 +199,18 @@ void main() {
       publisherIndex('gh release create') <= sums) {
     throw StateError('Both artifact checksums must pass before publishing');
   }
+  final releaseCommand =
+      publisherSteps[publisherIndex('gh release create')]['run'] as String;
+  if (!releaseCommand.contains(
+        'RELEASE_FLAGS+=(--prerelease --latest=false)',
+      ) ||
+      !releaseCommand.contains(
+        r'gh release edit "$GITHUB_REF_NAME" --prerelease --latest=false',
+      )) {
+    throw StateError(
+      'Beta releases must remain prereleases on creation and rerun',
+    );
+  }
   for (final builder in ['android-release', 'windows-release']) {
     if (releaseJobs[builder]['permissions']?['contents'] == 'write') {
       throw StateError('Build jobs must not have release write permissions');
@@ -210,7 +223,7 @@ void main() {
   final iosEvents = ios['on'] as YamlMap;
   final iosJobs = ios['jobs'] as YamlMap;
   // iOS 发布同样只由 tag 触发上传；手动入口仅允许构建冒烟。
-  if ((iosEvents['push'] as YamlMap)['tags'] == null) {
+  if (((iosEvents['push'] as YamlMap)['tags'] as YamlList?)?.single != 'v*') {
     throw StateError('iOS release must be tag-triggered');
   }
   // 公开仓库的 Actions 产物任何登录用户都可下载；

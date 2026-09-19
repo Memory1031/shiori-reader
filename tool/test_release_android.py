@@ -42,6 +42,22 @@ class ReleaseChecksTest(unittest.TestCase):
         self.assertEqual(properties_value(' a\\b:=#!\n密🔑'),
                          r'\ a\\b\:\=\#\!\n\u5bc6\ud83d\udd11')
 
+    def test_beta_sequence_is_independent_of_platform_version_and_build(self):
+        for tag, build in [('v1.2.1-beta.1', '11'), ('v1.2.1-beta.2', '12')]:
+            name, number = version(f'version: 1.2.1+{build}\n', tag)
+            self.assertEqual((name, number), ('1.2.1', build))
+            certificate = 'a' * 64
+            verify_metadata(
+                f"package: name='dev.shiori.reader' versionCode='{build}' versionName='1.2.1'\n",
+                f'Signer #1 certificate SHA-256 digest: {certificate}\n',
+                name, number, certificate)
+        for tag in ['v1.2.2-beta.1', 'v1.2.1-beta.0', 'v1.2.1-beta.01',
+                    'v1.2.1-beta.x', 'v1.2.1-beta.1-extra']:
+            with self.subTest(tag=tag), self.assertRaises(ReleaseCheckError):
+                version('version: 1.2.1+11\n', tag)
+        with self.assertRaises(ReleaseCheckError):
+            version('version: 1.2.1-beta.1+11\n', 'v1.2.1-beta.1')
+
     def test_all_secrets_required_and_base64_checked(self):
         env = dict(ANDROID_KEYSTORE_BASE64=base64.b64encode(b'synthetic').decode(),
                    ANDROID_STORE_PASSWORD='test', ANDROID_KEY_ALIAS='synthetic', ANDROID_KEY_PASSWORD='test')
