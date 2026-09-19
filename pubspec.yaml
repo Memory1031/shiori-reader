@@ -1,7 +1,7 @@
 name: shiori
 description: "Shiori light novel reader for Android, iOS and Windows."
 publish_to: 'none'
-version: 1.2.0+9
+version: 1.2.1+10
 
 environment:
   sdk: '>=3.10.3 <3.11.0'
