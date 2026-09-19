@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path/path.dart' as p;
 import 'package:shiori/app/production_app.dart';
 import 'package:shiori/data/cache/local_cache_management.dart';
@@ -69,6 +70,7 @@ Future<void> main(List<String> args) async {
       'plain',
       'webview',
       'webview-cycle',
+      'webview-early-close',
       'prepare',
       'restart',
       'killed',
@@ -310,6 +312,8 @@ class _Probe {
     final navigator = Navigator.of(shelfContext!);
     final image = base64Encode(epubFiles()['OPS/images/星 空.png']!);
     final cycles = phase == 'webview-cycle' ? 10 : 1;
+    final earlyClose = phase == 'webview-early-close';
+    final earlyOutcome = File(p.join(root.path, 'early-close-outcome.txt'));
     for (var i = 0; i < cycles; i++) {
       final ready = Completer<void>();
       unawaited(
@@ -323,9 +327,16 @@ class _Probe {
                     '<img src="data:image/png;base64,$image"></body></html>',
                 onCenterTap: () {},
                 onReady: () {
+                  if (earlyClose) {
+                    earlyOutcome.writeAsStringSync('ready', flush: true);
+                  }
                   if (!ready.isCompleted) ready.complete();
                 },
                 onFailed: () {
+                  if (earlyClose) {
+                    earlyOutcome.writeAsStringSync('failed', flush: true);
+                    return;
+                  }
                   if (!ready.isCompleted) {
                     ready.completeError(StateError('Native WebView failed'));
                   }
@@ -335,6 +346,26 @@ class _Probe {
           ),
         ),
       );
+      if (earlyClose) {
+        final deadline = DateTime.now().add(const Duration(seconds: 25));
+        do {
+          WidgetsBinding.instance.scheduleFrame();
+          await WidgetsBinding.instance.endOfFrame;
+          check(!ready.isCompleted, 'Missed the close-before-ready window');
+          check(
+            !earlyOutcome.existsSync(),
+            'WebView failed before early close',
+          );
+          check(errors.isEmpty, 'Flutter errors: $errors');
+          check(DateTime.now().isBefore(deadline), 'WebView mount timed out');
+        } while (widgets<InAppWebView>().isEmpty);
+        // The production platform widget has mounted and completed a frame.
+        // Do not wait for attachment/load callbacks before requesting closure.
+        passed.add(
+          'Production InAppWebView mounted for a frame before onReady',
+        );
+        return;
+      }
       await ready.future.timeout(const Duration(seconds: 25));
       await frame();
       if (i + 1 < cycles) {
@@ -358,14 +389,23 @@ class _Probe {
           widgets<BookshelfView>().single.controller.shelfReady,
       'production home',
     );
-    if (['plain', 'webview', 'webview-cycle'].contains(phase)) {
+    if ([
+      'plain',
+      'webview',
+      'webview-cycle',
+      'webview-early-close',
+    ].contains(phase)) {
       if (phase != 'plain') await webViewLifecycle();
       check(
         network.attempts == 0 && errors.isEmpty,
         'No network or Flutter errors',
       );
       passed.add('Production startup without library mutations');
-      await report('passed', {});
+      final earlyClose = phase == 'webview-early-close';
+      await report(earlyClose ? 'ready-to-close' : 'passed', {
+        if (earlyClose) 'webViewMounted': true,
+        if (earlyClose) 'readyAtSignal': false,
+      });
       return;
     }
     Map<String, dynamic>? expected;
