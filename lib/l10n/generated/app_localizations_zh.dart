@@ -484,7 +484,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get launchLoading => '正在准备书架…';
 
   @override
-  String get cacheTitle => '缓存与离线阅读';
+  String get cacheTitle => '离线内容';
 
   @override
   String cacheUsage(String text, String images) {
@@ -492,7 +492,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get cacheOfflineHint => '以下文章正文已缓存。图片数量以有效的本地文件为准；缓存可能被容量淘汰。';
+  String get cacheOfflineHint => '已缓存的在线书籍章节，可在离线时阅读。缓存可能因空间管理被清理。';
 
   @override
   String cacheChapterStatus(int saved, int total) {

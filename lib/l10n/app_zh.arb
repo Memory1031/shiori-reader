@@ -177,7 +177,7 @@
   "shelfRemove": "移除",
   "launchTagline": "故事，即将继续",
   "launchLoading": "正在准备书架…",
-  "cacheTitle": "缓存与离线阅读",
+  "cacheTitle": "离线内容",
   "cacheUsage": "正文与资料 {text} MiB · 图片 {images} MiB",
   "@cacheUsage": {
     "placeholders": {
@@ -189,7 +189,7 @@
       }
     }
   },
-  "cacheOfflineHint": "以下文章正文已缓存。图片数量以有效的本地文件为准；缓存可能被容量淘汰。",
+  "cacheOfflineHint": "已缓存的在线书籍章节，可在离线时阅读。缓存可能因空间管理被清理。",
   "cacheChapterStatus": "正文已缓存 · 插图 {saved}/{total}",
   "@cacheChapterStatus": {
     "placeholders": {

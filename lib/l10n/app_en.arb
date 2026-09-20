@@ -177,7 +177,7 @@
   "shelfRemove": "Remove",
   "launchTagline": "Your story continues",
   "launchLoading": "Preparing your library…",
-  "cacheTitle": "Cache & offline reading",
+  "cacheTitle": "Offline content",
   "cacheUsage": "Text & metadata {text} MiB · Images {images} MiB",
   "@cacheUsage": {
     "placeholders": {
@@ -189,7 +189,7 @@
       }
     }
   },
-  "cacheOfflineHint": "The articles below have cached text. Image counts reflect valid local files. Cached content may be evicted.",
+  "cacheOfflineHint": "Chapters cached from online books, available for offline reading. Cached content may be cleared to free up space.",
   "cacheChapterStatus": "Text cached · Images {saved}/{total}",
   "@cacheChapterStatus": {
     "placeholders": {

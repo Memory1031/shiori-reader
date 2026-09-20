@@ -1031,7 +1031,7 @@ abstract class AppLocalizations {
   /// No description provided for @cacheTitle.
   ///
   /// In en, this message translates to:
-  /// **'Cache & offline reading'**
+  /// **'Offline content'**
   String get cacheTitle;
 
   /// No description provided for @cacheUsage.
@@ -1043,7 +1043,7 @@ abstract class AppLocalizations {
   /// No description provided for @cacheOfflineHint.
   ///
   /// In en, this message translates to:
-  /// **'The articles below have cached text. Image counts reflect valid local files. Cached content may be evicted.'**
+  /// **'Chapters cached from online books, available for offline reading. Cached content may be cleared to free up space.'**
   String get cacheOfflineHint;
 
   /// No description provided for @cacheChapterStatus.

@@ -507,7 +507,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get launchLoading => 'Preparing your library…';
 
   @override
-  String get cacheTitle => 'Cache & offline reading';
+  String get cacheTitle => 'Offline content';
 
   @override
   String cacheUsage(String text, String images) {
@@ -516,7 +516,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cacheOfflineHint =>
-      'The articles below have cached text. Image counts reflect valid local files. Cached content may be evicted.';
+      'Chapters cached from online books, available for offline reading. Cached content may be cleared to free up space.';
 
   @override
   String cacheChapterStatus(int saved, int total) {
