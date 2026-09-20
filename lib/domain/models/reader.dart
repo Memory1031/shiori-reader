@@ -1,4 +1,5 @@
 import 'identity.dart';
+import 'book_progress.dart';
 import 'novel.dart';
 import 'value_model.dart';
 
@@ -192,6 +193,7 @@ final class ReadingProgress extends ValueModel {
     required String catalogRevision,
     required this.position,
     required this.completed,
+    this.bookProgress,
     required DateTime lastReadAt,
   }) : chapterOrdinalSnapshot = nonNegative(
          chapterOrdinalSnapshot,
@@ -206,13 +208,30 @@ final class ReadingProgress extends ValueModel {
       throw ArgumentError('Progress belongs to another novel');
     }
   }
+  ReadingProgress withBookProgress(
+    BookProgressSnapshot? book, {
+    int? ordinal,
+    String? revision,
+  }) => ReadingProgress(
+    snapshot: snapshot,
+    chapterKey: chapterKey,
+    chapterOrdinalSnapshot: ordinal ?? chapterOrdinalSnapshot,
+    catalogRevision: revision ?? catalogRevision,
+    position: position,
+    completed: completed,
+    lastReadAt: lastReadAt,
+    bookProgress: book,
+  );
   NovelKey get novelKey => snapshot.key;
   final NovelSummary snapshot;
   final ChapterKey chapterKey;
   final int chapterOrdinalSnapshot;
   final String catalogRevision;
   final ReaderPosition position;
+
+  /// Whether the current chapter viewport has reached its end.
   final bool completed;
+  final BookProgressSnapshot? bookProgress;
   final DateTime lastReadAt;
   @override
   List<Object?> get values => [
@@ -222,6 +241,7 @@ final class ReadingProgress extends ValueModel {
     catalogRevision,
     position,
     completed,
+    bookProgress,
     lastReadAt,
   ];
 }

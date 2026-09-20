@@ -111,6 +111,17 @@ class FaultCache extends CacheDatabase {
   Migrator createMigrator() => FaultMigrator(this, 'image_owners');
 }
 
+class FaultV5 extends UserDatabase {
+  FaultV5(super.executor);
+  @override
+  Future<void> customStatement(String statement, [List<Object?>? args]) async {
+    await super.customStatement(statement, args);
+    if (statement.contains('ADD COLUMN book_progress')) {
+      throw StateError('Injected failure after v5 ALTER');
+    }
+  }
+}
+
 void main() {
   late Directory root;
   setUp(() async {
@@ -119,7 +130,39 @@ void main() {
   tearDown(() async {
     await root.delete(recursive: true);
   });
-  for (final version in [1, 2, 3]) {
+  test(
+    'v5 snapshot column and version roll back together, then retry',
+    () async {
+      final file = File('${root.path}/users.sqlite');
+      seed(file, 'user', 4);
+      final before = rows(file);
+      final db = FaultV5(NativeDatabase(file));
+      await expectLater(db.customSelect('SELECT 1').get(), throwsA(anything));
+      await db.close();
+      expect(rows(file), before);
+      final raw = sql.sqlite3.open(file.path);
+      expect(raw.userVersion, 4);
+      expect(
+        raw.select('PRAGMA table_info(reading_progress)').map((r) => r['name']),
+        isNot(contains('book_progress')),
+      );
+      raw.close();
+      final retry = UserDatabase(NativeDatabase(file));
+      final record = await retry
+          .customSelect('SELECT book_progress FROM reading_progress')
+          .getSingle();
+      expect(record.data['book_progress'], isNull);
+      expect(
+        (await retry.customSelect('PRAGMA user_version').getSingle())
+            .data
+            .values
+            .single,
+        5,
+      );
+      await retry.close();
+    },
+  );
+  for (final version in [1, 2, 3, 4]) {
     test(
       'retained user v$version snapshot upgrades and preserves every old field',
       () async {
@@ -132,7 +175,7 @@ void main() {
               .data
               .values
               .single,
-          4,
+          5,
         );
         final library = LocalLibraryRepository(db);
         final shelf =
@@ -150,9 +193,15 @@ void main() {
         expect(progress.position.blockIndex, 17);
         expect(progress.position.blockFraction, .25);
         expect(progress.snapshot, shelf.single.snapshot);
+        expect(progress.bookProgress, isNull);
         await db.close();
         final after = rows(file);
         for (final name in before.keys) {
+          if (name == 'reading_progress') {
+            for (final row in (after[name] as List)) {
+              (row as Map).remove('book_progress');
+            }
+          }
           expect(after[name], before[name], reason: name);
         }
         expect(after['local_books'], isEmpty);
@@ -236,7 +285,13 @@ void main() {
         await retry.customSelect('SELECT 1').get();
         await retry.close();
         for (final name in before.keys) {
-          expect(rows(file)[name], before[name]);
+          final actual = rows(file)[name];
+          if (name == 'reading_progress') {
+            for (final row in actual as List) {
+              (row as Map).remove('book_progress');
+            }
+          }
+          expect(actual, before[name]);
         }
       },
     );

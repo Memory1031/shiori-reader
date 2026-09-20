@@ -98,7 +98,7 @@ void main() {
         expect(find.byType(IconButton), findsNothing);
         await tester.tapAt(tester.getCenter(find.byType(ReaderContentView)));
         await tester.pumpAndSettle();
-        await tester.tap(find.textContaining('Progress '));
+        await tester.tap(find.textContaining('Chapter '));
         await tester.pumpAndSettle();
         await tester.drag(find.byType(Slider), const Offset(140, 0));
         await tester.pumpAndSettle();

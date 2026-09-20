@@ -110,18 +110,6 @@ abstract class AppLocalizations {
   /// **'Footnote {number}'**
   String readerFootnote(String number);
 
-  /// No description provided for @shelfLocal.
-  ///
-  /// In en, this message translates to:
-  /// **'Local'**
-  String get shelfLocal;
-
-  /// No description provided for @shelfLocalFormat.
-  ///
-  /// In en, this message translates to:
-  /// **'Local · {format}'**
-  String shelfLocalFormat(String format);
-
   /// No description provided for @localBookContents.
   ///
   /// In en, this message translates to:
@@ -1687,6 +1675,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Increase {label}'**
   String readerIncrease(String label);
+
+  /// No description provided for @bookFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished'**
+  String get bookFinished;
+
+  /// No description provided for @bookCaughtUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Caught up'**
+  String get bookCaughtUp;
+
+  /// No description provided for @bookCurrentEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End of available chapters'**
+  String get bookCurrentEnd;
+
+  /// No description provided for @bookProgressPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading progress {percent}%'**
+  String bookProgressPercent(int percent);
+
+  /// No description provided for @readerChapterPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter {percent}%'**
+  String readerChapterPercent(int percent);
+
+  /// No description provided for @readerReadingProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading progress'**
+  String get readerReadingProgress;
+
+  /// No description provided for @readerBackToShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to bookshelf'**
+  String get readerBackToShelf;
+
+  /// No description provided for @readerViewCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'View contents'**
+  String get readerViewCatalog;
+
+  /// No description provided for @readerRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Read again'**
+  String get readerRestart;
+
+  /// No description provided for @bookOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get bookOnline;
 }
 
 class _AppLocalizationsDelegate

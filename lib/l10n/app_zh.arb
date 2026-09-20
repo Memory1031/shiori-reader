@@ -1,12 +1,9 @@
 {
   "readerImagePreview": "查看图片",
   "readerFootnote": "脚注 {number}",
-  "@readerFootnote": {"placeholders": {"number": {"type": "String"}}},
-  "shelfLocal": "本地",
-  "shelfLocalFormat": "本地 · {format}",
-  "@shelfLocalFormat": {
+  "@readerFootnote": {
     "placeholders": {
-      "format": {
+      "number": {
         "type": "String"
       }
     }
@@ -420,6 +417,30 @@
     "placeholders": {
       "label": {
         "type": "String"
+      }
+    }
+  },
+  "bookFinished": "已读完",
+  "bookCaughtUp": "已读至最新",
+  "bookCurrentEnd": "已读至当前末尾",
+  "bookProgressPercent": "阅读进度 {percent}%",
+  "readerChapterPercent": "本章 {percent}%",
+  "readerReadingProgress": "阅读进度",
+  "readerBackToShelf": "返回书架",
+  "readerViewCatalog": "查看目录",
+  "readerRestart": "重新阅读",
+  "bookOnline": "在线",
+  "@bookProgressPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "@readerChapterPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
       }
     }
   }

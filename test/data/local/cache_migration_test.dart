@@ -11,9 +11,11 @@ void main() {
       final cacheSql = File(
         'lib/data/local/database/cache.drift',
       ).readAsStringSync().split('CREATE TABLE image_cache').first;
-      final userSql = File(
-        'lib/data/local/database/users.drift',
-      ).readAsStringSync().split('CREATE TABLE prefetch_choices').first;
+      final userSql = File('lib/data/local/database/users.drift')
+          .readAsStringSync()
+          .replaceAll(' book_progress TEXT,\n', '')
+          .split('CREATE TABLE prefetch_choices')
+          .first;
       final cache = CacheDatabase(
         NativeDatabase.memory(
           setup: (db) {
@@ -61,7 +63,7 @@ void main() {
             .data
             .values
             .single,
-        4,
+        5,
       );
       await cache.close();
       await users.close();

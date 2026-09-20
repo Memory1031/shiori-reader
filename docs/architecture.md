@@ -17,6 +17,7 @@
 - Paragraph / Heading 可携带有序的 inlineImages：每项用 Unicode 码点偏移引用文本中的单个 U+FFFC，保存 MediaRef、alt 和 em 宽高；图片参与相同的资源校验与生命周期。无行内图片的旧记录及内容身份保持兼容，em 尺寸只影响布局，不改变语义身份。
 - Paragraph / Heading 可携带按 Unicode 码点定位的有序、不重叠 inlineStyles，保存颜色与相对字号、粗斜体；相邻块可通过 BlockBox.group 共享简单容器。两者均为纯 Dart、可序列化的排版元数据，不改变 blockKey / contentRevision，旧记录缺字段时使用默认值。排版缓存通过完整内容值变化失效。
 - 图片尺寸各自可未知；已知值须正数。封面和正文图片必须属于相同 Source。ImageBlock 尺寸为后续可发现的布局元数据，更新尺寸不改变 blockKey / contentRevision；mediaId、alt、caption 的改变会改变语义身份。
+- ReadingProgress 的全书进度快照与计算所依据的目录及章节身份绑定；全书终点状态独立于章节级 completed。全书算法与终点交互见[阅读器](reader.md)。
 - ReadingProgress 持有 NovelSummary 快照以保留离线标题 / 封面，并检查 ChapterKey 与快照属于同一本书；是否收藏由独立 BookshelfEntry 表示。lastReadAt 统一为 UTC 毫秒，写入先后由持久化 sequence 控制。
 
 ### 摘要 v1 与序列化
@@ -72,7 +73,7 @@ CachedChapter / CacheOverview / PrefetchState 是不可变投影，预取目标�
 
 正式入口为 `lib/main.dart`，组合根负责初始化本地存储、偏好、导入订阅和在线服务；开发入口为 `lib/main_dev.dart`，不进入生产依赖图。
 
-首页只有书架，没有发现页或底部推荐标签。顶部展示品牌图，保留搜索与更多菜单；导入在更多菜单中。继续阅读使用本地进度，书架封面统一 2:3 容器、完整显示图片，标题行数不改变封面尺寸。本地书在书名下方以小号次要文字标记“本地 · EPUB / TXT”，网格和列表一致；格式信息尚未就绪时显示“本地”。在线书移出同时清缓存，失败保留条目供重试；本地书移除先确认，再删除应用内文件和进度，详情成功后返回首页。均无撤销入口。
+首页只有书架，没有发现页或底部推荐标签。顶部展示品牌图，保留搜索与更多菜单；导入在更多菜单中。继续阅读使用本地进度，书架封面统一 2:3 容器、完整显示图片，标题行数不改变封面尺寸。书名下只有一行小号次要 metadata，例如“EPUB · 63%”“TXT · 已读完”或“在线 · 已读至最新”；网格不在封面上叠进度。来源标签为 EPUB、TXT 或“在线”；本地格式信息尚未就绪时暂不显示来源，进度未知则不显示百分比。书架每项通过索引读取快照，不请求目录或全书正文。在线书移出同时清缓存，失败保留条目供重试；本地书移除先确认，再删除应用内文件和进度，详情成功后返回首页。均无撤销入口。
 
 搜索显式提交才请求，不随输入自动发请求。结果支持分页、错误重试与空状态；不向应用 UI 暴露 Source 游标、原始协议或站点诊断。详情展示简介、书架操作和目录；真实分组与合成无卷分组保持区别，目录顺序来自领域快照。
 
@@ -99,7 +100,7 @@ Presentation 依赖领域契约，通过显式注入获得服务。应用根拥�
 
 | 位置 | Schema | 内容 |
 | --- | --- | --- |
-| `users/users.sqlite` | v4 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions |
+| `users/users.sqlite` | v5 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions |
 | `disposable/cache.sqlite` | v2 | novel_cache、catalog_cache、chapter_cache、image_cache、image_owners |
 | 平台 preferences | 独立 codec | readerSettings v3、appSettings v2 |
 | `users/books/` | manifest v1 | 本地书托管原件、语义正文索引与媒体 |
@@ -114,6 +115,8 @@ Library 写入由事务串行执行；重复收藏保留首次 addedAt，移除�
 
 beginProgressSession 原子递增 generation 并重置 sequence；saveProgress 只接受当前 generation 和严格递增 sequence，旧写返回 false。clearHistory 推进 generation 并保留会话保护行，防止晚响应恢复已清历史。提交前取消可回滚，提交后返回真实结果。
 
+全书进度快照与章节位置一同持久化，沿用上述事务及写入顺序保护。历史记录缺少快照时视为未知；已加载的在线目录更新可重算全书进度，但不新开阅读会话、不改变阅读位置或最近阅读时间。旧目录下的晚写按最新已知目录重算，避免恢复过期的终点状态。
+
 缓存存规范化领域 JSON、codec / parser 版本及抓取、过期、访问时间。校验类型、身份和摘要，单项损坏局部失败；离线列表同时检查外层 codec 和内部数据。TTL / LRU 由[缓存策略](architecture.md)负责。
 
 用户与缓存没有跨库事务或跨库外键；缓存失败不能回滚已保存的书架和进度。用户库升级成功而缓存打开失败时保留用户库，不删除重建。
@@ -122,7 +125,7 @@ preferences 使用独立 JSON key，Store 串行写入，读取等待已排队�
 
 ### 迁移与生成
 
-保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
+保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 / v5 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
 
 升级 DDL、完整性检查和 user_version 同事务提交；失败回滚，损坏或未知未来版本保留原文件并报错。不提供自动删用户库、drop/recreate 或生产 reset 来绕过故障。旧快照不能被当前 schema 重新导出覆盖。
 

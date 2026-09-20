@@ -197,7 +197,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final label = language == 'zh' ? '本地 · EPUB' : 'Local · EPUB';
+      const label = 'EPUB';
       expect(find.text(label), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.tap(find.byTooltip(language == 'zh' ? '列表' : 'List'));

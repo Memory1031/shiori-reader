@@ -69,6 +69,48 @@ ProgressTracker tracker(
   now: now,
 );
 void main() {
+  test('terminal EOF survives final-page sampling and catalog growth', () {
+    fakeAsync((clock) {
+      final library = Library();
+      final c = content();
+      final t = ProgressTracker(
+        library: library,
+        content: c,
+        snapshot: book,
+        ordinal: 0,
+        catalogRevision: 'old',
+        metrics: BookProgressMetrics(
+          revision: 'old',
+          order: [c.key],
+          weights: [1],
+        ),
+      );
+      t.sample(position(c, .8), completed: true);
+      expect(t.bookProgress!.terminal, BookTerminalState.reading);
+      t.enterBookEnd(BookTerminalState.caughtUp);
+      t.sample(position(c, .8), completed: true);
+      t.flush();
+      clock.flushMicrotasks();
+      expect(library.writes.last.$1.position.chapterFraction, 1);
+      t.updateMetrics(
+        BookProgressMetrics(
+          revision: 'new',
+          order: [c.key, content('two').key],
+          weights: [1, 1],
+        ),
+      );
+      t.flush();
+      clock.flushMicrotasks();
+      expect(library.writes.last.$1.bookProgress!.fraction, .5);
+      expect(
+        library.writes.last.$1.bookProgress!.terminal,
+        BookTerminalState.reading,
+      );
+      expect(library.writes.last.$1.position.chapterFraction, 1);
+      t.close();
+      clock.flushMicrotasks();
+    });
+  });
   test(
     'ten seconds of changes produce at most six writes and a trailing latest value',
     () {

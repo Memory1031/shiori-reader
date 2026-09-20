@@ -5,6 +5,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/state_views.dart';
 import 'library_controller.dart';
+import '../reader/book_progress_label.dart';
 import 'remove_shelf_book.dart';
 
 class BookshelfView extends StatefulWidget {
@@ -91,11 +92,15 @@ class _BookshelfViewState extends State<BookshelfView> {
           final book = books[index].snapshot;
           final local = book.key.sourceId == LocalBookIdentity.sourceId;
           final format = controller.localFormats[book.key];
-          final localLabel = format == null
-              ? strings.shelfLocal
-              : strings.shelfLocalFormat(format.name.toUpperCase());
+          final sourceLabel = local
+              ? format?.name.toUpperCase()
+              : strings.bookOnline;
+          final progressLabel = bookProgressLabel(
+            strings,
+            controller.progressFor(book.key)?.bookProgress,
+          );
           Widget provenance() => Text(
-            localLabel,
+            [?sourceLabel, ?progressLabel].join(' · '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -215,18 +220,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                               height: 66,
                               child: cover,
                             ),
-                            subtitle: local
-                                ? provenance()
-                                : book.authors.isEmpty
-                                ? null
-                                : Text(
-                                    book.authors.join(', '),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
+                            subtitle: provenance(),
                             onLongPress: () => _actions(book),
                             onTap: () {
                               if (open) {
@@ -250,7 +244,7 @@ class _BookshelfViewState extends State<BookshelfView> {
             onLongPress: () => _actions(book),
             cover: cover,
             title: book.title,
-            provenance: local ? provenance() : null,
+            provenance: provenance(),
           );
         }
 
@@ -336,13 +330,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                             1.5 +
                         10 +
                         48 * scale +
-                        (books.any(
-                              (entry) =>
-                                  entry.snapshot.key.sourceId ==
-                                  LocalBookIdentity.sourceId,
-                            )
-                            ? 24 * scale
-                            : 0),
+                        24 * scale,
                   ),
                   itemCount: books.length,
                   itemBuilder: (_, i) => item(i),

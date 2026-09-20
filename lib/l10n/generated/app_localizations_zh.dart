@@ -17,14 +17,6 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get shelfLocal => '本地';
-
-  @override
-  String shelfLocalFormat(String format) {
-    return '本地 · $format';
-  }
-
-  @override
   String get localBookContents => '全书目录';
 
   @override
@@ -845,4 +837,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String readerIncrease(String label) {
     return '增大$label';
   }
+
+  @override
+  String get bookFinished => '已读完';
+
+  @override
+  String get bookCaughtUp => '已读至最新';
+
+  @override
+  String get bookCurrentEnd => '已读至当前末尾';
+
+  @override
+  String bookProgressPercent(int percent) {
+    return '阅读进度 $percent%';
+  }
+
+  @override
+  String readerChapterPercent(int percent) {
+    return '本章 $percent%';
+  }
+
+  @override
+  String get readerReadingProgress => '阅读进度';
+
+  @override
+  String get readerBackToShelf => '返回书架';
+
+  @override
+  String get readerViewCatalog => '查看目录';
+
+  @override
+  String get readerRestart => '重新阅读';
+
+  @override
+  String get bookOnline => '在线';
 }

@@ -56,6 +56,16 @@ final class LocalBookContent {
        readingOrder = readingOrder == null
            ? null
            : List.unmodifiable(readingOrder);
+  late final BookProgressMetrics progressMetrics = BookProgressMetrics(
+    revision: catalog.revision,
+    order: readingOrder ?? catalog.flatChapters.map((c) => c.key),
+    weights: (readingOrder ?? catalog.flatChapters.map((c) => c.key)).map(
+      (key) => _blockCounts[key] ?? 0,
+    ),
+  );
+  late final Map<ChapterKey, int> _blockCounts = {
+    for (final c in chapters) c.key: c.blocks.length,
+  };
   final List<ChapterContent> auxiliaryChapters;
   final List<LocalContentLink> links;
   final List<ChapterKey>? readingOrder;
@@ -173,6 +183,14 @@ abstract interface class LocalBookReparse implements LocalBookInvalidation {
     NovelKey key, {
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    required CancellationToken cancellation,
+  });
+}
+
+/// Reader-only metadata; shelf/home never request complete local content.
+abstract interface class LocalBookProgressRepository {
+  Future<Result<BookProgressMetrics>> loadProgressMetrics(
+    NovelKey key, {
     required CancellationToken cancellation,
   });
 }

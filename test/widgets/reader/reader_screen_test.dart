@@ -107,7 +107,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('进度 0%'));
+    await tester.tap(find.text('本章 0%'));
     await tester.pumpAndSettle();
     expect(find.byType(Slider), findsOneWidget);
     expect(

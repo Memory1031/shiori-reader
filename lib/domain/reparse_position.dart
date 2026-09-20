@@ -63,6 +63,14 @@ ReparsedPosition migrateLocalPosition(
         catalogRevision: next.catalog.revision,
         position: position,
         completed: !approximate && saved.completed,
+        bookProgress: next.progressMetrics.at(
+          c.key,
+          position.chapterFraction,
+          terminal:
+              !approximate && old.catalog.revision == next.catalog.revision
+              ? saved.bookProgress?.terminal ?? BookTerminalState.reading
+              : BookTerminalState.reading,
+        ),
         lastReadAt: saved.lastReadAt,
       ),
       approximate: approximate,

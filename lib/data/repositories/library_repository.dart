@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:drift/drift.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -12,6 +13,46 @@ class LocalLibraryRepository implements LibraryRepository {
     : now = now ?? DateTime.now;
   final UserDatabase db;
   final DateTime Function() now;
+  final _catalogs = <NovelKey, BookProgressMetrics>{};
+  ReadingProgress _reconcile(
+    ReadingProgress progress,
+    BookProgressMetrics metrics,
+  ) {
+    if (progress.catalogRevision == metrics.revision) return progress;
+    final ordinal = metrics.ordinal(progress.chapterKey);
+    return progress.withBookProgress(
+      ordinal == null
+          ? null
+          : metrics.at(progress.chapterKey, progress.position.chapterFraction),
+      ordinal: ordinal,
+      revision: metrics.revision,
+    );
+  }
+
+  /// A catalog already loaded by a reader/detail refresh updates only metadata,
+  /// inside the same DB transaction as progress writes. It never opens a session.
+  Future<Result<void>> reconcileCatalog(Catalog catalog) {
+    final metrics = BookProgressMetrics.online(catalog);
+    _catalogs[catalog.novelKey] = metrics;
+    return localWrite(
+      db,
+      Operation.progressWrite,
+      CancellationSource().token,
+      () async {
+        final row = await db
+            .customSelect(
+              'SELECT * FROM reading_progress WHERE $_where',
+              variables: _key(catalog.novelKey),
+            )
+            .getSingleOrNull();
+        if (row == null) return;
+        final before = _progress(row);
+        final after = _reconcile(before, metrics);
+        if (before != after) await writeProgressRow(db, after, now());
+      },
+    );
+  }
+
   List<Variable> _key(NovelKey key) => [
     Variable(key.sourceId.value),
     Variable(key.novelId),
@@ -57,6 +98,12 @@ class LocalLibraryRepository implements LibraryRepository {
         pixelOffset: row.readNullable<double>('pixel_offset'),
         layoutKey: row.readNullable<String>('layout_key'),
       ),
+      bookProgress: row.readNullable<String>('book_progress') == null
+          ? null
+          : BookProgressSnapshot.fromJson(
+              jsonDecode(row.read<String>('book_progress'))
+                  as Map<String, dynamic>,
+            ),
       completed: row.read<int>('completed') == 1,
       lastReadAt: DateTime.fromMillisecondsSinceEpoch(
         row.read<int>('last_read_at'),
@@ -213,7 +260,12 @@ class LocalLibraryRepository implements LibraryRepository {
         stamp.sequence <= session.read<int>('sequence')) {
       return false;
     }
-    await writeProgressRow(db, progress, now());
+    final known = _catalogs[key];
+    await writeProgressRow(
+      db,
+      known == null ? progress : _reconcile(progress, known),
+      now(),
+    );
     await db.customUpdate(
       'UPDATE progress_sessions SET sequence=? WHERE $_where',
       variables: [Variable(stamp.sequence), ..._key(key)],

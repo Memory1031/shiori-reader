@@ -104,6 +104,13 @@ void main() {
       expect(next.content.detail.summary.title, 'Title');
       final saved = ok(await library.getProgress(key, cancellation: token()))!;
       expect(saved.lastReadAt, p.lastReadAt);
+      expect(
+        saved.bookProgress,
+        next.content.progressMetrics.at(
+          saved.chapterKey,
+          saved.position.chapterFraction,
+        ),
+      );
       expect(saved.position.pixelOffset, isNull);
       expect(
         ok(

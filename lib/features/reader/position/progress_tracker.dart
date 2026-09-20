@@ -13,6 +13,8 @@ class ProgressTracker {
     required this.ordinal,
     required this.catalogRevision,
     this.onStatus,
+    this.metrics,
+    this.previous,
     DateTime Function()? now,
   }) : now = now ?? DateTime.now;
 
@@ -20,7 +22,12 @@ class ProgressTracker {
   final ChapterContent content;
   final NovelSummary snapshot;
   final int ordinal;
-  final String catalogRevision;
+  String catalogRevision;
+  BookProgressMetrics? metrics;
+  final ReadingProgress? previous;
+  BookTerminalState _terminal = BookTerminalState.reading;
+  bool _sampled = false;
+  BookProgressSnapshot? get bookProgress => _latest?.bookProgress;
   final void Function()? onStatus;
   final DateTime Function() now;
   final _request = CancellationSource();
@@ -78,7 +85,7 @@ class ProgressTracker {
         blocks[position.blockIndex].blockKey != position.blockKey) {
       return;
     }
-    final normalized = ReaderPosition(
+    var normalized = ReaderPosition(
       contentRevision: position.contentRevision,
       blockKey: position.blockKey,
       blockIndex: position.blockIndex,
@@ -86,16 +93,47 @@ class ProgressTracker {
       chapterFraction:
           (position.blockIndex + position.blockFraction) / blocks.length,
     );
-    if (_latest?.position == normalized && _latest?.completed == completed) {
+    if (!_sampled) {
+      _sampled = true;
+      if (previous?.chapterKey == content.key &&
+          previous?.catalogRevision == catalogRevision &&
+          completed &&
+          metrics?.isLast(content.key) == true) {
+        _terminal =
+            previous?.bookProgress?.terminal ?? BookTerminalState.reading;
+      }
+    }
+    if (!completed) _terminal = BookTerminalState.reading;
+    if (_terminal != BookTerminalState.reading) {
+      // Returning to the final page must not replace a deliberate EOF anchor
+      // with that page's start. A later catalog refresh needs the consumed EOF.
+      normalized = ReaderPosition(
+        contentRevision: content.contentRevision,
+        blockKey: blocks.last.blockKey,
+        blockIndex: blocks.length - 1,
+        blockFraction: 1,
+        chapterFraction: 1,
+      );
+    }
+    final book = metrics?.at(
+      content.key,
+      _terminal == BookTerminalState.reading ? normalized.chapterFraction : 1,
+      terminal: _terminal,
+    );
+    if (_latest?.position == normalized &&
+        _latest?.completed == completed &&
+        _latest?.bookProgress == book &&
+        _latest?.catalogRevision == catalogRevision) {
       if (_latest == _saved) return;
     } else {
       _latest = ReadingProgress(
         snapshot: snapshot,
         chapterKey: content.key,
-        chapterOrdinalSnapshot: ordinal,
+        chapterOrdinalSnapshot: metrics?.ordinal(content.key) ?? ordinal,
         catalogRevision: catalogRevision,
         position: normalized,
         completed: completed,
+        bookProgress: book,
         lastReadAt: now(),
       );
     }
@@ -108,6 +146,40 @@ class ProgressTracker {
       _periodic = null;
       unawaited(flush());
     });
+  }
+
+  /// Metadata updates never move the semantic reading anchor.
+  void updateMetrics(BookProgressMetrics value) {
+    if (value.revision == metrics?.revision) return;
+    metrics = value;
+    if (catalogRevision != value.revision) {
+      _terminal = BookTerminalState.reading;
+    }
+    catalogRevision = value.revision;
+    final latest = _latest;
+    if (latest != null) sample(latest.position, completed: latest.completed);
+  }
+
+  void enterBookEnd(BookTerminalState state) {
+    if (_closed ||
+        _restoring ||
+        metrics?.isLast(content.key) != true ||
+        state == BookTerminalState.reading) {
+      return;
+    }
+    _sampled = true;
+    _terminal = state;
+    final i = content.blocks.length - 1;
+    sample(
+      ReaderPosition(
+        contentRevision: content.contentRevision,
+        blockKey: content.blocks[i].blockKey,
+        blockIndex: i,
+        blockFraction: 1,
+        chapterFraction: 1,
+      ),
+      completed: true,
+    );
   }
 
   Future<void> flush() {

@@ -838,6 +838,17 @@ class ReadingProgress extends Table
     $customConstraints:
         'NOT NULL CHECK (chapter_fraction >= 0 AND chapter_fraction <= 1)',
   );
+  static const VerificationMeta _bookProgressMeta = const VerificationMeta(
+    'bookProgress',
+  );
+  late final GeneratedColumn<String> bookProgress = GeneratedColumn<String>(
+    'book_progress',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
   static const VerificationMeta _completedMeta = const VerificationMeta(
     'completed',
   );
@@ -917,6 +928,7 @@ class ReadingProgress extends Table
     blockIndex,
     blockFraction,
     chapterFraction,
+    bookProgress,
     completed,
     pixelOffset,
     layoutKey,
@@ -1042,6 +1054,15 @@ class ReadingProgress extends Table
     } else if (isInserting) {
       context.missing(_chapterFractionMeta);
     }
+    if (data.containsKey('book_progress')) {
+      context.handle(
+        _bookProgressMeta,
+        bookProgress.isAcceptableOrUnknown(
+          data['book_progress']!,
+          _bookProgressMeta,
+        ),
+      );
+    }
     if (data.containsKey('completed')) {
       context.handle(
         _completedMeta,
@@ -1148,6 +1169,10 @@ class ReadingProgress extends Table
         DriftSqlType.double,
         data['${effectivePrefix}chapter_fraction'],
       )!,
+      bookProgress: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_progress'],
+      ),
       completed: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}completed'],
@@ -1202,6 +1227,7 @@ class ReadingProgressData extends DataClass
   final int blockIndex;
   final double blockFraction;
   final double chapterFraction;
+  final String? bookProgress;
   final int completed;
   final double? pixelOffset;
   final String? layoutKey;
@@ -1220,6 +1246,7 @@ class ReadingProgressData extends DataClass
     required this.blockIndex,
     required this.blockFraction,
     required this.chapterFraction,
+    this.bookProgress,
     required this.completed,
     this.pixelOffset,
     this.layoutKey,
@@ -1241,6 +1268,9 @@ class ReadingProgressData extends DataClass
     map['block_index'] = Variable<int>(blockIndex);
     map['block_fraction'] = Variable<double>(blockFraction);
     map['chapter_fraction'] = Variable<double>(chapterFraction);
+    if (!nullToAbsent || bookProgress != null) {
+      map['book_progress'] = Variable<String>(bookProgress);
+    }
     map['completed'] = Variable<int>(completed);
     if (!nullToAbsent || pixelOffset != null) {
       map['pixel_offset'] = Variable<double>(pixelOffset);
@@ -1267,6 +1297,9 @@ class ReadingProgressData extends DataClass
       blockIndex: Value(blockIndex),
       blockFraction: Value(blockFraction),
       chapterFraction: Value(chapterFraction),
+      bookProgress: bookProgress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bookProgress),
       completed: Value(completed),
       pixelOffset: pixelOffset == null && nullToAbsent
           ? const Value.absent()
@@ -1297,6 +1330,7 @@ class ReadingProgressData extends DataClass
       blockIndex: serializer.fromJson<int>(json['block_index']),
       blockFraction: serializer.fromJson<double>(json['block_fraction']),
       chapterFraction: serializer.fromJson<double>(json['chapter_fraction']),
+      bookProgress: serializer.fromJson<String?>(json['book_progress']),
       completed: serializer.fromJson<int>(json['completed']),
       pixelOffset: serializer.fromJson<double?>(json['pixel_offset']),
       layoutKey: serializer.fromJson<String?>(json['layout_key']),
@@ -1320,6 +1354,7 @@ class ReadingProgressData extends DataClass
       'block_index': serializer.toJson<int>(blockIndex),
       'block_fraction': serializer.toJson<double>(blockFraction),
       'chapter_fraction': serializer.toJson<double>(chapterFraction),
+      'book_progress': serializer.toJson<String?>(bookProgress),
       'completed': serializer.toJson<int>(completed),
       'pixel_offset': serializer.toJson<double?>(pixelOffset),
       'layout_key': serializer.toJson<String?>(layoutKey),
@@ -1341,6 +1376,7 @@ class ReadingProgressData extends DataClass
     int? blockIndex,
     double? blockFraction,
     double? chapterFraction,
+    Value<String?> bookProgress = const Value.absent(),
     int? completed,
     Value<double?> pixelOffset = const Value.absent(),
     Value<String?> layoutKey = const Value.absent(),
@@ -1359,6 +1395,7 @@ class ReadingProgressData extends DataClass
     blockIndex: blockIndex ?? this.blockIndex,
     blockFraction: blockFraction ?? this.blockFraction,
     chapterFraction: chapterFraction ?? this.chapterFraction,
+    bookProgress: bookProgress.present ? bookProgress.value : this.bookProgress,
     completed: completed ?? this.completed,
     pixelOffset: pixelOffset.present ? pixelOffset.value : this.pixelOffset,
     layoutKey: layoutKey.present ? layoutKey.value : this.layoutKey,
@@ -1393,6 +1430,9 @@ class ReadingProgressData extends DataClass
       chapterFraction: data.chapterFraction.present
           ? data.chapterFraction.value
           : this.chapterFraction,
+      bookProgress: data.bookProgress.present
+          ? data.bookProgress.value
+          : this.bookProgress,
       completed: data.completed.present ? data.completed.value : this.completed,
       pixelOffset: data.pixelOffset.present
           ? data.pixelOffset.value
@@ -1422,6 +1462,7 @@ class ReadingProgressData extends DataClass
           ..write('blockIndex: $blockIndex, ')
           ..write('blockFraction: $blockFraction, ')
           ..write('chapterFraction: $chapterFraction, ')
+          ..write('bookProgress: $bookProgress, ')
           ..write('completed: $completed, ')
           ..write('pixelOffset: $pixelOffset, ')
           ..write('layoutKey: $layoutKey, ')
@@ -1445,6 +1486,7 @@ class ReadingProgressData extends DataClass
     blockIndex,
     blockFraction,
     chapterFraction,
+    bookProgress,
     completed,
     pixelOffset,
     layoutKey,
@@ -1467,6 +1509,7 @@ class ReadingProgressData extends DataClass
           other.blockIndex == this.blockIndex &&
           other.blockFraction == this.blockFraction &&
           other.chapterFraction == this.chapterFraction &&
+          other.bookProgress == this.bookProgress &&
           other.completed == this.completed &&
           other.pixelOffset == this.pixelOffset &&
           other.layoutKey == this.layoutKey &&
@@ -1487,6 +1530,7 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
   final Value<int> blockIndex;
   final Value<double> blockFraction;
   final Value<double> chapterFraction;
+  final Value<String?> bookProgress;
   final Value<int> completed;
   final Value<double?> pixelOffset;
   final Value<String?> layoutKey;
@@ -1506,6 +1550,7 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
     this.blockIndex = const Value.absent(),
     this.blockFraction = const Value.absent(),
     this.chapterFraction = const Value.absent(),
+    this.bookProgress = const Value.absent(),
     this.completed = const Value.absent(),
     this.pixelOffset = const Value.absent(),
     this.layoutKey = const Value.absent(),
@@ -1526,6 +1571,7 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
     required int blockIndex,
     required double blockFraction,
     required double chapterFraction,
+    this.bookProgress = const Value.absent(),
     required int completed,
     this.pixelOffset = const Value.absent(),
     this.layoutKey = const Value.absent(),
@@ -1560,6 +1606,7 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
     Expression<int>? blockIndex,
     Expression<double>? blockFraction,
     Expression<double>? chapterFraction,
+    Expression<String>? bookProgress,
     Expression<int>? completed,
     Expression<double>? pixelOffset,
     Expression<String>? layoutKey,
@@ -1580,6 +1627,7 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
       if (blockIndex != null) 'block_index': blockIndex,
       if (blockFraction != null) 'block_fraction': blockFraction,
       if (chapterFraction != null) 'chapter_fraction': chapterFraction,
+      if (bookProgress != null) 'book_progress': bookProgress,
       if (completed != null) 'completed': completed,
       if (pixelOffset != null) 'pixel_offset': pixelOffset,
       if (layoutKey != null) 'layout_key': layoutKey,
@@ -1602,6 +1650,7 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
     Value<int>? blockIndex,
     Value<double>? blockFraction,
     Value<double>? chapterFraction,
+    Value<String?>? bookProgress,
     Value<int>? completed,
     Value<double?>? pixelOffset,
     Value<String?>? layoutKey,
@@ -1622,6 +1671,7 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
       blockIndex: blockIndex ?? this.blockIndex,
       blockFraction: blockFraction ?? this.blockFraction,
       chapterFraction: chapterFraction ?? this.chapterFraction,
+      bookProgress: bookProgress ?? this.bookProgress,
       completed: completed ?? this.completed,
       pixelOffset: pixelOffset ?? this.pixelOffset,
       layoutKey: layoutKey ?? this.layoutKey,
@@ -1668,6 +1718,9 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
     if (chapterFraction.present) {
       map['chapter_fraction'] = Variable<double>(chapterFraction.value);
     }
+    if (bookProgress.present) {
+      map['book_progress'] = Variable<String>(bookProgress.value);
+    }
     if (completed.present) {
       map['completed'] = Variable<int>(completed.value);
     }
@@ -1706,6 +1759,7 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
           ..write('blockIndex: $blockIndex, ')
           ..write('blockFraction: $blockFraction, ')
           ..write('chapterFraction: $chapterFraction, ')
+          ..write('bookProgress: $bookProgress, ')
           ..write('completed: $completed, ')
           ..write('pixelOffset: $pixelOffset, ')
           ..write('layoutKey: $layoutKey, ')
@@ -3603,6 +3657,7 @@ typedef $ReadingProgressCreateCompanionBuilder =
       required int blockIndex,
       required double blockFraction,
       required double chapterFraction,
+      Value<String?> bookProgress,
       required int completed,
       Value<double?> pixelOffset,
       Value<String?> layoutKey,
@@ -3624,6 +3679,7 @@ typedef $ReadingProgressUpdateCompanionBuilder =
       Value<int> blockIndex,
       Value<double> blockFraction,
       Value<double> chapterFraction,
+      Value<String?> bookProgress,
       Value<int> completed,
       Value<double?> pixelOffset,
       Value<String?> layoutKey,
@@ -3694,6 +3750,11 @@ class $ReadingProgressFilterComposer
 
   ColumnFilters<double> get chapterFraction => $composableBuilder(
     column: $table.chapterFraction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bookProgress => $composableBuilder(
+    column: $table.bookProgress,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3792,6 +3853,11 @@ class $ReadingProgressOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get bookProgress => $composableBuilder(
+    column: $table.bookProgress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get completed => $composableBuilder(
     column: $table.completed,
     builder: (column) => ColumnOrderings(column),
@@ -3879,6 +3945,11 @@ class $ReadingProgressAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get bookProgress => $composableBuilder(
+    column: $table.bookProgress,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get completed =>
       $composableBuilder(column: $table.completed, builder: (column) => column);
 
@@ -3950,6 +4021,7 @@ class $ReadingProgressTableManager
                 Value<int> blockIndex = const Value.absent(),
                 Value<double> blockFraction = const Value.absent(),
                 Value<double> chapterFraction = const Value.absent(),
+                Value<String?> bookProgress = const Value.absent(),
                 Value<int> completed = const Value.absent(),
                 Value<double?> pixelOffset = const Value.absent(),
                 Value<String?> layoutKey = const Value.absent(),
@@ -3969,6 +4041,7 @@ class $ReadingProgressTableManager
                 blockIndex: blockIndex,
                 blockFraction: blockFraction,
                 chapterFraction: chapterFraction,
+                bookProgress: bookProgress,
                 completed: completed,
                 pixelOffset: pixelOffset,
                 layoutKey: layoutKey,
@@ -3990,6 +4063,7 @@ class $ReadingProgressTableManager
                 required int blockIndex,
                 required double blockFraction,
                 required double chapterFraction,
+                Value<String?> bookProgress = const Value.absent(),
                 required int completed,
                 Value<double?> pixelOffset = const Value.absent(),
                 Value<String?> layoutKey = const Value.absent(),
@@ -4009,6 +4083,7 @@ class $ReadingProgressTableManager
                 blockIndex: blockIndex,
                 blockFraction: blockFraction,
                 chapterFraction: chapterFraction,
+                bookProgress: bookProgress,
                 completed: completed,
                 pixelOffset: pixelOffset,
                 layoutKey: layoutKey,

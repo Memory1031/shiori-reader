@@ -8,10 +8,25 @@ class LocalReadingRepository
     implements
         NovelRepository,
         LocalNavigationRepository,
+        LocalBookProgressRepository,
         LocalPagePresentationRepository,
         LocalBookInvalidation,
         LocalContentLinkRepository {
-  LocalReadingRepository({required this.local, required this.online});
+  LocalReadingRepository({
+    required this.local,
+    required this.online,
+    this.onOnlineCatalog,
+  });
+  final Future<void> Function(Catalog)? onOnlineCatalog;
+  Future<Result<LoadResult<Catalog>>> _observeCatalog(
+    Result<LoadResult<Catalog>> result,
+  ) async {
+    if (result case Success<LoadResult<Catalog>>(:final value)) {
+      await onOnlineCatalog?.call(value.value);
+    }
+    return result;
+  }
+
   final LocalBookStore local;
   @override
   Stream<NovelKey> get invalidations => local is LocalBookInvalidation
@@ -76,7 +91,9 @@ class LocalReadingRepository
     required CancellationToken cancellation,
   }) => _local(key)
       ? _read(key, Operation.catalog, cancellation, (r) => r.content.catalog)
-      : online.loadCatalog(key, mode: mode, cancellation: cancellation);
+      : online
+            .loadCatalog(key, mode: mode, cancellation: cancellation)
+            .then(_observeCatalog);
   @override
   Future<Result<LoadResult<ChapterContent>>> loadChapter(
     ChapterKey key, {
@@ -93,6 +110,23 @@ class LocalReadingRepository
           ].where((c) => c.key == key).firstOrNull,
         )
       : online.loadChapter(key, mode: mode, cancellation: cancellation);
+  @override
+  Future<Result<BookProgressMetrics>> loadProgressMetrics(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  }) async {
+    final result = await _read(
+      key,
+      Operation.catalog,
+      cancellation,
+      (r) => r.content.progressMetrics,
+    );
+    return switch (result) {
+      Success(:final value) => Success(value.value),
+      Failure(:final failure) => Failure(failure),
+    };
+  }
+
   @override
   Future<Result<List<LocalContentLink>>> loadContentLinks(
     ChapterKey source, {
@@ -121,7 +155,7 @@ class LocalReadingRepository
       cancellation,
       (r) =>
           r.content.readingOrder ??
-          r.content.chapters.map((c) => c.key).toList(),
+          r.content.catalog.flatChapters.map((c) => c.key).toList(),
     );
     return switch (result) {
       Success(:final value) => Success(value.value),
@@ -176,7 +210,7 @@ class LocalReadingRepository
                 cancellation: CancellationSource().token,
               ),
             )
-      : online.catalogUpdates(key);
+      : online.catalogUpdates(key).asyncMap(_observeCatalog);
   @override
   Stream<Result<LoadResult<ChapterContent>>> chapterUpdates(ChapterKey key) =>
       _local(key.novelKey)

@@ -109,7 +109,7 @@ void main() {
           retryPolicy: RetryPolicy.manual,
         ),
       );
-      await tester.tap(find.textContaining('Progress '));
+      await tester.tap(find.textContaining('Chapter '));
       await tester.pumpAndSettle();
       expect(
         tester

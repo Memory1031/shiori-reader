@@ -69,8 +69,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       widget.chapter.novelKey.sourceId == LocalBookIdentity.sourceId;
   CacheManagement? get _cache => _local ? null : widget.cache;
   bool _changing = false, _canPop = false;
+  BookTerminalState? _completion;
   final _titleRequest = CancellationSource();
   String? _bookTitle;
+  NovelStatus _bookStatus = NovelStatus.unknown;
   List<ChapterKey>? _readingOrder;
   bool get _needsOrder =>
       _local && widget.repository is LocalContentLinkRepository;
@@ -95,7 +97,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     );
     if (!mounted || _titleRequest.token.isCancelled) return;
     if (result case Success<LoadResult<NovelDetail>>(:final value)) {
-      setState(() => _bookTitle = value.value.summary.title);
+      setState(() {
+        _bookTitle = value.value.summary.title;
+        _bookStatus = value.value.status;
+      });
     }
   }
 
@@ -188,6 +193,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         ..addListener(_changed);
   void _changed() {
     if (_invalidated) return;
+    final latestCatalog = _catalog.loaded?.value;
+    if (_completion != null &&
+        !_local &&
+        latestCatalog != null &&
+        latestCatalog.flatChapters.lastOrNull?.key != _reader.chapter) {
+      _completion = null;
+    }
     final pending = _pending;
     if (pending != null &&
         (pending.status == ReaderStatus.error ||
@@ -260,7 +272,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     bool fromEnd = false,
   }) async {
     if (_changing ||
-        chapter == _reader.chapter && blockKey == null && !fromStart ||
+        chapter == _reader.chapter &&
+            blockKey == null &&
+            !fromStart &&
+            _completion == null ||
         chapter.novelKey != widget.chapter.novelKey) {
       return;
     }
@@ -298,6 +313,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     final previous = _reader;
     setState(() {
       _reader = reader;
+      _completion = null;
       _pending = null;
       _committing = false;
       _chapterTurn.value = 0;
@@ -339,7 +355,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     );
   }
 
-  Future<void> _exit() async {
+  Future<void> _exit({bool toShelf = false}) async {
     if (_changing || _canPop) return;
     setState(() => _changing = true);
     final saved = await _save();
@@ -350,7 +366,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     });
     if (saved) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Navigator.of(context).pop();
+        if (mounted) {
+          if (toShelf) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          } else {
+            Navigator.of(context).pop();
+          }
+        }
       });
     }
   }
@@ -424,6 +446,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       return;
     }
     if (target == _reader.chapter) {
+      setState(() => _completion = null);
       final content = _reader.content!;
       final index = blockKey == null
           ? 0
@@ -579,26 +602,41 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     final order = _needsOrder
         ? _readingOrder ?? <ChapterKey>[]
         : chapters.map((c) => c.key).toList();
-    final index = chapters.indexWhere((c) => c.key == reader.chapter);
-    ChapterKey? previous, next;
-    if (index >= 0 && widget.linkDepth == 0) {
-      for (var i = index - 1; i >= 0; i--) {
-        if (order.contains(chapters[i].key)) {
-          previous = chapters[i].key;
-          break;
-        }
-      }
-      for (var i = index + 1; i < chapters.length; i++) {
-        if (order.contains(chapters[i].key)) {
-          next = chapters[i].key;
-          break;
-        }
-      }
-    }
+    final index = order.indexOf(reader.chapter);
+    final previous = index > 0 && widget.linkDepth == 0
+        ? order[index - 1]
+        : null;
+    final next = index >= 0 && index + 1 < order.length && widget.linkDepth == 0
+        ? order[index + 1]
+        : null;
 
     return ReaderContentView(
       key: ValueKey(reader),
       content: reader.content!,
+      completion: reader == _reader ? _completion : null,
+      onCompletionPrevious: () => setState(() => _completion = null),
+      onCompletionExit: () => _exit(toShelf: true),
+      onRestart: order.isEmpty
+          ? null
+          : () => _switch(order.first, fromStart: true),
+      onBookEnd:
+          !_changing &&
+              widget.linkDepth == 0 &&
+              index >= 0 &&
+              index == order.length - 1
+          ? () {
+              if (_completion != null || reader != _reader) return;
+              final state = bookEndState(
+                local: _local,
+                status: reader.novelStatus == NovelStatus.unknown
+                    ? _bookStatus
+                    : reader.novelStatus,
+              );
+              setState(() => _completion = state);
+              reader.enterBookEnd(state);
+              unawaited(reader.flushProgress());
+            }
+          : null,
       onReady: () => _commitPending(reader),
       onPageAppearance: (paper) {
         if (reader == _reader) {
@@ -629,10 +667,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           : null,
       onDetails: widget.onDetails == null || _changing ? null : _details,
       onPreviousChapter: !_changing && previous != null
-          ? () => _switch(previous!, fromEnd: true)
+          ? () => _switch(previous, fromEnd: true)
           : null,
       onNextChapter: !_changing && next != null
-          ? () => _switch(next!, fromStart: true)
+          ? () => _switch(next, fromStart: true)
           : null,
     );
   }

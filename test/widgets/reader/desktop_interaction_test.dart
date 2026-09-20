@@ -152,7 +152,7 @@ void main() {
         for (final control in [
           find.byTooltip('Reading settings'),
           find.byIcon(Icons.list),
-          find.text('Progress 0%'),
+          find.text('Chapter 0%'),
         ]) {
           await tester.tap(control);
           await tester.pumpAndSettle();

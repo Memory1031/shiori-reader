@@ -11,6 +11,7 @@ class LibraryController extends ScopedController {
   final LibraryRepository repository;
   List<BookshelfEntry> books = const [];
   List<ReadingProgress> recent = const [];
+  Map<NovelKey, ReadingProgress> _progressByBook = const {};
   AppFailure? shelfFailure, historyFailure, writeFailure;
   bool shelfReady = false, historyReady = false, writing = false;
   @override
@@ -41,6 +42,7 @@ class LibraryController extends ScopedController {
       switch (result) {
         case Success(:final value):
           recent = List.unmodifiable(value);
+          _progressByBook = {for (final item in value) item.novelKey: item};
           historyFailure = null;
         case Failure(:final failure):
           historyFailure = failure;
@@ -50,12 +52,7 @@ class LibraryController extends ScopedController {
   }
 
   bool contains(NovelKey key) => books.any((b) => b.snapshot.key == key);
-  ReadingProgress? progressFor(NovelKey key) {
-    for (final item in recent) {
-      if (item.novelKey == key) return item;
-    }
-    return null;
-  }
+  ReadingProgress? progressFor(NovelKey key) => _progressByBook[key];
 
   List<BookshelfEntry> get sorted {
     final times = {for (final item in recent) item.novelKey: item.lastReadAt};

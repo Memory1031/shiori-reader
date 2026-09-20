@@ -17,14 +17,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get shelfLocal => 'Local';
-
-  @override
-  String shelfLocalFormat(String format) {
-    return 'Local · $format';
-  }
-
-  @override
   String get localBookContents => 'Book contents';
 
   @override
@@ -904,4 +896,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String readerIncrease(String label) {
     return 'Increase $label';
   }
+
+  @override
+  String get bookFinished => 'Finished';
+
+  @override
+  String get bookCaughtUp => 'Caught up';
+
+  @override
+  String get bookCurrentEnd => 'End of available chapters';
+
+  @override
+  String bookProgressPercent(int percent) {
+    return 'Reading progress $percent%';
+  }
+
+  @override
+  String readerChapterPercent(int percent) {
+    return 'Chapter $percent%';
+  }
+
+  @override
+  String get readerReadingProgress => 'Reading progress';
+
+  @override
+  String get readerBackToShelf => 'Back to bookshelf';
+
+  @override
+  String get readerViewCatalog => 'View contents';
+
+  @override
+  String get readerRestart => 'Read again';
+
+  @override
+  String get bookOnline => 'Online';
 }

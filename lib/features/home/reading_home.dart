@@ -1,3 +1,4 @@
+import '../reader/book_progress_label.dart';
 import 'package:flutter/material.dart';
 import '../../app/routes.dart';
 import '../../domain/contracts/contracts.dart';
@@ -333,15 +334,12 @@ class _ReadingHomeState extends State<ReadingHome> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               subtitle: Text(
-                                strings.readerChapterProgress(
-                                  (_library
-                                              .recent
-                                              .first
-                                              .position
-                                              .chapterFraction *
-                                          100)
-                                      .round(),
-                                ),
+                                bookProgressLabel(
+                                      strings,
+                                      _library.recent.first.bookProgress,
+                                      descriptive: true,
+                                    ) ??
+                                    strings.readerReadingProgress,
                               ),
                               leading: SizedBox(
                                 width: 36,

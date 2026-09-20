@@ -1,3 +1,4 @@
+import '../reader/book_progress_label.dart';
 import 'package:flutter/material.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -47,9 +48,12 @@ class HistoryScreen extends StatelessWidget {
                           key: ValueKey(item.novelKey),
                           title: Text(item.snapshot.title),
                           subtitle: Text(
-                            strings.readerChapterProgress(
-                              (item.position.chapterFraction * 100).round(),
-                            ),
+                            bookProgressLabel(
+                                  strings,
+                                  item.bookProgress,
+                                  descriptive: true,
+                                ) ??
+                                strings.readerReadingProgress,
                           ),
                           onTap: () => onContinue(item.novelKey),
                           trailing: IconButton(

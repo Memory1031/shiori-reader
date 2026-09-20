@@ -1,12 +1,9 @@
 {
   "readerImagePreview": "View image",
   "readerFootnote": "Footnote {number}",
-  "@readerFootnote": {"placeholders": {"number": {"type": "String"}}},
-  "shelfLocal": "Local",
-  "shelfLocalFormat": "Local · {format}",
-  "@shelfLocalFormat": {
+  "@readerFootnote": {
     "placeholders": {
-      "format": {
+      "number": {
         "type": "String"
       }
     }
@@ -420,6 +417,30 @@
     "placeholders": {
       "label": {
         "type": "String"
+      }
+    }
+  },
+  "bookFinished": "Finished",
+  "bookCaughtUp": "Caught up",
+  "bookCurrentEnd": "End of available chapters",
+  "bookProgressPercent": "Reading progress {percent}%",
+  "readerChapterPercent": "Chapter {percent}%",
+  "readerReadingProgress": "Reading progress",
+  "readerBackToShelf": "Back to bookshelf",
+  "readerViewCatalog": "View contents",
+  "readerRestart": "Read again",
+  "bookOnline": "Online",
+  "@bookProgressPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "@readerChapterPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
       }
     }
   }

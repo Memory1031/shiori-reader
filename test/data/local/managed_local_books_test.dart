@@ -391,9 +391,11 @@ void main() {
   test('v2 migration retains shelf and prefetch settings', () async {
     await store.close();
     await db.close();
-    final sql = File(
-      'lib/data/local/database/users.drift',
-    ).readAsStringSync().split('CREATE TABLE local_books').first;
+    final sql = File('lib/data/local/database/users.drift')
+        .readAsStringSync()
+        .replaceAll(' book_progress TEXT,\n', '')
+        .split('CREATE TABLE local_books')
+        .first;
     final old = UserDatabase(
       NativeDatabase.memory(
         setup: (raw) {

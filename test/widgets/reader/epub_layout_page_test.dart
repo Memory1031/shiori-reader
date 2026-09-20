@@ -1,3 +1,10 @@
+import 'package:flutter/services.dart';
+import 'package:shiori/domain/contracts/contracts.dart';
+import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/dev/fixtures.dart';
+import 'package:shiori/features/reader/book_reader_screen.dart';
+import 'package:shiori/features/reader/reader_completion_page.dart';
+import 'completion_test.dart' show CompletionRepository;
 import 'dart:async';
 import 'dart:io';
 
@@ -122,6 +129,16 @@ class _Platform extends InAppWebViewPlatform {
       _Environment(this);
 }
 
+class _CompletionPresentation extends CompletionRepository
+    implements LocalPagePresentationRepository {
+  _CompletionPresentation() : super(local: true);
+  @override
+  Future<Result<String?>> loadPagePresentation(
+    ChapterKey chapter, {
+    required CancellationToken cancellation,
+  }) async => const Success(document);
+}
+
 void main() {
   late _Platform platform;
   late Directory temp;
@@ -154,6 +171,61 @@ void main() {
         onCenterTap: () => center++,
       ),
     ),
+  );
+
+  testWidgets(
+    'last main WebView page enters completion and returns without reopening platform view',
+    (tester) async {
+      final repo = _CompletionPresentation();
+      final library = FixtureLibraryRepository();
+      await tester.pumpWidget(
+        EpubWebViewHost(
+          userDataDirectory: temp,
+          operatingSystem: 'android',
+          child: ShioriApp(
+            locale: const Locale('en'),
+            routes: AppRoutes(
+              home: (_) => BookReaderScreen(
+                chapter: repo.order.last,
+                repository: repo,
+                library: library,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      platform.heads.single.finish();
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderCompletionPage), findsNothing);
+      final requests = repo.loads;
+      // Keyboard and WebView tap callbacks both go through the same end boundary.
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderCompletionPage), findsOneWidget);
+      final saved =
+          (await library.getProgress(
+                    repo.key,
+                    cancellation: CancellationSource().token,
+                  )
+                  as Success<ReadingProgress?>)
+              .value!;
+      expect(saved.bookProgress!.terminal, BookTerminalState.finished);
+      expect(saved.position.chapterFraction, 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderCompletionPage), findsNothing);
+      expect(platform.heads.length, 1);
+      tester.widget<EpubLayoutPage>(find.byType(EpubLayoutPage)).onNext!();
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderCompletionPage), findsOneWidget);
+      expect(repo.loads, requests);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      expect(platform.heads.single.disposed, isTrue);
+      await repo.updates.close();
+      await library.close();
+    },
   );
 
   testWidgets(

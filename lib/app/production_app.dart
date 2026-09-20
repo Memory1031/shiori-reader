@@ -96,15 +96,18 @@ class _ProductionAppState extends State<ProductionApp> {
         paths: paths,
         users: databases.users,
       );
+      _library = LocalLibraryRepository(databases.users);
       _novels = LocalReadingRepository(
         local: databases.localBooks,
         online: _services!.novels,
+        onOnlineCatalog: (catalog) async {
+          await _library!.reconcileCatalog(catalog);
+        },
       );
       _images = LocalImageRepository(
         local: databases.localBooks,
         online: _services!.images,
       );
-      _library = LocalLibraryRepository(databases.users);
       _appearance = PreferencesAppSettingsStore(
         preferences: SharedPreferencesAsync(),
         paths: paths,
