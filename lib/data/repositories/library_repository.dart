@@ -51,48 +51,110 @@ class LocalLibraryRepository implements LibraryRepository {
     );
   }
 
+  /// Both candidate catalogs and eligible cache/network misses use the same
+  /// durable basis. Cancellation and non-fallback failures remain authoritative.
+  Future<Result<LoadResult<Catalog>>> resolveCatalog(
+    NovelKey key,
+    Result<LoadResult<Catalog>> result,
+  ) async {
+    if (result case Success(:final value)) {
+      if (value.value.novelKey != key) {
+        return Failure(
+          AppFailure(
+            kind: FailureKind.parse,
+            operation: Operation.catalog,
+            context: FailureContext.invalidContent,
+          ),
+        );
+      }
+      return reconcileCatalog(value);
+    }
+    final failure = (result as Failure<LoadResult<Catalog>>).failure;
+    final cacheMiss =
+        failure.kind == FailureKind.cache &&
+        failure.context == FailureContext.cacheMiss;
+    if (!cacheMiss &&
+        !{
+          FailureKind.network,
+          FailureKind.timeout,
+          FailureKind.sourceUnavailable,
+        }.contains(failure.kind)) {
+      return result;
+    }
+    final basis = await localRead(
+      Operation.catalog,
+      CancellationSource().token,
+      () => _catalogBasis(key),
+    );
+    return switch (basis) {
+      Failure(:final failure) => Failure(failure),
+      Success(value: null) => result,
+      Success(:final value) => Success(
+        LoadResult(
+          value: value!.value,
+          origin: LoadOrigin.local,
+          fetchedAt: value.fetchedAt,
+          isStale: true,
+          // Missing disposable storage is not itself a failed remote refresh.
+          refreshFailure: cacheMiss ? null : failure,
+        ),
+      ),
+    };
+  }
+
   /// The accepted basis and its derived progress commit or roll back together.
   /// It survives cache-write failure and restart; a failed observation is retryable.
-  Future<Result<void>> reconcileCatalog(LoadResult<Catalog> observation) {
+  Future<Result<LoadResult<Catalog>>> reconcileCatalog(
+    LoadResult<Catalog> observation,
+  ) {
     final catalog = observation.value;
-    return localWrite(
-      db,
-      Operation.progressWrite,
-      CancellationSource().token,
-      () async {
-        final current = await _catalogBasis(catalog.novelKey);
-        if (!acceptsCatalogObservation(observation, current)) return;
-        final row = await db
-            .customSelect(
-              'SELECT * FROM reading_progress WHERE $_where',
-              variables: _key(catalog.novelKey),
-            )
-            .getSingleOrNull();
-        final before = row == null ? null : _progress(row);
-        // Pre-migration snapshots have no fetch time. A conflicting cache cannot
-        // establish a newer basis; wait for a remote observation or matching cache.
-        if (current == null &&
-            observation.origin != LoadOrigin.remote &&
-            before?.bookProgress != null &&
-            before!.catalogRevision != catalog.revision) {
-          return;
-        }
-        await db.customUpdate(
-          'INSERT INTO progress_catalogs(source_id,novel_id,catalog_json,fetched_at,origin) VALUES(?,?,?,?,?) '
-          'ON CONFLICT(source_id,novel_id) DO UPDATE SET catalog_json=excluded.catalog_json,fetched_at=excluded.fetched_at,origin=excluded.origin',
-          variables: [
-            ..._key(catalog.novelKey),
-            Variable(RecordCodec.catalog(catalog)),
-            Variable(observation.fetchedAt.microsecondsSinceEpoch),
-            Variable(observation.origin.name),
-          ],
-          updates: {db.progressCatalogs},
+    return localWrite(db, Operation.progressWrite, CancellationSource().token, () async {
+      final current = await _catalogBasis(catalog.novelKey);
+      if (!acceptsCatalogObservation(observation, current)) {
+        // This is a local read of the accepted basis, not a fresh remote fetch.
+        // Preserve refresh diagnostics without returning the rejected catalog.
+        return LoadResult(
+          value: current!.value,
+          origin: LoadOrigin.local,
+          fetchedAt: current.fetchedAt,
+          isStale: observation.isStale,
+          refreshFailure: observation.refreshFailure,
         );
-        if (before == null) return;
+      }
+      final row = await db
+          .customSelect(
+            'SELECT * FROM reading_progress WHERE $_where',
+            variables: _key(catalog.novelKey),
+          )
+          .getSingleOrNull();
+      final before = row == null ? null : _progress(row);
+      // Pre-migration snapshots have no fetch time. A conflicting cache cannot
+      // establish a newer basis; wait for a remote observation or matching cache.
+      if (current == null &&
+          observation.origin != LoadOrigin.remote &&
+          before?.bookProgress != null &&
+          before!.catalogRevision != catalog.revision) {
+        // The old snapshot has no catalog payload; keep reading cache content
+        // while progress writes wait for a trustworthy basis.
+        return observation;
+      }
+      await db.customUpdate(
+        'INSERT INTO progress_catalogs(source_id,novel_id,catalog_json,fetched_at,origin) VALUES(?,?,?,?,?) '
+        'ON CONFLICT(source_id,novel_id) DO UPDATE SET catalog_json=excluded.catalog_json,fetched_at=excluded.fetched_at,origin=excluded.origin',
+        variables: [
+          ..._key(catalog.novelKey),
+          Variable(RecordCodec.catalog(catalog)),
+          Variable(observation.fetchedAt.microsecondsSinceEpoch),
+          Variable(observation.origin.name),
+        ],
+        updates: {db.progressCatalogs},
+      );
+      if (before != null) {
         final after = _reconcile(before, BookProgressMetrics.online(catalog));
         if (before != after) await writeProgressRow(db, after, now());
-      },
-    );
+      }
+      return observation;
+    });
   }
 
   List<Variable> _key(NovelKey key) => [
@@ -315,7 +377,7 @@ class LocalLibraryRepository implements LibraryRepository {
       if (previous?.readNullable<String>('book_progress') != null &&
           previous!.read<String>('catalog_revision') !=
               progress.catalogRevision) {
-        return false;
+        throw const LocalCatalogBasisUnavailable();
       }
     }
     final known = basis == null

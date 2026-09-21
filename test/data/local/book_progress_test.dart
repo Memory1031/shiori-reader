@@ -132,23 +132,42 @@ void main() {
                   .value!;
           expect(guarded.catalogRevision, catalog(3).revision);
           expect(guarded.bookProgress!.fraction, 2 / 3);
-          expect(
-            (await repo.saveProgress(
-                      progress,
-                      stamp: ProgressWriteStamp(generation: gen, sequence: 1),
-                      cancellation: token,
-                    )
-                    as Success<bool>)
-                .value,
-            isFalse,
+          final blocked = await repo.saveProgress(
+            progress,
+            stamp: ProgressWriteStamp(generation: gen, sequence: 1),
+            cancellation: token,
           );
+          expect(blocked, isA<Failure<bool>>());
+          expect(
+            (blocked as Failure<bool>).failure.context,
+            FailureContext.catalogBasisUnavailable,
+          );
+          expect(blocked.failure.retryPolicy, RetryPolicy.manual);
         }
         final newer = observation(3, 3);
         if (scenario == 'retry') {
           await db.customStatement(
             "CREATE TRIGGER fail_progress BEFORE UPDATE ON reading_progress BEGIN SELECT RAISE(ABORT, 'injected write failure'); END",
           );
-          expect(await repo.reconcileCatalog(newer), isA<Failure<void>>());
+          expect(
+            await repo.reconcileCatalog(newer),
+            isA<Failure<LoadResult<Catalog>>>(),
+          );
+          final failedReading = LocalReadingRepository(
+            local: _UnusedLocalStore(),
+            online: _CatalogOnline()..observation = newer,
+            resolveOnlineCatalog: repo.resolveCatalog,
+          );
+          final failedLoad = await failedReading.loadCatalog(
+            key,
+            mode: ReadMode.refresh,
+            cancellation: token,
+          );
+          expect(failedLoad, isA<Failure<LoadResult<Catalog>>>());
+          expect(
+            (failedLoad as Failure<LoadResult<Catalog>>).failure.retryPolicy,
+            RetryPolicy.manual,
+          );
           final unchanged =
               (await repo.getProgress(key, cancellation: token)
                       as Success<ReadingProgress?>)
@@ -165,9 +184,9 @@ void main() {
         final reading = LocalReadingRepository(
           local: _UnusedLocalStore(),
           online: online,
-          onOnlineCatalog: (value) async {
-            observed.add(value);
-            await repo.reconcileCatalog(value);
+          resolveOnlineCatalog: (key, result) async {
+            if (result case Success(:final value)) observed.add(value);
+            return repo.resolveCatalog(key, result);
           },
         );
         await reading.loadCatalog(
@@ -197,7 +216,24 @@ void main() {
             operation: Operation.catalog,
           ),
         );
-        await reading.catalogUpdates(key).single;
+        final resolved =
+            (await reading.catalogUpdates(key).single
+                    as Success<LoadResult<Catalog>>)
+                .value;
+        expect(resolved.value.revision, catalog(3).revision);
+        expect(resolved.fetchedAt, newer.fetchedAt);
+        expect(resolved.origin, LoadOrigin.local);
+        expect(resolved.isStale, isTrue);
+        expect(resolved.refreshFailure, online.observation.refreshFailure);
+        final cached =
+            (await reading.loadCatalog(
+                      key,
+                      mode: ReadMode.cacheOnly,
+                      cancellation: token,
+                    )
+                    as Success<LoadResult<Catalog>>)
+                .value;
+        expect(cached.value.revision, resolved.value.revision);
         expect(observed.last, same(online.observation));
         expect(observed.last.refreshFailure, isNotNull);
         var updated =
@@ -221,7 +257,17 @@ void main() {
         expect(updated.bookProgress!.fraction, 2 / 3);
         expect(updated.bookProgress!.terminal, BookTerminalState.reading);
         // A genuinely newer deletion must still be accepted (not max chapter count).
-        await repo.reconcileCatalog(observation(2, 4));
+        online.observation = observation(2, 4);
+        final deletion =
+            (await reading.loadCatalog(
+                      key,
+                      mode: ReadMode.refresh,
+                      cancellation: token,
+                    )
+                    as Success<LoadResult<Catalog>>)
+                .value;
+        expect(deletion.value.revision, catalog(2).revision);
+        expect(deletion.origin, LoadOrigin.remote);
         updated =
             (await repo.getProgress(key, cancellation: token)
                     as Success<ReadingProgress?>)

@@ -39,6 +39,7 @@ enum FailureContext {
   none,
   cacheMiss,
   cacheWriteFailed,
+  catalogBasisUnavailable,
   sourceMissing,
   invalidCursor,
   repeatedPage,

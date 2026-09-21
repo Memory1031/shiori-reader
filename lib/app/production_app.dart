@@ -100,9 +100,7 @@ class _ProductionAppState extends State<ProductionApp> {
       _novels = LocalReadingRepository(
         local: databases.localBooks,
         online: _services!.novels,
-        onOnlineCatalog: (catalog) async {
-          await _library!.reconcileCatalog(catalog);
-        },
+        resolveOnlineCatalog: _library!.resolveCatalog,
       );
       _images = LocalImageRepository(
         local: databases.localBooks,

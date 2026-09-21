@@ -6,14 +6,26 @@ class LocalCancelled implements Exception {
   const LocalCancelled();
 }
 
+/// A valid session must wait for a trustworthy catalog before replacing metadata.
+class LocalCatalogBasisUnavailable implements Exception {
+  const LocalCatalogBasisUnavailable();
+}
+
 void checkLocalCancellation(CancellationToken token) {
   if (token.isCancelled) throw const LocalCancelled();
 }
 
 AppFailure localFailure(Operation operation, [Object? error]) =>
-    error is LocalCancelled
-    ? AppFailure.cancelled(operation)
-    : AppFailure(kind: FailureKind.database, operation: operation);
+    switch (error) {
+      LocalCancelled() => AppFailure.cancelled(operation),
+      LocalCatalogBasisUnavailable() => AppFailure(
+        kind: FailureKind.cache,
+        operation: operation,
+        context: FailureContext.catalogBasisUnavailable,
+        retryPolicy: RetryPolicy.manual,
+      ),
+      _ => AppFailure(kind: FailureKind.database, operation: operation),
+    };
 Future<Result<T>> localRead<T>(
   Operation operation,
   CancellationToken token,

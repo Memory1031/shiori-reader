@@ -60,7 +60,7 @@ LibraryRepository 是书架和阅读历史唯一写入口，所有操作本地�
 
 putBookshelf 按 NovelKey 幂等，保留既有 addedAt；removeFromBookshelf 返回被移除条目，底层只删除书架记录。产品 LibraryController 对在线书先调用 CacheManagement 按书清理，再移出书架，不提供撤销；清理失败保留条目供重试。两个存储不共用事务，若清理成功但移出失败，条目仍在、缓存可能已清。在线阅读进度保留。本地书移除改走 LocalBookManagement.deleteBook，确认后删除托管文件、索引、书架和进度并失效旧写；不使用仅删书架的接口。文件清理延后时明确提示 cleanupPending。getProgress 无记录为 Success(null)。clearHistory 单独删除历史，不影响书架 / 缓存，且使在途旧进度代次失效，避免晚写复活历史。
 
-进度晚写保护使用 `beginProgressSession(NovelKey) → Result<int>` 与 `ProgressWriteStamp(generation,sequence)`：仓库生成每本书跨进程单调代次，调用方在同代次递增 sequence；saveProgress 原子检查 stamp 并写入。返回 true 表示已提交，false 表示旧代次 / 重复 / 倒序写被忽略，不能当作已保存。代次与正文 revision、时间戳无关，不塞进 ReadingProgress 实体；存储层负责持久代次与串行事务，协议测试和设备重启证据分开记录。
+进度晚写保护使用 `beginProgressSession(NovelKey) → Result<int>` 与 `ProgressWriteStamp(generation,sequence)`：仓库生成每本书跨进程单调代次，调用方在同代次递增 sequence；saveProgress 原子检查 stamp 并写入。返回 true 表示已提交，false 表示旧代次 / 重复 / 倒序写被忽略，不能当作已保存。目录依据暂缺或冲突返回可手动重试的 `Failure(cache, catalogBasisUnavailable)`，保留待保存位置；它不使当前 generation 失效。代次与正文 revision、时间戳无关，不塞进 ReadingProgress 实体；存储层负责持久代次与串行事务，协议测试和设备重启证据分开记录。
 
 SettingsStore.load/save 使用 ReaderSettings；取消前提交规则同上。存储层遇坏存储 codec / 未知版本可按既定策略回退默认设置并记录安全诊断，不重置无关书架 / 进度，实际写失败返回 Failure(database/cache)。不承诺设置与进度跨存储事务。
 
