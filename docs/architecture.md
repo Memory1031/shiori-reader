@@ -103,6 +103,8 @@ Presentation 依赖领域契约，通过显式注入获得服务。应用根拥�
 | `users/users.sqlite` | v6 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions、progress_catalogs |
 | `disposable/cache.sqlite` | v2 | novel_cache、catalog_cache、chapter_cache、image_cache、image_owners |
 | 平台 preferences | 独立 codec | readerSettings v3、appSettings v2 |
+| `users/update-preferences.json` | v1 | 更新渠道、自动检查开关、检查时间与限流期限 |
+| `disposable/updates/` | 独立更新记录 | 发布列表 ETag 缓存、已签名清单与更新下载；未完成下载在恢复时清理 |
 | `users/books/` | manifest v1 | 本地书托管原件、语义正文索引与媒体 |
 
 AppPaths 通过 path_provider 解析 ApplicationSupport / temporary，固定 `shiori/production` 或 `shiori/development` 子目录。机器绝对路径、URL 和 Source 秘密不进入持久身份。

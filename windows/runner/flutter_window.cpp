@@ -37,6 +37,33 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  app_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "dev.shiori.reader/app",
+      &flutter::StandardMethodCodec::GetInstance());
+  app_channel_->SetMethodCallHandler([](const auto& call, auto result) {
+    if (call.method_name() == "info") {
+      const auto version = std::to_string(FLUTTER_VERSION_MAJOR) + "." +
+          std::to_string(FLUTTER_VERSION_MINOR) + "." + std::to_string(FLUTTER_VERSION_PATCH);
+      result->Success(flutter::EncodableValue(flutter::EncodableMap{
+          {flutter::EncodableValue("version"), flutter::EncodableValue(version)},
+          {flutter::EncodableValue("build"), flutter::EncodableValue(FLUTTER_VERSION_BUILD)}}));
+    } else if (call.method_name() == "openRelease") {
+      const auto* url = call.arguments() ? std::get_if<std::string>(call.arguments()) : nullptr;
+      const std::string prefix = "https://github.com/Memory1031/shiori-reader/releases/";
+      if (!url || url->rfind(prefix, 0) != 0 ||
+          url->find_first_of("\r\n\"\\?#") != std::string::npos ||
+          url->find('\0') != std::string::npos) {
+        result->Success(flutter::EncodableValue(false));
+        return;
+      }
+      const std::wstring target(url->begin(), url->end());
+      const auto opened = reinterpret_cast<INT_PTR>(ShellExecuteW(
+          nullptr, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+      result->Success(flutter::EncodableValue(opened > 32));
+    } else {
+      result->NotImplemented();
+    }
+  });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
   if (launch_view_) {
     SetWindowPos(launch_view_, HWND_TOP, 0, 0, 0, 0,
@@ -89,6 +116,8 @@ void FlutterWindow::OnDestroy() {
   DragAcceptFiles(GetHandle(), FALSE);
   drop_sink_.reset();
   drop_channel_.reset();
+  if (app_channel_) app_channel_->SetMethodCallHandler(nullptr);
+  app_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

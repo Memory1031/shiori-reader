@@ -15,4 +15,5 @@
 | [解析支持矩阵](local-import.md#解析支持矩阵) | 能力、限制和回归入口 |
 | [解析器参考来源](references/epub.md) | 固定版本、许可和采纳理由 |
 | [发布说明](release/README.md) | 版本、签名、分发与发布步骤 |
+| [自动升级规划](release/auto-update-plan.md) | Android / Windows 更新方案与待实施任务 |
 | [依赖许可](release/dependencies.md) | 当前依赖清单与许可边界 |

@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="sharedpref" path="update-install.xml" />
         <exclude domain="file" path="shiori/production/users/import-staging/" />
         <exclude domain="file" path="shiori/production/disposable/" />
         <exclude domain="file" path="shiori/development/" />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="sharedpref" path="update-install.xml" />
         <exclude domain="file" path="shiori/production/users/import-staging/" />
         <exclude domain="file" path="shiori/production/disposable/" />
         <exclude domain="file" path="shiori/development/" />

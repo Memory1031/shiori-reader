@@ -173,7 +173,7 @@ abstract class AppLocalizations {
   /// No description provided for @historyTitle.
   ///
   /// In en, this message translates to:
-  /// **'Recent reading'**
+  /// **'Reading history'**
   String get historyTitle;
 
   /// No description provided for @historyClear.
@@ -1759,6 +1759,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Online'**
   String get bookOnline;
+
+  /// No description provided for @updateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'About & updates'**
+  String get updateTitle;
+
+  /// No description provided for @updateInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed: {version}'**
+  String updateInstalled(String version);
+
+  /// No description provided for @updateDevelopment.
+  ///
+  /// In en, this message translates to:
+  /// **'Development builds do not connect to the production update source.'**
+  String get updateDevelopment;
+
+  /// No description provided for @updateUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Get updates through the App Store or TestFlight.'**
+  String get updateUnsupported;
+
+  /// No description provided for @updateInvalidIdentity.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to verify the installed version. Update checks are unavailable.'**
+  String get updateInvalidIdentity;
+
+  /// No description provided for @updateAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Check automatically'**
+  String get updateAutomatic;
+
+  /// No description provided for @updateAutomaticHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks at most once a day. Downloads start only when you choose.'**
+  String get updateAutomaticHint;
+
+  /// No description provided for @updateChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Update channel'**
+  String get updateChannel;
+
+  /// No description provided for @updateStable.
+  ///
+  /// In en, this message translates to:
+  /// **'Stable'**
+  String get updateStable;
+
+  /// No description provided for @updateBeta.
+  ///
+  /// In en, this message translates to:
+  /// **'Beta (includes stable)'**
+  String get updateBeta;
+
+  /// No description provided for @updateChannelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Switching channels never downgrades. If your beta is newer, you\'ll be notified when a stable upgrade is available.'**
+  String get updateChannelHint;
+
+  /// No description provided for @updateNeverChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Not checked yet'**
+  String get updateNeverChecked;
+
+  /// No description provided for @updateLastChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Last checked: {time}'**
+  String updateLastChecked(String time);
+
+  /// No description provided for @updateCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get updateCheck;
+
+  /// No description provided for @updateCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get updateCancel;
+
+  /// No description provided for @updateChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get updateChecking;
+
+  /// No description provided for @updateNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not connect. Check your connection and try again.'**
+  String get updateNetworkError;
+
+  /// No description provided for @updateRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Request limit reached. Try again after {time}.'**
+  String updateRateLimited(String time);
+
+  /// No description provided for @updateIncomplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Release information is incomplete. Try checking again later.'**
+  String get updateIncomplete;
+
+  /// No description provided for @updateVerificationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Update verification failed. Check again or download a fresh copy.'**
+  String get updateVerificationError;
+
+  /// No description provided for @updateStorageError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not access update files. Check free space and folder permissions, then retry.'**
+  String get updateStorageError;
+
+  /// No description provided for @updateCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get updateCancelled;
+
+  /// No description provided for @updateNoUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'No newer release is available on this channel.'**
+  String get updateNoUpdate;
+
+  /// No description provided for @updateSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Download size: {size} MB'**
+  String updateSize(String size);
+
+  /// No description provided for @updateProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% downloaded'**
+  String updateProgress(int percent);
+
+  /// No description provided for @updateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download update'**
+  String get updateDownload;
+
+  /// No description provided for @updateDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Download verified. Visit the release page for installation instructions.'**
+  String get updateDownloaded;
+
+  /// No description provided for @updateReleasePage.
+  ///
+  /// In en, this message translates to:
+  /// **'View release page'**
+  String get updateReleasePage;
+
+  /// No description provided for @updateLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the browser. Release link copied.'**
+  String get updateLinkCopied;
+
+  /// No description provided for @updateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available: {version}'**
+  String updateAvailable(String version);
+
+  /// No description provided for @updateView.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get updateView;
+
+  /// No description provided for @updateInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Install update'**
+  String get updateInstall;
+
+  /// No description provided for @updateInstallHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The package is verified. Installing will close the app; your library, reading position and settings will be kept.'**
+  String get updateInstallHint;
+
+  /// No description provided for @updateInstallPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Shiori to install app updates. Return to this page after granting permission, then tap Install update.'**
+  String get updateInstallPermission;
+
+  /// No description provided for @updateInstallSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open installation settings'**
+  String get updateInstallSettings;
+
+  /// No description provided for @updateInstalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the system installer. Confirm or cancel in the system dialog.'**
+  String get updateInstalling;
+
+  /// No description provided for @updateInstallCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Installation cancelled. The downloaded package is kept for retry.'**
+  String get updateInstallCancelled;
+
+  /// No description provided for @updateInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The system could not complete installation. Check free space and installation permission, then retry.'**
+  String get updateInstallFailed;
+
+  /// No description provided for @updateInstallBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait for the current operation to finish before installing.'**
+  String get updateInstallBusy;
+
+  /// No description provided for @updateReturnToLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to the library and finish any import, then open App updates from the menu.'**
+  String get updateReturnToLibrary;
 }
 
 class _AppLocalizationsDelegate

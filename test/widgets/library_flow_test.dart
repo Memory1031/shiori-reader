@@ -67,7 +67,7 @@ void main() {
   });
 
   testWidgets(
-    'detail removal reflects on shelf without undo; history clears independently',
+    'detail removal clears cache and preserves progress without a history menu',
     (tester) async {
       final env = FixtureEnvironment(scenario: FixtureScenario.multiVolume);
       final cache = RemovalCache();
@@ -110,12 +110,17 @@ void main() {
       expect(find.text('Undo removal'), findsNothing);
       await tester.tap(find.byTooltip('More'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Recent reading'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Clear this reading history'));
-      await tester.pumpAndSettle();
-      expect(find.text('No reading history yet.'), findsOneWidget);
+      expect(find.text('Reading history'), findsNothing);
       await tester.runAsync(() async {
+        expect(
+          (await env.library.getProgress(
+                    summary.key,
+                    cancellation: CancellationSource().token,
+                  )
+                  as Success<ReadingProgress?>)
+              .value,
+          isNotNull,
+        );
         expect(
           (await env.library.watchBookshelf().first
                   as Success<List<BookshelfEntry>>)

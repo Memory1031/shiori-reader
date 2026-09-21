@@ -56,6 +56,11 @@ jobs:
       - name: 校验 tag 与包版本
         run: python3 tool/release_android.py version
 
+      - name: 写入发布身份与更新公钥
+        env:
+          UPDATE_PUBLIC_KEY_JSON: ${{ vars.UPDATE_PUBLIC_KEY_JSON }}
+        run: python3 tool/update_manifest.py identity
+
       - name: 校验并写入签名配置
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -123,6 +128,11 @@ jobs:
       - name: 检查锁文件
         run: git diff --exit-code -- pubspec.lock
 
+      - name: 写入发布身份与更新公钥
+        env:
+          UPDATE_PUBLIC_KEY_JSON: ${{ vars.UPDATE_PUBLIC_KEY_JSON }}
+        run: python tool/update_manifest.py identity
+
       - name: 构建 Windows Release
         run: flutter build windows --release --no-pub --target lib/main.dart
 
@@ -140,6 +150,9 @@ jobs:
   publish:
     name: 发布 Android 与 Windows 产物
     needs: [android-release, windows-release]
+    concurrency:
+      group: shiori-release-publish
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -165,26 +178,14 @@ jobs:
           sha256sum --check SHA256SUMS.txt
           sha256sum --check SHA256SUMS-windows-x64.txt
 
-      - name: 创建 GitHub Release 并附上产物
+      - name: 生成并签署更新清单
+        env:
+          UPDATE_PUBLIC_KEY_JSON: ${{ vars.UPDATE_PUBLIC_KEY_JSON }}
+          UPDATE_SIGNING_KEY_PEM_B64: ${{ secrets.UPDATE_SIGNING_KEY_PEM_B64 }}
+        run: python3 tool/update_manifest.py manifest
+
+      - name: 校验发布历史并发布完整产物
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # 已有 Release 才走覆盖上传；创建失败不再被无条件 fallback 掩盖。
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            if [[ "$GITHUB_REF_NAME" == *-* ]]; then
-              gh release edit "$GITHUB_REF_NAME" --prerelease --latest=false
-            fi
-            gh release upload "$GITHUB_REF_NAME" build/release-assets/* --clobber
-          else
-            RELEASE_FLAGS=()
-            if [[ "$GITHUB_REF_NAME" == *-* ]]; then RELEASE_FLAGS+=(--prerelease --latest=false); fi
-            NOTES_FILE="docs/release/notes/${GITHUB_REF_NAME}.md"
-            if [[ -f "$NOTES_FILE" ]]; then
-              RELEASE_FLAGS+=(--notes-file "$NOTES_FILE")
-            else
-              RELEASE_FLAGS+=(--generate-notes)
-            fi
-            gh release create "$GITHUB_REF_NAME" build/release-assets/* \
-              --title "$GITHUB_REF_NAME" --verify-tag "${RELEASE_FLAGS[@]}"
-          fi
+          UPDATE_PUBLIC_KEY_JSON: ${{ vars.UPDATE_PUBLIC_KEY_JSON }}
+        run: python3 tool/publish_assets.py

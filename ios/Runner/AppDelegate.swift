@@ -12,6 +12,17 @@ import UIKit
     GeneratedPluginRegistrant.register(with: self)
     let launched = super.application(application, didFinishLaunchingWithOptions: launchOptions)
     if let controller = window?.rootViewController as? FlutterViewController {
+      FlutterMethodChannel(name: "dev.shiori.reader/app", binaryMessenger: controller.binaryMessenger)
+        .setMethodCallHandler { call, result in
+          if call.method == "info" {
+            result([
+              "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+              "build": Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0
+            ])
+          } else {
+            result(FlutterMethodNotImplemented)
+          }
+        }
       importBridge = ImportBridge(messenger: controller.binaryMessenger, host: controller)
       if let url = launchOptions?[.url] as? URL { importBridge?.receive(url) }
     }

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
+    <exclude domain="sharedpref" path="update-install.xml" />
     <exclude domain="file" path="shiori/production/users/import-staging/" />
     <exclude domain="file" path="shiori/production/disposable/" />
     <exclude domain="file" path="shiori/development/" />

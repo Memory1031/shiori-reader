@@ -93,7 +93,7 @@ Apple 侧一次性准备（都在个人团队上下文操作，注意右上角�
 - `SHA256SUMS.txt`（APK校验值）
 - `release-info.json`（tag、commit、包版本、APK哈希、证书指纹，不含私钥 / 密码）
 
-产物先保存为14天的 Actions artifact，再写入 GitHub Release。已存在Release才走覆盖上传；创建失败不使用无条件上传fallback。新建带预发布后缀的tag（如v1.0.0-rc.1）标为prerelease。重跑仍可能覆盖同名资产。
+产物先保存为 14 天的 Actions artifact。发布 job 签署更新清单、核对历史构建号和已有资产摘要，通过草稿完成上传后再公开 Release；重跑只补齐内容一致的缺失附件。beta 标签标为 prerelease，Latest 指向正式版本。更新签名配置见[发布操作](release/README.md#更新清单签名配置)。
 
 本地验证：发布工具4项离线测试通过，覆盖tag/版本/非法build、缺Secret/错误Base64、密码转义、错误包身份/可调试包/错误或多个签名证书；工作流YAML与步骤顺序 / Secret绑定 / 清理检查通过，Dart检查工具分析通过。另用临时合成JKS和已有本地Release APK完成实际keytool → Java Properties读取 → apksigner签名与验证 → aapt版本检查 → 哈希文件生成冒烟，错误证书拒绝通过。未使用用户正式密钥，未重新构建并发修改中的应用，未推tag、未发布、未验证远端Secrets或runner。首次正式签名发布及设备安装仍待完成。
 

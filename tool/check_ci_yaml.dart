@@ -107,6 +107,12 @@ void main() {
   }
   final build = commandIndex('flutter build apk --release');
   final verify = commandIndex('release_android.py verify');
+  if (commandIndex('update_manifest.py identity') < 0 ||
+      commandIndex('update_manifest.py identity') >= build) {
+    throw StateError(
+      'Android release must embed identity and update trust before build',
+    );
+  }
   if (signing < 0 || build <= signing || verify <= build) {
     throw StateError(
       'Release must prepare signing, build, verify, then publish',
@@ -159,6 +165,8 @@ void main() {
       zipDependencies <= zipVersion ||
       zipLock <= zipDependencies ||
       zipBuild <= zipLock ||
+      zipIndex('update_manifest.py identity') <= zipLock ||
+      zipIndex('update_manifest.py identity') >= zipBuild ||
       zipPackage <= zipBuild ||
       zipUpload <= zipPackage) {
     throw StateError(
@@ -166,6 +174,12 @@ void main() {
     );
   }
   final publisher = releaseJobs['publish'] as YamlMap;
+  if (publisher['concurrency']?['group'] != 'shiori-release-publish' ||
+      publisher['concurrency']?['cancel-in-progress'] != false) {
+    throw StateError(
+      'Publication must serialize build-order checks across tags',
+    );
+  }
   final publisherSteps = publisher['steps'] as YamlList;
   final downloads = publisherSteps
       .where(
@@ -196,19 +210,20 @@ void main() {
   final sums = publisherIndex('sha256sum --check SHA256SUMS.txt');
   if (sums <= publisherSteps.indexOf(downloads.last) ||
       publisherIndex('sha256sum --check SHA256SUMS-windows-x64.txt') != sums ||
-      publisherIndex('gh release create') <= sums) {
+      publisherIndex('update_manifest.py manifest') <= sums ||
+      publisherIndex('publish_assets.py') <=
+          publisherIndex('update_manifest.py manifest')) {
     throw StateError('Both artifact checksums must pass before publishing');
   }
-  final releaseCommand =
-      publisherSteps[publisherIndex('gh release create')]['run'] as String;
-  if (!releaseCommand.contains(
-        'RELEASE_FLAGS+=(--prerelease --latest=false)',
-      ) ||
-      !releaseCommand.contains(
-        r'gh release edit "$GITHUB_REF_NAME" --prerelease --latest=false',
-      )) {
+  final updateSigning =
+      publisherSteps[publisherIndex('update_manifest.py manifest')]['env']
+          as YamlMap;
+  if (updateSigning['UPDATE_SIGNING_KEY_PEM_B64'] !=
+          r'${{ secrets.UPDATE_SIGNING_KEY_PEM_B64 }}' ||
+      updateSigning['UPDATE_PUBLIC_KEY_JSON'] !=
+          r'${{ vars.UPDATE_PUBLIC_KEY_JSON }}') {
     throw StateError(
-      'Beta releases must remain prereleases on creation and rerun',
+      'Update signing needs private key and matching bundled public key',
     );
   }
   for (final builder in ['android-release', 'windows-release']) {
@@ -330,6 +345,7 @@ void main() {
     'ANDROID_STORE_PASSWORD',
     'ANDROID_KEY_ALIAS',
     'ANDROID_KEY_PASSWORD',
+    'UPDATE_SIGNING_KEY_PEM_B64',
   ]) {
     if (ciText.contains(secret)) {
       throw StateError('Regular CI must not reference signing secret: $secret');

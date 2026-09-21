@@ -18,7 +18,7 @@
   "shelfTagline": "Keep your favourite stories close.",
   "discoverTagline": "Find your next chapter.",
   "offlineEnvironment": "Offline demo · sample books only",
-  "historyTitle": "Recent reading",
+  "historyTitle": "Reading history",
   "historyClear": "Clear this reading history",
   "chapterFallback": "The saved chapter is no longer listed. Opened a nearby chapter.",
   "historyEmpty": "No reading history yet.",
@@ -447,5 +447,87 @@
         "type": "int"
       }
     }
-  }
+  },
+  "updateTitle": "About & updates",
+  "updateInstalled": "Installed: {version}",
+  "@updateInstalled": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateDevelopment": "Development builds do not connect to the production update source.",
+  "updateUnsupported": "Get updates through the App Store or TestFlight.",
+  "updateInvalidIdentity": "Unable to verify the installed version. Update checks are unavailable.",
+  "updateAutomatic": "Check automatically",
+  "updateAutomaticHint": "Checks at most once a day. Downloads start only when you choose.",
+  "updateChannel": "Update channel",
+  "updateStable": "Stable",
+  "updateBeta": "Beta (includes stable)",
+  "updateChannelHint": "Switching channels never downgrades. If your beta is newer, you'll be notified when a stable upgrade is available.",
+  "updateNeverChecked": "Not checked yet",
+  "updateLastChecked": "Last checked: {time}",
+  "@updateLastChecked": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "updateCheck": "Check for updates",
+  "updateCancel": "Cancel",
+  "updateChecking": "Checking…",
+  "updateNetworkError": "Could not connect. Check your connection and try again.",
+  "updateRateLimited": "Request limit reached. Try again after {time}.",
+  "@updateRateLimited": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "updateIncomplete": "Release information is incomplete. Try checking again later.",
+  "updateVerificationError": "Update verification failed. Check again or download a fresh copy.",
+  "updateStorageError": "Could not access update files. Check free space and folder permissions, then retry.",
+  "updateCancelled": "Cancelled",
+  "updateNoUpdate": "No newer release is available on this channel.",
+  "updateSize": "Download size: {size} MB",
+  "@updateSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "updateProgress": "{percent}% downloaded",
+  "@updateProgress": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "updateDownload": "Download update",
+  "updateDownloaded": "Download verified. Visit the release page for installation instructions.",
+  "updateReleasePage": "View release page",
+  "updateLinkCopied": "Could not open the browser. Release link copied.",
+  "updateAvailable": "Update available: {version}",
+  "@updateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateView": "View",
+  "updateInstall": "Install update",
+  "updateInstallHint": "The package is verified. Installing will close the app; your library, reading position and settings will be kept.",
+  "updateInstallPermission": "Allow Shiori to install app updates. Return to this page after granting permission, then tap Install update.",
+  "updateInstallSettings": "Open installation settings",
+  "updateInstalling": "Waiting for the system installer. Confirm or cancel in the system dialog.",
+  "updateInstallCancelled": "Installation cancelled. The downloaded package is kept for retry.",
+  "updateInstallFailed": "The system could not complete installation. Check free space and installation permission, then retry.",
+  "updateInstallBusy": "Wait for the current operation to finish before installing.",
+  "updateReturnToLibrary": "Return to the library and finish any import, then open App updates from the menu."
 }

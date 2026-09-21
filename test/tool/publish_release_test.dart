@@ -57,6 +57,7 @@ void main() {
 
   for (final entry in {
     'beta': '1.2.3',
+    'stable': '1.2.3',
     'patch': '1.2.4',
     'minor': '1.3.0',
     'major': '2.0.0',

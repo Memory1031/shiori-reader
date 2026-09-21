@@ -24,6 +24,8 @@ dart tool/publish_release.dart prepare patch --apply
 
 支持 patch / minor / major，内部构建号递增，同步 pubspec 与全部 ShareExtension 配置。已 prepare 的版本不要重复执行，先检查 diff；提交后再次 prepare 会继续递增。
 
+同一基础版本从 beta 转为首次正式发布时使用 `prepare stable`，保持 `X.Y.Z` 并递增构建号；目标正式标签必须尚未发布。发布检查要求构建号高于已公开的所有正式 / beta 包。
+
 按输出版本编写 `notes/vX.Y.Z.md`，执行与改动相关的本地测试及必要分析、构建，记录实际结果和未测项。prepare 不提交、不推送、不打标签。
 
 ### 同版本 beta
@@ -64,7 +66,28 @@ dart tool/publish_release.dart vX.Y.Z --publish
 
 master 仅是发布中间分支。tag 同时触发 Android 签名 APK、Windows x64 ZIP 与 iOS 签名 / TestFlight 上传；APK 和 ZIP 均构建成功后统一发布到 GitHub Release，不等待日常 CI，也不重复 UT / analyze。CI 绿色不能替代本地测试记录。
 
-GitHub Release 优先读取 `notes/<tag>.md`，缺失时自动生成；已有 Release 重跑更新附件并保持 beta 的预发布标记，手动编辑过的正文需在 GitHub 单独更新。
+GitHub Release 优先读取 `notes/<tag>.md`，缺失时自动生成。新 Release 先建立草稿，资产完整上传后公开；重跑核对已有附件的大小与摘要，只补齐缺失附件，内容变化需分配新的构建号和标签。手动编辑过的正文需在 GitHub 单独更新。
+
+## 更新清单签名配置
+
+Android / Windows 的 tag 构建将发布身份与更新公钥写入 `assets/release/build-info.json`。发布 job 核对两端包内身份、生成 `update-manifest.json` 并签署原始字节，另附二进制 `update-manifest.sig`。签名协议为 RSA-3072 / PKCS#1 v1.5 / SHA-256，公钥指数为 65537，Windows 使用系统 CNG 验签。
+
+在安全的本地目录通过 OpenSSL 生成一次独立更新密钥：
+
+```sh
+python tool/update_manifest.py keygen --private-key /secure/update-private.pem --public-key /secure/update-public.json
+```
+
+GitHub Actions 需要以下仓库配置：
+
+| 配置 | 内容 |
+| --- | --- |
+| Variable `UPDATE_PUBLIC_KEY_JSON` | 生成的 public JSON 原文，包含算法、模数、指数及 keyId |
+| Secret `UPDATE_SIGNING_KEY_PEM_B64` | private PEM 完整字节的 Base64 |
+
+公钥供构建与签名 job 读取，私钥仅供发布 job 签名。配置缺失或密钥不匹配时终止发布。私钥单独备份，公钥变更需要安排受旧公钥信任的过渡版本。开发构建使用仓库中标为 development 的身份文件；本地生成正式身份后，应恢复该文件再提交代码。
+
+清单生成与发布规则测试使用隔离目录和测试密钥；Windows 原生验签互通测试入口为 `tool/test_update_signature.ps1`。
 
 ## 3. 验收
 

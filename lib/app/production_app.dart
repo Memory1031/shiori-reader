@@ -15,6 +15,7 @@ import '../data/local/preferences_app_settings_store.dart';
 import '../data/local/preferences_settings_store.dart';
 import '../data/repositories/library_repository.dart';
 import '../domain/contracts/contracts.dart';
+import '../domain/contracts/app_updates.dart';
 import '../domain/contracts/import_source.dart';
 import '../features/home/reading_home.dart';
 import '../shared/app_logger.dart';
@@ -26,8 +27,12 @@ import 'routes.dart';
 import 'source_services.dart';
 import 'launch_view.dart';
 import 'import_source.dart';
+import 'update_services.dart';
+import '../features/updates/update_controller.dart';
+import '../features/updates/update_screen.dart';
+import '../l10n/generated/app_localizations.dart';
 
-/// Process root owns databases and source services. Initial home does no HTTP.
+/// Process root owns databases, source services and the update service.
 class ProductionApp extends StatefulWidget {
   const ProductionApp({super.key, this.resolvePaths});
 
@@ -37,8 +42,12 @@ class ProductionApp extends StatefulWidget {
   State<ProductionApp> createState() => _ProductionAppState();
 }
 
-class _ProductionAppState extends State<ProductionApp> {
+class _ProductionAppState extends State<ProductionApp>
+    with WidgetsBindingObserver {
   final _navigator = GlobalKey<NavigatorState>();
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
+  UpdateController? _updates;
+  String? _notifiedUpdate;
   LocalReadingRepository? _novels;
   LocalImageRepository? _images;
   LocalDatabases? _databases;
@@ -53,6 +62,7 @@ class _ProductionAppState extends State<ProductionApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_open());
   }
 
@@ -116,7 +126,22 @@ class _ProductionAppState extends State<ProductionApp> {
         paths: paths,
         logger: AppLogger(),
       );
+      final updates = await createUpdateController(
+        paths,
+        beforeInstall: () async {
+          if (_imports?.busy == true) {
+            throw const UpdateIssue(UpdateProblem.busy);
+          }
+        },
+      );
+      if (!mounted) {
+        await updates.shutdown();
+        updates.dispose();
+        return;
+      }
+      _updates = updates..addListener(_updateChanged);
       setState(() => _opening = false);
+      unawaited(_startUpdates());
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -135,15 +160,84 @@ class _ProductionAppState extends State<ProductionApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_close());
     super.dispose();
   }
 
   Future<void> _close() async {
+    _updates?.removeListener(_updateChanged);
+    await _updates?.shutdown();
+    _updates?.dispose();
     await _imports?.shutdown();
     _imports?.dispose();
     await _services?.close();
     await _databases?.close();
+  }
+
+  Future<void> _startUpdates() async {
+    await _updates?.initialize();
+    if (mounted) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted) unawaited(_updates?.check(manual: false));
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_resumeUpdates());
+    }
+    if (state == AppLifecycleState.detached) _updates?.cancel();
+  }
+
+  Future<void> _resumeUpdates() async {
+    await _updates?.refreshInstallation();
+    await _updates?.check(manual: false);
+  }
+
+  void _openUpdates() {
+    final updates = _updates;
+    if (updates == null) return;
+    // Enter from the library after the reader's normal save/exit path completes.
+    // A notification may arrive while reading or while an import is active.
+    if (_navigator.currentState?.canPop() == true || _imports?.busy == true) {
+      final context = _navigator.currentContext;
+      if (context != null) {
+        _messenger.currentState?.showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context).updateReturnToLibrary),
+          ),
+        );
+      }
+      return;
+    }
+    _navigator.currentState?.push(
+      MaterialPageRoute(
+        settings: const RouteSettings(name: '/updates'),
+        builder: (_) =>
+            UpdateScreen(controller: updates, openPage: openUpdatePage),
+      ),
+    );
+  }
+
+  void _updateChanged() {
+    final candidate = _updates?.candidate;
+    if (candidate == null || candidate.release.tag == _notifiedUpdate) return;
+    _notifiedUpdate = candidate.release.tag;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final context = _navigator.currentContext;
+      if (context == null) return;
+      final l = AppLocalizations.of(context);
+      _messenger.currentState?.showSnackBar(
+        SnackBar(
+          content: Text(l.updateAvailable(candidate.release.tag)),
+          action: SnackBarAction(label: l.updateView, onPressed: _openUpdates),
+        ),
+      );
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   Future<void> _readImported(NovelKey key) async {
@@ -179,6 +273,7 @@ class _ProductionAppState extends State<ProductionApp> {
       : ShioriApp(
           key: const ValueKey('production-ready'),
           navigatorKey: _navigator,
+          scaffoldMessengerKey: _messenger,
           overlayBuilder: (context, child) => EpubWebViewHost(
             userDataDirectory: _paths!.webView,
             child: ImportOverlay(
@@ -196,6 +291,7 @@ class _ProductionAppState extends State<ProductionApp> {
             cache: _services!.cacheManagement,
             settings: _reading,
             onAppearance: () => showAppAppearance(context, app),
+            onUpdates: _openUpdates,
             onImport: _imports!.open,
             localBooks: _databases!.localBooks,
             localManagement: _databases!.localBooks,

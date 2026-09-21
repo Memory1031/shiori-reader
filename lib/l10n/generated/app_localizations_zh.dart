@@ -47,7 +47,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get offlineEnvironment => '离线演示 · 仅含测试书籍';
 
   @override
-  String get historyTitle => '最近阅读';
+  String get historyTitle => '阅读历史';
 
   @override
   String get historyClear => '清除此书阅读记录';
@@ -883,4 +883,136 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bookOnline => '在线';
+
+  @override
+  String get updateTitle => '关于与更新';
+
+  @override
+  String updateInstalled(String version) {
+    return '当前版本：$version';
+  }
+
+  @override
+  String get updateDevelopment => '开发版本不连接正式更新源。';
+
+  @override
+  String get updateUnsupported => '请通过 App Store 或 TestFlight 获取更新。';
+
+  @override
+  String get updateInvalidIdentity => '无法确认当前版本信息，暂时无法检查更新。';
+
+  @override
+  String get updateAutomatic => '自动检查更新';
+
+  @override
+  String get updateAutomaticHint => '每天最多自动检查一次，下载前会征求你的确认。';
+
+  @override
+  String get updateChannel => '更新渠道';
+
+  @override
+  String get updateStable => '正式版';
+
+  @override
+  String get updateBeta => '测试版（包含正式版）';
+
+  @override
+  String get updateChannelHint => '切换渠道不会降级。若当前测试版较新，将在有可升级的正式版时提示。';
+
+  @override
+  String get updateNeverChecked => '尚未检查更新';
+
+  @override
+  String updateLastChecked(String time) {
+    return '上次检查：$time';
+  }
+
+  @override
+  String get updateCheck => '检查更新';
+
+  @override
+  String get updateCancel => '取消';
+
+  @override
+  String get updateChecking => '正在检查…';
+
+  @override
+  String get updateNetworkError => '连接失败，请检查网络后重试。';
+
+  @override
+  String updateRateLimited(String time) {
+    return '请求较多，请在 $time 后重试。';
+  }
+
+  @override
+  String get updateIncomplete => '发布信息尚不完整，暂时无法确定更新，请稍后重试。';
+
+  @override
+  String get updateVerificationError => '更新校验失败，请重新检查或下载。';
+
+  @override
+  String get updateStorageError => '无法读写更新文件，请检查可用空间和目录权限后重试。';
+
+  @override
+  String get updateCancelled => '已取消';
+
+  @override
+  String get updateNoUpdate => '当前渠道暂无可用的新版本。';
+
+  @override
+  String updateSize(String size) {
+    return '下载大小：$size MB';
+  }
+
+  @override
+  String updateProgress(int percent) {
+    return '已下载 $percent%';
+  }
+
+  @override
+  String get updateDownload => '下载更新';
+
+  @override
+  String get updateDownloaded => '下载完成，已通过校验。可前往发布页查看安装说明。';
+
+  @override
+  String get updateReleasePage => '查看发布页';
+
+  @override
+  String get updateLinkCopied => '无法打开浏览器，发布页链接已复制。';
+
+  @override
+  String updateAvailable(String version) {
+    return '发现新版本 $version';
+  }
+
+  @override
+  String get updateView => '查看';
+
+  @override
+  String get updateInstall => '安装更新';
+
+  @override
+  String get updateInstallHint => '安装包已校验。确认安装后应用将关闭；书架、阅读位置和设置会保留。';
+
+  @override
+  String get updateInstallPermission => '请允许 Shiori 安装应用更新。授权后返回此页面，再点击安装更新。';
+
+  @override
+  String get updateInstallSettings => '前往授权';
+
+  @override
+  String get updateInstalling => '等待系统安装结果，请在系统界面确认或取消。';
+
+  @override
+  String get updateInstallCancelled => '已取消安装，下载包已保留，可以重试。';
+
+  @override
+  String get updateInstallFailed => '系统未能完成安装。请检查可用空间和安装权限后重试。';
+
+  @override
+  String get updateInstallBusy => '请等待当前操作完成后再安装更新。';
+
+  @override
+  String get updateReturnToLibrary => '请先返回书架并完成导入，再从菜单进入应用更新。';
 }

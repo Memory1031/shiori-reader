@@ -23,6 +23,51 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(engine: FlutterEngine) {
         super.configureFlutterEngine(engine)
+        val updater = UpdateInstaller(this)
+        MethodChannel(engine.dartExecutor.binaryMessenger, "dev.shiori.reader/update")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "settings") {
+                    try { updater.settings(this); result.success(null) }
+                    catch (_: Exception) { result.error("installation", null, null) }
+                } else if (call.method == "install" || call.method == "status") {
+                    worker.execute {
+                        try {
+                            val value = if (call.method == "status") updater.status()
+                                else updater.install(call.arguments as? Map<*, *> ?: throw UpdateInstaller.Issue("verification"))
+                            runOnUiThread { result.success(value) }
+                        } catch (e: Exception) {
+                            runOnUiThread { result.error((e as? UpdateInstaller.Issue)?.code ?: "installation", null, null) }
+                        }
+                    }
+                } else result.notImplemented()
+            }
+        MethodChannel(engine.dartExecutor.binaryMessenger, "dev.shiori.reader/app")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "info" -> {
+                        @Suppress("DEPRECATION")
+                        val info = packageManager.getPackageInfo(packageName, 0)
+                        @Suppress("DEPRECATION")
+                        val build = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+                        result.success(mapOf("version" to info.versionName, "build" to build))
+                    }
+                    "openRelease" -> {
+                        val uri = (call.arguments as? String)?.let(Uri::parse)
+                        if (uri?.scheme != "https" || uri.host != "github.com" ||
+                            uri.userInfo != null || uri.port != -1 ||
+                            uri.path?.startsWith("/Memory1031/shiori-reader/releases/") != true ||
+                            uri.query != null || uri.fragment != null) {
+                            result.success(false)
+                        } else {
+                            try {
+                                startActivity(Intent(Intent.ACTION_VIEW, uri))
+                                result.success(true)
+                            } catch (_: Exception) { result.success(false) }
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         EventChannel(engine.dartExecutor.binaryMessenger, "dev.shiori.reader/import_events")
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(args: Any?, sink: EventChannel.EventSink) {

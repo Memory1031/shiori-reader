@@ -9,7 +9,6 @@ import '../bookshelf/library_controller.dart';
 import '../bookshelf/bookshelf_view.dart';
 import '../bookshelf/library_observer.dart';
 import '../bookshelf/remove_shelf_book.dart';
-import '../history/history_screen.dart';
 import '../reader/continue_reading.dart';
 import '../novel_detail/detail_screen.dart';
 import '../reader/book_reader_screen.dart';
@@ -27,6 +26,7 @@ class ReadingHome extends StatefulWidget {
     this.cache,
     this.settings,
     this.onAppearance,
+    this.onUpdates,
     this.onImport,
     this.localBooks,
     this.localManagement,
@@ -39,6 +39,7 @@ class ReadingHome extends StatefulWidget {
   final CacheManagement? cache;
   final SettingsStore? settings;
   final VoidCallback? onAppearance;
+  final VoidCallback? onUpdates;
   final VoidCallback? onImport;
   final LocalBookStore? localBooks;
   final LocalBookManagement? localManagement;
@@ -161,6 +162,23 @@ class _ReadingHomeState extends State<ReadingHome> {
 
   void _continue(NovelKey key) =>
       _routes.open(context, ContinueDestination(key));
+
+  PopupMenuItem<String> _menuItem(String value, IconData icon, String label) =>
+      PopupMenuItem(
+        value: value,
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Flexible(child: Text(label)),
+          ],
+        ),
+      );
+
   void _search() {
     if (widget.sources.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -224,58 +242,34 @@ class _ReadingHomeState extends State<ReadingHome> {
                 );
               }
               if (value == 'appearance') widget.onAppearance?.call();
-              if (value == 'history') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => HistoryScreen(
-                      controller: _library,
-                      onContinue: _continue,
-                    ),
-                  ),
-                );
-              }
+              if (value == 'updates') widget.onUpdates?.call();
             },
             itemBuilder: (_) => [
+              if (widget.onUpdates != null)
+                _menuItem('updates', Icons.info_outline, strings.updateTitle),
               if (widget.onImport != null)
-                PopupMenuItem(
-                  value: 'import',
-                  child: Text(strings.importTitle),
+                _menuItem(
+                  'import',
+                  Icons.file_upload_outlined,
+                  strings.importTitle,
                 ),
               if (widget.localManagement != null)
-                PopupMenuItem(
-                  value: 'local',
-                  child: Text(strings.localBooksTitle),
+                _menuItem(
+                  'local',
+                  Icons.folder_outlined,
+                  strings.localBooksTitle,
                 ),
               if (widget.cache != null)
-                PopupMenuItem(value: 'cache', child: Text(strings.cacheTitle)),
-              PopupMenuItem(
-                value: 'history',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.history_outlined,
-                      size: 18,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 12),
-                    Flexible(child: Text(strings.historyTitle)),
-                  ],
+                _menuItem(
+                  'cache',
+                  Icons.offline_pin_outlined,
+                  strings.cacheTitle,
                 ),
-              ),
               if (widget.onAppearance != null)
-                PopupMenuItem(
-                  value: 'appearance',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.palette_outlined,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 12),
-                      Flexible(child: Text(strings.appAppearance)),
-                    ],
-                  ),
+                _menuItem(
+                  'appearance',
+                  Icons.palette_outlined,
+                  strings.appAppearance,
                 ),
             ],
           ),

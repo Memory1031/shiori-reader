@@ -2,7 +2,7 @@
 
 按当前 pubspec.lock 对应包的 LICENSE / NOTICE 文本列出；含开发及传递依赖，不表示全部进入产物。类别为文本识别，不替代原始完整声明。
 
-锁文件 SHA-256：`7237fe7e76401b68d484a8db8f90020488628ed0276d6d19c0c9601778ea413d`。
+锁文件 SHA-256：`1081d1a74a7e6d90e8ef8a7a84051f39ddfd218109af2593ca929a2d16003a3f`。
 
 Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Memory1031/flutter_inappwebview/tree/3e48253e4c03beb49fe020fb1168ab1fb2be4818/flutter_inappwebview_windows)，按完整提交 SHA 锁定，保留上游 LICENSE 与源码许可声明。仅 Windows 子包使用 Git override，其余平台包仍取自锁定的 hosted 版本。
 
@@ -88,6 +88,7 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 | petitparser | 7.0.2 | transitive | MIT 类 | LICENSE |
 | platform | 3.1.6 | transitive | BSD 类 | LICENSE |
 | plugin_platform_interface | 2.1.8 | transitive | BSD 类 | LICENSE |
+| pointycastle | 4.0.0 | direct main | MIT 类 | LICENSE |
 | pool | 1.5.3 | transitive | BSD 类 | LICENSE |
 | posix | 6.5.2 | transitive | MIT 类 | LICENSE |
 | pub_semver | 2.2.1 | transitive | BSD 类 | LICENSE |

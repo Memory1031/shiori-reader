@@ -5,7 +5,7 @@ void main(List<String> args) {
   const usage =
       'dart tool/publish_release.dart v1.0.0 [--publish]\n'
       'dart tool/publish_release.dart v1.0.0-beta.1 [--publish]\n'
-      'dart tool/publish_release.dart prepare beta|patch|minor|major [--apply]';
+      'dart tool/publish_release.dart prepare beta|stable|patch|minor|major [--apply]';
   if (args.contains('--help')) {
     stdout.writeln(usage);
     return;
@@ -229,8 +229,8 @@ String prepareRelease(
   String increment, {
   bool apply = false,
 }) {
-  if (!['beta', 'patch', 'minor', 'major'].contains(increment)) {
-    throw StateError('Expected beta, patch, minor or major.');
+  if (!['beta', 'stable', 'patch', 'minor', 'major'].contains(increment)) {
+    throw StateError('Expected beta, stable, patch, minor or major.');
   }
   String git(List<String> args) {
     final result = Process.runSync('git', args, workingDirectory: directory);
@@ -258,7 +258,7 @@ String prepareRelease(
     );
   }
   final parts = [for (var i = 1; i <= 3; i++) int.parse(match[i]!)];
-  if (increment != 'beta') {
+  if (increment != 'beta' && increment != 'stable') {
     final index = {'major': 0, 'minor': 1, 'patch': 2}[increment]!;
     parts[index]++;
     for (var i = index + 1; i < 3; i++) {

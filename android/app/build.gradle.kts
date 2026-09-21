@@ -39,7 +39,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        testInstrumentationRunner = "android.test.InstrumentationTestRunner"
+        testInstrumentationRunner = if (providers.gradleProperty("shioriUpdateInstallSmoke").orNull == "true") {
+            "dev.shiori.reader.UpdateInstallSmokeRunner"
+        } else "android.test.InstrumentationTestRunner"
     }
 
     signingConfigs {

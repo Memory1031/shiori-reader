@@ -18,7 +18,7 @@
   "shelfTagline": "把喜欢的故事，留在手边。",
   "discoverTagline": "下一本，读什么？",
   "offlineEnvironment": "离线演示 · 仅含测试书籍",
-  "historyTitle": "最近阅读",
+  "historyTitle": "阅读历史",
   "historyClear": "清除此书阅读记录",
   "chapterFallback": "原章节已不在目录中，已打开相邻章节。",
   "historyEmpty": "暂无阅读记录。",
@@ -447,5 +447,87 @@
         "type": "int"
       }
     }
-  }
+  },
+  "updateTitle": "关于与更新",
+  "updateInstalled": "当前版本：{version}",
+  "@updateInstalled": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateDevelopment": "开发版本不连接正式更新源。",
+  "updateUnsupported": "请通过 App Store 或 TestFlight 获取更新。",
+  "updateInvalidIdentity": "无法确认当前版本信息，暂时无法检查更新。",
+  "updateAutomatic": "自动检查更新",
+  "updateAutomaticHint": "每天最多自动检查一次，下载前会征求你的确认。",
+  "updateChannel": "更新渠道",
+  "updateStable": "正式版",
+  "updateBeta": "测试版（包含正式版）",
+  "updateChannelHint": "切换渠道不会降级。若当前测试版较新，将在有可升级的正式版时提示。",
+  "updateNeverChecked": "尚未检查更新",
+  "updateLastChecked": "上次检查：{time}",
+  "@updateLastChecked": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "updateCheck": "检查更新",
+  "updateCancel": "取消",
+  "updateChecking": "正在检查…",
+  "updateNetworkError": "连接失败，请检查网络后重试。",
+  "updateRateLimited": "请求较多，请在 {time} 后重试。",
+  "@updateRateLimited": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "updateIncomplete": "发布信息尚不完整，暂时无法确定更新，请稍后重试。",
+  "updateVerificationError": "更新校验失败，请重新检查或下载。",
+  "updateStorageError": "无法读写更新文件，请检查可用空间和目录权限后重试。",
+  "updateCancelled": "已取消",
+  "updateNoUpdate": "当前渠道暂无可用的新版本。",
+  "updateSize": "下载大小：{size} MB",
+  "@updateSize": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "updateProgress": "已下载 {percent}%",
+  "@updateProgress": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "updateDownload": "下载更新",
+  "updateDownloaded": "下载完成，已通过校验。可前往发布页查看安装说明。",
+  "updateReleasePage": "查看发布页",
+  "updateLinkCopied": "无法打开浏览器，发布页链接已复制。",
+  "updateAvailable": "发现新版本 {version}",
+  "@updateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "updateView": "查看",
+  "updateInstall": "安装更新",
+  "updateInstallHint": "安装包已校验。确认安装后应用将关闭；书架、阅读位置和设置会保留。",
+  "updateInstallPermission": "请允许 Shiori 安装应用更新。授权后返回此页面，再点击安装更新。",
+  "updateInstallSettings": "前往授权",
+  "updateInstalling": "等待系统安装结果，请在系统界面确认或取消。",
+  "updateInstallCancelled": "已取消安装，下载包已保留，可以重试。",
+  "updateInstallFailed": "系统未能完成安装。请检查可用空间和安装权限后重试。",
+  "updateInstallBusy": "请等待当前操作完成后再安装更新。",
+  "updateReturnToLibrary": "请先返回书架并完成导入，再从菜单进入应用更新。"
 }

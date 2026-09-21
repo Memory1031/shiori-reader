@@ -4,3 +4,4 @@ export 'novel.dart';
 export 'reader.dart';
 export 'app_settings.dart';
 export 'book_progress.dart';
+export 'release_identity.dart';

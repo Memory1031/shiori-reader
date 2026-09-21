@@ -50,7 +50,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get offlineEnvironment => 'Offline demo · sample books only';
 
   @override
-  String get historyTitle => 'Recent reading';
+  String get historyTitle => 'Reading history';
 
   @override
   String get historyClear => 'Clear this reading history';
@@ -942,4 +942,154 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookOnline => 'Online';
+
+  @override
+  String get updateTitle => 'About & updates';
+
+  @override
+  String updateInstalled(String version) {
+    return 'Installed: $version';
+  }
+
+  @override
+  String get updateDevelopment =>
+      'Development builds do not connect to the production update source.';
+
+  @override
+  String get updateUnsupported =>
+      'Get updates through the App Store or TestFlight.';
+
+  @override
+  String get updateInvalidIdentity =>
+      'Unable to verify the installed version. Update checks are unavailable.';
+
+  @override
+  String get updateAutomatic => 'Check automatically';
+
+  @override
+  String get updateAutomaticHint =>
+      'Checks at most once a day. Downloads start only when you choose.';
+
+  @override
+  String get updateChannel => 'Update channel';
+
+  @override
+  String get updateStable => 'Stable';
+
+  @override
+  String get updateBeta => 'Beta (includes stable)';
+
+  @override
+  String get updateChannelHint =>
+      'Switching channels never downgrades. If your beta is newer, you\'ll be notified when a stable upgrade is available.';
+
+  @override
+  String get updateNeverChecked => 'Not checked yet';
+
+  @override
+  String updateLastChecked(String time) {
+    return 'Last checked: $time';
+  }
+
+  @override
+  String get updateCheck => 'Check for updates';
+
+  @override
+  String get updateCancel => 'Cancel';
+
+  @override
+  String get updateChecking => 'Checking…';
+
+  @override
+  String get updateNetworkError =>
+      'Could not connect. Check your connection and try again.';
+
+  @override
+  String updateRateLimited(String time) {
+    return 'Request limit reached. Try again after $time.';
+  }
+
+  @override
+  String get updateIncomplete =>
+      'Release information is incomplete. Try checking again later.';
+
+  @override
+  String get updateVerificationError =>
+      'Update verification failed. Check again or download a fresh copy.';
+
+  @override
+  String get updateStorageError =>
+      'Could not access update files. Check free space and folder permissions, then retry.';
+
+  @override
+  String get updateCancelled => 'Cancelled';
+
+  @override
+  String get updateNoUpdate => 'No newer release is available on this channel.';
+
+  @override
+  String updateSize(String size) {
+    return 'Download size: $size MB';
+  }
+
+  @override
+  String updateProgress(int percent) {
+    return '$percent% downloaded';
+  }
+
+  @override
+  String get updateDownload => 'Download update';
+
+  @override
+  String get updateDownloaded =>
+      'Download verified. Visit the release page for installation instructions.';
+
+  @override
+  String get updateReleasePage => 'View release page';
+
+  @override
+  String get updateLinkCopied =>
+      'Could not open the browser. Release link copied.';
+
+  @override
+  String updateAvailable(String version) {
+    return 'Update available: $version';
+  }
+
+  @override
+  String get updateView => 'View';
+
+  @override
+  String get updateInstall => 'Install update';
+
+  @override
+  String get updateInstallHint =>
+      'The package is verified. Installing will close the app; your library, reading position and settings will be kept.';
+
+  @override
+  String get updateInstallPermission =>
+      'Allow Shiori to install app updates. Return to this page after granting permission, then tap Install update.';
+
+  @override
+  String get updateInstallSettings => 'Open installation settings';
+
+  @override
+  String get updateInstalling =>
+      'Waiting for the system installer. Confirm or cancel in the system dialog.';
+
+  @override
+  String get updateInstallCancelled =>
+      'Installation cancelled. The downloaded package is kept for retry.';
+
+  @override
+  String get updateInstallFailed =>
+      'The system could not complete installation. Check free space and installation permission, then retry.';
+
+  @override
+  String get updateInstallBusy =>
+      'Wait for the current operation to finish before installing.';
+
+  @override
+  String get updateReturnToLibrary =>
+      'Return to the library and finish any import, then open App updates from the menu.';
 }
