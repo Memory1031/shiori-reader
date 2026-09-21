@@ -120,6 +120,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailContinue => 'Continue reading';
 
   @override
+  String get homeContinueAction => 'Resume';
+
+  @override
   String get detailAddShelf => 'Add to bookshelf';
 
   @override
@@ -131,6 +134,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailSynopsis => 'Synopsis';
+
+  @override
+  String get detailOnShelf => 'In bookshelf';
+
+  @override
+  String get detailShowMore => 'Show more';
+
+  @override
+  String get detailShowLess => 'Show less';
 
   @override
   String get detailNoSynopsis => 'No synopsis available.';

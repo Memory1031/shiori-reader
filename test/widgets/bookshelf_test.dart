@@ -198,11 +198,12 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('epub'), findsOneWidget);
-      expect(find.text('online'), findsOneWidget);
+      expect(find.text('online'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.tap(find.byTooltip(language == 'zh' ? '列表' : 'List'));
       await tester.pumpAndSettle();
-      expect(find.text('EPUB'), findsOneWidget);
+      expect(find.text('epub'), findsOneWidget);
+      expect(find.text('online'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(() async {
@@ -280,12 +281,18 @@ void main() {
       expect(details, 1);
       await tester.tap(find.byTooltip('List'));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey(('shelf-more', book.key))));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Novel details'));
+      await tester.pumpAndSettle();
+      expect(details, 2);
+      expect(reads, 2);
       await tester.drag(find.byKey(ValueKey(book.key)), const Offset(-200, 0));
       await tester.pumpAndSettle();
       expect(c.books.length, 1);
       await tester.tap(find.text('Details'));
       await tester.pumpAndSettle();
-      expect(details, 2);
+      expect(details, 3);
       await tester.drag(find.byKey(ValueKey(book.key)), const Offset(-200, 0));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Remove'));

@@ -278,6 +278,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Book'), findsOneWidget);
       expect(find.text('Saved details may be out of date.'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('detail-more')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('detail-refresh')));
       await tester.pump();
       expect(find.text('Book'), findsOneWidget);

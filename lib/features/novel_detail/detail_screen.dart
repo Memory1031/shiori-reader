@@ -5,7 +5,7 @@ import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import '../../l10n/generated/app_localizations.dart';
-import '../../shared/source_image.dart';
+import 'detail_sections.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
@@ -47,14 +47,42 @@ class DetailScreen extends StatelessWidget {
     builder: (context, controller) {
       final strings = AppLocalizations.of(context);
       final loaded = controller.loaded;
+      final canChangeShelf = onShelf != null || onShelfSnapshot != null;
+      void changeShelf() {
+        if (loaded == null) return;
+        if (onShelfSnapshot != null) {
+          onShelfSnapshot!(loaded.value.summary);
+        } else {
+          onShelf?.call(novel);
+        }
+      }
+
       return AppScaffold(
         title: strings.novelDetailsTitle,
         actions: [
-          IconButton(
-            key: const ValueKey('detail-refresh'),
-            tooltip: strings.detailRefresh,
-            onPressed: controller.canLoad ? controller.refreshDetail : null,
-            icon: const Icon(Icons.refresh),
+          PopupMenuButton<String>(
+            key: const ValueKey('detail-more'),
+            tooltip: strings.moreActions,
+            icon: const Icon(Icons.more_horiz),
+            onSelected: (value) {
+              if (value == 'refresh') controller.refreshDetail();
+              if (value == 'remove') changeShelf();
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                key: const ValueKey('detail-refresh'),
+                value: 'refresh',
+                enabled: controller.canLoad,
+                child: Text(strings.detailRefresh),
+              ),
+              if (isOnShelf && loaded != null)
+                PopupMenuItem(
+                  key: const ValueKey('detail-remove'),
+                  value: 'remove',
+                  enabled: canChangeShelf,
+                  child: Text(strings.detailRemoveShelf),
+                ),
+            ],
           ),
         ],
         body: loaded == null
@@ -95,38 +123,87 @@ class DetailScreen extends StatelessWidget {
                           onRetry: controller.refreshDetail,
                           retryAvailable: !controller.loading,
                         ),
-                      _Header(detail: loaded.value, images: images),
+                      DetailBookHeader(
+                        key: ValueKey(novel),
+                        detail: loaded.value,
+                        images: images,
+                      ),
                       const SizedBox(height: ShioriSpace.section),
-                      Wrap(
-                        spacing: ShioriSpace.medium,
-                        runSpacing: ShioriSpace.medium,
-                        children: [
-                          FilledButton(
+                      LayoutBuilder(
+                        builder: (context, bounds) {
+                          final read = FilledButton.icon(
                             key: const ValueKey('detail-read'),
                             onPressed: onRead == null
                                 ? null
                                 : () => onRead!(novel),
-                            child: Text(
+                            icon: const Icon(
+                              Icons.auto_stories_outlined,
+                              size: 18,
+                            ),
+                            label: Text(
                               continueReading
                                   ? strings.detailContinue
                                   : strings.detailStart,
+                              textAlign: TextAlign.center,
                             ),
-                          ),
-                          OutlinedButton(
-                            key: const ValueKey('detail-shelf'),
-                            onPressed:
-                                onShelf == null && onShelfSnapshot == null
-                                ? null
-                                : () => onShelfSnapshot != null
-                                      ? onShelfSnapshot!(loaded.value.summary)
-                                      : onShelf!(novel),
-                            child: Text(
-                              isOnShelf
-                                  ? strings.detailRemoveShelf
-                                  : strings.detailAddShelf,
-                            ),
-                          ),
-                        ],
+                          );
+                          final shelf = isOnShelf
+                              ? Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                    horizontal: 8,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.bookmark_added_outlined,
+                                        size: 18,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: Text(
+                                          strings.detailOnShelf,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : OutlinedButton(
+                                  key: const ValueKey('detail-shelf'),
+                                  onPressed: canChangeShelf
+                                      ? changeShelf
+                                      : null,
+                                  child: Text(
+                                    strings.detailAddShelf,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                );
+                          if (bounds.maxWidth < 340 ||
+                              MediaQuery.textScalerOf(context).scale(14) > 20) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                read,
+                                const SizedBox(height: 8),
+                                shelf,
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(flex: 3, child: read),
+                              const SizedBox(width: 12),
+                              Expanded(flex: 2, child: shelf),
+                            ],
+                          );
+                        },
                       ),
                       if (actionFailure != null)
                         FailureView(failure: actionFailure!),
@@ -137,18 +214,15 @@ class DetailScreen extends StatelessWidget {
                         const SizedBox(height: ShioriSpace.small),
                         Text(strings.detailActionsPending),
                       ],
-                      const SizedBox(height: 16),
                       const SizedBox(height: ShioriSpace.section),
                       Text(
                         strings.detailSynopsis,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: ShioriSpace.medium),
-                      Text(
-                        loaded.value.synopsis.trim().isEmpty
-                            ? strings.detailNoSynopsis
-                            : loaded.value.synopsis,
-                        style: Theme.of(context).textTheme.bodyLarge,
+                      DetailSynopsis(
+                        key: ValueKey(('synopsis', novel)),
+                        text: loaded.value.synopsis,
                       ),
                       const SizedBox(height: 32),
                       VolumePreview(
@@ -165,121 +239,4 @@ class DetailScreen extends StatelessWidget {
       );
     },
   );
-}
-
-class _Header extends StatelessWidget {
-  const _Header({required this.detail, this.images});
-  final NovelDetail detail;
-  final ImageRepository? images;
-  @override
-  Widget build(BuildContext context) {
-    final book = detail.summary;
-    final strings = AppLocalizations.of(context);
-    final cover = ClipRRect(
-      borderRadius: BorderRadius.circular(ShioriShape.cover),
-      child: SizedBox(
-        width: 120,
-        height: 120 / ShioriShape.coverRatio,
-        child: book.cover != null && images != null
-            ? SourceImage(
-                media: book.cover!,
-                repository: images!,
-                semanticLabel: strings.detailCover,
-              )
-            : ColoredBox(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: const Icon(Icons.bookmark_outline, size: 40),
-              ),
-      ),
-    );
-    final metadata = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Semantics(
-          header: true,
-          child: Text(
-            book.title,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-        ),
-        if (book.authors.isNotEmpty) ...[
-          const SizedBox(height: ShioriSpace.medium),
-          Text(book.authors.join(', ')),
-        ],
-        const SizedBox(height: ShioriSpace.medium),
-        if (detail.status != NovelStatus.unknown)
-          Text(switch (detail.status) {
-            NovelStatus.unknown => strings.detailStatusUnknown,
-            NovelStatus.ongoing => strings.detailStatusOngoing,
-            NovelStatus.completed => strings.detailStatusCompleted,
-            NovelStatus.hiatus => strings.detailStatusHiatus,
-          }),
-        if (detail.tags.isNotEmpty) ...[
-          const SizedBox(height: ShioriSpace.medium),
-          Wrap(
-            spacing: ShioriSpace.small,
-            runSpacing: ShioriSpace.small,
-            children: [
-              for (final tag in detail.tags)
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(ShioriShape.control),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    child: Text(
-                      tag,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ],
-    );
-    final colors = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colors.primary.withValues(alpha: .22),
-                colors.surfaceContainerHighest,
-                colors.primary.withValues(alpha: .06),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Center(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                boxShadow: [
-                  BoxShadow(
-                    color: colors.shadow.withValues(alpha: .18),
-                    blurRadius: 22,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: cover,
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        metadata,
-      ],
-    );
-  }
 }

@@ -82,6 +82,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     final controller = widget.controller;
     final strings = AppLocalizations.of(context);
     final books = controller.sorted;
+    final theme = Theme.of(context);
     return LayoutBuilder(
       builder: (context, bounds) {
         final scale = MediaQuery.textScalerOf(context).scale(15) / 15;
@@ -90,29 +91,20 @@ class _BookshelfViewState extends State<BookshelfView> {
             .clamp(2, 6);
         Widget item(int index) {
           final book = books[index].snapshot;
-          final local = book.key.sourceId == LocalBookIdentity.sourceId;
           final format = controller.localFormats[book.key];
-          final sourceLabel = local
-              ? format?.name.toUpperCase()
-              : strings.bookOnline;
           final progressLabel = bookProgressLabel(
             strings,
             controller.progressFor(book.key)?.bookProgress,
-          );
-          Widget provenance() => Text(
-            [?sourceLabel, ?progressLabel].join(' · '),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            descriptive: true,
           );
           final cover = BookCover(book: book, images: widget.images);
           if (!_grid) {
             final open = _revealed == book.key;
+            final sourceLabel = _sourceBadgeLabel(book.key, format);
+            final metadata = [?sourceLabel, ?progressLabel].join(' · ');
             return Padding(
               key: ValueKey(book.key),
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Stack(
@@ -198,29 +190,8 @@ class _BookshelfViewState extends State<BookshelfView> {
                           0,
                         ),
                         child: Material(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHighest,
-                          child: ListTile(
-                            minTileHeight: open
-                                ? 112 * scale.clamp(1, 2)
-                                : null,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            title: Text(
-                              book.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                            leading: SizedBox(
-                              width: 44,
-                              height: 66,
-                              child: cover,
-                            ),
-                            subtitle: provenance(),
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          child: InkWell(
                             onLongPress: () => _actions(book),
                             onTap: () {
                               if (open) {
@@ -229,6 +200,93 @@ class _BookshelfViewState extends State<BookshelfView> {
                                 widget.onOpen(book.key);
                               }
                             },
+                            child: Container(
+                              constraints: BoxConstraints(
+                                minHeight: open ? 120 * scale.clamp(1, 2) : 120,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .outlineVariant
+                                        .withValues(alpha: .45),
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(width: 64, height: 96, child: cover),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        minHeight: 96,
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                book.title,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: theme
+                                                    .textTheme
+                                                    .titleSmall
+                                                    ?.copyWith(
+                                                      fontSize: 15,
+                                                      height: 1.4,
+                                                    ),
+                                              ),
+                                              if (book.authors.isNotEmpty) ...[
+                                                const SizedBox(height: 5),
+                                                Text(
+                                                  book.authors.join(', '),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style:
+                                                      theme.textTheme.bodySmall,
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          if (metadata.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                top: 8,
+                                              ),
+                                              child: Text(
+                                                metadata,
+                                                style:
+                                                    theme.textTheme.bodySmall,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    key: ValueKey(('shelf-more', book.key)),
+                                    tooltip: strings.moreActions,
+                                    onPressed: () => _actions(book),
+                                    icon: const Icon(
+                                      Icons.more_horiz,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -348,7 +406,7 @@ class _BookshelfViewState extends State<BookshelfView> {
 }
 
 String? _sourceBadgeLabel(NovelKey key, LocalBookFormat? format) {
-  if (key.sourceId != LocalBookIdentity.sourceId) return 'online';
+  if (key.sourceId != LocalBookIdentity.sourceId) return null;
   return switch (format) {
     LocalBookFormat.epub => 'epub',
     LocalBookFormat.txt => 'txt',
@@ -427,37 +485,9 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
                   width: 2,
                 ),
               ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  widget.cover,
-                  if (widget.sourceLabel != null)
-                    Positioned(
-                      left: 6,
-                      bottom: 6,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: .42),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 2,
-                          ),
-                          child: Text(
-                            widget.sourceLabel!,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: Colors.white.withValues(alpha: .90),
-                              fontSize: 10,
-                              height: 1.05,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
+              child: _ShelfCover(
+                cover: widget.cover,
+                sourceLabel: widget.sourceLabel,
               ),
             ),
           ),
@@ -476,6 +506,45 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ShelfCover extends StatelessWidget {
+  const _ShelfCover({required this.cover, this.sourceLabel});
+  final Widget cover;
+  final String? sourceLabel;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        cover,
+        if (sourceLabel != null)
+          Positioned(
+            left: 6,
+            bottom: 6,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: .42),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Text(
+                  sourceLabel!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: Colors.white.withValues(alpha: .90),
+                    fontSize: 10,
+                    height: 1.05,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

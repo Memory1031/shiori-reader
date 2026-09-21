@@ -49,7 +49,7 @@ Future<void> seed(
 
 void main() {
   testWidgets(
-    'grid has only cover source and title; list retains progress metadata',
+    'grid has only cover source and title; list retains progress text',
     (tester) async {
       final repo = FixtureLibraryRepository();
       final controller = LibraryController(repo)..onStart();
@@ -103,21 +103,23 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final labels = ['epub', 'txt', 'online'];
+      final labels = ['epub', 'txt', null];
       for (var i = 0; i < books.length; i++) {
         final card = find.byKey(ValueKey(books[i].key));
         final texts = find.descendant(of: card, matching: find.byType(Text));
         expect(tester.widgetList<Text>(texts).map((text) => text.data), [
-          labels[i],
+          ?labels[i],
           books[i].title,
         ]);
         final cover = tester.getRect(
           find.descendant(of: card, matching: find.byType(BookCover)),
         );
-        final badge = tester.getRect(find.text(labels[i]));
         expect(cover.height / cover.width, closeTo(1.5, .001));
-        expect(badge.left - cover.left, closeTo(10, .001));
-        expect(cover.bottom - badge.bottom, closeTo(8, .001));
+        if (labels[i] case final label?) {
+          final badge = tester.getRect(find.text(label));
+          expect(badge.left - cover.left, closeTo(10, .001));
+          expect(cover.bottom - badge.bottom, closeTo(8, .001));
+        }
         final title = tester.widget<Text>(find.text(books[i].title));
         expect(title.maxLines, 2);
         expect(title.overflow, TextOverflow.ellipsis);
@@ -127,9 +129,9 @@ void main() {
       expect(find.textContaining('已读至最新'), findsNothing);
       for (var i = 0; i < 2; i++) {
         if (i == 1) {
-          expect(find.text('EPUB · 63%'), findsOneWidget);
-          expect(find.text('TXT · 已读完'), findsOneWidget);
-          expect(find.text('在线 · 已读至最新'), findsOneWidget);
+          expect(find.text('epub · 阅读进度 63%'), findsOneWidget);
+          expect(find.text('txt · 已读完'), findsOneWidget);
+          expect(find.text('已读至最新'), findsOneWidget);
         }
         expect(find.byType(LinearProgressIndicator), findsNothing);
         expect(find.byType(Chip), findsNothing);

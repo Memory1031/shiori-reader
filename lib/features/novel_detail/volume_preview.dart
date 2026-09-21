@@ -37,13 +37,14 @@ class VolumePreview extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
             children: [
-              Expanded(
-                child: Text(
-                  l.catalogTitle,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+              Text(
+                l.catalogTitle,
+                style: Theme.of(context).textTheme.titleLarge,
               ),
               TextButton(
                 key: const ValueKey('detail-catalog'),
@@ -67,7 +68,14 @@ class VolumePreview extends StatelessWidget {
                   );
                   if (context.mounted && key != null) onChapter?.call(key);
                 },
-                child: Text('${l.allChapters} ›'),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(l.allChapters),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right, size: 18),
+                  ],
+                ),
               ),
             ],
           ),
@@ -88,15 +96,77 @@ class VolumePreview extends StatelessWidget {
           else if (catalog.flatChapters.isEmpty)
             EmptyView(message: l.catalogEmpty)
           else
-            SizedBox(
-              height: 340,
-              child: CatalogView(
-                catalog: catalog,
-                onSelect: (chapter) => onChapter?.call(chapter),
-              ),
-            ),
+            ..._preview(context, catalog),
         ],
       );
     },
   );
+
+  List<Widget> _preview(BuildContext context, Catalog catalog) {
+    final theme = Theme.of(context);
+    final rows = <Widget>[];
+    var remaining = 5;
+    for (final volume in catalog.volumes) {
+      if (remaining == 0) break;
+      if (volume.chapters.isEmpty) continue;
+      if (!volume.isSynthetic) {
+        rows.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 4),
+            child: Semantics(
+              header: true,
+              child: Text(
+                volume.title ??
+                    AppLocalizations.of(context).catalogUnnamedVolume,
+                style: theme.textTheme.titleSmall,
+              ),
+            ),
+          ),
+        );
+      }
+      for (final chapter in volume.chapters.take(remaining)) {
+        rows.add(
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: ValueKey(('preview-chapter', chapter.key)),
+              onTap: onChapter == null ? null : () => onChapter!(chapter.key),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: .45,
+                      ),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        chapter.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 18,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        remaining--;
+      }
+    }
+    return rows;
+  }
 }

@@ -302,6 +302,12 @@ abstract class AppLocalizations {
   /// **'Continue reading'**
   String get detailContinue;
 
+  /// No description provided for @homeContinueAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get homeContinueAction;
+
   /// No description provided for @detailAddShelf.
   ///
   /// In en, this message translates to:
@@ -325,6 +331,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Synopsis'**
   String get detailSynopsis;
+
+  /// No description provided for @detailOnShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'In bookshelf'**
+  String get detailOnShelf;
+
+  /// No description provided for @detailShowMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more'**
+  String get detailShowMore;
+
+  /// No description provided for @detailShowLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Show less'**
+  String get detailShowLess;
 
   /// No description provided for @detailNoSynopsis.
   ///

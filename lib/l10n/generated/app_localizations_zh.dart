@@ -113,6 +113,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get detailContinue => '继续阅读';
 
   @override
+  String get homeContinueAction => '继续';
+
+  @override
   String get detailAddShelf => '加入书架';
 
   @override
@@ -123,6 +126,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get detailSynopsis => '简介';
+
+  @override
+  String get detailOnShelf => '已在书架';
+
+  @override
+  String get detailShowMore => '展开';
+
+  @override
+  String get detailShowLess => '收起';
 
   @override
   String get detailNoSynopsis => '暂无简介。';

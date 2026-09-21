@@ -1,10 +1,9 @@
-import '../reader/book_progress_label.dart';
 import 'package:flutter/material.dart';
 import '../../app/routes.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
-import '../../shared/widgets/book_cover.dart';
+import 'continue_reading_card.dart';
 import '../../shared/widgets/shiori_logo.dart';
 import '../bookshelf/library_controller.dart';
 import '../bookshelf/bookshelf_view.dart';
@@ -320,38 +319,11 @@ class _ReadingHomeState extends State<ReadingHome> {
                             horizontal: 20,
                             vertical: 8,
                           ),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: ListTile(
-                              title: Text(
-                                _library.recent.first.snapshot.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                bookProgressLabel(
-                                      strings,
-                                      _library.recent.first.bookProgress,
-                                      descriptive: true,
-                                    ) ??
-                                    strings.readerReadingProgress,
-                              ),
-                              leading: SizedBox(
-                                width: 36,
-                                child: BookCover(
-                                  book: _library.recent.first.snapshot,
-                                  images: widget.images,
-                                ),
-                              ),
-                              trailing: const Icon(Icons.arrow_forward),
-                              onTap: () =>
-                                  _continue(_library.recent.first.novelKey),
-                            ),
+                          child: ContinueReadingCard(
+                            progress: _library.recent.first,
+                            images: widget.images,
+                            onContinue: () =>
+                                _continue(_library.recent.first.novelKey),
                           ),
                         ),
                       Expanded(

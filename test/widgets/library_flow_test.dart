@@ -34,7 +34,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(ListTile).first);
+    await tester.tap(find.text('Resume'));
     await tester.pumpAndSettle();
     for (var cycle = 0; cycle < 2; cycle++) {
       expect(find.byType(ReaderContentView), findsOneWidget);
@@ -96,7 +96,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Novel details'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Remove from bookshelf'));
+      expect(find.text('In bookshelf'), findsOneWidget);
+      expect(find.text('Remove from bookshelf'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('detail-more')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Remove from bookshelf'));
       await tester.pumpAndSettle();
       expect(find.text('Add to bookshelf'), findsOneWidget);
