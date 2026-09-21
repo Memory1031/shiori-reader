@@ -3229,6 +3229,385 @@ class LocalChapterRevisionsCompanion
   }
 }
 
+class ProgressCatalogs extends Table
+    with TableInfo<ProgressCatalogs, ProgressCatalog> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  ProgressCatalogs(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _novelIdMeta = const VerificationMeta(
+    'novelId',
+  );
+  late final GeneratedColumn<String> novelId = GeneratedColumn<String>(
+    'novel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _catalogJsonMeta = const VerificationMeta(
+    'catalogJson',
+  );
+  late final GeneratedColumn<String> catalogJson = GeneratedColumn<String>(
+    'catalog_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _fetchedAtMeta = const VerificationMeta(
+    'fetchedAt',
+  );
+  late final GeneratedColumn<int> fetchedAt = GeneratedColumn<int>(
+    'fetched_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _originMeta = const VerificationMeta('origin');
+  late final GeneratedColumn<String> origin = GeneratedColumn<String>(
+    'origin',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (origin IN (\'memory\', \'local\', \'remote\'))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    sourceId,
+    novelId,
+    catalogJson,
+    fetchedAt,
+    origin,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'progress_catalogs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProgressCatalog> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('novel_id')) {
+      context.handle(
+        _novelIdMeta,
+        novelId.isAcceptableOrUnknown(data['novel_id']!, _novelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_novelIdMeta);
+    }
+    if (data.containsKey('catalog_json')) {
+      context.handle(
+        _catalogJsonMeta,
+        catalogJson.isAcceptableOrUnknown(
+          data['catalog_json']!,
+          _catalogJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_catalogJsonMeta);
+    }
+    if (data.containsKey('fetched_at')) {
+      context.handle(
+        _fetchedAtMeta,
+        fetchedAt.isAcceptableOrUnknown(data['fetched_at']!, _fetchedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fetchedAtMeta);
+    }
+    if (data.containsKey('origin')) {
+      context.handle(
+        _originMeta,
+        origin.isAcceptableOrUnknown(data['origin']!, _originMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_originMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {sourceId, novelId};
+  @override
+  ProgressCatalog map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProgressCatalog(
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      novelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}novel_id'],
+      )!,
+      catalogJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}catalog_json'],
+      )!,
+      fetchedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}fetched_at'],
+      )!,
+      origin: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin'],
+      )!,
+    );
+  }
+
+  @override
+  ProgressCatalogs createAlias(String alias) {
+    return ProgressCatalogs(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'PRIMARY KEY(source_id, novel_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class ProgressCatalog extends DataClass implements Insertable<ProgressCatalog> {
+  final String sourceId;
+  final String novelId;
+  final String catalogJson;
+  final int fetchedAt;
+  final String origin;
+  const ProgressCatalog({
+    required this.sourceId,
+    required this.novelId,
+    required this.catalogJson,
+    required this.fetchedAt,
+    required this.origin,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['source_id'] = Variable<String>(sourceId);
+    map['novel_id'] = Variable<String>(novelId);
+    map['catalog_json'] = Variable<String>(catalogJson);
+    map['fetched_at'] = Variable<int>(fetchedAt);
+    map['origin'] = Variable<String>(origin);
+    return map;
+  }
+
+  ProgressCatalogsCompanion toCompanion(bool nullToAbsent) {
+    return ProgressCatalogsCompanion(
+      sourceId: Value(sourceId),
+      novelId: Value(novelId),
+      catalogJson: Value(catalogJson),
+      fetchedAt: Value(fetchedAt),
+      origin: Value(origin),
+    );
+  }
+
+  factory ProgressCatalog.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProgressCatalog(
+      sourceId: serializer.fromJson<String>(json['source_id']),
+      novelId: serializer.fromJson<String>(json['novel_id']),
+      catalogJson: serializer.fromJson<String>(json['catalog_json']),
+      fetchedAt: serializer.fromJson<int>(json['fetched_at']),
+      origin: serializer.fromJson<String>(json['origin']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'source_id': serializer.toJson<String>(sourceId),
+      'novel_id': serializer.toJson<String>(novelId),
+      'catalog_json': serializer.toJson<String>(catalogJson),
+      'fetched_at': serializer.toJson<int>(fetchedAt),
+      'origin': serializer.toJson<String>(origin),
+    };
+  }
+
+  ProgressCatalog copyWith({
+    String? sourceId,
+    String? novelId,
+    String? catalogJson,
+    int? fetchedAt,
+    String? origin,
+  }) => ProgressCatalog(
+    sourceId: sourceId ?? this.sourceId,
+    novelId: novelId ?? this.novelId,
+    catalogJson: catalogJson ?? this.catalogJson,
+    fetchedAt: fetchedAt ?? this.fetchedAt,
+    origin: origin ?? this.origin,
+  );
+  ProgressCatalog copyWithCompanion(ProgressCatalogsCompanion data) {
+    return ProgressCatalog(
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      novelId: data.novelId.present ? data.novelId.value : this.novelId,
+      catalogJson: data.catalogJson.present
+          ? data.catalogJson.value
+          : this.catalogJson,
+      fetchedAt: data.fetchedAt.present ? data.fetchedAt.value : this.fetchedAt,
+      origin: data.origin.present ? data.origin.value : this.origin,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProgressCatalog(')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('catalogJson: $catalogJson, ')
+          ..write('fetchedAt: $fetchedAt, ')
+          ..write('origin: $origin')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(sourceId, novelId, catalogJson, fetchedAt, origin);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProgressCatalog &&
+          other.sourceId == this.sourceId &&
+          other.novelId == this.novelId &&
+          other.catalogJson == this.catalogJson &&
+          other.fetchedAt == this.fetchedAt &&
+          other.origin == this.origin);
+}
+
+class ProgressCatalogsCompanion extends UpdateCompanion<ProgressCatalog> {
+  final Value<String> sourceId;
+  final Value<String> novelId;
+  final Value<String> catalogJson;
+  final Value<int> fetchedAt;
+  final Value<String> origin;
+  final Value<int> rowid;
+  const ProgressCatalogsCompanion({
+    this.sourceId = const Value.absent(),
+    this.novelId = const Value.absent(),
+    this.catalogJson = const Value.absent(),
+    this.fetchedAt = const Value.absent(),
+    this.origin = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProgressCatalogsCompanion.insert({
+    required String sourceId,
+    required String novelId,
+    required String catalogJson,
+    required int fetchedAt,
+    required String origin,
+    this.rowid = const Value.absent(),
+  }) : sourceId = Value(sourceId),
+       novelId = Value(novelId),
+       catalogJson = Value(catalogJson),
+       fetchedAt = Value(fetchedAt),
+       origin = Value(origin);
+  static Insertable<ProgressCatalog> custom({
+    Expression<String>? sourceId,
+    Expression<String>? novelId,
+    Expression<String>? catalogJson,
+    Expression<int>? fetchedAt,
+    Expression<String>? origin,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (sourceId != null) 'source_id': sourceId,
+      if (novelId != null) 'novel_id': novelId,
+      if (catalogJson != null) 'catalog_json': catalogJson,
+      if (fetchedAt != null) 'fetched_at': fetchedAt,
+      if (origin != null) 'origin': origin,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProgressCatalogsCompanion copyWith({
+    Value<String>? sourceId,
+    Value<String>? novelId,
+    Value<String>? catalogJson,
+    Value<int>? fetchedAt,
+    Value<String>? origin,
+    Value<int>? rowid,
+  }) {
+    return ProgressCatalogsCompanion(
+      sourceId: sourceId ?? this.sourceId,
+      novelId: novelId ?? this.novelId,
+      catalogJson: catalogJson ?? this.catalogJson,
+      fetchedAt: fetchedAt ?? this.fetchedAt,
+      origin: origin ?? this.origin,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (novelId.present) {
+      map['novel_id'] = Variable<String>(novelId.value);
+    }
+    if (catalogJson.present) {
+      map['catalog_json'] = Variable<String>(catalogJson.value);
+    }
+    if (fetchedAt.present) {
+      map['fetched_at'] = Variable<int>(fetchedAt.value);
+    }
+    if (origin.present) {
+      map['origin'] = Variable<String>(origin.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProgressCatalogsCompanion(')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('catalogJson: $catalogJson, ')
+          ..write('fetchedAt: $fetchedAt, ')
+          ..write('origin: $origin, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$UserDatabase extends GeneratedDatabase {
   _$UserDatabase(QueryExecutor e) : super(e);
   $UserDatabaseManager get managers => $UserDatabaseManager(this);
@@ -3248,6 +3627,7 @@ abstract class _$UserDatabase extends GeneratedDatabase {
   late final LocalBooks localBooks = LocalBooks(this);
   late final LocalChapterRevisions localChapterRevisions =
       LocalChapterRevisions(this);
+  late final ProgressCatalogs progressCatalogs = ProgressCatalogs(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3262,6 +3642,7 @@ abstract class _$UserDatabase extends GeneratedDatabase {
     prefetchSettings,
     localBooks,
     localChapterRevisions,
+    progressCatalogs,
   ];
 }
 
@@ -4912,6 +5293,208 @@ typedef $LocalChapterRevisionsProcessedTableManager =
       LocalChapterRevision,
       PrefetchHooks Function()
     >;
+typedef $ProgressCatalogsCreateCompanionBuilder =
+    ProgressCatalogsCompanion Function({
+      required String sourceId,
+      required String novelId,
+      required String catalogJson,
+      required int fetchedAt,
+      required String origin,
+      Value<int> rowid,
+    });
+typedef $ProgressCatalogsUpdateCompanionBuilder =
+    ProgressCatalogsCompanion Function({
+      Value<String> sourceId,
+      Value<String> novelId,
+      Value<String> catalogJson,
+      Value<int> fetchedAt,
+      Value<String> origin,
+      Value<int> rowid,
+    });
+
+class $ProgressCatalogsFilterComposer
+    extends Composer<_$UserDatabase, ProgressCatalogs> {
+  $ProgressCatalogsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get catalogJson => $composableBuilder(
+    column: $table.catalogJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get fetchedAt => $composableBuilder(
+    column: $table.fetchedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $ProgressCatalogsOrderingComposer
+    extends Composer<_$UserDatabase, ProgressCatalogs> {
+  $ProgressCatalogsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get catalogJson => $composableBuilder(
+    column: $table.catalogJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get fetchedAt => $composableBuilder(
+    column: $table.fetchedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get origin => $composableBuilder(
+    column: $table.origin,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $ProgressCatalogsAnnotationComposer
+    extends Composer<_$UserDatabase, ProgressCatalogs> {
+  $ProgressCatalogsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get novelId =>
+      $composableBuilder(column: $table.novelId, builder: (column) => column);
+
+  GeneratedColumn<String> get catalogJson => $composableBuilder(
+    column: $table.catalogJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get fetchedAt =>
+      $composableBuilder(column: $table.fetchedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get origin =>
+      $composableBuilder(column: $table.origin, builder: (column) => column);
+}
+
+class $ProgressCatalogsTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          ProgressCatalogs,
+          ProgressCatalog,
+          $ProgressCatalogsFilterComposer,
+          $ProgressCatalogsOrderingComposer,
+          $ProgressCatalogsAnnotationComposer,
+          $ProgressCatalogsCreateCompanionBuilder,
+          $ProgressCatalogsUpdateCompanionBuilder,
+          (
+            ProgressCatalog,
+            BaseReferences<_$UserDatabase, ProgressCatalogs, ProgressCatalog>,
+          ),
+          ProgressCatalog,
+          PrefetchHooks Function()
+        > {
+  $ProgressCatalogsTableManager(_$UserDatabase db, ProgressCatalogs table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $ProgressCatalogsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $ProgressCatalogsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $ProgressCatalogsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> sourceId = const Value.absent(),
+                Value<String> novelId = const Value.absent(),
+                Value<String> catalogJson = const Value.absent(),
+                Value<int> fetchedAt = const Value.absent(),
+                Value<String> origin = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProgressCatalogsCompanion(
+                sourceId: sourceId,
+                novelId: novelId,
+                catalogJson: catalogJson,
+                fetchedAt: fetchedAt,
+                origin: origin,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String sourceId,
+                required String novelId,
+                required String catalogJson,
+                required int fetchedAt,
+                required String origin,
+                Value<int> rowid = const Value.absent(),
+              }) => ProgressCatalogsCompanion.insert(
+                sourceId: sourceId,
+                novelId: novelId,
+                catalogJson: catalogJson,
+                fetchedAt: fetchedAt,
+                origin: origin,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $ProgressCatalogsProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      ProgressCatalogs,
+      ProgressCatalog,
+      $ProgressCatalogsFilterComposer,
+      $ProgressCatalogsOrderingComposer,
+      $ProgressCatalogsAnnotationComposer,
+      $ProgressCatalogsCreateCompanionBuilder,
+      $ProgressCatalogsUpdateCompanionBuilder,
+      (
+        ProgressCatalog,
+        BaseReferences<_$UserDatabase, ProgressCatalogs, ProgressCatalog>,
+      ),
+      ProgressCatalog,
+      PrefetchHooks Function()
+    >;
 
 class $UserDatabaseManager {
   final _$UserDatabase _db;
@@ -4930,4 +5513,6 @@ class $UserDatabaseManager {
       $LocalBooksTableManager(_db, _db.localBooks);
   $LocalChapterRevisionsTableManager get localChapterRevisions =>
       $LocalChapterRevisionsTableManager(_db, _db.localChapterRevisions);
+  $ProgressCatalogsTableManager get progressCatalogs =>
+      $ProgressCatalogsTableManager(_db, _db.progressCatalogs);
 }

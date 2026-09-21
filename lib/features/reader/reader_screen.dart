@@ -792,6 +792,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                     blockFraction: (scaled - index).clamp(0.0, 1.0),
                     chapterFraction: v,
                   );
+                  widget.session?.beginPositionNavigation();
                   _position = target;
                   _paged.restore(target);
                 },

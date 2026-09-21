@@ -58,3 +58,12 @@ CREATE TABLE local_chapter_revisions (
  catalog_revision TEXT NOT NULL,
  PRIMARY KEY(digest, chapter_id)
 );
+
+-- Durable progress basis; independent from the disposable catalog cache.
+CREATE TABLE progress_catalogs (
+ source_id TEXT NOT NULL, novel_id TEXT NOT NULL,
+ catalog_json TEXT NOT NULL,
+ fetched_at INTEGER NOT NULL,
+ origin TEXT NOT NULL CHECK(origin IN ('memory', 'local', 'remote')),
+ PRIMARY KEY(source_id, novel_id)
+);

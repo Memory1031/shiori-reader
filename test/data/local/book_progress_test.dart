@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/local/database/user_database.dart'
@@ -30,153 +31,215 @@ class _CatalogOnline implements NovelRepository {
 }
 
 void main() {
-  test(
-    'cold snapshot, catalog growth and late session writes preserve new metadata',
-    () async {
-      final dir = await Directory.systemTemp.createTemp('book-progress-');
-      final file = File('${dir.path}/users.sqlite');
-      var db = UserDatabase(NativeDatabase(file));
-      var repo = LocalLibraryRepository(db);
-      final key = NovelKey(sourceId: SourceId('online'), novelId: 'book');
-      Catalog catalog(int count) => Catalog(
-        novelKey: key,
-        volumes: [
-          Volume(
-            groupId: 'v',
-            chapters: List.generate(
-              count,
-              (i) => Chapter(
-                key: ChapterKey(novelKey: key, chapterId: '$i'),
-                title: '$i',
-                ordinal: i,
-                volumeGroupId: 'v',
+  for (final scenario in ['restart', 'retry', 'legacy']) {
+    test(
+      'catalog basis survives $scenario and rejects old cache and late writes',
+      () async {
+        final dir = await Directory.systemTemp.createTemp('book-progress-');
+        final file = File('${dir.path}/users.sqlite');
+        var db = UserDatabase(NativeDatabase(file));
+        var repo = LocalLibraryRepository(db);
+        final key = NovelKey(sourceId: SourceId('online'), novelId: 'book');
+        Catalog catalog(int count) => Catalog(
+          novelKey: key,
+          volumes: [
+            Volume(
+              groupId: 'v',
+              chapters: List.generate(
+                count,
+                (i) => Chapter(
+                  key: ChapterKey(novelKey: key, chapterId: '$i'),
+                  title: '$i',
+                  ordinal: i,
+                  volumeGroupId: 'v',
+                ),
               ),
             ),
+          ],
+        );
+        final token = CancellationSource().token;
+        final old = catalog(2);
+        final progress = ReadingProgress(
+          snapshot: NovelSummary(key: key, title: 'Book'),
+          chapterKey: old.flatChapters.last.key,
+          chapterOrdinalSnapshot: 1,
+          catalogRevision: old.revision,
+          position: ReaderPosition(
+            contentRevision: 'content',
+            blockKey: 'block',
+            blockIndex: 0,
+            blockFraction: 1,
+            chapterFraction: 1,
           ),
-        ],
-      );
-      final token = CancellationSource().token;
-      final old = catalog(2);
-      final progress = ReadingProgress(
-        snapshot: NovelSummary(key: key, title: 'Book'),
-        chapterKey: old.flatChapters.last.key,
-        chapterOrdinalSnapshot: 1,
-        catalogRevision: old.revision,
-        position: ReaderPosition(
-          contentRevision: 'content',
-          blockKey: 'block',
-          blockIndex: 0,
-          blockFraction: 1,
-          chapterFraction: 1,
-        ),
-        completed: true,
-        lastReadAt: DateTime.utc(2026),
-        bookProgress: BookProgressSnapshot(
-          fraction: 1,
-          chapterCount: 2,
-          terminal: BookTerminalState.caughtUp,
-        ),
-      );
-      final gen =
-          (await repo.beginProgressSession(key, cancellation: token)
-                  as Success<int>)
-              .value;
-      expect(
+          completed: true,
+          lastReadAt: DateTime.utc(2026),
+          bookProgress: BookProgressSnapshot(
+            fraction: 1,
+            chapterCount: 2,
+            terminal: BookTerminalState.caughtUp,
+          ),
+        );
+        final gen =
+            (await repo.beginProgressSession(key, cancellation: token)
+                    as Success<int>)
+                .value;
+        expect(
+          await repo.saveProgress(
+            progress,
+            stamp: ProgressWriteStamp(generation: gen, sequence: 0),
+            cancellation: token,
+          ),
+          isA<Success<bool>>(),
+        );
+        await db.close();
+        db = UserDatabase(NativeDatabase(file));
+        repo = LocalLibraryRepository(db);
+        final restored =
+            (await repo.getProgress(key, cancellation: token)
+                    as Success<ReadingProgress?>)
+                .value!;
+        expect(restored, progress);
+        LoadResult<Catalog> observation(
+          int count,
+          int day, {
+          LoadOrigin origin = LoadOrigin.remote,
+          bool stale = false,
+        }) => LoadResult(
+          value: catalog(count),
+          origin: origin,
+          fetchedAt: DateTime.utc(2026, 1, day),
+          isStale: stale,
+        );
+        if (scenario == 'legacy') {
+          // Emulate a pre-v6 progress row: B is persisted, its fetch time is not.
+          await db.customStatement(
+            'UPDATE reading_progress SET catalog_revision=?,book_progress=?',
+            [
+              catalog(3).revision,
+              jsonEncode(
+                BookProgressMetrics.online(
+                  catalog(3),
+                ).at(progress.chapterKey, 1)!.toJson(),
+              ),
+            ],
+          );
+          await repo.reconcileCatalog(
+            observation(2, 1, origin: LoadOrigin.local),
+          );
+          final guarded =
+              (await repo.getProgress(key, cancellation: token)
+                      as Success<ReadingProgress?>)
+                  .value!;
+          expect(guarded.catalogRevision, catalog(3).revision);
+          expect(guarded.bookProgress!.fraction, 2 / 3);
+          expect(
+            (await repo.saveProgress(
+                      progress,
+                      stamp: ProgressWriteStamp(generation: gen, sequence: 1),
+                      cancellation: token,
+                    )
+                    as Success<bool>)
+                .value,
+            isFalse,
+          );
+        }
+        final newer = observation(3, 3);
+        if (scenario == 'retry') {
+          await db.customStatement(
+            "CREATE TRIGGER fail_progress BEFORE UPDATE ON reading_progress BEGIN SELECT RAISE(ABORT, 'injected write failure'); END",
+          );
+          expect(await repo.reconcileCatalog(newer), isA<Failure<void>>());
+          final unchanged =
+              (await repo.getProgress(key, cancellation: token)
+                      as Success<ReadingProgress?>)
+                  .value!;
+          expect(unchanged, progress);
+          expect(
+            await db.customSelect('SELECT * FROM progress_catalogs').get(),
+            isEmpty,
+          );
+          await db.customStatement('DROP TRIGGER fail_progress');
+        }
+        final online = _CatalogOnline()..observation = newer;
+        final observed = <LoadResult<Catalog>>[];
+        final reading = LocalReadingRepository(
+          local: _UnusedLocalStore(),
+          online: online,
+          onOnlineCatalog: (value) async {
+            observed.add(value);
+            await repo.reconcileCatalog(value);
+          },
+        );
+        await reading.loadCatalog(
+          key,
+          mode: ReadMode.refresh,
+          cancellation: token,
+        );
+        expect(observed.last, same(online.observation));
+        final accepted =
+            (await repo.getProgress(key, cancellation: token)
+                    as Success<ReadingProgress?>)
+                .value!;
+        expect(accepted.bookProgress!.fraction, 2 / 3);
+        if (scenario == 'restart') {
+          await db.close();
+          db = UserDatabase(NativeDatabase(file));
+          repo = LocalLibraryRepository(db);
+        }
+        // Remote B was accepted, but its cache write failed. A is still readable.
+        online.observation = LoadResult(
+          value: catalog(2),
+          origin: LoadOrigin.local,
+          fetchedAt: DateTime.utc(2026, 1, 1),
+          isStale: true,
+          refreshFailure: AppFailure(
+            kind: FailureKind.network,
+            operation: Operation.catalog,
+          ),
+        );
+        await reading.catalogUpdates(key).single;
+        expect(observed.last, same(online.observation));
+        expect(observed.last.refreshFailure, isNotNull);
+        var updated =
+            (await repo.getProgress(key, cancellation: token)
+                    as Success<ReadingProgress?>)
+                .value!;
+        expect(updated.position, progress.position);
+        expect(updated.lastReadAt, progress.lastReadAt);
+        expect(updated.bookProgress!.fraction, 2 / 3);
+        expect(updated.bookProgress!.terminal, BookTerminalState.reading);
+        expect(updated.catalogRevision, catalog(3).revision);
         await repo.saveProgress(
           progress,
-          stamp: ProgressWriteStamp(generation: gen, sequence: 0),
+          stamp: ProgressWriteStamp(generation: gen, sequence: 1),
           cancellation: token,
-        ),
-        isA<Success<bool>>(),
-      );
-      await db.close();
-      db = UserDatabase(NativeDatabase(file));
-      repo = LocalLibraryRepository(db);
-      final restored =
-          (await repo.getProgress(key, cancellation: token)
-                  as Success<ReadingProgress?>)
-              .value!;
-      expect(restored, progress);
-      LoadResult<Catalog> observation(
-        int count,
-        int day, {
-        LoadOrigin origin = LoadOrigin.remote,
-        bool stale = false,
-      }) => LoadResult(
-        value: catalog(count),
-        origin: origin,
-        fetchedAt: DateTime.utc(2026, 1, day),
-        isStale: stale,
-      );
-      final online = _CatalogOnline()..observation = observation(3, 3);
-      final observed = <LoadResult<Catalog>>[];
-      final reading = LocalReadingRepository(
-        local: _UnusedLocalStore(),
-        online: online,
-        onOnlineCatalog: (value) async {
-          observed.add(value);
-          await repo.reconcileCatalog(value);
-        },
-      );
-      await reading.loadCatalog(
-        key,
-        mode: ReadMode.refresh,
-        cancellation: token,
-      );
-      expect(observed.last, same(online.observation));
-      // Remote B was accepted, but its cache write failed. A is still readable.
-      online.observation = LoadResult(
-        value: catalog(2),
-        origin: LoadOrigin.local,
-        fetchedAt: DateTime.utc(2026, 1, 1),
-        isStale: true,
-        refreshFailure: AppFailure(
-          kind: FailureKind.network,
-          operation: Operation.catalog,
-        ),
-      );
-      await reading.catalogUpdates(key).single;
-      expect(observed.last, same(online.observation));
-      expect(observed.last.refreshFailure, isNotNull);
-      var updated =
-          (await repo.getProgress(key, cancellation: token)
-                  as Success<ReadingProgress?>)
-              .value!;
-      expect(updated.position, progress.position);
-      expect(updated.lastReadAt, progress.lastReadAt);
-      expect(updated.bookProgress!.fraction, 2 / 3);
-      expect(updated.bookProgress!.terminal, BookTerminalState.reading);
-      expect(updated.catalogRevision, catalog(3).revision);
-      await repo.saveProgress(
-        progress,
-        stamp: ProgressWriteStamp(generation: gen, sequence: 1),
-        cancellation: token,
-      );
-      updated =
-          (await repo.getProgress(key, cancellation: token)
-                  as Success<ReadingProgress?>)
-              .value!;
-      expect(updated.bookProgress!.fraction, 2 / 3);
-      expect(updated.bookProgress!.terminal, BookTerminalState.reading);
-      // A genuinely newer deletion must still be accepted (not max chapter count).
-      await repo.reconcileCatalog(observation(2, 4));
-      updated =
-          (await repo.getProgress(key, cancellation: token)
-                  as Success<ReadingProgress?>)
-              .value!;
-      expect(updated.bookProgress!.fraction, 1);
-      expect(updated.bookProgress!.chapterCount, 2);
-      expect(updated.bookProgress!.terminal, BookTerminalState.reading);
-      expect(updated.lastReadAt, progress.lastReadAt);
-      await db.customStatement(
-        "UPDATE reading_progress SET book_progress='{\"fraction\":2,\"chapterCount\":3,\"terminal\":\"reading\"}'",
-      );
-      expect(
-        await repo.getProgress(key, cancellation: token),
-        isA<Failure<ReadingProgress?>>(),
-      );
-      await db.close();
-      await dir.delete(recursive: true);
-    },
-  );
+        );
+        updated =
+            (await repo.getProgress(key, cancellation: token)
+                    as Success<ReadingProgress?>)
+                .value!;
+        expect(updated.bookProgress!.fraction, 2 / 3);
+        expect(updated.bookProgress!.terminal, BookTerminalState.reading);
+        // A genuinely newer deletion must still be accepted (not max chapter count).
+        await repo.reconcileCatalog(observation(2, 4));
+        updated =
+            (await repo.getProgress(key, cancellation: token)
+                    as Success<ReadingProgress?>)
+                .value!;
+        expect(updated.bookProgress!.fraction, 1);
+        expect(updated.bookProgress!.chapterCount, 2);
+        expect(updated.bookProgress!.terminal, BookTerminalState.reading);
+        expect(updated.lastReadAt, progress.lastReadAt);
+        await db.customStatement(
+          "UPDATE reading_progress SET book_progress='{\"fraction\":2,\"chapterCount\":3,\"terminal\":\"reading\"}'",
+        );
+        expect(
+          await repo.getProgress(key, cancellation: token),
+          isA<Failure<ReadingProgress?>>(),
+        );
+        await db.close();
+        await dir.delete(recursive: true);
+      },
+    );
+  }
 }

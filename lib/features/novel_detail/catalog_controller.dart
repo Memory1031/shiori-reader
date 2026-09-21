@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../../domain/contracts/contracts.dart';
+import '../../domain/catalog_observation.dart';
 import '../../domain/models/models.dart';
 import '../../shared/controllers/scoped_controller.dart';
 
@@ -70,14 +71,13 @@ class CatalogController extends ScopedController {
     if (isClosed || request.token.isCancelled || _request != request) return;
     _request = null;
     loading = false;
-    // A current repository notification wins over an earlier cache snapshot.
-    if (_updates == updates) {
-      _accept(result);
-    } else if (loaded == null && result is Success<LoadResult<Catalog>>) {
-      // A failure notification can precede the initial cached value. Keep both.
-      final latestFailure = failure;
+    // Fetch time, not callback arrival, decides which successful value is newer.
+    if (result is Success<LoadResult<Catalog>>) {
+      final latestFailure = _updates != updates ? failure : null;
       _accept(result);
       failure = latestFailure ?? failure;
+    } else if (_updates == updates) {
+      _accept(result);
     }
     update();
   }
@@ -95,8 +95,12 @@ class CatalogController extends ScopedController {
           );
           return;
         }
-        loaded = value;
-        failure = value.refreshFailure;
+        if (acceptsCatalogObservation(value, loaded)) {
+          loaded = value;
+          failure = value.refreshFailure;
+        } else if (value.refreshFailure != null) {
+          failure = value.refreshFailure;
+        }
       case Failure(:final failure):
         if (!failure.isCancellation) this.failure = failure;
     }

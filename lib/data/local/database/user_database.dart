@@ -5,13 +5,13 @@ part 'user_database.g.dart';
 class UserDatabase extends _$UserDatabase {
   UserDatabase(super.executor);
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
     // Never silently recreate user or cache files on an unknown version.
     onUpgrade: (m, from, to) async {
-      if (from < 1 || from > 4 || to != 5) {
+      if (from < 1 || from > 5 || to != 6) {
         throw StateError('Unsupported database version');
       }
       await transaction(() async {
@@ -34,9 +34,12 @@ class UserDatabase extends _$UserDatabase {
           );
         }
         if (from < 4) await m.createTable(localChapterRevisions);
-        await customStatement(
-          'ALTER TABLE reading_progress ADD COLUMN book_progress TEXT',
-        );
+        if (from < 5) {
+          await customStatement(
+            'ALTER TABLE reading_progress ADD COLUMN book_progress TEXT',
+          );
+        }
+        await m.createTable(progressCatalogs);
         await _checkIntegrity();
         // Commit DDL and the version together; Drift's subsequent assignment
         // is idempotent if opening completes normally.

@@ -100,7 +100,7 @@ Presentation 依赖领域契约，通过显式注入获得服务。应用根拥�
 
 | 位置 | Schema | 内容 |
 | --- | --- | --- |
-| `users/users.sqlite` | v5 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions |
+| `users/users.sqlite` | v6 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions、progress_catalogs |
 | `disposable/cache.sqlite` | v2 | novel_cache、catalog_cache、chapter_cache、image_cache、image_owners |
 | 平台 preferences | 独立 codec | readerSettings v3、appSettings v2 |
 | `users/books/` | manifest v1 | 本地书托管原件、语义正文索引与媒体 |
@@ -115,7 +115,7 @@ Library 写入由事务串行执行；重复收藏保留首次 addedAt，移除�
 
 beginProgressSession 原子递增 generation 并重置 sequence；saveProgress 只接受当前 generation 和严格递增 sequence，旧写返回 false。clearHistory 推进 generation 并保留会话保护行，防止晚响应恢复已清历史。提交前取消可回滚，提交后返回真实结果。
 
-全书进度快照与章节位置一同持久化，沿用上述事务及写入顺序保护。历史记录缺少快照时视为未知；已加载的在线目录更新可重算全书进度，但不新开阅读会话、不改变阅读位置或最近阅读时间。旧目录下的晚写按最新已知目录重算，避免恢复过期的终点状态。
+全书进度快照与章节位置一同持久化，沿用上述事务及写入顺序保护。历史记录缺少快照时视为未知；已加载的在线目录更新可重算全书进度，但不新开阅读会话、不改变阅读位置或最近阅读时间。在线目录依据（目录、抓取时间及来源）与进度重算在用户库同一事务提交，独立于可丢弃的目录缓存；重启后仍按已接受的抓取时间仲裁，写入失败可重试同一观测。旧目录下的晚写按已持久化的目录依据重算，避免恢复过期的终点状态。升级前没有目录抓取时间的全书快照，不被冲突缓存或其晚写覆盖，直到获得远端目录或同版本缓存依据。
 
 缓存存规范化领域 JSON、codec / parser 版本及抓取、过期、访问时间。校验类型、身份和摘要，单项损坏局部失败；离线列表同时检查外层 codec 和内部数据。TTL / LRU 由[缓存策略](architecture.md)负责。
 
@@ -125,7 +125,7 @@ preferences 使用独立 JSON key，Store 串行写入，读取等待已排队�
 
 ### 迁移与生成
 
-保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 / v5 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
+保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 / v5 / v6 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
 
 升级 DDL、完整性检查和 user_version 同事务提交；失败回滚，损坏或未知未来版本保留原文件并报错。不提供自动删用户库、drop/recreate 或生产 reset 来绕过故障。旧快照不能被当前 schema 重新导出覆盖。
 

@@ -39,7 +39,7 @@ void seed(File file, String kind, int version) {
       );
       db.execute("INSERT INTO progress_sessions VALUES('s','n',3,8)");
       db.execute(
-        "INSERT INTO reading_progress VALUES('s','n','chapter','original-summary',2,'catalog','content','block',17,.25,.75,0,22.5,'layout',1,123,456)",
+        "INSERT INTO reading_progress(source_id,novel_id,chapter_id,summary_json,chapter_ordinal,catalog_revision,content_revision,block_key,block_index,block_fraction,chapter_fraction,completed,pixel_offset,layout_key,position_version,last_read_at,updated_at) VALUES('s','n','chapter','original-summary',2,'catalog','content','block',17,.25,.75,0,22.5,'layout',1,123,456)",
       );
       final summary = RecordCodec.summary(
         NovelSummary(
@@ -105,6 +105,12 @@ class FaultV4 extends UserDatabase {
   Migrator createMigrator() => FaultMigrator(this, 'local_chapter_revisions');
 }
 
+class FaultV6 extends UserDatabase {
+  FaultV6(super.executor);
+  @override
+  Migrator createMigrator() => FaultMigrator(this, 'progress_catalogs');
+}
+
 class FaultCache extends CacheDatabase {
   FaultCache(super.executor);
   @override
@@ -157,12 +163,12 @@ void main() {
             .data
             .values
             .single,
-        5,
+        6,
       );
       await retry.close();
     },
   );
-  for (final version in [1, 2, 3, 4]) {
+  for (final version in [1, 2, 3, 4, 5]) {
     test(
       'retained user v$version snapshot upgrades and preserves every old field',
       () async {
@@ -175,7 +181,7 @@ void main() {
               .data
               .values
               .single,
-          5,
+          6,
         );
         final library = LocalLibraryRepository(db);
         final shelf =
@@ -197,7 +203,7 @@ void main() {
         await db.close();
         final after = rows(file);
         for (final name in before.keys) {
-          if (name == 'reading_progress') {
+          if (name == 'reading_progress' && version < 5) {
             for (final row in (after[name] as List)) {
               (row as Map).remove('book_progress');
             }
@@ -208,6 +214,30 @@ void main() {
       },
     );
   }
+  test('v5 to v6 failure preserves progress and permits retry', () async {
+    final file = File('${root.path}/users.sqlite');
+    seed(file, 'user', 5);
+    final before = rows(file);
+    final failing = FaultV6(NativeDatabase(file));
+    await expectLater(
+      failing.customSelect('SELECT 1').get(),
+      throwsA(anything),
+    );
+    await failing.close();
+    expect(rows(file), before);
+    final raw = sql.sqlite3.open(file.path);
+    expect(raw.userVersion, 5);
+    raw.close();
+    final retry = UserDatabase(NativeDatabase(file));
+    expect(
+      await retry.customSelect('SELECT * FROM progress_catalogs').get(),
+      isEmpty,
+    );
+    await retry.close();
+    for (final name in before.keys) {
+      expect(rows(file)[name], before[name]);
+    }
+  });
   test('v3 ALTER operations roll back when v4 table creation fails', () async {
     final file = File('${root.path}/users.sqlite');
     seed(file, 'user', 3);

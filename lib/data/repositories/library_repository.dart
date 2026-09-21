@@ -14,8 +14,6 @@ class LocalLibraryRepository implements LibraryRepository {
     : now = now ?? DateTime.now;
   final UserDatabase db;
   final DateTime Function() now;
-  final _catalogs = <NovelKey, BookProgressMetrics>{};
-  final _catalogObservations = <NovelKey, LoadResult<Catalog>>{};
   ReadingProgress _reconcile(
     ReadingProgress progress,
     BookProgressMetrics metrics,
@@ -31,8 +29,30 @@ class LocalLibraryRepository implements LibraryRepository {
     );
   }
 
-  /// A catalog already loaded by a reader/detail refresh updates only metadata,
-  /// inside the same DB transaction as progress writes. It never opens a session.
+  Future<LoadResult<Catalog>?> _catalogBasis(NovelKey key) async {
+    final row = await db
+        .customSelect(
+          'SELECT * FROM progress_catalogs WHERE $_where',
+          variables: _key(key),
+        )
+        .getSingleOrNull();
+    if (row == null) return null;
+    final catalog = RecordCodec.readCatalog(row.read<String>('catalog_json'));
+    if (catalog.novelKey != key) {
+      throw const FormatException('Catalog identity mismatch');
+    }
+    return LoadResult(
+      value: catalog,
+      fetchedAt: DateTime.fromMicrosecondsSinceEpoch(
+        row.read<int>('fetched_at'),
+        isUtc: true,
+      ),
+      origin: LoadOrigin.values.byName(row.read<String>('origin')),
+    );
+  }
+
+  /// The accepted basis and its derived progress commit or roll back together.
+  /// It survives cache-write failure and restart; a failed observation is retryable.
   Future<Result<void>> reconcileCatalog(LoadResult<Catalog> observation) {
     final catalog = observation.value;
     return localWrite(
@@ -40,24 +60,36 @@ class LocalLibraryRepository implements LibraryRepository {
       Operation.progressWrite,
       CancellationSource().token,
       () async {
-        if (!acceptsCatalogObservation(
-          observation,
-          _catalogObservations[catalog.novelKey],
-        )) {
-          return;
-        }
-        final metrics = BookProgressMetrics.online(catalog);
-        _catalogObservations[catalog.novelKey] = observation;
-        _catalogs[catalog.novelKey] = metrics;
+        final current = await _catalogBasis(catalog.novelKey);
+        if (!acceptsCatalogObservation(observation, current)) return;
         final row = await db
             .customSelect(
               'SELECT * FROM reading_progress WHERE $_where',
               variables: _key(catalog.novelKey),
             )
             .getSingleOrNull();
-        if (row == null) return;
-        final before = _progress(row);
-        final after = _reconcile(before, metrics);
+        final before = row == null ? null : _progress(row);
+        // Pre-migration snapshots have no fetch time. A conflicting cache cannot
+        // establish a newer basis; wait for a remote observation or matching cache.
+        if (current == null &&
+            observation.origin != LoadOrigin.remote &&
+            before?.bookProgress != null &&
+            before!.catalogRevision != catalog.revision) {
+          return;
+        }
+        await db.customUpdate(
+          'INSERT INTO progress_catalogs(source_id,novel_id,catalog_json,fetched_at,origin) VALUES(?,?,?,?,?) '
+          'ON CONFLICT(source_id,novel_id) DO UPDATE SET catalog_json=excluded.catalog_json,fetched_at=excluded.fetched_at,origin=excluded.origin',
+          variables: [
+            ..._key(catalog.novelKey),
+            Variable(RecordCodec.catalog(catalog)),
+            Variable(observation.fetchedAt.microsecondsSinceEpoch),
+            Variable(observation.origin.name),
+          ],
+          updates: {db.progressCatalogs},
+        );
+        if (before == null) return;
+        final after = _reconcile(before, BookProgressMetrics.online(catalog));
         if (before != after) await writeProgressRow(db, after, now());
       },
     );
@@ -270,7 +302,25 @@ class LocalLibraryRepository implements LibraryRepository {
         stamp.sequence <= session.read<int>('sequence')) {
       return false;
     }
-    final known = _catalogs[key];
+    final basis = key.sourceId == LocalBookIdentity.sourceId
+        ? null
+        : await _catalogBasis(key);
+    if (basis == null && key.sourceId != LocalBookIdentity.sourceId) {
+      final previous = await db
+          .customSelect(
+            'SELECT catalog_revision,book_progress FROM reading_progress WHERE $_where',
+            variables: _key(key),
+          )
+          .getSingleOrNull();
+      if (previous?.readNullable<String>('book_progress') != null &&
+          previous!.read<String>('catalog_revision') !=
+              progress.catalogRevision) {
+        return false;
+      }
+    }
+    final known = basis == null
+        ? null
+        : BookProgressMetrics.online(basis.value);
     await writeProgressRow(
       db,
       known == null ? progress : _reconcile(progress, known),

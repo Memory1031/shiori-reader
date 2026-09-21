@@ -12,6 +12,7 @@ import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/reader_controller.dart';
+import 'package:shiori/features/novel_detail/catalog_controller.dart';
 import 'package:shiori/features/reader/reader_completion_page.dart';
 import 'package:shiori/features/reader/viewport/paper_turn.dart';
 
@@ -181,7 +182,72 @@ class _DelayedDetailRepository extends CompletionRepository {
   }
 }
 
+class _DelayedCatalogRepository extends CompletionRepository {
+  final catalogGate = Completer<Result<LoadResult<Catalog>>>();
+  @override
+  Future<Result<LoadResult<Catalog>>> loadCatalog(
+    NovelKey key, {
+    required ReadMode mode,
+    required CancellationToken cancellation,
+  }) => catalogGate.future;
+}
+
 void main() {
+  for (final responseIsNewer in [false, true]) {
+    testWidgets(
+      'catalog fetch time wins across stream/load ordering ($responseIsNewer)',
+      (tester) async {
+        final repo = _DelayedCatalogRepository();
+        final old = repo.catalog;
+        repo.count = 3;
+        final newer = repo.catalog;
+        final controller = CatalogController(repository: repo, novel: repo.key)
+          ..onStart();
+        Result<LoadResult<Catalog>> observation(Catalog value, int day) =>
+            Success(
+              LoadResult(
+                value: value,
+                origin: LoadOrigin.remote,
+                fetchedAt: DateTime.utc(2026, 1, day),
+              ),
+            );
+        repo.updates.add(
+          responseIsNewer ? observation(old, 1) : observation(newer, 3),
+        );
+        repo.catalogGate.complete(
+          responseIsNewer ? observation(newer, 3) : observation(old, 1),
+        );
+        await tester.pumpAndSettle();
+        expect(controller.loaded!.value.revision, newer.revision);
+        final failure = AppFailure(
+          kind: FailureKind.network,
+          operation: Operation.catalog,
+        );
+        repo.updates.add(
+          Success(
+            LoadResult(
+              value: old,
+              origin: LoadOrigin.local,
+              fetchedAt: DateTime.utc(2026),
+              isStale: true,
+              refreshFailure: failure,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(controller.loaded!.value.revision, newer.revision);
+        expect(controller.failure, same(failure));
+        // A later deletion is valid, and its successful refresh clears the error.
+        repo.updates.add(observation(old, 4));
+        await tester.pumpAndSettle();
+        expect(controller.loaded!.value.revision, old.revision);
+        expect(controller.failure, isNull);
+        controller.onDelete();
+        await repo.updates.close();
+      },
+    );
+  }
+
   for (final resize in [false, true]) {
     testWidgets(
       'completion catalog seek survives animation and close/reopen (resize=$resize)',
@@ -348,6 +414,113 @@ void main() {
     await repo.updates.close();
     await library.close();
   });
+  testWidgets('older catalog cannot remove next chapter or expose completion', (
+    tester,
+  ) async {
+    final repo = CompletionRepository();
+    final library = FixtureLibraryRepository();
+    await tester.pumpWidget(
+      ShioriApp(
+        locale: const Locale('en'),
+        routes: AppRoutes(
+          home: (_) => BookReaderScreen(
+            chapter: repo.keys[1],
+            repository: repo,
+            library: library,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    repo.count = 3;
+    repo.updates.add(repo.result(repo.catalog));
+    await tester.pumpAndSettle();
+    repo.count = 2;
+    repo.updates.add(repo.result(repo.catalog));
+    await tester.pumpAndSettle();
+    ReaderContentView view() =>
+        tester.widget<ReaderContentView>(find.byType(ReaderContentView));
+    expect(view().onNextChapter, isNotNull);
+    expect(view().onBookEnd, isNull);
+    await view().viewportController!.next();
+    await tester.pumpAndSettle();
+    expect(find.byType(ReaderCompletionPage), findsNothing);
+    expect(view().content.key, repo.keys[2]);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+    await repo.updates.close();
+    await library.close();
+  });
+
+  testWidgets(
+    'explicit slider seek leaves finished even on one-page final chapter',
+    (tester) async {
+      final repo = CompletionRepository(local: true);
+      final library = FixtureLibraryRepository();
+      final settings = FixtureSettingsStore();
+      await settings.save(
+        ReaderSettings(controlsHintSeen: true),
+        cancellation: CancellationSource().token,
+      );
+      Widget open() => ShioriApp(
+        locale: const Locale('en'),
+        routes: AppRoutes(
+          home: (_) => BookReaderScreen(
+            chapter: repo.order.last,
+            repository: repo,
+            library: library,
+            settings: settings,
+          ),
+        ),
+      );
+      ReaderContentView view() =>
+          tester.widget<ReaderContentView>(find.byType(ReaderContentView));
+      Future<ReadingProgress> saved() async =>
+          (await library.getProgress(
+                    repo.key,
+                    cancellation: CancellationSource().token,
+                  )
+                  as Success<ReadingProgress?>)
+              .value!;
+      await tester.pumpWidget(open());
+      await tester.pumpAndSettle();
+      await view().viewportController!.next();
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderCompletionPage), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(find.byType(ReaderCompletionPage), findsNothing);
+      expect(
+        (await saved()).bookProgress!.terminal,
+        BookTerminalState.finished,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('Chapter ').last);
+      await tester.pumpAndSettle();
+      final slider = tester.widget<Slider>(find.byType(Slider));
+      slider.onChanged!(.2);
+      slider.onChangeEnd!(.2);
+      await tester.pumpAndSettle();
+      await view().session!.flushProgress();
+      expect((await saved()).position.chapterFraction, closeTo(.2, .0001));
+      expect((await saved()).bookProgress!.terminal, BookTerminalState.reading);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(open());
+      await tester.pumpAndSettle();
+      expect(
+        view().viewportController!.capture()!.chapterFraction,
+        closeTo(.2, .0001),
+      );
+      expect((await saved()).bookProgress!.terminal, BookTerminalState.reading);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      await repo.updates.close();
+      await library.close();
+    },
+  );
+
   testWidgets('chapter 42%, overall 63%, slider remains chapter-only', (
     tester,
   ) async {

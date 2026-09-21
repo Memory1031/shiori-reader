@@ -1,0 +1,795 @@
+{
+  "_meta": {
+    "description": "This file contains a serialized version of schema entities for drift.",
+    "version": "1.3.0"
+  },
+  "options": {
+    "store_date_time_values_as_text": false
+  },
+  "entities": [
+    {
+      "id": 0,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "bookshelf",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "source_id",
+            "getter_name": "sourceId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "novel_id",
+            "getter_name": "novelId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "summary_json",
+            "getter_name": "summaryJson",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "added_at",
+            "getter_name": "addedAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "updated_at",
+            "getter_name": "updatedAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "PRIMARY KEY(source_id, novel_id)"
+        ],
+        "explicit_pk": [
+          "source_id",
+          "novel_id"
+        ]
+      }
+    },
+    {
+      "id": 1,
+      "references": [
+        0
+      ],
+      "type": "index",
+      "data": {
+        "on": 0,
+        "name": "bookshelf_added",
+        "sql": "CREATE INDEX bookshelf_added ON bookshelf(added_at DESC);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 2,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "progress_sessions",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "source_id",
+            "getter_name": "sourceId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "novel_id",
+            "getter_name": "novelId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "generation",
+            "getter_name": "generation",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (generation >= 1)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "sequence",
+            "getter_name": "sequence",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT (-1) CHECK (sequence >= -1)",
+            "default_dart": "const CustomExpression('-1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "PRIMARY KEY(source_id, novel_id)"
+        ],
+        "explicit_pk": [
+          "source_id",
+          "novel_id"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "reading_progress",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "source_id",
+            "getter_name": "sourceId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "novel_id",
+            "getter_name": "novelId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "chapter_id",
+            "getter_name": "chapterId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "summary_json",
+            "getter_name": "summaryJson",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "chapter_ordinal",
+            "getter_name": "chapterOrdinal",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (chapter_ordinal >= 0)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "catalog_revision",
+            "getter_name": "catalogRevision",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "content_revision",
+            "getter_name": "contentRevision",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "block_key",
+            "getter_name": "blockKey",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "block_index",
+            "getter_name": "blockIndex",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (block_index >= 0)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "block_fraction",
+            "getter_name": "blockFraction",
+            "moor_type": "double",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (block_fraction >= 0 AND block_fraction <= 1)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "chapter_fraction",
+            "getter_name": "chapterFraction",
+            "moor_type": "double",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (chapter_fraction >= 0 AND chapter_fraction <= 1)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "book_progress",
+            "getter_name": "bookProgress",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "completed",
+            "getter_name": "completed",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (completed IN (0, 1))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "pixel_offset",
+            "getter_name": "pixelOffset",
+            "moor_type": "double",
+            "nullable": true,
+            "customConstraints": "CHECK (pixel_offset >= 0)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "layout_key",
+            "getter_name": "layoutKey",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "position_version",
+            "getter_name": "positionVersion",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (position_version >= 1)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_read_at",
+            "getter_name": "lastReadAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "updated_at",
+            "getter_name": "updatedAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "CHECK((pixel_offset IS NULL)=(layout_key IS NULL))",
+          "PRIMARY KEY(source_id, novel_id)"
+        ],
+        "explicit_pk": [
+          "source_id",
+          "novel_id"
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "references": [
+        3
+      ],
+      "type": "index",
+      "data": {
+        "on": 3,
+        "name": "progress_recent",
+        "sql": "CREATE INDEX progress_recent ON reading_progress(last_read_at DESC);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 5,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "prefetch_choices",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "source_id",
+            "getter_name": "sourceId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "novel_id",
+            "getter_name": "novelId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "chapter_id",
+            "getter_name": "chapterId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "target_id",
+            "getter_name": "targetId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "PRIMARY KEY(source_id, novel_id, chapter_id)"
+        ],
+        "explicit_pk": [
+          "source_id",
+          "novel_id",
+          "chapter_id"
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "prefetch_settings",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY CHECK (id = 1)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "current_enabled",
+            "getter_name": "currentEnabled",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "next_enabled",
+            "getter_name": "nextEnabled",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 7,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "local_books",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "digest",
+            "getter_name": "digest",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY CHECK (length(digest) = 64)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "format",
+            "getter_name": "format",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (format IN ('txt', 'epub'))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "title",
+            "getter_name": "title",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "imported_at",
+            "getter_name": "importedAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "manifest_hash",
+            "getter_name": "manifestHash",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (length(manifest_hash) = 64)",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "active_bundle",
+            "getter_name": "activeBundle",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "parser_version",
+            "getter_name": "parserVersion",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "maintenance",
+            "getter_name": "maintenance",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 0 CHECK (maintenance IN (0, 1))",
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 8,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "local_chapter_revisions",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "digest",
+            "getter_name": "digest",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "chapter_id",
+            "getter_name": "chapterId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "content_revision",
+            "getter_name": "contentRevision",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "catalog_revision",
+            "getter_name": "catalogRevision",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "PRIMARY KEY(digest, chapter_id)"
+        ],
+        "explicit_pk": [
+          "digest",
+          "chapter_id"
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "progress_catalogs",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "source_id",
+            "getter_name": "sourceId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "novel_id",
+            "getter_name": "novelId",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "catalog_json",
+            "getter_name": "catalogJson",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "fetched_at",
+            "getter_name": "fetchedAt",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "origin",
+            "getter_name": "origin",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (origin IN ('memory', 'local', 'remote'))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "PRIMARY KEY(source_id, novel_id)"
+        ],
+        "explicit_pk": [
+          "source_id",
+          "novel_id"
+        ]
+      }
+    }
+  ],
+  "fixed_sql": [
+    {
+      "name": "bookshelf",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"bookshelf\" (\"source_id\" TEXT NOT NULL, \"novel_id\" TEXT NOT NULL, \"summary_json\" TEXT NOT NULL, \"added_at\" INTEGER NOT NULL, \"updated_at\" INTEGER NOT NULL, PRIMARY KEY(source_id, novel_id));"
+        }
+      ]
+    },
+    {
+      "name": "bookshelf_added",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX bookshelf_added ON bookshelf (added_at DESC)"
+        }
+      ]
+    },
+    {
+      "name": "progress_sessions",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"progress_sessions\" (\"source_id\" TEXT NOT NULL, \"novel_id\" TEXT NOT NULL, \"generation\" INTEGER NOT NULL CHECK (generation >= 1), \"sequence\" INTEGER NOT NULL DEFAULT (-1) CHECK (sequence >= -1), PRIMARY KEY(source_id, novel_id));"
+        }
+      ]
+    },
+    {
+      "name": "reading_progress",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"reading_progress\" (\"source_id\" TEXT NOT NULL, \"novel_id\" TEXT NOT NULL, \"chapter_id\" TEXT NOT NULL, \"summary_json\" TEXT NOT NULL, \"chapter_ordinal\" INTEGER NOT NULL CHECK (chapter_ordinal >= 0), \"catalog_revision\" TEXT NOT NULL, \"content_revision\" TEXT NOT NULL, \"block_key\" TEXT NOT NULL, \"block_index\" INTEGER NOT NULL CHECK (block_index >= 0), \"block_fraction\" REAL NOT NULL CHECK (block_fraction >= 0 AND block_fraction <= 1), \"chapter_fraction\" REAL NOT NULL CHECK (chapter_fraction >= 0 AND chapter_fraction <= 1), \"book_progress\" TEXT, \"completed\" INTEGER NOT NULL CHECK (completed IN (0, 1)), \"pixel_offset\" REAL CHECK (pixel_offset >= 0), \"layout_key\" TEXT, \"position_version\" INTEGER NOT NULL CHECK (position_version >= 1), \"last_read_at\" INTEGER NOT NULL, \"updated_at\" INTEGER NOT NULL, CHECK((pixel_offset IS NULL)=(layout_key IS NULL)), PRIMARY KEY(source_id, novel_id));"
+        }
+      ]
+    },
+    {
+      "name": "progress_recent",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX progress_recent ON reading_progress (last_read_at DESC)"
+        }
+      ]
+    },
+    {
+      "name": "prefetch_choices",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"prefetch_choices\" (\"source_id\" TEXT NOT NULL, \"novel_id\" TEXT NOT NULL, \"chapter_id\" TEXT NOT NULL, \"target_id\" TEXT NOT NULL, PRIMARY KEY(source_id, novel_id, chapter_id));"
+        }
+      ]
+    },
+    {
+      "name": "prefetch_settings",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"prefetch_settings\" (\"id\" INTEGER NOT NULL PRIMARY KEY CHECK (id = 1), \"current_enabled\" INTEGER NOT NULL, \"next_enabled\" INTEGER NOT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "local_books",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"local_books\" (\"digest\" TEXT NOT NULL PRIMARY KEY CHECK (length(digest) = 64), \"format\" TEXT NOT NULL CHECK (format IN ('txt', 'epub')), \"title\" TEXT NOT NULL, \"imported_at\" INTEGER NOT NULL, \"manifest_hash\" TEXT NOT NULL CHECK (length(manifest_hash) = 64), \"active_bundle\" TEXT, \"parser_version\" INTEGER NOT NULL DEFAULT 1, \"maintenance\" INTEGER NOT NULL DEFAULT 0 CHECK (maintenance IN (0, 1)));"
+        }
+      ]
+    },
+    {
+      "name": "local_chapter_revisions",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"local_chapter_revisions\" (\"digest\" TEXT NOT NULL, \"chapter_id\" TEXT NOT NULL, \"content_revision\" TEXT NOT NULL, \"catalog_revision\" TEXT NOT NULL, PRIMARY KEY(digest, chapter_id));"
+        }
+      ]
+    },
+    {
+      "name": "progress_catalogs",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"progress_catalogs\" (\"source_id\" TEXT NOT NULL, \"novel_id\" TEXT NOT NULL, \"catalog_json\" TEXT NOT NULL, \"fetched_at\" INTEGER NOT NULL, \"origin\" TEXT NOT NULL CHECK (origin IN ('memory', 'local', 'remote')), PRIMARY KEY(source_id, novel_id));"
+        }
+      ]
+    }
+  ]
+}
