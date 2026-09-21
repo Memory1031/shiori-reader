@@ -244,7 +244,7 @@ class _BookshelfViewState extends State<BookshelfView> {
             onLongPress: () => _actions(book),
             cover: cover,
             title: book.title,
-            provenance: provenance(),
+            sourceLabel: _sourceBadgeLabel(book.key, format),
           );
         }
 
@@ -329,8 +329,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                                 columns) *
                             1.5 +
                         10 +
-                        48 * scale +
-                        24 * scale,
+                        48 * scale,
                   ),
                   itemCount: books.length,
                   itemBuilder: (_, i) => item(i),
@@ -348,6 +347,15 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 }
 
+String? _sourceBadgeLabel(NovelKey key, LocalBookFormat? format) {
+  if (key.sourceId != LocalBookIdentity.sourceId) return 'online';
+  return switch (format) {
+    LocalBookFormat.epub => 'epub',
+    LocalBookFormat.txt => 'txt',
+    null => null,
+  };
+}
+
 class _ShelfGridCard extends StatefulWidget {
   const _ShelfGridCard({
     super.key,
@@ -355,12 +363,12 @@ class _ShelfGridCard extends StatefulWidget {
     required this.title,
     required this.onTap,
     required this.onLongPress,
-    this.provenance,
+    this.sourceLabel,
   });
 
   final Widget cover;
   final String title;
-  final Widget? provenance;
+  final String? sourceLabel;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -419,7 +427,38 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
                   width: 2,
                 ),
               ),
-              child: widget.cover,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  widget.cover,
+                  if (widget.sourceLabel != null)
+                    Positioned(
+                      left: 6,
+                      bottom: 6,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: .42),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          child: Text(
+                            widget.sourceLabel!,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: Colors.white.withValues(alpha: .90),
+                              fontSize: 10,
+                              height: 1.05,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -435,10 +474,6 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (widget.provenance != null) ...[
-            const SizedBox(height: 4),
-            widget.provenance!,
-          ],
         ],
       ),
     );

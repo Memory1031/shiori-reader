@@ -9,6 +9,7 @@ import 'package:shiori/features/bookshelf/library_controller.dart';
 import 'package:shiori/features/home/reading_home.dart';
 import 'package:shiori/features/history/history_screen.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
+import 'package:shiori/shared/widgets/book_cover.dart';
 
 Future<void> seed(
   FixtureLibraryRepository repo,
@@ -48,7 +49,7 @@ Future<void> seed(
 
 void main() {
   testWidgets(
-    'grid/list consume a single weak metadata line; no progress overlay or bar',
+    'grid has only cover source and title; list retains progress metadata',
     (tester) async {
       final repo = FixtureLibraryRepository();
       final controller = LibraryController(repo)..onStart();
@@ -102,10 +103,34 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      final labels = ['epub', 'txt', 'online'];
+      for (var i = 0; i < books.length; i++) {
+        final card = find.byKey(ValueKey(books[i].key));
+        final texts = find.descendant(of: card, matching: find.byType(Text));
+        expect(tester.widgetList<Text>(texts).map((text) => text.data), [
+          labels[i],
+          books[i].title,
+        ]);
+        final cover = tester.getRect(
+          find.descendant(of: card, matching: find.byType(BookCover)),
+        );
+        final badge = tester.getRect(find.text(labels[i]));
+        expect(cover.height / cover.width, closeTo(1.5, .001));
+        expect(badge.left - cover.left, closeTo(10, .001));
+        expect(cover.bottom - badge.bottom, closeTo(8, .001));
+        final title = tester.widget<Text>(find.text(books[i].title));
+        expect(title.maxLines, 2);
+        expect(title.overflow, TextOverflow.ellipsis);
+      }
+      expect(find.textContaining('63%'), findsNothing);
+      expect(find.textContaining('已读完'), findsNothing);
+      expect(find.textContaining('已读至最新'), findsNothing);
       for (var i = 0; i < 2; i++) {
-        expect(find.text('EPUB · 63%'), findsOneWidget);
-        expect(find.text('TXT · 已读完'), findsOneWidget);
-        expect(find.text('在线 · 已读至最新'), findsOneWidget);
+        if (i == 1) {
+          expect(find.text('EPUB · 63%'), findsOneWidget);
+          expect(find.text('TXT · 已读完'), findsOneWidget);
+          expect(find.text('在线 · 已读至最新'), findsOneWidget);
+        }
         expect(find.byType(LinearProgressIndicator), findsNothing);
         expect(find.byType(Chip), findsNothing);
         expect(find.textContaining('76 / 120'), findsNothing);

@@ -197,12 +197,12 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      const label = 'EPUB';
-      expect(find.text(label), findsOneWidget);
+      expect(find.text('epub'), findsOneWidget);
+      expect(find.text('online'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.tap(find.byTooltip(language == 'zh' ? '列表' : 'List'));
       await tester.pumpAndSettle();
-      expect(find.text(label), findsOneWidget);
+      expect(find.text('EPUB'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(() async {
