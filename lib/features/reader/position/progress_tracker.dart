@@ -21,7 +21,7 @@ class ProgressTracker {
   final LibraryRepository library;
   final ChapterContent content;
   final NovelSummary snapshot;
-  final int ordinal;
+  int ordinal;
   String catalogRevision;
   BookProgressMetrics? metrics;
   final ReadingProgress? previous;
@@ -68,7 +68,9 @@ class ProgressTracker {
   }
 
   void restoring(bool value) {
+    final wasRestoring = _restoring;
     _restoring = value;
+    if (!value && wasRestoring && _latest != _saved) _scheduleWrite();
     if (value) {
       _periodic?.cancel();
       _periodic = null;
@@ -129,7 +131,7 @@ class ProgressTracker {
       _latest = ReadingProgress(
         snapshot: snapshot,
         chapterKey: content.key,
-        chapterOrdinalSnapshot: metrics?.ordinal(content.key) ?? ordinal,
+        chapterOrdinalSnapshot: ordinal,
         catalogRevision: catalogRevision,
         position: normalized,
         completed: completed,
@@ -137,6 +139,11 @@ class ProgressTracker {
         lastReadAt: now(),
       );
     }
+    _scheduleWrite();
+  }
+
+  void _scheduleWrite() {
+    if (_closed || _restoring || _obsolete || _latest == null) return;
     _periodic ??= Timer.periodic(const Duration(seconds: 2), (_) {
       unawaited(flush());
     });
@@ -149,15 +156,33 @@ class ProgressTracker {
   }
 
   /// Metadata updates never move the semantic reading anchor.
-  void updateMetrics(BookProgressMetrics value) {
+  void updateMetrics(BookProgressMetrics value, {int? catalogOrdinal}) {
     if (value.revision == metrics?.revision) return;
     metrics = value;
+    if (catalogOrdinal != null && catalogOrdinal >= 0) ordinal = catalogOrdinal;
     if (catalogRevision != value.revision) {
       _terminal = BookTerminalState.reading;
     }
     catalogRevision = value.revision;
     final latest = _latest;
-    if (latest != null) sample(latest.position, completed: latest.completed);
+    if (latest != null) {
+      _latest = latest.withBookProgress(
+        metrics?.at(
+          content.key,
+          latest.position.chapterFraction,
+          terminal: _terminal,
+        ),
+        ordinal: ordinal,
+        revision: catalogRevision,
+      );
+      _scheduleWrite();
+    }
+  }
+
+  /// Explicit navigation is a new reading intent, even within a one-page chapter.
+  void leaveBookEnd() {
+    _terminal = BookTerminalState.reading;
+    _sampled = true;
   }
 
   void enterBookEnd(BookTerminalState state) {

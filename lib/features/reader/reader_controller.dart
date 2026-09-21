@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../domain/catalog_observation.dart';
 import 'position/progress_tracker.dart';
 import 'position/position_resolver.dart';
 
@@ -49,15 +50,24 @@ class ReaderController extends ScopedController {
   NovelStatus novelStatus = NovelStatus.unknown;
   ReadingProgress? _savedProgress;
   BookTerminalState? _pendingTerminal;
-  int _catalogEpoch = 0;
+  LoadResult<Catalog>? _catalogObservation;
   BookProgressSnapshot? bookProgressAt(double chapterFraction) =>
       bookMetrics?.at(chapter, chapterFraction);
-  void updateCatalog(Catalog catalog) {
-    if (chapter.novelKey.sourceId == LocalBookIdentity.sourceId) return;
-    _catalogEpoch++;
-    bookMetrics = BookProgressMetrics.online(catalog);
-    progress?.updateMetrics(bookMetrics!);
+  void updateCatalog(LoadResult<Catalog> observation) {
+    if (chapter.novelKey.sourceId == LocalBookIdentity.sourceId ||
+        observation.value.novelKey != chapter.novelKey ||
+        !acceptsCatalogObservation(observation, _catalogObservation)) {
+      return;
+    }
+    _catalogObservation = observation;
+    bookMetrics = BookProgressMetrics.online(observation.value);
+    progress?.updateMetrics(bookMetrics!, catalogOrdinal: _catalogOrdinal);
   }
+
+  int? get _catalogOrdinal => _catalogObservation?.value.flatChapters
+      .where((entry) => entry.key == chapter)
+      .firstOrNull
+      ?.ordinal;
 
   void enterBookEnd(BookTerminalState state) {
     _pendingTerminal = state;
@@ -84,15 +94,30 @@ class ReaderController extends ScopedController {
     progress?.restoring(true);
   }
 
-  void sampleProgress(ReaderPosition position, bool completed) {
+  bool hasPendingNavigation = false;
+  void beginPositionNavigation() {
+    hasPendingNavigation = true;
+    _savedProgress = null;
+    _pendingTerminal = null;
+    progress?.leaveBookEnd();
+  }
+
+  /// Layout completion must be acknowledged even when its hidden position is ignored.
+  void finishRestoringProgress() {
     if (isClosed) return;
     if (restoreStatus != ReaderRestoreStatus.readFailed) {
       restoreStatus = ReaderRestoreStatus.ready;
     }
     _restoring = false;
+    progress?.restoring(false);
+  }
+
+  void sampleProgress(ReaderPosition position, bool completed) {
+    if (isClosed) return;
+    finishRestoringProgress();
+    hasPendingNavigation = false;
     _sample = (position, completed);
     onPosition?.call(position.blockIndex);
-    progress?.restoring(false);
     progress?.sample(position, completed: completed);
   }
 
@@ -128,7 +153,6 @@ class ReaderController extends ScopedController {
     }
     _openingProgress = true;
     final request = _request!;
-    final catalogEpoch = _catalogEpoch;
     final results = await Future.wait([
       repository.loadDetail(
         chapter.novelKey,
@@ -162,8 +186,8 @@ class ReaderController extends ScopedController {
             bookMetrics = value;
           }
         }
-      } else if (catalogEpoch == _catalogEpoch) {
-        bookMetrics = BookProgressMetrics.online(catalog.value.value);
+      } else {
+        updateCatalog(catalog.value);
       }
     }
     if (detail is Success<LoadResult<NovelDetail>> &&
@@ -178,11 +202,13 @@ class ReaderController extends ScopedController {
           library: library!,
           content: content!,
           snapshot: detail.value.value.summary,
-          ordinal: chapters.first.ordinal,
+          ordinal: _catalogOrdinal ?? chapters.first.ordinal,
           catalogRevision:
               bookMetrics?.revision ?? catalog.value.value.revision,
           metrics: bookMetrics,
-          previous: startAtBeginning ? null : _savedProgress,
+          previous: startAtBeginning || initialBlockKey != null
+              ? null
+              : _savedProgress,
           onStatus: () {
             if (!isClosed) update();
           },
@@ -209,10 +235,10 @@ class ReaderController extends ScopedController {
         library: library!,
         content: content!,
         snapshot: previous.snapshot,
-        ordinal: previous.chapterOrdinalSnapshot,
+        ordinal: _catalogOrdinal ?? previous.chapterOrdinalSnapshot,
         catalogRevision: bookMetrics?.revision ?? previous.catalogRevision,
         metrics: bookMetrics,
-        previous: startAtBeginning ? null : previous,
+        previous: startAtBeginning || initialBlockKey != null ? null : previous,
         onStatus: () {
           if (!isClosed) update();
         },
@@ -245,7 +271,7 @@ class ReaderController extends ScopedController {
     if (library != null) {
       listenTo(repository.catalogUpdates(chapter.novelKey), (result) {
         if (result case Success<LoadResult<Catalog>>(:final value)) {
-          updateCatalog(value.value);
+          updateCatalog(value);
           update();
         }
       });

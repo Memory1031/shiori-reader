@@ -17,12 +17,12 @@ class LocalReadingRepository
     required this.online,
     this.onOnlineCatalog,
   });
-  final Future<void> Function(Catalog)? onOnlineCatalog;
+  final Future<void> Function(LoadResult<Catalog>)? onOnlineCatalog;
   Future<Result<LoadResult<Catalog>>> _observeCatalog(
     Result<LoadResult<Catalog>> result,
   ) async {
     if (result case Success<LoadResult<Catalog>>(:final value)) {
-      await onOnlineCatalog?.call(value.value);
+      await onOnlineCatalog?.call(value);
     }
     return result;
   }

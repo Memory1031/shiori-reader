@@ -230,7 +230,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
   Timer? _positionLabelTimer;
   bool _announcedReady = false;
   void _sample(ReaderPosition position, bool completed) {
-    if (widget.completion != null || _completionTurning) return;
+    widget.session?.finishRestoringProgress();
+    if ((widget.completion != null || _completionTurning) &&
+        widget.session?.hasPendingNavigation != true) {
+      return;
+    }
     if (!_announcedReady) {
       _announcedReady = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -564,21 +568,26 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                                 widget.onPreviousChapter,
                                             onNext: _presentationNext,
                                             onReady: () {
-                                              final position = ReaderPosition(
-                                                contentRevision: widget
-                                                    .content
-                                                    .contentRevision,
-                                                blockKey: widget
-                                                    .content
-                                                    .blocks
-                                                    .first
-                                                    .blockKey,
-                                                blockIndex: 0,
-                                                blockFraction: 0,
-                                                chapterFraction: 0,
-                                              );
+                                              final position =
+                                                  _position ??
+                                                  ReaderPosition(
+                                                    contentRevision: widget
+                                                        .content
+                                                        .contentRevision,
+                                                    blockKey: widget
+                                                        .content
+                                                        .blocks
+                                                        .first
+                                                        .blockKey,
+                                                    blockIndex: 0,
+                                                    blockFraction: 0,
+                                                    chapterFraction: 0,
+                                                  );
                                               _position = position;
-                                              _sample(position, false);
+                                              _sample(
+                                                position,
+                                                position.chapterFraction == 1,
+                                              );
                                             },
                                           ),
                                         );

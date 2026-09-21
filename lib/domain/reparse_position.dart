@@ -31,6 +31,13 @@ ReparsedPosition migrateLocalPosition(
       next.chapters.isEmpty) {
     throw ArgumentError('Mismatched migration');
   }
+  final nextByKey = {for (final chapter in next.chapters) chapter.key: chapter};
+  final catalogOrder = next.catalog.flatChapters.toList();
+  final fallbackChapters = catalogOrder
+      .map((entry) => nextByKey[entry.key])
+      .whereType<ChapterContent>()
+      .toList();
+  if (fallbackChapters.isEmpty) throw ArgumentError('Missing main chapters');
   final before = old.chapters
       .where((c) => c.key == saved.chapterKey)
       .firstOrNull;
@@ -59,7 +66,9 @@ ReparsedPosition migrateLocalPosition(
       ReadingProgress(
         snapshot: next.detail.summary,
         chapterKey: c.key,
-        chapterOrdinalSnapshot: next.chapters.indexOf(c),
+        chapterOrdinalSnapshot: catalogOrder.indexWhere(
+          (entry) => entry.key == c.key,
+        ),
         catalogRevision: next.catalog.revision,
         position: position,
         completed: !approximate && saved.completed,
@@ -183,9 +192,9 @@ ReparsedPosition migrateLocalPosition(
   }
   final target =
       same ??
-      next.chapters[saved.chapterOrdinalSnapshot.clamp(
+      fallbackChapters[saved.chapterOrdinalSnapshot.clamp(
         0,
-        next.chapters.length - 1,
+        fallbackChapters.length - 1,
       )];
   final point = same == null ? 0.0 : pos.chapterFraction * target.blocks.length;
   final index = point.floor().clamp(0, target.blocks.length - 1);

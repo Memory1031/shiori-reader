@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../domain/catalog_observation.dart';
 import 'package:drift/drift.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -14,6 +15,7 @@ class LocalLibraryRepository implements LibraryRepository {
   final UserDatabase db;
   final DateTime Function() now;
   final _catalogs = <NovelKey, BookProgressMetrics>{};
+  final _catalogObservations = <NovelKey, LoadResult<Catalog>>{};
   ReadingProgress _reconcile(
     ReadingProgress progress,
     BookProgressMetrics metrics,
@@ -31,14 +33,22 @@ class LocalLibraryRepository implements LibraryRepository {
 
   /// A catalog already loaded by a reader/detail refresh updates only metadata,
   /// inside the same DB transaction as progress writes. It never opens a session.
-  Future<Result<void>> reconcileCatalog(Catalog catalog) {
-    final metrics = BookProgressMetrics.online(catalog);
-    _catalogs[catalog.novelKey] = metrics;
+  Future<Result<void>> reconcileCatalog(LoadResult<Catalog> observation) {
+    final catalog = observation.value;
     return localWrite(
       db,
       Operation.progressWrite,
       CancellationSource().token,
       () async {
+        if (!acceptsCatalogObservation(
+          observation,
+          _catalogObservations[catalog.novelKey],
+        )) {
+          return;
+        }
+        final metrics = BookProgressMetrics.online(catalog);
+        _catalogObservations[catalog.novelKey] = observation;
+        _catalogs[catalog.novelKey] = metrics;
         final row = await db
             .customSelect(
               'SELECT * FROM reading_progress WHERE $_where',

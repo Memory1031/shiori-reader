@@ -446,12 +446,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       return;
     }
     if (target == _reader.chapter) {
-      setState(() => _completion = null);
       final content = _reader.content!;
       final index = blockKey == null
           ? 0
           : content.blocks.indexWhere((b) => b.blockKey == blockKey);
       if (index < 0) return;
+      _reader.beginPositionNavigation();
+      setState(() => _completion = null);
       final fraction = readerTargetFraction(content.blocks[index], blockOffset);
       _viewports[_reader]?.restore(
         ReaderPosition(

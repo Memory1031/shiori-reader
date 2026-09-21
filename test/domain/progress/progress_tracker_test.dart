@@ -69,6 +69,71 @@ ProgressTracker tracker(
   now: now,
 );
 void main() {
+  test('catalog ordinal is independent of local reading order', () async {
+    final library = Library();
+    final c = content();
+    final t = ProgressTracker(
+      library: library,
+      content: c,
+      snapshot: book,
+      ordinal: 0,
+      catalogRevision: 'catalog',
+      metrics: BookProgressMetrics(
+        revision: 'catalog',
+        order: [content('two').key, c.key],
+        weights: [1, 1],
+      ),
+    );
+    t.sample(position(c, .5), completed: false);
+    await t.flush();
+    expect(library.writes.last.$1.bookProgress!.fraction, .75);
+    expect(library.writes.last.$1.chapterOrdinalSnapshot, 0);
+    await t.close();
+  });
+  for (final restoring in [false, true]) {
+    test('metadata refresh preserves reading time (restoring=$restoring)', () {
+      fakeAsync((clock) {
+        final library = Library();
+        final c = content();
+        final t = ProgressTracker(
+          library: library,
+          content: c,
+          snapshot: book,
+          ordinal: 0,
+          catalogRevision: 'old',
+          now: () => DateTime.utc(2026).add(clock.elapsed),
+          metrics: BookProgressMetrics(
+            revision: 'old',
+            order: [c.key],
+            weights: [1],
+          ),
+        );
+        t.sample(position(c, .5), completed: false);
+        t.flush();
+        clock.flushMicrotasks();
+        final before = library.writes.last.$1;
+        clock.elapse(const Duration(hours: 1));
+        t.restoring(restoring);
+        t.updateMetrics(
+          BookProgressMetrics(
+            revision: 'new',
+            order: [c.key, content('two').key],
+            weights: [1, 1],
+          ),
+        );
+        t.restoring(false);
+        t.flush();
+        clock.flushMicrotasks();
+        final after = library.writes.last.$1;
+        expect(after.bookProgress!.fraction, .25);
+        expect(after.catalogRevision, 'new');
+        expect(after.position, before.position);
+        expect(after.lastReadAt, before.lastReadAt);
+        t.close();
+        clock.flushMicrotasks();
+      });
+    });
+  }
   test('terminal EOF survives final-page sampling and catalog growth', () {
     fakeAsync((clock) {
       final library = Library();

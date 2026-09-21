@@ -81,6 +81,37 @@ void main() {
     expect(r.progress!.position.pixelOffset, isNull);
     expect(r.progress!.lastReadAt, DateTime.utc(2025));
   });
+  test('reparse records and falls back through catalog ordinals', () {
+    final ordered = book([
+      [p('aaa')],
+      [p('bbb')],
+      [p('ccc')],
+    ]);
+    final reordered = LocalBookContent(
+      detail: ordered.detail,
+      catalog: ordered.catalog,
+      chapters: [ordered.chapters[1], ordered.chapters[0], ordered.chapters[2]],
+      readingOrder: [
+        ordered.chapters[1].key,
+        ordered.chapters[0].key,
+        ordered.chapters[2].key,
+      ],
+    );
+    final exact = migrateLocalPosition(ordered, reordered, progress(ordered));
+    expect(exact.progress!.chapterOrdinalSnapshot, 0);
+    expect(exact.progress!.bookProgress!.fraction, .5);
+    final lost = book(
+      [
+        [p('lost')],
+      ],
+      ids: ['removed'],
+    );
+    final fallback = migrateLocalPosition(lost, reordered, progress(lost));
+    expect(fallback.approximate, isTrue);
+    expect(fallback.progress!.chapterKey, ordered.chapters[0].key);
+    expect(fallback.progress!.chapterOrdinalSnapshot, 0);
+    expect(fallback.progress!.position.chapterFraction, 0);
+  });
   test('indent changes retain unique semantic position', () {
     final a = book([
           [p('abc')],

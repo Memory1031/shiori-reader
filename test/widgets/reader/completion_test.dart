@@ -7,6 +7,7 @@ import 'package:shiori/app/app.dart';
 import 'package:shiori/app/routes.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
+import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
@@ -66,7 +67,7 @@ class CompletionRepository
     LoadResult(
       value: v,
       origin: LoadOrigin.local,
-      fetchedAt: DateTime.utc(2026),
+      fetchedAt: DateTime.utc(2026, 1, count),
     ),
   );
   @override
@@ -132,7 +133,18 @@ class CompletionRepository
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _WeightedRepository extends CompletionRepository {
+class _WeightedRepository extends CompletionRepository
+    implements LocalNavigationRepository {
+  @override
+  Future<Result<List<LocalNavigationEntry>>> loadNavigation(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  }) async => Success([
+    LocalNavigationEntry(
+      title: 'Start of final chapter',
+      chapterKey: order.last,
+    ),
+  ]);
   _WeightedRepository() : super(local: true);
   @override
   ChapterContent content(ChapterKey key) => ChapterContent(
@@ -170,6 +182,100 @@ class _DelayedDetailRepository extends CompletionRepository {
 }
 
 void main() {
+  for (final resize in [false, true]) {
+    testWidgets(
+      'completion catalog seek survives animation and close/reopen (resize=$resize)',
+      (tester) async {
+        final repo = _WeightedRepository();
+        final library = FixtureLibraryRepository();
+        final settings = FixtureSettingsStore();
+        await settings.save(
+          ReaderSettings(controlsHintSeen: true),
+          cancellation: CancellationSource().token,
+        );
+        Widget open() => ShioriApp(
+          locale: const Locale('en'),
+          routes: AppRoutes(
+            home: (_) => BookReaderScreen(
+              chapter: repo.order.last,
+              repository: repo,
+              library: library,
+              settings: settings,
+            ),
+          ),
+        );
+        final c = repo.content(repo.order.last);
+        final token = CancellationSource().token;
+        final generation =
+            (await library.beginProgressSession(repo.key, cancellation: token)
+                    as Success<int>)
+                .value;
+        await library.saveProgress(
+          ReadingProgress(
+            snapshot: NovelSummary(key: repo.key, title: 'Book'),
+            chapterKey: c.key,
+            chapterOrdinalSnapshot: 1,
+            catalogRevision: repo.catalog.revision,
+            position: ReaderPosition(
+              contentRevision: c.contentRevision,
+              blockKey: c.blocks.last.blockKey,
+              blockIndex: c.blocks.length - 1,
+              blockFraction: 1,
+              chapterFraction: 1,
+            ),
+            completed: true,
+            lastReadAt: DateTime.utc(2026),
+          ),
+          stamp: ProgressWriteStamp(generation: generation, sequence: 0),
+          cancellation: token,
+        );
+        await tester.pumpWidget(open());
+        await tester.pumpAndSettle();
+        ReaderContentView view() =>
+            tester.widget<ReaderContentView>(find.byType(ReaderContentView));
+        await view().viewportController!.next();
+        await tester.pumpAndSettle();
+        expect(find.byType(ReaderCompletionPage), findsOneWidget);
+        // Hidden layout may restore while the completion page is visible.
+        if (resize) {
+          tester.view.physicalSize =
+              const Size(700, 900) * tester.view.devicePixelRatio;
+          addTearDown(tester.view.resetPhysicalSize);
+          await tester.pumpAndSettle();
+          expect(view().session!.restoreStatus, ReaderRestoreStatus.ready);
+          expect(
+            view().session!.progress!.bookProgress!.terminal,
+            BookTerminalState.finished,
+          );
+        }
+        await tester.tap(find.text('View contents'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Start of final chapter'));
+        await tester.pumpAndSettle();
+        expect(view().viewportController!.capture()!.chapterFraction, 0);
+        expect(view().session!.restoreStatus, ReaderRestoreStatus.ready);
+        await view().session!.flushProgress();
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+        final saved =
+            (await library.getProgress(
+                      repo.key,
+                      cancellation: CancellationSource().token,
+                    )
+                    as Success<ReadingProgress?>)
+                .value!;
+        expect(saved.position.chapterFraction, 0);
+        expect(saved.bookProgress!.terminal, BookTerminalState.reading);
+        await tester.pumpWidget(open());
+        await tester.pumpAndSettle();
+        expect(view().viewportController!.capture()!.chapterFraction, 0);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+        await repo.updates.close();
+        await library.close();
+      },
+    );
+  }
   testWidgets('new catalog wins over an earlier metadata load', (tester) async {
     final repo = _DelayedDetailRepository();
     final library = FixtureLibraryRepository();
@@ -199,6 +305,44 @@ void main() {
     await reader.flushProgress();
     expect(reader.progress!.bookProgress!.fraction, 2 / 3);
     expect(reader.progress!.catalogRevision, repo.catalog.revision);
+    final acceptedRevision = repo.catalog.revision;
+    Future<ReadingProgress> saved() async =>
+        (await library.getProgress(
+                  repo.key,
+                  cancellation: CancellationSource().token,
+                )
+                as Success<ReadingProgress?>)
+            .value!;
+    final before = await saved();
+    repo.count = 2;
+    repo.updates.add(
+      Success(
+        LoadResult(
+          value: repo.catalog,
+          origin: LoadOrigin.local,
+          fetchedAt: DateTime.utc(2026, 1, 2),
+          isStale: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(reader.bookMetrics!.order.length, 3);
+    expect(reader.progress!.catalogRevision, acceptedRevision);
+    repo.updates.add(
+      Success(
+        LoadResult(
+          value: repo.catalog,
+          origin: LoadOrigin.remote,
+          fetchedAt: DateTime.utc(2026, 1, 4),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await reader.flushProgress();
+    expect(reader.bookMetrics!.order.length, 2);
+    expect(reader.progress!.bookProgress!.fraction, 1);
+    expect((await saved()).lastReadAt, before.lastReadAt);
+
     reader.onDelete();
     await tester.pump();
     await repo.updates.close();

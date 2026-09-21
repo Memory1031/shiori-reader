@@ -223,6 +223,41 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
       expect(platform.heads.single.disposed, isTrue);
+      // A new route/platform view restores EOF rather than treating ready as restart.
+      await tester.pumpWidget(
+        EpubWebViewHost(
+          userDataDirectory: temp,
+          operatingSystem: 'android',
+          child: ShioriApp(
+            locale: const Locale('en'),
+            routes: AppRoutes(
+              home: (_) => BookReaderScreen(
+                chapter: repo.order.last,
+                repository: repo,
+                library: library,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      platform.heads.last.finish();
+      await tester.pumpAndSettle();
+      final reopened = tester.widget<ReaderContentView>(
+        find.byType(ReaderContentView),
+      );
+      await reopened.session!.flushProgress();
+      final restored =
+          (await library.getProgress(
+                    repo.key,
+                    cancellation: CancellationSource().token,
+                  )
+                  as Success<ReadingProgress?>)
+              .value!;
+      expect(restored.position.chapterFraction, 1);
+      expect(restored.bookProgress!.terminal, BookTerminalState.finished);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
       await repo.updates.close();
       await library.close();
     },

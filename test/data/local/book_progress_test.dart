@@ -4,8 +4,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/local/database/user_database.dart'
     show UserDatabase;
 import 'package:shiori/data/repositories/library_repository.dart';
+import 'package:shiori/data/repositories/local_reading_repository.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
+
+class _UnusedLocalStore implements LocalBookStore {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected local access');
+}
+
+class _CatalogOnline implements NovelRepository {
+  late LoadResult<Catalog> observation;
+  @override
+  Future<Result<LoadResult<Catalog>>> loadCatalog(
+    NovelKey key, {
+    required ReadMode mode,
+    required CancellationToken cancellation,
+  }) async => Success(observation);
+  @override
+  Stream<Result<LoadResult<Catalog>>> catalogUpdates(NovelKey key) =>
+      Stream.value(Success(observation));
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   test(
@@ -75,7 +97,47 @@ void main() {
                   as Success<ReadingProgress?>)
               .value!;
       expect(restored, progress);
-      await repo.reconcileCatalog(catalog(3));
+      LoadResult<Catalog> observation(
+        int count,
+        int day, {
+        LoadOrigin origin = LoadOrigin.remote,
+        bool stale = false,
+      }) => LoadResult(
+        value: catalog(count),
+        origin: origin,
+        fetchedAt: DateTime.utc(2026, 1, day),
+        isStale: stale,
+      );
+      final online = _CatalogOnline()..observation = observation(3, 3);
+      final observed = <LoadResult<Catalog>>[];
+      final reading = LocalReadingRepository(
+        local: _UnusedLocalStore(),
+        online: online,
+        onOnlineCatalog: (value) async {
+          observed.add(value);
+          await repo.reconcileCatalog(value);
+        },
+      );
+      await reading.loadCatalog(
+        key,
+        mode: ReadMode.refresh,
+        cancellation: token,
+      );
+      expect(observed.last, same(online.observation));
+      // Remote B was accepted, but its cache write failed. A is still readable.
+      online.observation = LoadResult(
+        value: catalog(2),
+        origin: LoadOrigin.local,
+        fetchedAt: DateTime.utc(2026, 1, 1),
+        isStale: true,
+        refreshFailure: AppFailure(
+          kind: FailureKind.network,
+          operation: Operation.catalog,
+        ),
+      );
+      await reading.catalogUpdates(key).single;
+      expect(observed.last, same(online.observation));
+      expect(observed.last.refreshFailure, isNotNull);
       var updated =
           (await repo.getProgress(key, cancellation: token)
                   as Success<ReadingProgress?>)
@@ -95,6 +157,17 @@ void main() {
                   as Success<ReadingProgress?>)
               .value!;
       expect(updated.bookProgress!.fraction, 2 / 3);
+      expect(updated.bookProgress!.terminal, BookTerminalState.reading);
+      // A genuinely newer deletion must still be accepted (not max chapter count).
+      await repo.reconcileCatalog(observation(2, 4));
+      updated =
+          (await repo.getProgress(key, cancellation: token)
+                  as Success<ReadingProgress?>)
+              .value!;
+      expect(updated.bookProgress!.fraction, 1);
+      expect(updated.bookProgress!.chapterCount, 2);
+      expect(updated.bookProgress!.terminal, BookTerminalState.reading);
+      expect(updated.lastReadAt, progress.lastReadAt);
       await db.customStatement(
         "UPDATE reading_progress SET book_progress='{\"fraction\":2,\"chapterCount\":3,\"terminal\":\"reading\"}'",
       );
