@@ -29,6 +29,15 @@ def main():
             }
 
         add("valid", lambda value: None)
+        for number in range(2, 11):
+
+            def history(value, number=number):
+                tag = f"v1.2.1-beta.{number}"
+                value.update(tag=tag, build=10 + number)
+                for asset in value["assets"]:
+                    asset["name"] = asset["name"].replace("1.2.1-beta.1", tag[1:])
+
+            add(f"beta{number}", history)
         add("wrongSchema", lambda value: value.update(schemaVersion=2))
         add("wrongChannel", lambda value: value.update(channel="stable"))
         add("wrongApp", lambda value: value.update(applicationId="other.app"))

@@ -1877,8 +1877,14 @@ abstract class AppLocalizations {
   /// No description provided for @updateVerificationError.
   ///
   /// In en, this message translates to:
-  /// **'Update verification failed. Check again or download a fresh copy.'**
+  /// **'Update verification failed. Check for updates again.'**
   String get updateVerificationError;
+
+  /// No description provided for @updatePackageInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The downloaded package is no longer valid. Download it again.'**
+  String get updatePackageInvalid;
 
   /// No description provided for @updateStorageError.
   ///

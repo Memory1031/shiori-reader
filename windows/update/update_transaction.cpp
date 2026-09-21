@@ -137,8 +137,17 @@ PreparedUpdate ValidateLayout(const PreparedUpdate& input) {
           "Missing installation or workspace");
   Require(GetDriveTypeW(task.install.root_path().c_str()) == DRIVE_FIXED,
           "Only local fixed volumes are supported");
-  Index(task.current);
-  Index(task.next);
+  auto all = Index(task.current);
+  const auto next = Index(task.next);
+  all.insert(next.begin(), next.end());
+  // Rollback restores files, not directory role changes. Reject both directions
+  // before locks, backups, or mutations to the installation.
+  for (const auto& [name, file] : all) {
+    (void)file;
+    for (auto parent = fs::path(name).parent_path(); !parent.empty(); parent = parent.parent_path()) {
+      Require(!all.count(Fold(parent)), "Cross-version file/directory collision");
+    }
+  }
   return task;
 }
 

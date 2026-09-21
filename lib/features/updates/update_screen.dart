@@ -146,6 +146,8 @@ class UpdateScreen extends StatelessWidget {
                           UpdateProblem.verification =>
                             l.updateVerificationError,
                           UpdateProblem.storage => l.updateStorageError,
+                          UpdateProblem.packageInvalid =>
+                            l.updatePackageInvalid,
                           UpdateProblem.cancelled => l.updateCancelled,
                           UpdateProblem.installation => l.updateInstallFailed,
                           UpdateProblem.busy => l.updateInstallBusy,

@@ -64,7 +64,14 @@ final class GithubUpdateRepository implements AppUpdateRepository {
       value.signature,
     );
     final package = storage.file('package.bin');
-    await _verifyPackage(package, verified, token);
+    try {
+      await _verifyPackage(package, verified, token);
+    } on UpdateIssue catch (error) {
+      if (error.problem == UpdateProblem.verification) {
+        throw const UpdateIssue(UpdateProblem.packageInvalid);
+      }
+      rethrow;
+    }
     checkUpdateCancellation(token);
     return installer!.install(
       package,
@@ -158,6 +165,7 @@ final class GithubUpdateRepository implements AppUpdateRepository {
     var inspected = 0;
     var complete = false;
     var incompleteRelease = false;
+    scan:
     for (var page = 1; page <= 3; page++) {
       checkUpdateCancellation(token);
       final uri = Uri.https(
@@ -227,7 +235,7 @@ final class GithubUpdateRepository implements AppUpdateRepository {
           incompleteRelease = true;
           continue;
         }
-        if (++inspected > 8) throw const UpdateIssue(UpdateProblem.incomplete);
+        if (++inspected > 8) break scan;
         void assetReady(String name, int limit, {int? exact}) {
           final asset = assets[name];
           if (asset == null || asset['state'] != 'uploaded') {
@@ -278,7 +286,6 @@ final class GithubUpdateRepository implements AppUpdateRepository {
       storage.file('http-cache.json'),
       replacements,
     );
-    if (!complete) throw const UpdateIssue(UpdateProblem.incomplete);
     verified.sort(
       (a, b) => b.candidate.release.build.compareTo(a.candidate.release.build),
     );
@@ -291,7 +298,9 @@ final class GithubUpdateRepository implements AppUpdateRepository {
     }
     checkUpdateCancellation(token);
     if (verified.isEmpty) {
-      if (incompleteRelease) throw const UpdateIssue(UpdateProblem.incomplete);
+      if (!complete || incompleteRelease) {
+        throw const UpdateIssue(UpdateProblem.incomplete);
+      }
       return null;
     }
     _selected = verified.first;

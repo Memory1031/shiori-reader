@@ -30,8 +30,12 @@ final class UpdateFixtures {
       commit: 'a' * 40,
     ),
   );
-  Map<String, dynamic> get release {
-    const tag = 'v1.2.1-beta.1';
+  Map<String, dynamic> get release => releaseFor('valid');
+  Map<String, dynamic> releaseFor(String name) {
+    final manifest =
+        jsonDecode(utf8.decode(bytes('manifest', name: name)))
+            as Map<String, dynamic>;
+    final tag = manifest['tag'] as String;
     Map<String, dynamic> asset(String name, int size) => {
       'name': name,
       'size': size,
@@ -44,7 +48,7 @@ final class UpdateFixtures {
       'prerelease': true,
       'body': 'Notes <b>stay plain text</b>',
       'assets': [
-        asset('update-manifest.json', bytes('manifest').length),
+        asset('update-manifest.json', bytes('manifest', name: name).length),
         asset('update-manifest.sig', 384),
         for (final entry in manifest['assets'] as List<dynamic>)
           asset(entry['name'] as String, entry['size'] as int),
@@ -59,6 +63,8 @@ class FixtureUpdateHttp implements UpdateHttp {
   }
   final UpdateFixtures fixtures;
   late List<dynamic> releases;
+  List<List<dynamic>>? pages;
+  final casesByTag = <String, String>{};
   final reads = <Uri>[];
   final etags = <String?>[];
   bool notModified = false;
@@ -82,7 +88,14 @@ class FixtureUpdateHttp implements UpdateHttp {
       return UpdateReply(
         notModified
             ? Uint8List(0)
-            : Uint8List.fromList(utf8.encode(jsonEncode(releases))),
+            : Uint8List.fromList(
+                utf8.encode(
+                  jsonEncode(
+                    pages?[int.parse(uri.queryParameters['page']!) - 1] ??
+                        releases,
+                  ),
+                ),
+              ),
         {'etag': '"fixture"'},
         notModified: notModified,
       );
@@ -90,7 +103,7 @@ class FixtureUpdateHttp implements UpdateHttp {
     return UpdateReply(
       fixtures.bytes(
         uri.path.endsWith('.sig') ? 'signature' : 'manifest',
-        name: badCase ?? 'valid',
+        name: badCase ?? casesByTag[uri.pathSegments[4]] ?? 'valid',
       ),
       {},
     );

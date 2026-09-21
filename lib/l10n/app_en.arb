@@ -488,7 +488,8 @@
     }
   },
   "updateIncomplete": "Release information is incomplete. Try checking again later.",
-  "updateVerificationError": "Update verification failed. Check again or download a fresh copy.",
+  "updateVerificationError": "Update verification failed. Check for updates again.",
+  "updatePackageInvalid": "The downloaded package is no longer valid. Download it again.",
   "updateStorageError": "Could not access update files. Check free space and folder permissions, then retry.",
   "updateCancelled": "Cancelled",
   "updateNoUpdate": "No newer release is available on this channel.",

@@ -208,6 +208,41 @@ class TransactionTest(unittest.TestCase):
         kernel.CloseHandle(handle)
         self.locks.remove(handle)
 
+    def reject_role_change(self, reverse=False, mixed_case=False):
+        old_name = "data/Layout" if mixed_case else "data/layout"
+        new_name = "DATA/layout" if mixed_case else "data/layout"
+        if reverse:
+            old_name += "/default.json"
+        else:
+            new_name += "/default.json"
+        for root, name, manifest in (
+            (self.install, old_name, self.old),
+            (self.payload, new_name, self.new),
+        ):
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("role change fixture")
+            manifest.append((name, digest(path)))
+        self.write_job()
+        before = self.entries(self.install)
+        process, _ = self.updater()
+        self.finish(process, 10)
+        self.assertEqual(self.entries(self.install), before)
+        self.check_old()
+        self.assertEqual({p.name for p in self.workspace.iterdir()}, {"payload"})
+
+    def test_file_to_directory_rejected_before_mutation(self):
+        self.reject_role_change()
+
+    def test_directory_to_file_rejected_before_mutation(self):
+        self.reject_role_change(reverse=True)
+
+    def test_case_insensitive_file_to_directory_rejected(self):
+        self.reject_role_change(mixed_case=True)
+
+    def test_case_insensitive_directory_to_file_rejected(self):
+        self.reject_role_change(reverse=True, mixed_case=True)
+
     def test_real_exit_replace_and_restart(self):
         ready, stop = self.event(), self.event()
         old = self.spawn(

@@ -31,7 +31,20 @@ void main() {
     expect(() => manifest.assets.last.files.clear(), throwsUnsupportedError);
   });
 
-  for (final name in cases.keys.where((name) => name != 'valid')) {
+  for (var number = 2; number <= 10; number++) {
+    test('verifies signed release history beta.$number', () {
+      final manifest = UpdateManifest.verifyAndRead(
+        bytes('beta$number', 'manifest'),
+        bytes('beta$number', 'signature'),
+        key,
+        expectedTag: 'v1.2.1-beta.$number',
+      );
+      expect(manifest.identity.build, 10 + number);
+    });
+  }
+  for (final name in cases.keys.where(
+    (name) => name != 'valid' && !name.startsWith('beta'),
+  )) {
     test('rejects signed but invalid manifest: $name', () {
       expect(
         () => UpdateManifest.verifyAndRead(

@@ -948,7 +948,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateIncomplete => '发布信息尚不完整，暂时无法确定更新，请稍后重试。';
 
   @override
-  String get updateVerificationError => '更新校验失败，请重新检查或下载。';
+  String get updateVerificationError => '更新校验失败，请重新检查更新。';
+
+  @override
+  String get updatePackageInvalid => '下载包已失效，请重新下载。';
 
   @override
   String get updateStorageError => '无法读写更新文件，请检查可用空间和目录权限后重试。';

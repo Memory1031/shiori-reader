@@ -25,15 +25,15 @@ internal class UpdateInstallProbe(private val instrumentation: Instrumentation) 
             "version" to apk.versionName!!, "build" to UpdateInstaller.versionCode(apk),
             "certificateSha256" to UpdateInstaller.hex(signature))
     }
-    private fun reject(values: Map<String, Any>, file: File = candidate) {
+    private fun reject(values: Map<String, Any>, file: File = candidate, code: String = "verification") {
         try { updater.verify(file, values); fail("Expected verification rejection") }
-        catch (error: UpdateInstaller.Issue) { assertEquals("verification", error.code) }
+        catch (error: UpdateInstaller.Issue) { assertEquals(code, error.code) }
     }
     fun testMetadata() {
         val values = args()
         updater.verify(candidate, values)
-        reject(values + ("sha256" to "0".repeat(64)))
-        reject(values + ("size" to candidate.length() + 1))
+        reject(values + ("sha256" to "0".repeat(64)), code = "packageInvalid")
+        reject(values + ("size" to candidate.length() + 1), code = "packageInvalid")
         reject(values + ("certificateSha256" to "0".repeat(64)))
         reject(values + ("version" to "0.0.0"))
         reject(values + ("build" to 1))
@@ -48,6 +48,42 @@ internal class UpdateInstallProbe(private val instrumentation: Instrumentation) 
     fun testPermissionDenied() {
         assertFalse(updater.permission())
         assertEquals("permissionRequired", updater.install(args()))
+    }
+    fun testPrecommit() {
+        File(app.filesDir, "update-smoke/precommit").delete()
+        val id = updater.stage(args())
+        val info = app.packageManager.packageInstaller.getSessionInfo(id)!!
+        assertFalse(info.isSealed)
+        assertFalse(updater.legacySealed(id))
+        File(app.filesDir, "update-smoke/precommit").writeText(id.toString())
+        // The external harness kills this process; production has no pause hook.
+        java.util.concurrent.CountDownLatch(1).await()
+    }
+    fun testRecover() {
+        val id = File(app.filesDir, "update-smoke/precommit").readText().toInt()
+        val sessions = app.packageManager.packageInstaller
+        val record = app.getSharedPreferences("update-install", 0)
+        assertEquals("installing", record.getString("state", null))
+        assertEquals(id, record.getInt("session", -1))
+        val retained = sessions.getSessionInfo(id) != null
+        instrumentation.sendStatus(0, Bundle().apply {
+            putString("stream", "Uncommitted session retained after process death: $retained\n")
+        })
+        assertEquals("cancelled", updater.status())
+        assertNull(sessions.getSessionInfo(id))
+        assertTrue(candidate.exists())
+        testCancel()
+    }
+    fun testUncommitted() {
+        val id = updater.stage(args())
+        val sessions = app.packageManager.packageInstaller
+        assertNotNull(sessions.getSessionInfo(id))
+        assertFalse(updater.legacySealed(id))
+        // Explicitly exercise a retained session even on systems that abandon
+        // sessions automatically when their owner process dies.
+        assertEquals("cancelled", UpdateInstaller(app).status())
+        assertNull(sessions.getSessionInfo(id))
+        testCancel()
     }
     private fun foreground() {
         // A killed smoke process may leave its system dialog in a separate task.
@@ -106,6 +142,9 @@ internal class UpdateInstallProbe(private val instrumentation: Instrumentation) 
             20000
         )
         SystemClock.sleep(500)
+        assertEquals("installing", updater.status())
+        val id = app.getSharedPreferences("update-install", 0).getInt("session", -1)
+        assertTrue(updater.legacySealed(id))
     }
     fun testCancel() {
         foreground()
@@ -141,6 +180,9 @@ class UpdateInstallSmokeRunner : Instrumentation() {
                 "metadata" -> probe.testMetadata()
                 "wrong-signer" -> probe.testWrongSigner()
                 "permission-denied" -> probe.testPermissionDenied()
+                "precommit" -> probe.testPrecommit()
+                "recover" -> probe.testRecover()
+                "uncommitted" -> probe.testUncommitted()
                 "cancel" -> probe.testCancel()
                 "confirm" -> probe.testConfirm()
                 else -> error("An explicit smoke mode is required")

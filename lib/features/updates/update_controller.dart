@@ -113,6 +113,17 @@ class UpdateController extends ChangeNotifier {
     try {
       await beforeInstall?.call();
       _installedState(await repository.install(target, token));
+    } on UpdateIssue catch (error) {
+      if (error.problem == UpdateProblem.packageInvalid) {
+        phase = UpdatePhase.available;
+        received = 0;
+        _installedState(UpdateInstallState.idle);
+      } else if (error.problem == UpdateProblem.verification) {
+        candidate = null;
+        phase = UpdatePhase.idle;
+        _installedState(UpdateInstallState.idle);
+      }
+      rethrow;
     } finally {
       preparingInstall = false;
     }
@@ -188,7 +199,12 @@ class UpdateController extends ChangeNotifier {
   }
 
   Future<void> setChannel(UpdateChannel channel) => _run((token) async {
-    final saved = _preferences(channel: channel);
+    if (channel == preferences.channel) return;
+    final saved = UpdatePreferences(
+      channel: channel,
+      automatic: preferences.automatic,
+      retryAt: preferences.retryAt,
+    );
     await repository.savePreferences(saved);
     preferences = saved;
     candidate = null;

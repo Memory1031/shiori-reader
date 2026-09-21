@@ -5,6 +5,7 @@ import 'cancellation.dart';
 enum UpdateAvailability { enabled, development, unsupported, invalidIdentity }
 
 enum UpdateProblem {
+  packageInvalid,
   network,
   rateLimited,
   incomplete,

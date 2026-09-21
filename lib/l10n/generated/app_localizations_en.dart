@@ -1015,7 +1015,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateVerificationError =>
-      'Update verification failed. Check again or download a fresh copy.';
+      'Update verification failed. Check for updates again.';
+
+  @override
+  String get updatePackageInvalid =>
+      'The downloaded package is no longer valid. Download it again.';
 
   @override
   String get updateStorageError =>

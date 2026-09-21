@@ -65,7 +65,7 @@ void main() {
           .writeAsBytes(List.filled(target.bytes, 0));
       await expectLater(
         repo.install(target, token()),
-        throwsA(issue(UpdateProblem.verification)),
+        throwsA(issue(UpdateProblem.packageInvalid)),
       );
       expect(installer.calls, 1);
     },
@@ -88,6 +88,40 @@ void main() {
     expect(await storage.file('unrelated').readAsString(), 'keep');
     await upgraded.close();
   });
+  test(
+    'nine signed releases retain the highest verified upgrade within budget',
+    () async {
+      http.releases = [
+        for (var i = 2; i <= 10; i++) fixture.releaseFor('beta$i'),
+      ];
+      for (var i = 2; i <= 10; i++) {
+        http.casesByTag['v1.2.1-beta.$i'] = 'beta$i';
+      }
+      final target = await repo.check(UpdateChannel.beta, token());
+      expect(target?.release.tag, 'v1.2.1-beta.9');
+      expect(http.reads.where((uri) => uri.path.endsWith('.sig')).length, 8);
+      expect(http.reads.length, 17);
+      await repo.download(target!, token(), (_) {});
+    },
+  );
+  test(
+    'three full pages retain an upgrade verified on the first page',
+    () async {
+      http.pages = [
+        [
+          fixture.release,
+          ...List.generate(19, (_) => {'draft': true}),
+        ],
+        List.generate(20, (_) => {'draft': true}),
+        List.generate(20, (_) => {'draft': true}),
+      ];
+      expect(
+        (await repo.check(UpdateChannel.beta, token()))?.release.build,
+        11,
+      );
+      expect(http.reads.where((uri) => uri.host == 'api.github.com').length, 3);
+    },
+  );
   test(
     'an older legacy release cannot hide a verified signed update',
     () async {

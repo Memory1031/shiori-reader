@@ -27,6 +27,7 @@ final class AndroidUpdateInstaller implements UpdateInstaller {
     } on PlatformException catch (error) {
       throw UpdateIssue(switch (error.code) {
         'verification' => UpdateProblem.verification,
+        'packageInvalid' => UpdateProblem.packageInvalid,
         'storage' => UpdateProblem.storage,
         'busy' => UpdateProblem.busy,
         _ => UpdateProblem.installation,

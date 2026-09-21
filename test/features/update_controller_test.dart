@@ -65,12 +65,54 @@ void main() {
     repository.supportsInstallation = true;
     repository.restored = fakeUpdateCandidate();
     await controller.initialize();
-    repository.failure = const UpdateIssue(UpdateProblem.verification);
+    repository.failure = const UpdateIssue(UpdateProblem.installation);
     await controller.install();
-    expect(controller.issue?.problem, UpdateProblem.verification);
+    expect(controller.issue?.problem, UpdateProblem.installation);
     expect(controller.phase, UpdatePhase.downloaded);
     expect(controller.busy, isFalse);
   });
+  test('untrusted installation candidate requires a fresh check', () async {
+    repository.supportsInstallation = true;
+    repository.restored = fakeUpdateCandidate();
+    await controller.initialize();
+    repository.failure = const UpdateIssue(UpdateProblem.verification);
+    await controller.install();
+    expect(controller.issue?.problem, UpdateProblem.verification);
+    expect(controller.phase, UpdatePhase.idle);
+    expect(controller.candidate, isNull);
+    await controller.install();
+    await controller.download();
+    expect(repository.installs, 1);
+    expect(repository.downloadStarted.isCompleted, isFalse);
+  });
+  test(
+    'channel change invalidates results and throttle but retains server limits',
+    () async {
+      await controller.initialize();
+      await controller.check();
+      await controller.setChannel(UpdateChannel.beta);
+      expect(controller.preferences.lastChecked, isNull);
+      expect(controller.preferences.lastAttempt, isNull);
+      await controller.check(manual: false);
+      expect(repository.checks, 2);
+      await controller.setChannel(UpdateChannel.beta);
+      expect(controller.preferences.lastChecked, now);
+      repository.failure = UpdateIssue(
+        UpdateProblem.rateLimited,
+        retryAt: now.add(const Duration(minutes: 5)),
+      );
+      await controller.check();
+      await controller.setChannel(UpdateChannel.stable);
+      expect(
+        controller.preferences.retryAt,
+        now.add(const Duration(minutes: 5)),
+      );
+      await controller.check();
+      await controller.check(manual: false);
+      expect(repository.checks, 3);
+      expect(repository.preferences.lastChecked, isNull);
+    },
+  );
   test(
     'invalid restored package still allows a fresh check and download',
     () async {

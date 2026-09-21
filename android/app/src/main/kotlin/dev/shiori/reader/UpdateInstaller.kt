@@ -40,13 +40,31 @@ internal class UpdateInstaller(private val context: Context) {
                 saveState("installed")
                 return "installed"
             }
-            if (sessions.getSessionInfo(record.getInt("session", -1)) == null) {
+            val id = record.getInt("session", -1)
+            val info = sessions.mySessions.singleOrNull { it.sessionId == id }
+            if (info == null) {
+                saveState("cancelled")
+                return "cancelled"
+            }
+            val sealed = if (Build.VERSION.SDK_INT >= 26) info.isSealed else legacySealed(id)
+            if (!sealed) {
+                sessions.abandonSession(id)
                 saveState("cancelled")
                 return "cancelled"
             }
             return state
         }
         return if (!permission()) "permissionRequired" else state
+    }
+
+    // API 24/25 do not expose SessionInfo.isSealed. Opening and closing an
+    // existing write stream without writing is allowed only before sealing.
+    // Other failures propagate; an ambiguous state must never abandon an install.
+    internal fun legacySealed(id: Int): Boolean = try {
+        sessions.openSession(id).use { it.openWrite("base.apk", 0, -1).close() }
+        false
+    } catch (_: SecurityException) {
+        true
     }
 
     private fun saveState(state: String) {
@@ -59,9 +77,11 @@ internal class UpdateInstaller(private val context: Context) {
         val expectedBuild = (args["build"] as? Number)?.toLong() ?: throw Issue("verification")
         val expectedHash = args["sha256"] as? String ?: throw Issue("verification")
         val expectedCertificate = args["certificateSha256"] as? String ?: throw Issue("verification")
-        if (expectedSize <= 0 || expectedSize > 2147483648L || file.length() != expectedSize ||
-            !HEX.matches(expectedHash) || !HEX.matches(expectedCertificate) ||
-            digest(file) != expectedHash) throw Issue("verification")
+        if (expectedSize <= 0 || expectedSize > 2147483648L ||
+            !HEX.matches(expectedHash) || !HEX.matches(expectedCertificate)) throw Issue("verification")
+        if (!file.isFile || file.length() != expectedSize || digest(file) != expectedHash) {
+            throw Issue("packageInvalid")
+        }
         val apk = manager.getPackageArchiveInfo(file.path, PackageManager.GET_SIGNATURES)
             ?: throw Issue("verification")
         val current = installed()
@@ -73,10 +93,7 @@ internal class UpdateInstaller(private val context: Context) {
             incoming != listOf(expectedCertificate) || existing != incoming) throw Issue("verification")
     }
 
-    @Suppress("DEPRECATION") // API 35 uses ALLOWED; API 36 narrows it to visible apps.
-    fun install(args: Map<*, *>): String {
-        if (status() == "installing") throw Issue("busy")
-        if (!permission()) return "permissionRequired"
+    internal fun stage(args: Map<*, *>): Int {
         val file = File(args["path"] as? String ?: throw Issue("verification")).canonicalFile
         // Method-channel callers cannot hand off shared/external storage or traverse out of the sandbox.
         if (!file.path.startsWith(context.filesDir.canonicalPath + File.separator) ||
@@ -88,7 +105,7 @@ internal class UpdateInstaller(private val context: Context) {
             if (Build.VERSION.SDK_INT >= 31) setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
         }
         val id = sessions.createSession(params)
-        var committed = false
+        var staged = false
         try {
             sessions.openSession(id).use { session ->
                 val hash = MessageDigest.getInstance("SHA-256")
@@ -100,7 +117,7 @@ internal class UpdateInstaller(private val context: Context) {
                             val count = input.read(buffer)
                             if (count < 0) break
                             written += count
-                            if (written > (args["size"] as Number).toLong()) throw Issue("verification")
+                            if (written > (args["size"] as Number).toLong()) throw Issue("packageInvalid")
                             hash.update(buffer, 0, count)
                             output.write(buffer, 0, count)
                         }
@@ -108,10 +125,29 @@ internal class UpdateInstaller(private val context: Context) {
                     session.fsync(output)
                 }
                 if (written != (args["size"] as Number).toLong() || hex(hash.digest()) != args["sha256"]) {
-                    throw Issue("verification")
+                    throw Issue("packageInvalid")
                 }
                 if (!record.edit().putInt("session", id).putLong("build", (args["build"] as Number).toLong())
                         .putString("state", "installing").commit()) throw Issue("storage")
+            }
+            staged = true
+            return id
+        } finally {
+            if (!staged) {
+                try { sessions.abandonSession(id) } catch (_: Exception) { }
+                saveState("failed")
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION") // API 35 uses ALLOWED; API 36 narrows it to visible apps.
+    fun install(args: Map<*, *>): String {
+        if (status() == "installing") throw Issue("busy")
+        if (!permission()) return "permissionRequired"
+        val id = stage(args)
+        var committed = false
+        try {
+            sessions.openSession(id).use { session ->
                 val callback = Intent(context, UpdateInstallActivity::class.java).apply {
                     action = "${context.packageName}.UPDATE_RESULT.$id"
                     putExtra("session", id)

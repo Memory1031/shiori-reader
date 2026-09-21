@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/domain/contracts/app_updates.dart';
+import 'package:shiori/domain/models/release_identity.dart';
 import 'package:shiori/features/updates/update_controller.dart';
 import 'package:shiori/features/updates/update_screen.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
@@ -8,6 +9,45 @@ import '../support/fake_update_repository.dart';
 
 void main() {
   for (final language in ['zh', 'en']) {
+    testWidgets(
+      '$language channel switch displays not checked until requested',
+      (tester) async {
+        tester.view.physicalSize = const Size(1000, 1800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final repo = FakeUpdateRepository();
+        final controller = UpdateController(repo);
+        await controller.initialize();
+        await controller.check();
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: Locale(language),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            home: UpdateScreen(
+              controller: controller,
+              openPage: (_) async => true,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final l = AppLocalizations.of(
+          tester.element(find.byType(UpdateScreen)),
+        );
+        expect(find.text(l.updateNeverChecked), findsNothing);
+        await tester.tap(find.byType(DropdownButtonFormField<UpdateChannel>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l.updateBeta).last);
+        await tester.pumpAndSettle();
+        expect(find.text(l.updateNeverChecked), findsOneWidget);
+        expect(repo.checks, 1);
+        expect(controller.preferences.lastChecked, isNull);
+        await tester.pumpWidget(const SizedBox());
+        await controller.shutdown();
+        controller.dispose();
+      },
+    );
     testWidgets('$language installation permission, cancellation and retry', (
       tester,
     ) async {
