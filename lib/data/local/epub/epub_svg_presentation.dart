@@ -92,7 +92,13 @@ class _SvgPage {
       _root = node;
       return;
     }
-    if (!{'body', 'div', 'main', 'section', 'article'}.contains(node.localName)) {
+    if (!{
+      'body',
+      'div',
+      'main',
+      'section',
+      'article',
+    }.contains(node.localName)) {
       _unsupported();
     }
     for (final entry in node.attributes.entries) {

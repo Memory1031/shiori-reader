@@ -93,9 +93,7 @@ void main() {
       expect(rendered, contains('data:image/png;base64,'));
       expect(rendered, contains('viewBox="0 0 1440 2048"'));
       expect(
-        RegExp('第１话　小澄同学与女生的证明')
-            .allMatches(rendered)
-            .length,
+        RegExp('第１话　小澄同学与女生的证明').allMatches(rendered).length,
         1,
       );
       expect(rendered, isNot(contains('<title>')));
