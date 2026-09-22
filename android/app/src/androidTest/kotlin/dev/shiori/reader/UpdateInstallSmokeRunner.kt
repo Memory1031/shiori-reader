@@ -53,7 +53,9 @@ internal class UpdateInstallProbe(private val instrumentation: Instrumentation) 
         File(app.filesDir, "update-smoke/precommit").delete()
         val id = updater.stage(args())
         val info = app.packageManager.packageInstaller.getSessionInfo(id)!!
-        assertFalse(info.isSealed)
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            assertFalse(info.isSealed)
+        }
         assertFalse(updater.legacySealed(id))
         File(app.filesDir, "update-smoke/precommit").writeText(id.toString())
         // The external harness kills this process; production has no pause hook.
@@ -162,6 +164,13 @@ internal class UpdateInstallProbe(private val instrumentation: Instrumentation) 
         // The harness checks actual installed version and saved user data after process death.
         SystemClock.sleep(15000)
     }
+    fun testInstalled() {
+        val expected = args()
+        val current = app.packageManager.getPackageInfo(app.packageName, 0)
+        assertEquals(expected["version"], current.versionName)
+        assertEquals(expected["build"], UpdateInstaller.versionCode(current))
+        assertEquals("installed", updater.status())
+    }
 }
 
 /** Dedicated runner: ordinary instrumentation discovery never initiates installation. */
@@ -185,6 +194,7 @@ class UpdateInstallSmokeRunner : Instrumentation() {
                 "uncommitted" -> probe.testUncommitted()
                 "cancel" -> probe.testCancel()
                 "confirm" -> probe.testConfirm()
+                "installed" -> probe.testInstalled()
                 else -> error("An explicit smoke mode is required")
             }
             result.putString("stream", "PASS: $mode\n")
