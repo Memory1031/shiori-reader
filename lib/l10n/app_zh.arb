@@ -202,6 +202,43 @@
       }
     }
   },
+  "cacheStored": "已缓存",
+  "cacheBooks": "已缓存书籍",
+  "cacheCounts": "{books} 本书 · {chapters} 个章节",
+  "@cacheCounts": {
+    "placeholders": {
+      "books": {
+        "type": "int"
+      },
+      "chapters": {
+        "type": "int"
+      }
+    }
+  },
+  "cacheBookImages": "{chapters} 章 · 插图 {saved}/{total}",
+  "@cacheBookImages": {
+    "placeholders": {
+      "chapters": {
+        "type": "int"
+      },
+      "saved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "cacheBookNoImages": "{chapters} 章 · 无插图",
+  "@cacheBookNoImages": {
+    "placeholders": {
+      "chapters": {
+        "type": "int"
+      }
+    }
+  },
+  "cacheNoChapters": "仅缓存资料，暂无离线正文",
+  "cacheClearAll": "清除全部缓存",
   "cacheEmpty": "还没有缓存的正文",
   "cacheClearTitle": "清除缓存？",
   "cacheClearExplanation": "书架、阅读进度和设置会保留。再次打开已清理内容可能需要联网。",

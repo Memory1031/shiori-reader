@@ -202,6 +202,43 @@
       }
     }
   },
+  "cacheStored": "Cached storage",
+  "cacheBooks": "Cached books",
+  "cacheCounts": "{books, plural, =1{1 book} other{{books} books}} · {chapters, plural, =1{1 chapter} other{{chapters} chapters}}",
+  "@cacheCounts": {
+    "placeholders": {
+      "books": {
+        "type": "int"
+      },
+      "chapters": {
+        "type": "int"
+      }
+    }
+  },
+  "cacheBookImages": "{chapters, plural, =1{1 chapter} other{{chapters} chapters}} · Images {saved}/{total}",
+  "@cacheBookImages": {
+    "placeholders": {
+      "chapters": {
+        "type": "int"
+      },
+      "saved": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "cacheBookNoImages": "{chapters, plural, =1{1 chapter} other{{chapters} chapters}} · No illustrations",
+  "@cacheBookNoImages": {
+    "placeholders": {
+      "chapters": {
+        "type": "int"
+      }
+    }
+  },
+  "cacheNoChapters": "Metadata only · No offline chapters",
+  "cacheClearAll": "Clear all cache",
   "cacheEmpty": "No cached articles yet",
   "cacheClearTitle": "Clear cached content?",
   "cacheClearExplanation": "Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.",

@@ -528,6 +528,57 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get cacheStored => 'Cached storage';
+
+  @override
+  String get cacheBooks => 'Cached books';
+
+  @override
+  String cacheCounts(int books, int chapters) {
+    String _temp0 = intl.Intl.pluralLogic(
+      books,
+      locale: localeName,
+      other: '$books books',
+      one: '1 book',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      chapters,
+      locale: localeName,
+      other: '$chapters chapters',
+      one: '1 chapter',
+    );
+    return '$_temp0 · $_temp1';
+  }
+
+  @override
+  String cacheBookImages(int chapters, int saved, int total) {
+    String _temp0 = intl.Intl.pluralLogic(
+      chapters,
+      locale: localeName,
+      other: '$chapters chapters',
+      one: '1 chapter',
+    );
+    return '$_temp0 · Images $saved/$total';
+  }
+
+  @override
+  String cacheBookNoImages(int chapters) {
+    String _temp0 = intl.Intl.pluralLogic(
+      chapters,
+      locale: localeName,
+      other: '$chapters chapters',
+      one: '1 chapter',
+    );
+    return '$_temp0 · No illustrations';
+  }
+
+  @override
+  String get cacheNoChapters => 'Metadata only · No offline chapters';
+
+  @override
+  String get cacheClearAll => 'Clear all cache';
+
+  @override
   String get cacheEmpty => 'No cached articles yet';
 
   @override

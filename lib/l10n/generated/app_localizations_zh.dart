@@ -504,6 +504,33 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get cacheStored => '已缓存';
+
+  @override
+  String get cacheBooks => '已缓存书籍';
+
+  @override
+  String cacheCounts(int books, int chapters) {
+    return '$books 本书 · $chapters 个章节';
+  }
+
+  @override
+  String cacheBookImages(int chapters, int saved, int total) {
+    return '$chapters 章 · 插图 $saved/$total';
+  }
+
+  @override
+  String cacheBookNoImages(int chapters) {
+    return '$chapters 章 · 无插图';
+  }
+
+  @override
+  String get cacheNoChapters => '仅缓存资料，暂无离线正文';
+
+  @override
+  String get cacheClearAll => '清除全部缓存';
+
+  @override
   String get cacheEmpty => '还没有缓存的正文';
 
   @override

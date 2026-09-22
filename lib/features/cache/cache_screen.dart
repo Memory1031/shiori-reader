@@ -88,6 +88,7 @@ class _CacheScreenState extends State<CacheScreen> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final groups = <NovelKey, List<CachedChapter>>{};
     for (final key in _overview?.books.keys ?? <NovelKey>[]) {
       groups[key] = [];
@@ -95,6 +96,7 @@ class _CacheScreenState extends State<CacheScreen> {
     for (final chapter in _overview?.chapters ?? <CachedChapter>[]) {
       groups.putIfAbsent(chapter.key.novelKey, () => []).add(chapter);
     }
+    final entries = groups.entries.toList();
     return Scaffold(
       appBar: AppBar(
         title: Text(l.cacheTitle),
@@ -110,68 +112,229 @@ class _CacheScreenState extends State<CacheScreen> {
           ? const LoadingView()
           : _failure != null
           ? FailureView(failure: _failure!, onRetry: _load)
-          : ListView(
-              padding: const EdgeInsets.all(20),
+          : SafeArea(
+              top: false,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                    itemCount: entries.length + 2,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _usage(context, groups.length),
+                            const SizedBox(height: 28),
+                            Text(
+                              l.cacheBooks,
+                              style: theme.textTheme.titleSmall,
+                            ),
+                            const SizedBox(height: 8),
+                            if (groups.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 32,
+                                ),
+                                child: Text(
+                                  l.cacheEmpty,
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ),
+                          ],
+                        );
+                      }
+                      if (index == entries.length + 1) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l.cacheOfflineHint,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              if (groups.isNotEmpty ||
+                                  (_overview?.textBytes ?? 0) +
+                                          (_overview?.imageBytes ?? 0) >
+                                      0) ...[
+                                const SizedBox(height: 12),
+                                TextButton(
+                                  key: const ValueKey('cache-clear-all'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: theme.colorScheme.error,
+                                  ),
+                                  onPressed: () => _clear(widget.novel),
+                                  child: Text(
+                                    widget.novel == null
+                                        ? l.cacheClearAll
+                                        : l.cacheClearBook,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }
+                      final group = entries[index - 1];
+                      return Column(
+                        children: [
+                          _book(context, group.key, group.value),
+                          if (index < entries.length)
+                            Divider(
+                              height: 1,
+                              indent: 44,
+                              color: theme.colorScheme.outlineVariant
+                                  .withValues(alpha: .45),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _usage(BuildContext context, int books) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final textBytes = _overview?.textBytes ?? 0;
+    final imageBytes = _overview?.imageBytes ?? 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l.cacheStored,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text.rich(
+            TextSpan(
               children: [
-                Text(
-                  l.cacheUsage(
-                    ((_overview?.textBytes ?? 0) / 1048576).toStringAsFixed(1),
-                    ((_overview?.imageBytes ?? 0) / 1048576).toStringAsFixed(1),
+                TextSpan(
+                  text: ((textBytes + imageBytes) / 1048576).toStringAsFixed(1),
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  l.cacheOfflineHint,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: () => _clear(widget.novel),
-                  child: Text(l.cacheClear),
-                ),
-                if (groups.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(l.cacheEmpty),
+                TextSpan(
+                  text: ' MiB',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                for (final group in groups.entries) ...[
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _overview?.books[group.key] ??
-                              group.value.first.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: l.cacheClearBook,
-                        onPressed: () => _clear(group.key),
-                        icon: const Icon(Icons.delete_outline),
-                      ),
-                    ],
-                  ),
-                  for (final chapter in group.value)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(chapter.title),
-                      subtitle: Text(
-                        l.cacheChapterStatus(
-                          chapter.savedImages,
-                          chapter.imageCount,
-                        ),
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: widget.onRead == null
-                          ? null
-                          : () => widget.onRead!(chapter.key),
-                    ),
-                ],
+                ),
               ],
             ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            l.cacheUsage(
+              (textBytes / 1048576).toStringAsFixed(1),
+              (imageBytes / 1048576).toStringAsFixed(1),
+            ),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            l.cacheCounts(books, _overview?.chapters.length ?? 0),
+            style: theme.textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _book(
+    BuildContext context,
+    NovelKey key,
+    List<CachedChapter> chapters,
+  ) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final saved = chapters.fold(0, (sum, chapter) => sum + chapter.savedImages);
+    final total = chapters.fold(0, (sum, chapter) => sum + chapter.imageCount);
+    return ExpansionTile(
+      key: PageStorageKey(key),
+      controlAffinity: ListTileControlAffinity.leading,
+      tilePadding: const EdgeInsets.fromLTRB(4, 8, 0, 8),
+      childrenPadding: const EdgeInsets.only(left: 44, bottom: 12),
+      shape: const Border(),
+      collapsedShape: const Border(),
+      textColor: theme.colorScheme.onSurface,
+      iconColor: theme.colorScheme.onSurfaceVariant,
+      title: Text(
+        _overview?.books[key] ?? chapters.first.title,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.titleSmall,
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          chapters.isEmpty
+              ? l.cacheNoChapters
+              : total == 0
+              ? l.cacheBookNoImages(chapters.length)
+              : l.cacheBookImages(chapters.length, saved, total),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+      trailing: PopupMenuButton<String>(
+        key: ValueKey(('cache-book-actions', key)),
+        tooltip: l.moreActions,
+        icon: const Icon(Icons.more_vert, size: 20),
+        onSelected: (_) => _clear(key),
+        itemBuilder: (_) => [
+          PopupMenuItem(value: 'clear', child: Text(l.cacheClearBook)),
+        ],
+      ),
+      children: [
+        if (chapters.isEmpty)
+          Padding(padding: const EdgeInsets.all(12), child: Text(l.cacheEmpty))
+        else
+          for (final chapter in chapters)
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 2,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: Text(
+                chapter.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+              subtitle: Text(
+                l.cacheChapterStatus(chapter.savedImages, chapter.imageCount),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              trailing: widget.onRead == null
+                  ? null
+                  : const Icon(Icons.chevron_right, size: 18),
+              onTap: widget.onRead == null
+                  ? null
+                  : () => widget.onRead!(chapter.key),
+            ),
+      ],
     );
   }
 }

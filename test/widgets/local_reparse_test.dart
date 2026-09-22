@@ -150,6 +150,50 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
+  testWidgets(
+    'local library keeps reading and import reachable on narrow large text',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final store = BatchReparseStore();
+      NovelKey? selected;
+      var imports = 0;
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          overlayBuilder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(1.6)),
+            child: child,
+          ),
+          routes: AppRoutes(
+            home: (_) => LocalBooksScreen(
+              store: store,
+              management: store,
+              library: FixtureLibraryRepository(),
+              onRead: (key) => selected = key,
+              onImport: () => imports++,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(store.books.first.title));
+      expect(selected, store.books.first.key);
+      await tester.tap(find.byKey(const ValueKey('local-books-actions')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Import book'));
+      await tester.pumpAndSettle();
+      expect(imports, 1);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await store.events.close();
+    },
+  );
+
   for (final lang in ['en', 'zh']) {
     testWidgets(
       'batch reparse serializes, continues after failure and reports results in $lang',
@@ -289,12 +333,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(
-          find.descendant(
-            of: find.byType(ListTile),
-            matching: find.byType(PopupMenuButton<String>),
-          ),
-        );
+        await tester.tap(find.byKey(ValueKey(('local-book-actions', f.key))));
         await tester.pumpAndSettle();
         final label = lang == 'en' ? 'Reparse' : '重新解析';
         await tester.tap(find.text(label));
@@ -332,12 +371,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(ListTile),
-        matching: find.byType(PopupMenuButton<String>),
-      ),
-    );
+    await tester.tap(find.byKey(ValueKey(('local-book-actions', f.key))));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Reparse'));
     await tester.pumpAndSettle();

@@ -1064,6 +1064,48 @@ abstract class AppLocalizations {
   /// **'Text cached · Images {saved}/{total}'**
   String cacheChapterStatus(int saved, int total);
 
+  /// No description provided for @cacheStored.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached storage'**
+  String get cacheStored;
+
+  /// No description provided for @cacheBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached books'**
+  String get cacheBooks;
+
+  /// No description provided for @cacheCounts.
+  ///
+  /// In en, this message translates to:
+  /// **'{books, plural, =1{1 book} other{{books} books}} · {chapters, plural, =1{1 chapter} other{{chapters} chapters}}'**
+  String cacheCounts(int books, int chapters);
+
+  /// No description provided for @cacheBookImages.
+  ///
+  /// In en, this message translates to:
+  /// **'{chapters, plural, =1{1 chapter} other{{chapters} chapters}} · Images {saved}/{total}'**
+  String cacheBookImages(int chapters, int saved, int total);
+
+  /// No description provided for @cacheBookNoImages.
+  ///
+  /// In en, this message translates to:
+  /// **'{chapters, plural, =1{1 chapter} other{{chapters} chapters}} · No illustrations'**
+  String cacheBookNoImages(int chapters);
+
+  /// No description provided for @cacheNoChapters.
+  ///
+  /// In en, this message translates to:
+  /// **'Metadata only · No offline chapters'**
+  String get cacheNoChapters;
+
+  /// No description provided for @cacheClearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all cache'**
+  String get cacheClearAll;
+
   /// No description provided for @cacheEmpty.
   ///
   /// In en, this message translates to:

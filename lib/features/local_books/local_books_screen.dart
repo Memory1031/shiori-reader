@@ -445,22 +445,20 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                   )
                 else ...[
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverList.builder(
-                      itemCount: books.length,
-                      itemBuilder: (context, index) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _bookTile(context, books[index]),
-                      ),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(24, 10, 24, 32),
-                    sliver: SliverToBoxAdapter(
-                      child: Text(
-                        l.localBooksHint,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                    sliver: SliverPadding(
+                      padding: const EdgeInsets.all(8),
+                      sliver: SliverList.separated(
+                        itemCount: books.length,
+                        itemBuilder: (context, index) =>
+                            _bookTile(context, books[index]),
+                        separatorBuilder: (context, index) => Divider(
+                          height: 1,
+                          indent: 92,
+                          endIndent: 12,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.outlineVariant.withValues(alpha: .35),
                         ),
                       ),
                     ),
@@ -501,7 +499,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
               ),
               if (books.isNotEmpty)
                 Text(
-                  'EPUB $epub  ·  TXT ${books.length - epub}',
+                  '$epub epub · ${books.length - epub} txt',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -524,114 +522,123 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final epub = book.format == LocalBookFormat.epub;
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-      side: BorderSide(color: colors.outlineVariant.withValues(alpha: .55)),
-    );
+    final radius = BorderRadius.circular(16);
     return Material(
-      color: colors.surface,
-      shape: shape,
+      key: ValueKey(book.key),
+      type: MaterialType.transparency,
+      borderRadius: radius,
       clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        key: ValueKey(book.key),
-        shape: shape,
-        contentPadding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
-        minVerticalPadding: 12,
-        horizontalTitleGap: 14,
-        leading: _LocalCover(
-          book: book,
-          store: widget.store,
-          images: widget.images,
-          placeholder: ExcludeSemantics(
-            child: Container(
-              width: 44,
-              height: 56,
-              decoration: BoxDecoration(
-                color: epub
-                    ? Color.alphaBlend(
-                        colors.primary.withValues(alpha: .10),
-                        colors.surface,
-                      )
-                    : colors.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-                border: Border(
-                  left: BorderSide(
-                    width: 3,
-                    color: colors.primary.withValues(alpha: .3),
-                  ),
-                ),
-              ),
-              child: Icon(
-                epub ? Icons.auto_stories_outlined : Icons.description_outlined,
-                size: 23,
-                color: colors.primary,
-              ),
-            ),
-          ),
-        ),
-        title: Text(
-          book.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: _busy ? null : () => widget.onRead(book.key),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Text(
-                  book.format.name.toUpperCase(),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                    letterSpacing: .4,
+              _LocalCover(
+                book: book,
+                store: widget.store,
+                images: widget.images,
+                placeholder: ExcludeSemantics(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: epub
+                          ? Color.alphaBlend(
+                              colors.primary.withValues(alpha: .10),
+                              colors.surface,
+                            )
+                          : colors.surfaceContainerHighest,
+                      border: Border(
+                        left: BorderSide(
+                          width: 4,
+                          color: colors.primary.withValues(alpha: .3),
+                        ),
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        epub
+                            ? Icons.auto_stories_outlined
+                            : Icons.description_outlined,
+                        size: 28,
+                        color: colors.primary,
+                      ),
+                    ),
                   ),
                 ),
               ),
-              Text(
-                l.localBooksImportedOn(
-                  MaterialLocalizations.of(
-                    context,
-                  ).formatShortDate(book.importedAt.toLocal()),
-                ),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colors.onSurfaceVariant,
+              const SizedBox(width: 16),
+              Expanded(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 96),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                book.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                          _bookMenu(context, book),
+                        ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16, bottom: 4),
+                        child: Text(
+                          '${book.format.name} · ${l.localBooksImportedOn(MaterialLocalizations.of(context).formatShortDate(book.importedAt.toLocal()))}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        onTap: _busy ? null : () => widget.onRead(book.key),
-        trailing: PopupMenuButton<String>(
-          enabled: !_busy,
-          tooltip: l.moreActions,
-          onSelected: (action) {
-            if (action == 'add') {
-              _add(book);
-            } else if (action == 'reparse') {
-              _reparse(book);
-            } else if (action == 'delete') {
-              _delete(book);
-            }
-          },
-          itemBuilder: (_) => [
-            if (widget.store is LocalBookReparse)
-              PopupMenuItem(value: 'reparse', child: Text(l.localReparse)),
-            PopupMenuItem(value: 'add', child: Text(l.detailAddShelf)),
-            PopupMenuItem(value: 'delete', child: Text(l.localDeleteConfirm)),
-          ],
-        ),
       ),
+    );
+  }
+
+  Widget _bookMenu(BuildContext context, LocalBookInfo book) {
+    final l = AppLocalizations.of(context);
+    return PopupMenuButton<String>(
+      key: ValueKey(('local-book-actions', book.key)),
+      padding: EdgeInsets.zero,
+      icon: const Icon(Icons.more_vert, size: 20),
+      enabled: !_busy,
+      tooltip: l.moreActions,
+      onSelected: (action) {
+        if (action == 'add') {
+          _add(book);
+        } else if (action == 'reparse') {
+          _reparse(book);
+        } else if (action == 'delete') {
+          _delete(book);
+        }
+      },
+      itemBuilder: (_) => [
+        if (widget.store is LocalBookReparse)
+          PopupMenuItem(value: 'reparse', child: Text(l.localReparse)),
+        PopupMenuItem(value: 'add', child: Text(l.detailAddShelf)),
+        PopupMenuItem(value: 'delete', child: Text(l.localDeleteConfirm)),
+      ],
     );
   }
 
@@ -806,8 +813,8 @@ class _LocalCoverState extends State<_LocalCover> {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: 44,
-    height: 56,
+    width: 64,
+    height: 96,
     child: ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: _cover == null || widget.images == null
