@@ -173,17 +173,36 @@ void main() {
         200,
         scrollable: scroll,
       );
+      final installButton = find.byKey(const ValueKey('update-install'));
+      expect(
+        tester.getTopLeft(installButton).dy -
+            tester.getBottomLeft(find.text(l.updateInstallCancelled)).dy,
+        greaterThanOrEqualTo(12),
+      );
+      repo.installState = UpdateInstallState.failed;
+      await controller.refreshInstallation();
+      await tester.pumpAndSettle();
+      expect(find.text(l.updateInstallFailed), findsOneWidget);
+      expect(
+        tester.getTopLeft(installButton).dy -
+            tester.getBottomLeft(find.text(l.updateInstallFailed)).dy,
+        greaterThanOrEqualTo(12),
+      );
+      await tester.ensureVisible(installButton);
+      await tester.pumpAndSettle();
       repo.installState = UpdateInstallState.installing;
       await tester.tap(find.byKey(const ValueKey('update-install')));
       await tester.pump();
       expect(repo.installs, 1);
-      expect(
-        tester
-            .widget<FilledButton>(find.byKey(const ValueKey('update-install')))
-            .onPressed,
-        isNull,
-      );
+      expect(installButton, findsNothing);
+      expect(find.text(l.updateInstalling), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text(l.updateCancel), findsNothing);
+      repo.installState = UpdateInstallState.cancelled;
+      await controller.refreshInstallation();
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(installButton).onPressed, isNotNull);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await controller.shutdown();
@@ -197,7 +216,12 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        final repo = FakeUpdateRepository()..result = fakeUpdateCandidate();
+        final repo = FakeUpdateRepository()
+          ..result = fakeUpdateCandidate(
+            notes:
+                '## Changes\n\n- **EPUB** fix\n* Windows fix\n'
+                '- Release notes <b>plain text</b>\n- More details',
+          );
         final controller = UpdateController(repo);
         await controller.initialize();
         await tester.pumpWidget(
@@ -231,7 +255,12 @@ void main() {
               )
               .first,
         );
-        expect(find.text('Release notes <b>plain text</b>'), findsOneWidget);
+        expect(find.text('EPUB fix', findRichText: true), findsOneWidget);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('update-download')),
+        );
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('update-download')));
         await tester.pumpAndSettle();
         expect(controller.phase, UpdatePhase.downloaded);

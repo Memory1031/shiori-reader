@@ -99,7 +99,9 @@ class FakeUpdateRepository implements AppUpdateRepository {
   }
 }
 
-UpdateCandidate fakeUpdateCandidate() => UpdateCandidate(
+UpdateCandidate fakeUpdateCandidate({
+  String notes = 'Release notes <b>plain text</b>',
+}) => UpdateCandidate(
   release: ReleaseIdentity(
     tag: 'v1.2.2',
     version: '1.2.2',
@@ -107,7 +109,7 @@ UpdateCandidate fakeUpdateCandidate() => UpdateCandidate(
     commit: 'b' * 40,
   ),
   bytes: 1024,
-  notes: 'Release notes <b>plain text</b>',
+  notes: notes,
   page: Uri.parse(
     'https://github.com/Memory1031/shiori-reader/releases/tag/v1.2.2',
   ),

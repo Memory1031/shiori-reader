@@ -8,6 +8,7 @@ import '../../domain/models/release_identity.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/shiori_logo.dart';
 import 'update_controller.dart';
+import 'release_notes_preview.dart';
 
 class UpdateScreen extends StatelessWidget {
   const UpdateScreen({
@@ -301,19 +302,17 @@ class UpdateScreen extends StatelessWidget {
                   ],
                   const Divider(height: 40),
                   _SectionTitle(l.updateProject),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('GitHub'),
-                    trailing: const Icon(Icons.north_east, size: 18),
+                  _ProjectAction(
+                    title: 'GitHub',
+                    icon: Icons.north_east,
                     onTap: () => _openPage(
                       context,
                       Uri.parse('https://github.com/Memory1031/shiori-reader'),
                     ),
                   ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(l.updateLicenses),
-                    trailing: const Icon(Icons.chevron_right, size: 18),
+                  _ProjectAction(
+                    title: l.updateLicenses,
+                    icon: Icons.chevron_right,
                     onTap: () => showLicensePage(
                       context: context,
                       applicationName: 'Shiori',
@@ -324,10 +323,9 @@ class UpdateScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(l.updateCopyVersion),
-                    trailing: const Icon(Icons.copy_outlined, size: 18),
+                  _ProjectAction(
+                    title: l.updateCopyVersion,
+                    icon: Icons.copy_outlined,
                     onTap: () async {
                       await Clipboard.setData(
                         ClipboardData(
@@ -397,12 +395,9 @@ class UpdateScreen extends StatelessWidget {
             ),
             if (target.notes.trim().isNotEmpty) ...[
               const SizedBox(height: 16),
-              Text(
-                target.notes.trim(),
+              ReleaseNotesPreview(
+                notes: target.notes,
                 key: const ValueKey('update-notes'),
-                maxLines: 5,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium,
               ),
             ],
             const SizedBox(height: 20),
@@ -412,7 +407,22 @@ class UpdateScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(l.updateProgress((c.received * 100 / target.bytes).floor())),
-            ] else if (c.phase == UpdatePhase.downloaded) ...[
+            ] else if (c.installing)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 3),
+                    child: SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(l.updateInstalling)),
+                ],
+              )
+            else if (c.phase == UpdatePhase.downloaded) ...[
               Text(
                 c.canInstall ? l.updateInstallHint : l.updateDownloaded,
                 style: theme.textTheme.bodySmall,
@@ -431,11 +441,14 @@ class UpdateScreen extends StatelessWidget {
                     child: Text(l.updateInstallSettings),
                   ),
                 ] else ...[
-                  if (c.installState == UpdateInstallState.cancelled)
+                  if (c.installState == UpdateInstallState.cancelled) ...[
                     Text(l.updateInstallCancelled),
-                  if (c.installState == UpdateInstallState.failed)
+                    const SizedBox(height: 12),
+                  ],
+                  if (c.installState == UpdateInstallState.failed) ...[
                     Text(l.updateInstallFailed),
-                  if (c.installing) Text(l.updateInstalling),
+                    const SizedBox(height: 12),
+                  ],
                   FilledButton.icon(
                     key: const ValueKey('update-install'),
                     onPressed: c.busy ? null : c.install,
@@ -457,6 +470,49 @@ class UpdateScreen extends StatelessWidget {
               child: Text(l.updateReleasePage),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectAction extends StatelessWidget {
+  const _ProjectAction({
+    required this.title,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(12)),
+    );
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Material(
+        type: MaterialType.transparency,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            splashFactory: NoSplash.splashFactory,
+            highlightColor: colors.onSurface.withValues(alpha: .06),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            shape: shape,
+            hoverColor: colors.onSurface.withValues(alpha: .04),
+            focusColor: colors.onSurface.withValues(alpha: .08),
+            title: Text(title),
+            trailing: Icon(icon, size: 18, color: colors.onSurfaceVariant),
+            onTap: onTap,
+          ),
         ),
       ),
     );

@@ -2,7 +2,7 @@
 
 按当前 pubspec.lock 对应包的 LICENSE / NOTICE 文本列出；含开发及传递依赖，不表示全部进入产物。类别为文本识别，不替代原始完整声明。
 
-锁文件 SHA-256：`1081d1a74a7e6d90e8ef8a7a84051f39ddfd218109af2593ca929a2d16003a3f`。
+锁文件 SHA-256：`2d8d019f67ef9aab0a4eb17b1dbd9d35c185476e031655d4a3905c429a929e62`。
 
 Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Memory1031/flutter_inappwebview/tree/3e48253e4c03beb49fe020fb1168ab1fb2be4818/flutter_inappwebview_windows)，按完整提交 SHA 锁定，保留上游 LICENSE 与源码许可声明。仅 Windows 子包使用 Git override，其余平台包仍取自锁定的 hosted 版本。
 
@@ -49,6 +49,7 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 | flutter_inappwebview_windows | 0.6.0（fork 补丁） | direct overridden | Apache 类 | LICENSE |
 | flutter_lints | 6.0.0 | direct dev | BSD 类 | LICENSE |
 | flutter_localizations | 0.0.0 | direct main | BSD 类 | LICENSE |
+| flutter_markdown_plus | 1.0.12 | direct main | BSD 类 | LICENSE |
 | flutter_test | 0.0.0 | direct dev | BSD 类 | LICENSE |
 | flutter_web_plugins | 0.0.0 | transitive | BSD 类 | LICENSE |
 | frontend_server_client | 4.0.0 | transitive | BSD 类 | LICENSE |
@@ -70,6 +71,7 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 | leak_tracker_testing | 3.0.2 | transitive | BSD 类 | LICENSE |
 | lints | 6.1.0 | transitive | BSD 类 | LICENSE |
 | logging | 1.3.0 | transitive | BSD 类 | LICENSE |
+| markdown | 7.3.1 | transitive | BSD 类 | LICENSE |
 | matcher | 0.12.17 | transitive | BSD 类 | LICENSE |
 | material_color_utilities | 0.11.1 | transitive | Apache 类 | LICENSE |
 | meta | 1.17.0 | transitive | BSD 类 | LICENSE |
