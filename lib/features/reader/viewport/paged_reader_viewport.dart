@@ -16,8 +16,10 @@ class PagedReaderController {
   _PagedReaderViewportState? _state;
   ReaderPosition? capture() => _state?._position;
   void restore(ReaderPosition position) => _state?._restore(position);
-  Future<void> next() => _state?._turn(1) ?? Future.value();
-  Future<void> previous() => _state?._turn(-1) ?? Future.value();
+  Future<void> next({bool queueIfTurning = false}) =>
+      _state?._turn(1, queueIfTurning: queueIfTurning) ?? Future.value();
+  Future<void> previous({bool queueIfTurning = false}) =>
+      _state?._turn(-1, queueIfTurning: queueIfTurning) ?? Future.value();
   int get measuredChunks => _state?._layout?.measuredChunks ?? 0;
   int get cachedPages => _state?._pages.length ?? 0;
   bool get usedFallback => _state?._usedFallback ?? false;
@@ -87,6 +89,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   late final AnimationController _turnAnimation;
   int _current = 0;
   int? _target;
+  int? _queuedDirection;
+  bool _acceptsQueuedTurn = false;
   int _direction = 1;
   double _dragDistance = 0;
   final _pages = <int, ReaderPage>{};
@@ -148,6 +152,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
 
   void _restore(ReaderPosition position) {
     if (!mounted) return;
+    _queuedDirection = null;
     _restoring = true;
     widget.onRestoreStart?.call();
     setState(() {
@@ -274,15 +279,45 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     });
     widget.onTurning?.call(false);
     if (commit) _sample();
+    if (!commit) _queuedDirection = null;
+    if (_queuedDirection != null) {
+      // Let pending layout/route changes settle before consuming the one-slot
+      // input buffer. Explicit restores and new gestures invalidate it.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || epoch != _epoch) return;
+        final direction = _queuedDirection;
+        _queuedDirection = null;
+        if (direction == null ||
+            _restoring ||
+            _target != null ||
+            ModalRoute.of(context)?.isCurrent == false ||
+            (WidgetsBinding.instance.lifecycleState != null &&
+                WidgetsBinding.instance.lifecycleState !=
+                    AppLifecycleState.resumed)) {
+          return;
+        }
+        _turn(direction, queueIfTurning: true);
+      });
+    }
   }
 
-  Future<void> _turn(int direction) async {
-    if (_layout == null || _target != null || _restoring) return;
+  Future<void> _turn(int direction, {bool queueIfTurning = false}) async {
+    if (_layout == null || _restoring) return;
+    if (_target != null) {
+      if (queueIfTurning && _acceptsQueuedTurn) {
+        // Repeated input coalesces; reversing intent drops the pending turn
+        // without interrupting the page already moving.
+        _queuedDirection = direction == _direction ? direction : null;
+      }
+      return;
+    }
+    _queuedDirection = null;
     if (_page(_current + direction) == null) {
       widget.onBoundary?.call(direction);
       return;
     }
     setState(() {
+      _acceptsQueuedTurn = queueIfTurning;
       _direction = direction;
       _target = _current + direction;
       _userScrolling = true;
@@ -298,6 +333,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     if (_target == null) {
       if (_page(_current + direction) == null) return;
       setState(() {
+        _acceptsQueuedTurn = false;
         _direction = direction;
         _target = _current + direction;
         _userScrolling = true;
@@ -384,6 +420,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           _signature != signature || !listEquals(_imageGeometry, imageGeometry);
       if (changed && _userScrolling) _deferredLayout = true;
       if ((changed && !_userScrolling) || _positionReset) {
+        _queuedDirection = null;
         _restoring = true;
         widget.onRestoreStart?.call();
         if (changed) {
@@ -666,7 +703,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         onScrollRight: () => _turn(-1),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onHorizontalDragStart: (_) => _dragDistance = 0,
+          onHorizontalDragStart: (_) {
+            _queuedDirection = null;
+            _dragDistance = 0;
+          },
           onHorizontalDragUpdate: _dragUpdate,
           onHorizontalDragEnd: _dragEnd,
           onHorizontalDragCancel: () {
@@ -675,10 +715,11 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           },
           onTapUp: (details) {
             if (details.localPosition.dx < constraints.maxWidth * .3) {
-              _turn(-1);
+              _turn(-1, queueIfTurning: true);
             } else if (details.localPosition.dx > constraints.maxWidth * .7) {
-              _turn(1);
+              _turn(1, queueIfTurning: true);
             } else {
+              _queuedDirection = null;
               widget.onCenterTap?.call();
             }
           },

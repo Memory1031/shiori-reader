@@ -272,7 +272,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   void _toggle() => _chrome.value = !_chrome.value;
 
-  void _turnPage(bool forward) {
+  void _turnPage(bool forward, {bool queueIfTurning = true}) {
     if (_completionTurning || ModalRoute.of(context)?.isCurrent == false) {
       return;
     }
@@ -287,7 +287,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
         widget.onPreviousChapter?.call();
       }
     } else {
-      unawaited(forward ? _paged.next() : _paged.previous());
+      unawaited(
+        forward
+            ? _paged.next(queueIfTurning: queueIfTurning)
+            : _paged.previous(queueIfTurning: queueIfTurning),
+      );
     }
   }
 
@@ -329,7 +333,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
         _wheelCooldown = null;
       });
       if (active || _dragging || _paged.isRestoring) return;
-      _turnPage(event.scrollDelta.dy > 0);
+      _turnPage(event.scrollDelta.dy > 0, queueIfTurning: false);
     });
   }
 

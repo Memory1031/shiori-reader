@@ -114,6 +114,25 @@ void main() {
         await key(LogicalKeyboardKey.arrowLeft);
         expect(pages.capture(), start);
 
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        await tester.pump(const Duration(milliseconds: 80));
+        for (var i = 0; i < 8; i++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+        }
+        await tester.pumpAndSettle();
+        expect(
+          pages.capture()!.chapterFraction,
+          greaterThan(next.chapterFraction),
+        );
+        await key(LogicalKeyboardKey.arrowLeft);
+        expect(
+          pages.capture(),
+          next,
+          reason: 'keyboard burst buffers only one turn',
+        );
+        await key(LogicalKeyboardKey.arrowLeft);
+        expect(pages.capture(), start);
+
         Future<void> wheel(Offset delta, {Offset? position}) async {
           await tester.sendEventToBinding(
             PointerScrollEvent(
