@@ -8,8 +8,56 @@ import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/viewport/paper_turn.dart';
+import 'package:shiori/l10n/generated/app_localizations.dart';
 
 void main() {
+  testWidgets(
+    'chrome preserves numbered catalog title and falls back to content title',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final content = const FixtureData().content(FixtureScenario.shortChapter);
+      const fullTitle = '第十二章 关于夏日结束以后我们再次相遇的故事';
+      for (final catalogTitle in [fullTitle, null]) {
+        await tester.pumpWidget(
+          ShioriApp(
+            locale: const Locale('zh'),
+            routes: AppRoutes(
+              home: (_) => ReaderContentView(
+                key: ValueKey(catalogTitle),
+                content: content,
+                chapterTitle: catalogTitle,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final l = AppLocalizations.of(
+          tester.element(find.byType(ReaderContentView)),
+        );
+        if (find.text(l.readerGotIt).evaluate().isNotEmpty) {
+          await tester.tap(find.text(l.readerGotIt));
+          await tester.pumpAndSettle();
+        }
+        if (find
+            .byKey(const ValueKey('reader-chapter-title'))
+            .evaluate()
+            .isEmpty) {
+          await tester.tapAt(tester.getCenter(find.byType(ReaderContentView)));
+          await tester.pumpAndSettle();
+        }
+        final title = find.byKey(const ValueKey('reader-chapter-title'));
+        expect(tester.widget<Text>(title).data, catalogTitle ?? content.title);
+        expect(find.byTooltip(catalogTitle ?? content.title), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      }
+    },
+  );
+
   testWidgets(
     'slow next chapter keeps current page until new layout is ready',
     (tester) async {
@@ -31,6 +79,14 @@ void main() {
       // Keep the exact current page mounted throughout a slow chapter request.
       final before = tester.widget<ReaderContentView>(
         find.byType(ReaderContentView),
+      );
+      expect(
+        before.chapterTitle,
+        const FixtureData()
+            .catalog(FixtureScenario.multiVolume)
+            .flatChapters
+            .first
+            .title,
       );
       env.source.controls.delays[Operation.chapter] = const Duration(
         seconds: 2,
@@ -69,6 +125,14 @@ void main() {
       expect(
         next.content.key,
         fixtureChapterKey(FixtureScenario.multiVolume, 1),
+      );
+      expect(
+        next.chapterTitle,
+        const FixtureData()
+            .catalog(FixtureScenario.multiVolume)
+            .flatChapters
+            .elementAt(1)
+            .title,
       );
       env.source.controls.delays.remove(Operation.chapter);
       next.onPreviousChapter!();

@@ -124,19 +124,19 @@ void main() {
         expect(title.maxLines, 2);
         expect(title.overflow, TextOverflow.ellipsis);
       }
-      expect(find.textContaining('63%'), findsNothing);
+      expect(find.textContaining('63.00%'), findsNothing);
       expect(find.textContaining('已读完'), findsNothing);
       expect(find.textContaining('已读至最新'), findsNothing);
       for (var i = 0; i < 2; i++) {
         if (i == 1) {
-          expect(find.text('epub · 阅读进度 63%'), findsOneWidget);
+          expect(find.text('epub · 阅读进度 63.00%'), findsOneWidget);
           expect(find.text('txt · 已读完'), findsOneWidget);
           expect(find.text('已读至最新'), findsOneWidget);
         }
         expect(find.byType(LinearProgressIndicator), findsNothing);
         expect(find.byType(Chip), findsNothing);
         expect(find.textContaining('76 / 120'), findsNothing);
-        expect(find.textContaining('42%'), findsNothing);
+        expect(find.textContaining('42.00%'), findsNothing);
         if (i == 0) {
           await tester.tap(find.byTooltip('列表'));
           await tester.pumpAndSettle();
@@ -169,8 +169,8 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Reading progress 63%'), findsOneWidget);
-      expect(find.textContaining('42%'), findsNothing);
+      expect(find.text('Reading progress 63.00%'), findsOneWidget);
+      expect(find.textContaining('42.00%'), findsNothing);
       expect(env.source.controls.calls, isEmpty);
       final controller = LibraryController(env.library)..onStart();
       await tester.pumpWidget(
@@ -182,7 +182,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Reading progress 63%'), findsOneWidget);
+      expect(find.text('Reading progress 63.00%'), findsOneWidget);
       expect(env.source.controls.calls, isEmpty);
       await tester.pumpWidget(const SizedBox());
       controller.onDelete();

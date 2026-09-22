@@ -101,7 +101,9 @@ class _SearchBody extends StatelessWidget {
                                 vertical: 3,
                               ),
                               child: Text(
-                                environmentLabel ?? strings.onlineSource,
+                                environmentLabel ??
+                                    sourceName ??
+                                    strings.onlineSource,
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ),

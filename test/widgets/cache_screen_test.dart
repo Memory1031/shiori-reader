@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
@@ -11,6 +12,7 @@ class Cache implements CacheManagement {
   int clears = 0;
   NovelKey? clearedNovel;
   CacheOverview? data;
+  Completer<Result<CacheOverview>>? pending;
   @override
   ReadingPrefetch? get prefetch => null;
   @override
@@ -23,27 +25,87 @@ class Cache implements CacheManagement {
   }
 
   @override
-  Future<Result<CacheOverview>> inspect({NovelKey? novel}) async => Success(
-    data ??
-        CacheOverview(
-          textBytes: 100,
-          imageBytes: 200,
-          books: {this.novel: 'Fixture book'},
-          chapters: clears > 0
-              ? []
-              : [
-                  CachedChapter(
-                    key: ChapterKey(novelKey: this.novel, chapterId: 'c'),
-                    title: 'Volume 1',
-                    imageCount: 2,
-                    savedImages: 1,
-                  ),
-                ],
-        ),
-  );
+  Future<Result<CacheOverview>> inspect({NovelKey? novel}) async =>
+      pending != null
+      ? await pending!.future
+      : Success(
+          data ??
+              CacheOverview(
+                textBytes: 100,
+                imageBytes: 200,
+                books: {this.novel: 'Fixture book'},
+                chapters: clears > 0
+                    ? []
+                    : [
+                        CachedChapter(
+                          key: ChapterKey(novelKey: this.novel, chapterId: 'c'),
+                          title: 'Volume 1',
+                          imageCount: 2,
+                          savedImages: 1,
+                        ),
+                      ],
+              ),
+        );
 }
 
 void main() {
+  testWidgets('refresh preserves expanded chapters through failure and retry', (
+    tester,
+  ) async {
+    final cache = Cache();
+    final overview = (await cache.inspect() as Success<CacheOverview>).value;
+    await tester.pumpWidget(
+      ShioriApp(
+        locale: const Locale('en'),
+        routes: AppRoutes(home: (_) => CacheScreen(cache: cache)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fixture book'));
+    await tester.pumpAndSettle();
+    final state = tester.state(find.byType(ExpansionTile));
+    cache.pending = Completer<Result<CacheOverview>>();
+    await tester.tap(find.byIcon(Icons.refresh));
+    await tester.pump();
+    expect(find.text('Volume 1'), findsOneWidget);
+    expect(tester.state(find.byType(ExpansionTile)), same(state));
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<PopupMenuButton<String>>(
+            find.byKey(ValueKey(('cache-book-actions', cache.novel))),
+          )
+          .enabled,
+      isFalse,
+    );
+    cache.pending!.complete(
+      Failure(
+        AppFailure(
+          kind: FailureKind.cache,
+          operation: Operation.libraryRead,
+          retryPolicy: RetryPolicy.manual,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Volume 1'), findsOneWidget);
+    expect(tester.state(find.byType(ExpansionTile)), same(state));
+    cache.pending = Completer<Result<CacheOverview>>();
+    await tester.tap(find.byIcon(Icons.refresh));
+    await tester.pump();
+    cache.pending!.complete(Success(overview));
+    await tester.pumpAndSettle();
+    expect(find.text('Volume 1'), findsOneWidget);
+    expect(tester.state(find.byType(ExpansionTile)), same(state));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'narrow large-text overview distinguishes metadata and text-only books',
     (tester) async {
@@ -92,6 +154,13 @@ void main() {
       await tester.ensureVisible(find.text('Metadata'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Metadata only'), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.textContaining('Metadata only'),
+          matching: find.byType(ExpansionTile),
+        ),
+        findsNothing,
+      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -163,6 +232,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(cache.clearedNovel, cache.novel);
       expect(find.textContaining('Metadata only'), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.textContaining('Metadata only'),
+          matching: find.byType(ExpansionTile),
+        ),
+        findsNothing,
+      );
       expect(tester.takeException(), isNull);
     },
   );

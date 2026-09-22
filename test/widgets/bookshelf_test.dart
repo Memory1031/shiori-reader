@@ -46,6 +46,46 @@ class ShelfLocalBooks implements LocalBookManagement {
 }
 
 void main() {
+  testWidgets('empty shelf offers search and import without overflow menu', (
+    tester,
+  ) async {
+    final repo = FixtureLibraryRepository();
+    final controller = LibraryController(repo)..onStart();
+    var searches = 0;
+    var imports = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: ListenableBuilder(
+            listenable: controller,
+            builder: (_, _) => BookshelfView(
+              controller: controller,
+              onOpen: (_) {},
+              onSearch: () => searches++,
+              onImport: () => imports++,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Search'));
+    await tester.tap(find.text('Import book'));
+    expect(searches, 1);
+    expect(imports, 1);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(() async {
+      controller.onDelete();
+      await controller.resourcesReleased;
+      controller.dispose();
+      await repo.close();
+    });
+  });
+
   for (final grid in [true, false]) {
     testWidgets(
       'local removal requires confirmation in ${grid ? "grid" : "list"}',

@@ -646,6 +646,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       },
       onLoadFailure: () => _rejectPending(reader),
       runningTitle: _runningTitle(reader),
+      chapterTitle: chapters
+          .where(
+            (chapter) =>
+                chapter.key == reader.chapter &&
+                chapter.title.trim().isNotEmpty,
+          )
+          .firstOrNull
+          ?.title,
       images: _displayImages,
       settings: widget.settings,
       session: reader,

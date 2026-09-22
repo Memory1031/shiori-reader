@@ -328,6 +328,7 @@ class _ReadingHomeState extends State<ReadingHome> {
                           onDetails: (key) =>
                               _routes.open(context, NovelDestination(key)),
                           onSearch: _search,
+                          onImport: widget.onImport,
                         ),
                       ),
                     ],

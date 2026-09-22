@@ -348,7 +348,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get labChapter => 'Chapter 1 · The last train';
 
   @override
-  String get labProgress => 'About 36% of this chapter';
+  String get labProgress => 'Chapter 36.00%';
 
   @override
   String get labAuthor => 'Shiori Studio';
@@ -476,8 +476,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerNextPage => 'Next page';
 
   @override
-  String readerChapterProgress(int percent) {
-    return 'About $percent% of this chapter';
+  String readerChapterProgress(String percent) {
+    return 'Chapter $percent%';
   }
 
   @override
@@ -970,12 +970,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookCurrentEnd => 'End of available chapters';
 
   @override
-  String bookProgressPercent(int percent) {
+  String bookProgressPercent(String percent) {
     return 'Reading progress $percent%';
   }
 
   @override
-  String readerChapterPercent(int percent) {
+  String readerChapterPercent(String percent) {
     return 'Chapter $percent%';
   }
 

@@ -331,7 +331,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get labChapter => '第一章 · 末班列车';
 
   @override
-  String get labProgress => '本章约 36%';
+  String get labProgress => '本章 36.00%';
 
   @override
   String get labAuthor => '栞文库编辑室';
@@ -453,8 +453,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerNextPage => '下一页';
 
   @override
-  String readerChapterProgress(int percent) {
-    return '本章约 $percent%';
+  String readerChapterProgress(String percent) {
+    return '本章 $percent%';
   }
 
   @override
@@ -887,12 +887,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookCurrentEnd => '已读至当前末尾';
 
   @override
-  String bookProgressPercent(int percent) {
+  String bookProgressPercent(String percent) {
     return '阅读进度 $percent%';
   }
 
   @override
-  String readerChapterPercent(int percent) {
+  String readerChapterPercent(String percent) {
     return '本章 $percent%';
   }
 

@@ -42,6 +42,64 @@ Success<LoadResult<ChapterContent>> loaded(ChapterContent content) => Success(
 );
 
 void main() {
+  testWidgets(
+    'hidden chrome, visible chrome and progress sheet share decimal progress',
+    (tester) async {
+      final content = const FixtureData().content(FixtureScenario.longChapter);
+      final settings = FixtureSettingsStore();
+      await settings.save(
+        ReaderSettings(controlsHintSeen: true),
+        cancellation: CancellationSource().token,
+      );
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          routes: AppRoutes(
+            home: (_) =>
+                ReaderContentView(content: content, settings: settings),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final viewport = tester.widget<PagedReaderViewport>(
+        find.byType(PagedReaderViewport),
+      );
+      viewport.onPosition!(
+        ReaderPosition(
+          contentRevision: content.contentRevision,
+          blockKey: content.blocks.first.blockKey,
+          blockIndex: 0,
+          blockFraction: .267899,
+          chapterFraction: .267899,
+        ),
+        false,
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      final center = tester.getCenter(find.byType(ReaderContentView));
+      if (find
+          .byKey(const ValueKey('reader-chapter-title'))
+          .evaluate()
+          .isEmpty) {
+        await tester.tapAt(center);
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('Chapter 26.78%'), findsOneWidget);
+      await tester.tapAt(center);
+      await tester.pumpAndSettle();
+      expect(find.text('Chapter 26.78%'), findsOneWidget);
+      await tester.tapAt(center);
+      await tester.pumpAndSettle();
+      expect(find.text('Chapter 26.78%'), findsOneWidget);
+      await tester.tap(find.text('Chapter 26.78%'));
+      await tester.pumpAndSettle();
+      expect(find.text('26.78%'), findsOneWidget);
+      expect(tester.widget<Slider>(find.byType(Slider)).value, .267899);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+  );
+
   test(
     'wrong chapter is rejected and non-retryable failures cannot reload',
     () async {
@@ -107,7 +165,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('本章 0%'));
+    await tester.tap(find.text('本章 0.00%'));
     await tester.pumpAndSettle();
     expect(find.byType(Slider), findsOneWidget);
     expect(

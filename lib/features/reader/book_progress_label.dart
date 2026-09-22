@@ -1,5 +1,6 @@
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
+import 'reading_progress_format.dart';
 
 String? bookProgressLabel(
   AppLocalizations l,
@@ -13,7 +14,7 @@ String? bookProgressLabel(
     BookTerminalState.currentEnd => l.bookCurrentEnd,
     BookTerminalState.reading =>
       descriptive
-          ? l.bookProgressPercent((progress.fraction * 100).round())
-          : '${(progress.fraction * 100).round()}%',
+          ? l.bookProgressPercent(formatReadingPercent(progress.fraction))
+          : '${formatReadingPercent(progress.fraction)}%',
   };
 }

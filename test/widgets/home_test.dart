@@ -115,8 +115,8 @@ void main() {
       await tester.tap(find.byTooltip('Search'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('search-input')), findsOneWidget);
-      expect(find.text('Online source'), findsOneWidget);
-      expect(find.text('LightNovel.fun'), findsNothing);
+      expect(find.text('Online source'), findsNothing);
+      expect(find.text('LightNovel.fun'), findsOneWidget);
       expect(env.source.controls.calls, isEmpty);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();

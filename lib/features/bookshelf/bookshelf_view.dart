@@ -15,12 +15,14 @@ class BookshelfView extends StatefulWidget {
     required this.onOpen,
     required this.onSearch,
     this.onDetails,
+    this.onImport,
     this.images,
   });
   final LibraryController controller;
   final ValueChanged<NovelKey> onOpen;
   final ValueChanged<NovelKey>? onDetails;
   final VoidCallback onSearch;
+  final VoidCallback? onImport;
   final ImageRepository? images;
   @override
   State<BookshelfView> createState() => _BookshelfViewState();
@@ -370,6 +372,14 @@ class _BookshelfViewState extends State<BookshelfView> {
                       icon: const Icon(Icons.search),
                       label: Text(strings.searchTitle),
                     ),
+                    if (widget.onImport != null) ...[
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: widget.onImport,
+                        icon: const Icon(Icons.file_upload_outlined),
+                        label: Text(strings.importTitle),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                   ],
                 ),

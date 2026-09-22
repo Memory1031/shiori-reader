@@ -53,6 +53,7 @@ class _CacheScreenState extends State<CacheScreen> {
   }
 
   Future<void> _clear(NovelKey? key) async {
+    if (_busy) return;
     final l = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -71,7 +72,7 @@ class _CacheScreenState extends State<CacheScreen> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted || _busy) return;
     setState(() => _busy = true);
     final result = await widget.cache.clear(novel: key);
     if (!mounted) return;
@@ -104,13 +105,21 @@ class _CacheScreenState extends State<CacheScreen> {
           IconButton(
             onPressed: _busy ? null : _load,
             tooltip: l.retryAction,
-            icon: const Icon(Icons.refresh),
+            icon: _busy && _overview != null
+                ? SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      semanticsLabel: l.loading,
+                    ),
+                  )
+                : const Icon(Icons.refresh),
           ),
         ],
       ),
-      body: _busy
+      body: _busy && _overview == null
           ? const LoadingView()
-          : _failure != null
+          : _failure != null && _overview == null
           ? FailureView(failure: _failure!, onRetry: _load)
           : SafeArea(
               top: false,
@@ -126,6 +135,12 @@ class _CacheScreenState extends State<CacheScreen> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (_failure != null)
+                              FailureView(
+                                failure: _failure!,
+                                onRetry: _load,
+                                retryAvailable: !_busy,
+                              ),
                             _usage(context, groups.length),
                             const SizedBox(height: 28),
                             Text(
@@ -168,7 +183,9 @@ class _CacheScreenState extends State<CacheScreen> {
                                   style: TextButton.styleFrom(
                                     foregroundColor: theme.colorScheme.error,
                                   ),
-                                  onPressed: () => _clear(widget.novel),
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _clear(widget.novel),
                                   child: Text(
                                     widget.novel == null
                                         ? l.cacheClearAll
@@ -265,6 +282,44 @@ class _CacheScreenState extends State<CacheScreen> {
     final theme = Theme.of(context);
     final saved = chapters.fold(0, (sum, chapter) => sum + chapter.savedImages);
     final total = chapters.fold(0, (sum, chapter) => sum + chapter.imageCount);
+    final title = Text(
+      _overview?.books[key] ?? chapters.first.title,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: theme.textTheme.titleSmall,
+    );
+    final subtitle = Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text(
+        chapters.isEmpty
+            ? l.cacheNoChapters
+            : total == 0
+            ? l.cacheBookNoImages(chapters.length)
+            : l.cacheBookImages(chapters.length, saved, total),
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+    final menu = PopupMenuButton<String>(
+      key: ValueKey(('cache-book-actions', key)),
+      enabled: !_busy,
+      tooltip: l.moreActions,
+      icon: const Icon(Icons.more_vert, size: 20),
+      onSelected: (_) => _clear(key),
+      itemBuilder: (_) => [
+        PopupMenuItem(value: 'clear', child: Text(l.cacheClearBook)),
+      ],
+    );
+    if (chapters.isEmpty) {
+      return ListTile(
+        key: ValueKey(key),
+        contentPadding: const EdgeInsets.fromLTRB(44, 8, 0, 8),
+        title: title,
+        subtitle: subtitle,
+        trailing: menu,
+      );
+    }
     return ExpansionTile(
       key: PageStorageKey(key),
       controlAffinity: ListTileControlAffinity.leading,
@@ -274,66 +329,38 @@ class _CacheScreenState extends State<CacheScreen> {
       collapsedShape: const Border(),
       textColor: theme.colorScheme.onSurface,
       iconColor: theme.colorScheme.onSurfaceVariant,
-      title: Text(
-        _overview?.books[key] ?? chapters.first.title,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.titleSmall,
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 6),
-        child: Text(
-          chapters.isEmpty
-              ? l.cacheNoChapters
-              : total == 0
-              ? l.cacheBookNoImages(chapters.length)
-              : l.cacheBookImages(chapters.length, saved, total),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ),
-      trailing: PopupMenuButton<String>(
-        key: ValueKey(('cache-book-actions', key)),
-        tooltip: l.moreActions,
-        icon: const Icon(Icons.more_vert, size: 20),
-        onSelected: (_) => _clear(key),
-        itemBuilder: (_) => [
-          PopupMenuItem(value: 'clear', child: Text(l.cacheClearBook)),
-        ],
-      ),
+      title: title,
+      subtitle: subtitle,
+      trailing: menu,
       children: [
-        if (chapters.isEmpty)
-          Padding(padding: const EdgeInsets.all(12), child: Text(l.cacheEmpty))
-        else
-          for (final chapter in chapters)
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 2,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              title: Text(
-                chapter.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium,
-              ),
-              subtitle: Text(
-                l.cacheChapterStatus(chapter.savedImages, chapter.imageCount),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              trailing: widget.onRead == null
-                  ? null
-                  : const Icon(Icons.chevron_right, size: 18),
-              onTap: widget.onRead == null
-                  ? null
-                  : () => widget.onRead!(chapter.key),
+        for (final chapter in chapters)
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 2,
             ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Text(
+              chapter.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
+            ),
+            subtitle: Text(
+              l.cacheChapterStatus(chapter.savedImages, chapter.imageCount),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            trailing: widget.onRead == null
+                ? null
+                : const Icon(Icons.chevron_right, size: 18),
+            onTap: _busy || widget.onRead == null
+                ? null
+                : () => widget.onRead!(chapter.key),
+          ),
       ],
     );
   }

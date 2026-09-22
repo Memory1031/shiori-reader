@@ -41,6 +41,11 @@ void main() {
       expect(find.byType(ReaderViewport), findsNothing);
       await openReaderSettings(tester);
       await tester.pumpAndSettle();
+      // ReaderSettingsPanel owns the single handle and its live paper theme.
+      expect(
+        tester.widget<BottomSheet>(find.byType(BottomSheet)).showDragHandle,
+        isFalse,
+      );
       expect(find.text('Scroll'), findsNothing);
       expect(find.text('Paged'), findsNothing);
       await tester.pumpWidget(const SizedBox());

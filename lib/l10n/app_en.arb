@@ -120,7 +120,7 @@
   "labMyBooks": "My books",
   "labDiscover": "Discover",
   "labChapter": "Chapter 1 · The last train",
-  "labProgress": "About 36% of this chapter",
+  "labProgress": "Chapter 36.00%",
   "labAuthor": "Shiori Studio",
   "labBook1": "The Station Beyond Summer",
   "labBook2": "Letters to the Moon",
@@ -160,11 +160,11 @@
   "readerGotIt": "Got it",
   "readerPreviousPage": "Previous page",
   "readerNextPage": "Next page",
-  "readerChapterProgress": "About {percent}% of this chapter",
+  "readerChapterProgress": "Chapter {percent}%",
   "@readerChapterProgress": {
     "placeholders": {
       "percent": {
-        "type": "int"
+        "type": "String"
       }
     }
   },
@@ -474,14 +474,14 @@
   "@bookProgressPercent": {
     "placeholders": {
       "percent": {
-        "type": "int"
+        "type": "String"
       }
     }
   },
   "@readerChapterPercent": {
     "placeholders": {
       "percent": {
-        "type": "int"
+        "type": "String"
       }
     }
   },

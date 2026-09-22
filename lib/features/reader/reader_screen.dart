@@ -13,6 +13,7 @@ import 'reader_completion_page.dart';
 import 'reader_completion_transition.dart';
 import 'reader_preferences.dart';
 import 'reader_theme.dart';
+import 'reading_progress_format.dart';
 import 'article_contents.dart';
 import 'settings_panel.dart';
 import 'reader_margin.dart';
@@ -88,6 +89,7 @@ class ReaderContentView extends StatefulWidget {
     super.key,
     required this.content,
     this.runningTitle,
+    this.chapterTitle,
     this.onReady,
     this.onLoadFailure,
     this.onPageAppearance,
@@ -113,6 +115,7 @@ class ReaderContentView extends StatefulWidget {
   final ImageRepository? images;
   final ChapterContent content;
   final String? runningTitle;
+  final String? chapterTitle;
   final VoidCallback? onReady, onLoadFailure;
   final ValueChanged<Color>? onPageAppearance;
   final ReaderController? session;
@@ -195,6 +198,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      // The panel owns the handle so it follows live reading-theme changes.
+      showDragHandle: false,
       backgroundColor: Colors.transparent,
       useSafeArea: true,
       sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
@@ -227,6 +232,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
   final _chrome = ValueNotifier(true);
   final _readingPosition = ValueNotifier<ReaderPosition?>(null);
   ReaderPosition? _latestReadingPosition;
+  double get _displayChapterFraction =>
+      (_latestReadingPosition ?? _readingPosition.value ?? _position)
+          ?.chapterFraction ??
+      0;
   Timer? _positionLabelTimer;
   bool _announcedReady = false;
   void _sample(ReaderPosition position, bool completed) {
@@ -739,10 +748,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   Future<void> _progressPanel(BuildContext context) async {
     final l = AppLocalizations.of(context);
-    var fraction = (_latestReadingPosition?.chapterFraction ?? 0).clamp(
-      0.0,
-      1.0,
-    );
+    var fraction = _displayChapterFraction.clamp(0.0, 1.0);
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
@@ -762,7 +768,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                   ),
                   if (widget.session?.bookProgressAt(fraction) case final book?)
                     Text(
-                      '${(book.fraction * 100).round()}%',
+                      '${formatReadingPercent(book.fraction)}%',
                       style: Theme.of(sheet).textTheme.titleMedium,
                     ),
                 ],
@@ -778,7 +784,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Text('${(fraction * 100).round()}%'),
+                  Text('${formatReadingPercent(fraction)}%'),
                 ],
               ),
               Slider(
@@ -875,7 +881,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                 valueListenable: _readingPosition,
                 builder: (context, position, _) => Text(
                   l.readerChapterProgress(
-                    ((position ?? _position)?.chapterFraction ?? 0) * 100 ~/ 1,
+                    formatReadingPercent(_displayChapterFraction),
                   ),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -912,11 +918,15 @@ class _ReaderContentViewState extends State<ReaderContentView>
                 else
                   const BackButton(),
                 Expanded(
-                  child: Text(
-                    widget.content.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
+                  child: Tooltip(
+                    message: widget.chapterTitle ?? widget.content.title,
+                    child: Text(
+                      widget.chapterTitle ?? widget.content.title,
+                      key: const ValueKey('reader-chapter-title'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
                   ),
                 ),
                 PopupMenuButton<String>(
@@ -997,7 +1007,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                       onPressed: () => _progressPanel(context),
                       child: Text(
                         l.readerChapterPercent(
-                          ((position?.chapterFraction ?? 0) * 100).round(),
+                          formatReadingPercent(_displayChapterFraction),
                         ),
                       ),
                     ),

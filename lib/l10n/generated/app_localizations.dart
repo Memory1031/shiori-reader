@@ -737,7 +737,7 @@ abstract class AppLocalizations {
   /// No description provided for @labProgress.
   ///
   /// In en, this message translates to:
-  /// **'About 36% of this chapter'**
+  /// **'Chapter 36.00%'**
   String get labProgress;
 
   /// No description provided for @labAuthor.
@@ -977,8 +977,8 @@ abstract class AppLocalizations {
   /// No description provided for @readerChapterProgress.
   ///
   /// In en, this message translates to:
-  /// **'About {percent}% of this chapter'**
-  String readerChapterProgress(int percent);
+  /// **'Chapter {percent}%'**
+  String readerChapterProgress(String percent);
 
   /// No description provided for @moreActions.
   ///
@@ -1764,13 +1764,13 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Reading progress {percent}%'**
-  String bookProgressPercent(int percent);
+  String bookProgressPercent(String percent);
 
   /// No description provided for @readerChapterPercent.
   ///
   /// In en, this message translates to:
   /// **'Chapter {percent}%'**
-  String readerChapterPercent(int percent);
+  String readerChapterPercent(String percent);
 
   /// No description provided for @readerReadingProgress.
   ///

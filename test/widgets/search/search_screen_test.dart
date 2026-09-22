@@ -14,6 +14,8 @@ Future<void> mount(
   WidgetTester tester,
   Repository repository, {
   String locale = 'en',
+  String? sourceName,
+  String? environmentLabel,
   double scale = 1,
   bool dark = false,
   AppRoutes routes = const AppRoutes(),
@@ -33,6 +35,8 @@ Future<void> mount(
       repository: repository,
       sourceId: sourceId,
       routes: routes,
+      sourceName: sourceName,
+      environmentLabel: environmentLabel,
     ),
   ),
 );
@@ -42,6 +46,23 @@ final submit = find.byKey(const ValueKey('search-submit'));
 final more = find.byKey(const ValueKey('search-more'));
 
 void main() {
+  testWidgets('source label names the source unless environment overrides it', (
+    tester,
+  ) async {
+    await mount(tester, Repository(), sourceName: 'Test library');
+    await tester.pumpAndSettle();
+    expect(find.text('Test library'), findsOneWidget);
+    await mount(
+      tester,
+      Repository(),
+      sourceName: 'Test library',
+      environmentLabel: 'Offline fixture',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Offline fixture'), findsOneWidget);
+    expect(find.text('Test library'), findsNothing);
+  });
+
   testWidgets(
     'hardware Enter submits; editing cancels and late results stay hidden',
     (tester) async {
