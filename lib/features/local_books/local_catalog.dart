@@ -100,32 +100,54 @@ class LocalNavigationView extends StatelessWidget {
     if (rows.isEmpty) {
       return EmptyView(message: AppLocalizations.of(context).catalogEmpty);
     }
-    return ListView.builder(
-      itemCount: rows.length,
-      itemBuilder: (context, index) {
-        final (entry, depth) = rows[index];
-        return ListTile(
-          key: ValueKey(('local-toc', index)),
-          contentPadding: EdgeInsetsDirectional.only(
-            start: 16 + depth.clamp(0, 4) * 16,
-            end: 16,
+    Widget buildRow(BuildContext context, int index) {
+      final (entry, depth) = rows[index];
+      return ListTile(
+        key: ValueKey(('local-toc', index)),
+        contentPadding: EdgeInsetsDirectional.only(
+          start: 16 + depth.clamp(0, 4) * 16,
+          end: 16,
+        ),
+        selected: entry.chapterKey == current,
+        leading: Icon(
+          entry.chapterKey == current
+              ? Icons.bookmark
+              : entry.children.isEmpty
+              ? Icons.article_outlined
+              : Icons.folder_outlined,
+        ),
+        title: Text(entry.title, maxLines: 3, overflow: TextOverflow.ellipsis),
+        onTap: () => onSelect(entry),
+      );
+    }
+
+    final match = rows.indexWhere((row) => row.$1.chapterKey == current);
+    final anchor = match < 0 ? 0 : match;
+    const center = ValueKey('local-toc-anchor');
+    // Start at the current chapter without measuring the unseen prefix. Rows
+    // before the center grow upwards, retaining variable-height, lazy layout.
+    return CustomScrollView(
+      key: ValueKey((current, anchor)),
+      center: center,
+      semanticChildCount: rows.length,
+      slivers: [
+        if (anchor > 0)
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => buildRow(context, anchor - index - 1),
+              childCount: anchor,
+              semanticIndexCallback: (_, index) => anchor - index - 1,
+            ),
           ),
-          selected: entry.chapterKey == current,
-          leading: Icon(
-            entry.chapterKey == current
-                ? Icons.bookmark
-                : entry.children.isEmpty
-                ? Icons.article_outlined
-                : Icons.folder_outlined,
+        SliverList(
+          key: center,
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => buildRow(context, anchor + index),
+            childCount: rows.length - anchor,
+            semanticIndexOffset: anchor,
           ),
-          title: Text(
-            entry.title,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
-          onTap: () => onSelect(entry),
-        );
-      },
+        ),
+      ],
     );
   }
 }
