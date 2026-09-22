@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:html/dom.dart' as dom;
 import 'epub_text_styles.dart';
 import 'epub_image_candidates.dart';
+import 'epub_svg_presentation.dart';
 
 /// Builds a self-contained, inert document for short, authored layout pages.
 /// The caller resolves archive paths; no filesystem or network URLs survive.
@@ -22,6 +23,17 @@ String? epubPresentation(
     resolveStyle ?? resolve,
     readText,
   ).toList();
+  // SVG coordinates establish authored layout even without CSS positioning.
+  // Only a small, rebuilt subset is admitted; unsupported SVG stays native.
+  if (body.querySelector('svg') != null) {
+    return epubSvgPresentation(
+      document,
+      path,
+      sheets.map((sheet) => sheet.$2),
+      readBytes,
+      resolve,
+    );
+  }
   final layout = RegExp(
     r'(?:float\s*:\s*(?:left|right)|(?:^|[;{])\s*(?:-webkit-)?transform\s*:|writing-mode\s*:\s*vertical|position\s*:\s*absolute)',
     caseSensitive: false,
@@ -50,9 +62,6 @@ String? epubPresentation(
     }
   }
   if (!authored) return null;
-  // Complex SVG is not in the inert HTML subset. The native parser retains
-  // package-local SVG <image> bitmaps; prefer that to a visually empty page.
-  if (body.querySelector('svg') != null) return null;
   var resourceBytes = 0;
   final resources = <String, String>{};
   String resource(String base, String href, {bool rasterOnly = false}) {

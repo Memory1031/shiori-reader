@@ -64,6 +64,60 @@ void main() {
     },
   );
   test(
+    'A02b positioned SVG text is rebuilt as one inert authored page',
+    () {
+      final files = epubFiles()
+        ..['OPS/text/a.xhtml'] = utf8.encode(
+          '''<html><head><title>目录</title></head>
+<body style="margin:0;padding:0;"><div>
+<svg style="margin:0;padding:0;" xmlns="http://www.w3.org/2000/svg"
+ xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1"
+ width="100%" height="100%" viewBox="0 0 1440 2048">
+<image width="1440" height="2048" xlink:href="../images/%E6%98%9F%20%E7%A9%BA.png"/>
+<a xlink:href="b.xhtml" target="_top">
+<rect x="245" y="715" width="684" height="114" fill-opacity="0.0"/>
+<text x="275" y="795" font-size="35" font-family="sans-serif">第１话　小澄同学与女生的证明</text>
+<title>第１话　小澄同学与女生的证明</title>
+</a>
+</svg></div></body></html>''',
+        );
+      final native = EpubParser(
+        zipFiles(files),
+        NovelKey(sourceId: SourceId('local'), novelId: 'fixture'),
+        'self-authored.epub',
+      ).parse();
+      final p = parser(files);
+      final parsed = p.parse();
+      final chapter = parsed.content.chapters.first;
+      final rendered = p.presentations[chapter.key.chapterId]!;
+      expect(rendered, contains('data:image/png;base64,'));
+      expect(rendered, contains('viewBox="0 0 1440 2048"'));
+      expect(
+        RegExp('第１话　小澄同学与女生的证明')
+            .allMatches(rendered)
+            .length,
+        1,
+      );
+      expect(rendered, isNot(contains('<title>')));
+      expect(rendered, isNot(contains('b.xhtml')));
+      expect(rendered, isNot(contains('xlink:href')));
+      expect(
+        chapter.contentRevision,
+        native.content.chapters.first.contentRevision,
+      );
+    },
+  );
+  test('A02c unsupported SVG drawing keeps the native fallback', () {
+    final p = parser(
+      body(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+        '<image width="100" height="100" href="../images/%E6%98%9F%20%E7%A9%BA.png"/>'
+        '<path d="M0 0 L1 1"/><text x="5" y="20">Title</text></svg>',
+      ),
+    )..parse();
+    expect(p.presentations, isEmpty);
+  });
+  test(
     'A03 explicit hidden subtree is omitted with missing anchor falling back to chapter start',
     () {
       final result = parser(

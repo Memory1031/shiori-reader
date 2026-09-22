@@ -149,6 +149,56 @@ void main() {
     },
   );
 
+  test(
+    'existing import derives positioned SVG rendition without a semantic reparse',
+    () async {
+      final files = epubFiles(ncx: true);
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '''<html><head><title>目录</title></head>
+<body style="margin:0;padding:0;"><div>
+<svg style="margin:0;padding:0;" xmlns="http://www.w3.org/2000/svg"
+ xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1"
+ width="100%" height="100%" viewBox="0 0 1440 2048">
+<image width="1440" height="2048" xlink:href="../images/%E6%98%9F%20%E7%A9%BA.png"/>
+<a xlink:href="b.xhtml" target="_top">
+<rect x="245" y="715" width="684" height="114" fill-opacity="0.0"/>
+<text x="275" y="795" font-size="35" font-family="sans-serif">第１话　测试章节</text>
+<title>第１话　测试章节</title>
+</a>
+</svg></div></body></html>''',
+      );
+      final imported = ok(
+        await store.importBook(
+          bytes: Stream.value(zipFiles(files)),
+          format: LocalBookFormat.epub,
+          cancellation: token(),
+          parse: (session) => const BookDecoder().decode(
+            session,
+            format: LocalBookFormat.epub,
+            filename: 'fixture.epub',
+            cancellation: token(),
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+          ),
+        ),
+      );
+      final chapter = imported.content.chapters.first;
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      final rendition = ok(
+        await store.loadPagePresentation(chapter.key, cancellation: token()),
+      )!;
+      expect(rendition, contains('data:image/png;base64,'));
+      expect(RegExp('第１话　测试章节').allMatches(rendition).length, 1);
+      final reread = ok(
+        await store.read(chapter.key.novelKey, cancellation: token()),
+      )!;
+      expect(
+        reread.content.chapters.first.contentRevision,
+        chapter.contentRevision,
+      );
+    },
+  );
+
   Future<Result<LocalBookRecord>> add(
     String text, {
     LocalBookParser? parse,
