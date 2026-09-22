@@ -70,9 +70,10 @@ class _SvgPage {
       final split = part.indexOf(':');
       if (split <= 0 ||
           split != part.lastIndexOf(':') ||
-          !{'margin', 'padding'}.contains(
-            part.substring(0, split).trim().toLowerCase(),
-          ) ||
+          !{
+            'margin',
+            'padding',
+          }.contains(part.substring(0, split).trim().toLowerCase()) ||
           !RegExp(r'^0(?:px)?$').hasMatch(part.substring(split + 1).trim())) {
         return false;
       }
@@ -155,11 +156,7 @@ class _SvgPage {
       'stroke-width',
     }.contains(name)) {
       if (_numbers(value).single < 0) _unsupported();
-    } else if ({
-      'opacity',
-      'fill-opacity',
-      'stroke-opacity',
-    }.contains(name)) {
+    } else if ({'opacity', 'fill-opacity', 'stroke-opacity'}.contains(name)) {
       final number = _numbers(value).single;
       if (number < 0 || number > 1) _unsupported();
     } else if ({'fill', 'stroke'}.contains(name)) {

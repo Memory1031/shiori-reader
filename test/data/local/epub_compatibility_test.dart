@@ -63,12 +63,10 @@ void main() {
       expect(p.presentations, isEmpty);
     },
   );
-  test(
-    'A02b positioned SVG text is rebuilt as one inert authored page',
-    () {
-      final files = epubFiles()
-        ..['OPS/text/a.xhtml'] = utf8.encode(
-          '''<html><head><title>目录</title></head>
+  test('A02b positioned SVG text is rebuilt as one inert authored page', () {
+    final files = epubFiles()
+      ..['OPS/text/a.xhtml'] = utf8.encode(
+        '''<html><head><title>目录</title></head>
 <body style="margin:0;padding:0;"><div>
 <svg style="margin:0;padding:0;" xmlns="http://www.w3.org/2000/svg"
  xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1"
@@ -80,31 +78,27 @@ void main() {
 <title>第１话　小澄同学与女生的证明</title>
 </a>
 </svg></div></body></html>''',
-        );
-      final native = EpubParser(
-        zipFiles(files),
-        NovelKey(sourceId: SourceId('local'), novelId: 'fixture'),
-        'self-authored.epub',
-      ).parse();
-      final p = parser(files);
-      final parsed = p.parse();
-      final chapter = parsed.content.chapters.first;
-      final rendered = p.presentations[chapter.key.chapterId]!;
-      expect(rendered, contains('data:image/png;base64,'));
-      expect(rendered, contains('viewBox="0 0 1440 2048"'));
-      expect(
-        RegExp('第１话　小澄同学与女生的证明').allMatches(rendered).length,
-        1,
       );
-      expect(rendered, isNot(contains('<title>')));
-      expect(rendered, isNot(contains('b.xhtml')));
-      expect(rendered, isNot(contains('xlink:href')));
-      expect(
-        chapter.contentRevision,
-        native.content.chapters.first.contentRevision,
-      );
-    },
-  );
+    final native = EpubParser(
+      zipFiles(files),
+      NovelKey(sourceId: SourceId('local'), novelId: 'fixture'),
+      'self-authored.epub',
+    ).parse();
+    final p = parser(files);
+    final parsed = p.parse();
+    final chapter = parsed.content.chapters.first;
+    final rendered = p.presentations[chapter.key.chapterId]!;
+    expect(rendered, contains('data:image/png;base64,'));
+    expect(rendered, contains('viewBox="0 0 1440 2048"'));
+    expect(RegExp('第１话　小澄同学与女生的证明').allMatches(rendered).length, 1);
+    expect(rendered, isNot(contains('<title>')));
+    expect(rendered, isNot(contains('b.xhtml')));
+    expect(rendered, isNot(contains('xlink:href')));
+    expect(
+      chapter.contentRevision,
+      native.content.chapters.first.contentRevision,
+    );
+  });
   test('A02c unsupported SVG drawing keeps the native fallback', () {
     final p = parser(
       body(
