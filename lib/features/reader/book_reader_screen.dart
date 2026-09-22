@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../domain/contracts/contracts.dart';
+import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/state_views.dart';
@@ -74,6 +75,69 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   String? _bookTitle;
   NovelStatus _bookStatus = NovelStatus.unknown;
   List<ChapterKey>? _readingOrder;
+  final _navigation = <ChapterKey, List<(LocalNavigationEntry, int)>>{};
+  Future<void> _loadNavigation() async {
+    final repository = widget.repository;
+    if (!_local || repository is! LocalNavigationRepository) return;
+    final result = await (repository as LocalNavigationRepository)
+        .loadNavigation(
+          widget.chapter.novelKey,
+          cancellation: _titleRequest.token,
+        );
+    if (!mounted || _invalidated || _titleRequest.token.isCancelled) return;
+    if (result case Success<List<LocalNavigationEntry>>(:final value)) {
+      void collect(List<LocalNavigationEntry> entries, int depth) {
+        for (final entry in entries) {
+          _navigation.putIfAbsent(entry.chapterKey, () => []).add((
+            entry,
+            depth,
+          ));
+          collect(entry.children, depth + 1);
+        }
+      }
+
+      setState(() {
+        _navigation.clear();
+        collect(value, 0);
+      });
+    }
+  }
+
+  String? _chapterTitle(ReaderController reader) {
+    String? title;
+    int? earliest;
+    var deepest = -1;
+    final blocks = reader.content!.blocks;
+    // The EPUB navigation label is independent of the spine catalog's h1.
+    // Prefer the chapter's earliest target, then its more specific child label
+    // when a volume/group points to exactly the same position.
+    for (final (entry, depth)
+        in _navigation[reader.chapter] ??
+            const <(LocalNavigationEntry, int)>[]) {
+      if (entry.title.trim().isEmpty) continue;
+      final index = entry.blockKey == null
+          ? 0
+          : blocks.indexWhere((block) => block.blockKey == entry.blockKey);
+      if (index < 0) continue;
+      if (earliest == null ||
+          index < earliest ||
+          index == earliest && depth > deepest) {
+        title = entry.title;
+        earliest = index;
+        deepest = depth;
+      }
+    }
+    return title ??
+        _catalog.loaded?.value.flatChapters
+            .where(
+              (chapter) =>
+                  chapter.key == reader.chapter &&
+                  chapter.title.trim().isNotEmpty,
+            )
+            .firstOrNull
+            ?.title;
+  }
+
   bool get _needsOrder =>
       _local && widget.repository is LocalContentLinkRepository;
   Future<void> _loadOrder() async {
@@ -140,6 +204,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           ..addListener(_changed);
     unawaited(_loadBookTitle());
     unawaited(_loadOrder());
+    unawaited(_loadNavigation());
     _reader = _create(
       widget.chapter,
       blockKey: widget.initialBlockKey,
@@ -646,14 +711,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       },
       onLoadFailure: () => _rejectPending(reader),
       runningTitle: _runningTitle(reader),
-      chapterTitle: chapters
-          .where(
-            (chapter) =>
-                chapter.key == reader.chapter &&
-                chapter.title.trim().isNotEmpty,
-          )
-          .firstOrNull
-          ?.title,
+      chapterTitle: _chapterTitle(reader),
       images: _displayImages,
       settings: widget.settings,
       session: reader,

@@ -12,7 +12,7 @@ import 'package:shiori/l10n/generated/app_localizations.dart';
 
 void main() {
   testWidgets(
-    'chrome preserves numbered catalog title and falls back to content title',
+    'chrome and progress sheet share numbered title and content fallback',
     (tester) async {
       tester.view.physicalSize = const Size(320, 720);
       tester.view.devicePixelRatio = 1;
@@ -51,6 +51,25 @@ void main() {
         final title = find.byKey(const ValueKey('reader-chapter-title'));
         expect(tester.widget<Text>(title).data, catalogTitle ?? content.title);
         expect(find.byTooltip(catalogTitle ?? content.title), findsOneWidget);
+        await tester.tap(
+          find.widgetWithText(TextButton, l.readerChapterPercent('0.00')),
+        );
+        await tester.pumpAndSettle();
+        final sheet = find.byType(BottomSheet);
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.text(catalogTitle ?? content.title),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: sheet,
+            matching: find.byTooltip(catalogTitle ?? content.title),
+          ),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
         await tester.pumpAndSettle();

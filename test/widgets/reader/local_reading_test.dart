@@ -50,6 +50,77 @@ class MemoryBooks implements LocalBookStore {
 }
 
 void main() {
+  for (final ncx in [true, false]) {
+    for (final toc in [true, false]) {
+      testWidgets(
+        'local chrome uses published ${ncx ? 'NCX' : 'nav'} title, toc=$toc',
+        (tester) async {
+          final files = epubFiles(ncx: ncx, toc: toc);
+          files['OPS/text/a.xhtml'] = utf8.encode(
+            '<html><body><p>第二十二章</p><h1>无头悬案</h1><p id="late">正文内容。</p></body></html>',
+          );
+          files['OPS/text/b.xhtml'] = utf8.encode(
+            '<html><body><h1>后续故事</h1><p>下一章正文。</p></body></html>',
+          );
+          files['OPS/toc.ncx'] = utf8.encode(
+            '''<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><navMap>
+          <navPoint id="v"><navLabel><text>作品名称</text></navLabel><content src="text/a.xhtml"/>
+            <navPoint id="a"><navLabel><text>第二十二章　无头悬案</text></navLabel><content src="text/a.xhtml"/>
+              <navPoint id="s"><navLabel><text>正文小节</text></navLabel><content src="text/a.xhtml#late"/></navPoint>
+            </navPoint>
+            <navPoint id="b"><navLabel><text>第二十三章　后续故事</text></navLabel><content src="text/b.xhtml"/></navPoint>
+          </navPoint></navMap></ncx>''',
+          );
+          files['OPS/nav.xhtml'] = utf8.encode(
+            '''<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol>
+          <li><span>作品名称</span><ol>
+            <li><a href="text/a.xhtml">第二十二章　无头悬案</a><ol><li><a href="text/a.xhtml#late">正文小节</a></li></ol></li>
+            <li><a href="text/b.xhtml">第二十三章　后续故事</a></li>
+          </ol></li></ol></nav></body></html>''',
+          );
+          final book = EpubParser(
+            zipFiles(files),
+            LocalBookIdentity.book('c' * 64),
+            'titles.epub',
+          ).parse().content;
+          expect(book.catalog.flatChapters.first.title, '无头悬案');
+          final repository = LocalReadingRepository(
+            local: MemoryBooks(
+              LocalBookRecord(
+                content: book,
+                format: LocalBookFormat.epub,
+                importedAt: DateTime.utc(2026),
+              ),
+            ),
+            online: ForbiddenOnline(),
+          );
+          await tester.pumpWidget(
+            ShioriApp(
+              locale: const Locale('zh'),
+              routes: AppRoutes(
+                home: (_) => BookReaderScreen(
+                  chapter: book.chapters.first.key,
+                  repository: repository,
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          ReaderContentView view() =>
+              tester.widget<ReaderContentView>(find.byType(ReaderContentView));
+          expect(view().chapterTitle, toc ? '第二十二章　无头悬案' : '无头悬案');
+          expect(find.text(toc ? '第二十二章　无头悬案' : '无头悬案'), findsWidgets);
+          view().onNextChapter!();
+          await tester.pumpAndSettle();
+          expect(view().chapterTitle, toc ? '第二十三章　后续故事' : '后续故事');
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+  }
+
   testWidgets(
     'mixed fixed image pages participate in next and previous navigation',
     (tester) async {

@@ -746,6 +746,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
     );
   }
 
+  String get _effectiveChapterTitle =>
+      widget.chapterTitle ?? widget.content.title;
+
   Future<void> _progressPanel(BuildContext context) async {
     final l = AppLocalizations.of(context);
     var fraction = _displayChapterFraction.clamp(0.0, 1.0);
@@ -777,10 +780,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      widget.content.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: Tooltip(
+                      message: _effectiveChapterTitle,
+                      child: Text(
+                        _effectiveChapterTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -919,9 +925,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
                   const BackButton(),
                 Expanded(
                   child: Tooltip(
-                    message: widget.chapterTitle ?? widget.content.title,
+                    message: _effectiveChapterTitle,
                     child: Text(
-                      widget.chapterTitle ?? widget.content.title,
+                      _effectiveChapterTitle,
                       key: const ValueKey('reader-chapter-title'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
