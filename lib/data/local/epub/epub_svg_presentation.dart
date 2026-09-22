@@ -48,6 +48,20 @@ class _SvgPage {
 
   Never _unsupported() => throw const _UnsupportedSvg();
 
+  /// Only text nodes and nested tspans render glyphs; the skipped
+  /// title/desc/metadata subtrees never count as visible text.
+  bool _hasRenderedText(dom.Element text) {
+    bool visit(dom.Node node) {
+      if (node is dom.Text) return node.text.trim().isNotEmpty;
+      return node is dom.Element &&
+          node.namespaceUri == _namespace &&
+          node.localName == 'tspan' &&
+          node.nodes.any(visit);
+    }
+
+    return text.nodes.any(visit);
+  }
+
   void _count(int depth) {
     if (++_nodes > 512 || depth > 32) _unsupported();
   }
@@ -205,7 +219,7 @@ class _SvgPage {
       _unsupported();
     }
     if (inText && tag != 'tspan') _unsupported();
-    if (tag == 'text' && node.text.trim().isNotEmpty) _texts++;
+    if (tag == 'text' && _hasRenderedText(node)) _texts++;
 
     final renderedTag = tag == 'a' ? 'g' : tag;
     _output.write('<$renderedTag');
@@ -256,6 +270,14 @@ class _SvgPage {
 
     if (tag == 'image') {
       if (++_images > 1 || node.nodes.isNotEmpty) _unsupported();
+      // SVG images have no intrinsic-size fallback: missing or zero
+      // width/height renders nothing, unlike HTML img.
+      final width = node.attributes['width'];
+      final height = node.attributes['height'];
+      if (width == null || height == null) _unsupported();
+      if (_numbers(width).single <= 0 || _numbers(height).single <= 0) {
+        _unsupported();
+      }
       final href = epubImageCandidates(node).firstOrNull;
       if (href == null) _unsupported();
       final ref = resolve(path, href);
@@ -276,7 +298,9 @@ class _SvgPage {
   String? build(dom.Element body) {
     _findRoot(body, 0);
     final svg = _root;
-    if (svg == null || svg.querySelector('text') == null) return null;
+    if (svg == null || !svg.querySelectorAll('text').any(_hasRenderedText)) {
+      return null;
+    }
     _draw(svg, 0);
     // Bitmap-only wrappers already have a cheaper native rendering path.
     if (_images != 1 || _texts == 0) return null;

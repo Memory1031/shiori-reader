@@ -109,6 +109,26 @@ void main() {
     )..parse();
     expect(p.presentations, isEmpty);
   });
+  test('A02d metadata-only text does not qualify as positioned text', () {
+    final p = parser(
+      body(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+        '<image width="100" height="100" href="../images/%E6%98%9F%20%E7%A9%BA.png"/>'
+        '<text x="5" y="20"><title>only metadata</title></text></svg>',
+      ),
+    )..parse();
+    expect(p.presentations, isEmpty);
+  });
+  test('A02e unsized SVG image keeps the native fallback', () {
+    final p = parser(
+      body(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+        '<image href="../images/%E6%98%9F%20%E7%A9%BA.png"/>'
+        '<text x="10" y="20">Visible</text></svg>',
+      ),
+    )..parse();
+    expect(p.presentations, isEmpty);
+  });
   test(
     'A03 explicit hidden subtree is omitted with missing anchor falling back to chapter start',
     () {
