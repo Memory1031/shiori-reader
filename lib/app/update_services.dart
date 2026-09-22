@@ -72,7 +72,9 @@ Future<bool> openUpdatePage(Uri page) async {
   if (page.scheme != 'https' ||
       page.host != 'github.com' ||
       page.userInfo.isNotEmpty ||
-      !page.path.startsWith('/$updateRepositoryPath/releases/') ||
+      page.hasPort ||
+      (page.path != '/$updateRepositoryPath' &&
+          !page.path.startsWith('/$updateRepositoryPath/releases/')) ||
       page.hasQuery ||
       page.hasFragment) {
     return false;

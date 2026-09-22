@@ -905,7 +905,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateAutomatic => '自动检查更新';
 
   @override
-  String get updateAutomaticHint => '每天最多自动检查一次，下载前会征求你的确认。';
+  String get updateAutomaticHint => '每天最多检查一次，下载由你确认。';
 
   @override
   String get updateChannel => '更新渠道';
@@ -914,7 +914,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateStable => '正式版';
 
   @override
-  String get updateBeta => '测试版（包含正式版）';
+  String get updateBeta => '测试版';
 
   @override
   String get updateChannelHint => '切换渠道不会降级。若当前测试版较新，将在有可升级的正式版时提示。';
@@ -979,10 +979,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateDownloaded => '下载完成，已通过校验。可前往发布页查看安装说明。';
 
   @override
-  String get updateReleasePage => '查看发布页';
+  String get updateReleasePage => '查看完整发布说明';
 
   @override
-  String get updateLinkCopied => '无法打开浏览器，发布页链接已复制。';
+  String get updateLinkCopied => '无法打开浏览器，链接已复制。';
 
   @override
   String updateAvailable(String version) {
@@ -1018,4 +1018,31 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get updateReturnToLibrary => '请先返回书架并完成导入，再从菜单进入应用更新。';
+
+  @override
+  String get updateSection => '更新';
+
+  @override
+  String get updateProject => '项目';
+
+  @override
+  String get updateChooseChannel => '选择更新渠道';
+
+  @override
+  String get updateStableHint => '只接收正式版更新';
+
+  @override
+  String get updateBetaHint => '接收测试版和正式版更新';
+
+  @override
+  String get updateNewVersion => '新版本可用';
+
+  @override
+  String get updateLicenses => '开源许可证';
+
+  @override
+  String get updateCopyVersion => '复制版本信息';
+
+  @override
+  String get updateVersionCopied => '版本信息已复制';
 }

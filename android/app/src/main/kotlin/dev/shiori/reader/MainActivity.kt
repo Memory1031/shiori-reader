@@ -55,7 +55,8 @@ class MainActivity : FlutterActivity() {
                         val uri = (call.arguments as? String)?.let(Uri::parse)
                         if (uri?.scheme != "https" || uri.host != "github.com" ||
                             uri.userInfo != null || uri.port != -1 ||
-                            uri.path?.startsWith("/Memory1031/shiori-reader/releases/") != true ||
+                            (uri.path != "/Memory1031/shiori-reader" &&
+                                uri.path?.startsWith("/Memory1031/shiori-reader/releases/") != true) ||
                             uri.query != null || uri.fragment != null) {
                             result.success(false)
                         } else {

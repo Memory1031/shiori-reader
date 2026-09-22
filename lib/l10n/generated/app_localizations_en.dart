@@ -968,7 +968,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateAutomaticHint =>
-      'Checks at most once a day. Downloads start only when you choose.';
+      'At most once a day. You choose when to download.';
 
   @override
   String get updateChannel => 'Update channel';
@@ -977,7 +977,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateStable => 'Stable';
 
   @override
-  String get updateBeta => 'Beta (includes stable)';
+  String get updateBeta => 'Beta';
 
   @override
   String get updateChannelHint =>
@@ -1049,11 +1049,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Download verified. Visit the release page for installation instructions.';
 
   @override
-  String get updateReleasePage => 'View release page';
+  String get updateReleasePage => 'View full release notes';
 
   @override
-  String get updateLinkCopied =>
-      'Could not open the browser. Release link copied.';
+  String get updateLinkCopied => 'Could not open the browser. Link copied.';
 
   @override
   String updateAvailable(String version) {
@@ -1096,4 +1095,31 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get updateReturnToLibrary =>
       'Return to the library and finish any import, then open App updates from the menu.';
+
+  @override
+  String get updateSection => 'Updates';
+
+  @override
+  String get updateProject => 'Project';
+
+  @override
+  String get updateChooseChannel => 'Choose update channel';
+
+  @override
+  String get updateStableHint => 'Receive stable releases only';
+
+  @override
+  String get updateBetaHint => 'Receive beta and stable releases';
+
+  @override
+  String get updateNewVersion => 'New version available';
+
+  @override
+  String get updateLicenses => 'Open-source licenses';
+
+  @override
+  String get updateCopyVersion => 'Copy version info';
+
+  @override
+  String get updateVersionCopied => 'Version info copied';
 }

@@ -1,13 +1,79 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/domain/contracts/app_updates.dart';
-import 'package:shiori/domain/models/release_identity.dart';
+import 'package:flutter/services.dart';
 import 'package:shiori/features/updates/update_controller.dart';
 import 'package:shiori/features/updates/update_screen.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 import '../support/fake_update_repository.dart';
 
 void main() {
+  testWidgets('project actions remain available without in-app updates', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repo = FakeUpdateRepository()
+      ..installed = const InstalledUpdateApp(
+        version: '1.2.1',
+        build: 10,
+        availability: UpdateAvailability.unsupported,
+      );
+    final controller = UpdateController(repo);
+    await controller.initialize();
+    addTearDown(() async {
+      await controller.shutdown();
+      controller.dispose();
+    });
+    Uri? opened;
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: UpdateScreen(
+          controller: controller,
+          openPage: (page) async {
+            opened = page;
+            return true;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final l = AppLocalizations.of(tester.element(find.byType(UpdateScreen)));
+    expect(find.text('v1.2.1'), findsOneWidget);
+    expect(find.text(l.updateUnsupported), findsOneWidget);
+    expect(find.byKey(const ValueKey('update-check')), findsNothing);
+    await tester.tap(find.text('GitHub'));
+    expect(opened.toString(), 'https://github.com/Memory1031/shiori-reader');
+    await tester.tap(find.text(l.updateCopyVersion));
+    await tester.pumpAndSettle();
+    expect(copied, contains('Shiori 1.2.1\nBuild: 10\nPlatform:'));
+    expect(find.text(l.updateVersionCopied), findsOneWidget);
+    await tester.tap(find.text(l.updateLicenses));
+    await tester.pumpAndSettle();
+    expect(find.byType(LicensePage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   for (final language in ['zh', 'en']) {
     testWidgets(
       '$language channel switch displays not checked until requested',
@@ -36,7 +102,7 @@ void main() {
           tester.element(find.byType(UpdateScreen)),
         );
         expect(find.text(l.updateNeverChecked), findsNothing);
-        await tester.tap(find.byType(DropdownButtonFormField<UpdateChannel>));
+        await tester.tap(find.byKey(const ValueKey('update-channel')));
         await tester.pumpAndSettle();
         await tester.tap(find.text(l.updateBeta).last);
         await tester.pumpAndSettle();

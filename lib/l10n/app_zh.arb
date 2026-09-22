@@ -461,10 +461,10 @@
   "updateUnsupported": "请通过 App Store 或 TestFlight 获取更新。",
   "updateInvalidIdentity": "无法确认当前版本信息，暂时无法检查更新。",
   "updateAutomatic": "自动检查更新",
-  "updateAutomaticHint": "每天最多自动检查一次，下载前会征求你的确认。",
+  "updateAutomaticHint": "每天最多检查一次，下载由你确认。",
   "updateChannel": "更新渠道",
   "updateStable": "正式版",
-  "updateBeta": "测试版（包含正式版）",
+  "updateBeta": "测试版",
   "updateChannelHint": "切换渠道不会降级。若当前测试版较新，将在有可升级的正式版时提示。",
   "updateNeverChecked": "尚未检查更新",
   "updateLastChecked": "上次检查：{time}",
@@ -511,8 +511,8 @@
   },
   "updateDownload": "下载更新",
   "updateDownloaded": "下载完成，已通过校验。可前往发布页查看安装说明。",
-  "updateReleasePage": "查看发布页",
-  "updateLinkCopied": "无法打开浏览器，发布页链接已复制。",
+  "updateReleasePage": "查看完整发布说明",
+  "updateLinkCopied": "无法打开浏览器，链接已复制。",
   "updateAvailable": "发现新版本 {version}",
   "@updateAvailable": {
     "placeholders": {
@@ -530,5 +530,14 @@
   "updateInstallCancelled": "已取消安装，下载包已保留，可以重试。",
   "updateInstallFailed": "系统未能完成安装。请检查可用空间和安装权限后重试。",
   "updateInstallBusy": "请等待当前操作完成后再安装更新。",
-  "updateReturnToLibrary": "请先返回书架并完成导入，再从菜单进入应用更新。"
+  "updateReturnToLibrary": "请先返回书架并完成导入，再从菜单进入应用更新。",
+  "updateSection": "更新",
+  "updateProject": "项目",
+  "updateChooseChannel": "选择更新渠道",
+  "updateStableHint": "只接收正式版更新",
+  "updateBetaHint": "接收测试版和正式版更新",
+  "updateNewVersion": "新版本可用",
+  "updateLicenses": "开源许可证",
+  "updateCopyVersion": "复制版本信息",
+  "updateVersionCopied": "版本信息已复制"
 }

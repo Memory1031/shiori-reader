@@ -1799,7 +1799,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateAutomaticHint.
   ///
   /// In en, this message translates to:
-  /// **'Checks at most once a day. Downloads start only when you choose.'**
+  /// **'At most once a day. You choose when to download.'**
   String get updateAutomaticHint;
 
   /// No description provided for @updateChannel.
@@ -1817,7 +1817,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateBeta.
   ///
   /// In en, this message translates to:
-  /// **'Beta (includes stable)'**
+  /// **'Beta'**
   String get updateBeta;
 
   /// No description provided for @updateChannelHint.
@@ -1931,13 +1931,13 @@ abstract class AppLocalizations {
   /// No description provided for @updateReleasePage.
   ///
   /// In en, this message translates to:
-  /// **'View release page'**
+  /// **'View full release notes'**
   String get updateReleasePage;
 
   /// No description provided for @updateLinkCopied.
   ///
   /// In en, this message translates to:
-  /// **'Could not open the browser. Release link copied.'**
+  /// **'Could not open the browser. Link copied.'**
   String get updateLinkCopied;
 
   /// No description provided for @updateAvailable.
@@ -2005,6 +2005,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Return to the library and finish any import, then open App updates from the menu.'**
   String get updateReturnToLibrary;
+
+  /// No description provided for @updateSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates'**
+  String get updateSection;
+
+  /// No description provided for @updateProject.
+  ///
+  /// In en, this message translates to:
+  /// **'Project'**
+  String get updateProject;
+
+  /// No description provided for @updateChooseChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose update channel'**
+  String get updateChooseChannel;
+
+  /// No description provided for @updateStableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive stable releases only'**
+  String get updateStableHint;
+
+  /// No description provided for @updateBetaHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive beta and stable releases'**
+  String get updateBetaHint;
+
+  /// No description provided for @updateNewVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'New version available'**
+  String get updateNewVersion;
+
+  /// No description provided for @updateLicenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Open-source licenses'**
+  String get updateLicenses;
+
+  /// No description provided for @updateCopyVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy version info'**
+  String get updateCopyVersion;
+
+  /// No description provided for @updateVersionCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Version info copied'**
+  String get updateVersionCopied;
 }
 
 class _AppLocalizationsDelegate

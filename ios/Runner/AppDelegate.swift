@@ -19,6 +19,20 @@ import UIKit
               "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
               "build": Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0
             ])
+          } else if call.method == "openRelease" {
+            guard let value = call.arguments as? String,
+              let url = URL(string: value),
+              let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              parts.scheme == "https", parts.host == "github.com",
+              parts.user == nil, parts.password == nil, parts.port == nil,
+              parts.query == nil, parts.fragment == nil,
+              (parts.path == "/Memory1031/shiori-reader" ||
+                parts.path.hasPrefix("/Memory1031/shiori-reader/releases/"))
+            else {
+              result(false)
+              return
+            }
+            UIApplication.shared.open(url, options: [:]) { opened in result(opened) }
           } else {
             result(FlutterMethodNotImplemented)
           }

@@ -50,7 +50,8 @@ bool FlutterWindow::OnCreate() {
     } else if (call.method_name() == "openRelease") {
       const auto* url = call.arguments() ? std::get_if<std::string>(call.arguments()) : nullptr;
       const std::string prefix = "https://github.com/Memory1031/shiori-reader/releases/";
-      if (!url || url->rfind(prefix, 0) != 0 ||
+      if (!url || (*url != "https://github.com/Memory1031/shiori-reader" &&
+                   url->rfind(prefix, 0) != 0) ||
           url->find_first_of("\r\n\"\\?#") != std::string::npos ||
           url->find('\0') != std::string::npos) {
         result->Success(flutter::EncodableValue(false));

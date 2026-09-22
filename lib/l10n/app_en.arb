@@ -461,10 +461,10 @@
   "updateUnsupported": "Get updates through the App Store or TestFlight.",
   "updateInvalidIdentity": "Unable to verify the installed version. Update checks are unavailable.",
   "updateAutomatic": "Check automatically",
-  "updateAutomaticHint": "Checks at most once a day. Downloads start only when you choose.",
+  "updateAutomaticHint": "At most once a day. You choose when to download.",
   "updateChannel": "Update channel",
   "updateStable": "Stable",
-  "updateBeta": "Beta (includes stable)",
+  "updateBeta": "Beta",
   "updateChannelHint": "Switching channels never downgrades. If your beta is newer, you'll be notified when a stable upgrade is available.",
   "updateNeverChecked": "Not checked yet",
   "updateLastChecked": "Last checked: {time}",
@@ -511,8 +511,8 @@
   },
   "updateDownload": "Download update",
   "updateDownloaded": "Download verified. Visit the release page for installation instructions.",
-  "updateReleasePage": "View release page",
-  "updateLinkCopied": "Could not open the browser. Release link copied.",
+  "updateReleasePage": "View full release notes",
+  "updateLinkCopied": "Could not open the browser. Link copied.",
   "updateAvailable": "Update available: {version}",
   "@updateAvailable": {
     "placeholders": {
@@ -530,5 +530,14 @@
   "updateInstallCancelled": "Installation cancelled. The downloaded package is kept for retry.",
   "updateInstallFailed": "The system could not complete installation. Check free space and installation permission, then retry.",
   "updateInstallBusy": "Wait for the current operation to finish before installing.",
-  "updateReturnToLibrary": "Return to the library and finish any import, then open App updates from the menu."
+  "updateReturnToLibrary": "Return to the library and finish any import, then open App updates from the menu.",
+  "updateSection": "Updates",
+  "updateProject": "Project",
+  "updateChooseChannel": "Choose update channel",
+  "updateStableHint": "Receive stable releases only",
+  "updateBetaHint": "Receive beta and stable releases",
+  "updateNewVersion": "New version available",
+  "updateLicenses": "Open-source licenses",
+  "updateCopyVersion": "Copy version info",
+  "updateVersionCopied": "Version info copied"
 }
