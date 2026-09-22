@@ -64,7 +64,7 @@ void main() {
       await seed(
         repo,
         books[0],
-        BookProgressSnapshot(fraction: .63, chapterCount: 120),
+        BookProgressSnapshot(fraction: .6399, chapterCount: 120),
       );
       await seed(
         repo,
@@ -124,12 +124,12 @@ void main() {
         expect(title.maxLines, 2);
         expect(title.overflow, TextOverflow.ellipsis);
       }
-      expect(find.textContaining('63.00%'), findsNothing);
+      expect(find.textContaining('63%'), findsNothing);
       expect(find.textContaining('已读完'), findsNothing);
       expect(find.textContaining('已读至最新'), findsNothing);
       for (var i = 0; i < 2; i++) {
         if (i == 1) {
-          expect(find.text('epub · 阅读进度 63.00%'), findsOneWidget);
+          expect(find.text('epub · 阅读进度 63%'), findsOneWidget);
           expect(find.text('txt · 已读完'), findsOneWidget);
           expect(find.text('已读至最新'), findsOneWidget);
         }
@@ -155,7 +155,7 @@ void main() {
       await seed(
         env.library,
         env.source.data.summary(FixtureScenario.shortChapter),
-        BookProgressSnapshot(fraction: .63, chapterCount: 120),
+        BookProgressSnapshot(fraction: .6399, chapterCount: 120),
       );
       await tester.pumpWidget(
         ShioriApp(
@@ -169,7 +169,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Reading progress 63.00%'), findsOneWidget);
+      expect(find.text('Reading progress 63%'), findsOneWidget);
       expect(find.textContaining('42.00%'), findsNothing);
       expect(env.source.controls.calls, isEmpty);
       final controller = LibraryController(env.library)..onStart();
@@ -182,7 +182,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Reading progress 63.00%'), findsOneWidget);
+      expect(find.text('Reading progress 63.99%'), findsOneWidget);
       expect(env.source.controls.calls, isEmpty);
       await tester.pumpWidget(const SizedBox());
       controller.onDelete();
