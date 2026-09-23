@@ -48,6 +48,36 @@ void main() {
     expect(paragraph.inlineRuby.map((ruby) => ruby.annotation), ['shown']);
   });
 
+  test('visible descendants of hidden rt remain readable', () {
+    final chapter = parse(
+      '<p><ruby style="visibility:hidden">'
+      '<span style="visibility:visible">甲</span>'
+      '<rt>secret<span style="visibility:visible">jia</span></rt>'
+      '</ruby><ruby style="visibility:hidden">'
+      '<span style="visibility:visible">乙</span><rt>secret</rt>'
+      '</ruby><ruby>丙<rt style="visibility:hidden">'
+      '<span style="visibility:visible">bing</span></rt></ruby>'
+      '<ruby>丁<rt hidden><span style="visibility:visible">leak</span>'
+      '</rt></ruby><ruby>戊<rt style="display:none">'
+      '<span style="visibility:visible">leak</span></rt></ruby></p>',
+    );
+    final paragraph = chapter.blocks.first as ParagraphBlock;
+    expect(paragraph.text, '甲乙丙丁戊');
+    expect(paragraph.inlineRuby.map((ruby) => ruby.annotation), [
+      'jia',
+      'bing',
+    ]);
+
+    final fallback = parse(
+      '<pre><ruby style="visibility:hidden">'
+      '<span style="visibility:visible">甲</span>'
+      '<rt>secret<span style="visibility:visible">jia</span></rt>'
+      '</ruby></pre>',
+    );
+    expect((fallback.blocks.first as ParagraphBlock).text, '甲（jia）');
+    expect(fallback.blocks.first.inlineRuby, isEmpty);
+  });
+
   test(
     'ruby preserves base ranges, multiple pairs, heading, link and Unicode',
     () {

@@ -935,7 +935,6 @@ class EpubParser {
         'hidden' || 'collapse' => false,
         _ => inheritedVisible,
       };
-      if (!annotationVisible) return null;
       final text = StringBuffer();
       void collect(dom.Node node, bool visible) {
         if (node is dom.Text) {
@@ -1008,7 +1007,7 @@ class EpubParser {
         'hidden' || 'collapse' => false,
         _ => visible,
       };
-      if (!visible && {'img', 'image', 'hr', 'br', 'rt', 'rp'}.contains(tag)) {
+      if (!visible && {'img', 'image', 'hr', 'br', 'rp'}.contains(tag)) {
         whitespace = previousWhitespace;
         visible = previousVisible;
         return;
