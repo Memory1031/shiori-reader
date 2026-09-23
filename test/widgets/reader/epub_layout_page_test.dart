@@ -11,6 +11,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
@@ -422,6 +423,26 @@ void main() {
     );
     expect(taps, 2);
     expect(center, 0);
+
+    for (final button in [kSecondaryButton, kTertiaryButton]) {
+      listener.onPointerDown!(
+        PointerDownEvent(
+          position: point,
+          timeStamp: const Duration(milliseconds: 200),
+          buttons: button,
+        ),
+      );
+      listener.onPointerUp!(
+        const PointerUpEvent(
+          position: point,
+          timeStamp: Duration(milliseconds: 250),
+        ),
+      );
+      expect(taps, 2);
+      expect(center, 0);
+      expect(previous, 0);
+      expect(next, 0);
+    }
   });
 
   testWidgets('SVG TOC tap reaches the real Reader chapter navigation', (

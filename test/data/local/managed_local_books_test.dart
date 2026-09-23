@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/local/database/user_database.dart';
 import 'package:shiori/data/local/files/app_paths.dart';
 import 'package:shiori/data/local/managed_local_books.dart';
+import 'package:shiori/data/local/record_codec.dart';
 import 'package:shiori/data/repositories/local_reading_repository.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
@@ -307,6 +308,101 @@ void main() {
         ).loadContentLinks(chapter.key, cancellation: token()),
       );
       expect(bundledLinks.where((link) => link.region != null), hasLength(1));
+    },
+  );
+
+  test(
+    'legacy SVG scan retains matching hotspots after a stale page request',
+    () async {
+      final files = epubFiles(ncx: true);
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '''<html><body><svg xmlns="http://www.w3.org/2000/svg"
+ xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1440 2048">
+<image width="1440" height="2048" xlink:href="../images/%E6%98%9F%20%E7%A9%BA.png"/>
+<text x="275" y="795">旧扉页</text></svg></body></html>''',
+      );
+      files['OPS/text/b.xhtml'] = utf8.encode(
+        '''<html><body><svg xmlns="http://www.w3.org/2000/svg"
+ xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1440 2048">
+<image width="1440" height="2048" xlink:href="../images/%E6%98%9F%20%E7%A9%BA.png"/>
+<a xlink:href="a.xhtml"><rect x="245" y="715" width="684" height="114"
+ fill-opacity="0.0"/><text x="275" y="795">回到扉页</text></a>
+</svg></body></html>''',
+      );
+      final imported = ok(
+        await store.importBook(
+          bytes: Stream.value(zipFiles(files)),
+          format: LocalBookFormat.epub,
+          cancellation: token(),
+          parse: (session) => const BookDecoder().decode(
+            session,
+            format: LocalBookFormat.epub,
+            filename: 'fixture.epub',
+            cancellation: token(),
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+          ),
+        ),
+      );
+      final key = imported.content.detail.summary.key;
+      final a = imported.content.chapters.first;
+      final b = imported.content.chapters.last;
+      ok(
+        await store.reparseBook(
+          key,
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+          cancellation: token(),
+        ),
+      );
+      final bundle =
+          (await db
+                  .customSelect(
+                    'SELECT active_bundle FROM local_books WHERE digest=?',
+                    variables: [Variable(key.novelId)],
+                  )
+                  .getSingle())
+              .read<String>('active_bundle');
+      final manifestFile = File(
+        '${paths.localBooks.path}/${key.novelId}/revisions/$bundle/manifest.json',
+      );
+      final manifest =
+          jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+      final chapters = manifest['chapters'] as List;
+      chapters[0] = RecordCodec.chapter(
+        ChapterContent(key: a.key, title: '旧版扉页标题', blocks: a.blocks),
+      );
+      manifest['links'] = <Object>[];
+      final oldBundle = utf8.encode(jsonEncode(manifest));
+      await manifestFile.writeAsBytes(oldBundle, flush: true);
+      await db.customStatement(
+        'UPDATE local_books SET manifest_hash=?,parser_version=12 WHERE digest=?',
+        [sha256.convert(oldBundle).toString(), key.novelId],
+      );
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      final original = File('${paths.localBooks.path}/${key.novelId}/original');
+      final hiddenOriginal = File('${original.path}.hidden');
+
+      for (final first in [a.key, b.key]) {
+        final firstLinks = ok(
+          await store.loadContentLinks(first, cancellation: token()),
+        );
+        expect(
+          firstLinks.where((link) => link.region != null),
+          first == b.key ? hasLength(1) : isEmpty,
+        );
+        await original.rename(hiddenOriginal.path);
+        final second = first == a.key ? b.key : a.key;
+        final secondLinks = ok(
+          await store.loadContentLinks(second, cancellation: token()),
+        );
+        expect(
+          secondLinks.where((link) => link.region != null),
+          second == b.key ? hasLength(1) : isEmpty,
+        );
+        await hiddenOriginal.rename(original.path);
+        await store.close();
+        store = ok(await ManagedLocalBooks.open(paths, db));
+      }
     },
   );
 

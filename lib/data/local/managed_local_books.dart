@@ -103,8 +103,6 @@ class ManagedLocalBooks
             source.novelKey,
             cancellation,
           );
-          // A successful scan is conclusive even when the book has no links.
-          _svgLinksScanned.add(source.novelKey);
           final revisions = {
             for (final chapter in [
               ...record.content.chapters,
@@ -121,10 +119,13 @@ class ManagedLocalBooks
                   extracted.$2.containsKey(chapter.key.chapterId))
                 chapter.key.chapterId: extracted.$2[chapter.key.chapterId]!,
           };
-          if (matchingPages.containsKey(source.chapterId)) {
-            derived = (extracted.$1, {...derived.$2, ...matchingPages});
-            _presentations[source.novelKey] = derived;
-          }
+          // Cache every matching page before marking the whole-book scan as
+          // complete. The requested page may be stale while another page has
+          // recoverable hotspots.
+          derived = (extracted.$1, {...derived.$2, ...matchingPages});
+          _presentations[source.novelKey] = derived;
+          // A successful scan is conclusive even when the book has no links.
+          _svgLinksScanned.add(source.novelKey);
         }
         if (derived == null || !derived.$2.containsKey(source.chapterId)) {
           return stored;

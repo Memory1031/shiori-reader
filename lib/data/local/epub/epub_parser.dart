@@ -925,12 +925,17 @@ class EpubParser {
       'figure',
     };
     const paragraphs = {'p', 'li', 'dt', 'dd', 'pre', 'figcaption', 'tr'};
-    String? rubyAnnotation(dom.Element rt) {
+    String? rubyAnnotation(dom.Element rt, bool inheritedVisible) {
       if (rt.attributes.containsKey('hidden') ||
-          styles[rt]?['display'] == 'none' ||
-          {'hidden', 'collapse'}.contains(styles[rt]?['visibility'])) {
+          styles[rt]?['display'] == 'none') {
         return null;
       }
+      final annotationVisible = switch (styles[rt]?['visibility']) {
+        'visible' || 'initial' => true,
+        'hidden' || 'collapse' => false,
+        _ => inheritedVisible,
+      };
+      if (!annotationVisible) return null;
       final text = StringBuffer();
       void collect(dom.Node node, bool visible) {
         if (node is dom.Text) {
@@ -953,7 +958,7 @@ class EpubParser {
       }
 
       for (final child in rt.nodes) {
-        collect(child, true);
+        collect(child, annotationVisible);
       }
       return text.toString().replaceAll(RegExp(r'[ \t\r\n\f]+'), ' ').trim();
     }
@@ -1194,7 +1199,10 @@ class EpubParser {
       }
       if (tag == 'ruby') {
         final pairs = whitespace == ProseWhiteSpace.normal
-            ? proseRuby(node, annotationText: rubyAnnotation)
+            ? proseRuby(
+                node,
+                annotationText: (rt) => rubyAnnotation(rt, visible),
+              )
             : null;
         if (pairs != null) {
           for (final pair in pairs) {
@@ -1219,7 +1227,7 @@ class EpubParser {
       if (tag == 'rt') {
         whitespace = previousWhitespace;
         visible = previousVisible;
-        final annotation = rubyAnnotation(node);
+        final annotation = rubyAnnotation(node, previousVisible);
         if (annotation != null && annotation.isNotEmpty) {
           buffer.write('（$annotation）');
         }

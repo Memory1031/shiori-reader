@@ -168,8 +168,10 @@ $interactionStyle
       builder: (context, bounds) => Listener(
         behavior: HitTestBehavior.opaque,
         onPointerDown: (e) {
-          _down = e.localPosition;
-          _downTime = e.timeStamp;
+          // Only a primary press may navigate or turn the page. Pointer-up
+          // no longer carries the released mouse button, so decide here.
+          _down = e.buttons == kPrimaryButton ? e.localPosition : null;
+          _downTime = _down == null ? null : e.timeStamp;
         },
         onPointerCancel: (_) {
           _down = null;

@@ -35,6 +35,19 @@ void main() {
     expect(paragraph.inlineRuby.map((ruby) => ruby.annotation), ['show']);
   });
 
+  test('ruby annotation inherits visibility from its hidden parent', () {
+    final chapter = parse(
+      '<p><ruby style="visibility:hidden">'
+      '<span style="visibility:visible">甲</span><rt>secret</rt>'
+      '</ruby><ruby style="visibility:hidden">'
+      '<span style="visibility:visible">乙</span>'
+      '<rt style="visibility:visible">shown</rt></ruby></p>',
+    );
+    final paragraph = chapter.blocks.first as ParagraphBlock;
+    expect(paragraph.text, '甲乙');
+    expect(paragraph.inlineRuby.map((ruby) => ruby.annotation), ['shown']);
+  });
+
   test(
     'ruby preserves base ranges, multiple pairs, heading, link and Unicode',
     () {
