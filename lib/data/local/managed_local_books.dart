@@ -90,9 +90,9 @@ class ManagedLocalBooks
         var derived = _presentations[source.novelKey];
         if (derived != null &&
             derived.$2[source.chapterId]?.contains('shiori-svg-page') == true &&
-            !derived.$1.links.any(
-              (link) => link.source == source && link.region != null,
-            )) {
+            // A hotspot anywhere in the derived book proves this version has
+            // already scanned SVG links. A linkless title page needs no retry.
+            !derived.$1.links.any((link) => link.region != null)) {
           // Older reparse bundles retained the rendition but not its link side
           // table. Recover the matching page from the immutable original too.
           final original = await _file(source.novelKey.novelId, 'original');

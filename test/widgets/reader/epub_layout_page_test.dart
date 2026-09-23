@@ -6,7 +6,9 @@ import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_completion_page.dart';
 import 'completion_test.dart' show CompletionRepository;
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -15,6 +17,7 @@ import 'package:shiori/app/app.dart';
 import 'package:shiori/app/routes.dart';
 import 'package:shiori/features/reader/epub_layout_page.dart';
 import 'package:shiori/features/reader/epub_webview_host.dart';
+import 'package:shiori/features/reader/svg_paper_art.dart';
 import 'package:shiori/features/reader/reader_controller.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
@@ -26,6 +29,48 @@ import 'local_reading_test.dart' show MemoryBooks;
 import 'package:shiori/data/repositories/local_reading_repository.dart';
 
 const document = '<html><head></head><body>Static page</body></html>';
+
+Future<String> svgArtworkPage({required Color paper, Color? accent}) async {
+  final recorder = ui.PictureRecorder();
+  final canvas = ui.Canvas(recorder);
+  canvas.drawColor(paper, BlendMode.src);
+  canvas.drawRect(
+    const Rect.fromLTWH(8, 8, 16, 16),
+    Paint()..color = accent ?? const Color(0xff777777),
+  );
+  final image = await recorder.endRecording().toImage(64, 64);
+  try {
+    final png = await image.toByteData(format: ui.ImageByteFormat.png);
+    final data = base64Encode(png!.buffer.asUint8List());
+    return '<html><head></head><body class="shiori-svg-page">'
+        '<svg><image href="data:image/png;base64,$data"/></svg>'
+        '</body></html>';
+  } finally {
+    image.dispose();
+  }
+}
+
+Future<(int, int)> svgArtworkAlphas(String html) async {
+  const prefix = 'data:image/png;base64,';
+  final start = html.indexOf(prefix) + prefix.length;
+  final end = html.indexOf('"', start);
+  final codec = await ui.instantiateImageCodec(
+    base64Decode(html.substring(start, end)),
+  );
+  final image = (await codec.getNextFrame()).image;
+  try {
+    final pixels = (await image.toByteData(
+      format: ui.ImageByteFormat.rawRgba,
+    ))!;
+    return (
+      pixels.getUint8(3),
+      pixels.getUint8((16 * image.width + 16) * 4 + 3),
+    );
+  } finally {
+    image.dispose();
+    codec.dispose();
+  }
+}
 
 class _Controller extends PlatformInAppWebViewController {
   _Controller()
@@ -171,13 +216,16 @@ void main() {
     String html = document,
     String os = 'android',
     Brightness brightness = Brightness.light,
+    Color? paper,
     List<LocalContentLink> links = const [],
     ValueChanged<LocalContentLink>? onLink,
   }) => EpubWebViewHost(
     userDataDirectory: temp,
     operatingSystem: os,
     child: MaterialApp(
-      theme: ThemeData(brightness: brightness),
+      theme: ThemeData(
+        brightness: brightness,
+      ).copyWith(scaffoldBackgroundColor: paper),
       home: EpubLayoutPage(
         html: html,
         links: links,
@@ -190,6 +238,66 @@ void main() {
       ),
     ),
   );
+
+  Future<void> settleSvgArtwork(WidgetTester tester, {int minHeads = 1}) async {
+    // Engine image decodes complete outside the widget test's fake clock.
+    for (var i = 0; i < 100 && platform.heads.length < minHeads; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(platform.heads.length, greaterThanOrEqualTo(minHeads));
+  }
+
+  testWidgets('only neutral white SVG artwork blends with reader paper', (
+    tester,
+  ) async {
+    final (neutral, colorful) = (await tester.runAsync(() async {
+      final neutral = await svgArtworkPage(paper: Colors.white);
+      final colorful = await svgArtworkPage(
+        paper: Colors.white,
+        accent: const Color(0xffe52c50),
+      );
+      final transparent = await svgArtworkPage(paper: Colors.transparent);
+      final prepared = await themedSvgPaperArtwork(
+        neutral,
+        const Color(0xff332211),
+      );
+      expect(prepared, isNot(neutral));
+      final (backgroundAlpha, detailAlpha) = await svgArtworkAlphas(prepared);
+      expect(backgroundAlpha, 0);
+      expect(detailAlpha, greaterThan(0));
+      expect(await themedSvgPaperArtwork(colorful, Colors.black), colorful);
+      expect(
+        await themedSvgPaperArtwork(transparent, Colors.black),
+        transparent,
+      );
+      expect(await themedSvgPaperArtwork(document, Colors.black), document);
+      return (neutral, colorful);
+    }))!;
+
+    await tester.pumpWidget(
+      page(html: neutral, paper: const Color(0xfff2e8d5)),
+    );
+    await settleSvgArtwork(tester);
+    final warm = platform.heads.last.params.initialData!.data;
+    expect(warm, contains('background:#f2e8d5!important'));
+    expect(warm, contains('data:image/png;base64,'));
+    expect(warm, isNot(contains('mix-blend-mode:')));
+    await tester.pumpWidget(page(html: neutral, brightness: Brightness.dark));
+    await settleSvgArtwork(tester, minHeads: 2);
+    final dark = platform.heads.last.params.initialData!.data;
+    expect(dark, contains('svg text:not([fill])'));
+
+    await tester.pumpWidget(page(html: colorful));
+    await settleSvgArtwork(tester, minHeads: 3);
+    expect(
+      platform.heads.last.params.initialData!.data,
+      isNot(contains('mix-blend-mode:')),
+    );
+    await tester.pumpWidget(const SizedBox());
+  });
 
   for (final size in [const Size(320, 800), const Size(1200, 600)]) {
     testWidgets('SVG hotspots follow meet geometry and consume one tap: $size', (
@@ -205,7 +313,7 @@ void main() {
       await tester.pumpWidget(
         page(html: html, links: [link], onLink: (_) => taps++),
       );
-      await tester.pumpAndSettle();
+      await settleSvgArtwork(tester);
       platform.heads.single.finish();
       await tester.pumpAndSettle();
       final width = size.width < size.height * .5
@@ -278,6 +386,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await settleSvgArtwork(tester);
     expect(find.byType(EpubLayoutPage), findsOneWidget);
     final before = tester.widget<ReaderContentView>(
       find.byType(ReaderContentView),

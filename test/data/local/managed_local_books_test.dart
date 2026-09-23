@@ -170,6 +170,13 @@ void main() {
 </a>
 </svg></div></body></html>''',
       );
+      files['OPS/text/b.xhtml'] = utf8.encode(
+        '''<html><body><svg xmlns="http://www.w3.org/2000/svg"
+ xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1440 2048">
+<image width="1440" height="2048" xlink:href="../images/%E6%98%9F%20%E7%A9%BA.png"/>
+<text x="275" y="795">第１话　测试章节</text>
+</svg></body></html>''',
+      );
       final imported = ok(
         await store.importBook(
           bytes: Stream.value(zipFiles(files)),
@@ -185,6 +192,28 @@ void main() {
         ),
       );
       final chapter = imported.content.chapters.first;
+      final titlePage = imported.content.chapters.last;
+      expect(
+        ok(
+          await store.loadPagePresentation(
+            titlePage.key,
+            cancellation: token(),
+          ),
+        ),
+        contains('shiori-svg-page'),
+      );
+      final original = File(
+        '${paths.localBooks.path}/${chapter.key.novelKey.novelId}/original',
+      );
+      final hiddenOriginal = File('${original.path}.hidden');
+      await original.rename(hiddenOriginal.path);
+      // The no-link SVG title page must use the already-derived hotspot table
+      // instead of reading and parsing the immutable original again.
+      expect(
+        ok(await store.loadContentLinks(titlePage.key, cancellation: token())),
+        isEmpty,
+      );
+      await hiddenOriginal.rename(original.path);
       final manifestFile = File(
         '${paths.localBooks.path}/${chapter.key.novelKey.novelId}/manifest.json',
       );
@@ -220,6 +249,12 @@ void main() {
       );
       expect(links.where((link) => link.region != null), hasLength(1));
       expect(links.single.target, reread.content.chapters.last.key);
+      await original.rename(hiddenOriginal.path);
+      expect(
+        ok(await store.loadContentLinks(titlePage.key, cancellation: token())),
+        isEmpty,
+      );
+      await hiddenOriginal.rename(original.path);
 
       ok(
         await store.reparseBook(

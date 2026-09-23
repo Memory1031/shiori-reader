@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import 'epub_webview_host.dart';
+import 'svg_paper_art.dart';
 import '../../domain/contracts/local_content_links.dart';
 
 /// A short authored page, not the renderer for normal long-form reading.
@@ -34,6 +35,27 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
   Offset? _down;
   Duration? _downTime;
   bool _ready = false;
+  String? _preparedHtml;
+  String? _preparingSource;
+  Color? _preparingInk;
+
+  void _prepareArtwork(String html, Color ink) {
+    if (identical(_preparingSource, html) && _preparingInk == ink) return;
+    _preparingSource = html;
+    _preparingInk = ink;
+    _preparedHtml = null;
+    if (!html.contains('class="shiori-svg-page"')) {
+      _preparedHtml = html;
+      return;
+    }
+    unawaited(
+      themedSvgPaperArtwork(html, ink).then((prepared) {
+        if (mounted && identical(widget.html, html) && _preparingInk == ink) {
+          setState(() => _preparedHtml = prepared);
+        }
+      }),
+    );
+  }
 
   @override
   void didUpdateWidget(covariant EpubLayoutPage oldWidget) {
@@ -77,6 +99,7 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
   String? _sourceHtml;
   Color? _paper;
   Color? _foreground;
+  Brightness? _brightness;
   TargetPlatform? _platform;
   int _generation = 0;
   String? _document;
@@ -85,6 +108,7 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
     String html,
     Color paper,
     Color foreground,
+    Brightness brightness,
     TargetPlatform platform,
   ) {
     final cached = _document;
@@ -92,6 +116,7 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
         identical(_sourceHtml, html) &&
         _paper == paper &&
         _foreground == foreground &&
+        _brightness == brightness &&
         _platform == platform) {
       return cached;
     }
@@ -100,17 +125,24 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
     final interactionStyle = platform == TargetPlatform.windows
         ? 'html,body,body *{-webkit-user-select:none!important;user-select:none!important;-webkit-user-drag:none!important;}'
         : '';
+    final svgTextStyle =
+        brightness == Brightness.dark &&
+            html.contains('class="shiori-svg-page"')
+        ? 'body.shiori-svg-page>svg text:not([fill]){fill:#$ink;}'
+        : '';
     final document = html.replaceFirst('</head>', '''<style>
 html,body{background:#$background!important;color:#$ink;margin:0!important;}
 html,body{scrollbar-width:none;}
 ::-webkit-scrollbar{display:none;}
 body{font-size:clamp(12px,5.7vw,20px);padding:8px!important;box-sizing:border-box;display:flow-root;overflow-wrap:break-word;}
 img{max-width:100%;height:auto;}
+$svgTextStyle
 $interactionStyle
 </style></head>''');
     _sourceHtml = html;
     _paper = paper;
     _foreground = foreground;
+    _brightness = brightness;
     _platform = platform;
     _generation++;
     _ready = false;
@@ -121,10 +153,15 @@ $interactionStyle
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    _prepareArtwork(widget.html, theme.colorScheme.onSurface);
+    if (_preparedHtml == null) {
+      return ColoredBox(color: theme.scaffoldBackgroundColor);
+    }
     final document = _documentOf(
-      widget.html,
+      _preparedHtml!,
       theme.scaffoldBackgroundColor,
       theme.colorScheme.onSurface,
+      theme.brightness,
       defaultTargetPlatform,
     );
     return LayoutBuilder(
