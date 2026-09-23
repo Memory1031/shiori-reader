@@ -159,13 +159,19 @@ void main() {
     expect(blocks[0].alignment, ParagraphAlignment.center);
     expect(blocks[1].alignment, ParagraphAlignment.end);
   });
-  test('A05 ruby consistently falls back to one parenthesized annotation', () {
+  test('A05 ruby preserves base text with structured annotations', () {
     final result = parser(
       body(
         '<p><ruby>甲<rt>こう</rt></ruby>字 / <ruby>乙<rp>(</rp><rt>おつ</rt><rp>)</rp></ruby></p>',
       ),
     ).parse();
-    expect(prose(result.content.chapters.first), '甲（こう）字 / 乙（おつ）');
+    expect(prose(result.content.chapters.first), '甲字 / 乙');
+    expect(
+      result.content.chapters.first.blocks.first.inlineRuby.map(
+        (r) => r.annotation,
+      ),
+      ['こう', 'おつ'],
+    );
   });
   test('A06 inline and stylesheet body layout select a presentation', () {
     for (final inline in [true, false]) {

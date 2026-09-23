@@ -1,4 +1,5 @@
 import '../../html/prose_semantics.dart';
+import '../../html/prose_ruby.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
@@ -14,6 +15,7 @@ import '../txt/txt_parser.dart' show filenameTitle;
 import 'epub_zip.dart';
 import 'epub_image_dimensions.dart';
 import 'epub_presentation.dart';
+import 'epub_svg_presentation.dart';
 import 'epub_text_styles.dart';
 import 'epub_rich_styles.dart';
 import 'epub_image_candidates.dart';
@@ -146,6 +148,7 @@ class EpubParser {
         List<(int, String, String?, String?, LocalLinkUnavailable?, int?, int?)>
       >{};
   var linkCount = 0;
+  final _linkRegions = <String, Map<int, LocalLinkRegion>>{};
   final _footnotes =
       <String, List<(int, String, String?, LocalLinkUnavailable?)>>{};
   final _noteDocuments = <String, Map<String, dom.Element>?>{};
@@ -428,6 +431,7 @@ class EpubParser {
         );
         if (links.length > 10000) zipLimit();
       }
+      var rawIndex = -1;
       for (final raw
           in rawLinks[path] ??
               <
@@ -441,6 +445,7 @@ class EpubParser {
                   int?,
                 )
               >[]) {
+        rawIndex++;
         if (raw.$1 >= source.blocks.length) continue;
         var unavailable = raw.$5;
         final destination = raw.$3 == path ? source : byPath[raw.$3];
@@ -465,6 +470,7 @@ class EpubParser {
             source: source.key,
             sourceBlockKey: source.blocks[raw.$1].blockKey,
             label: raw.$2,
+            region: _linkRegions[path]?[rawIndex],
             sourceOffset: raw.$6,
             sourceLength: raw.$7,
             target: unavailable == null ? destination?.key : null,
@@ -723,6 +729,7 @@ class EpubParser {
       return null;
     }
 
+    final svgHotspots = <EpubSvgHotspot>[];
     final presentation = includePresentations
         ? epubPresentation(
             doc,
@@ -733,6 +740,7 @@ class EpubParser {
                 : Uint8List(0),
             (base, href) => epubReference(base, href)?.$1,
             resolveStyle: optionalEpubStyleReference,
+            onSvgHotspot: svgHotspots.add,
           )
         : null;
     if (presentation != null) {
@@ -746,6 +754,7 @@ class EpubParser {
     int? activeLink;
     final spans = <(int, int, int)>[];
     final inlineImages = <InlineImage>[];
+    final rubyRanges = ProseRubyRanges();
     var explicitGapEm = 0.0;
     final buffer = ProseTextBuffer(
       onWrite: (start, end) {
@@ -779,6 +788,7 @@ class EpubParser {
       final rawText = buffer.rawText;
       final value = buffer.take();
       final trimStart = rawText.indexOf(value);
+      final ruby = rubyRanges.take(rawText, value);
       // Normalize against the emitted block, then convert UTF-16 to code points.
       for (final id in pendingAnchors) {
         final anchor = anchors[id]!;
@@ -863,6 +873,7 @@ class EpubParser {
         heading == null
             ? ParagraphBlock(
                 inlineImages: images,
+                inlineRuby: ruby,
                 inlineStyles: textStyles,
                 box: activeBox,
                 text: value,
@@ -884,6 +895,7 @@ class EpubParser {
               )
             : HeadingBlock(
                 inlineImages: images,
+                inlineRuby: ruby,
                 inlineStyles: textStyles,
                 box: activeBox,
                 text: value,
@@ -977,7 +989,11 @@ class EpubParser {
           pendingAnchors.add(id);
         }
       }
-      if (tag == 'a' && visible && node.attributes.containsKey('href')) {
+      if (tag == 'a' &&
+          visible &&
+          node.attributes.containsKey('href') &&
+          !(presentation != null &&
+              node.namespaceUri == 'http://www.w3.org/2000/svg')) {
         if (++linkCount > 10000) zipLimit();
         (String, String?)? ref;
         LocalLinkUnavailable? unavailable;
@@ -1143,6 +1159,25 @@ class EpubParser {
         buffer.write('\n');
         return;
       }
+      if (tag == 'ruby') {
+        final pairs = whitespace == ProseWhiteSpace.normal
+            ? proseRuby(node)
+            : null;
+        if (pairs != null) {
+          for (final pair in pairs) {
+            final start = buffer.length;
+            for (final child in pair.base) {
+              walk(child);
+            }
+            rubyRanges.add(start, buffer.length, pair.annotation);
+          }
+          activeLink = previousLink;
+          paragraphOwner = previousOwner;
+          whitespace = previousWhitespace;
+          visible = previousVisible;
+          return;
+        }
+      }
       if (tag == 'rp') {
         whitespace = previousWhitespace;
         visible = previousVisible;
@@ -1202,6 +1237,7 @@ class EpubParser {
             text: text,
             alignment: alignment,
             inlineImages: blocks[i].inlineImages,
+            inlineRuby: blocks[i].inlineRuby,
             inlineStyles: blocks[i].inlineStyles,
             box: blocks[i].box,
           );
@@ -1231,6 +1267,7 @@ class EpubParser {
           level: 2,
           alignment: alignment,
           inlineImages: blocks[0].inlineImages,
+          inlineRuby: blocks[0].inlineRuby,
           inlineStyles: blocks[0].inlineStyles,
           box: blocks[0].box,
         );
@@ -1260,6 +1297,29 @@ class EpubParser {
           : filenameTitle(path),
       blocks: blocks,
     );
+    for (final hotspot in svgHotspots) {
+      if (++linkCount > 10000) zipLimit();
+      (String, String?)? ref;
+      LocalLinkUnavailable? unavailable;
+      try {
+        ref = epubReference(path, hotspot.href);
+        if (ref == null) unavailable = LocalLinkUnavailable.external;
+      } on FormatException {
+        unavailable = LocalLinkUnavailable.unsupported;
+      }
+      final records = rawLinks[path] ??= [];
+      (_linkRegions[path] ??= {})[records.length] = hotspot.region;
+      records.add((
+        0,
+        hotspot.label,
+        ref?.$1,
+        ref?.$2,
+        unavailable,
+        null,
+        null,
+      ));
+      if (ref != null) requestedPaths.add(ref.$1);
+    }
     chapters.add(chapter);
     chapterPaths[chapter.key] = path;
     byPath[path] = chapter;

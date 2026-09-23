@@ -4,23 +4,35 @@ import 'dart:typed_data';
 import 'package:html/dom.dart' as dom;
 
 import 'epub_image_candidates.dart';
+import '../../../domain/contracts/local_content_links.dart';
+
+typedef EpubSvgHotspot = ({String href, String label, LocalLinkRegion region});
 
 /// Rebuilds a bounded authored SVG page instead of passing publisher markup
 /// through. Supported pages contain one local raster image plus positioned
-/// text and simple transparent/decorative rectangles. Links are made inert.
+/// text and simple transparent/decorative rectangles. Link markup stays inert
+/// in the WebView; validated rectangular hotspots are reported separately.
 String? epubSvgPresentation(
   dom.Document document,
   String path,
   Iterable<String> sheets,
   Uint8List Function(String) readBytes,
-  String? Function(String, String) resolve,
-) {
+  String? Function(String, String) resolve, {
+  void Function(EpubSvgHotspot)? onHotspot,
+}) {
   final body = document.body;
   if (body == null || body.text.length > 2000) return null;
   // SVG stylesheet cascade is deliberately outside this first safe subset.
   if (sheets.any((css) => css.trim().isNotEmpty)) return null;
   try {
-    return _SvgPage(path, readBytes, resolve).build(body);
+    final page = _SvgPage(path, readBytes, resolve);
+    final html = page.build(body);
+    if (html != null && onHotspot != null) {
+      for (final hotspot in page.hotspots) {
+        onHotspot(hotspot);
+      }
+    }
+    return html;
   } on _UnsupportedSvg {
     return null;
   }
@@ -41,6 +53,7 @@ class _SvgPage {
   static const _escape = HtmlEscape(HtmlEscapeMode.attribute);
 
   final _output = StringBuffer();
+  final hotspots = <EpubSvgHotspot>[];
   dom.Element? _root;
   int _nodes = 0;
   int _images = 0;
@@ -295,6 +308,58 @@ class _SvgPage {
     _output.write('</$renderedTag>');
   }
 
+  void _collectHotspots(dom.Element svg) {
+    final box = _numbers(
+      svg.attributes['viewBox'] ?? svg.attributes['viewbox']!,
+      limit: 4,
+    );
+    final aspectRatio = box[2] / box[3];
+    if (!aspectRatio.isFinite || aspectRatio <= 0) return;
+    for (final anchor in svg.querySelectorAll('a')) {
+      final hrefs = anchor.attributes.entries
+          .where((e) => _localName(e.key) == 'href')
+          .toList();
+      if (hrefs.length != 1 || hrefs.single.value.trim().isEmpty) continue;
+      final title = anchor.querySelector('title')?.text.trim();
+      final text = anchor
+          .querySelectorAll('text')
+          .map((e) => e.text)
+          .join(' ')
+          .trim();
+      final label = title?.isNotEmpty == true ? title! : text;
+      for (final rect in anchor.querySelectorAll('rect')) {
+        // Nested anchors own their own regions, just as the closest SVG link.
+        var owner = rect.parent;
+        while (owner != null && owner.localName != 'a') {
+          owner = owner.parent;
+        }
+        if (owner != anchor) continue;
+        final x = _numbers(rect.attributes['x'] ?? '0').single;
+        final y = _numbers(rect.attributes['y'] ?? '0').single;
+        final w = _numbers(rect.attributes['width'] ?? '0').single;
+        final h = _numbers(rect.attributes['height'] ?? '0').single;
+        final left = ((x - box[0]) / box[2]).clamp(0.0, 1.0);
+        final top = ((y - box[1]) / box[3]).clamp(0.0, 1.0);
+        final right = ((x + w - box[0]) / box[2]).clamp(0.0, 1.0);
+        final bottom = ((y + h - box[1]) / box[3]).clamp(0.0, 1.0);
+        if (right <= left || bottom <= top) continue;
+        hotspots.add((
+          href: hrefs.single.value,
+          label: label.isEmpty
+              ? '↗'
+              : String.fromCharCodes(label.runes.take(200)),
+          region: LocalLinkRegion(
+            left: left,
+            top: top,
+            right: right,
+            bottom: bottom,
+            aspectRatio: aspectRatio,
+          ),
+        ));
+      }
+    }
+  }
+
   String? build(dom.Element body) {
     _findRoot(body, 0);
     final svg = _root;
@@ -304,6 +369,7 @@ class _SvgPage {
     _draw(svg, 0);
     // Bitmap-only wrappers already have a cheaper native rendering path.
     if (_images != 1 || _texts == 0) return null;
+    _collectHotspots(svg);
     return '''<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">

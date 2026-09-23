@@ -116,6 +116,7 @@ WHATWG 编码映射与许可保留在工程，生成工具位于 `tool/encoding/
 对实际应用了浮动、定位、变换或竖排等样式、且文本不超过 2000 字符的短页，提供受限静态 HTML 展示，适配扉页与标题设计。普通长正文仍走原生分页，不承诺完整 CSS / 固定版式支持。
 
 - 仅允许安全元素和样式，移除脚本、表单与 iframe，关闭 JavaScript，使用严格 CSP，禁止外部请求。
+- 含单张包内位图、定位文字和基础矩形的受限 SVG 短页可保留视觉布局；作者用 `<a>` 包住的矩形热点经校验后交由 Reader 执行书内跳转，原始 href 不进入 WebView。复杂 SVG 仍退回原生正文。
 - Android / iOS / Windows / macOS 共用 `flutter_inappwebview` 呈现封装；初始化、页面加载失败或超时后切回该章的原生语义正文。Windows 在首次使用时检查 WebView2 Runtime，浏览器数据写入环境隔离的应用可写目录。
 - 本地图片、字体内嵌；字体单项上限 8MiB、单文档生成 HTML 上限 16MiB。
 - 旧格式可从原件校验后派生与已发布正文 revision 一致的特殊页；不会替换语义正文。重解析后呈现与 manifest 一起发布并校验；派生缓存有界。
@@ -207,7 +208,7 @@ EPUB 2 重复引用保持拒绝；只有明确 package version=3.0 使用 EPUB 3
 | EPUB 2 / 3 目录 | NCX/nav、嵌套标签与 fragment；可选目录损坏可降级；内部存储章节以 spine 文档为单位 | epub_structure、epub_boundary |
 | 路径与 fragment | Unicode、百分号一次解码、大小写精确；目录缺锚点可回章首，正文链接缺锚点明确不可用 | epub_structure、epub_links |
 | 重复 spine | EPUB 3 occurrence 独立身份，同文档链接保留 occurrence；跨文档指向首个 occurrence；EPUB 2 重复拒绝 | reparse、epub_links |
-| 正文语义 | 段落、标题、br、缩进、对齐、ruby 文本降级；强调/上下标无完整富文本样式 | epub_compatibility、epub_prose_semantics |
+| 正文语义 | 段落、标题、br、缩进、对齐、常见 ruby 基字/注音；复杂 ruby 保留括注降级；强调/上下标无完整富文本样式 | epub_compatibility、epub_prose_semantics |
 | CSS | 受限选择器、顺序/media、important、white-space 与 visibility；隐藏元素不保留原生几何占位，非完整 cascade | epub_stylesheet、epub_prose_semantics |
 | 图片 | PNG/JPEG/GIF/WebP 字节识别、SVG image 包装、srcset/picture 包内候选；确定性选图，不按 viewport/sizes 计算；缺图占位 | epub_compatibility、epub_resources |
 | 特殊页 | 受限静态 HTML；保留部分复杂排版，脚本/外链受限；不保证完整出版方布局 | epub_presentation |

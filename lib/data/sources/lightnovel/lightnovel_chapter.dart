@@ -1,5 +1,6 @@
 import 'lightnovel_media_uri.dart';
 import '../../html/prose_semantics.dart';
+import '../../html/prose_ruby.dart';
 import 'package:html/parser.dart' as html;
 import 'package:html/dom.dart';
 import '../../../domain/content_identity.dart';
@@ -96,16 +97,23 @@ final class _Body {
   final ChapterKey key;
   final blocks = <ContentBlock>[];
   final text = ProseTextBuffer();
+  final rubyRanges = ProseRubyRanges();
   var whitespace = ProseWhiteSpace.normal;
-  void flush({bool empty = false}) {
+  void flush({bool empty = false, int? heading}) {
+    final raw = text.rawText;
     var value = text.take();
-    if (value.isEmpty && !empty) return;
     var indent = 0;
     while (value.startsWith('　') && indent < 8) {
       indent++;
       value = value.substring(1);
     }
-    blocks.add(ParagraphBlock(text: value, leadingIndent: indent));
+    final ruby = rubyRanges.take(raw, value);
+    if (value.isEmpty && !empty) return;
+    blocks.add(
+      heading == null
+          ? ParagraphBlock(text: value, leadingIndent: indent, inlineRuby: ruby)
+          : HeadingBlock(text: value, level: heading, inlineRuby: ruby),
+    );
   }
 
   List<ContentBlock> parse(DocumentFragment root) {
@@ -202,6 +210,21 @@ final class _Body {
       );
       return;
     }
+    if (tag == 'ruby') {
+      final pairs = whitespace == ProseWhiteSpace.normal
+          ? proseRuby(node)
+          : null;
+      if (pairs != null) {
+        for (final pair in pairs) {
+          final start = text.length;
+          for (final child in pair.base) {
+            visit(child, depth + 1);
+          }
+          rubyRanges.add(start, text.length, pair.annotation);
+        }
+        return;
+      }
+    }
     if (tag == 'rt') {
       text.write('（');
       for (final child in node.nodes) {
@@ -212,10 +235,10 @@ final class _Body {
     }
     if (proseHeadingLevel(tag) != null && node.querySelector('img') == null) {
       flush();
-      final value = plainDetailText(node.innerHtml);
-      if (value.isNotEmpty) {
-        blocks.add(HeadingBlock(text: value, level: proseHeadingLevel(tag)!));
+      for (final child in node.nodes) {
+        visit(child, depth + 1);
       }
+      flush(heading: proseHeadingLevel(tag)!);
       return;
     }
     final boundary = {

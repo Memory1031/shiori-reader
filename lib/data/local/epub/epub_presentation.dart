@@ -14,6 +14,7 @@ String? epubPresentation(
   Uint8List Function(String) readBytes,
   String? Function(String, String) resolve, {
   String? Function(String, String)? resolveStyle,
+  void Function(EpubSvgHotspot)? onSvgHotspot,
 }) {
   final body = document.body;
   if (body == null || body.text.length > 2000) return null;
@@ -32,6 +33,7 @@ String? epubPresentation(
       sheets.map((sheet) => sheet.$2),
       readBytes,
       resolve,
+      onHotspot: onSvgHotspot,
     );
   }
   final layout = RegExp(

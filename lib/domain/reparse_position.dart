@@ -130,6 +130,56 @@ ReparsedPosition migrateLocalPosition(
         false,
       );
     }
+    // Earlier imports appended ruby as full-width parentheses. Only migrate
+    // when reconstructing the entire old block proves a unique exact match;
+    // never remove arbitrary parenthetical text from user content.
+    if (block.inlineRuby.isEmpty && oldCount == 1 && _text(block) != null) {
+      final rubyMatches = <(ChapterContent, int, double, bool)>[];
+      for (final c in same == null ? next.chapters : [same]) {
+        for (var i = 0; i < c.blocks.length; i++) {
+          final target = c.blocks[i];
+          final base = _text(target);
+          if (target.inlineRuby.isEmpty || base == null) continue;
+          final units = base.runes.toList();
+          final expanded = StringBuffer();
+          var last = 0, added = 0;
+          final oldOffset = (pos.blockFraction * _text(block)!.runes.length)
+              .round();
+          var mapped = oldOffset;
+          var inAnnotation = false;
+          for (final ruby in target.inlineRuby) {
+            expanded.write(String.fromCharCodes(units.sublist(last, ruby.end)));
+            final annotation = '（${ruby.annotation}）';
+            expanded.write(annotation);
+            final start = ruby.end + added;
+            final end = start + annotation.runes.length;
+            if (oldOffset > start) {
+              if (oldOffset < end) {
+                mapped = ruby.end;
+                inAnnotation = true;
+              } else {
+                mapped -= annotation.runes.length;
+              }
+            }
+            added += annotation.runes.length;
+            last = ruby.end;
+          }
+          expanded.write(String.fromCharCodes(units.skip(last)));
+          if (expanded.toString() == _text(block)) {
+            rubyMatches.add((
+              c,
+              i,
+              mapped.clamp(0, units.length) / units.length,
+              inAnnotation,
+            ));
+          }
+        }
+      }
+      if (rubyMatches.length == 1) {
+        final match = rubyMatches.single;
+        return result(match.$1, match.$2, match.$3, match.$4);
+      }
+    }
     // Bounded character context tolerates split/merged paragraphs. Only text
     // windows of <=3 adjacent blocks, <=16384 scalars each, are considered.
     final text = _text(block);

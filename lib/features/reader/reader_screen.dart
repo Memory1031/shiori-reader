@@ -568,6 +568,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                           excluding: widget.completion != null,
                                           child: EpubLayoutPage(
                                             html: presentation!,
+                                            links:
+                                                widget.session?.contentLinks ??
+                                                const [],
+                                            onLink: widget.onContentLink,
                                             onFailed: () {
                                               if (mounted) {
                                                 setState(

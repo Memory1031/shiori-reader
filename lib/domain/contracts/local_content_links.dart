@@ -9,6 +9,45 @@ enum LocalLinkUnavailable {
   unsupported,
 }
 
+/// A rectangle in an authored SVG viewBox, normalized to its width/height.
+/// The renderer uses xMidYMin meet; no publisher URL or executable markup.
+final class LocalLinkRegion {
+  LocalLinkRegion({
+    required this.left,
+    required this.top,
+    required this.right,
+    required this.bottom,
+    required this.aspectRatio,
+  }) {
+    if (![left, top, right, bottom, aspectRatio].every((v) => v.isFinite) ||
+        left < 0 ||
+        top < 0 ||
+        right > 1 ||
+        bottom > 1 ||
+        right <= left ||
+        bottom <= top ||
+        aspectRatio <= 0) {
+      throw ArgumentError('Invalid local link region');
+    }
+  }
+  final double left, top, right, bottom, aspectRatio;
+  Map<String, Object?> toJson() => {
+    'left': left,
+    'top': top,
+    'right': right,
+    'bottom': bottom,
+    'aspectRatio': aspectRatio,
+  };
+  factory LocalLinkRegion.fromJson(Map<String, dynamic> json) =>
+      LocalLinkRegion(
+        left: (json['left'] as num).toDouble(),
+        top: (json['top'] as num).toDouble(),
+        right: (json['right'] as num).toDouble(),
+        bottom: (json['bottom'] as num).toDouble(),
+        aspectRatio: (json['aspectRatio'] as num).toDouble(),
+      );
+}
+
 final class LocalContentLink {
   LocalContentLink({
     required this.source,
@@ -21,6 +60,7 @@ final class LocalContentLink {
     this.sourceOffset,
     this.sourceLength,
     this.footnoteText,
+    this.region,
   }) {
     if (sourceBlockKey.isEmpty ||
         label.trim().isEmpty ||
@@ -54,8 +94,10 @@ final class LocalContentLink {
   /// Ordinary inline links carry a range; older footnotes omit this field.
   final int? sourceLength;
   final String? footnoteText;
+  final LocalLinkRegion? region;
   bool get isFootnote => sourceOffset != null && sourceLength == null;
   Map<String, Object?> toJson() => {
+    if (region != null) 'region': region!.toJson(),
     'source': source.toJson(),
     'block': sourceBlockKey,
     'label': label,
@@ -69,6 +111,9 @@ final class LocalContentLink {
   };
   factory LocalContentLink.fromJson(Map<String, dynamic> json) =>
       LocalContentLink(
+        region: json['region'] == null
+            ? null
+            : LocalLinkRegion.fromJson(json['region'] as Map<String, dynamic>),
         source: ChapterKey.fromJson(json['source'] as Map<String, dynamic>),
         sourceBlockKey: json['block'] as String,
         label: json['label'] as String,

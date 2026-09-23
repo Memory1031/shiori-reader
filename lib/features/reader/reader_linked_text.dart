@@ -60,6 +60,7 @@ class ReaderLinkedText extends StatefulWidget {
     required this.scaler,
     this.onLink,
     this.inlineImages = const [],
+    this.inlineRuby = const [],
     this.inlineStyles = const [],
     this.authoredBackground,
     this.images,
@@ -68,6 +69,7 @@ class ReaderLinkedText extends StatefulWidget {
   });
   final String text, prefix;
   final List<InlineImage> inlineImages;
+  final List<InlineRuby> inlineRuby;
   final List<InlineTextStyle> inlineStyles;
   final int? authoredBackground;
   final ImageRepository? images;
@@ -99,7 +101,12 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) =>
+        _buildText(context, constraints.maxWidth),
+  );
+
+  Widget _buildText(BuildContext context, double maxWidth) {
     _clear();
     final colors = ReaderAuthoredColors(Theme.of(context));
     final background = widget.authoredBackground == null
@@ -124,6 +131,12 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
           offset: widget.blockOffset + start,
           images: widget.inlineImages,
           styles: widget.inlineStyles,
+          ruby: widget.inlineRuby,
+          scaler: widget.scaler,
+          direction: Directionality.of(context),
+          locale: widget.locale,
+          maxWidth: maxWidth,
+          onRubyTap: onTap,
           resolveColor: foreground,
           style: displayStyle,
           imageBuilder: (image) => GestureDetector(

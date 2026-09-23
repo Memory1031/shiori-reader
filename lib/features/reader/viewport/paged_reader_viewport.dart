@@ -515,8 +515,15 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       Widget? buildPage(BuildContext context, int number) {
         final page = _page(number);
         if (page == null) return null;
-        Widget column(List<PageFragment> fragments, double width) => Column(
+        Widget column(
+          List<PageFragment> fragments,
+          double width, {
+          bool centered = false,
+        }) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          // Centered pages shrink-wrap so Align can place them mid-page;
+          // top-aligned pages keep the column filling for stable hit tests.
+          mainAxisSize: centered ? MainAxisSize.min : MainAxisSize.max,
           children: [
             for (final fragment in fragments)
               Semantics(
@@ -575,6 +582,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                               authoredBackground: fragmentBlock(
                                 fragment,
                               ).box?.backgroundColor,
+                              inlineRuby: fragmentBlock(fragment).inlineRuby,
                               inlineStyles: widget
                                   .content
                                   .blocks[_layout!
@@ -646,7 +654,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           explicitChildNodes: true,
           child: widget.columns == 1 || page.fullWidth
               ? Align(
-                  alignment: Alignment.topCenter,
+                  alignment: page.centered
+                      ? Alignment.center
+                      : Alignment.topCenter,
                   child: SizedBox(
                     width: page.fullWidth
                         ? constraints.maxWidth.clamp(0, readerMaxPageWidth)
@@ -656,6 +666,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                       page.fullWidth
                           ? constraints.maxWidth.clamp(0, readerMaxPageWidth)
                           : constraints.maxWidth,
+                      centered: page.centered,
                     ),
                   ),
                 )

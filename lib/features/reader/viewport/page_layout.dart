@@ -39,12 +39,16 @@ final class ReaderPage {
     List<PageFragment> fragments, {
     this.columnBreak,
     this.fullWidth = false,
+    this.centered = false,
   }) : fragments = List.unmodifiable(fragments);
   final PageCursor start;
   final PageCursor end;
   final List<PageFragment> fragments;
   final int? columnBreak;
   final bool fullWidth;
+
+  /// Standalone full-page images center vertically instead of hugging the top.
+  final bool centered;
 }
 
 /// Only lays out bounded chunks around a requested semantic anchor. It does not
@@ -105,6 +109,14 @@ final class PageLayout {
       final next = offset + grapheme.runes.length;
       if (next > desired) break;
       offset = next;
+    }
+    final block = index.content.blocks[chunk.blockIndex];
+    for (final ruby in block.inlineRuby) {
+      if (ruby.start < chunk.start + offset &&
+          chunk.start + offset < ruby.end) {
+        offset = ruby.start - chunk.start;
+        break;
+      }
     }
     return normalize(PageCursor(resolved.chunk, offset));
   }
@@ -167,6 +179,11 @@ final class PageLayout {
                   text: text,
                   offset: blockOffset,
                   images: block.inlineImages,
+                  ruby: block.inlineRuby,
+                  scaler: scaler,
+                  direction: direction,
+                  locale: locale,
+                  maxWidth: textWidth,
                   styles: block.inlineStyles,
                   style: blockStyle,
                 ),
@@ -184,6 +201,10 @@ final class PageLayout {
               offset: blockOffset,
               length: text.runes.length,
               images: block.inlineImages,
+              ruby: block.inlineRuby,
+              text: text,
+              direction: direction,
+              locale: locale,
               styles: block.inlineStyles,
               style: blockStyle,
               scaler: scaler,
@@ -246,8 +267,15 @@ final class PageLayout {
           boundaryLine.baseline - boundaryLine.ascent * .5,
         ),
       );
-      var boundary = (painter.getLineBoundary(point).start - prefix.length)
-          .clamp(0, text.length);
+      var boundary = readerInlineSourceBoundary(
+        text,
+        blockOffset,
+        block.inlineRuby,
+        (painter.getLineBoundary(point).start - prefix.length).clamp(
+          0,
+          text.length,
+        ),
+      );
       // A Flutter line break is normally grapheme-safe; snap defensively.
       var safe = 0;
       for (final grapheme in text.characters) {
@@ -259,7 +287,7 @@ final class PageLayout {
           ? text.substring(boundary)
           : text.substring(0, boundary);
       if (selected.isEmpty) return null;
-      if (block.inlineImages.isNotEmpty) {
+      if (block.inlineImages.isNotEmpty || block.inlineRuby.isNotEmpty) {
         // A new fragment has its own leading and placeholder baselines.
         // Measure the strictly shorter slice instead of summing line heights.
         if (selected.length >= text.length) return null;
@@ -307,11 +335,19 @@ final class PageLayout {
         .clamp(1.0, height);
   }
 
-  bool _standaloneImage(ReaderPage page) =>
-      page.fragments.length == 1 &&
-      index.content.blocks[index.chunks[page.fragments.single.unit].blockIndex]
+  bool _standaloneImageFragments(List<PageFragment> fragments) =>
+      fragments.length == 1 &&
+      index.content.blocks[index.chunks[fragments.single.unit].blockIndex]
           is ImageBlock &&
-      page.fragments.single.height >= height * .6;
+      (fragments.single.height >= height * .6 ||
+          index.content.blocks.length == 1);
+
+  bool _fullPageImage(int blockIndex, double extent) =>
+      index.content.blocks[blockIndex] is ImageBlock &&
+      (extent >= height * .6 || index.content.blocks.length == 1);
+
+  bool _standaloneImage(ReaderPage page) =>
+      _standaloneImageFragments(page.fragments);
 
   ReaderPage? forward(PageCursor from) {
     final first = _forwardColumn(from);
@@ -322,6 +358,7 @@ final class PageLayout {
         first.end,
         first.fragments,
         fullWidth: true,
+        centered: true,
       );
     }
     final second = _forwardColumn(first.end);
@@ -341,6 +378,7 @@ final class PageLayout {
         second.end,
         second.fragments,
         fullWidth: true,
+        centered: true,
       );
     }
     final first = _backwardColumn(second.start);
@@ -361,9 +399,7 @@ final class PageLayout {
       final text = chunk.text;
       if (text == null || text.isEmpty) {
         final extent = _objectHeight(cursor.unit);
-        final fullPageImage =
-            index.content.blocks[chunk.blockIndex] is ImageBlock &&
-            extent >= height * .6;
+        final fullPageImage = _fullPageImage(chunk.blockIndex, extent);
         if (extent > remaining + .01 || fullPageImage && fragments.isNotEmpty) {
           break;
         }
@@ -444,7 +480,14 @@ final class PageLayout {
         );
       }
     }
-    return fragments.isEmpty ? null : ReaderPage(start, cursor, fragments);
+    return fragments.isEmpty
+        ? null
+        : ReaderPage(
+            start,
+            cursor,
+            fragments,
+            centered: _standaloneImageFragments(fragments),
+          );
   }
 
   ReaderPage? _backwardColumn(PageCursor until) {
@@ -460,9 +503,7 @@ final class PageLayout {
       final text = chunk.text;
       if (text == null || text.isEmpty) {
         final extent = _objectHeight(cursor.unit);
-        final fullPageImage =
-            index.content.blocks[chunk.blockIndex] is ImageBlock &&
-            extent >= height * .6;
+        final fullPageImage = _fullPageImage(chunk.blockIndex, extent);
         if (extent > remaining + .01 || fullPageImage && fragments.isNotEmpty) {
           break;
         }
@@ -515,6 +556,7 @@ final class PageLayout {
             PageCursor(fragments.last.unit, fragments.last.start),
             end,
             fragments.reversed.toList(),
+            centered: _standaloneImageFragments(fragments),
           );
   }
 }

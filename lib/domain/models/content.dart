@@ -3,6 +3,8 @@ import 'identity.dart';
 import 'value_model.dart';
 import 'content_style.dart';
 export 'content_style.dart';
+import 'inline_ruby.dart';
+export 'inline_ruby.dart';
 
 enum ParagraphAlignment { start, center, end }
 
@@ -13,6 +15,7 @@ sealed class ContentBlock extends ValueModel {
   final BlockBox? box;
   List<InlineTextStyle> get inlineStyles => const [];
   List<InlineImage> get inlineImages => const [];
+  List<InlineRuby> get inlineRuby => const [];
   Iterable<MediaRef> get mediaRefs sync* {
     if (this case ImageBlock(:final media)) yield media;
     for (final image in inlineImages) {
@@ -54,6 +57,9 @@ sealed class ContentBlock extends ValueModel {
       'paragraph' => ParagraphBlock(
         authoredGapEm: (json['authoredGapEm'] as num?)?.toDouble(),
         inlineStyles: styles,
+        inlineRuby: (json['inlineRuby'] as List? ?? const []).map(
+          (v) => InlineRuby.fromJson(v as Map<String, dynamic>),
+        ),
         box: box,
         inlineImages: (json['inlineImages'] as List? ?? const []).map(
           (v) => InlineImage.fromJson(v as Map<String, dynamic>),
@@ -76,6 +82,9 @@ sealed class ContentBlock extends ValueModel {
       ),
       'heading' => HeadingBlock(
         inlineStyles: styles,
+        inlineRuby: (json['inlineRuby'] as List? ?? const []).map(
+          (v) => InlineRuby.fromJson(v as Map<String, dynamic>),
+        ),
         box: box,
         inlineImages: (json['inlineImages'] as List? ?? const []).map(
           (v) => InlineImage.fromJson(v as Map<String, dynamic>),
@@ -156,13 +165,15 @@ final class ParagraphBlock extends ContentBlock {
   ParagraphBlock({
     required String text,
     Iterable<InlineImage> inlineImages = const [],
+    Iterable<InlineRuby> inlineRuby = const [],
     Iterable<InlineTextStyle> inlineStyles = const [],
     BlockBox? box,
     this.alignment = ParagraphAlignment.start,
     this.leadingIndent = 0,
     this.authoredGapEm,
     int occurrence = 0,
-  }) : inlineStyles = List.unmodifiable(inlineStyles),
+  }) : inlineRuby = List.unmodifiable(inlineRuby),
+       inlineStyles = List.unmodifiable(inlineStyles),
        inlineImages = List.unmodifiable(inlineImages),
        text = ContentIdentity.normalizeText(text),
        super(occurrence, box: box) {
@@ -173,6 +184,7 @@ final class ParagraphBlock extends ContentBlock {
             this.text.isNotEmpty)) {
       throw ArgumentError('Invalid authored gap');
     }
+    validateInlineRuby(this.text, this.inlineRuby);
     validateInlineStyles(this.text, this.inlineStyles);
     validateInlineImages(this.text, this.inlineImages);
     if (leadingIndent < 0 || leadingIndent > 8) {
@@ -185,6 +197,8 @@ final class ParagraphBlock extends ContentBlock {
   final double? authoredGapEm;
   @override
   final List<InlineImage> inlineImages;
+  @override
+  final List<InlineRuby> inlineRuby;
   @override
   final List<InlineTextStyle> inlineStyles;
   final ParagraphAlignment alignment;
@@ -202,10 +216,14 @@ final class ParagraphBlock extends ContentBlock {
       inlineImages
           .map((i) => [i.offset, i.media.identityFields, i.alt])
           .toList(),
+    if (inlineRuby.isNotEmpty)
+      ['ruby', inlineRuby.map((r) => r.values).toList()],
   ];
   @override
   Map<String, Object?> get fieldsJson => {
     'text': text,
+    if (inlineRuby.isNotEmpty)
+      'inlineRuby': inlineRuby.map((r) => r.toJson()).toList(),
     if (authoredGapEm != null) 'authoredGapEm': authoredGapEm,
     if (inlineStyles.isNotEmpty)
       'inlineStyles': inlineStyles.map((s) => s.toJson()).toList(),
@@ -219,6 +237,7 @@ final class ParagraphBlock extends ContentBlock {
     text: text,
     authoredGapEm: authoredGapEm,
     inlineImages: inlineImages,
+    inlineRuby: inlineRuby,
     inlineStyles: inlineStyles,
     box: box,
     alignment: alignment,
@@ -298,15 +317,18 @@ final class HeadingBlock extends ContentBlock {
   HeadingBlock({
     required String text,
     Iterable<InlineImage> inlineImages = const [],
+    Iterable<InlineRuby> inlineRuby = const [],
     Iterable<InlineTextStyle> inlineStyles = const [],
     BlockBox? box,
     this.level = 1,
     this.alignment = ParagraphAlignment.start,
     int occurrence = 0,
-  }) : inlineStyles = List.unmodifiable(inlineStyles),
+  }) : inlineRuby = List.unmodifiable(inlineRuby),
+       inlineStyles = List.unmodifiable(inlineStyles),
        inlineImages = List.unmodifiable(inlineImages),
        text = nonBlank(ContentIdentity.normalizeText(text), 'heading'),
        super(occurrence, box: box) {
+    validateInlineRuby(this.text, this.inlineRuby);
     validateInlineStyles(this.text, this.inlineStyles);
     validateInlineImages(this.text, this.inlineImages);
     if (level < 1 || level > 6) {
@@ -316,6 +338,8 @@ final class HeadingBlock extends ContentBlock {
   final String text;
   @override
   final List<InlineImage> inlineImages;
+  @override
+  final List<InlineRuby> inlineRuby;
   @override
   final List<InlineTextStyle> inlineStyles;
   final int level;
@@ -331,10 +355,14 @@ final class HeadingBlock extends ContentBlock {
           .map((i) => [i.offset, i.media.identityFields, i.alt])
           .toList(),
     if (alignment != ParagraphAlignment.start) alignment.name,
+    if (inlineRuby.isNotEmpty)
+      ['ruby', inlineRuby.map((r) => r.values).toList()],
   ];
   @override
   Map<String, Object?> get fieldsJson => {
     'text': text,
+    if (inlineRuby.isNotEmpty)
+      'inlineRuby': inlineRuby.map((r) => r.toJson()).toList(),
     if (inlineStyles.isNotEmpty)
       'inlineStyles': inlineStyles.map((s) => s.toJson()).toList(),
     if (inlineImages.isNotEmpty)
@@ -346,6 +374,7 @@ final class HeadingBlock extends ContentBlock {
   HeadingBlock withOccurrence(int occurrence) => HeadingBlock(
     text: text,
     inlineImages: inlineImages,
+    inlineRuby: inlineRuby,
     inlineStyles: inlineStyles,
     box: box,
     level: level,

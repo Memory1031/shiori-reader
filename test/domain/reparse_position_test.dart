@@ -71,6 +71,47 @@ ReadingProgress progress(
 ParagraphBlock p(String s, {int indent = 0}) =>
     ParagraphBlock(text: s, leadingIndent: indent);
 void main() {
+  test(
+    'ruby reparse maps base offsets and conservatively restores annotations',
+    () {
+      const oldText = '讨论头脑风暴（buresuto）后再看明神（Akegami）。';
+      const newText = '讨论头脑风暴后再看明神。';
+      final before = book([
+        [p(oldText)],
+      ]);
+      final next = book([
+        [
+          ParagraphBlock(
+            text: newText,
+            inlineRuby: [
+              InlineRuby(start: 2, length: 4, annotation: 'buresuto'),
+              InlineRuby(start: 9, length: 2, annotation: 'Akegami'),
+            ],
+          ),
+        ],
+      ]);
+      for (final (offset, expected, approximate) in [
+        (2, 2, false),
+        (8, 6, true),
+        (16, 6, false),
+        (20, 10, false),
+        (oldText.runes.length, newText.runes.length, false),
+      ]) {
+        final r = migrateLocalPosition(
+          before,
+          next,
+          progress(before, fraction: offset / oldText.runes.length),
+        );
+        expect(
+          r.progress!.position.blockFraction,
+          expected / newText.runes.length,
+        );
+        expect(r.approximate, approximate);
+        expect(r.progress!.position.pixelOffset, isNull);
+        if (approximate) expect(r.progress!.completed, isFalse);
+      }
+    },
+  );
   test('no history is not created; unchanged position loses layout hints', () {
     final b = book([
       [p('abc')],

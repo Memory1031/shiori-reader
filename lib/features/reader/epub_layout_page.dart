@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import 'epub_webview_host.dart';
+import '../../domain/contracts/local_content_links.dart';
 
 /// A short authored page, not the renderer for normal long-form reading.
 class EpubLayoutPage extends StatefulWidget {
@@ -17,7 +18,11 @@ class EpubLayoutPage extends StatefulWidget {
     this.onNext,
     required this.onReady,
     this.onFailed,
+    this.links = const [],
+    this.onLink,
   });
+  final List<LocalContentLink> links;
+  final ValueChanged<LocalContentLink>? onLink;
   final String html;
   final VoidCallback onCenterTap, onReady;
   final VoidCallback? onPrevious, onNext, onFailed;
@@ -28,6 +33,41 @@ class EpubLayoutPage extends StatefulWidget {
 class _EpubLayoutPageState extends State<EpubLayoutPage> {
   Offset? _down;
   Duration? _downTime;
+  bool _ready = false;
+
+  @override
+  void didUpdateWidget(covariant EpubLayoutPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.html, widget.html)) {
+      _down = null;
+      _ready = false;
+    }
+  }
+
+  Rect _regionRect(LocalLinkRegion region, Size size) {
+    // Matches the sanitized SVG's xMidYMin meet, including side letterboxing.
+    final width = size.width < size.height * region.aspectRatio
+        ? size.width
+        : size.height * region.aspectRatio;
+    final height = width / region.aspectRatio;
+    final left = (size.width - width) / 2;
+    return Rect.fromLTRB(
+      left + region.left * width,
+      region.top * height,
+      left + region.right * width,
+      region.bottom * height,
+    );
+  }
+
+  LocalContentLink? _linkAt(Offset point, Size size) {
+    if (!_ready || widget.onLink == null) return null;
+    for (final link in widget.links.reversed) {
+      if (link.region case final region?) {
+        if (_regionRect(region, size).contains(point)) return link;
+      }
+    }
+    return null;
+  }
 
   // Inlined documents can reach ~10 MiB. The source string is held by
   // reference and compared with identical(), so no multi-MiB hashing or
@@ -73,6 +113,8 @@ $interactionStyle
     _foreground = foreground;
     _platform = platform;
     _generation++;
+    _ready = false;
+    _down = null;
     return _document = document;
   }
 
@@ -104,7 +146,10 @@ $interactionStyle
             (delta.dx < 0 ? widget.onNext : widget.onPrevious)?.call();
           } else if (delta.distance < 8 &&
               e.timeStamp - _downTime! < const Duration(milliseconds: 350)) {
-            if (down.dx < bounds.maxWidth * .25) {
+            final link = _linkAt(down, bounds.biggest);
+            if (link != null) {
+              widget.onLink?.call(link);
+            } else if (down.dx < bounds.maxWidth * .25) {
               widget.onPrevious?.call();
             } else if (down.dx > bounds.maxWidth * .75) {
               widget.onNext?.call();
@@ -113,11 +158,37 @@ $interactionStyle
             }
           }
         },
-        child: _StaticWebView(
-          key: ValueKey(_generation),
-          document: document,
-          onReady: widget.onReady,
-          onFailed: widget.onFailed,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _StaticWebView(
+              key: ValueKey(_generation),
+              document: document,
+              onReady: () {
+                setState(() => _ready = true);
+                widget.onReady();
+              },
+              onFailed: () {
+                setState(() => _ready = false);
+                widget.onFailed?.call();
+              },
+            ),
+            if (_ready && widget.onLink != null)
+              for (final link in widget.links)
+                if (link.region case final region?)
+                  Positioned.fromRect(
+                    rect: _regionRect(region, bounds.biggest),
+                    child: Semantics(
+                      label: link.label,
+                      link: true,
+                      onTap: () => widget.onLink?.call(link),
+                      child: const MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: SizedBox.expand(),
+                      ),
+                    ),
+                  ),
+          ],
         ),
       ),
     );

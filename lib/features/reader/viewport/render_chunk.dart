@@ -68,9 +68,17 @@ final class ChunkIndex {
         buffer = StringBuffer();
       }
 
+      var rubyIndex = 0;
       for (final grapheme in text.characters) {
         final count = grapheme.runes.length;
-        if (length + count > maxCodePoints) flush();
+        while (rubyIndex < block.inlineRuby.length &&
+            block.inlineRuby[rubyIndex].end <= start + length) {
+          rubyIndex++;
+        }
+        final insideRuby =
+            rubyIndex < block.inlineRuby.length &&
+            block.inlineRuby[rubyIndex].start < start + length;
+        if (length + count > maxCodePoints && !insideRuby) flush();
         buffer.write(grapheme);
         length += count;
       }

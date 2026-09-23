@@ -78,7 +78,8 @@ void main() {
         'image',
         'paragraph',
       ]);
-      expect((result.blocks[2] as ParagraphBlock).text, '一个语义段落包含测试（test）注音。');
+      expect((result.blocks[2] as ParagraphBlock).text, '一个语义段落包含测试注音。');
+      expect(result.blocks[2].inlineRuby.single.annotation, 'test');
       expect((result.blocks[3] as ImageBlock).alt, '合成测试插图');
       expect(
         jsonDecode(utf8.decode(adapter.requests.single.data as List<int>)),

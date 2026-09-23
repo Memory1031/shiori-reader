@@ -20,6 +20,10 @@ import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 
 import '../../support/contract_fakes.dart';
+import '../../data/local/epub_svg_links_test.dart' show svgLinksParser;
+import '../../data/local/local_reading_test.dart' show ForbiddenOnline;
+import 'local_reading_test.dart' show MemoryBooks;
+import 'package:shiori/data/repositories/local_reading_repository.dart';
 
 const document = '<html><head></head><body>Static page</body></html>';
 
@@ -139,6 +143,16 @@ class _CompletionPresentation extends CompletionRepository
   }) async => const Success(document);
 }
 
+class _SvgBooks extends MemoryBooks implements LocalPagePresentationRepository {
+  _SvgBooks(super.record, this.pages);
+  final Map<String, String> pages;
+  @override
+  Future<Result<String?>> loadPagePresentation(
+    ChapterKey chapter, {
+    required CancellationToken cancellation,
+  }) async => Success(pages[chapter.chapterId]);
+}
+
 void main() {
   late _Platform platform;
   late Directory temp;
@@ -157,6 +171,8 @@ void main() {
     String html = document,
     String os = 'android',
     Brightness brightness = Brightness.light,
+    List<LocalContentLink> links = const [],
+    ValueChanged<LocalContentLink>? onLink,
   }) => EpubWebViewHost(
     userDataDirectory: temp,
     operatingSystem: os,
@@ -164,6 +180,8 @@ void main() {
       theme: ThemeData(brightness: brightness),
       home: EpubLayoutPage(
         html: html,
+        links: links,
+        onLink: onLink,
         onReady: () => ready++,
         onFailed: () => failed++,
         onPrevious: () => previous++,
@@ -172,6 +190,141 @@ void main() {
       ),
     ),
   );
+
+  for (final size in [const Size(320, 800), const Size(1200, 600)]) {
+    testWidgets('SVG hotspots follow meet geometry and consume one tap: $size', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final parser = svgLinksParser();
+      final content = parser.parse().content;
+      final link = content.links.singleWhere((l) => l.region != null);
+      final html = parser.presentations.values.first;
+      var taps = 0;
+      await tester.pumpWidget(
+        page(html: html, links: [link], onLink: (_) => taps++),
+      );
+      await tester.pumpAndSettle();
+      platform.heads.single.finish();
+      await tester.pumpAndSettle();
+      final width = size.width < size.height * .5
+          ? size.width
+          : size.height * .5;
+      final origin = (size.width - width) / 2;
+      final point = Offset(origin + width * .15, width / .5 * .225);
+      await tester.tapAt(point);
+      await tester.pump();
+      expect(taps, 1);
+      expect(previous + next + center, 0);
+      expect(find.bySemanticsLabel('Go 1'), findsOneWidget);
+      await tester.dragFrom(point, const Offset(100, 0));
+      await tester.pump();
+      expect(taps, 1);
+      expect(previous, 1);
+      // Outside the rendered viewBox/region, normal reader tap controls remain.
+      await tester.tapAt(Offset(size.width - 5, size.height - 5));
+      await tester.pump();
+      expect(next, 1);
+      await tester.pumpWidget(page(html: document));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Go 1'), findsNothing);
+      platform.heads.first
+          .finish(); // Retired native callback cannot revive links.
+      await tester.pump();
+      expect(taps, 1);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
+  testWidgets('SVG TOC tap reaches the real Reader chapter navigation', (
+    tester,
+  ) async {
+    final parser = svgLinksParser();
+    final content = parser.parse().content;
+    final local = _SvgBooks(
+      LocalBookRecord(
+        content: content,
+        format: LocalBookFormat.epub,
+        importedAt: DateTime.utc(2025),
+      ),
+      parser.presentations,
+    );
+    final repo = LocalReadingRepository(
+      online: ForbiddenOnline(),
+      local: local,
+    );
+    final library = FixtureLibraryRepository();
+    final settings = FixtureSettingsStore();
+    await settings.save(
+      ReaderSettings(controlsHintSeen: true),
+      cancellation: CancellationSource().token,
+    );
+    await tester.pumpWidget(
+      EpubWebViewHost(
+        userDataDirectory: temp,
+        operatingSystem: 'android',
+        child: ShioriApp(
+          locale: const Locale('en'),
+          routes: AppRoutes(
+            home: (_) => BookReaderScreen(
+              chapter: content.chapters.first.key,
+              repository: repo,
+              library: library,
+              settings: settings,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(EpubLayoutPage), findsOneWidget);
+    final before = tester.widget<ReaderContentView>(
+      find.byType(ReaderContentView),
+    );
+    expect(
+      before.session!.contentLinks.where((l) => l.region != null),
+      isNotEmpty,
+    );
+    final hotspot = find.byWidgetPredicate(
+      (w) => w is Semantics && w.properties.label == 'Go 1',
+    );
+    for (var i = 0; i < 3 && hotspot.evaluate().isEmpty; i++) {
+      platform.heads.last.finish();
+      await tester.pumpAndSettle();
+    }
+    expect(
+      tester.widget<EpubLayoutPage>(find.byType(EpubLayoutPage)).onLink,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<EpubLayoutPage>(find.byType(EpubLayoutPage))
+          .links
+          .where((l) => l.region != null),
+      isNotEmpty,
+    );
+    await tester.tapAt(tester.getCenter(hotspot));
+    await tester.pumpAndSettle();
+    final reader = tester.widget<ReaderContentView>(
+      find.byType(ReaderContentView),
+    );
+    expect(reader.content.key, content.chapters.last.key);
+    expect(find.byType(BookReaderScreen), findsOneWidget);
+    expect(find.byType(ReaderCompletionPage), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+    final progress = await library.getProgress(
+      content.detail.summary.key,
+      cancellation: CancellationSource().token,
+    );
+    expect(
+      (progress as Success<ReadingProgress?>).value!.chapterKey,
+      content.chapters.last.key,
+    );
+    await library.close();
+  });
 
   testWidgets(
     'last main WebView page enters completion and returns without reopening platform view',

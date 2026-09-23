@@ -13,7 +13,8 @@
 - Summary / Detail 以字符串列表表示作者和标签；缺少信息保留 empty / null / unknown，不猜作者、完结状态或时间。Source 负责 HTML entity / 标记清理，Domain 只接收普通文本；不因文本含 `<` 等合法字符便把它当 HTML 删除。
 - Catalog 只持有不可变卷章树，flatChapters 是惰性视图；不按 ID 或标题排序。全目录 ordinal 必须从 0 连续递增；重复 groupId / ChapterKey、跨小说归属或卷归属错误直接拒绝。Source 先处理重复链接和缺名诊断，不能依赖 Domain 静默去重。无卷可用明确 isSynthetic 的分组，缺卷名为 null，由 UI 展示占位名。
 - ChapterContent 接受 Paragraph / Image / Heading / Divider，保留段落顺序和单段完整文本。可读正文至少有一个非空 Paragraph 或 Image；纯图片章有效，只有空白 / 标题 / 分隔符无效。空 Paragraph 可在有效正文中表达已确认的语义空白。
-- Paragraph 的 alignment 为 start / center / end，leadingIndent 为整数 0–8 em，表示段落首行缩进，不是整段左内边距；展示用前缀不计入原文位置。当前不启用 text runs / 嵌套 AST；Source 的 Ruby 初始降级为基字加括注、强调保留文字，不在 Domain 处理站点标签。
+- Paragraph 的 alignment 为 start / center / end，leadingIndent 为整数 0–8 em，表示段落首行缩进，不是整段左内边距；展示用前缀不计入原文位置。不在 Domain 处理站点标签或嵌套 HTML AST。
+- Paragraph / Heading 可携带有序、不重叠的 inlineRuby：start / length 按基字的 Unicode 码点定位，annotation 独立保存注音。基字仍属于正文文本，注音参与语义身份；旧 JSON 缺字段时为空。
 - Paragraph / Heading 可携带有序的 inlineImages：每项用 Unicode 码点偏移引用文本中的单个 U+FFFC，保存 MediaRef、alt 和 em 宽高；图片参与相同的资源校验与生命周期。无行内图片的旧记录及内容身份保持兼容，em 尺寸只影响布局，不改变语义身份。
 - Paragraph / Heading 可携带按 Unicode 码点定位的有序、不重叠 inlineStyles，保存颜色与相对字号、粗斜体；相邻块可通过 BlockBox.group 共享简单容器。两者均为纯 Dart、可序列化的排版元数据，不改变 blockKey / contentRevision，旧记录缺字段时使用默认值。排版缓存通过完整内容值变化失效。
 - 图片尺寸各自可未知；已知值须正数。封面和正文图片必须属于相同 Source。ImageBlock 尺寸为后续可发现的布局元数据，更新尺寸不改变 blockKey / contentRevision；mediaId、alt、caption 的改变会改变语义身份。
@@ -26,9 +27,9 @@
 
 | 摘要 | 固定 fields 顺序 |
 | --- | --- |
-| Paragraph 语义 | text、alignment.name、leadingIndent；有行内图片时追加 `[offset, media.identityFields, alt]` 列表 |
+| Paragraph 语义 | text、alignment.name、leadingIndent；有行内图片时追加 `[offset, media.identityFields, alt]` 列表；有 Ruby 时末尾追加 `["ruby", [[start,length,annotation],...]]` |
 | Image 语义 | `[sourceId, mediaId]`、alt、caption；不含 width / height |
-| Heading 语义 | text、level（1–6）；有行内图片时追加 `[offset, media.identityFields, alt]` 列表，再追加非默认 alignment，默认 start 保持旧格式 |
+| Heading 语义 | text、level（1–6）；有行内图片时追加 `[offset, media.identityFields, alt]` 列表，再追加非默认 alignment，默认 start 保持旧格式；有 Ruby 时末尾追加 `["ruby", [[start,length,annotation],...]]` |
 | Divider 语义 | 空数组 |
 | blockKey（kind=block） | block kind、该类 semantic fields、同章该语义的 occurrence（从 0 开始） |
 | contentRevision（kind=chapter） | title、按正文顺序排列的 blockKey 数组 |

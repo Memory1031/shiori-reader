@@ -132,17 +132,53 @@ void main() {
     await repo.close();
     await db.close();
   });
-  Future<void> seed({bool stale = false}) async {
+  Future<void> seed({bool stale = false, int parserVersion = 2}) async {
     value(
       await records.writeChapter(
         contractContent('cached'),
         fetchedAt: contractNow.subtract(const Duration(days: 1)),
         expiresAt: stale ? contractNow : null,
-        parserVersion: 1,
+        parserVersion: parserVersion,
         cancellation: token,
       ),
     );
   }
+
+  test(
+    'pre-ruby chapter cache remains readable offline and refreshes online',
+    () async {
+      await seed(parserVersion: 1);
+      final offline = value(
+        await repo.loadChapter(
+          contractChapter,
+          mode: ReadMode.cacheOnly,
+          cancellation: token,
+        ),
+      );
+      expect(offline.isStale, isTrue);
+      expect(source.chapterCalls, 0);
+      source.pending = Completer();
+      final updated = repo.chapterUpdates(contractChapter).first;
+      final cached = value(
+        await repo.loadChapter(
+          contractChapter,
+          mode: ReadMode.cacheFirst,
+          cancellation: token,
+        ),
+      );
+      expect(cached.value, offline.value);
+      source.pending!.complete(
+        Success(contractContent('new ruby-capable content')),
+      );
+      await updated;
+      expect(
+        value(
+          await records.readChapter(contractChapter, cancellation: token),
+        )!.parserVersion,
+        2,
+      );
+    },
+  );
 
   test(
     'registry rejects duplicate identity; queries forward and cursor source is checked',

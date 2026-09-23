@@ -157,7 +157,7 @@ void main() {
               blocks: [ParagraphBlock(text: 'old')],
             ),
             fetchedAt: DateTime.utc(2026),
-            parserVersion: 2,
+            parserVersion: 1,
             cancellation: token,
           ),
           isA<Success>(),
@@ -196,7 +196,7 @@ void main() {
                   as Success<StoredRecord<ChapterContent>?>)
               .value!
               .parserVersion,
-          1,
+          2,
         );
       } finally {
         await repo.close();

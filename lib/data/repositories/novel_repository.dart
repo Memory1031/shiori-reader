@@ -96,7 +96,7 @@ final class DefaultNovelRepository implements NovelRepository {
       write: (value, time, token) => records.writeChapter(
         value,
         fetchedAt: time,
-        parserVersion: 1,
+        parserVersion: 2,
         cancellation: token,
       ),
     );
@@ -346,7 +346,7 @@ final class _Records<K, T> {
           Operation.catalog => record.fetchedAt.add(policy.catalogTtl),
           _ => null,
         };
-    return record.parserVersion != 1 ||
+    return record.parserVersion != (operation == Operation.chapter ? 2 : 1) ||
         (expiry != null && !now().toUtc().isBefore(expiry));
   }
 
