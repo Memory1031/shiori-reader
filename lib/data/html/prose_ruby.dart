@@ -3,7 +3,10 @@ import '../../domain/models/models.dart';
 
 /// Common group/mono ruby. Complex, nested or interactive markup uses the
 /// caller's existing base + parenthetical annotation fallback.
-List<({List<Node> base, String annotation})>? proseRuby(Element ruby) {
+List<({List<Node> base, String annotation})>? proseRuby(
+  Element ruby, {
+  String? Function(Element)? annotationText,
+}) {
   const inline = {'rb', 'rt', 'rp', 'span', 'b', 'strong', 'i', 'em', 'u'};
   if (ruby.querySelectorAll('*').any((e) => !inline.contains(e.localName))) {
     return null;
@@ -14,7 +17,11 @@ List<({List<Node> base, String annotation})>? proseRuby(Element ruby) {
     if (node is! Text && node is! Element) continue;
     if (node is Element && node.localName == 'rp') continue;
     if (node is Element && node.localName == 'rt') {
-      final annotation = node.text.replaceAll(RegExp(r'\s+'), ' ').trim();
+      final rawAnnotation = annotationText == null
+          ? node.text
+          : annotationText(node);
+      if (rawAnnotation == null) return null;
+      final annotation = rawAnnotation.replaceAll(RegExp(r'\s+'), ' ').trim();
       final text = base.map((n) => n.text ?? '').join().trim();
       if (text.isEmpty ||
           annotation.isEmpty ||

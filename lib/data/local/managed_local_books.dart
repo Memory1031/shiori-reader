@@ -52,6 +52,7 @@ class ManagedLocalBooks
 
   (NovelKey, String, DateTime, int, LocalBookRecord)? _readCache;
   final _presentations = <NovelKey, (LocalBookContent, Map<String, String>)>{};
+  final _svgLinksScanned = <NovelKey>{};
   @override
   Future<Result<String?>> loadPagePresentation(
     ChapterKey chapter, {
@@ -90,9 +91,7 @@ class ManagedLocalBooks
         var derived = _presentations[source.novelKey];
         if (derived != null &&
             derived.$2[source.chapterId]?.contains('shiori-svg-page') == true &&
-            // A hotspot anywhere in the derived book proves this version has
-            // already scanned SVG links. A linkless title page needs no retry.
-            !derived.$1.links.any((link) => link.region != null)) {
+            !_svgLinksScanned.contains(source.novelKey)) {
           // Older reparse bundles retained the rendition but not its link side
           // table. Recover the matching page from the immutable original too.
           final original = await _file(source.novelKey.novelId, 'original');
@@ -104,6 +103,8 @@ class ManagedLocalBooks
             source.novelKey,
             cancellation,
           );
+          // A successful scan is conclusive even when the book has no links.
+          _svgLinksScanned.add(source.novelKey);
           final revisions = {
             for (final chapter in [
               ...record.content.chapters,
@@ -590,7 +591,13 @@ class ManagedLocalBooks
       }
       checkLocalCancellation(token);
       _presentations.clear();
+      _svgLinksScanned.clear();
       _presentations[key] = (derivedContent, html);
+      // The original was fully scanned above. Reparse bundles only persist
+      // rendered HTML; even a current-version manifest may lack SVG links.
+      if (bundle == null) {
+        _svgLinksScanned.add(key);
+      }
     }
   }
 
@@ -631,6 +638,7 @@ class ManagedLocalBooks
     }
     checkLocalCancellation(cancellation);
     _presentations.remove(key);
+    _svgLinksScanned.remove(key);
     if (_readCache?.$1 == key) _readCache = null;
     await db.transaction(() async {
       final variables = [Variable(key.sourceId.value), Variable(key.novelId)];
@@ -800,6 +808,7 @@ class ManagedLocalBooks
     await _invalidations.close();
     await _changes.close();
     _presentations.clear();
+    _svgLinksScanned.clear();
     _readCache = null;
   }
 }

@@ -66,10 +66,12 @@ Future<String> themedSvgPaperArtwork(String html, ui.Color ink) async {
     for (var at = 0; at < rgba.length; at += 4) {
       final luminance =
           (rgba[at] * 54 + rgba[at + 1] * 183 + rgba[at + 2] * 19) >> 8;
-      rgba[at] = red;
-      rgba[at + 1] = green;
-      rgba[at + 2] = blue;
-      rgba[at + 3] = 255 - luminance;
+      final alpha = 255 - luminance;
+      // PixelFormat.rgba8888 expects premultiplied channels.
+      rgba[at] = (red * alpha + 127) ~/ 255;
+      rgba[at + 1] = (green * alpha + 127) ~/ 255;
+      rgba[at + 2] = (blue * alpha + 127) ~/ 255;
+      rgba[at + 3] = alpha;
     }
     outputBuffer = await ui.ImmutableBuffer.fromUint8List(rgba);
     outputDescriptor = ui.ImageDescriptor.raw(

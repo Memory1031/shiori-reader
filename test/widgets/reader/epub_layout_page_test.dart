@@ -50,7 +50,7 @@ Future<String> svgArtworkPage({required Color paper, Color? accent}) async {
   }
 }
 
-Future<(int, int)> svgArtworkAlphas(String html) async {
+Future<(int, int, Color)> svgArtworkPixels(String html) async {
   const prefix = 'data:image/png;base64,';
   final start = html.indexOf(prefix) + prefix.length;
   final end = html.indexOf('"', start);
@@ -60,11 +60,18 @@ Future<(int, int)> svgArtworkAlphas(String html) async {
   final image = (await codec.getNextFrame()).image;
   try {
     final pixels = (await image.toByteData(
-      format: ui.ImageByteFormat.rawRgba,
+      format: ui.ImageByteFormat.rawStraightRgba,
     ))!;
+    final detail = (16 * image.width + 16) * 4;
     return (
       pixels.getUint8(3),
-      pixels.getUint8((16 * image.width + 16) * 4 + 3),
+      pixels.getUint8(detail + 3),
+      Color.fromARGB(
+        pixels.getUint8(detail + 3),
+        pixels.getUint8(detail),
+        pixels.getUint8(detail + 1),
+        pixels.getUint8(detail + 2),
+      ),
     );
   } finally {
     image.dispose();
@@ -265,9 +272,13 @@ void main() {
         const Color(0xff332211),
       );
       expect(prepared, isNot(neutral));
-      final (backgroundAlpha, detailAlpha) = await svgArtworkAlphas(prepared);
+      final (backgroundAlpha, detailAlpha, detailColor) =
+          await svgArtworkPixels(prepared);
       expect(backgroundAlpha, 0);
-      expect(detailAlpha, greaterThan(0));
+      expect(detailAlpha, closeTo(136, 1));
+      expect((detailColor.r * 255).round(), closeTo(0x33, 1));
+      expect((detailColor.g * 255).round(), closeTo(0x22, 1));
+      expect((detailColor.b * 255).round(), closeTo(0x11, 1));
       expect(await themedSvgPaperArtwork(colorful, Colors.black), colorful);
       expect(
         await themedSvgPaperArtwork(transparent, Colors.black),
@@ -344,6 +355,74 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
   }
+
+  testWidgets('center SVG hotspot navigates through the page pointer layer', (
+    tester,
+  ) async {
+    const size = Size(320, 800);
+    await tester.binding.setSurfaceSize(size);
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final parser = svgLinksParser();
+    final content = parser.parse().content;
+    final original = content.links.singleWhere((link) => link.region != null);
+    final link = LocalContentLink(
+      source: original.source,
+      sourceBlockKey: original.sourceBlockKey,
+      label: original.label,
+      target: original.target,
+      targetBlockKey: original.targetBlockKey,
+      region: LocalLinkRegion(
+        left: .4,
+        top: .45,
+        right: .6,
+        bottom: .55,
+        aspectRatio: .5,
+      ),
+    );
+    var taps = 0;
+    await tester.pumpWidget(
+      page(
+        html: parser.presentations.values.first,
+        links: [link],
+        onLink: (_) => taps++,
+      ),
+    );
+    await settleSvgArtwork(tester);
+    platform.heads.single.finish();
+    await tester.pumpAndSettle();
+    const point = Offset(160, 320);
+    await tester.tapAt(point);
+    await tester.pump();
+    expect(taps, 1);
+    expect(center, 0);
+
+    // A native platform view may consume its child's gesture recognizer;
+    // the outer pointer path must still deliver the hotspot exactly once.
+    final listener = tester.widget<Listener>(
+      find
+          .descendant(
+            of: find.byType(EpubLayoutPage),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Listener &&
+                  widget.onPointerDown != null &&
+                  widget.onPointerUp != null,
+            ),
+          )
+          .first,
+    );
+    listener.onPointerDown!(
+      const PointerDownEvent(position: point, timeStamp: Duration.zero),
+    );
+    listener.onPointerUp!(
+      const PointerUpEvent(
+        position: point,
+        timeStamp: Duration(milliseconds: 100),
+      ),
+    );
+    expect(taps, 2);
+    expect(center, 0);
+  });
 
   testWidgets('SVG TOC tap reaches the real Reader chapter navigation', (
     tester,

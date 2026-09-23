@@ -21,6 +21,20 @@ void main() {
     expect(chapter.blocks.first.inlineRuby, isEmpty);
   });
 
+  test('hidden EPUB ruby annotations do not leak into visible prose', () {
+    final chapter = parse(
+      '<style>.hide{display:none}.invisible{visibility:hidden}</style>'
+      '<p><ruby>甲<rt hidden>secret1</rt></ruby>'
+      '<ruby>乙<rt style="display:none">secret2</rt></ruby>'
+      '<ruby>丙<rt class="hide">secret3</rt></ruby>'
+      '<ruby>丁<rt class="invisible">secret4</rt></ruby>'
+      '<ruby>戊<rt>show<span hidden>secret5</span></rt></ruby></p>',
+    );
+    final paragraph = chapter.blocks.first as ParagraphBlock;
+    expect(paragraph.text, '甲乙丙丁戊');
+    expect(paragraph.inlineRuby.map((ruby) => ruby.annotation), ['show']);
+  });
+
   test(
     'ruby preserves base ranges, multiple pairs, heading, link and Unicode',
     () {

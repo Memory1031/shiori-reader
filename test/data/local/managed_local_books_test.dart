@@ -263,6 +263,20 @@ void main() {
           cancellation: token(),
         ),
       );
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      final currentRecord = ok(
+        await store.read(chapter.key.novelKey, cancellation: token()),
+      )!;
+      expect(
+        currentRecord.content.links.where((link) => link.region != null),
+        isEmpty,
+      );
+      final currentLinks = ok(
+        await store.loadContentLinks(chapter.key, cancellation: token()),
+      );
+      expect(currentLinks.where((link) => link.region != null), hasLength(1));
+
       final bundle =
           (await db
                   .customSelect(
@@ -293,6 +307,94 @@ void main() {
         ).loadContentLinks(chapter.key, cancellation: token()),
       );
       expect(bundledLinks.where((link) => link.region != null), hasLength(1));
+    },
+  );
+
+  test(
+    'linkless SVG scans once for current and legacy presentations',
+    () async {
+      final files = epubFiles(ncx: true);
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '''<html><body><svg xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 1440 2048"><image width="1440" height="2048"
+      href="../images/%E6%98%9F%20%E7%A9%BA.png"/>
+      <text x="275" y="795">无链接的扉页</text></svg></body></html>''',
+      );
+      final imported = ok(
+        await store.importBook(
+          bytes: Stream.value(zipFiles(files)),
+          format: LocalBookFormat.epub,
+          cancellation: token(),
+          parse: (session) => const BookDecoder().decode(
+            session,
+            format: LocalBookFormat.epub,
+            filename: 'fixture.epub',
+            cancellation: token(),
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+          ),
+        ),
+      );
+      final chapter = imported.content.chapters.first;
+      final key = chapter.key.novelKey;
+      final original = File('${paths.localBooks.path}/${key.novelId}/original');
+      final hiddenOriginal = File('${original.path}.hidden');
+      expect(
+        ok(
+          await store.loadPagePresentation(chapter.key, cancellation: token()),
+        ),
+        contains('shiori-svg-page'),
+      );
+      await original.rename(hiddenOriginal.path);
+      expect(
+        ok(await store.loadContentLinks(chapter.key, cancellation: token())),
+        isEmpty,
+      );
+      await hiddenOriginal.rename(original.path);
+
+      // A persisted old bundle can lack a link side table. Its first fallback
+      // scan is also conclusive when it finds no hotspots.
+      ok(
+        await store.reparseBook(
+          key,
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+          cancellation: token(),
+        ),
+      );
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      expect(
+        ok(await store.loadContentLinks(chapter.key, cancellation: token())),
+        isEmpty,
+      );
+      await original.rename(hiddenOriginal.path);
+      expect(
+        ok(await store.loadContentLinks(chapter.key, cancellation: token())),
+        isEmpty,
+      );
+      await hiddenOriginal.rename(original.path);
+
+      await db.customStatement(
+        'UPDATE local_books SET parser_version=12 WHERE digest=?',
+        [key.novelId],
+      );
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      expect(
+        ok(
+          await store.loadPagePresentation(chapter.key, cancellation: token()),
+        ),
+        contains('shiori-svg-page'),
+      );
+      expect(
+        ok(await store.loadContentLinks(chapter.key, cancellation: token())),
+        isEmpty,
+      );
+      await original.rename(hiddenOriginal.path);
+      expect(
+        ok(await store.loadContentLinks(chapter.key, cancellation: token())),
+        isEmpty,
+      );
+      await hiddenOriginal.rename(original.path);
     },
   );
 

@@ -183,9 +183,13 @@ $interactionStyle
             (delta.dx < 0 ? widget.onNext : widget.onPrevious)?.call();
           } else if (delta.distance < 8 &&
               e.timeStamp - _downTime! < const Duration(milliseconds: 350)) {
-            // Hotspots have their own Flutter tap recognizer above the native
-            // WebView. Do not also treat their pointer-up as a page tap.
-            if (_linkAt(down, bounds.biggest) != null) return;
+            // The enclosing Listener receives taps even when the native
+            // WebView wins the gesture arena. Dispatch links here so a
+            // hotspot in the center cannot turn into a Chrome tap or vanish.
+            if (_linkAt(down, bounds.biggest) case final link?) {
+              widget.onLink?.call(link);
+              return;
+            }
             if (down.dx < bounds.maxWidth * .25) {
               widget.onPrevious?.call();
             } else if (down.dx > bounds.maxWidth * .75) {
@@ -221,11 +225,7 @@ $interactionStyle
                       onTap: () => widget.onLink?.call(link),
                       child: MouseRegion(
                         cursor: SystemMouseCursors.click,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => widget.onLink?.call(link),
-                          child: const SizedBox.expand(),
-                        ),
+                        child: const SizedBox.expand(),
                       ),
                     ),
                   ),

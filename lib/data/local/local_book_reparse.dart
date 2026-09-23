@@ -188,6 +188,7 @@ Future<LocalReparseResult> _reparse(
     committed = true;
     store._readCache = null;
     store._presentations.remove(key);
+    store._svgLinksScanned.remove(key);
     store._changes.add(key);
     return LocalReparseResult(
       approximate: migration.approximate,

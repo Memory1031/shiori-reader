@@ -925,6 +925,39 @@ class EpubParser {
       'figure',
     };
     const paragraphs = {'p', 'li', 'dt', 'dd', 'pre', 'figcaption', 'tr'};
+    String? rubyAnnotation(dom.Element rt) {
+      if (rt.attributes.containsKey('hidden') ||
+          styles[rt]?['display'] == 'none' ||
+          {'hidden', 'collapse'}.contains(styles[rt]?['visibility'])) {
+        return null;
+      }
+      final text = StringBuffer();
+      void collect(dom.Node node, bool visible) {
+        if (node is dom.Text) {
+          if (visible) text.write(node.text);
+          return;
+        }
+        if (node is! dom.Element ||
+            node.attributes.containsKey('hidden') ||
+            styles[node]?['display'] == 'none') {
+          return;
+        }
+        final childVisible = switch (styles[node]?['visibility']) {
+          'visible' || 'initial' => true,
+          'hidden' || 'collapse' => false,
+          _ => visible,
+        };
+        for (final child in node.nodes) {
+          collect(child, childVisible);
+        }
+      }
+
+      for (final child in rt.nodes) {
+        collect(child, true);
+      }
+      return text.toString().replaceAll(RegExp(r'[ \t\r\n\f]+'), ' ').trim();
+    }
+
     late void Function(dom.Node) walk;
     void visit(dom.Node node) {
       if (node is dom.Text) {
@@ -1161,7 +1194,7 @@ class EpubParser {
       }
       if (tag == 'ruby') {
         final pairs = whitespace == ProseWhiteSpace.normal
-            ? proseRuby(node)
+            ? proseRuby(node, annotationText: rubyAnnotation)
             : null;
         if (pairs != null) {
           for (final pair in pairs) {
@@ -1186,10 +1219,10 @@ class EpubParser {
       if (tag == 'rt') {
         whitespace = previousWhitespace;
         visible = previousVisible;
-        final annotation = node.text
-            .replaceAll(RegExp(r'[ \t\r\n\f]+'), ' ')
-            .trim();
-        if (annotation.isNotEmpty) buffer.write('（$annotation）');
+        final annotation = rubyAnnotation(node);
+        if (annotation != null && annotation.isNotEmpty) {
+          buffer.write('（$annotation）');
+        }
         return;
       }
       for (final child in node.nodes) {
