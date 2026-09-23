@@ -349,6 +349,8 @@ void main() {
       ('an unfinished code', 'ShioriUpdateClosed/1\n2\n'),
       ('a malformed record', 'ShioriUpdateClosed/1\ninstalled\n'),
       ('a foreign record', 'done'),
+      ('an unknown code', 'ShioriUpdateClosed/1\n99\n'),
+      ('only the header', 'ShioriUpdateClosed/1\n'),
     ]) {
       test('$name does not end the transaction', () async {
         stageFinished();
@@ -359,6 +361,14 @@ void main() {
         expect(contents(workspace), before);
       });
     }
+
+    test('a truncated record leaves recovery to the updater', () async {
+      stageFinished();
+      closed().writeAsStringSync('ShioriUpdateClosed/1\n');
+      expect(await installer().status(), UpdateInstallState.installed);
+      expect(runs.single.first, 'recover');
+      expect(workspace.existsSync(), isFalse);
+    });
 
     test('an unpublished record leaves recovery to the updater', () async {
       stageFinished();
@@ -400,11 +410,61 @@ void main() {
       skip: Platform.isWindows ? false : 'Needs Windows file locking',
     );
 
-    test('an error keeps an unfinished transaction for recovery', () async {
-      stageWorkspace(plan: true);
-      code = (_) => WindowsUpdaterCode.error;
-      expect(await installer().status(), UpdateInstallState.failed);
-      expect(workspace.existsSync(), isTrue);
+    for (final result in [
+      WindowsUpdaterCode.error,
+      WindowsUpdaterCode.storage,
+      WindowsUpdaterCode.invalid,
+    ]) {
+      test('refusal $result keeps an unfinished transaction', () async {
+        stageFinished();
+        code = (_) => result;
+        final before = contents(workspace);
+        expect(await installer().status(), UpdateInstallState.failed);
+        expect(contents(workspace), before);
+      });
+    }
+
+    for (final result in [99, -1, -1073741819]) {
+      test('unknown code $result ends nothing', () async {
+        stageFinished();
+        code = (_) => result;
+        final before = contents(workspace);
+        expect(await installer().status(), UpdateInstallState.failed);
+        expect(contents(workspace), before);
+        File('${workspace.path}/plan.bin').deleteSync();
+        Directory('${workspace.path}/backup').deleteSync(recursive: true);
+        expect(await installer().status(), UpdateInstallState.failed);
+        expect(workspace.existsSync(), isTrue);
+        expect(closed().existsSync(), isFalse);
+      });
+    }
+
+    test('an empty leftover folder does not block the next update', () async {
+      workspace.createSync();
+      expect(await installer().status(), UpdateInstallState.idle);
+      expect(workspace.existsSync(), isFalse);
+      expect(runs, isEmpty);
+      workspace.createSync();
+      expect(
+        await installer().install(
+          package,
+          manifest.identity,
+          asset,
+          manifestBytes,
+          signature,
+        ),
+        UpdateInstallState.installing,
+      );
+      expect(runs.map((r) => r.first), ['check']);
+    });
+
+    test('a leftover folder holding an empty folder is a conflict', () async {
+      Directory('${workspace.path}/mine').createSync(recursive: true);
+      await expectLater(
+        installer().status(),
+        problem(UpdateProblem.workspaceConflict),
+      );
+      expect(Directory('${workspace.path}/mine').existsSync(), isTrue);
     });
 
     for (final (result, expected) in [

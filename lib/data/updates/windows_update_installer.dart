@@ -79,6 +79,7 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
   static const _ownership = 'ShioriUpdateWorkspace/1\n';
   static const _closedName = 'shiori-update-closed';
   static const _closedFormat = 'ShioriUpdateClosed/1\n';
+  static final _closedRecord = RegExp(r'^ShioriUpdateClosed/1\n(\d{1,3})\n$');
 
   File get _updater => File('${workspace.path}/shiori-updater.exe');
   File get _marker => File('${workspace.path}/$_markerName');
@@ -129,14 +130,38 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
           FileSystemEntityType.file) {
         return null;
       }
-      final text = await _closed.readAsString();
-      if (!text.startsWith(_closedFormat) || !text.endsWith('\n')) return null;
-      final code = int.tryParse(
-        text.substring(_closedFormat.length, text.length - 1),
-      );
-      return code == null || !_finished(code) ? null : code;
+      final match = _closedRecord.firstMatch(await _closed.readAsString());
+      final code = match == null ? null : int.parse(match[1]!);
+      return code != null && (_ended.contains(code) || _refusals.contains(code))
+          ? code
+          : null;
     } on FileSystemException {
       return null;
+    }
+  }
+
+  /// Whether [code] from recover proves no transaction needs these files.
+  /// Refusals only do when no transaction record exists: with one, they come
+  /// from a recovery attempt that stopped. Anything else, including exit
+  /// codes of a crashed updater, keeps the workspace.
+  Future<bool> _finished(int code) async =>
+      _ended.contains(code) ||
+      (_refusals.contains(code) && !await _transaction());
+
+  /// Removes a leftover folder only when it is empty, as an interrupted
+  /// cleanup leaves it after the marker. The non-recursive delete fails,
+  /// keeping everything, if anything is or has since been put inside.
+  Future<bool> _removeEmpty() async {
+    try {
+      if (await FileSystemEntity.type(workspace.path, followLinks: false) !=
+              FileSystemEntityType.directory ||
+          !await workspace.list(followLinks: false).isEmpty) {
+        return false;
+      }
+      await workspace.delete();
+      return true;
+    } on FileSystemException {
+      return false;
     }
   }
 
@@ -189,10 +214,24 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
     }
   }
 
-  /// Codes after which the updater no longer needs the workspace.
-  static bool _finished(int code) =>
-      code != WindowsUpdaterCode.busy &&
-      code != WindowsUpdaterCode.recoveryRequired;
+  /// Results after which no transaction exists.
+  static const _ended = {
+    WindowsUpdaterCode.installed,
+    WindowsUpdaterCode.launchFailed,
+    WindowsUpdaterCode.rolledBack,
+    WindowsUpdaterCode.none,
+  };
+
+  /// Refusals the updater records before starting a transaction.
+  static const _refusals = {
+    WindowsUpdaterCode.error,
+    WindowsUpdaterCode.failed,
+    WindowsUpdaterCode.timeout,
+    WindowsUpdaterCode.instances,
+    WindowsUpdaterCode.storage,
+    WindowsUpdaterCode.invalid,
+    WindowsUpdaterCode.unsupported,
+  };
 
   static UpdateInstallState _result(int code) => switch (code) {
     WindowsUpdaterCode.installed ||
@@ -222,6 +261,7 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
       return UpdateInstallState.idle;
     }
     if (!await _owned()) {
+      if (await _removeEmpty()) return UpdateInstallState.idle;
       throw const UpdateIssue(UpdateProblem.workspaceConflict);
     }
     // A finished transaction whose cleanup was interrupted: whatever is left,
@@ -242,11 +282,7 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
     if (code == WindowsUpdaterCode.busy) return UpdateInstallState.installing;
     // An unfinished transaction is kept so the workspace updater copy can
     // still complete recovery; the updater has told the user what to do.
-    if (code == WindowsUpdaterCode.recoveryRequired ||
-        (code == WindowsUpdaterCode.error &&
-            await File('${workspace.path}/plan.bin').exists())) {
-      return UpdateInstallState.failed;
-    }
+    if (!await _finished(code)) return UpdateInstallState.failed;
     if (await _close(code)) await _clear();
     return _result(code);
   }
