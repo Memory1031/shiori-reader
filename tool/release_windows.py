@@ -15,7 +15,7 @@ from release_android import ReleaseCheckError, version
 
 
 RUNTIME = (
-    'shiori.exe', 'flutter_windows.dll', 'flutter_inappwebview_windows_plugin.dll',
+    'shiori.exe', 'shiori-updater.exe', 'flutter_windows.dll', 'flutter_inappwebview_windows_plugin.dll',
     'file_selector_windows_plugin.dll', 'WebView2Loader.dll', 'sqlite3.dll',
     'dartjni.dll', 'data/app.so', 'data/icudtl.dat',
     'data/flutter_assets/AssetManifest.bin', 'data/flutter_assets/NOTICES.Z',
@@ -25,6 +25,9 @@ CRT = ('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')
 NATIVE_PACKAGES = Path('build/windows/x64/packages/flutter_inappwebview_windows/1.0.231216.1-1.0.2792.45-3.11.2')
 NATIVE_NOTICES = ('Microsoft.Web.WebView2/LICENSE.txt', 'Microsoft.Web.WebView2/NOTICE.txt',
                   'Microsoft.Windows.ImplementationLibrary/LICENSE')
+# Every shipped path, itself included: the next updater replaces exactly these.
+PROGRAM_FILES = 'program-files.txt'
+BUILD_INFO = 'data/flutter_assets/assets/release/build-info.json'
 
 
 def exe_metadata(executable):
@@ -56,6 +59,16 @@ def verify_exe(executable, name, number, metadata):
         raise ReleaseCheckError('Windows executable identity/version/debug flag does not match release')
 
 
+def verify_updater(bundle):
+    # The updater must trust the same key the application bundles.
+    if not (bundle / BUILD_INFO).is_file():
+        raise ReleaseCheckError('Missing bundled build identity')
+    bundled = json.loads((bundle / BUILD_INFO).read_bytes())
+    modulus = bundled.get('publicKey', {}).get('modulus')
+    if modulus and modulus.encode('ascii') not in (bundle / 'shiori-updater.exe').read_bytes():
+        raise ReleaseCheckError('Windows updater does not embed the bundled update key')
+
+
 def package(root, bundle, crt, output, tag, commit, metadata_reader=exe_metadata):
     name, number = version((root / 'pubspec.yaml').read_text(encoding='utf-8'), tag)
     if not re.fullmatch(r'[0-9a-fA-F]{40}', commit):
@@ -75,6 +88,7 @@ def package(root, bundle, crt, output, tag, commit, metadata_reader=exe_metadata
     for relative in RUNTIME:
         include(bundle / relative, relative)
     verify_exe(bundle / 'shiori.exe', name, number, metadata_reader(bundle / 'shiori.exe'))
+    verify_updater(bundle)
     for path in sorted(bundle.glob('*.dll')):
         include(path, path.name)
     for path in sorted((bundle / 'data').rglob('*')):
@@ -91,10 +105,12 @@ def package(root, bundle, crt, output, tag, commit, metadata_reader=exe_metadata
     include(root / 'tool/licenses/nlohmann-json-3.11.2-LICENSE.MIT',
             'licenses/nlohmann-json-3.11.2-LICENSE.MIT')
     output.mkdir(parents=True, exist_ok=True)
+    listing = ''.join(relative + '\n' for relative in sorted([*files, PROGRAM_FILES]))
     archive = output / f'shiori-reader-{tag}-windows-x64.zip'
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as zipped:
         for relative, path in sorted(files.items()):
             zipped.write(path, relative)
+        zipped.writestr(PROGRAM_FILES, listing.encode('utf-8'))
     with zipfile.ZipFile(archive) as zipped:
         if zipped.testzip() is not None:
             raise ReleaseCheckError('Windows ZIP integrity check failed')

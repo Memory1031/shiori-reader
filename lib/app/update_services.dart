@@ -9,6 +9,7 @@ import '../data/updates/update_http.dart';
 import '../data/updates/update_manifest.dart';
 import '../data/updates/update_storage.dart';
 import '../data/updates/update_installer.dart';
+import '../data/updates/windows_update_installer.dart';
 import '../domain/contracts/app_updates.dart';
 import '../features/updates/update_controller.dart';
 
@@ -17,6 +18,7 @@ const _channel = MethodChannel('dev.shiori.reader/app');
 Future<UpdateController> createUpdateController(
   AppPaths paths, {
   Future<void> Function()? beforeInstall,
+  required Future<void> Function() prepareExit,
 }) async {
   var version = '—';
   var build = 0;
@@ -56,7 +58,11 @@ Future<UpdateController> createUpdateController(
         release: bundled?.identity,
       ),
       platform: Platform.isWindows ? 'windows-x64' : 'android',
-      installer: Platform.isAndroid ? const AndroidUpdateInstaller() : null,
+      installer: Platform.isAndroid
+          ? const AndroidUpdateInstaller()
+          : Platform.isWindows
+          ? WindowsUpdateInstaller.system(prepareExit: prepareExit)
+          : null,
       key: bundled?.publicKey,
       http: DioUpdateHttp(),
       storage: UpdateStorage(

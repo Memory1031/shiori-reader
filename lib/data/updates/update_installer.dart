@@ -14,6 +14,8 @@ abstract interface class UpdateInstaller {
     File package,
     ReleaseIdentity release,
     UpdateAsset asset,
+    Uint8List manifest,
+    Uint8List signature,
   );
 }
 
@@ -58,6 +60,8 @@ final class AndroidUpdateInstaller implements UpdateInstaller {
     File package,
     ReleaseIdentity release,
     UpdateAsset asset,
+    Uint8List manifest,
+    Uint8List signature,
   ) => _state('install', {
     'path': package.path,
     'version': release.version,

@@ -77,6 +77,8 @@ final class GithubUpdateRepository implements AppUpdateRepository {
       package,
       verified.candidate.release,
       verified.asset,
+      verified.manifest,
+      verified.signature,
     );
   });
   _VerifiedUpdate? _selected;

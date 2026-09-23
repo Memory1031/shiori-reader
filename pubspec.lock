@@ -956,5 +956,5 @@ packages:
     source: hosted
     version: "3.1.4"
 sdks:
-  dart: ">=3.10.3 <3.11.0"
-  flutter: ">=3.38.4 <3.39.0"
+  dart: ">=3.10.9 <3.11.0"
+  flutter: ">=3.38.10 <3.39.0"

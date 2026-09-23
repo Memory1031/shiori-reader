@@ -13,7 +13,7 @@
 
 ## 质量检查
 
-固定 Flutter 3.38.4，应用、`tools/source_probe`、`tool/db_codegen` 三份依赖严格按 lockfile 安装。统一 `PUB_HOSTED_URL=https://pub.flutter-io.cn`，缓存只加速安装，不能替代锁文件校验。
+固定 Flutter 3.38.10，应用、`tools/source_probe`、`tool/db_codegen` 三份依赖严格按 lockfile 安装。统一 `PUB_HOSTED_URL=https://pub.flutter-io.cn`，缓存只加速安装，不能替代锁文件校验。
 
 CI 检查工作流结构、锁文件变化、数据库生成与新 schema、gen-l10n 生成一致性、Dart 格式、静态分析，以及独立 Source 调查包的格式 / 分析 / 样本完整性预检。根分析会扫描工具包，必须提前完成其依赖安装。
 

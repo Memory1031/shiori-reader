@@ -4,7 +4,7 @@
 
 ## 复跑（Windows PowerShell）
 
-使用项目 Flutter 3.38.4 所带 Dart 3.10.3。在仓库根目录执行：
+使用项目 Flutter 3.38.10 所带 Dart 3.10.9。在仓库根目录执行：
 
 ```powershell
 Set-Location tools/source_probe

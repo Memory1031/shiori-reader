@@ -1140,6 +1140,29 @@ class AppLocalizationsEn extends AppLocalizations {
       'The system could not complete installation. Check free space and installation permission, then retry.';
 
   @override
+  String get updateRestartInstall => 'Restart to update';
+
+  @override
+  String get updateInstallHintWindows =>
+      'The package is verified. Shiori will close, replace its program files and start again; your library, reading position and settings will be kept.';
+
+  @override
+  String get updateRestarting =>
+      'Closing Shiori to install the update. It will start again when installation finishes.';
+
+  @override
+  String get updateInstallFailedWindows =>
+      'The update could not be completed. Retry, or download the full Windows ZIP from the release page and extract it again. Your library and reading data are stored separately and are not affected.';
+
+  @override
+  String get updateInstallInstances =>
+      'Close other Shiori windows, then retry.';
+
+  @override
+  String get updateInstallLocation =>
+      'Shiori cannot update itself in this folder. Extract the full Windows ZIP to a writable folder on a local drive, or update manually from the release page.';
+
+  @override
   String get updateInstallBusy =>
       'Wait for the current operation to finish before installing.';
 

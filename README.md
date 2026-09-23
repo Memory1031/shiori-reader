@@ -60,12 +60,12 @@ Android 覆盖安装需要签名一致；从 Debug 包切换到正式签名包�
 
 ## 本地开发
 
-使用固定的 **Flutter 3.38.4 / Dart 3.10.3**。Android 构建需要 JDK 17、SDK 36 和 NDK 28.2.13676358；iOS 构建需要 macOS / Xcode；Windows 构建需要 Visual Studio 2022 C++ 工具、Windows SDK 与 NuGet CLI，详见[开发说明](docs/development.md)。
+使用固定的 **Flutter 3.38.10 / Dart 3.10.9**。Android 构建需要 JDK 17、SDK 36 和 NDK 28.2.13676358；iOS 构建需要 macOS / Xcode；Windows 构建需要 Visual Studio 2022 C++ 工具、Windows SDK 与 NuGet CLI，详见[开发说明](docs/development.md)。
 
 以下命令适用于已安装 FVM 的 macOS / Linux 环境：
 
 ```sh
-fvm install 3.38.4
+fvm install 3.38.10
 export PUB_HOSTED_URL=https://pub.flutter-io.cn
 fvm flutter pub get --enforce-lockfile
 fvm flutter devices

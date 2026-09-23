@@ -281,8 +281,13 @@ class UpdateScreen extends StatelessWidget {
                           UpdateProblem.packageInvalid =>
                             l.updatePackageInvalid,
                           UpdateProblem.cancelled => l.updateCancelled,
-                          UpdateProblem.installation => l.updateInstallFailed,
+                          UpdateProblem.installation =>
+                            defaultTargetPlatform == TargetPlatform.windows
+                                ? l.updateInstallFailedWindows
+                                : l.updateInstallFailed,
                           UpdateProblem.busy => l.updateInstallBusy,
+                          UpdateProblem.instances => l.updateInstallInstances,
+                          UpdateProblem.location => l.updateInstallLocation,
                         }, style: TextStyle(color: theme.colorScheme.error)),
                       )
                     else if (target == null && date != null && !c.busy)
@@ -358,6 +363,8 @@ class UpdateScreen extends StatelessWidget {
     final l = AppLocalizations.of(context);
     final c = controller;
     final theme = Theme.of(context);
+    // Windows replaces files after the app exits, then starts it again.
+    final windows = defaultTargetPlatform == TargetPlatform.windows;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
@@ -419,12 +426,20 @@ class UpdateScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(l.updateInstalling)),
+                  Expanded(
+                    child: Text(
+                      windows ? l.updateRestarting : l.updateInstalling,
+                    ),
+                  ),
                 ],
               )
             else if (c.phase == UpdatePhase.downloaded) ...[
               Text(
-                c.canInstall ? l.updateInstallHint : l.updateDownloaded,
+                !c.canInstall
+                    ? l.updateDownloaded
+                    : windows
+                    ? l.updateInstallHintWindows
+                    : l.updateInstallHint,
                 style: theme.textTheme.bodySmall,
               ),
               if (c.canInstall) ...[
@@ -446,14 +461,22 @@ class UpdateScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                   ],
                   if (c.installState == UpdateInstallState.failed) ...[
-                    Text(l.updateInstallFailed),
+                    Text(
+                      windows
+                          ? l.updateInstallFailedWindows
+                          : l.updateInstallFailed,
+                    ),
                     const SizedBox(height: 12),
                   ],
                   FilledButton.icon(
                     key: const ValueKey('update-install'),
                     onPressed: c.busy ? null : c.install,
-                    icon: const Icon(Icons.system_update),
-                    label: Text(l.updateInstall),
+                    icon: Icon(
+                      windows ? Icons.restart_alt : Icons.system_update,
+                    ),
+                    label: Text(
+                      windows ? l.updateRestartInstall : l.updateInstall,
+                    ),
                   ),
                 ],
               ],

@@ -6,7 +6,8 @@ import tempfile
 import unittest
 import zipfile
 
-from release_windows import CRT, RUNTIME, NATIVE_PACKAGES, NATIVE_NOTICES, ReleaseCheckError, package
+from release_windows import (BUILD_INFO, CRT, RUNTIME, NATIVE_PACKAGES, NATIVE_NOTICES,
+                             PROGRAM_FILES, ReleaseCheckError, package)
 
 
 class WindowsReleaseTest(unittest.TestCase):
@@ -31,6 +32,8 @@ class WindowsReleaseTest(unittest.TestCase):
         struct.pack_into('<I', pe, 60, 64)
         pe[64:] = b'PE\0\0\x64\x86'
         (self.bundle / 'shiori.exe').write_bytes(pe)
+        (self.bundle / BUILD_INFO).parent.mkdir(parents=True, exist_ok=True)
+        (self.bundle / BUILD_INFO).write_text('{"schemaVersion":1,"development":true}\n')
         self.metadata = dict(ProductName='Shiori', OriginalFilename='shiori.exe',
                              ProductVersion='1.2.0+9', FileMajorPart=1, FileMinorPart=2,
                              FileBuildPart=0, FilePrivatePart=9, IsDebug=False)
@@ -56,6 +59,23 @@ class WindowsReleaseTest(unittest.TestCase):
         self.assertEqual(metadata['sha256'], digest)
         self.assertFalse(metadata['signed'])
         self.assertFalse((self.output / 'SHA256SUMS.txt').exists())
+
+    def test_program_file_list_names_every_entry_including_itself(self):
+        with zipfile.ZipFile(self.package()) as zipped:
+            listing = zipped.read(PROGRAM_FILES).decode('utf-8')
+            self.assertEqual(listing, ''.join(name + '\n' for name in sorted(zipped.namelist())))
+            self.assertIn('shiori-updater.exe\n', listing)
+
+    def test_updater_must_embed_bundled_update_key(self):
+        modulus = '8' + 'a' * 767
+        (self.bundle / BUILD_INFO).write_text(json.dumps({'publicKey': {'modulus': modulus}}))
+        with self.assertRaisesRegex(ReleaseCheckError, 'updater'):
+            self.package()
+        (self.bundle / 'shiori-updater.exe').write_bytes(b'MZ...' + modulus.encode() + b'...')
+        self.package()
+        (self.bundle / 'shiori-updater.exe').unlink()
+        with self.assertRaisesRegex(ReleaseCheckError, 'shiori-updater.exe'):
+            self.package()
 
     def test_missing_dependency_and_stale_or_debug_executable_rejected(self):
         for key, value in [('FilePrivatePart', 8), ('ProductVersion', '1.1.0+9'),

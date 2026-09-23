@@ -14,6 +14,8 @@ enum UpdateProblem {
   cancelled,
   installation,
   busy,
+  instances,
+  location,
 }
 
 enum UpdateInstallState {

@@ -276,16 +276,28 @@ class TransactionTest(unittest.TestCase):
     def test_lock_failure_then_recovery(self):
         updater, proceed = self.updater(checkpoint="file_applied:1")
         self.assertFalse((self.install / "shiori.exe").exists())
+        # runtime.bin fails the apply; the already-published added.bin then
+        # cannot be removed, so rollback stops. Unchanged files are skipped.
         lock = self.lock(self.install / "runtime.bin")
+        added = self.lock(self.install / "added.bin")
         proceed.signal()
         self.finish(updater, 2)
         self.assertFalse((self.install / "shiori.exe").exists())
         self.unlock(lock)
+        self.unlock(added)
         recovery, _ = self.updater("recover")
         self.finish(recovery, 1)
         self.check_old()
         repeated, _ = self.updater("recover")
         self.finish(repeated, 1)
+        self.check_old()
+
+    def test_locked_unchanged_file_does_not_block_rollback(self):
+        updater, proceed = self.updater(checkpoint="file_applied:1")
+        lock = self.lock(self.install / "runtime.bin")
+        proceed.signal()
+        self.finish(updater, 1)
+        self.unlock(lock)
         self.check_old()
 
     def test_failure_rolls_back_without_manual_recovery(self):

@@ -102,4 +102,4 @@ GitHub Actions 需要以下仓库配置：
 
 下载 `shiori-reader-<tag>-windows-x64.zip`，可用 PowerShell `Get-FileHash -Algorithm SHA256 <ZIP 路径>` 与随包发布的 `SHA256SUMS-windows-x64.txt` 对照。完整解压到可写目录后运行 `shiori.exe`，不要只复制 EXE 或在压缩包内启动。包内包含 Flutter / 插件 DLL、资源、VC++ 运行库及许可文件；WebView2 Runtime 由系统提供，未安装时原版式 EPUB 页面会提示运行环境不可用。
 
-当前提供未签名的 x64 ZIP，不包含安装器、自动更新或 Windows ARM64 构建。更新前关闭应用，将新版完整解压到独立目录；书架、阅读进度与设置使用应用数据目录，不随 ZIP 目录更换而清除。正式发布前仍需核对依赖许可及目标系统运行表现。
+当前提供未签名的 x64 ZIP，不包含安装器或 Windows ARM64 构建。应用内更新下载 ZIP 并按签名清单校验后，在安装目录旁的 `<安装目录>.update` 暂存；应用关闭后由包内 `shiori-updater.exe` 原位替换程序文件并重新启动，失败时回滚到原版本。自动更新要求本地磁盘上的可写目录且没有其他 Shiori 窗口；无法自动更新时，关闭应用后将新版完整解压到独立目录。书架、阅读进度与设置使用应用数据目录，两种方式都不会清除。正式发布前仍需核对依赖许可及目标系统运行表现。

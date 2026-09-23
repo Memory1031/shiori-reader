@@ -58,6 +58,7 @@ class _ProductionAppState extends State<ProductionApp>
   LocalLibraryRepository? _library;
   AppFailure? _failure;
   bool _opening = false;
+  bool _storesClosed = false;
   AppPaths? _paths;
   @override
   void initState() {
@@ -133,6 +134,7 @@ class _ProductionAppState extends State<ProductionApp>
             throw const UpdateIssue(UpdateProblem.busy);
           }
         },
+        prepareExit: _closeStores,
       );
       if (!mounted) {
         await updates.shutdown();
@@ -169,6 +171,15 @@ class _ProductionAppState extends State<ProductionApp>
     _updates?.removeListener(_updateChanged);
     await _updates?.shutdown();
     _updates?.dispose();
+    await _closeStores();
+  }
+
+  /// Also run before a Windows update exits the process, while the update
+  /// controller is still completing its handoff.
+  Future<void> _closeStores() async {
+    // The fields stay set so frames drawn before the window closes still build.
+    if (_storesClosed) return;
+    _storesClosed = true;
     await _imports?.shutdown();
     _imports?.dispose();
     await _services?.close();

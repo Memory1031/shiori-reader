@@ -191,7 +191,7 @@ Source 各自拥有 NetworkTransport / Dio，注入允许的 HTTPS URI 和私有
 
 AppLogger 只接受类型化摘要字段，内存最多 200 条；Release 不保存成功请求明细。不接收 URL / body / Header / exception / 自由文本。opaque SourceId 用 SHA-256 标识，requestId 为本地随机 ID；取消不产生错误事件。Source 原始响应只留在 data 层，状态与 Dio 异常映射为既有 AppFailure。
 
-依赖：精确锁定 Dio 5.11.1，官方 [包元数据](https://pub.dev/api/packages/dio/versions/5.11.1) 与本机下载包均声明 Dart >=2.18.0 <4.0.0，满足本项目 Dart 3.10.3；使用默认 IO adapter，未增移动平台插件、修改最低 OS 或放宽 TLS 校验。fake_async 1.3.3 从既有传递依赖提升为直接 dev 依赖。
+依赖：精确锁定 Dio 5.11.1，官方 [包元数据](https://pub.dev/api/packages/dio/versions/5.11.1) 与本机下载包均声明 Dart >=2.18.0 <4.0.0，满足本项目 Dart 3.10.9；使用默认 IO adapter，未增移动平台插件、修改最低 OS 或放宽 TLS 校验。fake_async 1.3.3 从既有传递依赖提升为直接 dev 依赖。
 
 离线复验：`fvm flutter test --no-pub test/data/network --reporter expanded`。使用 FakeAdapter 和秘密哨兵检查字节 / MIME / 长度、超时、取消、错误映射与日志；未以 fake 宣称真实网站 HTTPS / 会话有效。
 

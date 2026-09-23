@@ -1041,6 +1041,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateInstallFailed => '系统未能完成安装。请检查可用空间和安装权限后重试。';
 
   @override
+  String get updateRestartInstall => '重启并更新';
+
+  @override
+  String get updateInstallHintWindows =>
+      '安装包已校验。Shiori 将关闭、替换程序文件后重新启动；书架、阅读位置和设置会保留。';
+
+  @override
+  String get updateRestarting => '正在关闭 Shiori 以安装更新，安装完成后会自动重新启动。';
+
+  @override
+  String get updateInstallFailedWindows =>
+      '更新未能完成。请重试，或从发布页下载完整的 Windows ZIP 重新解压。书架和阅读数据单独保存，不受影响。';
+
+  @override
+  String get updateInstallInstances => '请先关闭其他 Shiori 窗口，然后重试。';
+
+  @override
+  String get updateInstallLocation =>
+      'Shiori 无法在当前文件夹中自动更新。请将完整的 Windows ZIP 解压到本地磁盘上可写入的文件夹，或从发布页手动更新。';
+
+  @override
   String get updateInstallBusy => '请等待当前操作完成后再安装更新。';
 
   @override

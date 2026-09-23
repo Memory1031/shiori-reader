@@ -2036,6 +2036,42 @@ abstract class AppLocalizations {
   /// **'The system could not complete installation. Check free space and installation permission, then retry.'**
   String get updateInstallFailed;
 
+  /// No description provided for @updateRestartInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart to update'**
+  String get updateRestartInstall;
+
+  /// No description provided for @updateInstallHintWindows.
+  ///
+  /// In en, this message translates to:
+  /// **'The package is verified. Shiori will close, replace its program files and start again; your library, reading position and settings will be kept.'**
+  String get updateInstallHintWindows;
+
+  /// No description provided for @updateRestarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing Shiori to install the update. It will start again when installation finishes.'**
+  String get updateRestarting;
+
+  /// No description provided for @updateInstallFailedWindows.
+  ///
+  /// In en, this message translates to:
+  /// **'The update could not be completed. Retry, or download the full Windows ZIP from the release page and extract it again. Your library and reading data are stored separately and are not affected.'**
+  String get updateInstallFailedWindows;
+
+  /// No description provided for @updateInstallInstances.
+  ///
+  /// In en, this message translates to:
+  /// **'Close other Shiori windows, then retry.'**
+  String get updateInstallInstances;
+
+  /// No description provided for @updateInstallLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Shiori cannot update itself in this folder. Extract the full Windows ZIP to a writable folder on a local drive, or update manually from the release page.'**
+  String get updateInstallLocation;
+
   /// No description provided for @updateInstallBusy.
   ///
   /// In en, this message translates to:

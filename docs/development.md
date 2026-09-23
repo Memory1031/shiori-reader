@@ -4,7 +4,7 @@
 
 | 工具 | 固定配置 |
 | --- | --- |
-| Flutter / Dart | 3.38.4 stable / 3.10.3；精确 SDK 见 [.fvmrc](../.fvmrc) |
+| Flutter / Dart | 3.38.10 stable / 3.10.9；精确 SDK 见 [.fvmrc](../.fvmrc) |
 | Android | JDK 17、AGP 8.11.1、Gradle 8.14、Kotlin 2.2.20 |
 | Android SDK | compile / target 36、min 24、NDK 28.2.13676358 |
 | iOS | macOS / Xcode，deployment target 15.0 |
@@ -17,7 +17,7 @@
 macOS / Linux shell：
 
 ```sh
-fvm install 3.38.4
+fvm install 3.38.10
 export PUB_HOSTED_URL=https://pub.flutter-io.cn
 fvm flutter pub get --enforce-lockfile
 (cd tools/source_probe && fvm dart pub get --enforce-lockfile)

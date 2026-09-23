@@ -2,12 +2,84 @@
 
 #include <optional>
 #include <shellapi.h>
+#include <string>
+#include <vector>
 #include <flutter/standard_method_codec.h>
 #include <flutter/event_stream_handler_functions.h>
 
 #include "flutter/generated_plugin_registrant.h"
 #include "launch_view.h"
 #include "utils.h"
+
+namespace {
+
+// Starts the updater copy staged in <install>.update, handing it a waitable
+// handle to this process so it replaces files only after the app has exited.
+// Paths are derived here rather than taken from Dart, so the channel cannot
+// launch arbitrary programs.
+bool StartUpdater() {
+  std::wstring executable(MAX_PATH, L'\0');
+  for (;;) {
+    const DWORD length = GetModuleFileNameW(nullptr, executable.data(),
+                                            static_cast<DWORD>(executable.size()));
+    if (length == 0) return false;
+    if (length < executable.size()) {
+      executable.resize(length);
+      break;
+    }
+    if (executable.size() >= 32768) return false;
+    executable.resize(executable.size() * 2);
+  }
+  const auto separator = executable.find_last_of(L'\\');
+  // A drive root cannot have a sibling workspace.
+  if (separator == std::wstring::npos || separator < 3) return false;
+  const std::wstring install = executable.substr(0, separator);
+  const std::wstring workspace = install + L".update";
+  const std::wstring updater = workspace + L"\\shiori-updater.exe";
+
+  // The updater waits on the handle and checks with GetProcessId that it names a process.
+  HANDLE self = nullptr;
+  if (!DuplicateHandle(GetCurrentProcess(), GetCurrentProcess(), GetCurrentProcess(),
+                       &self, SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, TRUE, 0)) {
+    return false;
+  }
+  SIZE_T size = 0;
+  InitializeProcThreadAttributeList(nullptr, 1, 0, &size);
+  std::vector<char> storage(size);
+  auto* attributes = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(storage.data());
+  bool started = false;
+  if (InitializeProcThreadAttributeList(attributes, 1, 0, &size)) {
+    // Only the process handle is inherited, nothing else this process holds.
+    if (UpdateProcThreadAttribute(attributes, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+                                  &self, sizeof(self), nullptr, nullptr)) {
+      STARTUPINFOEXW startup{};
+      startup.StartupInfo.cb = sizeof(startup);
+      startup.lpAttributeList = attributes;
+      std::wstring command = L"\"" + updater + L"\" apply \"" + workspace + L"\" \"" +
+                             install + L"\" " +
+                             std::to_wstring(reinterpret_cast<uintptr_t>(self));
+      PROCESS_INFORMATION process{};
+      // Leave a job that would kill the updater when the app exits, if allowed.
+      const DWORD attempts[] = {EXTENDED_STARTUPINFO_PRESENT | CREATE_BREAKAWAY_FROM_JOB,
+                                EXTENDED_STARTUPINFO_PRESENT};
+      for (const DWORD flags : attempts) {
+        if (CreateProcessW(updater.c_str(), command.data(), nullptr, nullptr, TRUE, flags,
+                           nullptr, workspace.c_str(), &startup.StartupInfo, &process)) {
+          CloseHandle(process.hThread);
+          CloseHandle(process.hProcess);
+          started = true;
+          break;
+        }
+        if (GetLastError() != ERROR_ACCESS_DENIED) break;
+      }
+    }
+    DeleteProcThreadAttributeList(attributes);
+  }
+  CloseHandle(self);
+  return started;
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -40,7 +112,7 @@ bool FlutterWindow::OnCreate() {
   app_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       flutter_controller_->engine()->messenger(), "dev.shiori.reader/app",
       &flutter::StandardMethodCodec::GetInstance());
-  app_channel_->SetMethodCallHandler([](const auto& call, auto result) {
+  app_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
     if (call.method_name() == "info") {
       const auto version = std::to_string(FLUTTER_VERSION_MAJOR) + "." +
           std::to_string(FLUTTER_VERSION_MINOR) + "." + std::to_string(FLUTTER_VERSION_PATCH);
@@ -61,6 +133,12 @@ bool FlutterWindow::OnCreate() {
       const auto opened = reinterpret_cast<INT_PTR>(ShellExecuteW(
           nullptr, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
       result->Success(flutter::EncodableValue(opened > 32));
+    } else if (call.method_name() == "startUpdater") {
+      result->Success(flutter::EncodableValue(StartUpdater()));
+    } else if (call.method_name() == "exit") {
+      // Normal window close, after Dart has flushed and closed its stores.
+      result->Success();
+      PostMessage(GetHandle(), WM_CLOSE, 0, 0);
     } else {
       result->NotImplemented();
     }

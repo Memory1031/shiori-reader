@@ -16,8 +16,8 @@ struct FileEntry {
 };
 
 // Prepared, authenticated file lists belong to the caller. This engine neither
-// downloads nor trusts an unsigned task as release authorization. The standalone
-// probe uses synthetic lists; release-manifest binding precedes app integration.
+// downloads nor trusts an unsigned task as release authorization; the updater
+// binds `next` to the signed release manifest before calling it.
 struct PreparedUpdate {
   fs::path install;
   fs::path workspace;  // A dedicated sibling of install, on the same local volume.
@@ -36,6 +36,15 @@ struct Result {
 using Progress = std::function<void(const std::string&)>;
 
 std::string FileSha256(const fs::path& path);
+// Throws unless path is a safe relative program file name, before any access.
+void ValidateRelativePath(const std::string& path);
+// Named mutex held by Apply and Recover for one installation directory.
+std::wstring InstallationMutexName(const fs::path& install);
+// Starts install/shiori.exe detached from the caller.
+bool LaunchApplication(const fs::path& install);
+// Every Apply precondition that holds before the application exits: layout,
+// file hashes, free space and unmanaged files. Changes nothing.
+void Check(const PreparedUpdate& task);
 void SaveTask(const fs::path& path, const PreparedUpdate& task);
 PreparedUpdate ReadTask(const fs::path& path);
 

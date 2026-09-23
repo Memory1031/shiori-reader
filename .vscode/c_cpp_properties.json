@@ -9,6 +9,18 @@
         "${workspaceFolder}/windows/flutter/ephemeral/cpp_client_wrapper/include",
         "${workspaceFolder}/windows/flutter/ephemeral/.plugin_symlinks/**"
       ],
+      "defines": [
+        "UNICODE",
+        "_UNICODE",
+        "NOMINMAX",
+        "FLUTTER_VERSION=\"0.0.0+0\"",
+        "FLUTTER_VERSION_MAJOR=0",
+        "FLUTTER_VERSION_MINOR=0",
+        "FLUTTER_VERSION_PATCH=0",
+        "FLUTTER_VERSION_BUILD=0",
+        "SHIORI_UPDATE_MODULUS=\"\"",
+        "SHIORI_UPDATE_BUILD=0"
+      ],
       "cStandard": "c17",
       "cppStandard": "c++17",
       "intelliSenseMode": "windows-msvc-x64"

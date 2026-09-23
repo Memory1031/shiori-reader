@@ -165,6 +165,18 @@ std::string Hex(const unsigned char* bytes, size_t length) {
   return result;
 }
 
+std::wstring MutexName(const fs::path& install) {
+  const auto name = Fold(install);
+  std::array<unsigned char, 32> digest{};
+  Require(BCryptHash(BCRYPT_SHA256_ALG_HANDLE, nullptr, 0,
+                    reinterpret_cast<PUCHAR>(const_cast<wchar_t*>(name.data())),
+                    static_cast<ULONG>(name.size() * sizeof(wchar_t)),
+                    digest.data(), static_cast<ULONG>(digest.size())) >= 0,
+          "Cannot hash installation identity");
+  const auto hex = Hex(digest.data(), digest.size());
+  return L"Local\\Shiori.Update." + std::wstring(hex.begin(), hex.end());
+}
+
 class Locks {
  public:
   explicit Locks(const PreparedUpdate& task)
@@ -182,17 +194,6 @@ class Locks {
   }
   ~Locks() { if (owned_) ReleaseMutex(mutex_.get()); }
  private:
-  static std::wstring MutexName(const fs::path& install) {
-    const auto name = Fold(install);
-    std::array<unsigned char, 32> digest{};
-    Require(BCryptHash(BCRYPT_SHA256_ALG_HANDLE, nullptr, 0,
-                      reinterpret_cast<PUCHAR>(const_cast<wchar_t*>(name.data())),
-                      static_cast<ULONG>(name.size() * sizeof(wchar_t)),
-                      digest.data(), static_cast<ULONG>(digest.size())) >= 0,
-            "Cannot hash installation identity");
-    const auto hex = Hex(digest.data(), digest.size());
-    return L"Local\\Shiori.Update." + std::wstring(hex.begin(), hex.end());
-  }
   static HANDLE OpenWorkspace(const fs::path& workspace) {
     const auto path = workspace / L"transaction.lock";
     SafeAncestors(path);
@@ -300,6 +301,12 @@ void Rollback(const PreparedUpdate& task, const Progress& progress) {
     if (name == kExe) continue;
     const auto destination = task.install / fs::u8path(file.path);
     if (old.count(name)) {
+      // Unchanged files stay in place, so an external reader of one (scanner,
+      // preview) cannot block restoring the rest.
+      if (Exists(destination) && FileSha256(destination) == old.at(name).sha256) {
+        ProgressAt(progress, "rollback_file:" + std::to_string(++number));
+        continue;
+      }
       Replace(task.workspace / L"backup" / fs::u8path(old.at(name).path),
               destination, task.workspace, old.at(name).sha256);
     } else if (Exists(destination)) {
@@ -353,6 +360,25 @@ bool Launch(const fs::path& install) {
   return true;
 }
 
+// Checks that precede every mutation of the installation or its backups.
+void Preflight(const PreparedUpdate& task) {
+  VerifyFiles(task.install, task.current);
+  VerifyFiles(task.workspace / L"payload", task.next);
+  const auto old = Index(task.current);
+  const auto next = Index(task.next);
+  uint64_t bytes = 0;
+  for (const auto& file : task.current) bytes += fs::file_size(task.install / fs::u8path(file.path));
+  for (const auto& file : task.next) bytes += fs::file_size(task.workspace / L"payload" / fs::u8path(file.path));
+  ULARGE_INTEGER free{};
+  Require(GetDiskFreeSpaceExW(task.workspace.c_str(), &free, nullptr, nullptr) &&
+              free.QuadPart > bytes + 1024 * 1024, "Insufficient free space");
+  for (const auto& [name, file] : next) {
+    const auto target = task.install / fs::u8path(file.path);
+    SafeAncestors(target);
+    Require(old.count(name) || !Exists(target), "New file would overwrite unmanaged data");
+  }
+}
+
 void PutString(std::ostream& out, const std::string& value) {
   Require(value.size() <= 32768, "Task field too large");
   const auto size = static_cast<uint32_t>(value.size());
@@ -370,6 +396,16 @@ std::string GetString(std::istream& input) {
   return value;
 }
 }  // namespace
+
+std::wstring InstallationMutexName(const fs::path& install) {
+  return MutexName(Absolute(install));
+}
+
+bool LaunchApplication(const fs::path& install) { return Launch(Absolute(install)); }
+
+void Check(const PreparedUpdate& task) { Preflight(ValidateLayout(task)); }
+
+void ValidateRelativePath(const std::string& path) { SafeRelative(path); }
 
 std::string FileSha256(const fs::path& path) {
   SafeAncestors(path);
@@ -459,21 +495,9 @@ Result Apply(const PreparedUpdate& input, HANDLE parent, DWORD timeout_ms,
     Require(WaitForSingleObject(parent, timeout_ms) == WAIT_OBJECT_0,
             "Application exit timed out");
   }
-  VerifyFiles(task.install, task.current);
-  VerifyFiles(task.workspace / L"payload", task.next);
+  Preflight(task);
   const auto old = Index(task.current);
   const auto next = Index(task.next);
-  uint64_t bytes = 0;
-  for (const auto& file : task.current) bytes += fs::file_size(task.install / fs::u8path(file.path));
-  for (const auto& file : task.next) bytes += fs::file_size(task.workspace / L"payload" / fs::u8path(file.path));
-  ULARGE_INTEGER free{};
-  Require(GetDiskFreeSpaceExW(task.workspace.c_str(), &free, nullptr, nullptr) &&
-              free.QuadPart > bytes + 1024 * 1024, "Insufficient free space");
-  for (const auto& [name, file] : next) {
-    const auto target = task.install / fs::u8path(file.path);
-    SafeAncestors(target);
-    Require(old.count(name) || !Exists(target), "New file would overwrite unmanaged data");
-  }
   SaveTask(task.workspace / L"plan.bin", task);
   for (const auto& file : task.current) {
     Copy(task.install / fs::u8path(file.path),

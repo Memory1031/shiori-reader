@@ -17,7 +17,7 @@ concurrency:
 
 env:
   # 必须与 .fvmrc 和 pubspec.yaml 的 Flutter 约束保持一致
-  FLUTTER_VERSION: 3.38.4
+  FLUTTER_VERSION: 3.38.10
   # 三份 pubspec.lock 都记录此镜像；源地址不同也会导致严格锁定校验失败。
   PUB_HOSTED_URL: https://pub.flutter-io.cn
 
