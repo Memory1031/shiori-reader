@@ -13,7 +13,7 @@ void main() {
       ).readAsStringSync().split('CREATE TABLE image_cache').first;
       final userSql = File('lib/data/local/database/users.drift')
           .readAsStringSync()
-          .replaceAll(' book_progress TEXT,\n', '')
+          .replaceAll(' book_progress TEXT,', '')
           .split('CREATE TABLE prefetch_choices')
           .first;
       final cache = CacheDatabase(
