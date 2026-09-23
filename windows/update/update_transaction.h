@@ -45,7 +45,7 @@ bool LaunchApplication(const fs::path& install);
 // Every Apply precondition that holds before the application exits: layout,
 // file hashes, free space and unmanaged files. Changes nothing.
 void Check(const PreparedUpdate& task);
-void SaveTask(const fs::path& path, const PreparedUpdate& task);
+void SaveTask(const fs::path& path, const PreparedUpdate& task, const Progress& progress = {});
 PreparedUpdate ReadTask(const fs::path& path);
 
 // parent is an already-open SYNCHRONIZE process handle, avoiding PID reuse.

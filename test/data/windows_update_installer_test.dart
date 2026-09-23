@@ -54,11 +54,25 @@ void main() {
         },
       );
 
-  void stageWorkspace({bool plan = false}) {
+  const ownership = 'ShioriUpdateWorkspace/1\n';
+  File marker() => File('${workspace.path}/shiori-update-workspace');
+
+  void ownWorkspace() {
     workspace.createSync();
+    marker().writeAsStringSync(ownership);
+  }
+
+  void stageWorkspace({bool plan = false}) {
+    ownWorkspace();
     File('${workspace.path}/shiori-updater.exe').writeAsStringSync('updater');
     if (plan) File('${workspace.path}/plan.bin').writeAsStringSync('plan');
   }
+
+  /// Every file below [directory] with its bytes, for exact comparison.
+  Map<String, List<int>> contents(Directory directory) => {
+    for (final file in directory.listSync(recursive: true).whereType<File>())
+      file.path.substring(directory.path.length): file.readAsBytesSync(),
+  };
 
   Uint8List zip(
     Map<String, List<int>> entries, {
@@ -159,11 +173,77 @@ void main() {
   group('status', () {
     test('nothing staged is idle without running the updater', () async {
       expect(await installer().status(), UpdateInstallState.idle);
-      workspace.createSync();
+      ownWorkspace();
+      File('${workspace.path}/payload/shiori.exe')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('partial');
       expect(await installer().status(), UpdateInstallState.idle);
       expect(workspace.existsSync(), isFalse);
       expect(runs, isEmpty);
     });
+
+    for (final (name, prepare) in <(String, void Function())>[
+      ('an unmarked folder', () {}),
+      (
+        'a folder with a foreign marker',
+        () {
+          marker().writeAsStringSync('mine');
+        },
+      ),
+      (
+        'an unmarked folder holding an updater',
+        () {
+          File('${workspace.path}/shiori-updater.exe').writeAsStringSync('x');
+          File('${workspace.path}/plan.bin').writeAsStringSync('not ours');
+        },
+      ),
+    ]) {
+      test('$name is a conflict and stays untouched', () async {
+        File('${workspace.path}/notes/draft.txt')
+          ..createSync(recursive: true)
+          ..writeAsBytesSync([0, 1, 2, 255]);
+        prepare();
+        final before = contents(workspace);
+        await expectLater(
+          installer().status(),
+          problem(UpdateProblem.workspaceConflict),
+        );
+        await expectLater(
+          installer().install(
+            package,
+            manifest.identity,
+            asset,
+            manifestBytes,
+            signature,
+          ),
+          problem(UpdateProblem.workspaceConflict),
+        );
+        expect(contents(workspace), before);
+        expect(runs, isEmpty);
+      });
+    }
+
+    test('a file with the workspace name is a conflict', () async {
+      File(workspace.path).writeAsStringSync('user file');
+      await expectLater(
+        installer().status(),
+        problem(UpdateProblem.workspaceConflict),
+      );
+      expect(File(workspace.path).readAsStringSync(), 'user file');
+    });
+
+    for (final record in ['plan.bin', 'backup/shiori.exe']) {
+      test('a transaction record without the updater is kept', () async {
+        ownWorkspace();
+        File('${workspace.path}/$record')
+          ..createSync(recursive: true)
+          ..writeAsStringSync('record');
+        final before = contents(workspace);
+        expect(await installer().status(), UpdateInstallState.failed);
+        expect(contents(workspace), before);
+        expect(runs, isEmpty);
+      });
+    }
 
     for (final (result, state, kept) in [
       (WindowsUpdaterCode.installed, UpdateInstallState.installed, false),
@@ -230,6 +310,7 @@ void main() {
         File('${workspace.path}/shiori-updater.exe').readAsStringSync(),
         'installed updater',
       );
+      expect(marker().readAsStringSync(), ownership);
       for (final file in asset.files) {
         expect(
           File('${workspace.path}/payload/${file.path}').lengthSync(),

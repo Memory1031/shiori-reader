@@ -572,6 +572,7 @@
   "updateInstallFailedWindows": "The update could not be completed. Retry, or download the full Windows ZIP from the release page and extract it again. Your library and reading data are stored separately and are not affected.",
   "updateInstallInstances": "Close other Shiori windows, then retry.",
   "updateInstallLocation": "Shiori cannot update itself in this folder. Extract the full Windows ZIP to a writable folder on a local drive, or update manually from the release page.",
+  "updateWorkspaceConflict": "A folder named “<Shiori folder name>.update” next to the Shiori folder was not created by Shiori. The update stopped to protect its files. Move or rename that folder, then retry.",
   "updateInstallBusy": "Wait for the current operation to finish before installing.",
   "updateReturnToLibrary": "Return to the library and finish any import, then open App updates from the menu.",
   "updateSection": "Updates",

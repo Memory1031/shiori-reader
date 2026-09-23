@@ -311,6 +311,7 @@ class TransactionTest(unittest.TestCase):
         # Before publication there is no runnable new entry point, so recovery
         # restores the old version at every mutation boundary.
         for checkpoint in [
+            "planned",
             "prepared",
             "gated",
             "removed",
@@ -324,6 +325,22 @@ class TransactionTest(unittest.TestCase):
                 self.finish(recovery, 1)
                 self.check_old()
                 self.reset_workspace()
+
+    def test_killed_plan_write_leaves_retryable_installation(self):
+        # Killed before plan.bin is published, even with a torn temporary plan:
+        # no transaction exists, the old files are untouched and a fresh apply runs.
+        updater, _ = self.updater(checkpoint="planning")
+        updater.kill()
+        updater.communicate(timeout=10)
+        temporary = self.workspace / "plan.tmp"
+        temporary.write_bytes(temporary.read_bytes()[:7])
+        self.assertFalse((self.workspace / "plan.bin").exists())
+        self.assertFalse((self.workspace / "backup").exists())
+        self.check_old()
+        retry, _ = self.updater()
+        self.finish(retry, 0)
+        self.check_new()
+        self.assertFalse(temporary.exists())
 
     def reset_workspace(self):
         # Only the fresh test-owned workspace under this TemporaryDirectory.

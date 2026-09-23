@@ -572,6 +572,7 @@
   "updateInstallFailedWindows": "更新未能完成。请重试，或从发布页下载完整的 Windows ZIP 重新解压。书架和阅读数据单独保存，不受影响。",
   "updateInstallInstances": "请先关闭其他 Shiori 窗口，然后重试。",
   "updateInstallLocation": "Shiori 无法在当前文件夹中自动更新。请将完整的 Windows ZIP 解压到本地磁盘上可写入的文件夹，或从发布页手动更新。",
+  "updateWorkspaceConflict": "安装文件夹旁的“<安装文件夹名>.update”文件夹不是 Shiori 创建的。为保护其中的文件，更新已停止。请移走或重命名该文件夹后重试。",
   "updateInstallBusy": "请等待当前操作完成后再安装更新。",
   "updateReturnToLibrary": "请先返回书架并完成导入，再从菜单进入应用更新。",
   "updateSection": "更新",

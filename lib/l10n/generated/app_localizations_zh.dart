@@ -1062,6 +1062,10 @@ class AppLocalizationsZh extends AppLocalizations {
       'Shiori 无法在当前文件夹中自动更新。请将完整的 Windows ZIP 解压到本地磁盘上可写入的文件夹，或从发布页手动更新。';
 
   @override
+  String get updateWorkspaceConflict =>
+      '安装文件夹旁的“<安装文件夹名>.update”文件夹不是 Shiori 创建的。为保护其中的文件，更新已停止。请移走或重命名该文件夹后重试。';
+
+  @override
   String get updateInstallBusy => '请等待当前操作完成后再安装更新。';
 
   @override

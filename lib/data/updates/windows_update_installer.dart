@@ -29,6 +29,10 @@ abstract final class WindowsUpdaterCode {
 /// Stages the verified ZIP in `<install>.update` beside the installation and
 /// hands off to the installed updater, which replaces the program files once
 /// this process has exited. User data lives elsewhere and is never touched.
+///
+/// The workspace is created with an ownership marker written first. A folder
+/// of that name without the marker is someone else's: it is never run, used
+/// or deleted, and is reported as [UpdateProblem.workspaceConflict].
 final class WindowsUpdateInstaller implements UpdateInstaller {
   WindowsUpdateInstaller({
     required this.installation,
@@ -67,7 +71,33 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
   final Future<void> Function() exit;
   bool _handedOff = false;
 
+  static const _markerName = 'shiori-update-workspace';
+  static const _ownership = 'ShioriUpdateWorkspace/1\n';
+
   File get _updater => File('${workspace.path}/shiori-updater.exe');
+  File get _marker => File('${workspace.path}/$_markerName');
+
+  /// Listed children are joined with the platform separator.
+  bool _isMarker(FileSystemEntity entry) =>
+      entry.path.substring(workspace.path.length + 1) == _markerName;
+
+  Future<bool> _owned() async {
+    try {
+      return await FileSystemEntity.type(workspace.path, followLinks: false) ==
+              FileSystemEntityType.directory &&
+          await FileSystemEntity.type(_marker.path, followLinks: false) ==
+              FileSystemEntityType.file &&
+          await _marker.length() == _ownership.length &&
+          await _marker.readAsString() == _ownership;
+    } on FileSystemException {
+      return false;
+    }
+  }
+
+  /// A transaction record means the updater may still need these files.
+  Future<bool> _transaction() async =>
+      await File('${workspace.path}/plan.bin').exists() ||
+      await Directory('${workspace.path}/backup').exists();
 
   Future<int> _run(String mode, [List<String> extra = const []]) async {
     try {
@@ -82,11 +112,35 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
     }
   }
 
+  /// Deletes an owned workspace, removing the marker last so an interrupted
+  /// cleanup is still recognised and retried.
   Future<void> _clear() async {
     try {
-      if (await workspace.exists()) await workspace.delete(recursive: true);
+      if (!await _owned()) return;
+      await for (final entry in workspace.list(followLinks: false)) {
+        if (!_isMarker(entry)) await entry.delete(recursive: true);
+      }
+      await _marker.delete();
+      await workspace.delete();
     } on FileSystemException {
       // A just-exited updater may still hold its image; retried next status.
+    }
+  }
+
+  /// Undoes a workspace creation that failed before ownership was recorded.
+  /// Only an empty folder or one holding just a partial marker is removed.
+  Future<void> _abandon() async {
+    try {
+      final entries = await workspace.list(followLinks: false).toList();
+      if (entries.length == 1 &&
+          _isMarker(entries.single) &&
+          entries.single is File &&
+          await _marker.length() <= _ownership.length) {
+        await _marker.delete();
+      }
+      await workspace.delete();
+    } on FileSystemException {
+      // Left in place; status reports it rather than deleting unknown files.
     }
   }
 
@@ -105,9 +159,17 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
   @override
   Future<UpdateInstallState> status() async {
     if (_handedOff) return UpdateInstallState.installing;
-    if (!await workspace.exists()) return UpdateInstallState.idle;
-    // Only the updater copy starts transactions; without it nothing is pending.
+    if (await FileSystemEntity.type(workspace.path, followLinks: false) ==
+        FileSystemEntityType.notFound) {
+      return UpdateInstallState.idle;
+    }
+    if (!await _owned()) {
+      throw const UpdateIssue(UpdateProblem.workspaceConflict);
+    }
+    // Only the updater copy starts transactions; without it nothing is
+    // pending unless a transaction record was left for manual recovery.
     if (!await _updater.exists()) {
+      if (await _transaction()) return UpdateInstallState.failed;
       await _clear();
       return UpdateInstallState.idle;
     }
@@ -143,12 +205,20 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
     if (previous == UpdateInstallState.installing) {
       throw const UpdateIssue(UpdateProblem.busy);
     }
-    if (await workspace.exists()) {
+    if (await FileSystemEntity.type(workspace.path, followLinks: false) !=
+        FileSystemEntityType.notFound) {
       throw const UpdateIssue(UpdateProblem.installation);
     }
     final installed = File('${installation.path}/shiori-updater.exe');
     if (!await installed.exists()) {
       throw const UpdateIssue(UpdateProblem.location);
+    }
+    try {
+      await workspace.create();
+      await _marker.writeAsString(_ownership, flush: true);
+    } on FileSystemException {
+      await _abandon();
+      throw const UpdateIssue(UpdateProblem.storage);
     }
     try {
       final payload = Directory('${workspace.path}/payload');

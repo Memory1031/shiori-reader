@@ -1,5 +1,8 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
+# Must precede project(): lets the updater link the CRT statically through
+# MSVC_RUNTIME_LIBRARY. Other targets keep the default /MD runtime.
+cmake_policy(SET CMP0091 NEW)
 project(shiori LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change

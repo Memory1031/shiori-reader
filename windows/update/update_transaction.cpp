@@ -440,10 +440,15 @@ std::string FileSha256(const fs::path& path) {
   }
 }
 
-void SaveTask(const fs::path& path, const PreparedUpdate& task) {
+// Published atomically: an interrupted write leaves only plan.tmp, which is
+// not a transaction, so the untouched installation stays retryable.
+void SaveTask(const fs::path& path, const PreparedUpdate& task, const Progress& progress) {
+  const auto temp = fs::path(path).replace_extension(L".tmp");
   SafeAncestors(path);
+  SafeAncestors(temp);
   Require(!Exists(path), "Task already exists");
-  std::ofstream output(path, std::ios::binary);
+  if (Exists(temp)) Require(DeleteFileW(temp.c_str()) != 0, "Cannot remove stale task");
+  std::ofstream output(temp, std::ios::binary | std::ios::trunc);
   PutString(output, "ShioriUpdateTransaction/1");
   PutString(output, task.install.u8string());
   PutString(output, task.workspace.u8string());
@@ -458,7 +463,9 @@ void SaveTask(const fs::path& path, const PreparedUpdate& task) {
   }
   output.close();
   Require(!output.fail(), "Cannot write task");
-  Flush(path);
+  Flush(temp);
+  ProgressAt(progress, "planning");
+  Move(temp, path);
 }
 
 PreparedUpdate ReadTask(const fs::path& path) {
@@ -498,7 +505,8 @@ Result Apply(const PreparedUpdate& input, HANDLE parent, DWORD timeout_ms,
   Preflight(task);
   const auto old = Index(task.current);
   const auto next = Index(task.next);
-  SaveTask(task.workspace / L"plan.bin", task);
+  SaveTask(task.workspace / L"plan.bin", task, progress);
+  ProgressAt(progress, "planned");
   for (const auto& file : task.current) {
     Copy(task.install / fs::u8path(file.path),
          task.workspace / L"backup" / fs::u8path(file.path));

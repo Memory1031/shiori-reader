@@ -16,6 +16,7 @@ enum UpdateProblem {
   busy,
   instances,
   location,
+  workspaceConflict,
 }
 
 enum UpdateInstallState {

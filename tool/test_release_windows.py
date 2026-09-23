@@ -10,6 +10,26 @@ from release_windows import (BUILD_INFO, CRT, RUNTIME, NATIVE_PACKAGES, NATIVE_N
                              PROGRAM_FILES, ReleaseCheckError, package)
 
 
+def pe_image(imports, payload=b''):
+    # Minimal x64 PE: one section holding the import descriptors and DLL names.
+    names, table = b'', b''
+    base = 0x1000 + 20 * (len(imports) + 1)
+    for dll in imports:
+        table += struct.pack('<3I', 0, 0, 0) + struct.pack('<2I', base + len(names), 0)
+        names += dll.encode('ascii') + b'\0'
+    section = table + bytes(20) + names + payload
+    header = bytearray(0x200)
+    header[:2] = b'MZ'
+    struct.pack_into('<I', header, 60, 64)
+    header[64:70] = b'PE\0\0\x64\x86'
+    struct.pack_into('<HH12xH', header, 68, 0x8664, 1, 240)
+    struct.pack_into('<H', header, 88, 0x20b)
+    struct.pack_into('<I', header, 88 + 108, 16)
+    struct.pack_into('<2I', header, 88 + 120, 0x1000, len(table) + 20)
+    struct.pack_into('<8s4I', header, 328, b'.idata', len(section), 0x1000, len(section), 0x200)
+    return bytes(header) + section
+
+
 class WindowsReleaseTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -32,6 +52,7 @@ class WindowsReleaseTest(unittest.TestCase):
         struct.pack_into('<I', pe, 60, 64)
         pe[64:] = b'PE\0\0\x64\x86'
         (self.bundle / 'shiori.exe').write_bytes(pe)
+        (self.bundle / 'shiori-updater.exe').write_bytes(pe_image(['KERNEL32.dll', 'bcrypt.dll']))
         (self.bundle / BUILD_INFO).parent.mkdir(parents=True, exist_ok=True)
         (self.bundle / BUILD_INFO).write_text('{"schemaVersion":1,"development":true}\n')
         self.metadata = dict(ProductName='Shiori', OriginalFilename='shiori.exe',
@@ -71,11 +92,26 @@ class WindowsReleaseTest(unittest.TestCase):
         (self.bundle / BUILD_INFO).write_text(json.dumps({'publicKey': {'modulus': modulus}}))
         with self.assertRaisesRegex(ReleaseCheckError, 'updater'):
             self.package()
-        (self.bundle / 'shiori-updater.exe').write_bytes(b'MZ...' + modulus.encode() + b'...')
+        (self.bundle / 'shiori-updater.exe').write_bytes(pe_image(['KERNEL32.dll'], modulus.encode()))
         self.package()
         (self.bundle / 'shiori-updater.exe').unlink()
         with self.assertRaisesRegex(ReleaseCheckError, 'shiori-updater.exe'):
             self.package()
+
+    def test_updater_must_not_import_the_crt(self):
+        # It runs from the update workspace, where the bundled CRT DLLs are absent.
+        for dll in ['VCRUNTIME140.dll', 'MSVCP140.dll', 'api-ms-win-crt-runtime-l1-1-0.dll']:
+            with self.subTest(dll=dll):
+                (self.bundle / 'shiori-updater.exe').write_bytes(pe_image(['KERNEL32.dll', dll]))
+                with self.assertRaisesRegex(ReleaseCheckError, 'statically.*' + dll.lower()):
+                    self.package()
+        (self.bundle / 'shiori-updater.exe').write_bytes(
+            pe_image(['KERNEL32.dll', 'USER32.dll', 'SHELL32.dll', 'bcrypt.dll']))
+        self.package()
+        for image in [b'synthetic', pe_image(['KERNEL32.dll'])[:0x210]]:
+            (self.bundle / 'shiori-updater.exe').write_bytes(image)
+            with self.assertRaisesRegex(ReleaseCheckError, 'valid x64 PE'):
+                self.package()
 
     def test_missing_dependency_and_stale_or_debug_executable_rejected(self):
         for key, value in [('FilePrivatePart', 8), ('ProductVersion', '1.1.0+9'),

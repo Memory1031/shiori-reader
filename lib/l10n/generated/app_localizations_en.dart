@@ -1163,6 +1163,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Shiori cannot update itself in this folder. Extract the full Windows ZIP to a writable folder on a local drive, or update manually from the release page.';
 
   @override
+  String get updateWorkspaceConflict =>
+      'A folder named “<Shiori folder name>.update” next to the Shiori folder was not created by Shiori. The update stopped to protect its files. Move or rename that folder, then retry.';
+
+  @override
   String get updateInstallBusy =>
       'Wait for the current operation to finish before installing.';
 

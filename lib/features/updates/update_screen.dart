@@ -288,6 +288,8 @@ class UpdateScreen extends StatelessWidget {
                           UpdateProblem.busy => l.updateInstallBusy,
                           UpdateProblem.instances => l.updateInstallInstances,
                           UpdateProblem.location => l.updateInstallLocation,
+                          UpdateProblem.workspaceConflict =>
+                            l.updateWorkspaceConflict,
                         }, style: TextStyle(color: theme.colorScheme.error)),
                       )
                     else if (target == null && date != null && !c.busy)

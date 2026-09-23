@@ -2072,6 +2072,12 @@ abstract class AppLocalizations {
   /// **'Shiori cannot update itself in this folder. Extract the full Windows ZIP to a writable folder on a local drive, or update manually from the release page.'**
   String get updateInstallLocation;
 
+  /// No description provided for @updateWorkspaceConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'A folder named “<Shiori folder name>.update” next to the Shiori folder was not created by Shiori. The update stopped to protect its files. Move or rename that folder, then retry.'**
+  String get updateWorkspaceConflict;
+
   /// No description provided for @updateInstallBusy.
   ///
   /// In en, this message translates to:

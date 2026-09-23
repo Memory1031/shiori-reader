@@ -21,6 +21,9 @@ RUNTIME = (
     'data/flutter_assets/AssetManifest.bin', 'data/flutter_assets/NOTICES.Z',
 )
 CRT = ('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')
+# The updater runs from the workspace, away from the bundled CRT DLLs, so it may
+# import only system DLLs present on every supported Windows.
+UPDATER_IMPORTS = frozenset({'kernel32.dll', 'user32.dll', 'shell32.dll', 'bcrypt.dll'})
 # Versions match the locked Windows WebView fork's native CMake dependencies.
 NATIVE_PACKAGES = Path('build/windows/x64/packages/flutter_inappwebview_windows/1.0.231216.1-1.0.2792.45-3.11.2')
 NATIVE_NOTICES = ('Microsoft.Web.WebView2/LICENSE.txt', 'Microsoft.Web.WebView2/NOTICE.txt',
@@ -59,13 +62,53 @@ def verify_exe(executable, name, number, metadata):
         raise ReleaseCheckError('Windows executable identity/version/debug flag does not match release')
 
 
+def pe_imports(image):
+    """DLL names in the import directory of an x64 PE image."""
+    try:
+        pe = struct.unpack_from('<I', image, 60)[0]
+        if image[:2] != b'MZ' or image[pe:pe + 6] != b'PE\0\0\x64\x86':
+            raise ValueError
+        sections, optional_size = struct.unpack_from('<H12xH', image, pe + 6)
+        optional = pe + 24
+        if (struct.unpack_from('<H', image, optional)[0] != 0x20b
+                or struct.unpack_from('<I', image, optional + 108)[0] < 2):
+            raise ValueError
+        directory = struct.unpack_from('<I', image, optional + 120)[0]
+        table = [struct.unpack_from('<4I', image, optional + optional_size + 40 * index + 8)
+                 for index in range(sections)]
+
+        def offset(rva):
+            for size, address, raw_size, raw in table:
+                if address <= rva < address + max(size, raw_size) and rva - address < raw_size:
+                    return raw + rva - address
+            raise ValueError
+
+        names = []
+        if directory:
+            descriptor = offset(directory)
+            while any(struct.unpack_from('<5I', image, descriptor)):
+                if len(names) == 256:
+                    raise ValueError
+                start = offset(struct.unpack_from('<I', image, descriptor + 12)[0])
+                end = image.index(b'\0', start)
+                names.append(image[start:end].decode('ascii'))
+                descriptor += 20
+        return names
+    except (struct.error, ValueError, UnicodeDecodeError):
+        raise ReleaseCheckError('Windows updater is not a valid x64 PE image') from None
+
+
 def verify_updater(bundle):
-    # The updater must trust the same key the application bundles.
     if not (bundle / BUILD_INFO).is_file():
         raise ReleaseCheckError('Missing bundled build identity')
+    image = (bundle / 'shiori-updater.exe').read_bytes()
+    extra = sorted({name.lower() for name in pe_imports(image)} - UPDATER_IMPORTS)
+    if extra:
+        raise ReleaseCheckError('Windows updater must link the CRT statically; imports ' + ', '.join(extra))
+    # The updater must trust the same key the application bundles.
     bundled = json.loads((bundle / BUILD_INFO).read_bytes())
     modulus = bundled.get('publicKey', {}).get('modulus')
-    if modulus and modulus.encode('ascii') not in (bundle / 'shiori-updater.exe').read_bytes():
+    if modulus and modulus.encode('ascii') not in image:
         raise ReleaseCheckError('Windows updater does not embed the bundled update key')
 
 
