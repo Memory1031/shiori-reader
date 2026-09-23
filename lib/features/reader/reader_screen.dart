@@ -232,10 +232,14 @@ class _ReaderContentViewState extends State<ReaderContentView>
   final _chrome = ValueNotifier(true);
   final _readingPosition = ValueNotifier<ReaderPosition?>(null);
   ReaderPosition? _latestReadingPosition;
+  bool _lastPageVisible = false;
   double get _displayChapterFraction =>
       (_latestReadingPosition ?? _readingPosition.value ?? _position)
           ?.chapterFraction ??
       0;
+  // Show the extent of the visible page; keep its start as the resume anchor.
+  double get _visibleChapterFraction =>
+      _lastPageVisible ? 1 : _displayChapterFraction;
   Timer? _positionLabelTimer;
   bool _announcedReady = false;
   void _sample(ReaderPosition position, bool completed) {
@@ -252,6 +256,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       WidgetsBinding.instance.scheduleFrame();
     }
     _latestReadingPosition = position;
+    _lastPageVisible = _usesPresentation || completed;
     // Display is bounded to 4Hz; persistence still receives every sample.
     _positionLabelTimer ??= Timer(const Duration(milliseconds: 250), () {
       _positionLabelTimer = null;
@@ -755,7 +760,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   Future<void> _progressPanel(BuildContext context) async {
     final l = AppLocalizations.of(context);
-    var fraction = _displayChapterFraction.clamp(0.0, 1.0);
+    var fraction = _visibleChapterFraction.clamp(0.0, 1.0);
+    var bookFraction = _displayChapterFraction.clamp(0.0, 1.0);
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
@@ -773,7 +779,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
                       style: Theme.of(sheet).textTheme.titleLarge,
                     ),
                   ),
-                  if (widget.session?.bookProgressAt(fraction) case final book?)
+                  if (widget.session?.bookProgressAt(bookFraction)
+                      case final book?)
                     Text(
                       '${formatReadingPercent(book.fraction)}%',
                       style: Theme.of(sheet).textTheme.titleMedium,
@@ -799,7 +806,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
               ),
               Slider(
                 value: fraction,
-                onChanged: (v) => update(() => fraction = v),
+                onChanged: (v) => update(() {
+                  fraction = v;
+                  bookFraction = v;
+                }),
                 onChangeEnd: (v) {
                   final count = widget.content.blocks.length;
                   if (count == 0) return;
@@ -891,7 +901,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                 valueListenable: _readingPosition,
                 builder: (context, position, _) => Text(
                   l.readerChapterProgress(
-                    formatReadingPercent(_displayChapterFraction),
+                    formatReadingPercent(_visibleChapterFraction),
                   ),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -1017,7 +1027,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                       onPressed: () => _progressPanel(context),
                       child: Text(
                         l.readerChapterPercent(
-                          formatReadingPercent(_displayChapterFraction),
+                          formatReadingPercent(_visibleChapterFraction),
                         ),
                       ),
                     ),

@@ -64,16 +64,14 @@ void main() {
       final viewport = tester.widget<PagedReaderViewport>(
         find.byType(PagedReaderViewport),
       );
-      viewport.onPosition!(
-        ReaderPosition(
-          contentRevision: content.contentRevision,
-          blockKey: content.blocks.first.blockKey,
-          blockIndex: 0,
-          blockFraction: .267899,
-          chapterFraction: .267899,
-        ),
-        false,
+      final position = ReaderPosition(
+        contentRevision: content.contentRevision,
+        blockKey: content.blocks.first.blockKey,
+        blockIndex: 0,
+        blockFraction: .267899,
+        chapterFraction: .267899,
       );
+      viewport.onPosition!(position, false);
       await tester.pump(const Duration(milliseconds: 300));
       final center = tester.getCenter(find.byType(ReaderContentView));
       if (find
@@ -99,6 +97,34 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  testWidgets('the visible final page displays full chapter progress', (
+    tester,
+  ) async {
+    final content = ChapterContent(
+      key: fixtureChapterKey(FixtureScenario.shortChapter),
+      title: 'One page',
+      blocks: [ParagraphBlock(text: 'A short chapter.')],
+    );
+    await tester.pumpWidget(
+      ShioriApp(
+        locale: const Locale('en'),
+        routes: AppRoutes(home: (_) => ReaderContentView(content: content)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Chapter 100.00%'), findsOneWidget);
+    final viewport = tester.widget<PagedReaderViewport>(
+      find.byType(PagedReaderViewport),
+    );
+    expect(viewport.controller.capture()!.chapterFraction, 0);
+    await tester.tap(find.text('Chapter 100.00%'));
+    await tester.pumpAndSettle();
+    expect(find.text('100.00%'), findsOneWidget);
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 1);
+    expect(tester.takeException(), isNull);
+  });
 
   test(
     'wrong chapter is rejected and non-retryable failures cannot reload',
