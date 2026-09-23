@@ -28,6 +28,7 @@ class ManagedLocalBooks
         LocalBookStore,
         LocalBookManagement,
         LocalPagePresentationRepository,
+        LocalBookLinkStore,
         LocalBookReparse {
   ManagedLocalBooks._(this.paths, this.db);
   final AppPaths paths;
@@ -62,6 +63,122 @@ class ManagedLocalBooks
     await _loadPresentations(chapter.novelKey, record, cancellation);
     return _presentations[chapter.novelKey]?.$2[chapter.chapterId];
   });
+
+  @override
+  Future<Result<List<LocalContentLink>>> loadContentLinks(
+    ChapterKey source, {
+    required CancellationToken cancellation,
+  }) async {
+    final result = await _run<List<LocalContentLink>?>(
+      Operation.chapter,
+      () async {
+        checkLocalCancellation(cancellation);
+        final record = await _read(source.novelKey, token: cancellation);
+        if (record == null) return null;
+        final stored = record.content.links
+            .where((link) => link.source == source)
+            .toList();
+        if (record.format != LocalBookFormat.epub ||
+            stored.any((link) => link.region != null)) {
+          return stored;
+        }
+
+        // A previously imported book can gain its SVG rendition on demand,
+        // while its older manifest still has no hotspot side table. Reuse the
+        // already bounded presentation parse without changing stored chapters.
+        await _loadPresentations(source.novelKey, record, cancellation);
+        var derived = _presentations[source.novelKey];
+        if (derived != null &&
+            derived.$2[source.chapterId]?.contains('shiori-svg-page') == true &&
+            !derived.$1.links.any(
+              (link) => link.source == source && link.region != null,
+            )) {
+          // Older reparse bundles retained the rendition but not its link side
+          // table. Recover the matching page from the immutable original too.
+          final original = await _file(source.novelKey.novelId, 'original');
+          if (await original.length() > 64 * 1024 * 1024) {
+            throw const _LimitExceeded();
+          }
+          final extracted = await _extractPresentations(
+            await original.readAsBytes(),
+            source.novelKey,
+            cancellation,
+          );
+          final revisions = {
+            for (final chapter in [
+              ...record.content.chapters,
+              ...record.content.auxiliaryChapters,
+            ])
+              chapter.key: chapter.contentRevision,
+          };
+          final matchingPages = {
+            for (final chapter in [
+              ...extracted.$1.chapters,
+              ...extracted.$1.auxiliaryChapters,
+            ])
+              if (revisions[chapter.key] == chapter.contentRevision &&
+                  extracted.$2.containsKey(chapter.key.chapterId))
+                chapter.key.chapterId: extracted.$2[chapter.key.chapterId]!,
+          };
+          if (matchingPages.containsKey(source.chapterId)) {
+            derived = (extracted.$1, {...derived.$2, ...matchingPages});
+            _presentations[source.novelKey] = derived;
+          }
+        }
+        if (derived == null || !derived.$2.containsKey(source.chapterId)) {
+          return stored;
+        }
+        final oldChapters = {
+          for (final chapter in [
+            ...record.content.chapters,
+            ...record.content.auxiliaryChapters,
+          ])
+            chapter.key: chapter,
+        };
+        final newChapters = {
+          for (final chapter in [
+            ...derived.$1.chapters,
+            ...derived.$1.auxiliaryChapters,
+          ])
+            chapter.key: chapter,
+        };
+        final oldSource = oldChapters[source];
+        final newSource = newChapters[source];
+        if (oldSource == null ||
+            newSource == null ||
+            oldSource.contentRevision != newSource.contentRevision) {
+          return stored;
+        }
+        final sourceBlocks = oldSource.blocks.map((b) => b.blockKey).toSet();
+        final hotspots = derived.$1.links.where((link) {
+          if (link.source != source ||
+              link.region == null ||
+              !sourceBlocks.contains(link.sourceBlockKey)) {
+            return false;
+          }
+          final target = link.target;
+          if (target == null) return true;
+          final oldTarget = oldChapters[target];
+          return oldTarget != null &&
+              (link.targetBlockKey == null ||
+                  oldTarget.blocks.any(
+                    (block) => block.blockKey == link.targetBlockKey,
+                  ));
+        });
+        return [...stored, ...hotspots];
+      },
+    );
+    if (result case Failure(:final failure)) return Failure(failure);
+    final links = (result as Success<List<LocalContentLink>?>).value;
+    return links == null
+        ? Failure(
+            AppFailure(
+              kind: FailureKind.notFound,
+              operation: Operation.chapter,
+            ),
+          )
+        : Success(links);
+  }
 
   Future<void> _tail = Future.value();
   bool _closed = false;
@@ -412,6 +529,7 @@ class ManagedLocalBooks
     final bundle = row.readNullable<String>('active_bundle');
     if (!_presentations.containsKey(key)) {
       Map<String, String> html;
+      var derivedContent = record.content;
       if (bundle != null) {
         final f = await _file(
           key.novelId,
@@ -450,6 +568,7 @@ class ManagedLocalBooks
           key,
           token,
         );
+        derivedContent = extracted.$1;
         // Legacy presentation may be derived, but never replace persisted
         // semantics or show a rendition for a different content revision.
         final revisions = {
@@ -471,7 +590,7 @@ class ManagedLocalBooks
       }
       checkLocalCancellation(token);
       _presentations.clear();
-      _presentations[key] = (record.content, html);
+      _presentations[key] = (derivedContent, html);
     }
   }
 

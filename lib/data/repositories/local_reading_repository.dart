@@ -162,6 +162,12 @@ class LocalReadingRepository
     ChapterKey source, {
     required CancellationToken cancellation,
   }) async {
+    if (_local(source.novelKey) && local is LocalBookLinkStore) {
+      return (local as LocalBookLinkStore).loadContentLinks(
+        source,
+        cancellation: cancellation,
+      );
+    }
     final result = await _read(
       source.novelKey,
       Operation.chapter,

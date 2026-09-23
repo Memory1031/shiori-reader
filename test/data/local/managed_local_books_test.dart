@@ -5,13 +5,16 @@ import 'package:shiori/data/local/book_decoder.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'support/epub_fixtures.dart';
 import 'package:crypto/crypto.dart';
+import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/local/database/user_database.dart';
 import 'package:shiori/data/local/files/app_paths.dart';
 import 'package:shiori/data/local/managed_local_books.dart';
+import 'package:shiori/data/repositories/local_reading_repository.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
+import 'local_reading_test.dart' show ForbiddenOnline;
 
 T ok<T>(Result<T> result) => (result as Success<T>).value;
 CancellationToken token() => CancellationSource().token;
@@ -150,7 +153,7 @@ void main() {
   );
 
   test(
-    'existing import derives positioned SVG rendition without a semantic reparse',
+    'existing import derives positioned SVG links without a semantic reparse',
     () async {
       final files = epubFiles(ncx: true);
       files['OPS/text/a.xhtml'] = utf8.encode(
@@ -182,6 +185,18 @@ void main() {
         ),
       );
       final chapter = imported.content.chapters.first;
+      final manifestFile = File(
+        '${paths.localBooks.path}/${chapter.key.novelKey.novelId}/manifest.json',
+      );
+      final manifest =
+          jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+      manifest['links'] = <Object>[]; // Previously imported manifest.
+      final oldManifest = utf8.encode(jsonEncode(manifest));
+      await manifestFile.writeAsBytes(oldManifest, flush: true);
+      await db.customStatement(
+        'UPDATE local_books SET manifest_hash=?,parser_version=12 WHERE digest=?',
+        [sha256.convert(oldManifest).toString(), chapter.key.novelKey.novelId],
+      );
       await store.close();
       store = ok(await ManagedLocalBooks.open(paths, db));
       final rendition = ok(
@@ -192,10 +207,57 @@ void main() {
       final reread = ok(
         await store.read(chapter.key.novelKey, cancellation: token()),
       )!;
+      expect(reread.content.links, isEmpty);
       expect(
         reread.content.chapters.first.contentRevision,
         chapter.contentRevision,
       );
+      final links = ok(
+        await LocalReadingRepository(
+          local: store,
+          online: ForbiddenOnline(),
+        ).loadContentLinks(chapter.key, cancellation: token()),
+      );
+      expect(links.where((link) => link.region != null), hasLength(1));
+      expect(links.single.target, reread.content.chapters.last.key);
+
+      ok(
+        await store.reparseBook(
+          chapter.key.novelKey,
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+          cancellation: token(),
+        ),
+      );
+      final bundle =
+          (await db
+                  .customSelect(
+                    'SELECT active_bundle FROM local_books WHERE digest=?',
+                    variables: [Variable(chapter.key.novelKey.novelId)],
+                  )
+                  .getSingle())
+              .read<String>('active_bundle');
+      final bundleManifest = File(
+        '${paths.localBooks.path}/${chapter.key.novelKey.novelId}/revisions/$bundle/manifest.json',
+      );
+      final bundleData =
+          jsonDecode(await bundleManifest.readAsString())
+              as Map<String, dynamic>;
+      bundleData['links'] = <Object>[];
+      final oldBundle = utf8.encode(jsonEncode(bundleData));
+      await bundleManifest.writeAsBytes(oldBundle, flush: true);
+      await db.customStatement(
+        'UPDATE local_books SET manifest_hash=?,parser_version=12 WHERE digest=?',
+        [sha256.convert(oldBundle).toString(), chapter.key.novelKey.novelId],
+      );
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      final bundledLinks = ok(
+        await LocalReadingRepository(
+          local: store,
+          online: ForbiddenOnline(),
+        ).loadContentLinks(chapter.key, cancellation: token()),
+      );
+      expect(bundledLinks.where((link) => link.region != null), hasLength(1));
     },
   );
 

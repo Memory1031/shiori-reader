@@ -141,3 +141,12 @@ abstract interface class LocalContentLinkRepository {
     required CancellationToken cancellation,
   });
 }
+
+/// Optional local-store hook for links recovered from an imported original.
+/// Stored chapter semantics remain authoritative when the parser evolves.
+abstract interface class LocalBookLinkStore {
+  Future<Result<List<LocalContentLink>>> loadContentLinks(
+    ChapterKey source, {
+    required CancellationToken cancellation,
+  });
+}

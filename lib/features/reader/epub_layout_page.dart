@@ -146,10 +146,10 @@ $interactionStyle
             (delta.dx < 0 ? widget.onNext : widget.onPrevious)?.call();
           } else if (delta.distance < 8 &&
               e.timeStamp - _downTime! < const Duration(milliseconds: 350)) {
-            final link = _linkAt(down, bounds.biggest);
-            if (link != null) {
-              widget.onLink?.call(link);
-            } else if (down.dx < bounds.maxWidth * .25) {
+            // Hotspots have their own Flutter tap recognizer above the native
+            // WebView. Do not also treat their pointer-up as a page tap.
+            if (_linkAt(down, bounds.biggest) != null) return;
+            if (down.dx < bounds.maxWidth * .25) {
               widget.onPrevious?.call();
             } else if (down.dx > bounds.maxWidth * .75) {
               widget.onNext?.call();
@@ -182,9 +182,13 @@ $interactionStyle
                       label: link.label,
                       link: true,
                       onTap: () => widget.onLink?.call(link),
-                      child: const MouseRegion(
+                      child: MouseRegion(
                         cursor: SystemMouseCursors.click,
-                        child: SizedBox.expand(),
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => widget.onLink?.call(link),
+                          child: const SizedBox.expand(),
+                        ),
                       ),
                     ),
                   ),
