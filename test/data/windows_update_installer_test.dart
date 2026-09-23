@@ -68,6 +68,22 @@ void main() {
     if (plan) File('${workspace.path}/plan.bin').writeAsStringSync('plan');
   }
 
+  File closed() => File('${workspace.path}/shiori-update-closed');
+  void closeWorkspace(int result) =>
+      closed().writeAsStringSync('ShioriUpdateClosed/1\n$result\n');
+
+  /// A committed transaction as the updater leaves it before cleanup.
+  void stageFinished() {
+    stageWorkspace(plan: true);
+    File('${workspace.path}/state').writeAsStringSync('committed');
+    File('${workspace.path}/backup/shiori.exe')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('old');
+    File('${workspace.path}/payload/shiori.exe')
+      ..createSync(recursive: true)
+      ..writeAsStringSync('new');
+  }
+
   /// Every file below [directory] with its bytes, for exact comparison.
   Map<String, List<int>> contents(Directory directory) => {
     for (final file in directory.listSync(recursive: true).whereType<File>())
@@ -197,6 +213,12 @@ void main() {
           File('${workspace.path}/plan.bin').writeAsStringSync('not ours');
         },
       ),
+      (
+        'an unmarked folder with a finished record',
+        () {
+          closeWorkspace(WindowsUpdaterCode.installed);
+        },
+      ),
     ]) {
       test('$name is a conflict and stays untouched', () async {
         File('${workspace.path}/notes/draft.txt')
@@ -261,6 +283,122 @@ void main() {
         expect(workspace.existsSync(), kept);
       });
     }
+
+    for (final (name, interrupt) in <(String, void Function())>[
+      (
+        'the updater deleted but plan and backup left',
+        () {
+          File('${workspace.path}/shiori-updater.exe').deleteSync();
+        },
+      ),
+      (
+        'the state deleted but plan left',
+        () {
+          File('${workspace.path}/state').deleteSync();
+          Directory('${workspace.path}/payload').deleteSync(recursive: true);
+        },
+      ),
+      (
+        'only the record left',
+        () {
+          for (final entry in workspace.listSync()) {
+            final name = entry.uri.pathSegments.lastWhere((s) => s.isNotEmpty);
+            if (name != 'shiori-update-closed' &&
+                name != 'shiori-update-workspace') {
+              entry.deleteSync(recursive: true);
+            }
+          }
+        },
+      ),
+    ]) {
+      test('cleanup interrupted with $name resumes', () async {
+        stageFinished();
+        closeWorkspace(WindowsUpdaterCode.installed);
+        interrupt();
+        expect(await installer().status(), UpdateInstallState.installed);
+        expect(workspace.existsSync(), isFalse);
+        expect(runs, isEmpty);
+        expect(
+          await installer().install(
+            package,
+            manifest.identity,
+            asset,
+            manifestBytes,
+            signature,
+          ),
+          UpdateInstallState.installing,
+        );
+        expect(runs.map((r) => r.first), ['check']);
+      });
+    }
+
+    test('a finished record keeps reporting its own result', () async {
+      stageFinished();
+      closeWorkspace(WindowsUpdaterCode.rolledBack);
+      expect(await installer().status(), UpdateInstallState.failed);
+      expect(workspace.existsSync(), isFalse);
+      stageFinished();
+      closeWorkspace(WindowsUpdaterCode.storage);
+      await expectLater(installer().status(), problem(UpdateProblem.storage));
+      expect(workspace.existsSync(), isFalse);
+      expect(await installer().status(), UpdateInstallState.idle);
+      expect(runs, isEmpty);
+    });
+
+    for (final (name, record) in [
+      ('an unfinished code', 'ShioriUpdateClosed/1\n2\n'),
+      ('a malformed record', 'ShioriUpdateClosed/1\ninstalled\n'),
+      ('a foreign record', 'done'),
+    ]) {
+      test('$name does not end the transaction', () async {
+        stageFinished();
+        File('${workspace.path}/shiori-updater.exe').deleteSync();
+        closed().writeAsStringSync(record);
+        final before = contents(workspace);
+        expect(await installer().status(), UpdateInstallState.failed);
+        expect(contents(workspace), before);
+      });
+    }
+
+    test('an unpublished record leaves recovery to the updater', () async {
+      stageFinished();
+      File('${closed().path}.tmp').writeAsStringSync('ShioriUpd');
+      expect(await installer().status(), UpdateInstallState.installed);
+      expect(runs.single.first, 'recover');
+      expect(workspace.existsSync(), isFalse);
+    });
+
+    test('a record that cannot be written keeps the transaction', () async {
+      stageFinished();
+      Directory('${closed().path}.tmp').createSync();
+      final before = contents(workspace);
+      expect(await installer().status(), UpdateInstallState.installed);
+      expect(contents(workspace), before);
+      Directory('${closed().path}.tmp').deleteSync();
+      expect(await installer().status(), UpdateInstallState.installed);
+      expect(runs.map((r) => r.first), ['recover', 'recover']);
+      expect(workspace.existsSync(), isFalse);
+    });
+
+    test(
+      'cleanup stopped by a locked file resumes without the updater',
+      () async {
+        stageFinished();
+        final held = File(
+          '${workspace.path}/backup/shiori.exe',
+        ).openSync(mode: FileMode.append);
+        try {
+          expect(await installer().status(), UpdateInstallState.installed);
+          expect(closed().existsSync(), isTrue);
+        } finally {
+          held.closeSync();
+        }
+        expect(await installer().status(), UpdateInstallState.installed);
+        expect(workspace.existsSync(), isFalse);
+        expect(runs, hasLength(1));
+      },
+      skip: Platform.isWindows ? false : 'Needs Windows file locking',
+    );
 
     test('an error keeps an unfinished transaction for recovery', () async {
       stageWorkspace(plan: true);

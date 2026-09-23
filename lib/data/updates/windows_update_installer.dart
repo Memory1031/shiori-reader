@@ -33,6 +33,10 @@ abstract final class WindowsUpdaterCode {
 /// The workspace is created with an ownership marker written first. A folder
 /// of that name without the marker is someone else's: it is never run, used
 /// or deleted, and is reported as [UpdateProblem.workspaceConflict].
+///
+/// Once the updater reports a finished transaction, its result is recorded
+/// before any file is deleted, so an interrupted cleanup is resumed instead
+/// of being mistaken for a transaction that still needs recovery.
 final class WindowsUpdateInstaller implements UpdateInstaller {
   WindowsUpdateInstaller({
     required this.installation,
@@ -73,13 +77,17 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
 
   static const _markerName = 'shiori-update-workspace';
   static const _ownership = 'ShioriUpdateWorkspace/1\n';
+  static const _closedName = 'shiori-update-closed';
+  static const _closedFormat = 'ShioriUpdateClosed/1\n';
 
   File get _updater => File('${workspace.path}/shiori-updater.exe');
   File get _marker => File('${workspace.path}/$_markerName');
+  File get _closed => File('${workspace.path}/$_closedName');
 
   /// Listed children are joined with the platform separator.
-  bool _isMarker(FileSystemEntity entry) =>
-      entry.path.substring(workspace.path.length + 1) == _markerName;
+  String _name(FileSystemEntity entry) =>
+      entry.path.substring(workspace.path.length + 1);
+  bool _isMarker(FileSystemEntity entry) => _name(entry) == _markerName;
 
   Future<bool> _owned() async {
     try {
@@ -99,6 +107,39 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
       await File('${workspace.path}/plan.bin').exists() ||
       await Directory('${workspace.path}/backup').exists();
 
+  /// Records that the transaction is over, published atomically. Returns
+  /// false when it cannot be written; the updater files are then kept so the
+  /// next status asks the updater again.
+  Future<bool> _close(int code) async {
+    try {
+      final temp = File('${_closed.path}.tmp');
+      await temp.writeAsString('$_closedFormat$code\n', flush: true);
+      await temp.rename(_closed.path);
+      return true;
+    } on FileSystemException {
+      return false;
+    }
+  }
+
+  /// The recorded result of a finished transaction, or null when none is
+  /// recorded. Unreadable records are ignored so the files stay protected.
+  Future<int?> _closedCode() async {
+    try {
+      if (await FileSystemEntity.type(_closed.path, followLinks: false) !=
+          FileSystemEntityType.file) {
+        return null;
+      }
+      final text = await _closed.readAsString();
+      if (!text.startsWith(_closedFormat) || !text.endsWith('\n')) return null;
+      final code = int.tryParse(
+        text.substring(_closedFormat.length, text.length - 1),
+      );
+      return code == null || !_finished(code) ? null : code;
+    } on FileSystemException {
+      return null;
+    }
+  }
+
   Future<int> _run(String mode, [List<String> extra = const []]) async {
     try {
       return await runUpdater(_updater.path, [
@@ -112,14 +153,18 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
     }
   }
 
-  /// Deletes an owned workspace, removing the marker last so an interrupted
-  /// cleanup is still recognised and retried.
+  /// Deletes an owned workspace, removing the result record and then the
+  /// marker last so an interrupted cleanup is still recognised and resumed.
   Future<void> _clear() async {
     try {
       if (!await _owned()) return;
       await for (final entry in workspace.list(followLinks: false)) {
-        if (!_isMarker(entry)) await entry.delete(recursive: true);
+        final name = _name(entry);
+        if (name != _markerName && name != _closedName) {
+          await entry.delete(recursive: true);
+        }
       }
+      if (await _closed.exists()) await _closed.delete();
       await _marker.delete();
       await workspace.delete();
     } on FileSystemException {
@@ -144,6 +189,19 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
     }
   }
 
+  /// Codes after which the updater no longer needs the workspace.
+  static bool _finished(int code) =>
+      code != WindowsUpdaterCode.busy &&
+      code != WindowsUpdaterCode.recoveryRequired;
+
+  static UpdateInstallState _result(int code) => switch (code) {
+    WindowsUpdaterCode.installed ||
+    WindowsUpdaterCode.launchFailed => UpdateInstallState.installed,
+    WindowsUpdaterCode.rolledBack => UpdateInstallState.failed,
+    WindowsUpdaterCode.none => UpdateInstallState.idle,
+    _ => throw UpdateIssue(_problem(code)),
+  };
+
   static UpdateProblem _problem(int code) => switch (code) {
     WindowsUpdaterCode.busy => UpdateProblem.busy,
     WindowsUpdaterCode.instances => UpdateProblem.instances,
@@ -166,6 +224,13 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
     if (!await _owned()) {
       throw const UpdateIssue(UpdateProblem.workspaceConflict);
     }
+    // A finished transaction whose cleanup was interrupted: whatever is left,
+    // plan.bin and backup included, is no longer needed by the updater.
+    final closed = await _closedCode();
+    if (closed != null) {
+      await _clear();
+      return _result(closed);
+    }
     // Only the updater copy starts transactions; without it nothing is
     // pending unless a transaction record was left for manual recovery.
     if (!await _updater.exists()) {
@@ -182,14 +247,8 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
             await File('${workspace.path}/plan.bin').exists())) {
       return UpdateInstallState.failed;
     }
-    await _clear();
-    return switch (code) {
-      WindowsUpdaterCode.installed ||
-      WindowsUpdaterCode.launchFailed => UpdateInstallState.installed,
-      WindowsUpdaterCode.rolledBack => UpdateInstallState.failed,
-      WindowsUpdaterCode.none => UpdateInstallState.idle,
-      _ => throw UpdateIssue(_problem(code)),
-    };
+    if (await _close(code)) await _clear();
+    return _result(code);
   }
 
   @override
