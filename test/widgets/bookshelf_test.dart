@@ -327,6 +327,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(details, 2);
       expect(reads, 2);
+      // A slow nudge below the commit distance must not reveal row actions.
+      await tester.timedDrag(
+        find.byKey(ValueKey(book.key)),
+        const Offset(-20, 0),
+        const Duration(milliseconds: 400),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Details'), findsNothing);
       await tester.drag(find.byKey(ValueKey(book.key)), const Offset(-200, 0));
       await tester.pumpAndSettle();
       expect(c.books.length, 1);

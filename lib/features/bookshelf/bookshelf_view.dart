@@ -36,6 +36,20 @@ class BookshelfView extends StatefulWidget {
 class _BookshelfViewState extends State<BookshelfView> {
   bool _grid = true;
   NovelKey? _revealed;
+  double _drag = 0;
+
+  // Reveal or hide row actions once a swipe commits by distance or speed,
+  // not on the first couple of pixels of any horizontal movement.
+  void _dragEnd(NovelKey key, DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    final open = _revealed == key;
+    if (!open && (_drag < -48 || velocity < -300)) {
+      setState(() => _revealed = key);
+    } else if (open && (_drag > 48 || velocity > 300)) {
+      setState(() => _revealed = null);
+    }
+    _drag = 0;
+  }
 
   Future<void> _actions(NovelSummary book) async {
     final l = AppLocalizations.of(context);
@@ -93,6 +107,10 @@ class _BookshelfViewState extends State<BookshelfView> {
     return LayoutBuilder(
       builder: (context, bounds) {
         final scale = MediaQuery.textScalerOf(context).scale(15) / 15;
+        final titleStyle = theme.textTheme.titleSmall;
+        final titleLine =
+            MediaQuery.textScalerOf(context).scale(titleStyle?.fontSize ?? 15) *
+            (titleStyle?.height ?? 1.5);
         final columns = (bounds.maxWidth / (110 * scale.clamp(1, 1.5)))
             .floor()
             .clamp(2, 6);
@@ -180,14 +198,9 @@ class _BookshelfViewState extends State<BookshelfView> {
                         ),
                       ),
                     GestureDetector(
-                      onHorizontalDragUpdate: (d) {
-                        if (d.delta.dx < -2 && !open) {
-                          setState(() => _revealed = book.key);
-                        }
-                        if (d.delta.dx > 2 && open) {
-                          setState(() => _revealed = null);
-                        }
-                      },
+                      onHorizontalDragStart: (_) => _drag = 0,
+                      onHorizontalDragUpdate: (d) => _drag += d.delta.dx,
+                      onHorizontalDragEnd: (d) => _dragEnd(book.key, d),
                       child: AnimatedContainer(
                         duration: ShioriMotion.of(
                           context,
@@ -398,12 +411,14 @@ class _BookshelfViewState extends State<BookshelfView> {
                     crossAxisCount: columns,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 20,
+                    // Cover, the 10dp gap and two title lines at the card style.
                     mainAxisExtent:
                         ((bounds.maxWidth - 32 - (columns - 1) * 16) /
-                                columns) *
-                            1.5 +
+                                columns) /
+                            ShioriShape.coverRatio +
                         10 +
-                        48 * scale,
+                        2 * titleLine +
+                        2,
                   ),
                   itemCount: books.length,
                   itemBuilder: (_, i) => item(i),
