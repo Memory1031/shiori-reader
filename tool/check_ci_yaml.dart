@@ -259,8 +259,67 @@ void main() {
   final iosArchive = iosIndex('xcodebuild -workspace');
   final iosExport = iosIndex('xcodebuild -exportArchive');
   final iosUpload = iosIndex('xcrun altool --upload-app');
-  if (iosArchive < 0 || iosExport <= iosArchive || iosUpload <= iosExport) {
+  final iosSigning = iosIndex('python3 ../tool/ios_release_signing.py');
+  if (iosSigning < 0 ||
+      iosArchive <= iosSigning ||
+      iosExport <= iosArchive ||
+      iosUpload <= iosExport) {
     throw StateError('iOS release must archive, export, then upload');
+  }
+  final signingStep = iosSteps[iosSigning] as YamlMap;
+  if (signingStep['working-directory'] != 'ios' ||
+      signingStep['env']['IOS_DIST_CERT_P12'] !=
+          r'${{ secrets.IOS_DIST_CERT_P12 }}' ||
+      signingStep['env']['IOS_DIST_CERT_PASSWORD'] !=
+          r'${{ secrets.IOS_DIST_CERT_PASSWORD }}' ||
+      signingStep['env']['ASC_KEY_ID'] != r'${{ secrets.ASC_KEY_ID }}' ||
+      signingStep['env']['ASC_ISSUER_ID'] != r'${{ secrets.ASC_ISSUER_ID }}' ||
+      !(signingStep['run'] as String).contains('security find-identity')) {
+    throw StateError(
+      'iOS signing preparation needs the saved Distribution p12 and API key',
+    );
+  }
+  final archiveCommand = iosSteps[iosArchive]['run'].toString();
+  final exportCommand = iosSteps[iosExport]['run'].toString();
+  if ([archiveCommand, exportCommand].any(
+        (command) =>
+            command.contains('-allowProvisioningUpdates') ||
+            command.contains('-authenticationKeyPath'),
+      ) ||
+      !exportCommand.contains('../build/ios/ExportOptions.plist') ||
+      !RegExp(
+        r'<key>signingStyle</key>\s*<string>manual</string>',
+      ).hasMatch(File('ios/ExportOptions.plist').readAsStringSync())) {
+    throw StateError('iOS archive and export must use prepared manual signing');
+  }
+  final signingScript = File('tool/ios_release_signing.py').readAsStringSync();
+  for (final required in [
+    'IOS_APP_STORE',
+    'Apple Distribution',
+    'ShareExtension',
+    'com.apple.security.application-groups',
+    'verify_build_settings(profiles)',
+  ]) {
+    if (!signingScript.contains(required)) {
+      throw StateError('iOS signing preparation lost $required');
+    }
+  }
+  if (signingScript.contains('api.request("/certificates",')) {
+    throw StateError('iOS signing preparation must not create certificates');
+  }
+  final xcodeProject = File(
+    'ios/Runner.xcodeproj/project.pbxproj',
+  ).readAsStringSync();
+  for (final debugConfiguration in [
+    '97C147061CF9000F007C117D', // Runner Debug
+    '36049AA6F05B2752A0E63A78', // ShareExtension Debug
+  ]) {
+    final section = RegExp(
+      '$debugConfiguration /\\* Debug \\*/ = \\{[\\s\\S]*?name = Debug;',
+    ).firstMatch(xcodeProject)?.group(0);
+    if (section == null || section.contains('CODE_SIGN_STYLE = Manual')) {
+      throw StateError('Local iOS Debug signing must stay automatic');
+    }
   }
   const tagGate = "startsWith(github.ref, 'refs/tags/')";
   final iosVersionStep = iosSteps.firstWhere(
@@ -278,11 +337,16 @@ void main() {
       'iOS version check and TestFlight upload must be tag-gated',
     );
   }
-  if (!iosSteps.any(
-    (step) => ((step as YamlMap)['uses']?.toString() ?? '').startsWith(
-      'apple-actions/import-codesign-certs',
-    ),
-  )) {
+  if (!iosSteps.any((step) {
+    final entry = step as YamlMap;
+    return (entry['uses']?.toString() ?? '').startsWith(
+          'apple-actions/import-codesign-certs',
+        ) &&
+        entry['with']['p12-file-base64'] ==
+            r'${{ secrets.IOS_DIST_CERT_P12 }}' &&
+        entry['with']['p12-password'] ==
+            r'${{ secrets.IOS_DIST_CERT_PASSWORD }}';
+  })) {
     throw StateError('iOS release must import the distribution certificate');
   }
   if (iosSteps.any(

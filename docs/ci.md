@@ -60,7 +60,7 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 
 工作流：[`.github/workflows/ios-release.yml`](../.github/workflows/ios-release.yml)。推送 `v*` tag 时与 Android 发布并行，在 macOS runner 上构建签名 IPA 并上传 App Store Connect（TestFlight）。手动入口只做签名构建冒烟（不上传 ASC，且无标签上下文时跳过版本预检）。质量检查不在发布工作流重复；tag 与 pubspec 版本一致性复用 `release_android.py version` 预检（仅 tag 触发时执行）。
 
-签名链路：分发证书 p12 导入临时钥匙串（runner 钥匙串每次重建，不能依赖 xcodebuild 自动建证——Apple 每团队仅允许 2 张分发证书，重复建证第三次即失败）；profile 由 `xcodebuild -allowProvisioningUpdates` 配合 App Store Connect API 密钥现场下载。导出配置为 [`ios/ExportOptions.plist`](../ios/ExportOptions.plist)，teamID 与工程 `DEVELOPMENT_TEAM` 一致（个人团队）。共 5 个 secrets：
+签名链路：分发证书 p12 导入临时钥匙串；`tool/ios_release_signing.py` 用 App Store Connect API 密钥按该证书查找或创建 Runner 和 ShareExtension 各自的 App Store profile，核对 Bundle ID、App Group、证书和有效期后安装到 runner。脚本仅在 CI 工作副本中将两个 target 的 Release archive 改为手动 Apple Distribution 签名，并生成含两份 profile 映射的导出配置；archive / export 不启用 Xcode 自动更新签名，因此不会请求 Development 证书。仓库工程的 Debug 和本地 Xcode 自动开发签名保持原样。导出配置基础文件为 [`ios/ExportOptions.plist`](../ios/ExportOptions.plist)，teamID 与工程 `DEVELOPMENT_TEAM` 一致（个人团队）。共 5 个 secrets：
 
 | Secret | 内容 |
 | --- | --- |
@@ -98,8 +98,3 @@ Apple 侧一次性准备（都在个人团队上下文操作，注意右上角�
 本地验证：发布工具4项离线测试通过，覆盖tag/版本/非法build、缺Secret/错误Base64、密码转义、错误包身份/可调试包/错误或多个签名证书；工作流YAML与步骤顺序 / Secret绑定 / 清理检查通过，Dart检查工具分析通过。另用临时合成JKS和已有本地Release APK完成实际keytool → Java Properties读取 → apksigner签名与验证 → aapt版本检查 → 哈希文件生成冒烟，错误证书拒绝通过。未使用用户正式密钥，未重新构建并发修改中的应用，未推tag、未发布、未验证远端Secrets或runner。首次正式签名发布及设备安装仍待完成。
 
 参考：[apksigner](https://developer.android.com/tools/apksigner)、[GitHub job权限](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)。
-
-## iOS 发布工作流记录（2026-09-09）
-
-- `tool/check_ci_yaml.dart` 扩展并通过：ios-release.yml 解析、tag 触发、证书引导任务不存在、archive → export → upload 顺序、版本预检与 altool 上传的 tag 门控、分发证书导入步骤存在、无测试 / 分析步骤混入、工作目录存在。
-- 未验证：macOS runner 实际执行。`xcodebuild -allowProvisioningUpdates` 自动签名、`pod install`、`fastlane cert`、`altool` 上传均为官方 / 社区文档依据的源码审查；首次真实运行需 Apple 侧（App ID、App 记录、API 密钥、分发证书）与 5 个 secrets 就绪，可能需按实际报错微调（runner Xcode 版本、ExportOptions `method` 取值等）。本机为 Windows，无法本地执行 iOS 构建。
