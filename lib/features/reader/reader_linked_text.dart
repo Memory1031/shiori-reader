@@ -5,15 +5,13 @@ import '../../domain/contracts/contracts.dart';
 import '../../shared/source_image.dart';
 import 'reader_inline_images.dart';
 import 'reader_authored_colors.dart';
+import 'reader_sheet.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 
 Future<void> showReaderFootnote(BuildContext context, LocalContentLink note) =>
-    showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      showDragHandle: true,
+    showReaderSheet<void>(
+      context,
       builder: (context) {
         final l = AppLocalizations.of(context);
         return ConstrainedBox(

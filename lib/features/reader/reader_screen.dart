@@ -18,6 +18,8 @@ import 'reader_theme.dart';
 import 'reading_progress_format.dart';
 import 'reader_chrome.dart';
 import 'reader_contents.dart';
+import 'reader_progress_panel.dart';
+import 'reader_sheet.dart';
 import 'settings_panel.dart';
 import 'reader_margin.dart';
 import 'reader_image.dart';
@@ -215,8 +217,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
       sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
           ? AnimationStyle.noAnimation
           : null,
+      // Short enough to keep the page being adjusted in view.
       builder: (_) => FractionallySizedBox(
-        heightFactor: .75,
+        heightFactor: ReaderSheetSize.half.heightFactor,
         child: ReaderSettingsPanel(preferences: _preferences),
       ),
     );
@@ -798,109 +801,39 @@ class _ReaderContentViewState extends State<ReaderContentView>
   String get _effectiveChapterTitle =>
       widget.chapterTitle ?? widget.content.title;
 
-  Future<void> _progressPanel(BuildContext context) async {
-    final l = AppLocalizations.of(context);
-    var fraction = _visibleChapterFraction.clamp(0.0, 1.0);
-    var bookFraction = _displayChapterFraction.clamp(0.0, 1.0);
-    await showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      builder: (sheet) => StatefulBuilder(
-        builder: (sheet, update) => Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      l.readerReadingProgress,
-                      style: Theme.of(sheet).textTheme.titleLarge,
-                    ),
-                  ),
-                  if (widget.session?.bookProgressAt(bookFraction)
-                      case final book?)
-                    Text(
-                      '${formatReadingPercent(book.fraction)}%',
-                      style: Theme.of(sheet).textTheme.titleMedium,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: Tooltip(
-                      message: _effectiveChapterTitle,
-                      child: Text(
-                        _effectiveChapterTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text('${formatReadingPercent(fraction)}%'),
-                ],
-              ),
-              Slider(
-                value: fraction,
-                onChanged: (v) => update(() {
-                  fraction = v;
-                  bookFraction = v;
-                }),
-                onChangeEnd: (v) {
-                  final count = widget.content.blocks.length;
-                  if (count == 0) return;
-                  final scaled = v * count;
-                  final index = scaled.floor().clamp(0, count - 1);
-                  final target = ReaderPosition(
-                    contentRevision: widget.content.contentRevision,
-                    blockKey: widget.content.blocks[index].blockKey,
-                    blockIndex: index,
-                    blockFraction: (scaled - index).clamp(0.0, 1.0),
-                    chapterFraction: v,
-                  );
-                  widget.session?.beginPositionNavigation();
-                  _position = target;
-                  _paged.restore(target);
-                },
-              ),
-              if (widget.onPreviousChapter != null ||
-                  widget.onNextChapter != null)
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: widget.onPreviousChapter == null
-                            ? null
-                            : () {
-                                Navigator.pop(sheet);
-                                widget.onPreviousChapter!();
-                              },
-                        child: Text(l.previousChapter),
-                      ),
-                    ),
-                    Expanded(
-                      child: TextButton(
-                        onPressed: widget.onNextChapter == null
-                            ? null
-                            : () {
-                                Navigator.pop(sheet);
-                                widget.onNextChapter!();
-                              },
-                        child: Text(l.nextChapter),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      ),
+  void _seekChapter(double fraction) {
+    final count = widget.content.blocks.length;
+    if (count == 0) return;
+    final scaled = fraction * count;
+    final index = scaled.floor().clamp(0, count - 1);
+    final target = ReaderPosition(
+      contentRevision: widget.content.contentRevision,
+      blockKey: widget.content.blocks[index].blockKey,
+      blockIndex: index,
+      blockFraction: (scaled - index).clamp(0.0, 1.0),
+      chapterFraction: fraction,
     );
+    widget.session?.beginPositionNavigation();
+    _position = target;
+    _paged.restore(target);
   }
+
+  Future<void> _progressPanel(BuildContext context) => showReaderSheet<void>(
+    context,
+    builder: (sheet) => ReaderProgressPanel(
+      chapterTitle: _effectiveChapterTitle,
+      chapterFraction: _visibleChapterFraction,
+      anchorFraction: _displayChapterFraction,
+      bookFractionAt: (fraction) =>
+          widget.session?.bookProgressAt(fraction)?.fraction,
+      onSeek: _seekChapter,
+      onDone: () => Navigator.of(sheet).pop(),
+      showChapterStepper:
+          widget.onPreviousChapter != null || widget.onNextChapter != null,
+      onPreviousChapter: widget.onPreviousChapter,
+      onNextChapter: widget.onNextChapter,
+    ),
+  );
 
   Widget _controls(BuildContext context, bool visible) {
     final l = AppLocalizations.of(context);

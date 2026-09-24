@@ -18,6 +18,7 @@ import 'reader_linked_text.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'reader_chrome.dart';
 import 'reader_contents.dart';
+import 'reader_sheet.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
 class BookReaderScreen extends StatefulWidget {
@@ -464,9 +465,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (_changing || _invalidated) return;
     final l = AppLocalizations.of(context);
     final source = _reader;
-    final link = await showModalBottomSheet<LocalContentLink>(
-      context: context,
-      useSafeArea: true,
+    final link = await showReaderSheet<LocalContentLink>(
+      context,
+      size: ReaderSheetSize.tall,
       builder: (context) => ListView(
         children: [
           Padding(
