@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/capabilities.dart';
 import '../../shared/widgets/shiori_sheet.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -117,7 +118,9 @@ class _PrefetchPanelState extends State<_PrefetchPanel> {
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
+                    platformPageRoute<void>(
+                      context,
+                      settings: const RouteSettings(name: '/cache'),
                       builder: (_) => CacheScreen(cache: widget.cache),
                     ),
                   ),

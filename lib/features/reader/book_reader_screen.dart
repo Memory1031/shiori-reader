@@ -664,7 +664,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       return;
     }
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+      platformPageRoute<void>(
+        context,
         settings: const RouteSettings(name: '/local-link'),
         builder: (_) => BookReaderScreen(
           chapter: target,

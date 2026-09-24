@@ -8,6 +8,7 @@ import '../features/reader/continue_reading.dart';
 import '../features/import/import_controller.dart';
 import '../features/import/import_overlay.dart';
 import 'package:flutter/material.dart';
+import '../shared/capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/local/database/local_databases.dart';
 import '../data/local/files/app_paths.dart';
@@ -223,8 +224,11 @@ class _ProductionAppState extends State<ProductionApp>
       }
       return;
     }
-    _navigator.currentState?.push(
-      MaterialPageRoute(
+    final navigator = _navigator.currentState;
+    if (navigator == null) return;
+    navigator.push(
+      platformPageRoute<void>(
+        navigator.context,
         settings: const RouteSettings(name: '/updates'),
         builder: (_) =>
             UpdateScreen(controller: updates, openPage: openUpdatePage),
@@ -254,8 +258,11 @@ class _ProductionAppState extends State<ProductionApp>
   Future<void> _readImported(NovelKey key) async {
     await _imports!.finish();
     if (!mounted) return;
-    _navigator.currentState?.push(
-      MaterialPageRoute(
+    final navigator = _navigator.currentState;
+    if (navigator == null) return;
+    navigator.push(
+      platformPageRoute<void>(
+        navigator.context,
         settings: const RouteSettings(name: '/continue'),
         builder: (_) => ContinueReadingScreen(
           novel: key,
