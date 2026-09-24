@@ -21,6 +21,10 @@ class CatalogController extends ScopedController {
   CancellationSource? _request;
   int _updates = 0;
 
+  /// Repository catalog notifications also invalidate local navigation when
+  /// a reparse changes NCX labels without changing the spine catalog.
+  int get updateGeneration => _updates;
+
   bool get canLoad =>
       !isClosed &&
       !loading &&

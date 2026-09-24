@@ -101,6 +101,7 @@ class VolumePreview extends StatelessWidget {
             _LocalNavigationPreview(
               novel: novel,
               repository: localNavigation,
+              updateGeneration: controller.updateGeneration,
               onTarget: onTarget,
               onChapter: onChapter,
             )
@@ -194,11 +195,13 @@ class _LocalNavigationPreview extends StatefulWidget {
   const _LocalNavigationPreview({
     required this.novel,
     required this.repository,
+    required this.updateGeneration,
     this.onTarget,
     this.onChapter,
   });
   final NovelKey novel;
   final LocalNavigationRepository repository;
+  final int updateGeneration;
   final ValueChanged<LocalNavigationEntry>? onTarget;
   final ValueChanged<ChapterKey>? onChapter;
 
@@ -232,7 +235,8 @@ class _LocalNavigationPreviewState extends State<_LocalNavigationPreview> {
   void didUpdateWidget(covariant _LocalNavigationPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.novel != widget.novel ||
-        oldWidget.repository != widget.repository) {
+        oldWidget.repository != widget.repository ||
+        oldWidget.updateGeneration != widget.updateGeneration) {
       _request.cancel();
       _request = CancellationSource();
       _result = _load();

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
@@ -35,7 +37,24 @@ class PreviewRepo extends Repo {
 class LocalPreviewRepo extends PreviewRepo
     implements LocalNavigationRepository {
   LocalPreviewRepo(super.value, this.entries);
-  final List<LocalNavigationEntry> entries;
+  List<LocalNavigationEntry> entries;
+  final catalogEvents = StreamController<Result<LoadResult<Catalog>>>.broadcast(
+    sync: true,
+  );
+
+  @override
+  Stream<Result<LoadResult<Catalog>>> catalogUpdates(NovelKey key) =>
+      catalogEvents.stream;
+
+  void notifyCatalogChanged() => catalogEvents.add(
+    Success(
+      LoadResult(
+        value: value,
+        origin: LoadOrigin.local,
+        fetchedAt: DateTime.utc(2026),
+      ),
+    ),
+  );
 
   @override
   Future<Result<List<LocalNavigationEntry>>> loadNavigation(
@@ -87,7 +106,10 @@ void main() {
         LocalNavigationEntry(title: '预览范围外', chapterKey: second),
       ];
       final repo = LocalPreviewRepo(data, entries);
-      addTearDown(repo.events.close);
+      addTearDown(() async {
+        await repo.catalogEvents.close();
+        await repo.events.close();
+      });
       LocalNavigationEntry? selected;
       await tester.pumpWidget(
         app(
@@ -118,6 +140,95 @@ void main() {
       expect(selected, same(entries[1]));
     },
   );
+
+  testWidgets('local detail reloads navigation after a catalog change', (
+    tester,
+  ) async {
+    final novel = LocalBookIdentity.book('b' * 64);
+    final chapter = LocalBookIdentity.chapter(novel, 'epub:first.xhtml');
+    final data = Catalog(
+      novelKey: novel,
+      volumes: [
+        Volume(
+          groupId: 'epub',
+          isSynthetic: true,
+          chapters: [
+            Chapter(
+              key: chapter,
+              title: 'Unchanged spine title',
+              ordinal: 0,
+              volumeGroupId: 'epub',
+            ),
+          ],
+        ),
+      ],
+    );
+    final repo = LocalPreviewRepo(data, [
+      LocalNavigationEntry(title: 'Old NCX label', chapterKey: chapter),
+    ]);
+    addTearDown(() async {
+      await repo.catalogEvents.close();
+      await repo.events.close();
+    });
+    await tester.pumpWidget(app(VolumePreview(novel: novel, repository: repo)));
+    await tester.pumpAndSettle();
+    expect(find.text('Old NCX label'), findsOneWidget);
+
+    // A reparse can change navigation while the spine catalog stays identical.
+    repo.entries = [
+      LocalNavigationEntry(title: 'New NCX label', chapterKey: chapter),
+    ];
+    repo.notifyCatalogChanged();
+    await tester.pumpAndSettle();
+    expect(find.text('Old NCX label'), findsNothing);
+    expect(find.text('New NCX label'), findsOneWidget);
+  });
+
+  testWidgets('local preview falls back to chapter selection', (tester) async {
+    final novel = LocalBookIdentity.book('c' * 64);
+    final chapter = LocalBookIdentity.chapter(novel, 'epub:first.xhtml');
+    final data = Catalog(
+      novelKey: novel,
+      volumes: [
+        Volume(
+          groupId: 'epub',
+          isSynthetic: true,
+          chapters: [
+            Chapter(
+              key: chapter,
+              title: 'Spine title',
+              ordinal: 0,
+              volumeGroupId: 'epub',
+            ),
+          ],
+        ),
+      ],
+    );
+    final repo = LocalPreviewRepo(data, [
+      LocalNavigationEntry(
+        title: 'NCX chapter',
+        chapterKey: chapter,
+        blockKey: 'chapter-start',
+      ),
+    ]);
+    addTearDown(() async {
+      await repo.catalogEvents.close();
+      await repo.events.close();
+    });
+    ChapterKey? selected;
+    await tester.pumpWidget(
+      app(
+        VolumePreview(
+          novel: novel,
+          repository: repo,
+          onChapter: (key) => selected = key,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey(('preview-local', 0))));
+    expect(selected, chapter);
+  });
 
   testWidgets('synopsis and tags expand only when truncated and can collapse', (
     tester,
