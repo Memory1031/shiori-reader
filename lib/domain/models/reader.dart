@@ -11,8 +11,13 @@ enum ReaderThemeMode { system, light, dark }
 
 enum ReaderPaper { paper, warm }
 
+/// How a page change animates. [curl] folds the page corner back; [cover]
+/// slides the new page over the old one; [slide] moves both pages side by
+/// side; [none] swaps instantly.
+enum PageTurnStyle { curl, cover, slide, none }
+
 final class ReaderSettings extends ValueModel {
-  static const schemaVersion = 3;
+  static const schemaVersion = 4;
   ReaderSettings({
     double fontSize = 20,
     double lineHeight = 1.6,
@@ -22,6 +27,7 @@ final class ReaderSettings extends ValueModel {
     this.themeMode = ReaderThemeMode.system,
     this.paper = ReaderPaper.paper,
     this.controlsHintSeen = false,
+    this.pageTurn = PageTurnStyle.curl,
   }) : fontSize = finiteRange(fontSize, 14, 32, 'fontSize'),
        lineHeight = finiteRange(lineHeight, 1.2, 2.4, 'lineHeight'),
        paragraphSpacing = finiteRange(
@@ -44,6 +50,7 @@ final class ReaderSettings extends ValueModel {
   final ReaderMode mode;
   final ReaderPaper paper;
   final bool controlsHintSeen;
+  final PageTurnStyle pageTurn;
   ReaderSettings copyWith({
     double? fontSize,
     double? lineHeight,
@@ -53,6 +60,7 @@ final class ReaderSettings extends ValueModel {
     ReaderMode? mode,
     ReaderPaper? paper,
     bool? controlsHintSeen,
+    PageTurnStyle? pageTurn,
   }) => ReaderSettings(
     fontSize: fontSize ?? this.fontSize,
     lineHeight: lineHeight ?? this.lineHeight,
@@ -62,6 +70,7 @@ final class ReaderSettings extends ValueModel {
     mode: mode ?? this.mode,
     paper: paper ?? this.paper,
     controlsHintSeen: controlsHintSeen ?? this.controlsHintSeen,
+    pageTurn: pageTurn ?? this.pageTurn,
   );
   Map<String, Object?> toJson() => {
     'schemaVersion': schemaVersion,
@@ -73,9 +82,11 @@ final class ReaderSettings extends ValueModel {
     'mode': mode.name,
     'paper': paper.name,
     'controlsHintSeen': controlsHintSeen,
+    'pageTurn': pageTurn.name,
   };
   factory ReaderSettings.fromJson(Map<String, dynamic> json) {
-    if (![1, 2, schemaVersion].contains(json['schemaVersion'])) {
+    final version = json['schemaVersion'];
+    if (![1, 2, 3, schemaVersion].contains(version)) {
       throw const FormatException('Unsupported reader settings version');
     }
     double number(String key, double min, double max) {
@@ -85,13 +96,15 @@ final class ReaderSettings extends ValueModel {
     }
 
     return ReaderSettings(
-      paper: json['schemaVersion'] == 3
+      paper: version as int >= 3
           ? ReaderPaper.values.byName(json['paper'] as String)
           : ReaderPaper.paper,
-      controlsHintSeen: json['schemaVersion'] == 3
-          ? json['controlsHintSeen'] as bool
-          : false,
-      mode: json['schemaVersion'] == 1
+      controlsHintSeen: version >= 3 ? json['controlsHintSeen'] as bool : false,
+      // Older settings keep the curl they always had.
+      pageTurn: version >= 4
+          ? PageTurnStyle.values.byName(json['pageTurn'] as String)
+          : PageTurnStyle.curl,
+      mode: version == 1
           ? ReaderMode.paged
           : ReaderMode.values.byName(json['mode'] as String),
       fontSize: number('fontSize', 14, 32),
@@ -111,6 +124,7 @@ final class ReaderSettings extends ValueModel {
     mode,
     paper,
     controlsHintSeen,
+    pageTurn,
   ];
 }
 

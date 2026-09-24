@@ -463,6 +463,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerNight => 'Night';
 
   @override
+  String get readerPageTurn => 'Page turn';
+
+  @override
+  String get readerPageTurnCurl => 'Curl';
+
+  @override
+  String get readerPageTurnCover => 'Cover';
+
+  @override
+  String get readerPageTurnSlide => 'Slide';
+
+  @override
+  String get readerPageTurnNone => 'None';
+
+  @override
   String get readerControlsHint =>
       'Tap the center to show or hide controls. Tap either side or swipe horizontally to turn pages.';
 

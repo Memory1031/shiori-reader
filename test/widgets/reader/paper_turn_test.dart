@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
+import 'package:shiori/features/reader/viewport/page_turn.dart';
 import 'package:shiori/features/reader/viewport/paper_turn.dart';
 
 void main() {
@@ -102,4 +103,25 @@ void main() {
       );
     },
   );
+
+  test('a curl held low lifts the bottom corner further than the top', () {
+    const size = Size(360, 600);
+    // With a low grip the crease leans so more of the page is uncovered near
+    // the bottom edge than near the top.
+    final low = const PaperTurnClipper(.5, 1, grip: .8).getClip(size);
+    double coveredWidth(Path clip, double y) {
+      var x = 0.0;
+      while (x < size.width && clip.contains(Offset(x, y))) {
+        x += 1;
+      }
+      return x;
+    }
+
+    expect(coveredWidth(low, 20), greaterThan(coveredWidth(low, 580)));
+    final high = const PaperTurnClipper(.5, 1, grip: .2).getClip(size);
+    expect(coveredWidth(high, 20), lessThan(coveredWidth(high, 580)));
+    expect(pageTurnGrip(0, 600), .15);
+    expect(pageTurnGrip(300, 600), .5);
+    expect(pageTurnGrip(600, 600), .85);
+  });
 }

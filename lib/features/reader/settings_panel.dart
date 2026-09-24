@@ -247,6 +247,34 @@ class ReaderSettingsPanel extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: ShioriSpace.small),
+                          const SizedBox(height: ShioriSpace.medium),
+                          Text(
+                            l.readerPageTurn,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: ShioriSpace.small),
+                          Wrap(
+                            spacing: ShioriSpace.small,
+                            runSpacing: ShioriSpace.small,
+                            children: [
+                              for (final style in PageTurnStyle.values)
+                                ChoiceChip(
+                                  label: Text(switch (style) {
+                                    PageTurnStyle.curl => l.readerPageTurnCurl,
+                                    PageTurnStyle.cover =>
+                                      l.readerPageTurnCover,
+                                    PageTurnStyle.slide =>
+                                      l.readerPageTurnSlide,
+                                    PageTurnStyle.none => l.readerPageTurnNone,
+                                  }),
+                                  selected: s.pageTurn == style,
+                                  onSelected: (_) => preferences.update(
+                                    s.copyWith(pageTurn: style),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: ShioriSpace.small),
                           const Divider(),
                           const SizedBox(height: ShioriSpace.item),
                           Text(

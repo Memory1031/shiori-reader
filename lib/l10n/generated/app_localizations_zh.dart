@@ -441,6 +441,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerNight => '夜间';
 
   @override
+  String get readerPageTurn => '翻页方式';
+
+  @override
+  String get readerPageTurnCurl => '仿真';
+
+  @override
+  String get readerPageTurnCover => '覆盖';
+
+  @override
+  String get readerPageTurnSlide => '平移';
+
+  @override
+  String get readerPageTurnNone => '无动画';
+
+  @override
   String get readerControlsHint => '点按正文中间显示或隐藏工具栏，点按两侧或左右拖动翻页。';
 
   @override

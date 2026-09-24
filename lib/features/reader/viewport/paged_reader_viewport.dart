@@ -7,7 +7,7 @@ import 'page_boundaries.dart';
 import 'render_chunk.dart';
 import 'block_style.dart';
 import 'reader_box.dart';
-import 'paper_turn.dart';
+import 'page_turn.dart';
 import '../reader_linked_text.dart';
 import '../reader_tap_zones.dart';
 import '../reader_margin.dart';
@@ -57,6 +57,7 @@ class PagedReaderViewport extends StatefulWidget {
     this.images,
     this.columns = 1,
     this.columnGap = readerColumnGap,
+    this.turnStyle = PageTurnStyle.curl,
   }) : assert(columns == 1 || columns == 2),
        assert(columnGap >= 0);
   final ChapterContent content;
@@ -79,7 +80,11 @@ class PagedReaderViewport extends StatefulWidget {
   final ValueListenable<bool>? chromeVisible;
   final ValueChanged<int>? onBoundary;
   final ValueChanged<bool>? onTurning;
-  final void Function(double progress, int direction)? onTurnVisual;
+
+  /// Reports each frame of a turn so the host can paint the curl over the
+  /// full reader page; when null the viewport paints it itself.
+  final ValueChanged<PageTurnFrame>? onTurnVisual;
+  final PageTurnStyle turnStyle;
   final Size? pageSize;
   final Offset contentOrigin;
   final bool startAtEnd;
@@ -97,6 +102,13 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   int? _queuedDirection;
   bool _acceptsQueuedTurn = false;
   int _direction = 1;
+  double _grip = pageTurnCentreGrip;
+  PageTurnFrame get _frame => PageTurnFrame(
+    style: widget.turnStyle,
+    progress: _turnAnimation.value,
+    direction: _direction,
+    grip: _grip,
+  );
   double _dragDistance = 0;
   final _pages = <int, ReaderPage>{};
   PageLayout? _layout;
@@ -122,11 +134,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   @override
   void initState() {
     super.initState();
-    _turnAnimation =
-        AnimationController(vsync: this, duration: PaperTurnMotion.duration)
-          ..addListener(
-            () => widget.onTurnVisual?.call(_turnAnimation.value, _direction),
-          );
+    _turnAnimation = AnimationController(
+      vsync: this,
+      duration: PaperTurnMotion.duration,
+    )..addListener(() => widget.onTurnVisual?.call(_frame));
     _attach();
     _position = widget.initialPosition;
     _anchorAtEnd = widget.startAtEnd;
@@ -263,7 +274,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       await PaperTurnMotion.settle(
         _turnAnimation,
         target: commit ? 1 : 0,
-        reduced: reduced,
+        reduced: reduced || !_frame.animates,
+        curve: _frame.curve,
       );
     } on TickerCanceled {
       return;
@@ -321,6 +333,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       widget.onBoundary?.call(direction);
       return;
     }
+    // Taps and keys have no held point; turn from the page centre.
+    _grip = pageTurnCentreGrip;
     setState(() {
       _acceptsQueuedTurn = queueIfTurning;
       _direction = direction;
@@ -722,9 +736,13 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         onScrollRight: () => _turn(-1),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onHorizontalDragStart: (_) {
+          onHorizontalDragStart: (details) {
             _queuedDirection = null;
             _dragDistance = 0;
+            _grip = pageTurnGrip(
+              details.localPosition.dy,
+              constraints.maxHeight,
+            );
           },
           onHorizontalDragUpdate: _dragUpdate,
           onHorizontalDragEnd: _dragEnd,
@@ -749,40 +767,45 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           },
           child: AnimatedBuilder(
             animation: _turnAnimation,
-            builder: (context, _) => ClipRect(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  for (final number in [?_target, _current])
-                    ExcludeSemantics(
-                      key: ValueKey((widget.content.key, number)),
-                      excluding: number != _current,
-                      child: ClipPath(
-                        clipper: number == _current
-                            ? PaperTurnClipper(
-                                _turnAnimation.value,
-                                _direction,
-                                pageSize: widget.pageSize,
-                                contentOrigin: widget.contentOrigin,
-                              )
-                            : null,
-                        child: ColoredBox(
-                          color: Theme.of(context).scaffoldBackgroundColor,
-                          child: number == _current
-                              ? _lastReadyPage!
-                              : targetPage!,
-                        ),
-                      ),
-                    ),
-                  if (widget.onTurnVisual == null)
-                    PaperTurnFold(
-                      progress: _turnAnimation.value,
-                      direction: _direction,
-                      paper: Theme.of(context).scaffoldBackgroundColor,
-                    ),
-                ],
-              ),
-            ),
+            builder: (context, _) {
+              final frame = _frame;
+              final paper = Theme.of(context).scaffoldBackgroundColor;
+              Widget slot(int number) => ExcludeSemantics(
+                key: ValueKey((widget.content.key, number)),
+                excluding: number != _current,
+                child: PageTurnSlot(
+                  frame: frame,
+                  role: number == _current
+                      ? PageTurnRole.leaving
+                      : PageTurnRole.entering,
+                  paper: paper,
+                  pageSize: widget.pageSize,
+                  contentOrigin: widget.contentOrigin,
+                  child: number == _current ? _lastReadyPage! : targetPage!,
+                ),
+              );
+              final target = _target;
+              final lower = target != null && frame.enteringOnTop
+                  ? _current
+                  : target;
+              final upper = target != null && frame.enteringOnTop
+                  ? target
+                  : _current;
+              return ClipRect(
+                clipper: _PageBoundsClip(widget.pageSize, widget.contentOrigin),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (lower != null) slot(lower),
+                    if (target != null)
+                      PageTurnShade(frame: frame, pageSize: widget.pageSize),
+                    slot(upper),
+                    if (widget.onTurnVisual == null)
+                      PageTurnOverlay(frame: frame, paper: paper),
+                  ],
+                ),
+              );
+            },
           ),
         ),
       );
@@ -797,4 +820,22 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     }
     return const Divider();
   }
+}
+
+/// Clips a turn to the full reader page width rather than the text column,
+/// so a sliding sheet travels through the margins instead of appearing at
+/// the column edge.
+class _PageBoundsClip extends CustomClipper<Rect> {
+  const _PageBoundsClip(this.pageSize, this.origin);
+  final Size? pageSize;
+  final Offset origin;
+  @override
+  Rect getClip(Size size) => switch (pageSize) {
+    final page? => Rect.fromLTWH(-origin.dx, 0, page.width, size.height),
+    null => Offset.zero & size,
+  };
+
+  @override
+  bool shouldReclip(_PageBoundsClip old) =>
+      old.pageSize != pageSize || old.origin != origin;
 }

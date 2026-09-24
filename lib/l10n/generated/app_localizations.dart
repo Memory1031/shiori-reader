@@ -950,6 +950,36 @@ abstract class AppLocalizations {
   /// **'Night'**
   String get readerNight;
 
+  /// No description provided for @readerPageTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Page turn'**
+  String get readerPageTurn;
+
+  /// No description provided for @readerPageTurnCurl.
+  ///
+  /// In en, this message translates to:
+  /// **'Curl'**
+  String get readerPageTurnCurl;
+
+  /// No description provided for @readerPageTurnCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover'**
+  String get readerPageTurnCover;
+
+  /// No description provided for @readerPageTurnSlide.
+  ///
+  /// In en, this message translates to:
+  /// **'Slide'**
+  String get readerPageTurnSlide;
+
+  /// No description provided for @readerPageTurnNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get readerPageTurnNone;
+
   /// No description provided for @readerControlsHint.
   ///
   /// In en, this message translates to:

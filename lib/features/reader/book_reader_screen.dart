@@ -11,7 +11,7 @@ import '../novel_detail/catalog_controller.dart';
 import 'reader_controller.dart';
 import 'position/position_resolver.dart';
 import 'reader_screen.dart';
-import 'viewport/paper_turn.dart';
+import 'viewport/page_turn.dart';
 import '../cache/prefetch_sheet.dart';
 import '../../shared/source_image.dart';
 import 'reader_linked_text.dart';
@@ -67,6 +67,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   bool _animateChapter = false;
   bool _committing = false;
   Color _paper = ShioriReaderPaper.paper;
+  PageTurnStyle _turnStyle = PageTurnStyle.curl;
   late final ImageRepository? _displayImages;
   late final CatalogController _catalog;
   bool get _local =>
@@ -453,9 +454,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   Future<void> _commitPending(ReaderController reader) async {
     if (!mounted || _pending != reader || _committing) return;
     _committing = true;
-    if (_animateChapter && !MediaQuery.disableAnimationsOf(context)) {
+    if (_animateChapter &&
+        _turnStyle != PageTurnStyle.none &&
+        !MediaQuery.disableAnimationsOf(context)) {
       try {
-        await PaperTurnMotion.settle(_chapterTurn);
+        await PaperTurnMotion.settle(_chapterTurn, curve: _chapterFrame.curve);
       } on TickerCanceled {
         return;
       }
@@ -857,9 +860,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       completion: reader == _reader ? _completion : null,
       actions: actions,
       onReady: () => _commitPending(reader),
-      onPageAppearance: (paper) {
+      onPageAppearance: (paper, turn) {
         if (reader == _reader) {
           _paper = paper;
+          _turnStyle = turn;
         }
       },
       onLoadFailure: () => _rejectPending(reader),
@@ -879,6 +883,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     );
   }
 
+  PageTurnFrame get _chapterFrame => PageTurnFrame(
+    style: _turnStyle,
+    progress: _chapterTurn.value,
+    direction: _turnDirection,
+  );
+
   Widget _pageLayer(ReaderController reader, {required bool active}) =>
       Positioned.fill(
         key: ValueKey(reader),
@@ -887,16 +897,33 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           child: AnimatedBuilder(
             animation: _chapterTurn,
             child: ExcludeSemantics(excluding: !active, child: _view(reader)),
-            builder: (context, child) => ClipPath(
-              clipper: PaperTurnClipper(
-                active ? _chapterTurn.value : 0,
-                _turnDirection,
-              ),
-              child: child,
+            builder: (context, child) => PageTurnSlot(
+              frame: _chapterFrame,
+              role: active ? PageTurnRole.leaving : PageTurnRole.entering,
+              child: child!,
             ),
           ),
         ),
       );
+
+  /// The chapter being turned away from and the one being turned to, in
+  /// paint order for the current style.
+  List<Widget> _chapterLayers() {
+    final pending = _pending;
+    final ready = pending != null && pending.status == ReaderStatus.ready;
+    final leaving = _pageLayer(_reader, active: true);
+    if (!ready) return [leaving];
+    final entering = _pageLayer(pending, active: false);
+    final shade = Positioned.fill(
+      child: AnimatedBuilder(
+        animation: _chapterTurn,
+        builder: (context, _) => PageTurnShade(frame: _chapterFrame),
+      ),
+    );
+    return _chapterFrame.enteringOnTop
+        ? [leaving, shade, entering]
+        : [entering, shade, leaving];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -933,18 +960,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             ? Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (_pending case final pending?
-                      when pending.status == ReaderStatus.ready)
-                    _pageLayer(pending, active: false),
-                  _pageLayer(_reader, active: true),
+                  ..._chapterLayers(),
                   Positioned.fill(
                     child: AnimatedBuilder(
                       animation: _chapterTurn,
-                      builder: (context, _) => PaperTurnFold(
-                        progress: _chapterTurn.value,
-                        direction: _turnDirection,
-                        paper: _paper,
-                      ),
+                      builder: (context, _) =>
+                          PageTurnOverlay(frame: _chapterFrame, paper: _paper),
                     ),
                   ),
                 ],

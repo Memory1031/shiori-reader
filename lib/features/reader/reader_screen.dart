@@ -29,7 +29,7 @@ import 'reader_image.dart';
 import 'reader_image_preview.dart';
 import 'epub_layout_page.dart';
 import 'viewport/paged_reader_viewport.dart';
-import 'viewport/paper_turn.dart';
+import 'viewport/page_turn.dart';
 
 /// The body never observes per-frame progress or Chrome visibility changes.
 /// Preferences are injected and scoped to this reading session.
@@ -58,7 +58,10 @@ class ReaderContentView extends StatefulWidget {
   final String? runningTitle;
   final String? chapterTitle;
   final VoidCallback? onReady, onLoadFailure;
-  final ValueChanged<Color>? onPageAppearance;
+
+  /// Paper colour and page-turn style, so the host can match chapter and
+  /// completion transitions to the page.
+  final void Function(Color paper, PageTurnStyle turn)? onPageAppearance;
   final ReaderController? session;
   final ReaderPosition? initialPosition;
   final SettingsStore? settings;
@@ -81,7 +84,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     with WidgetsBindingObserver {
   late final ReaderPreferences _preferences;
   ReaderSettings _settings = ReaderSettings();
-  final _paperTurn = ValueNotifier<(double, int)>((0, 1));
+  final _paperTurn = ValueNotifier<PageTurnFrame>(PageTurnFrame.rest);
   bool _completionTurning = false;
   bool _settingsReady = false;
   bool _hintVisible = false;
@@ -203,7 +206,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   ReaderPosition? _position;
   // Horizontal page margin from the last build; the chrome aligns to it.
   double _margin = 0;
-  Color? _reportedPaper;
+  (Color, PageTurnStyle)? _reportedLook;
 
   // Whether the chapter has flowing prose (spreads apply); scanning every
   // block is linear, so remember the answer per content instance.
@@ -405,10 +408,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
     if (!_settingsReady) {
       return const Scaffold(body: SafeArea(child: LoadingView()));
     }
-    final paper = Theme.of(context).scaffoldBackgroundColor;
-    if (paper != _reportedPaper) {
-      _reportedPaper = paper;
-      widget.onPageAppearance?.call(paper);
+    final look = (
+      Theme.of(context).scaffoldBackgroundColor,
+      _settings.pageTurn,
+    );
+    if (look != _reportedLook) {
+      _reportedLook = look;
+      widget.onPageAppearance?.call(look.$1, look.$2);
     }
     _pageInsets = MediaQuery.paddingOf(context);
     _margin = readerHorizontalMargin(
@@ -437,6 +443,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
               child: Focus(
                 autofocus: true,
                 child: ReaderCompletionTransition(
+                  style: _settings.pageTurn,
                   onTurning: (value) => _completionTurning = value,
                   completion: widget.completion == null
                       ? null
@@ -476,11 +483,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
               ),
             ),
           ),
-          ValueListenableBuilder<(double, int)>(
+          ValueListenableBuilder<PageTurnFrame>(
             valueListenable: _paperTurn,
-            builder: (context, turn, _) => PaperTurnFold(
-              progress: turn.$1,
-              direction: turn.$2,
+            builder: (context, frame, _) => PageTurnOverlay(
+              frame: frame,
               paper: Theme.of(context).scaffoldBackgroundColor,
             ),
           ),
@@ -650,9 +656,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
           (pageBounds.maxWidth - bounds.maxWidth) / 2,
           contentTop,
         ),
-        onTurnVisual: (progress, direction) {
-          _paperTurn.value = (progress, direction);
-        },
+        onTurnVisual: (frame) => _paperTurn.value = frame,
+        turnStyle: _settings.pageTurn,
         startAtEnd:
             (widget.session?.startAtEnd ?? false) &&
             _position?.chapterFraction == 1 &&
