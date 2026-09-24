@@ -67,7 +67,8 @@ void main() {
         find.byType(PagedReaderViewport),
       );
       expect(viewport.pageSize, const Size(390, 844));
-      expect(viewport.contentOrigin, const Offset(30, 100));
+      // Safe-area top (44) plus the running-header gutter (34).
+      expect(viewport.contentOrigin, const Offset(30, 78));
       expect(tester.getSize(find.byType(PaperTurnFold)), const Size(390, 844));
       final next = viewport.controller.next();
       await tester.pump();
@@ -80,7 +81,7 @@ void main() {
           .whereType<PaperTurnClipper>()
           .single;
       expect(clip.pageSize, const Size(390, 844));
-      expect(clip.contentOrigin, const Offset(30, 100));
+      expect(clip.contentOrigin, const Offset(30, 78));
       expect(clip.progress, fold.progress);
       await tester.pumpAndSettle();
       await next;

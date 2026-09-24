@@ -16,6 +16,7 @@ import '../cache/prefetch_sheet.dart';
 import '../../shared/source_image.dart';
 import 'reader_linked_text.dart';
 import 'viewport/paged_reader_viewport.dart';
+import 'reader_chrome.dart';
 import 'reader_contents.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
@@ -71,6 +72,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       widget.chapter.novelKey.sourceId == LocalBookIdentity.sourceId;
   CacheManagement? get _cache => _local ? null : widget.cache;
   bool _changing = false, _canPop = false;
+  bool _immersive = false;
   BookTerminalState? _completion;
   final _titleRequest = CancellationSource();
   String? _bookTitle;
@@ -294,7 +296,17 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_immersive && ShioriCapabilities.of(context).immersiveSystemUi) {
+      _immersive = true;
+      ReaderSystemUi.enter();
+    }
+  }
+
+  @override
   void dispose() {
+    if (_immersive) ReaderSystemUi.exit();
     _invalidation?.cancel();
     _chapterTurn.dispose();
     _titleRequest.cancel();

@@ -16,6 +16,7 @@ import 'reader_completion_transition.dart';
 import 'reader_preferences.dart';
 import 'reader_theme.dart';
 import 'reading_progress_format.dart';
+import 'reader_chrome.dart';
 import 'reader_contents.dart';
 import 'settings_panel.dart';
 import 'reader_margin.dart';
@@ -285,6 +286,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   ReaderPosition? _position;
+  // Horizontal page margin from the last build; the chrome aligns to it.
+  double _margin = 0;
+  EdgeInsets _pageInsets = EdgeInsets.zero;
   final _sizes = <MediaRef, Size>{};
   final _pendingSizes = <MediaRef, Size>{};
   bool _dragging = false;
@@ -414,9 +418,19 @@ class _ReaderContentViewState extends State<ReaderContentView>
       ReaderThemeMode.dark => Brightness.dark,
     };
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: brightness == Brightness.dark
-          ? SystemUiOverlayStyle.light
-          : SystemUiOverlayStyle.dark,
+      // Transparent bars let edge-to-edge pages show paper, not black.
+      value:
+          (brightness == Brightness.dark
+                  ? SystemUiOverlayStyle.light
+                  : SystemUiOverlayStyle.dark)
+              .copyWith(
+                statusBarColor: Colors.transparent,
+                systemNavigationBarColor: Colors.transparent,
+                systemNavigationBarContrastEnforced: false,
+                systemNavigationBarIconBrightness: brightness == Brightness.dark
+                    ? Brightness.light
+                    : Brightness.dark,
+              ),
       child: Theme(
         data: readerTheme(
           _settings,
@@ -435,6 +449,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
     widget.onPageAppearance?.call(Theme.of(context).scaffoldBackgroundColor);
     final pageInsets = MediaQuery.paddingOf(context);
+    _pageInsets = pageInsets;
+    final chrome = ReaderChromeMetrics.of(context);
     final theme = Theme.of(context);
     final bodyTypography = ShioriCapabilities.of(context).explicitUiTypeface
         ? theme.textTheme.bodyLarge
@@ -451,6 +467,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       MediaQuery.textScalerOf(context),
       Directionality.of(context),
     );
+    _margin = margin;
     final prose = widget.content.blocks.whereType<ParagraphBlock>().any(
       (block) =>
           block.box == null &&
@@ -509,6 +526,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
                   child: SafeArea(
                     child: Stack(
                       fit: StackFit.expand,
+                      // Toolbars paint into the safe-area insets.
+                      clipBehavior: Clip.none,
                       children: [
                         // Stable gutters keep showing/hiding controls from repaginating content.
                         Positioned.fill(
@@ -518,9 +537,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
                             child: Padding(
                               padding: EdgeInsets.fromLTRB(
                                 margin,
-                                56,
+                                chrome.header,
                                 margin,
-                                64,
+                                chrome.footer,
                               ),
                               child: Align(
                                 child: ConstrainedBox(
@@ -646,7 +665,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                             (pageBounds.maxWidth -
                                                     bounds.maxWidth) /
                                                 2,
-                                            pageInsets.top + 56,
+                                            pageInsets.top + chrome.header,
                                           ),
                                           onTurnVisual: (progress, direction) {
                                             _paperTurn.value = (
@@ -716,7 +735,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                           Positioned(
                             left: 16,
                             right: 16,
-                            bottom: 72,
+                            bottom: chrome.bottomBar + ShioriSpace.small,
                             child: Material(
                               elevation: 2,
                               borderRadius: BorderRadius.circular(
@@ -885,23 +904,27 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   Widget _controls(BuildContext context, bool visible) {
     final l = AppLocalizations.of(context);
+    final chrome = ReaderChromeMetrics.of(context);
     if (!visible) {
+      final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+      final progress = ValueListenableBuilder<ReaderPosition?>(
+        valueListenable: _readingPosition,
+        builder: (context, position, _) => Text(
+          l.readerChapterProgress(
+            formatReadingPercent(_visibleChapterFraction),
+          ),
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: muted),
+        ),
+      );
       return IgnorePointer(
         child: Stack(
           children: [
             Positioned(
               top: 0,
-              left: readerHorizontalMargin(
-                _settings,
-                MediaQuery.textScalerOf(context),
-                Directionality.of(context),
-              ),
-              right: readerHorizontalMargin(
-                _settings,
-                MediaQuery.textScalerOf(context),
-                Directionality.of(context),
-              ),
-              height: 48,
+              left: _margin,
+              right: _margin,
+              height: chrome.header,
               child: Center(
                 child: Text(
                   widget.runningTitle ?? widget.content.title,
@@ -909,27 +932,23 @@ class _ReaderContentViewState extends State<ReaderContentView>
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: muted,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
               ),
             ),
+            // With system bars hidden, the footer carries the clock and
+            // battery; elsewhere it shows progress alone.
             Positioned(
-              bottom: 12,
-              left: 16,
-              right: 16,
-              child: ValueListenableBuilder<ReaderPosition?>(
-                valueListenable: _readingPosition,
-                builder: (context, position, _) => Text(
-                  l.readerChapterProgress(
-                    formatReadingPercent(_visibleChapterFraction),
-                  ),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
+              bottom: 0,
+              left: _margin,
+              right: _margin,
+              height: chrome.footer,
+              child: Center(
+                child: ShioriCapabilities.of(context).immersiveSystemUi
+                    ? ReaderStatusRow(progress: progress)
+                    : progress,
               ),
             ),
           ],
@@ -941,15 +960,24 @@ class _ReaderContentViewState extends State<ReaderContentView>
         widget.session?.progressFailure != null ||
         widget.session?.progress?.unsaved == true ||
         widget.session?.restoreFailure != null;
+    // Bars bleed into the safe area so they read as one surface over the page.
+    final insets = _pageInsets;
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 56,
-          child: Material(
-            color: Theme.of(context).scaffoldBackgroundColor,
+          top: -insets.top,
+          left: -insets.left,
+          right: -insets.right,
+          height: insets.top + chrome.topBar,
+          child: ReaderToolbarSurface(
+            edge: VerticalDirection.down,
+            padding: EdgeInsets.fromLTRB(
+              insets.left,
+              insets.top,
+              insets.right,
+              0,
+            ),
             child: Row(
               children: [
                 if (widget.returnToOrigin)
@@ -1020,12 +1048,18 @@ class _ReaderContentViewState extends State<ReaderContentView>
           ),
         ),
         Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: 64,
-          child: Material(
-            color: Theme.of(context).scaffoldBackgroundColor,
+          bottom: -insets.bottom,
+          left: -insets.left,
+          right: -insets.right,
+          height: insets.bottom + chrome.bottomBar,
+          child: ReaderToolbarSurface(
+            edge: VerticalDirection.up,
+            padding: EdgeInsets.fromLTRB(
+              insets.left,
+              0,
+              insets.right,
+              insets.bottom,
+            ),
             child: Row(
               children: [
                 Expanded(
