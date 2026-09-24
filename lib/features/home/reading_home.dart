@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../app/routes.dart';
@@ -16,6 +18,7 @@ import '../reader/book_reader_screen.dart';
 import '../cache/cache_screen.dart';
 import '../search/search_screen.dart';
 import '../local_books/local_books_screen.dart';
+import '../local_books/local_cover_index.dart';
 
 class ReadingHome extends StatefulWidget {
   const ReadingHome({
@@ -51,6 +54,12 @@ class ReadingHome extends StatefulWidget {
 
 class _ReadingHomeState extends State<ReadingHome> {
   late final LibraryController _library;
+
+  // Home lives for the app run, so local cover references survive leaving
+  // and reopening the local files page.
+  late final LocalCoverIndex? _localCovers = widget.localBooks == null
+      ? null
+      : LocalCoverIndex(widget.localBooks!);
   @override
   void initState() {
     super.initState();
@@ -73,6 +82,7 @@ class _ReadingHomeState extends State<ReadingHome> {
     _library.removeListener(_changed);
     _library.onDelete();
     _library.dispose();
+    unawaited(_localCovers?.close());
     super.dispose();
   }
 
@@ -164,6 +174,7 @@ class _ReadingHomeState extends State<ReadingHome> {
             library: widget.library,
             onRead: _continue,
             onImport: widget.onImport!,
+            covers: _localCovers,
           ),
     readerTarget: (_, key, block) => BookReaderScreen(
       initialBlockKey: block,

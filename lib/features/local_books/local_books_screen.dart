@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'local_cover_index.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../shared/source_image.dart';
 import '../../domain/contracts/local_book_decoder.dart';
@@ -20,8 +21,13 @@ class LocalBooksScreen extends StatefulWidget {
     required this.library,
     required this.onRead,
     required this.onImport,
+    this.covers,
   });
   final ImageRepository? images;
+
+  /// Cover references kept across visits; without one the page owns an
+  /// index for its own lifetime.
+  final LocalCoverIndex? covers;
   final LocalBookStore store;
   final LocalBookManagement management;
   final LibraryRepository library;
@@ -32,9 +38,10 @@ class LocalBooksScreen extends StatefulWidget {
 }
 
 class _LocalBooksScreenState extends State<LocalBooksScreen> {
-  // Covers resolved this visit; rows remount while scrolling and would
-  // otherwise decode the whole manifest again for one image reference.
-  final _covers = <NovelKey, MediaRef?>{};
+  late final LocalCoverIndex? _ownedCovers = widget.covers == null
+      ? LocalCoverIndex(widget.store)
+      : null;
+  LocalCoverIndex get _covers => widget.covers ?? _ownedCovers!;
   final _request = CancellationSource();
   late final _books = widget.management.watchBooks();
   CancellationSource? _reparseRequest;
@@ -48,6 +55,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
   void dispose() {
     _request.cancel();
     _reparseRequest?.cancel();
+    unawaited(_ownedCovers?.close());
     super.dispose();
   }
 
@@ -450,23 +458,18 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                     child: _emptyLibrary(context),
                   )
                 else ...[
+                  // Same row shell and gutters as the shelf's list mode.
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                    sliver: SliverPadding(
-                      padding: const EdgeInsets.all(ShioriSpace.small),
-                      sliver: SliverList.separated(
-                        itemCount: books.length,
-                        itemBuilder: (context, index) =>
-                            _bookTile(context, books[index]),
-                        separatorBuilder: (context, index) => Divider(
-                          height: 1,
-                          indent: 92,
-                          endIndent: 12,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.outlineVariant.withValues(alpha: .35),
-                        ),
-                      ),
+                    padding: const EdgeInsets.fromLTRB(
+                      ShioriSpace.page,
+                      0,
+                      ShioriSpace.page,
+                      ShioriSpace.section,
+                    ),
+                    sliver: SliverList.builder(
+                      itemCount: books.length,
+                      itemBuilder: (context, index) =>
+                          _bookTile(context, books[index]),
                     ),
                   ),
                 ],
@@ -526,39 +529,25 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
   Widget _bookTile(BuildContext context, LocalBookInfo book) {
     final l = AppLocalizations.of(context);
     final epub = book.format == LocalBookFormat.epub;
-    final radius = BorderRadius.circular(ShioriShape.card);
-    return Material(
+    return BookListItem(
       key: ValueKey(book.key),
-      type: MaterialType.transparency,
-      borderRadius: radius,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        borderRadius: radius,
-        onTap: _busy ? null : () => widget.onRead(book.key),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: ShioriSpace.medium,
-            vertical: ShioriSpace.item,
-          ),
-          child: BookListTile(
-            cover: _LocalCover(
-              book: book,
-              covers: _covers,
-              store: widget.store,
-              images: widget.images,
-              placeholder: CoverPlaceholder(
-                icon: epub
-                    ? Icons.auto_stories_outlined
-                    : Icons.description_outlined,
-                tinted: epub,
-              ),
-            ),
-            title: book.title,
-            metadata:
-                '${book.format.name} · ${l.localBooksImportedOn(MaterialLocalizations.of(context).formatShortDate(book.importedAt.toLocal()))}',
-            trailing: _bookMenu(context, book),
+      onTap: _busy ? null : () => widget.onRead(book.key),
+      child: BookListTile(
+        cover: _LocalCover(
+          book: book,
+          covers: _covers,
+          images: widget.images,
+          placeholder: CoverPlaceholder(
+            icon: epub
+                ? Icons.auto_stories_outlined
+                : Icons.description_outlined,
+            tinted: epub,
           ),
         ),
+        title: book.title,
+        metadata:
+            '${book.format.name} · ${l.localBooksImportedOn(MaterialLocalizations.of(context).formatShortDate(book.importedAt.toLocal()))}',
+        trailing: _bookMenu(context, book),
       ),
     );
   }
@@ -568,7 +557,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     return PopupMenuButton<String>(
       key: ValueKey(('local-book-actions', book.key)),
       padding: EdgeInsets.zero,
-      icon: const Icon(Icons.more_vert, size: 20),
+      icon: const Icon(Icons.more_horiz, size: 20),
       enabled: !_busy,
       tooltip: l.moreActions,
       onSelected: (action) {
@@ -681,18 +670,16 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
   }
 }
 
-/// Fetch metadata only for mounted list rows and refresh after reparsing.
+/// Shows a row's cover once the shared index resolves it.
 class _LocalCover extends StatefulWidget {
   const _LocalCover({
     required this.book,
     required this.covers,
-    required this.store,
     required this.images,
     required this.placeholder,
   });
   final LocalBookInfo book;
-  final Map<NovelKey, MediaRef?> covers;
-  final LocalBookStore store;
+  final LocalCoverIndex covers;
   final ImageRepository? images;
   final Widget placeholder;
 
@@ -701,33 +688,29 @@ class _LocalCover extends StatefulWidget {
 }
 
 class _LocalCoverState extends State<_LocalCover> {
-  CancellationSource? _request;
   StreamSubscription<NovelKey>? _changes;
   MediaRef? _cover;
 
   @override
   void initState() {
     super.initState();
+    // Resolved covers paint in the first frame instead of flashing the
+    // placeholder on every visit.
     _cover = widget.covers[widget.book.key];
     _listen();
     _load();
   }
 
   void _listen() {
-    final store = widget.store;
-    if (store is LocalBookInvalidation) {
-      _changes = (store as LocalBookInvalidation).changes.listen((key) {
-        if (key != widget.book.key) return;
-        widget.covers.remove(key);
-        _load();
-      });
-    }
+    _changes = widget.covers.invalidations.listen((key) {
+      if (key == widget.book.key) _load();
+    });
   }
 
   @override
   void didUpdateWidget(_LocalCover oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.store != widget.store ||
+    if (oldWidget.covers != widget.covers ||
         oldWidget.book.key != widget.book.key ||
         oldWidget.images != widget.images) {
       _changes?.cancel();
@@ -738,35 +721,19 @@ class _LocalCoverState extends State<_LocalCover> {
   }
 
   Future<void> _load() async {
-    _request?.cancel();
-    final request = _request = CancellationSource();
+    final key = widget.book.key;
     if (widget.images == null || widget.book.format == LocalBookFormat.txt) {
       return;
     }
-    final key = widget.book.key;
-    if (widget.covers.containsKey(key)) {
-      if (_cover != widget.covers[key]) {
-        setState(() => _cover = widget.covers[key]);
-      }
-      return;
-    }
-    final result = await widget.store.read(
-      widget.book.key,
-      cancellation: request.token,
-    );
-    if (!mounted || _request != request) return;
-    final cover = switch (result) {
-      Success(value: final book?) => book.content.detail.summary.cover,
-      _ => null,
-    };
-    // Failures stay uncached so the next mount retries.
-    if (result is Success) widget.covers[key] = cover;
+    final cover = widget.covers.contains(key)
+        ? widget.covers[key]
+        : await widget.covers.resolve(key);
+    if (!mounted || widget.book.key != key || cover == _cover) return;
     setState(() => _cover = cover);
   }
 
   @override
   void dispose() {
-    _request?.cancel();
     _changes?.cancel();
     super.dispose();
   }

@@ -51,17 +51,25 @@ class DecodedSourceImage {
 typedef SourceImageDecoder =
     Future<DecodedSourceImage> Function(MediaData data, int targetWidth);
 
-/// Reader-owned decoded LRU. Only already mounted/nearby pages populate it;
-/// downloading a volume never allocates decoded images for the entire volume.
+/// Decoded LRU shared by the images below it. Only mounted images populate
+/// it; downloading a volume never allocates decoded images for the volume.
+/// The reader keeps a few large pages; the app root keeps more small covers
+/// so returning to a list does not decode them again.
 class SourceImageDecodeScope extends StatefulWidget {
-  const SourceImageDecodeScope({super.key, required this.child});
+  const SourceImageDecodeScope({
+    super.key,
+    required this.child,
+    this.maxEntries = 5,
+    this.maxBytes = 24 * 1024 * 1024,
+  });
   final Widget child;
+  final int maxEntries, maxBytes;
   @override
   State<SourceImageDecodeScope> createState() => _SourceImageDecodeScopeState();
 }
 
 class _SourceImageDecodeScopeState extends State<SourceImageDecodeScope> {
-  final cache = _DecodedCache();
+  late final cache = _DecodedCache(widget.maxEntries, widget.maxBytes);
   @override
   void dispose() {
     cache.close();
@@ -81,21 +89,33 @@ class _DecodeOwner extends InheritedWidget {
 }
 
 class _DecodedCache {
-  final _entries = <(String, int), DecodedSourceImage>{};
+  _DecodedCache(this.maxEntries, this.maxBytes);
+  final int maxEntries, maxBytes;
+  final _entries = <(Object, int), DecodedSourceImage>{};
   int _bytes = 0;
   bool _closed = false;
   Future<void> _tail = Future.value();
-  Future<DecodedSourceImage> decode(MediaData data, int width) {
-    final result = _tail.then((_) => _decode(data, width));
+  Future<DecodedSourceImage> decode(MediaData data, int width, MediaRef ref) {
+    final result = _tail.then((_) => _decode(data, width, ref));
     _tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return result;
   }
 
-  Future<DecodedSourceImage> _decode(MediaData data, int width) async {
-    if (_closed) throw StateError('Reader decode scope closed');
-    // Content-addressed persisted paths distinguish refreshed image versions.
-    if (data is! LocalMedia) return decodeSourceImage(data, width);
-    final key = (data.path, width);
+  Future<DecodedSourceImage> _decode(
+    MediaData data,
+    int width,
+    MediaRef ref,
+  ) async {
+    if (_closed) throw StateError('Decode scope closed');
+    // Keys must change whenever the bytes can: persisted paths are content
+    // addressed, and imported-book media ids embed the content digest.
+    final Object? identity = switch (data) {
+      LocalMedia(:final path) => path,
+      _ when ref.sourceId == LocalBookIdentity.sourceId => ref,
+      _ => null,
+    };
+    if (identity == null) return decodeSourceImage(data, width);
+    final key = (identity, width);
     final existing = _entries.remove(key);
     if (existing != null) {
       _entries[key] = existing;
@@ -110,7 +130,7 @@ class _DecodedCache {
     }
     final size = decoded.image.width * decoded.image.height * 4;
     while (_entries.isNotEmpty &&
-        (_bytes + size > 24 * 1024 * 1024 || _entries.length >= 5)) {
+        (_bytes + size > maxBytes || _entries.length >= maxEntries)) {
       final old = _entries.remove(_entries.keys.first)!;
       _bytes -= old.image.width * old.image.height * 4;
       old.image.dispose();
@@ -281,7 +301,7 @@ class _SourceImageState extends State<SourceImage> {
       if (!_current(generation)) return;
       final decoded =
           await (widget.decoder == decodeSourceImage && shared != null
-              ? shared.decode(pendingLease.data, width)
+              ? shared.decode(pendingLease.data, width, widget.media)
               : widget.decoder(pendingLease.data, width));
       pendingImage = decoded.image;
       if (!_current(generation)) return;

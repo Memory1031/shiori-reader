@@ -76,3 +76,42 @@ class BookListTile extends StatelessWidget {
     );
   }
 }
+
+/// Tappable list row shell shared by book lists: paper background, 120dp
+/// minimum height and a hairline below.
+class BookListItem extends StatelessWidget {
+  const BookListItem({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.onLongPress,
+    this.minHeight = 120,
+  });
+  final Widget child;
+  final VoidCallback? onTap, onLongPress;
+  final double minHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.scaffoldBackgroundColor,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Container(
+          constraints: BoxConstraints(minHeight: minHeight),
+          padding: const EdgeInsets.symmetric(vertical: ShioriSpace.medium),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: theme.colorScheme.outlineVariant.withValues(alpha: .45),
+              ),
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}

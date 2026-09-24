@@ -20,6 +20,7 @@ import '../domain/contracts/app_updates.dart';
 import '../domain/contracts/import_source.dart';
 import '../features/home/reading_home.dart';
 import '../shared/app_logger.dart';
+import '../shared/source_image.dart';
 import '../shared/widgets/state_views.dart';
 import 'app.dart';
 import 'app_controller.dart';
@@ -297,7 +298,13 @@ class _ProductionAppState extends State<ProductionApp>
             child: ImportOverlay(
               controller: _imports!,
               onRead: _readImported,
-              child: child,
+              // Above the navigator, so shelf and local-file covers stay
+              // decoded across pages; the reader nests its own scope.
+              child: SourceImageDecodeScope(
+                maxEntries: 60,
+                maxBytes: 32 * 1024 * 1024,
+                child: child,
+              ),
             ),
           ),
           createController: () => AppController(settingsStore: _appearance),

@@ -213,48 +213,28 @@ class _BookshelfViewState extends State<BookshelfView> {
                           0,
                           0,
                         ),
-                        child: Material(
-                          color: Theme.of(context).scaffoldBackgroundColor,
-                          child: InkWell(
-                            onLongPress: () => _actions(book),
-                            onTap: () {
-                              if (open) {
-                                setState(() => _revealed = null);
-                              } else {
-                                widget.onOpen(book.key);
-                              }
-                            },
-                            child: Container(
-                              constraints: BoxConstraints(
-                                minHeight: open ? 120 * scale.clamp(1, 2) : 120,
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                vertical: ShioriSpace.medium,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .outlineVariant
-                                        .withValues(alpha: .45),
-                                  ),
-                                ),
-                              ),
-                              child: BookListTile(
-                                cover: cover,
-                                title: book.title,
-                                subtitle: book.authors.isEmpty
-                                    ? null
-                                    : book.authors.join(', '),
-                                metadata: metadata,
-                                trailing: IconButton(
-                                  key: ValueKey(('shelf-more', book.key)),
-                                  tooltip: strings.moreActions,
-                                  onPressed: () => _actions(book),
-                                  icon: const Icon(Icons.more_horiz, size: 20),
-                                ),
-                              ),
+                        child: BookListItem(
+                          onLongPress: () => _actions(book),
+                          onTap: () {
+                            if (open) {
+                              setState(() => _revealed = null);
+                            } else {
+                              widget.onOpen(book.key);
+                            }
+                          },
+                          minHeight: open ? 120 * scale.clamp(1, 2) : 120,
+                          child: BookListTile(
+                            cover: cover,
+                            title: book.title,
+                            subtitle: book.authors.isEmpty
+                                ? null
+                                : book.authors.join(', '),
+                            metadata: metadata,
+                            trailing: IconButton(
+                              key: ValueKey(('shelf-more', book.key)),
+                              tooltip: strings.moreActions,
+                              onPressed: () => _actions(book),
+                              icon: const Icon(Icons.more_horiz, size: 20),
                             ),
                           ),
                         ),
