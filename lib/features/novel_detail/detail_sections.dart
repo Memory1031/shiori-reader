@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/capabilities.dart';
 import '../../app/theme/shiori_theme.dart';
 
 import '../../domain/contracts/contracts.dart';
@@ -26,7 +27,10 @@ class DetailBookHeader extends StatelessWidget {
                 bounds.maxWidth < 560 &&
                     MediaQuery.textScalerOf(context).scale(20) > 28;
             final cover = SizedBox(
-              width: bounds.maxWidth >= 600 ? 120 : 104,
+              width:
+                  WindowClass.forWidth(bounds.maxWidth) == WindowClass.compact
+                  ? 104
+                  : 120,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(ShioriShape.cover),
