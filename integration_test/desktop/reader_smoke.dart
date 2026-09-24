@@ -272,7 +272,7 @@ ${List.generate(100, (i) => '<p>段落 $i ${'混排正文与翻页检查。' * 2
       final link = _reader.session!.contentLinks.firstWhere(
         (link) => link.label == '跳到目标',
       );
-      _reader.onContentLink!(link);
+      _reader.actions.contentLink!(link);
       await _until(
         () =>
             !_pages.isRestoring &&
@@ -295,14 +295,14 @@ ${List.generate(100, (i) => '<p>段落 $i ${'混排正文与翻页检查。' * 2
         () => _widgets<RawImage>().any((image) => image.image != null),
         'fixed image decoded',
       );
-      _reader.onNextChapter!();
+      _reader.actions.nextChapter!();
       await _until(
         () =>
             _widgets<ReaderContentView>().length == 1 &&
             _reader.content.key == fixed.chapters[1].key,
         'fixed next chapter',
       );
-      _reader.onPreviousChapter!();
+      _reader.actions.previousChapter!();
       await _until(
         () =>
             _widgets<ReaderContentView>().length == 1 &&

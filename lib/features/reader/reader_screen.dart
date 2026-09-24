@@ -16,10 +16,14 @@ import 'reader_completion_transition.dart';
 import 'reader_preferences.dart';
 import 'reader_theme.dart';
 import 'reading_progress_format.dart';
+export 'reader_actions.dart' show ReaderActions;
+
+import 'reader_actions.dart';
 import 'reader_chrome.dart';
 import 'reader_contents.dart';
 import 'reader_progress_panel.dart';
 import 'reader_sheet.dart';
+import 'reader_toolbars.dart';
 import 'settings_panel.dart';
 import 'reader_margin.dart';
 import 'reader_image.dart';
@@ -102,23 +106,12 @@ class ReaderContentView extends StatefulWidget {
     this.settings,
     this.session,
     this.initialPosition,
-    this.bookContents,
+    this.actions = const ReaderActions(),
     this.articleContents = true,
-    this.onPreviousChapter,
-    this.onNextChapter,
-    this.onBookEnd,
     this.completion,
-    this.onCompletionPrevious,
-    this.onCompletionExit,
-    this.onRestart,
-    this.onDetails,
-    this.onPrefetch,
-    this.onLinks,
-    this.onContentLink,
     this.viewportController,
     this.returnToOrigin = false,
     this.chrome,
-    this.onLeave,
   });
   final ImageRepository? images;
   final ChapterContent content;
@@ -129,32 +122,17 @@ class ReaderContentView extends StatefulWidget {
   final ReaderController? session;
   final ReaderPosition? initialPosition;
   final SettingsStore? settings;
-
-  /// The book-level navigation layer (volume catalog or local contents).
-  final ReaderContentsLayer Function(BuildContext context)? bookContents;
+  final ReaderActions actions;
 
   /// Whether headings recognised inside the article form their own layer.
   final bool articleContents;
-  final VoidCallback? onPreviousChapter, onNextChapter;
-  final VoidCallback? onBookEnd,
-      onCompletionPrevious,
-      onCompletionExit,
-      onRestart;
   final BookTerminalState? completion;
-  final VoidCallback? onDetails;
-  final VoidCallback? onPrefetch;
-  final void Function(BuildContext readerContext)? onLinks;
-  final ValueChanged<LocalContentLink>? onContentLink;
   final PagedReaderController? viewportController;
   final bool returnToOrigin;
 
   /// Toolbar visibility, owned by the caller when it must outlive this view
   /// (e.g. so the screen can close the toolbars on back).
   final ValueNotifier<bool>? chrome;
-
-  /// Toolbar back / return button. An explicit tap always leaves, unlike
-  /// system back, which may first close the toolbars. Defaults to maybePop.
-  final VoidCallback? onLeave;
   @override
   State<ReaderContentView> createState() => _ReaderContentViewState();
 }
@@ -168,6 +146,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   bool _settingsReady = false;
   bool _hintVisible = false;
   String? _failedPresentation;
+  ReaderActions get _actions => widget.actions;
   bool get _usesPresentation =>
       widget.session?.pagePresentation != null &&
       widget.session?.pagePresentation != _failedPresentation;
@@ -216,25 +195,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
   }
 
-  Future<void> _panel(BuildContext context) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      // The panel owns the handle so it follows live reading-theme changes.
-      showDragHandle: false,
-      backgroundColor: Colors.transparent,
-      useSafeArea: true,
-      sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
-          ? AnimationStyle.noAnimation
-          : null,
-      // Short enough to keep the page being adjusted in view.
-      builder: (_) => FractionallySizedBox(
-        heightFactor: ReaderSheetSize.half.heightFactor,
-        child: ReaderSettingsPanel(preferences: _preferences),
-      ),
-    );
-    await _preferences.flush();
-  }
+  Future<void> _settingsPanel(BuildContext context) =>
+      showReaderSettings(context, _preferences);
 
   List<ReaderContentsLayer> _contentsLayers(BuildContext context) => [
     if (widget.articleContents)
@@ -247,7 +209,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
           _paged.restore(target);
         },
       ),
-    if (widget.bookContents case final book?) book(context),
+    if (_actions.bookContents case final book?) book(context),
   ];
 
   /// [book] opens on the book-level layer, e.g. from the completion page.
@@ -345,7 +307,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   void _toggle() => _chrome.value = !_chrome.value;
 
   void _leave(BuildContext context) {
-    if (widget.onLeave case final leave?) {
+    if (_actions.leave case final leave?) {
       leave();
     } else {
       Navigator.of(context).maybePop();
@@ -357,14 +319,14 @@ class _ReaderContentViewState extends State<ReaderContentView>
       return;
     }
     if (widget.completion != null) {
-      if (!forward) widget.onCompletionPrevious?.call();
+      if (!forward) _actions.completionPrevious?.call();
       return;
     }
     if (_usesPresentation) {
       if (forward) {
         _presentationNext();
       } else {
-        widget.onPreviousChapter?.call();
+        _actions.previousChapter?.call();
       }
     } else {
       unawaited(
@@ -375,7 +337,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
   }
 
-  void _forwardBoundary() => (widget.onNextChapter ?? widget.onBookEnd)?.call();
+  void _forwardBoundary() => (_actions.nextChapter ?? _actions.bookEnd)?.call();
   void _presentationNext() {
     final last = widget.content.blocks.length - 1;
     _sample(
@@ -438,7 +400,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(ShioriSpace.medium),
             child: Text(
               image.caption ??
                   image.alt ??
@@ -485,8 +447,21 @@ class _ReaderContentViewState extends State<ReaderContentView>
     );
   }
 
+  TextStyle _bodyStyle(BuildContext context) {
+    final theme = Theme.of(context);
+    final typography = ShioriCapabilities.of(context).explicitUiTypeface
+        ? theme.textTheme.bodyLarge
+        : null;
+    return TextStyle(
+      fontFamily: typography?.fontFamily,
+      fontFamilyFallback: typography?.fontFamilyFallback,
+      fontSize: _settings.fontSize,
+      height: _settings.lineHeight,
+      color: theme.colorScheme.onSurface,
+    );
+  }
+
   Widget _body(BuildContext context) {
-    final strings = AppLocalizations.of(context);
     if (!_settingsReady) {
       return const Scaffold(body: SafeArea(child: LoadingView()));
     }
@@ -495,32 +470,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
       _reportedPaper = paper;
       widget.onPageAppearance?.call(paper);
     }
-    final pageInsets = MediaQuery.paddingOf(context);
-    _pageInsets = pageInsets;
-    final chrome = ReaderChromeMetrics.of(context);
-    final theme = Theme.of(context);
-    final bodyTypography = ShioriCapabilities.of(context).explicitUiTypeface
-        ? theme.textTheme.bodyLarge
-        : null;
-    final style = TextStyle(
-      fontFamily: bodyTypography?.fontFamily,
-      fontFamilyFallback: bodyTypography?.fontFamilyFallback,
-      fontSize: _settings.fontSize,
-      height: _settings.lineHeight,
-      color: theme.colorScheme.onSurface,
-    );
-    final margin = readerHorizontalMargin(
+    _pageInsets = MediaQuery.paddingOf(context);
+    _margin = readerHorizontalMargin(
       _settings,
       MediaQuery.textScalerOf(context),
       Directionality.of(context),
     );
-    _margin = margin;
-    final prose = _isProse(widget.content);
-    bool spreadFor(BoxConstraints bounds) =>
-        !_usesPresentation &&
-        prose &&
-        bounds.maxWidth - pageInsets.horizontal - 2 * margin >=
-            2 * readerMinColumnWidth + readerColumnGap;
+    final style = _bodyStyle(context);
     return LayoutBuilder(
       builder: (context, pageBounds) => Stack(
         fit: StackFit.expand,
@@ -544,280 +500,34 @@ class _ReaderContentViewState extends State<ReaderContentView>
                   onTurning: (value) => _completionTurning = value,
                   completion: widget.completion == null
                       ? null
-                      : ColoredBox(
-                          color: theme.scaffoldBackgroundColor,
-                          child: SafeArea(
-                            child: Listener(
-                              onPointerSignal: _scrollPage,
-                              child: ReaderCompletionPage(
-                                state: widget.completion!,
-                                title:
-                                    widget.session?.progress?.snapshot.title ??
-                                    widget.runningTitle ??
-                                    widget.content.title,
-                                style: style,
-                                onPrevious:
-                                    widget.onCompletionPrevious ?? () {},
-                                onExit: widget.onCompletionExit ?? () {},
-                                onCatalog: () => _contents(context, book: true),
-                                onRestart: widget.onRestart ?? () {},
-                              ),
-                            ),
-                          ),
-                        ),
+                      : _completionPage(context, style),
                   child: SafeArea(
                     child: Stack(
                       fit: StackFit.expand,
                       // Toolbars paint into the safe-area insets.
                       clipBehavior: Clip.none,
                       children: [
-                        // Stable gutters keep showing/hiding controls from repaginating content.
                         Positioned.fill(
-                          child: Listener(
-                            onPointerSignal: _scrollPage,
-                            behavior: HitTestBehavior.opaque,
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                margin,
-                                chrome.header,
-                                margin,
-                                chrome.footer,
-                              ),
-                              child: Align(
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxWidth: spreadFor(pageBounds)
-                                        ? 2 * readerMaxPageWidth +
-                                              readerColumnGap
-                                        : readerMaxPageWidth,
-                                  ),
-                                  child: LayoutBuilder(
-                                    builder: (context, bounds) {
-                                      final maxHeight = bounds.maxHeight;
-                                      ({double height, double caption}) extent(
-                                        ImageBlock block,
-                                      ) => readerImageExtent(
-                                        block,
-                                        width: bounds.maxWidth.clamp(
-                                          0,
-                                          readerMaxPageWidth,
-                                        ),
-                                        maxHeight: maxHeight,
-                                        scaler: MediaQuery.textScalerOf(
-                                          context,
-                                        ),
-                                        direction: Directionality.of(context),
-                                        knownSize: _sizes[block.media],
-                                      );
-                                      Widget image(
-                                        BuildContext context,
-                                        ImageBlock block,
-                                      ) {
-                                        final geometry = extent(block);
-                                        return SizedBox(
-                                          height: geometry.height,
-                                          child: widget.images == null
-                                              ? _image(context, block)
-                                              : ReaderImage(
-                                                  onTap: () =>
-                                                      showReaderImagePreview(
-                                                        context,
-                                                        block: block,
-                                                        repository:
-                                                            widget.images!,
-                                                      ),
-                                                  block: block,
-                                                  repository: widget.images!,
-                                                  captionHeight:
-                                                      geometry.caption,
-                                                  onIntrinsicSize: (size) {
-                                                    if (block.width ==
-                                                            size.width &&
-                                                        block.height ==
-                                                            size.height) {
-                                                      return;
-                                                    }
-                                                    _dimensions(
-                                                      block.media,
-                                                      size,
-                                                    );
-                                                  },
-                                                ),
-                                        );
-                                      }
-
-                                      final presentation =
-                                          widget.session?.pagePresentation;
-                                      if (_usesPresentation) {
-                                        return ExcludeSemantics(
-                                          excluding: widget.completion != null,
-                                          child: EpubLayoutPage(
-                                            html: presentation!,
-                                            links:
-                                                widget.session?.contentLinks ??
-                                                const [],
-                                            onLink: widget.onContentLink,
-                                            onFailed: () {
-                                              if (mounted) {
-                                                setState(
-                                                  () => _failedPresentation =
-                                                      presentation,
-                                                );
-                                              }
-                                            },
-                                            onCenterTap: _toggle,
-                                            chromeVisible: _chrome,
-                                            onPrevious:
-                                                widget.onPreviousChapter,
-                                            onNext: _presentationNext,
-                                            onReady: () {
-                                              final position =
-                                                  _position ??
-                                                  ReaderPosition(
-                                                    contentRevision: widget
-                                                        .content
-                                                        .contentRevision,
-                                                    blockKey: widget
-                                                        .content
-                                                        .blocks
-                                                        .first
-                                                        .blockKey,
-                                                    blockIndex: 0,
-                                                    blockFraction: 0,
-                                                    chapterFraction: 0,
-                                                  );
-                                              _position = position;
-                                              _sample(
-                                                position,
-                                                position.chapterFraction == 1,
-                                              );
-                                            },
-                                          ),
-                                        );
-                                      }
-                                      return ExcludeSemantics(
-                                        excluding: widget.completion != null,
-                                        child: PagedReaderViewport(
-                                          columns: spreadFor(pageBounds)
-                                              ? 2
-                                              : 1,
-                                          images: widget.images,
-                                          content: widget.content,
-                                          pageSize: pageBounds.biggest,
-                                          contentOrigin: Offset(
-                                            (pageBounds.maxWidth -
-                                                    bounds.maxWidth) /
-                                                2,
-                                            pageInsets.top + chrome.header,
-                                          ),
-                                          onTurnVisual: (progress, direction) {
-                                            _paperTurn.value = (
-                                              progress,
-                                              direction,
-                                            );
-                                          },
-                                          startAtEnd:
-                                              (widget.session?.startAtEnd ??
-                                                  false) &&
-                                              _position?.chapterFraction == 1 &&
-                                              _position?.blockFraction == 1,
-                                          onTurning: (turning) {
-                                            _dragging = turning;
-                                            if (!turning) {
-                                              WidgetsBinding.instance
-                                                  .addPostFrameCallback((_) {
-                                                    if (mounted) {
-                                                      _applySizes();
-                                                    }
-                                                  });
-                                            }
-                                          },
-                                          onPosition: _sample,
-                                          onRestoreStart:
-                                              widget.session?.restoringProgress,
-                                          controller: _paged,
-                                          onLink: widget.onContentLink,
-                                          contentLinks:
-                                              widget.session?.contentLinks
-                                                  .toList() ??
-                                              const [],
-                                          initialPosition: _position,
-                                          textStyle: style,
-                                          paragraphSpacing:
-                                              _settings.paragraphSpacing,
-                                          onCenterTap: _toggle,
-                                          chromeVisible: _chrome,
-                                          onBoundary: (direction) {
-                                            if (direction > 0) {
-                                              _forwardBoundary();
-                                            } else {
-                                              widget.onPreviousChapter?.call();
-                                            }
-                                          },
-                                          imageBuilder: image,
-                                          imageExtent: (block) =>
-                                              extent(block).height,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
+                          child: _page(context, pageBounds, style),
+                        ),
+                        if (widget.completion == null)
+                          ValueListenableBuilder<bool>(
+                            valueListenable: _chrome,
+                            builder: (context, visible, _) => ListenableBuilder(
+                              listenable: _preferences,
+                              builder: (context, _) => visible
+                                  ? _toolbars(context)
+                                  : _runningChrome(context),
                             ),
                           ),
-                        ),
-                        ValueListenableBuilder<bool>(
-                          valueListenable: _chrome,
-                          builder: (context, visible, _) => ListenableBuilder(
-                            listenable: _preferences,
-                            builder: (context, _) => widget.completion == null
-                                ? _controls(context, visible)
-                                : const SizedBox.shrink(),
-                          ),
-                        ),
                         if (_hintVisible && widget.completion == null)
                           Positioned(
-                            left: 16,
-                            right: 16,
-                            bottom: chrome.bottomBar + ShioriSpace.small,
-                            child: Material(
-                              elevation: 2,
-                              borderRadius: BorderRadius.circular(
-                                ShioriShape.control,
-                              ),
-                              color: Theme.of(context).colorScheme.surface,
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxHeight:
-                                      MediaQuery.sizeOf(context).height * .4,
-                                ),
-                                child: SingleChildScrollView(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(strings.readerControlsHint),
-                                        TextButton(
-                                          onPressed: () {
-                                            setState(
-                                              () => _hintVisible = false,
-                                            );
-                                            _preferences.update(
-                                              _settings.copyWith(
-                                                controlsHintSeen: true,
-                                              ),
-                                            );
-                                            _preferences.flush();
-                                          },
-                                          child: Text(strings.readerGotIt),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                            left: ShioriSpace.item,
+                            right: ShioriSpace.item,
+                            bottom:
+                                ReaderChromeMetrics.of(context).bottomBar +
+                                ShioriSpace.small,
+                            child: ReaderControlsHint(onDismiss: _dismissHint),
                           ),
                       ],
                     ),
@@ -835,6 +545,205 @@ class _ReaderContentViewState extends State<ReaderContentView>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _dismissHint() {
+    setState(() => _hintVisible = false);
+    _preferences.update(_settings.copyWith(controlsHintSeen: true));
+    _preferences.flush();
+  }
+
+  Widget _completionPage(BuildContext context, TextStyle style) => ColoredBox(
+    color: Theme.of(context).scaffoldBackgroundColor,
+    child: SafeArea(
+      child: Listener(
+        onPointerSignal: _scrollPage,
+        child: ReaderCompletionPage(
+          state: widget.completion!,
+          title:
+              widget.session?.progress?.snapshot.title ??
+              widget.runningTitle ??
+              widget.content.title,
+          style: style,
+          onPrevious: _actions.completionPrevious ?? () {},
+          onExit: _actions.exitToShelf ?? () {},
+          onCatalog: () => _contents(context, book: true),
+          onRestart: _actions.restart ?? () {},
+        ),
+      ),
+    ),
+  );
+
+  /// The paginated page (native or EPUB presentation) inside stable gutters
+  /// that keep showing / hiding the toolbars from repaginating content.
+  Widget _page(
+    BuildContext context,
+    BoxConstraints pageBounds,
+    TextStyle style,
+  ) {
+    final chrome = ReaderChromeMetrics.of(context);
+    final spread =
+        !_usesPresentation &&
+        _isProse(widget.content) &&
+        pageBounds.maxWidth - _pageInsets.horizontal - 2 * _margin >=
+            2 * readerMinColumnWidth + readerColumnGap;
+    return Listener(
+      onPointerSignal: _scrollPage,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          _margin,
+          chrome.header,
+          _margin,
+          chrome.footer,
+        ),
+        child: Align(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: spread
+                  ? 2 * readerMaxPageWidth + readerColumnGap
+                  : readerMaxPageWidth,
+            ),
+            child: LayoutBuilder(
+              builder: (context, bounds) => _usesPresentation
+                  ? _presentationPage()
+                  : _nativePage(
+                      context,
+                      pageBounds: pageBounds,
+                      bounds: bounds,
+                      columns: spread ? 2 : 1,
+                      style: style,
+                      contentTop: _pageInsets.top + chrome.header,
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _presentationPage() {
+    final presentation = widget.session!.pagePresentation!;
+    return ExcludeSemantics(
+      excluding: widget.completion != null,
+      child: EpubLayoutPage(
+        html: presentation,
+        links: widget.session?.contentLinks ?? const [],
+        onLink: _actions.contentLink,
+        onFailed: () {
+          if (mounted) setState(() => _failedPresentation = presentation);
+        },
+        onCenterTap: _toggle,
+        chromeVisible: _chrome,
+        onPrevious: _actions.previousChapter,
+        onNext: _presentationNext,
+        onReady: () {
+          final position =
+              _position ??
+              ReaderPosition(
+                contentRevision: widget.content.contentRevision,
+                blockKey: widget.content.blocks.first.blockKey,
+                blockIndex: 0,
+                blockFraction: 0,
+                chapterFraction: 0,
+              );
+          _position = position;
+          _sample(position, position.chapterFraction == 1);
+        },
+      ),
+    );
+  }
+
+  Widget _nativePage(
+    BuildContext context, {
+    required BoxConstraints pageBounds,
+    required BoxConstraints bounds,
+    required int columns,
+    required TextStyle style,
+    required double contentTop,
+  }) {
+    ({double height, double caption}) extent(ImageBlock block) =>
+        readerImageExtent(
+          block,
+          width: bounds.maxWidth.clamp(0, readerMaxPageWidth),
+          maxHeight: bounds.maxHeight,
+          scaler: MediaQuery.textScalerOf(context),
+          direction: Directionality.of(context),
+          knownSize: _sizes[block.media],
+        );
+    Widget image(BuildContext context, ImageBlock block) {
+      final geometry = extent(block);
+      return SizedBox(
+        height: geometry.height,
+        child: widget.images == null
+            ? _image(context, block)
+            : ReaderImage(
+                onTap: () => showReaderImagePreview(
+                  context,
+                  block: block,
+                  repository: widget.images!,
+                ),
+                block: block,
+                repository: widget.images!,
+                captionHeight: geometry.caption,
+                onIntrinsicSize: (size) {
+                  if (block.width == size.width &&
+                      block.height == size.height) {
+                    return;
+                  }
+                  _dimensions(block.media, size);
+                },
+              ),
+      );
+    }
+
+    return ExcludeSemantics(
+      excluding: widget.completion != null,
+      child: PagedReaderViewport(
+        columns: columns,
+        images: widget.images,
+        content: widget.content,
+        pageSize: pageBounds.biggest,
+        contentOrigin: Offset(
+          (pageBounds.maxWidth - bounds.maxWidth) / 2,
+          contentTop,
+        ),
+        onTurnVisual: (progress, direction) {
+          _paperTurn.value = (progress, direction);
+        },
+        startAtEnd:
+            (widget.session?.startAtEnd ?? false) &&
+            _position?.chapterFraction == 1 &&
+            _position?.blockFraction == 1,
+        onTurning: (turning) {
+          _dragging = turning;
+          if (!turning) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _applySizes();
+            });
+          }
+        },
+        onPosition: _sample,
+        onRestoreStart: widget.session?.restoringProgress,
+        controller: _paged,
+        onLink: _actions.contentLink,
+        contentLinks: widget.session?.contentLinks.toList() ?? const [],
+        initialPosition: _position,
+        textStyle: style,
+        paragraphSpacing: _settings.paragraphSpacing,
+        onCenterTap: _toggle,
+        chromeVisible: _chrome,
+        onBoundary: (direction) {
+          if (direction > 0) {
+            _forwardBoundary();
+          } else {
+            _actions.previousChapter?.call();
+          }
+        },
+        imageBuilder: image,
+        imageExtent: (block) => extent(block).height,
       ),
     );
   }
@@ -869,221 +778,115 @@ class _ReaderContentViewState extends State<ReaderContentView>
           widget.session?.bookProgressAt(fraction)?.fraction,
       onSeek: _seekChapter,
       onDone: () => Navigator.of(sheet).pop(),
-      showChapterStepper:
-          widget.onPreviousChapter != null || widget.onNextChapter != null,
-      onPreviousChapter: widget.onPreviousChapter,
-      onNextChapter: widget.onNextChapter,
+      showChapterStepper: _actions.hasChapterStepper,
+      onPreviousChapter: _actions.previousChapter,
+      onNextChapter: _actions.nextChapter,
     ),
   );
 
-  Widget _controls(BuildContext context, bool visible) {
+  /// Chapter progress text, rebuilt at most at the sampling rate.
+  Widget _progressLabel(
+    String Function(String percent) label, {
+    TextStyle? style,
+    StrutStyle? strut,
+  }) => ValueListenableBuilder<ReaderPosition?>(
+    valueListenable: _readingPosition,
+    builder: (context, position, _) => Text(
+      label(formatReadingPercent(_visibleChapterFraction)),
+      textAlign: TextAlign.center,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      strutStyle: strut,
+      style: style,
+    ),
+  );
+
+  Widget _runningChrome(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final chrome = ReaderChromeMetrics.of(context);
-    if (!visible) {
-      final muted = Theme.of(context).colorScheme.onSurfaceVariant;
-      final progress = ValueListenableBuilder<ReaderPosition?>(
-        valueListenable: _readingPosition,
-        builder: (context, position, _) => Text(
-          l.readerChapterProgress(
-            formatReadingPercent(_visibleChapterFraction),
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          // Same forced line box as the status row labels, so CJK fallback
-          // cannot shift it against them.
-          strutStyle: StrutStyle.fromTextStyle(
-            Theme.of(context).textTheme.labelSmall ?? const TextStyle(),
-            height: 1,
-            forceStrutHeight: true,
-          ),
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: muted),
+    final label = Theme.of(context).textTheme.labelSmall ?? const TextStyle();
+    return ReaderRunningChrome(
+      metrics: ReaderChromeMetrics.of(context),
+      margin: _margin,
+      title: widget.runningTitle ?? widget.content.title,
+      statusRow: ShioriCapabilities.of(context).immersiveSystemUi,
+      progress: _progressLabel(
+        l.readerChapterProgress,
+        style: label.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
-      );
-      return IgnorePointer(
-        child: Stack(
-          children: [
-            Positioned(
-              top: 0,
-              left: _margin,
-              right: _margin,
-              height: chrome.header,
-              child: Center(
-                child: Text(
-                  widget.runningTitle ?? widget.content.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: muted,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ),
-            ),
-            // With system bars hidden, the footer carries the clock and
-            // battery; elsewhere it shows progress alone.
-            Positioned(
-              bottom: 0,
-              left: _margin,
-              right: _margin,
-              height: chrome.footer,
-              child: Center(
-                child: ShioriCapabilities.of(context).immersiveSystemUi
-                    ? ReaderStatusRow(progress: progress)
-                    : progress,
-              ),
-            ),
-          ],
+        // Same forced line box as the status row labels, so CJK fallback
+        // cannot shift it against them.
+        strut: StrutStyle.fromTextStyle(
+          label,
+          height: 1,
+          forceStrutHeight: true,
         ),
-      );
-    }
-    final failedRead = widget.session?.restoreFailure != null;
+      ),
+    );
+  }
+
+  List<(ReaderMenuAction, String)> _menu(AppLocalizations l) {
+    final session = widget.session;
     final unsaved =
-        widget.session?.progressFailure != null ||
-        widget.session?.progress?.unsaved == true ||
-        widget.session?.restoreFailure != null;
-    // Bars bleed into the safe area so they read as one surface over the page.
-    final insets = _pageInsets;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          top: -insets.top,
-          left: -insets.left,
-          right: -insets.right,
-          height: insets.top + chrome.topBar,
-          child: ReaderToolbarSurface(
-            edge: VerticalDirection.down,
-            padding: EdgeInsets.fromLTRB(
-              insets.left,
-              insets.top,
-              insets.right,
-              0,
-            ),
-            child: Row(
-              children: [
-                if (widget.returnToOrigin)
-                  TextButton(
-                    onPressed: () => _leave(context),
-                    child: Text(l.readerLinkReturn),
-                  )
-                else
-                  BackButton(onPressed: () => _leave(context)),
-                Expanded(
-                  child: Tooltip(
-                    message: _effectiveChapterTitle,
-                    child: Text(
-                      _effectiveChapterTitle,
-                      key: const ValueKey('reader-chapter-title'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  tooltip: l.moreActions,
-                  icon: const Icon(Icons.more_horiz),
-                  onSelected: (value) {
-                    if (value == 'links') widget.onLinks?.call(context);
-                    if (value == 'details') widget.onDetails?.call();
-                    if (value == 'prefetch') widget.onPrefetch?.call();
-                    if (value == 'hide') _toggle();
-                    if (value == 'save') widget.session?.retryProgress();
-                    if (value == 'settings') _panel(context);
-                  },
-                  itemBuilder: (_) => [
-                    if (widget.onLinks != null)
-                      PopupMenuItem(value: 'links', child: Text(l.readerLinks)),
-                    if (widget.onPrefetch != null)
-                      PopupMenuItem(
-                        value: 'prefetch',
-                        child: Text(l.prefetchTitle),
-                      ),
-                    if (widget.onDetails != null)
-                      PopupMenuItem(
-                        value: 'details',
-                        child: Text(l.novelDetailsTitle),
-                      ),
-                    if (unsaved)
-                      PopupMenuItem(
-                        value: 'save',
-                        child: Text(
-                          failedRead
-                              ? l.readerRestoreReadFailed
-                              : l.readerProgressUnsaved,
-                        ),
-                      ),
-                    if (_preferences.failure != null)
-                      PopupMenuItem(
-                        value: 'settings',
-                        child: Text(l.readerSettingsFailure),
-                      ),
-                    PopupMenuItem(
-                      value: 'hide',
-                      child: Text(l.hideReaderControls),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+        session?.progressFailure != null ||
+        session?.progress?.unsaved == true ||
+        session?.restoreFailure != null;
+    return [
+      if (_actions.links != null) (ReaderMenuAction.links, l.readerLinks),
+      if (_actions.prefetch != null)
+        (ReaderMenuAction.prefetch, l.prefetchTitle),
+      if (_actions.details != null)
+        (ReaderMenuAction.details, l.novelDetailsTitle),
+      if (unsaved)
+        (
+          ReaderMenuAction.retrySave,
+          session?.restoreFailure != null
+              ? l.readerRestoreReadFailed
+              : l.readerProgressUnsaved,
         ),
-        Positioned(
-          bottom: -insets.bottom,
-          left: -insets.left,
-          right: -insets.right,
-          height: insets.bottom + chrome.bottomBar,
-          child: ReaderToolbarSurface(
-            edge: VerticalDirection.up,
-            padding: EdgeInsets.fromLTRB(
-              insets.left,
-              0,
-              insets.right,
-              insets.bottom,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Tooltip(
-                    message:
-                        _contentsLayers(context).firstOrNull?.label ??
-                        l.catalogTitle,
-                    child: TextButton.icon(
-                      onPressed: () => _contents(context),
-                      icon: const Icon(Icons.list, size: 20),
-                      label: Text(l.catalogTitle),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: ValueListenableBuilder<ReaderPosition?>(
-                    valueListenable: _readingPosition,
-                    builder: (context, position, _) => TextButton(
-                      onPressed: () => _progressPanel(context),
-                      child: Text(
-                        l.readerChapterPercent(
-                          formatReadingPercent(_visibleChapterFraction),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Tooltip(
-                    message: l.readerSettings,
-                    child: TextButton(
-                      onPressed: () => _panel(context),
-                      child: Text('Aa', semanticsLabel: l.readerSettings),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+      if (_preferences.failure != null)
+        (ReaderMenuAction.retrySettings, l.readerSettingsFailure),
+      (ReaderMenuAction.hideControls, l.hideReaderControls),
+    ];
+  }
+
+  void _onMenu(BuildContext context, ReaderMenuAction action) {
+    switch (action) {
+      case ReaderMenuAction.links:
+        _actions.links?.call(context);
+      case ReaderMenuAction.prefetch:
+        _actions.prefetch?.call();
+      case ReaderMenuAction.details:
+        _actions.details?.call();
+      case ReaderMenuAction.retrySave:
+        widget.session?.retryProgress();
+      case ReaderMenuAction.retrySettings:
+        _settingsPanel(context);
+      case ReaderMenuAction.hideControls:
+        _toggle();
+    }
+  }
+
+  Widget _toolbars(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return ReaderToolbars(
+      metrics: ReaderChromeMetrics.of(context),
+      insets: _pageInsets,
+      top: ReaderTopBar(
+        title: _effectiveChapterTitle,
+        returnToOrigin: widget.returnToOrigin,
+        onLeave: () => _leave(context),
+        menu: _menu(l),
+        onMenu: (action) => _onMenu(context, action),
+      ),
+      bottom: ReaderBottomBar(
+        contentsTooltip:
+            _contentsLayers(context).firstOrNull?.label ?? l.catalogTitle,
+        onContents: () => _contents(context),
+        progress: _progressLabel(l.readerChapterPercent),
+        onProgress: () => _progressPanel(context),
+        onSettings: () => _settingsPanel(context),
+      ),
     );
   }
 }

@@ -760,33 +760,58 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         ? order[index + 1]
         : null;
 
-    return ReaderContentView(
-      key: ValueKey(reader),
-      content: reader.content!,
-      completion: reader == _reader ? _completion : null,
-      onCompletionPrevious: () => setState(() => _completion = null),
-      onCompletionExit: () => _exit(toShelf: true),
-      onRestart: order.isEmpty
+    void bookEnd() {
+      if (_completion != null || reader != _reader) return;
+      final state = bookEndState(
+        local: _local,
+        status: reader.novelStatus == NovelStatus.unknown
+            ? _bookStatus
+            : reader.novelStatus,
+      );
+      setState(() => _completion = state);
+      reader.enterBookEnd(state);
+      unawaited(reader.flushProgress());
+    }
+
+    final actions = ReaderActions(
+      completionPrevious: () => setState(() => _completion = null),
+      exitToShelf: () => _exit(toShelf: true),
+      restart: order.isEmpty
           ? null
           : () => _switch(order.first, fromStart: true),
-      onBookEnd:
+      bookEnd:
           !_changing &&
               widget.linkDepth == 0 &&
               index >= 0 &&
               index == order.length - 1
-          ? () {
-              if (_completion != null || reader != _reader) return;
-              final state = bookEndState(
-                local: _local,
-                status: reader.novelStatus == NovelStatus.unknown
-                    ? _bookStatus
-                    : reader.novelStatus,
-              );
-              setState(() => _completion = state);
-              reader.enterBookEnd(state);
-              unawaited(reader.flushProgress());
-            }
+          ? bookEnd
           : null,
+      contentLink: _changing ? null : _followContentLink,
+      bookContents: _changing || widget.linkDepth > 0 ? null : _bookContents,
+      links: _changing || reader.contentLinks.isEmpty ? null : _links,
+      leave: () => unawaited(_exit()),
+      prefetch: !widget.offline && _cache?.prefetch != null
+          ? () => showPrefetchSheet(
+              context,
+              cache: _cache!,
+              catalog: _catalog.loaded?.value,
+              current: reader.chapter,
+            )
+          : null,
+      details: widget.onDetails == null || _changing ? null : _details,
+      previousChapter: !_changing && previous != null
+          ? () => _switch(previous, fromEnd: true)
+          : null,
+      nextChapter: !_changing && next != null
+          ? () => _switch(next, fromStart: true)
+          : null,
+    );
+
+    return ReaderContentView(
+      key: ValueKey(reader),
+      content: reader.content!,
+      completion: reader == _reader ? _completion : null,
+      actions: actions,
       onReady: () => _commitPending(reader),
       onPageAppearance: (paper) {
         if (reader == _reader) {
@@ -803,29 +828,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         reader,
         PagedReaderController.new,
       ),
-      onContentLink: _changing ? null : _followContentLink,
       initialPosition: reader.initialPosition,
       articleContents: !_local,
-      bookContents: _changing || widget.linkDepth > 0 ? null : _bookContents,
-      onLinks: _changing || reader.contentLinks.isEmpty ? null : _links,
       returnToOrigin: widget.linkDepth > 0,
       chrome: _chrome,
-      onLeave: () => unawaited(_exit()),
-      onPrefetch: !widget.offline && _cache?.prefetch != null
-          ? () => showPrefetchSheet(
-              context,
-              cache: _cache!,
-              catalog: _catalog.loaded?.value,
-              current: reader.chapter,
-            )
-          : null,
-      onDetails: widget.onDetails == null || _changing ? null : _details,
-      onPreviousChapter: !_changing && previous != null
-          ? () => _switch(previous, fromEnd: true)
-          : null,
-      onNextChapter: !_changing && next != null
-          ? () => _switch(next, fromStart: true)
-          : null,
     );
   }
 

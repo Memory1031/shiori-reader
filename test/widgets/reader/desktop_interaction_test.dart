@@ -38,7 +38,7 @@ void main() {
       final reader = tester.widget<ReaderContentView>(
         find.byType(ReaderContentView),
       );
-      expect(reader.onPreviousChapter, isNull);
+      expect(reader.actions.previousChapter, isNull);
       final viewport = tester.widget<PagedReaderViewport>(
         find.byType(PagedReaderViewport),
       );

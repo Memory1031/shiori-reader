@@ -305,8 +305,8 @@ void main() {
         await tester.pumpAndSettle();
         ReaderContentView view() =>
             tester.widget<ReaderContentView>(find.byType(ReaderContentView));
-        expect(view().onNextChapter, isNotNull);
-        expect(view().onBookEnd, isNull);
+        expect(view().actions.nextChapter, isNotNull);
+        expect(view().actions.bookEnd, isNull);
         expect(view().session!.bookMetrics!.revision, reliable.revision);
         final flush = view().session!.flushProgress();
         await tester.pumpAndSettle();

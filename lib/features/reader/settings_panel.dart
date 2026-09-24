@@ -6,10 +6,50 @@ import '../../l10n/generated/app_localizations.dart';
 import 'reader_preferences.dart';
 import 'reader_theme.dart';
 import 'reader_margin.dart';
+import 'reader_sheet.dart';
 
+/// Opens the typography panel as a sheet that leaves the page in view, and
+/// flushes the edits when it closes.
+Future<void> showReaderSettings(
+  BuildContext context,
+  ReaderPreferences preferences,
+) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    // The panel owns the handle so it follows live reading-theme changes.
+    showDragHandle: false,
+    backgroundColor: Colors.transparent,
+    useSafeArea: true,
+    sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+        ? AnimationStyle.noAnimation
+        : null,
+    builder: (sheet) => FractionallySizedBox(
+      heightFactor: ReaderSheetSize.half.heightFactor,
+      child: ReaderSettingsPanel(
+        preferences: preferences,
+        onDone: () => Navigator.of(sheet).pop(),
+        sheet: true,
+      ),
+    ),
+  );
+  await preferences.flush();
+}
+
+/// Reading typography and colours. Placement agnostic: [sheet] adds the drag
+/// handle and rounded top a modal host needs; a docked host omits them.
 class ReaderSettingsPanel extends StatelessWidget {
-  const ReaderSettingsPanel({super.key, required this.preferences});
+  const ReaderSettingsPanel({
+    super.key,
+    required this.preferences,
+    this.onDone,
+    this.sheet = false,
+  });
   final ReaderPreferences preferences;
+
+  /// Close control; hidden when null (e.g. a persistent side panel).
+  final VoidCallback? onDone;
+  final bool sheet;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -91,9 +131,11 @@ class ReaderSettingsPanel extends StatelessWidget {
           );
           return Material(
             color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(ShioriShape.sheet),
-            ),
+            borderRadius: sheet
+                ? const BorderRadius.vertical(
+                    top: Radius.circular(ShioriShape.sheet),
+                  )
+                : null,
             clipBehavior: Clip.antiAlias,
             child: SafeArea(
               child: Column(
@@ -102,17 +144,21 @@ class ReaderSettingsPanel extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
                     child: Column(
                       children: [
-                        Container(
-                          width: 36,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                            borderRadius: BorderRadius.circular(
-                              ShioriShape.indicator,
+                        if (sheet) ...[
+                          Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.outlineVariant,
+                              borderRadius: BorderRadius.circular(
+                                ShioriShape.indicator,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
+                          const SizedBox(height: 8),
+                        ],
                         Row(
                           children: [
                             Expanded(
@@ -121,13 +167,14 @@ class ReaderSettingsPanel extends StatelessWidget {
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
                             ),
-                            IconButton(
-                              tooltip: MaterialLocalizations.of(
-                                context,
-                              ).closeButtonTooltip,
-                              onPressed: () => Navigator.of(context).pop(),
-                              icon: const Icon(Icons.close),
-                            ),
+                            if (onDone != null)
+                              IconButton(
+                                tooltip: MaterialLocalizations.of(
+                                  context,
+                                ).closeButtonTooltip,
+                                onPressed: onDone,
+                                icon: const Icon(Icons.close),
+                              ),
                           ],
                         ),
                       ],

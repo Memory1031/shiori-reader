@@ -267,7 +267,7 @@ void main() {
           linkBookKey,
           cancellation: CancellationSource().token,
         );
-        await tester.tap(find.byType(PopupMenuButton<String>));
+        await tester.tap(find.byTooltip(lang == 'en' ? 'More' : '更多'));
         await tester.pumpAndSettle();
         await tester.tap(find.text(lang == 'en' ? 'Chapter links' : '本章链接'));
         await tester.pumpAndSettle();
@@ -278,8 +278,8 @@ void main() {
         );
         expect(note.content.key, content.auxiliaryChapters.single.key);
         expect(note.session!.library, isNull);
-        expect(note.onNextChapter, isNull);
-        expect(note.onPreviousChapter, isNull);
+        expect(note.actions.nextChapter, isNull);
+        expect(note.actions.previousChapter, isNull);
         if (find
             .text(lang == 'en' ? 'Return to reading' : '返回原位置')
             .evaluate()
@@ -345,9 +345,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      tester.widget<ReaderContentView>(find.byType(ReaderContentView)).onLinks!(
-        tester.element(find.byType(ReaderContentView)),
-      );
+      tester
+          .widget<ReaderContentView>(find.byType(ReaderContentView))
+          .actions
+          .links!(tester.element(find.byType(ReaderContentView)));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('external'),
@@ -366,7 +367,8 @@ void main() {
       expect(find.textContaining('Link unavailable'), findsOneWidget);
       tester
           .widget<ReaderContentView>(find.byType(ReaderContentView))
-          .onNextChapter!();
+          .actions
+          .nextChapter!();
       await tester.pumpAndSettle();
       expect(
         tester
@@ -410,9 +412,10 @@ void main() {
     );
     await tester.pumpAndSettle();
     final state = tester.state(find.byType(ReaderContentView));
-    tester.widget<ReaderContentView>(find.byType(ReaderContentView)).onLinks!(
-      tester.element(find.byType(ReaderContentView)),
-    );
+    tester
+        .widget<ReaderContentView>(find.byType(ReaderContentView))
+        .actions
+        .links!(tester.element(find.byType(ReaderContentView)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('note'));
     await tester.pumpAndSettle();

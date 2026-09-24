@@ -47,7 +47,7 @@ void main() {
       expect(notifications, inInclusiveRange(1, 40));
       // Opening controls must not use the delayed label's value.
       viewport.onPosition!(at(.95), false);
-      final progressButton = find.descendant(
+      final progressButton = find.ancestor(
         of: find.byWidgetPredicate(
           (w) => w is ValueListenableBuilder<ReaderPosition?>,
         ),

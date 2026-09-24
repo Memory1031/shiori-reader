@@ -36,8 +36,10 @@ void main() {
           ReaderContentView(
             content: content,
             images: repo,
-            onNextChapter: () => boundaries++,
-            onPreviousChapter: () => boundaries++,
+            actions: ReaderActions(
+              nextChapter: () => boundaries++,
+              previousChapter: () => boundaries++,
+            ),
           ),
         ),
       );

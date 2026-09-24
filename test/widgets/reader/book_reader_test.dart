@@ -110,7 +110,7 @@ void main() {
       env.source.controls.delays[Operation.chapter] = const Duration(
         seconds: 2,
       );
-      before.onNextChapter!();
+      before.actions.nextChapter!();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(
@@ -154,7 +154,7 @@ void main() {
             .title,
       );
       env.source.controls.delays.remove(Operation.chapter);
-      next.onPreviousChapter!();
+      next.actions.previousChapter!();
       await tester.pumpAndSettle();
 
       await tester.pumpWidget(const SizedBox());

@@ -110,7 +110,7 @@ void main() {
               tester.widget<ReaderContentView>(find.byType(ReaderContentView));
           expect(view().chapterTitle, toc ? '第二十二章　无头悬案' : '无头悬案');
           expect(find.text(toc ? '第二十二章　无头悬案' : '无头悬案'), findsWidgets);
-          view().onNextChapter!();
+          view().actions.nextChapter!();
           await tester.pumpAndSettle();
           expect(view().chapterTitle, toc ? '第二十三章　后续故事' : '后续故事');
           expect(tester.takeException(), isNull);
@@ -198,12 +198,12 @@ void main() {
       await frames(tester);
       expect(view().initialPosition!.blockKey, saved.position.blockKey);
       for (final index in [1, 2]) {
-        view().onNextChapter!();
+        view().actions.nextChapter!();
         await frames(tester);
         expect(view().content.key, content.chapters[index].key);
       }
       for (final index in [1, 0]) {
-        view().onPreviousChapter!();
+        view().actions.previousChapter!();
         await frames(tester);
         expect(view().content.key, content.chapters[index].key);
       }
@@ -301,10 +301,10 @@ void main() {
         await tester.pumpWidget(app());
         await tester.pumpAndSettle();
         expect(view().initialPosition!.blockIndex, saved.position.blockIndex);
-        view().onNextChapter!();
+        view().actions.nextChapter!();
         await tester.pumpAndSettle();
         expect(view().content.key, content.chapters[1].key);
-        view().onPreviousChapter!();
+        view().actions.previousChapter!();
         await tester.pumpAndSettle();
         expect(view().content.key, content.chapters.first.key);
         if (find.byTooltip('Book contents').evaluate().isEmpty) {
@@ -323,7 +323,7 @@ void main() {
         expect(view().viewportController!.capture()!.blockIndex, 0);
         // Late local reads must not update a disposed reader.
         store.delay = Completer<void>();
-        view().onNextChapter!();
+        view().actions.nextChapter!();
         await tester.pump();
         await tester.pumpWidget(const SizedBox());
         store.delay!.complete();

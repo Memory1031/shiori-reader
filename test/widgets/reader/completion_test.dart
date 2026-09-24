@@ -440,8 +440,8 @@ void main() {
     await tester.pumpAndSettle();
     ReaderContentView view() =>
         tester.widget<ReaderContentView>(find.byType(ReaderContentView));
-    expect(view().onNextChapter, isNotNull);
-    expect(view().onBookEnd, isNull);
+    expect(view().actions.nextChapter, isNotNull);
+    expect(view().actions.bookEnd, isNull);
     await view().viewportController!.next();
     await tester.pumpAndSettle();
     expect(find.byType(ReaderCompletionPage), findsNothing);
@@ -712,7 +712,7 @@ void main() {
         ReaderContentView view() =>
             tester.widget<ReaderContentView>(find.byType(ReaderContentView));
         expect(find.byType(ReaderCompletionPage), findsNothing);
-        expect(view().onNextChapter, isNull);
+        expect(view().actions.nextChapter, isNull);
         final requests = repo.loads;
         // Actual keyboard boundary, not a direct invocation of onBookEnd.
         await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
