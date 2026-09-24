@@ -101,6 +101,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   NovelStatus _bookStatus = NovelStatus.unknown;
   List<ChapterKey>? _readingOrder;
   final _navigation = <ChapterKey, List<(LocalNavigationEntry, int)>>{};
+  Object _navigationRevision = Object();
   final _navigationTree = ValueNotifier<Result<List<LocalNavigationEntry>>?>(
     null,
   );
@@ -128,11 +129,53 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       setState(() {
         _navigation.clear();
         collect(value, 0);
+        _navigationRevision = Object();
       });
     }
   }
 
-  String? _chapterTitle(ReaderController reader) {
+  // Rebuilds follow every session notification; recompute titles only when
+  // an input (catalog snapshot, navigation, book title, chapter content)
+  // actually changes.
+  final _titles =
+      Expando<
+        ({
+          Object? catalog,
+          Object navigation,
+          String? book,
+          Object? content,
+          String? chapter,
+          String? running,
+        })
+      >();
+  (String?, String?) _titlesFor(ReaderController reader) {
+    final catalog = _catalog.loaded?.value;
+    final content = reader.content;
+    final cached = _titles[reader];
+    if (cached != null &&
+        identical(cached.catalog, catalog) &&
+        identical(cached.navigation, _navigationRevision) &&
+        cached.book == _bookTitle &&
+        identical(cached.content, content)) {
+      return (cached.chapter, cached.running);
+    }
+    final chapter = _scanChapterTitle(reader);
+    final running = _scanRunningTitle(reader);
+    _titles[reader] = (
+      catalog: catalog,
+      navigation: _navigationRevision,
+      book: _bookTitle,
+      content: content,
+      chapter: chapter,
+      running: running,
+    );
+    return (chapter, running);
+  }
+
+  String? _chapterTitle(ReaderController reader) => _titlesFor(reader).$1;
+  String? _runningTitle(ReaderController reader) => _titlesFor(reader).$2;
+
+  String? _scanChapterTitle(ReaderController reader) {
     String? title;
     int? earliest;
     var deepest = -1;
@@ -197,7 +240,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
-  String? _runningTitle(ReaderController reader) {
+  String? _scanRunningTitle(ReaderController reader) {
     for (final volume in _catalog.loaded?.value.volumes ?? <Volume>[]) {
       if (!volume.isSynthetic &&
           volume.title != null &&
