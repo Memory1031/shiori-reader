@@ -18,8 +18,12 @@ class BookshelfView extends StatefulWidget {
     this.onDetails,
     this.onImport,
     this.images,
+    this.header,
   });
   final LibraryController controller;
+
+  /// Scrolls above the shelf title, e.g. the continue-reading card.
+  final Widget? header;
   final ValueChanged<NovelKey> onOpen;
   final ValueChanged<NovelKey>? onDetails;
   final VoidCallback onSearch;
@@ -311,6 +315,8 @@ class _BookshelfViewState extends State<BookshelfView> {
         return CustomScrollView(
           key: PageStorageKey(_grid ? 'shelf-grid' : 'shelf-list'),
           slivers: [
+            if (widget.header case final header?)
+              SliverToBoxAdapter(child: header),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),

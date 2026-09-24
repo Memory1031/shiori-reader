@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shiori/features/home/continue_reading_card.dart';
 import 'package:shiori/app/theme.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
@@ -83,8 +84,17 @@ void main() {
             of: shelf,
             matching: find.byType(BookCover),
           );
+          // The continue card scrolls inside the shelf; measure grid covers only.
+          final cardCovers = find
+              .descendant(
+                of: find.byType(ContinueReadingCard),
+                matching: find.byType(BookCover),
+              )
+              .evaluate()
+              .toSet();
           final coverRects = covers
               .evaluate()
+              .where((e) => !cardCovers.contains(e))
               .map((e) => tester.getRect(find.byWidget(e.widget)))
               .toList();
           expect(coverRects.length, inInclusiveRange(4, 59));

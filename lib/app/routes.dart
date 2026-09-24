@@ -40,6 +40,26 @@ final class ContinueDestination extends AppDestination {
   String get routeName => '/continue';
 }
 
+/// Reads from the article cache only, without touching the network.
+final class OfflineReaderDestination extends AppDestination {
+  const OfflineReaderDestination(this.key);
+  final ChapterKey key;
+  @override
+  String get routeName => '/offline-reader';
+}
+
+final class LocalBooksDestination extends AppDestination {
+  const LocalBooksDestination();
+  @override
+  String get routeName => '/local-books';
+}
+
+final class CacheDestination extends AppDestination {
+  const CacheDestination();
+  @override
+  String get routeName => '/cache';
+}
+
 /// Factories capture explicitly injected contracts at the composition root.
 /// Missing features stay honest placeholders until their own implementation task.
 class AppRoutes {
@@ -50,6 +70,9 @@ class AppRoutes {
     this.reader,
     this.readerTarget,
     this.continueReader,
+    this.offlineReader,
+    this.localBooks,
+    this.cache,
   });
 
   final WidgetBuilder? home;
@@ -58,6 +81,8 @@ class AppRoutes {
   final Widget Function(BuildContext, ChapterKey)? reader;
   final Widget Function(BuildContext, ChapterKey, String?)? readerTarget;
   final Widget Function(BuildContext, NovelKey)? continueReader;
+  final Widget Function(BuildContext, ChapterKey)? offlineReader;
+  final WidgetBuilder? localBooks, cache;
 
   Widget buildHome(BuildContext context, {VoidCallback? onAppearance}) =>
       home?.call(context) ??
@@ -91,6 +116,15 @@ class AppRoutes {
       ContinueDestination(:final key) =>
         continueReader?.call(context, key) ??
             _PendingPage(title: AppLocalizations.of(context).readerTitle),
+      OfflineReaderDestination(:final key) =>
+        offlineReader?.call(context, key) ??
+            _PendingPage(title: AppLocalizations.of(context).readerTitle),
+      LocalBooksDestination() =>
+        localBooks?.call(context) ??
+            _PendingPage(title: AppLocalizations.of(context).localBooksTitle),
+      CacheDestination() =>
+        cache?.call(context) ??
+            _PendingPage(title: AppLocalizations.of(context).cacheTitle),
     };
     // Route names deliberately exclude opaque IDs and potential site locators.
     final settings = RouteSettings(name: destination.routeName);

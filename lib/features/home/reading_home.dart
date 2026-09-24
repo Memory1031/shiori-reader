@@ -139,6 +139,32 @@ class _ReadingHomeState extends State<ReadingHome> {
       onDetails: _readerDetails,
       cache: widget.cache,
     ),
+    offlineReader: (_, key) => BookReaderScreen(
+      chapter: key,
+      repository: widget.repository,
+      images: widget.images,
+      library: widget.library,
+      settings: widget.settings,
+      cache: widget.cache,
+      offline: true,
+    ),
+    cache: widget.cache == null
+        ? null
+        : (context) => CacheScreen(
+            cache: widget.cache!,
+            onRead: (key) =>
+                _routes.open(context, OfflineReaderDestination(key)),
+          ),
+    localBooks: widget.localBooks == null || widget.localManagement == null
+        ? null
+        : (_) => LocalBooksScreen(
+            images: widget.images,
+            store: widget.localBooks!,
+            management: widget.localManagement!,
+            library: widget.library,
+            onRead: _continue,
+            onImport: widget.onImport!,
+          ),
     readerTarget: (_, key, block) => BookReaderScreen(
       initialBlockKey: block,
       startAtBeginning: key.novelKey.sourceId == LocalBookIdentity.sourceId,
@@ -207,40 +233,10 @@ class _ReadingHomeState extends State<ReadingHome> {
             onSelected: (value) {
               if (value == 'import') widget.onImport?.call();
               if (value == 'cache') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => CacheScreen(
-                      cache: widget.cache!,
-                      onRead: (key) => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BookReaderScreen(
-                            chapter: key,
-                            repository: widget.repository,
-                            images: widget.images,
-                            library: widget.library,
-                            settings: widget.settings,
-                            cache: widget.cache,
-                            offline: true,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
+                _routes.open(context, const CacheDestination());
               }
               if (value == 'local') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => LocalBooksScreen(
-                      images: widget.images,
-                      store: widget.localBooks!,
-                      management: widget.localManagement!,
-                      library: widget.library,
-                      onRead: _continue,
-                      onImport: widget.onImport!,
-                    ),
-                  ),
-                );
+                _routes.open(context, const LocalBooksDestination());
               }
               if (value == 'appearance') widget.onAppearance?.call();
               if (value == 'updates') widget.onUpdates?.call();
@@ -297,44 +293,42 @@ class _ReadingHomeState extends State<ReadingHome> {
                   constraints: const BoxConstraints(
                     maxWidth: ShioriLayout.page,
                   ),
-                  child: Column(
-                    children: [
-                      if (_library.recent.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              strings.detailContinue,
-                              style: Theme.of(context).textTheme.titleSmall,
+                  // The continue card scrolls with the shelf so short or landscape
+                  // windows keep room for books.
+                  child: BookshelfView(
+                    controller: _library,
+                    images: widget.images,
+                    onOpen: _continue,
+                    onDetails: (key) =>
+                        _routes.open(context, NovelDestination(key)),
+                    onSearch: _search,
+                    onImport: widget.onImport,
+                    header: _library.recent.isEmpty
+                        ? null
+                        : Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              ShioriSpace.page,
+                              ShioriSpace.item,
+                              ShioriSpace.page,
+                              ShioriSpace.small,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  strings.detailContinue,
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                const SizedBox(height: ShioriSpace.small),
+                                ContinueReadingCard(
+                                  progress: _library.recent.first,
+                                  images: widget.images,
+                                  onContinue: () =>
+                                      _continue(_library.recent.first.novelKey),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                      if (_library.recent.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 8,
-                          ),
-                          child: ContinueReadingCard(
-                            progress: _library.recent.first,
-                            images: widget.images,
-                            onContinue: () =>
-                                _continue(_library.recent.first.novelKey),
-                          ),
-                        ),
-                      Expanded(
-                        child: BookshelfView(
-                          controller: _library,
-                          images: widget.images,
-                          onOpen: _continue,
-                          onDetails: (key) =>
-                              _routes.open(context, NovelDestination(key)),
-                          onSearch: _search,
-                          onImport: widget.onImport,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),
