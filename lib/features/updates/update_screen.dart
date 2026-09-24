@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
@@ -380,7 +381,7 @@ class UpdateScreen extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(ShioriShape.sheet),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -525,7 +526,7 @@ class _ProjectAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.all(Radius.circular(12)),
+      borderRadius: BorderRadius.all(Radius.circular(ShioriShape.control)),
     );
     final colors = Theme.of(context).colorScheme;
     return Padding(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -12,7 +13,7 @@ class BookCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(8),
+    borderRadius: BorderRadius.circular(ShioriShape.cover),
     child: AspectRatio(
       aspectRatio: 2 / 3,
       child: book.cover != null && images != null

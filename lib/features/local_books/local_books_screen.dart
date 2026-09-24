@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import '../../shared/source_image.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/contracts/contracts.dart';
@@ -522,7 +523,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final epub = book.format == LocalBookFormat.epub;
-    final radius = BorderRadius.circular(16);
+    final radius = BorderRadius.circular(ShioriShape.card);
     return Material(
       key: ValueKey(book.key),
       type: MaterialType.transparency,
@@ -651,7 +652,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: failed ? colors.errorContainer : colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(ShioriShape.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -669,7 +670,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
               const SizedBox(height: 12),
             ],
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(ShioriShape.tag),
               child: LinearProgressIndicator(
                 value: _batchIndex == null
                     ? null
@@ -816,7 +817,7 @@ class _LocalCoverState extends State<_LocalCover> {
     width: 64,
     height: 96,
     child: ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(ShioriShape.cover),
       child: _cover == null || widget.images == null
           ? widget.placeholder
           : SourceImage(

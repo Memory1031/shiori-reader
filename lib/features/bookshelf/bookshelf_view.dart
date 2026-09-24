@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -109,7 +110,7 @@ class _BookshelfViewState extends State<BookshelfView> {
               key: ValueKey(book.key),
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(ShioriShape.control),
                 child: Stack(
                   children: [
                     if (open)
@@ -184,9 +185,10 @@ class _BookshelfViewState extends State<BookshelfView> {
                         }
                       },
                       child: AnimatedContainer(
-                        duration: MediaQuery.disableAnimationsOf(context)
-                            ? Duration.zero
-                            : const Duration(milliseconds: 180),
+                        duration: ShioriMotion.of(
+                          context,
+                          ShioriMotion.feedback,
+                        ),
                         transform: Matrix4.translationValues(
                           open ? -148 : 0,
                           0,
@@ -245,10 +247,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                                                 style: theme
                                                     .textTheme
                                                     .titleSmall
-                                                    ?.copyWith(
-                                                      fontSize: 15,
-                                                      height: 1.4,
-                                                    ),
+                                                    ?.copyWith(height: 1.4),
                                               ),
                                               if (book.authors.isNotEmpty) ...[
                                                 const SizedBox(height: 5),
@@ -455,10 +454,8 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final active = _hovered || _pressed || _focused;
-    final duration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 180);
-    final radius = BorderRadius.circular(8);
+    final duration = ShioriMotion.of(context, ShioriMotion.feedback);
+    final radius = BorderRadius.circular(ShioriShape.cover);
 
     return InkWell(
       onTap: widget.onTap,
@@ -539,7 +536,7 @@ class _ShelfCover extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: .42),
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(ShioriShape.tag),
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),

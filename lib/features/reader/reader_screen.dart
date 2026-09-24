@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import 'package:flutter/services.dart';
 
 import '../../domain/contracts/contracts.dart';
@@ -700,7 +701,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
                             bottom: 72,
                             child: Material(
                               elevation: 2,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(
+                                ShioriShape.control,
+                              ),
                               color: Theme.of(context).colorScheme.surface,
                               child: ConstrainedBox(
                                 constraints: BoxConstraints(

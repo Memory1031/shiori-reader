@@ -24,7 +24,7 @@ class ShioriPalette extends ThemeExtension<ShioriPalette> {
     separator: Color(0xffded8d5),
   );
   static const dark = ShioriPalette(
-    paper: Color(0xff1b181c),
+    paper: ShioriReaderPaper.night,
     surface: Color(0xff252126),
     ink: Color(0xffeee7eb),
     secondary: Color(0xffbeb3ba),
@@ -68,13 +68,33 @@ abstract final class ShioriSpace {
       section = 32.0;
 }
 
+/// Corner radii: tag for badges / bars, cover for artwork, control for rows,
+/// inputs and menus, card for grouped surfaces, sheet for modal surfaces.
 abstract final class ShioriShape {
-  static const cover = 8.0, control = 12.0, sheet = 20.0, coverRatio = 2 / 3;
+  static const indicator = 2.0,
+      tag = 4.0,
+      cover = 8.0,
+      control = 12.0,
+      card = 16.0,
+      sheet = 20.0,
+      coverRatio = 2 / 3;
 }
 
 abstract final class ShioriMotion {
   static const feedback = Duration(milliseconds: 180);
   static const transition = Duration(milliseconds: 240);
+
+  /// Honors the platform reduce-motion preference.
+  static Duration of(BuildContext context, Duration duration) =>
+      MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
+}
+
+/// Reading surfaces. Night uses the app's dark paper so swatches match pages.
+abstract final class ShioriReaderPaper {
+  static const paper = Color(0xfffffcf8);
+  static const warm = Color(0xfff2e8d5);
+  static const warmSecondary = Color(0xff686166);
+  static const night = Color(0xff1b181c);
 }
 
 @immutable
@@ -182,7 +202,7 @@ ThemeData shioriTheme(
       menuPadding: const EdgeInsets.symmetric(vertical: 4),
       position: PopupMenuPosition.under,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(ShioriShape.control),
         side: BorderSide(color: p.separator.withValues(alpha: .65), width: .5),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
@@ -244,7 +264,9 @@ ThemeData shioriTheme(
         foregroundColor: p.ink,
         minimumSize: const Size(48, 48),
         side: BorderSide(color: p.separator),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ShioriShape.control),
+        ),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -276,7 +298,9 @@ ThemeData shioriTheme(
       ),
     ),
     chipTheme: ChipThemeData(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ShioriShape.control),
+      ),
     ),
   );
 }

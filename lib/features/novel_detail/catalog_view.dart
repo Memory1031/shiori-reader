@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -148,7 +149,7 @@ class _CatalogViewState extends State<CatalogView> {
             padding: EdgeInsets.only(top: index == 0 ? 0 : 12),
             child: Material(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(ShioriShape.cover),
               clipBehavior: Clip.antiAlias,
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -161,7 +162,7 @@ class _CatalogViewState extends State<CatalogView> {
                     color: Theme.of(
                       context,
                     ).colorScheme.primary.withValues(alpha: .5),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(ShioriShape.indicator),
                   ),
                 ),
                 minLeadingWidth: 3,
@@ -189,7 +190,7 @@ class _CatalogViewState extends State<CatalogView> {
           padding: EdgeInsets.only(top: index == 0 ? 0 : 4),
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(ShioriShape.control),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
               contentPadding: const EdgeInsets.symmetric(
@@ -197,7 +198,7 @@ class _CatalogViewState extends State<CatalogView> {
                 vertical: 2,
               ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(ShioriShape.control),
               ),
               key: ValueKey(chapter.key),
               selected: selected,
@@ -209,7 +210,7 @@ class _CatalogViewState extends State<CatalogView> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(ShioriShape.cover),
                 ),
                 child: selected
                     ? Icon(

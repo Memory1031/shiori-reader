@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -28,7 +29,7 @@ class DetailBookHeader extends StatelessWidget {
               width: bounds.maxWidth >= 600 ? 120 : 104,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(ShioriShape.cover),
                   boxShadow: [
                     BoxShadow(
                       color: theme.colorScheme.shadow.withValues(alpha: .12),

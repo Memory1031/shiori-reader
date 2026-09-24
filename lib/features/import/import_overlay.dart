@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import 'package:flutter/services.dart';
 import '../../domain/contracts/import_source.dart';
 import '../../domain/contracts/local_book_decoder.dart';
@@ -141,7 +142,9 @@ class _ImportOverlayState extends State<ImportOverlay>
                         ),
                         child: Material(
                           elevation: 8,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(
+                            ShioriShape.sheet,
+                          ),
                           color: Theme.of(context).colorScheme.surfaceContainer,
                           child: Padding(
                             padding: const EdgeInsets.all(20),

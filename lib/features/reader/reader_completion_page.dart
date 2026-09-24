@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 
@@ -111,7 +112,9 @@ class ReaderCompletionPage extends StatelessWidget {
                                   vertical: 14,
                                 ),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(
+                                    ShioriShape.cover,
+                                  ),
                                 ),
                                 textStyle: type.copyWith(
                                   fontSize: 15,

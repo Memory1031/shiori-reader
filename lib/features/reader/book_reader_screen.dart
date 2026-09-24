@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
@@ -63,7 +64,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   int _turnDirection = 1;
   bool _animateChapter = false;
   bool _committing = false;
-  Color _paper = const Color(0xfffaf7f2);
+  Color _paper = ShioriReaderPaper.paper;
   late final ImageRepository? _displayImages;
   late final CatalogController _catalog;
   bool get _local =>

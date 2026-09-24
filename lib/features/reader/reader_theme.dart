@@ -18,11 +18,11 @@ ThemeData readerTheme(
   final paper = brightness == Brightness.dark
       ? ShioriPalette.dark.paper
       : settings.paper == ReaderPaper.warm
-      ? const Color(0xfff2e8d5)
-      : const Color(0xfffffcf8);
+      ? ShioriReaderPaper.warm
+      : ShioriReaderPaper.paper;
   final secondary =
       brightness == Brightness.light && settings.paper == ReaderPaper.warm
-      ? const Color(0xff686166)
+      ? ShioriReaderPaper.warmSecondary
       : base.colorScheme.onSurfaceVariant;
   return base.copyWith(
     scaffoldBackgroundColor: paper,

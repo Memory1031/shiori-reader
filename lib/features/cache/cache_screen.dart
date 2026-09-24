@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import 'dart:async';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -340,7 +341,7 @@ class _CacheScreenState extends State<CacheScreen> {
               vertical: 2,
             ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(ShioriShape.control),
             ),
             title: Text(
               chapter.title,

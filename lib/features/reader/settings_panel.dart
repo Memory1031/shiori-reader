@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -37,7 +38,7 @@ class ReaderSettingsPanel extends StatelessWidget {
               color: Theme.of(
                 context,
               ).colorScheme.onSurface.withValues(alpha: .035),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(ShioriShape.card),
             ),
             child: Row(
               children: [
@@ -90,7 +91,9 @@ class ReaderSettingsPanel extends StatelessWidget {
           );
           return Material(
             color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(ShioriShape.sheet),
+            ),
             clipBehavior: Clip.antiAlias,
             child: SafeArea(
               child: Column(
@@ -104,7 +107,9 @@ class ReaderSettingsPanel extends StatelessWidget {
                           height: 4,
                           decoration: BoxDecoration(
                             color: Theme.of(context).colorScheme.outlineVariant,
-                            borderRadius: BorderRadius.circular(2),
+                            borderRadius: BorderRadius.circular(
+                              ShioriShape.indicator,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -215,8 +220,8 @@ class ReaderSettingsPanel extends StatelessWidget {
                                 ChoiceChip(
                                   avatar: CircleAvatar(
                                     backgroundColor: paper == ReaderPaper.paper
-                                        ? const Color(0xfffffcf8)
-                                        : const Color(0xfff2e8d5),
+                                        ? ShioriReaderPaper.paper
+                                        : ShioriReaderPaper.warm,
                                   ),
                                   label: Text(
                                     paper == ReaderPaper.paper
@@ -240,7 +245,7 @@ class ReaderSettingsPanel extends StatelessWidget {
                                 ),
                               ChoiceChip(
                                 avatar: const CircleAvatar(
-                                  backgroundColor: Color(0xff252525),
+                                  backgroundColor: ShioriReaderPaper.night,
                                 ),
                                 label: Text(l.readerNight),
                                 selected:

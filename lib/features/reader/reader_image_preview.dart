@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -12,12 +13,8 @@ Future<void> showReaderImagePreview(
   PageRouteBuilder<void>(
     barrierDismissible: true,
     settings: const RouteSettings(name: '/reader-image'),
-    transitionDuration: MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 150),
-    reverseTransitionDuration: MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 150),
+    transitionDuration: ShioriMotion.of(context, ShioriMotion.feedback),
+    reverseTransitionDuration: ShioriMotion.of(context, ShioriMotion.feedback),
     pageBuilder: (_, _, _) =>
         ReaderImagePreview(block: block, repository: repository),
     transitionsBuilder: (_, animation, _, child) =>
@@ -62,7 +59,8 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
 
   @override
   Widget build(BuildContext context) {
-    final dark = ThemeData.dark();
+    // App typography (including the Windows UI face) on a true-black stage.
+    final dark = shioriTheme(Brightness.dark, accent: appAccentOf(context));
     return Theme(
       data: dark.copyWith(
         scaffoldBackgroundColor: Colors.black,

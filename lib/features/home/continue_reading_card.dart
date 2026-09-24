@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -24,7 +25,7 @@ class ContinueReadingCard extends StatelessWidget {
     final colors = theme.colorScheme;
     final strings = AppLocalizations.of(context);
     final bookProgress = progress.bookProgress;
-    final radius = BorderRadius.circular(16);
+    final radius = BorderRadius.circular(ShioriShape.card);
 
     final progressSummary = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,7 +47,7 @@ class ContinueReadingCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: bookProgress.fraction,
               minHeight: 3,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(ShioriShape.indicator),
               color: colors.primary.withValues(alpha: .75),
               backgroundColor: colors.primary.withValues(alpha: .10),
               stopIndicatorRadius: 0,

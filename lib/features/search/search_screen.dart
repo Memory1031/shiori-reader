@@ -93,7 +93,9 @@ class _SearchBody extends StatelessWidget {
                               color: Theme.of(
                                 context,
                               ).colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(
+                                ShioriShape.tag,
+                              ),
                             ),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -252,15 +254,15 @@ class _SearchInputState extends State<_SearchInput> {
         filled: true,
         fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(ShioriShape.control),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(ShioriShape.control),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(ShioriShape.control),
           borderSide: BorderSide(
             color: Theme.of(context).colorScheme.primary,
             width: 1,
@@ -277,7 +279,7 @@ class _SearchInputState extends State<_SearchInput> {
               foregroundColor: Theme.of(context).colorScheme.primary,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(ShioriShape.control),
               ),
             ),
             child: Text(AppLocalizations.of(context).searchTitle),
@@ -309,7 +311,7 @@ class _ResultRow extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
       child: Material(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(ShioriShape.card),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
@@ -333,7 +335,6 @@ class _ResultRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w600,
-                          fontSize: 15,
                         ),
                       ),
                       if (book.authors.isNotEmpty) ...[
