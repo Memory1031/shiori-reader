@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/widgets/shiori_sheet.dart';
 import '../../app/theme/shiori_theme.dart';
 
 import '../../domain/models/models.dart';
@@ -6,7 +7,6 @@ import '../../l10n/generated/app_localizations.dart';
 import 'reader_preferences.dart';
 import 'reader_theme.dart';
 import 'reader_margin.dart';
-import 'reader_sheet.dart';
 
 /// Opens the typography panel as a sheet that leaves the page in view, and
 /// flushes the edits when it closes.
@@ -14,23 +14,15 @@ Future<void> showReaderSettings(
   BuildContext context,
   ReaderPreferences preferences,
 ) async {
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
+  await showShioriSheet<void>(
+    context,
+    size: ShioriSheetSize.half,
     // The panel owns the handle so it follows live reading-theme changes.
-    showDragHandle: false,
-    backgroundColor: Colors.transparent,
-    useSafeArea: true,
-    sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
-        ? AnimationStyle.noAnimation
-        : null,
-    builder: (sheet) => FractionallySizedBox(
-      heightFactor: ReaderSheetSize.half.heightFactor,
-      child: ReaderSettingsPanel(
-        preferences: preferences,
-        onDone: () => Navigator.of(sheet).pop(),
-        sheet: true,
-      ),
+    owned: true,
+    builder: (sheet) => ReaderSettingsPanel(
+      preferences: preferences,
+      onDone: () => Navigator.of(sheet).pop(),
+      sheet: true,
     ),
   );
   await preferences.flush();

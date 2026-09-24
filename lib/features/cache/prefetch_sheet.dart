@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/widgets/shiori_sheet.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -9,16 +10,11 @@ Future<void> showPrefetchSheet(
   required CacheManagement cache,
   required Catalog? catalog,
   required ChapterKey current,
-}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  showDragHandle: true,
-  builder: (context) => SafeArea(
-    child: SizedBox(
-      height: MediaQuery.sizeOf(context).height * .75,
-      child: _PrefetchPanel(cache: cache, catalog: catalog, current: current),
-    ),
-  ),
+}) => showShioriSheet<void>(
+  context,
+  size: ShioriSheetSize.tall,
+  builder: (context) =>
+      _PrefetchPanel(cache: cache, catalog: catalog, current: current),
 );
 
 class _PrefetchPanel extends StatefulWidget {

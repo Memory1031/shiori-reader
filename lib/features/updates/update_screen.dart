@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../shared/widgets/shiori_sheet.dart';
 import '../../app/theme/shiori_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -39,11 +40,10 @@ class UpdateScreen extends StatelessWidget {
 
   Future<void> _chooseChannel(BuildContext context) async {
     final l = AppLocalizations.of(context);
-    final value = await showModalBottomSheet<UpdateChannel>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
+    final value = await showShioriSheet<UpdateChannel>(
+      context,
       builder: (context) => SafeArea(
+        top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
           child: Column(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/widgets/shiori_sheet.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -53,10 +54,10 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   Future<void> _actions(NovelSummary book) async {
     final l = AppLocalizations.of(context);
-    await showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
+    await showShioriSheet<void>(
+      context,
       builder: (sheet) => SafeArea(
+        top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
           child: Column(
