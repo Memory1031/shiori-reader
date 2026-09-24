@@ -117,6 +117,8 @@ class ReaderContentView extends StatefulWidget {
     this.onContentLink,
     this.viewportController,
     this.returnToOrigin = false,
+    this.chrome,
+    this.onLeave,
   });
   final ImageRepository? images;
   final ChapterContent content;
@@ -145,6 +147,14 @@ class ReaderContentView extends StatefulWidget {
   final ValueChanged<LocalContentLink>? onContentLink;
   final PagedReaderController? viewportController;
   final bool returnToOrigin;
+
+  /// Toolbar visibility, owned by the caller when it must outlive this view
+  /// (e.g. so the screen can close the toolbars on back).
+  final ValueNotifier<bool>? chrome;
+
+  /// Toolbar back / return button. An explicit tap always leaves, unlike
+  /// system back, which may first close the toolbars. Defaults to maybePop.
+  final VoidCallback? onLeave;
   @override
   State<ReaderContentView> createState() => _ReaderContentViewState();
 }
@@ -252,7 +262,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   late final _paged = widget.viewportController ?? PagedReaderController();
-  final _chrome = ValueNotifier(true);
+  late final _chrome = widget.chrome ?? ValueNotifier(true);
   final _readingPosition = ValueNotifier<ReaderPosition?>(null);
   ReaderPosition? _latestReadingPosition;
   bool _lastPageVisible = false;
@@ -311,6 +321,14 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   void _toggle() => _chrome.value = !_chrome.value;
+
+  void _leave(BuildContext context) {
+    if (widget.onLeave case final leave?) {
+      leave();
+    } else {
+      Navigator.of(context).maybePop();
+    }
+  }
 
   void _turnPage(bool forward, {bool queueIfTurning = true}) {
     if (_completionTurning || ModalRoute.of(context)?.isCurrent == false) {
@@ -384,7 +402,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _preferences.removeListener(_changed);
     _preferences.dispose();
     _paperTurn.dispose();
-    _chrome.dispose();
+    if (widget.chrome == null) _chrome.dispose();
     _positionLabelTimer?.cancel();
     _readingPosition.dispose();
     super.dispose();
@@ -917,11 +935,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
               children: [
                 if (widget.returnToOrigin)
                   TextButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    onPressed: () => _leave(context),
                     child: Text(l.readerLinkReturn),
                   )
                 else
-                  const BackButton(),
+                  BackButton(onPressed: () => _leave(context)),
                 Expanded(
                   child: Tooltip(
                     message: _effectiveChapterTitle,

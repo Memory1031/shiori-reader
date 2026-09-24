@@ -74,6 +74,27 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   CacheManagement? get _cache => _local ? null : widget.cache;
   bool _changing = false, _canPop = false;
   bool _immersive = false;
+
+  /// Insets frozen when leaving starts, so restoring the system bars during
+  /// the exit transition cannot repaginate (and resample) the page.
+  EdgeInsets? _leavingInsets;
+
+  /// Brings the system bars back as soon as the reader starts to close
+  /// rather than after the route transition has finished.
+  void _restoreSystemUi() {
+    if (!_immersive) return;
+    _immersive = false;
+    ReaderSystemUi.exit();
+  }
+
+  void _beginLeaving() {
+    if (_leavingInsets == null) {
+      final padding = MediaQuery.paddingOf(context);
+      setState(() => _leavingInsets = padding);
+    }
+    _restoreSystemUi();
+  }
+
   BookTerminalState? _completion;
   final _titleRequest = CancellationSource();
   String? _bookTitle;
@@ -299,7 +320,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_immersive && ShioriCapabilities.of(context).immersiveSystemUi) {
+    if (!_immersive &&
+        _leavingInsets == null &&
+        ShioriCapabilities.of(context).immersiveSystemUi) {
       _immersive = true;
       ReaderSystemUi.enter();
     }
@@ -307,7 +330,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   void dispose() {
-    if (_immersive) ReaderSystemUi.exit();
+    _restoreSystemUi();
     _invalidation?.cancel();
     _chapterTurn.dispose();
     _titleRequest.cancel();
@@ -319,6 +342,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _catalog.onDelete();
     _catalog.dispose();
     _navigationTree.dispose();
+    _chrome.dispose();
     super.dispose();
   }
 
@@ -439,6 +463,39 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     );
   }
 
+  /// Toolbar visibility shared with the active page so back can close it.
+  final _chrome = ValueNotifier(false);
+
+  /// Android back first closes the toolbars; the interactive Cupertino swipe
+  /// is always a deliberate exit and must be allowed before it starts.
+  bool _backClosesChrome(BuildContext context) =>
+      !ShioriCapabilities.of(context).cupertinoNavigation;
+
+  /// Leaving directly keeps system back animations (Android predictive back,
+  /// the iOS swipe); it is only held back to close the toolbars or while
+  /// progress is known to be unsaved, where [_exit] saves and warns first.
+  bool _backLeaves(BuildContext context, bool chromeVisible) {
+    if (_canPop || ShioriCapabilities.of(context).cupertinoNavigation) {
+      return true;
+    }
+    if (chromeVisible) return false;
+    return !_changing &&
+        _reader.progressFailure == null &&
+        _reader.progress?.unsaved != true;
+  }
+
+  /// After a direct pop, persist the last samples and surface a failed save
+  /// on the screen underneath instead of losing it silently.
+  Future<void> _flushAfterPop() async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final l = AppLocalizations.of(context);
+    final reader = _reader;
+    await reader.flushProgress();
+    if (reader.progress?.unsaved == true || reader.progressFailure != null) {
+      messenger?.showSnackBar(SnackBar(content: Text(l.readerProgressUnsaved)));
+    }
+  }
+
   Future<void> _exit({bool toShelf = false}) async {
     if (_changing || _canPop) return;
     setState(() => _changing = true);
@@ -451,6 +508,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (saved) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
+          _beginLeaving();
           if (toShelf) {
             Navigator.of(context).popUntil((route) => route.isFirst);
           } else {
@@ -728,6 +786,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       bookContents: _changing || widget.linkDepth > 0 ? null : _bookContents,
       onLinks: _changing || reader.contentLinks.isEmpty ? null : _links,
       returnToOrigin: widget.linkDepth > 0,
+      chrome: _chrome,
+      onLeave: () => unawaited(_exit()),
       onPrefetch: !widget.offline && _cache?.prefetch != null
           ? () => showPrefetchSheet(
               context,
@@ -779,18 +839,23 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       );
     }
 
-    return SourceImageDecodeScope(
-      child: PopScope(
-        // Cupertino's interactive back gesture requires canPop before it starts.
-        // Periodic/lifecycle commits remain the durable boundary on every platform.
-        canPop: _canPop || ShioriCapabilities.of(context).cupertinoNavigation,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) {
-            unawaited(_exit());
-          } else {
-            unawaited(_reader.flushProgress());
-          }
-        },
+    final screen = SourceImageDecodeScope(
+      child: ValueListenableBuilder<bool>(
+        valueListenable: _chrome,
+        builder: (context, chromeVisible, child) => PopScope(
+          canPop: _backLeaves(context, chromeVisible),
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) {
+              _beginLeaving();
+              unawaited(_flushAfterPop());
+            } else if (chromeVisible && _backClosesChrome(context)) {
+              _chrome.value = false;
+            } else {
+              unawaited(_exit());
+            }
+          },
+          child: child!,
+        ),
         child: _reader.status == ReaderStatus.ready
             ? Stack(
                 fit: StackFit.expand,
@@ -839,6 +904,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 ),
               ),
       ),
+    );
+    final frozen = _leavingInsets;
+    if (frozen == null) return screen;
+    final media = MediaQuery.of(context);
+    return MediaQuery(
+      data: media.copyWith(padding: frozen, viewPadding: frozen),
+      child: screen,
     );
   }
 }
