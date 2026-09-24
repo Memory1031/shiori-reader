@@ -30,6 +30,9 @@ class LocalBooksScreen extends StatefulWidget {
 }
 
 class _LocalBooksScreenState extends State<LocalBooksScreen> {
+  // Covers resolved this visit; rows remount while scrolling and would
+  // otherwise decode the whole manifest again for one image reference.
+  final _covers = <NovelKey, MediaRef?>{};
   final _request = CancellationSource();
   late final _books = widget.management.watchBooks();
   CancellationSource? _reparseRequest;
@@ -539,6 +542,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
             children: [
               _LocalCover(
                 book: book,
+                covers: _covers,
                 store: widget.store,
                 images: widget.images,
                 placeholder: ExcludeSemantics(
@@ -739,11 +743,13 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
 class _LocalCover extends StatefulWidget {
   const _LocalCover({
     required this.book,
+    required this.covers,
     required this.store,
     required this.images,
     required this.placeholder,
   });
   final LocalBookInfo book;
+  final Map<NovelKey, MediaRef?> covers;
   final LocalBookStore store;
   final ImageRepository? images;
   final Widget placeholder;
@@ -760,6 +766,7 @@ class _LocalCoverState extends State<_LocalCover> {
   @override
   void initState() {
     super.initState();
+    _cover = widget.covers[widget.book.key];
     _listen();
     _load();
   }
@@ -768,7 +775,9 @@ class _LocalCoverState extends State<_LocalCover> {
     final store = widget.store;
     if (store is LocalBookInvalidation) {
       _changes = (store as LocalBookInvalidation).changes.listen((key) {
-        if (key == widget.book.key) _load();
+        if (key != widget.book.key) return;
+        widget.covers.remove(key);
+        _load();
       });
     }
   }
@@ -792,17 +801,25 @@ class _LocalCoverState extends State<_LocalCover> {
     if (widget.images == null || widget.book.format == LocalBookFormat.txt) {
       return;
     }
+    final key = widget.book.key;
+    if (widget.covers.containsKey(key)) {
+      if (_cover != widget.covers[key]) {
+        setState(() => _cover = widget.covers[key]);
+      }
+      return;
+    }
     final result = await widget.store.read(
       widget.book.key,
       cancellation: request.token,
     );
     if (!mounted || _request != request) return;
-    setState(() {
-      _cover = switch (result) {
-        Success(value: final book?) => book.content.detail.summary.cover,
-        _ => null,
-      };
-    });
+    final cover = switch (result) {
+      Success(value: final book?) => book.content.detail.summary.cover,
+      _ => null,
+    };
+    // Failures stay uncached so the next mount retries.
+    if (result is Success) widget.covers[key] = cover;
+    setState(() => _cover = cover);
   }
 
   @override
