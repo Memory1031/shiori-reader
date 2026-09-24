@@ -711,6 +711,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       }
 
       _lastReadyPage = buildPage(context, _current);
+      // Built once per turn: _target only changes through setState, so the
+      // animation frames reuse it instead of re-measuring every fragment.
+      final targetPage = _target == null ? null : buildPage(context, _target!);
       _seekPreview = null;
       return Semantics(
         key: const ValueKey('paper-reader-pages'),
@@ -767,7 +770,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                           color: Theme.of(context).scaffoldBackgroundColor,
                           child: number == _current
                               ? _lastReadyPage!
-                              : buildPage(context, number)!,
+                              : targetPage!,
                         ),
                       ),
                     ),

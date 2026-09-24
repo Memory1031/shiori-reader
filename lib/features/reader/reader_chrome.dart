@@ -131,14 +131,19 @@ class _ReaderStatusRowState extends State<ReaderStatusRow> {
     super.dispose();
   }
 
+  TextStyle _style(BuildContext context) {
+    final theme = Theme.of(context);
+    return (theme.textTheme.labelSmall ?? const TextStyle()).copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = theme.colorScheme.onSurfaceVariant;
-    final style = theme.textTheme.labelSmall?.copyWith(
-      color: color,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
+    final style = _style(context);
+    final color = style.color!;
     final time = MaterialLocalizations.of(context).formatTimeOfDay(
       TimeOfDay.fromDateTime(_now),
       alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
@@ -149,43 +154,47 @@ class _ReaderStatusRowState extends State<ReaderStatusRow> {
         level != null && level > 0 && _state != BatteryState.unknown;
     final charging =
         _state == BatteryState.charging || _state == BatteryState.full;
+    final size = MediaQuery.textScalerOf(context).scale(style.fontSize ?? 12);
+    // A forced strut gives every label the same line box whatever fallback
+    // font a run uses. CJK fallback (e.g. "下午") otherwise shifts where
+    // digits are drawn relative to the reported baseline, so the glyph is
+    // centred against a Latin-only label box instead of sharing its line.
+    final strut = StrutStyle.fromTextStyle(
+      style,
+      height: 1,
+      forceStrutHeight: true,
+    );
+    Text label(String text) =>
+        Text(text, style: style, strutStyle: strut, maxLines: 1);
     return DefaultTextStyle.merge(
       style: style,
       child: Row(
         children: [
-          Text(time),
+          label(time),
           if (showBattery) ...[
             const SizedBox(width: 10),
-            Semantics(
-              label: '$level%',
-              excludeSemantics: true,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CustomPaint(
-                    size: Size(
-                      (style?.fontSize ?? 12) * 1.7,
-                      (style?.fontSize ?? 12) * .85,
-                    ),
-                    painter: _BatteryGlyph(
-                      level: level / 100,
-                      charging: charging,
-                      color: color,
-                      low: theme.colorScheme.error,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text('$level%'),
-                ],
+            ExcludeSemantics(
+              child: CustomPaint(
+                // Digit height is about 0.72em in common UI faces.
+                size: Size(size * 1.6, size * .72),
+                painter: _BatteryGlyph(
+                  level: level / 100,
+                  charging: charging,
+                  color: color,
+                  low: theme.colorScheme.error,
+                ),
               ),
             ),
+            const SizedBox(width: 4),
+            label('$level%'),
           ],
           const SizedBox(width: 12),
-          // Clock and battery keep their size; progress yields on narrow pages.
+          // Clock and battery keep their size; progress ellipsizes on narrow
+          // pages.
           Expanded(
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: FittedBox(fit: BoxFit.scaleDown, child: widget.progress),
+              child: widget.progress,
             ),
           ),
         ],
