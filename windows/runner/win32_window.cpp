@@ -122,7 +122,8 @@ Win32Window::~Win32Window() {
 
 bool Win32Window::Create(const std::wstring& title,
                          const Point& origin,
-                         const Size& size) {
+                         const Size& size,
+                         bool center) {
   Destroy();
 
   const wchar_t* window_class =
@@ -142,6 +143,23 @@ bool Win32Window::Create(const std::wstring& title,
 
   if (!window) {
     return false;
+  }
+
+  if (center) {
+    MONITORINFO monitor_info{sizeof(monitor_info)};
+    RECT bounds{};
+    if (GetMonitorInfoW(monitor, &monitor_info) &&
+        GetWindowRect(window, &bounds)) {
+      const RECT& work = monitor_info.rcWork;
+      const int width = bounds.right - bounds.left;
+      const int height = bounds.bottom - bounds.top;
+      const int horizontal_space = work.right - work.left - width;
+      const int vertical_space = work.bottom - work.top - height;
+      const int x = work.left + (horizontal_space > 0 ? horizontal_space / 2 : 0);
+      const int y = work.top + (vertical_space > 0 ? vertical_space / 2 : 0);
+      SetWindowPos(window, nullptr, x, y, 0, 0,
+                   SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
   }
 
   UpdateTheme(window);

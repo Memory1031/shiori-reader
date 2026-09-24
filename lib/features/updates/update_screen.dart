@@ -61,6 +61,7 @@ class UpdateScreen extends StatelessWidget {
                         ListTile(
                           contentPadding: EdgeInsets.zero,
                           selected: controller.preferences.channel == channel,
+                          selectedTileColor: Colors.transparent,
                           leading: Icon(
                             controller.preferences.channel == channel
                                 ? Icons.radio_button_checked
@@ -149,7 +150,7 @@ class UpdateScreen extends StatelessWidget {
                   _SectionTitle(l.updateSection),
                   if (!c.enabled)
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
                       child: Text(
                         switch (c.installed.availability) {
                           UpdateAvailability.development => l.updateDevelopment,
@@ -163,7 +164,9 @@ class UpdateScreen extends StatelessWidget {
                     )
                   else ...[
                     SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                      ),
                       title: Text(l.updateAutomatic),
                       subtitle: Text(l.updateAutomaticHint),
                       value: c.preferences.automatic,
@@ -173,7 +176,9 @@ class UpdateScreen extends StatelessWidget {
                     ),
                     ListTile(
                       key: const ValueKey('update-channel'),
-                      contentPadding: EdgeInsets.zero,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                      ),
                       title: Text(l.updateChannel),
                       subtitle: Text(
                         c.preferences.channel == UpdateChannel.stable
@@ -200,60 +205,65 @@ class UpdateScreen extends StatelessWidget {
                           : () => _chooseChannel(context),
                     ),
                     const SizedBox(height: 8),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final checked = Text(
-                          date == null
-                              ? l.updateNeverChecked
-                              : l.updateLastChecked(
-                                  DateFormat.yMd(
-                                    locale,
-                                  ).add_Hm().format(date.toLocal()),
-                                ),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: muted,
-                          ),
-                        );
-                        final actions = Wrap(
-                          alignment: WrapAlignment.end,
-                          children: [
-                            TextButton(
-                              key: const ValueKey('update-check'),
-                              onPressed: c.busy
-                                  ? null
-                                  : () => c.initialized
-                                        ? c.check()
-                                        : c.initialize(),
-                              child: Text(l.updateCheck),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final checked = Text(
+                            date == null
+                                ? l.updateNeverChecked
+                                : l.updateLastChecked(
+                                    DateFormat.yMd(
+                                      locale,
+                                    ).add_Hm().format(date.toLocal()),
+                                  ),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: muted,
                             ),
-                            if (c.busy && !c.installing && !c.preparingInstall)
-                              TextButton(
-                                onPressed: c.cancel,
-                                child: Text(l.updateCancel),
-                              ),
-                          ],
-                        );
-                        if (constraints.maxWidth < 400 &&
-                            MediaQuery.textScalerOf(context).scale(14) > 18) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          );
+                          final actions = Wrap(
+                            alignment: WrapAlignment.end,
                             children: [
-                              checked,
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: actions,
+                              TextButton(
+                                key: const ValueKey('update-check'),
+                                onPressed: c.busy
+                                    ? null
+                                    : () => c.initialized
+                                          ? c.check()
+                                          : c.initialize(),
+                                child: Text(l.updateCheck),
                               ),
+                              if (c.busy &&
+                                  !c.installing &&
+                                  !c.preparingInstall)
+                                TextButton(
+                                  onPressed: c.cancel,
+                                  child: Text(l.updateCancel),
+                                ),
                             ],
                           );
-                        }
-                        return Row(
-                          children: [
-                            Expanded(child: checked),
-                            const SizedBox(width: 8),
-                            actions,
-                          ],
-                        );
-                      },
+                          if (constraints.maxWidth < 400 &&
+                              MediaQuery.textScalerOf(context).scale(14) > 18) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                checked,
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: actions,
+                                ),
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(child: checked),
+                              const SizedBox(width: 8),
+                              actions,
+                            ],
+                          );
+                        },
+                      ),
                     ),
                     if (c.phase == UpdatePhase.checking ||
                         c.phase == UpdatePhase.loading) ...[
@@ -264,7 +274,7 @@ class UpdateScreen extends StatelessWidget {
                     ],
                     if (c.issue case final issue?)
                       Padding(
-                        padding: const EdgeInsets.only(top: 16),
+                        padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
                         child: Text(switch (issue.problem) {
                           UpdateProblem.network => l.updateNetworkError,
                           UpdateProblem.rateLimited => l.updateRateLimited(
@@ -294,7 +304,7 @@ class UpdateScreen extends StatelessWidget {
                       )
                     else if (target == null && date != null && !c.busy)
                       Padding(
-                        padding: const EdgeInsets.only(top: 12),
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                         child: Text(
                           l.updateNoUpdate,
                           style: theme.textTheme.bodySmall?.copyWith(
