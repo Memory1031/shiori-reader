@@ -301,6 +301,28 @@ class _ReaderContentViewState extends State<ReaderContentView>
   ReaderPosition? _position;
   // Horizontal page margin from the last build; the chrome aligns to it.
   double _margin = 0;
+  Color? _reportedPaper;
+
+  // Whether the chapter has flowing prose (spreads apply); scanning every
+  // block is linear, so remember the answer per content instance.
+  (ChapterContent, bool)? _prose;
+  bool _isProse(ChapterContent content) {
+    if (_prose case (
+      final cached,
+      final value,
+    ) when identical(cached, content)) {
+      return value;
+    }
+    final value = content.blocks.whereType<ParagraphBlock>().any(
+      (block) =>
+          block.box == null &&
+          block.alignment == ParagraphAlignment.start &&
+          block.text.replaceAll('FFFC', '').trim().isNotEmpty,
+    );
+    _prose = (content, value);
+    return value;
+  }
+
   EdgeInsets _pageInsets = EdgeInsets.zero;
   final _sizes = <MediaRef, Size>{};
   final _pendingSizes = <MediaRef, Size>{};
@@ -468,7 +490,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
     if (!_settingsReady) {
       return const Scaffold(body: SafeArea(child: LoadingView()));
     }
-    widget.onPageAppearance?.call(Theme.of(context).scaffoldBackgroundColor);
+    final paper = Theme.of(context).scaffoldBackgroundColor;
+    if (paper != _reportedPaper) {
+      _reportedPaper = paper;
+      widget.onPageAppearance?.call(paper);
+    }
     final pageInsets = MediaQuery.paddingOf(context);
     _pageInsets = pageInsets;
     final chrome = ReaderChromeMetrics.of(context);
@@ -489,12 +515,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       Directionality.of(context),
     );
     _margin = margin;
-    final prose = widget.content.blocks.whereType<ParagraphBlock>().any(
-      (block) =>
-          block.box == null &&
-          block.alignment == ParagraphAlignment.start &&
-          block.text.replaceAll('\uFFFC', '').trim().isNotEmpty,
-    );
+    final prose = _isProse(widget.content);
     bool spreadFor(BoxConstraints bounds) =>
         !_usesPresentation &&
         prose &&
@@ -867,6 +888,15 @@ class _ReaderContentViewState extends State<ReaderContentView>
             formatReadingPercent(_visibleChapterFraction),
           ),
           textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          // Same forced line box as the status row labels, so CJK fallback
+          // cannot shift it against them.
+          strutStyle: StrutStyle.fromTextStyle(
+            Theme.of(context).textTheme.labelSmall ?? const TextStyle(),
+            height: 1,
+            forceStrutHeight: true,
+          ),
           style: Theme.of(context).textTheme.labelSmall?.copyWith(color: muted),
         ),
       );

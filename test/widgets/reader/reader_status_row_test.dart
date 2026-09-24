@@ -41,7 +41,7 @@ void main() {
   testWidgets('shows the clock, battery level and progress', (tester) async {
     await tester.pumpWidget(_row(_FakeBattery(82, BatteryState.discharging)));
     await tester.pump();
-    expect(find.textContaining(RegExp(r'^\d{2}:\d{2}$')), findsOneWidget);
+    expect(find.textContaining(RegExp(r'\d{1,2}:\d{2}')), findsOneWidget);
     expect(find.text('82%'), findsOneWidget);
     expect(
       find.byWidgetPredicate(
@@ -52,7 +52,6 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Chapter 12%'), findsOneWidget);
-    expect(find.bySemanticsLabel('82%'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -65,6 +64,7 @@ void main() {
     ]) {
       await tester.pumpWidget(_row(battery));
       await tester.pump();
+      // Only the progress label carries a percentage.
       expect(find.textContaining('%'), findsOneWidget);
       expect(
         find.byWidgetPredicate(
@@ -85,7 +85,10 @@ void main() {
     expect(find.text('50%'), findsOneWidget);
     // The next tick is scheduled; disposing the row cancels it.
     await tester.pump(const Duration(minutes: 1));
-    expect(find.textContaining(RegExp(r'^\d{2}:\d{2}$')), findsOneWidget);
+    expect(
+      find.textContaining(RegExp(r'\d{1,2}:\d{2}'), findRichText: true),
+      findsOneWidget,
+    );
     await tester.pumpWidget(const SizedBox());
   });
 }

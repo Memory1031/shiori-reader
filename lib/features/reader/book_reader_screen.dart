@@ -723,13 +723,36 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     widget.onDetails!(widget.chapter.novelKey);
   }
 
-  Widget _view(ReaderController reader) {
-    final chapters =
-        _catalog.loaded?.value.flatChapters.toList() ?? <Chapter>[];
+  // Rebuilds follow every session notification; derive the reading order
+  // and its index only when the catalog or local order actually changes.
+  (Object?, List<ChapterKey>, Map<ChapterKey, int>)? _order;
+  (List<ChapterKey>, Map<ChapterKey, int>) _readingSequence() {
+    final Object? source = _needsOrder ? _readingOrder : _catalog.loaded?.value;
+    if (_order case (
+      final cached,
+      final order,
+      final index,
+    ) when identical(cached, source)) {
+      return (order, index);
+    }
     final order = _needsOrder
         ? _readingOrder ?? <ChapterKey>[]
-        : chapters.map((c) => c.key).toList();
-    final index = order.indexOf(reader.chapter);
+        : [
+            for (final c in _catalog.loaded?.value.flatChapters ?? <Chapter>[])
+              c.key,
+          ];
+    // First occurrence wins, matching the previous indexOf lookup.
+    final index = <ChapterKey, int>{};
+    for (final (i, key) in order.indexed) {
+      index.putIfAbsent(key, () => i);
+    }
+    _order = (source, order, index);
+    return (order, index);
+  }
+
+  Widget _view(ReaderController reader) {
+    final (order, positions) = _readingSequence();
+    final index = positions[reader.chapter] ?? -1;
     final previous = index > 0 && widget.linkDepth == 0
         ? order[index - 1]
         : null;
