@@ -160,10 +160,18 @@ class _ReadingHomeState extends State<ReadingHome> {
     ),
     cache: widget.cache == null
         ? null
-        : (context) => CacheScreen(
-            cache: widget.cache!,
-            onRead: (key) =>
-                _routes.open(context, OfflineReaderDestination(key)),
+        : (context) => LibraryObserver(
+            controller: _library,
+            builder: (context, library) => CacheScreen(
+              cache: widget.cache!,
+              images: widget.images,
+              summaryOf: (key) => library.books
+                  .where((entry) => entry.snapshot.key == key)
+                  .firstOrNull
+                  ?.snapshot,
+              onRead: (key) =>
+                  _routes.open(context, OfflineReaderDestination(key)),
+            ),
           ),
     localBooks: widget.localBooks == null || widget.localManagement == null
         ? null

@@ -4,11 +4,24 @@ import 'dart:async';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/state_views.dart';
 
 class CacheScreen extends StatefulWidget {
-  const CacheScreen({super.key, required this.cache, this.onRead, this.novel});
+  const CacheScreen({
+    super.key,
+    required this.cache,
+    this.onRead,
+    this.novel,
+    this.summaryOf,
+    this.images,
+  });
   final CacheManagement cache;
+
+  /// Shelf snapshot of a cached book, for its cover; books without one get
+  /// a placeholder.
+  final NovelSummary? Function(NovelKey key)? summaryOf;
+  final ImageRepository? images;
   final ValueChanged<ChapterKey>? onRead;
   final NovelKey? novel;
   @override
@@ -130,90 +143,49 @@ class _CacheScreenState extends State<CacheScreen> {
                   constraints: const BoxConstraints(
                     maxWidth: ShioriLayout.list,
                   ),
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-                    itemCount: entries.length + 2,
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (_failure != null)
-                              FailureView(
-                                failure: _failure!,
-                                onRetry: _load,
-                                retryAvailable: !_busy,
-                              ),
-                            _usage(context, groups.length),
-                            const SizedBox(height: 28),
-                            Text(
-                              l.cacheBooks,
-                              style: theme.textTheme.titleSmall,
-                            ),
-                            const SizedBox(height: ShioriSpace.small),
-                            if (groups.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 32,
-                                ),
-                                child: Text(
-                                  l.cacheEmpty,
-                                  style: theme.textTheme.bodyMedium,
-                                ),
-                              ),
-                          ],
-                        );
-                      }
-                      if (index == entries.length + 1) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l.cacheOfflineHint,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              if (groups.isNotEmpty ||
-                                  (_overview?.textBytes ?? 0) +
-                                          (_overview?.imageBytes ?? 0) >
-                                      0) ...[
-                                const SizedBox(height: ShioriSpace.medium),
-                                TextButton(
-                                  key: const ValueKey('cache-clear-all'),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: theme.colorScheme.error,
-                                  ),
-                                  onPressed: _busy
-                                      ? null
-                                      : () => _clear(widget.novel),
-                                  child: Text(
-                                    widget.novel == null
-                                        ? l.cacheClearAll
-                                        : l.cacheClearBook,
-                                  ),
-                                ),
-                              ],
-                            ],
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(
+                      ShioriSpace.page,
+                      ShioriSpace.small,
+                      ShioriSpace.page,
+                      ShioriSpace.section,
+                    ),
+                    children: [
+                      if (_failure != null)
+                        FailureView(
+                          failure: _failure!,
+                          onRetry: _load,
+                          retryAvailable: !_busy,
+                        ),
+                      _storage(context, groups.length),
+                      const SizedBox(height: ShioriSpace.section),
+                      Text(l.cacheBooks, style: theme.textTheme.titleSmall),
+                      const SizedBox(height: ShioriSpace.tight),
+                      Text(
+                        l.cacheOfflineHint,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: ShioriSpace.medium),
+                      if (groups.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: ShioriSpace.section,
                           ),
-                        );
-                      }
-                      final group = entries[index - 1];
-                      return Column(
-                        children: [
-                          _book(context, group.key, group.value),
-                          if (index < entries.length)
-                            Divider(
-                              height: 1,
-                              indent: 44,
-                              color: theme.colorScheme.outlineVariant
-                                  .withValues(alpha: .45),
-                            ),
-                        ],
-                      );
-                    },
+                          child: EmptyView(message: l.cacheEmpty),
+                        ),
+                      for (final group in entries)
+                        // Keyed so an inserted error banner cannot hand a
+                        // book's expansion state to its neighbour.
+                        Padding(
+                          key: ValueKey(('cache-book', group.key)),
+                          padding: const EdgeInsets.only(
+                            bottom: ShioriSpace.medium,
+                          ),
+                          child: _book(context, group.key, group.value),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -221,61 +193,151 @@ class _CacheScreenState extends State<CacheScreen> {
     );
   }
 
-  Widget _usage(BuildContext context, int books) {
+  /// Total cached size, a two-part bar for text versus images, counts and
+  /// the clear-all control.
+  Widget _storage(BuildContext context, int books) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final textBytes = _overview?.textBytes ?? 0;
     final imageBytes = _overview?.imageBytes ?? 0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: ShioriSpace.medium),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l.cacheStored,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+    final total = textBytes + imageBytes;
+    String mib(int bytes) => (bytes / 1048576).toStringAsFixed(1);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: colors.onSurfaceVariant,
+    );
+    final textColor = colors.primary;
+    final imageColor = colors.primary.withValues(alpha: .4);
+    Widget legend(Color color, String label) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: ShioriSpace.tight),
+        Flexible(child: Text(label, style: muted)),
+      ],
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(ShioriShape.card),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(ShioriSpace.item),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l.cacheStored,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
             ),
-          ),
-          const SizedBox(height: ShioriSpace.small),
-          Text.rich(
-            TextSpan(
+            const SizedBox(height: ShioriSpace.tight),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: mib(total),
+                    style: theme.textTheme.headlineSmall,
+                  ),
+                  TextSpan(
+                    text: ' MiB',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: ShioriSpace.medium),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(ShioriShape.tag),
+              child: SizedBox(
+                height: 8,
+                child: total == 0
+                    ? ColoredBox(color: colors.outlineVariant)
+                    : Row(
+                        // Childless segments take the bar's height only
+                        // when stretched.
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (textBytes > 0)
+                            Expanded(
+                              flex: textBytes,
+                              child: ColoredBox(color: textColor),
+                            ),
+                          if (textBytes > 0 && imageBytes > 0)
+                            const SizedBox(width: 2),
+                          if (imageBytes > 0)
+                            Expanded(
+                              flex: imageBytes,
+                              child: ColoredBox(color: imageColor),
+                            ),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: ShioriSpace.small),
+            Semantics(
+              label: l.cacheUsage(mib(textBytes), mib(imageBytes)),
+              excludeSemantics: true,
+              child: Wrap(
+                spacing: ShioriSpace.item,
+                runSpacing: ShioriSpace.tight,
+                children: [
+                  legend(
+                    textColor,
+                    l
+                        .cacheUsage(mib(textBytes), mib(imageBytes))
+                        .split(' · ')
+                        .first,
+                  ),
+                  legend(
+                    imageColor,
+                    l
+                        .cacheUsage(mib(textBytes), mib(imageBytes))
+                        .split(' · ')
+                        .last,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: ShioriSpace.medium),
+            // Counts and the destructive action wrap onto two lines when
+            // narrow or at large text sizes.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: ShioriSpace.small,
               children: [
-                TextSpan(
-                  text: ((textBytes + imageBytes) / 1048576).toStringAsFixed(1),
-                  style: theme.textTheme.displaySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                Text(
+                  l.cacheCounts(books, _overview?.chapters.length ?? 0),
+                  style: theme.textTheme.bodyMedium,
                 ),
-                TextSpan(
-                  text: ' MiB',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                if (books > 0 || total > 0)
+                  TextButton.icon(
+                    key: const ValueKey('cache-clear-all'),
+                    style: TextButton.styleFrom(foregroundColor: colors.error),
+                    onPressed: _busy ? null : () => _clear(widget.novel),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: Text(
+                      widget.novel == null ? l.cacheClearAll : l.cacheClearBook,
+                    ),
                   ),
-                ),
               ],
             ),
-          ),
-          const SizedBox(height: ShioriSpace.medium),
-          Text(
-            l.cacheUsage(
-              (textBytes / 1048576).toStringAsFixed(1),
-              (imageBytes / 1048576).toStringAsFixed(1),
-            ),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: ShioriSpace.page),
-          Text(
-            l.cacheCounts(books, _overview?.chapters.length ?? 0),
-            style: theme.textTheme.bodyMedium,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
+  /// One cached book: cover, title, chapter and image completeness, and
+  /// its chapters to read offline once expanded.
   Widget _book(
     BuildContext context,
     NovelKey key,
@@ -283,88 +345,159 @@ class _CacheScreenState extends State<CacheScreen> {
   ) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final saved = chapters.fold(0, (sum, chapter) => sum + chapter.savedImages);
     final total = chapters.fold(0, (sum, chapter) => sum + chapter.imageCount);
+    final summary = widget.summaryOf?.call(key);
+    final titleText = _overview?.books[key] ?? summary?.title;
     final title = Text(
-      _overview?.books[key] ?? chapters.first.title,
+      titleText ?? chapters.first.title,
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
       style: theme.textTheme.titleSmall,
     );
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: colors.onSurfaceVariant,
+    );
     final subtitle = Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Text(
-        chapters.isEmpty
-            ? l.cacheNoChapters
-            : total == 0
-            ? l.cacheBookNoImages(chapters.length)
-            : l.cacheBookImages(chapters.length, saved, total),
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
+      padding: const EdgeInsets.only(top: ShioriSpace.tight),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            chapters.isEmpty
+                ? l.cacheNoChapters
+                : total == 0
+                ? l.cacheBookNoImages(chapters.length)
+                : l.cacheBookImages(chapters.length, saved, total),
+            style: muted,
+          ),
+          if (total > 0) ...[
+            const SizedBox(height: ShioriSpace.small),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(ShioriShape.indicator),
+              child: LinearProgressIndicator(
+                value: saved / total,
+                minHeight: 3,
+                backgroundColor: colors.outlineVariant.withValues(alpha: .5),
+              ),
+            ),
+          ],
+        ],
       ),
+    );
+    final cover = SizedBox(
+      width: 44,
+      height: 44 / ShioriShape.coverRatio,
+      child: summary == null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(ShioriShape.cover),
+              child: const CoverPlaceholder(),
+            )
+          : BookCover(book: summary, images: widget.images),
     );
     final menu = PopupMenuButton<String>(
       key: ValueKey(('cache-book-actions', key)),
       enabled: !_busy,
       tooltip: l.moreActions,
-      icon: const Icon(Icons.more_vert, size: 20),
+      icon: const Icon(Icons.more_horiz, size: 20),
       onSelected: (_) => _clear(key),
       itemBuilder: (_) => [
         PopupMenuItem(value: 'clear', child: Text(l.cacheClearBook)),
       ],
     );
+    final card = BoxDecoration(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(ShioriShape.card),
+      border: Border.all(color: colors.outlineVariant.withValues(alpha: .6)),
+    );
+    const tilePadding = EdgeInsets.fromLTRB(
+      ShioriSpace.medium,
+      ShioriSpace.small,
+      ShioriSpace.tight,
+      ShioriSpace.small,
+    );
     if (chapters.isEmpty) {
-      return ListTile(
+      return DecoratedBox(
         key: ValueKey(key),
-        contentPadding: const EdgeInsets.fromLTRB(44, 8, 0, 8),
-        title: title,
-        subtitle: subtitle,
-        trailing: menu,
+        decoration: card,
+        child: ListTile(
+          contentPadding: tilePadding,
+          leading: cover,
+          title: title,
+          subtitle: subtitle,
+          trailing: menu,
+        ),
       );
     }
-    return ExpansionTile(
-      key: PageStorageKey(key),
-      controlAffinity: ListTileControlAffinity.leading,
-      tilePadding: const EdgeInsets.fromLTRB(4, 8, 0, 8),
-      childrenPadding: const EdgeInsets.only(left: 44, bottom: 12),
-      shape: const Border(),
-      collapsedShape: const Border(),
-      textColor: theme.colorScheme.onSurface,
-      iconColor: theme.colorScheme.onSurfaceVariant,
-      title: title,
-      subtitle: subtitle,
-      trailing: menu,
-      children: [
-        for (final chapter in chapters)
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 2,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(ShioriShape.control),
-            ),
-            title: Text(
-              chapter.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium,
-            ),
-            subtitle: Text(
-              l.cacheChapterStatus(chapter.savedImages, chapter.imageCount),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            trailing: widget.onRead == null
-                ? null
-                : const Icon(Icons.chevron_right, size: 18),
-            onTap: _busy || widget.onRead == null
-                ? null
-                : () => widget.onRead!(chapter.key),
+    return DecoratedBox(
+      decoration: card,
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: BorderRadius.circular(ShioriShape.card),
+        clipBehavior: Clip.antiAlias,
+        child: ExpansionTile(
+          key: PageStorageKey(key),
+          tilePadding: tilePadding,
+          childrenPadding: const EdgeInsets.fromLTRB(
+            ShioriSpace.small,
+            0,
+            ShioriSpace.small,
+            ShioriSpace.small,
           ),
-      ],
+          shape: const Border(),
+          collapsedShape: const Border(),
+          textColor: colors.onSurface,
+          iconColor: colors.onSurfaceVariant,
+          leading: cover,
+          title: title,
+          subtitle: subtitle,
+          trailing: menu,
+          children: [
+            const Divider(height: 1),
+            for (final chapter in chapters)
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: ShioriSpace.small,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(ShioriShape.control),
+                ),
+                leading: Icon(
+                  chapter.savedImages < chapter.imageCount
+                      ? Icons.image_not_supported_outlined
+                      : Icons.offline_pin_outlined,
+                  size: 20,
+                  color: chapter.savedImages < chapter.imageCount
+                      ? colors.onSurfaceVariant
+                      : colors.primary,
+                ),
+                minLeadingWidth: 20,
+                title: Text(
+                  chapter.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium,
+                ),
+                subtitle: chapter.imageCount == 0
+                    ? null
+                    : Text(
+                        l.cacheChapterStatus(
+                          chapter.savedImages,
+                          chapter.imageCount,
+                        ),
+                        style: muted,
+                      ),
+                trailing: widget.onRead == null
+                    ? null
+                    : const Icon(Icons.chevron_right, size: 18),
+                onTap: _busy || widget.onRead == null
+                    ? null
+                    : () => widget.onRead!(chapter.key),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

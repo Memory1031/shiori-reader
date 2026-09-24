@@ -149,9 +149,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('3.0 MiB', findRichText: true), findsOneWidget);
       expect(find.text('2 books · 1 chapter'), findsOneWidget);
+      // The storage card fills a narrow, large-text screen; scroll to books.
+      await tester.scrollUntilVisible(
+        find.text('1 chapter · No illustrations'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('1 chapter · No illustrations'), findsOneWidget);
       expect(find.text('Text only chapter'), findsNothing);
-      await tester.ensureVisible(find.text('Metadata'));
+      await tester.scrollUntilVisible(
+        find.text('Metadata'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.pumpAndSettle();
       expect(find.textContaining('Metadata only'), findsOneWidget);
       expect(
@@ -242,4 +252,38 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('storage bar splits text and images by size', (tester) async {
+    final cache = Cache();
+    cache.data = CacheOverview(
+      textBytes: 1048576,
+      imageBytes: 3145728,
+      chapters: const [],
+    );
+    await tester.pumpWidget(
+      ShioriApp(
+        locale: const Locale('en'),
+        routes: AppRoutes(home: (_) => CacheScreen(cache: cache)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final segments = tester
+        .widgetList<Expanded>(
+          find.descendant(
+            of: find.byType(ClipRRect).first,
+            matching: find.byType(Expanded),
+          ),
+        )
+        .toList();
+    expect(segments.map((e) => e.flex), [1048576, 3145728]);
+    for (final segment
+        in find
+            .descendant(
+              of: find.byType(ClipRRect).first,
+              matching: find.byType(ColoredBox),
+            )
+            .evaluate()) {
+      expect(tester.getSize(find.byWidget(segment.widget)).height, 8);
+    }
+  });
 }
