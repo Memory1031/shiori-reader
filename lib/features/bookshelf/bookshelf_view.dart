@@ -5,6 +5,7 @@ import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
+import '../../shared/widgets/book_list_tile.dart';
 import '../../shared/widgets/state_views.dart';
 import 'library_controller.dart';
 import '../reader/book_progress_label.dart';
@@ -240,73 +241,19 @@ class _BookshelfViewState extends State<BookshelfView> {
                                   ),
                                 ),
                               ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  SizedBox(width: 64, height: 96, child: cover),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        minHeight: 96,
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                book.title,
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: theme
-                                                    .textTheme
-                                                    .titleSmall
-                                                    ?.copyWith(height: 1.4),
-                                              ),
-                                              if (book.authors.isNotEmpty) ...[
-                                                const SizedBox(height: 5),
-                                                Text(
-                                                  book.authors.join(', '),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style:
-                                                      theme.textTheme.bodySmall,
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                          if (metadata.isNotEmpty)
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 8,
-                                              ),
-                                              child: Text(
-                                                metadata,
-                                                style:
-                                                    theme.textTheme.bodySmall,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    key: ValueKey(('shelf-more', book.key)),
-                                    tooltip: strings.moreActions,
-                                    onPressed: () => _actions(book),
-                                    icon: const Icon(
-                                      Icons.more_horiz,
-                                      size: 20,
-                                    ),
-                                  ),
-                                ],
+                              child: BookListTile(
+                                cover: cover,
+                                title: book.title,
+                                subtitle: book.authors.isEmpty
+                                    ? null
+                                    : book.authors.join(', '),
+                                metadata: metadata,
+                                trailing: IconButton(
+                                  key: ValueKey(('shelf-more', book.key)),
+                                  tooltip: strings.moreActions,
+                                  onPressed: () => _actions(book),
+                                  icon: const Icon(Icons.more_horiz, size: 20),
+                                ),
                               ),
                             ),
                           ),

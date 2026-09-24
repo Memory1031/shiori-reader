@@ -8,6 +8,7 @@ import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
+import '../../shared/widgets/book_list_tile.dart';
 import '../../shared/widgets/state_views.dart';
 
 class LocalBooksScreen extends StatefulWidget {
@@ -524,8 +525,6 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
 
   Widget _bookTile(BuildContext context, LocalBookInfo book) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
     final epub = book.format == LocalBookFormat.epub;
     final radius = BorderRadius.circular(ShioriShape.card);
     return Material(
@@ -541,63 +540,23 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
             horizontal: ShioriSpace.medium,
             vertical: ShioriSpace.item,
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _LocalCover(
-                book: book,
-                covers: _covers,
-                store: widget.store,
-                images: widget.images,
-                placeholder: CoverPlaceholder(
-                  icon: epub
-                      ? Icons.auto_stories_outlined
-                      : Icons.description_outlined,
-                  tinted: epub,
-                ),
+          child: BookListTile(
+            cover: _LocalCover(
+              book: book,
+              covers: _covers,
+              store: widget.store,
+              images: widget.images,
+              placeholder: CoverPlaceholder(
+                icon: epub
+                    ? Icons.auto_stories_outlined
+                    : Icons.description_outlined,
+                tinted: epub,
               ),
-              const SizedBox(width: ShioriSpace.item),
-              Expanded(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 96),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                book.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                          _bookMenu(context, book),
-                        ],
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16, bottom: 4),
-                        child: Text(
-                          '${book.format.name} · ${l.localBooksImportedOn(MaterialLocalizations.of(context).formatShortDate(book.importedAt.toLocal()))}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+            ),
+            title: book.title,
+            metadata:
+                '${book.format.name} · ${l.localBooksImportedOn(MaterialLocalizations.of(context).formatShortDate(book.importedAt.toLocal()))}',
+            trailing: _bookMenu(context, book),
           ),
         ),
       ),
@@ -813,9 +772,7 @@ class _LocalCoverState extends State<_LocalCover> {
   }
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 64,
-    height: 96,
+  Widget build(BuildContext context) => SizedBox.expand(
     child: ClipRRect(
       borderRadius: BorderRadius.circular(ShioriShape.cover),
       child: _cover == null || widget.images == null
