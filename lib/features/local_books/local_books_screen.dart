@@ -7,6 +7,7 @@ import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/state_views.dart';
 
 class LocalBooksScreen extends StatefulWidget {
@@ -545,32 +546,11 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                 covers: _covers,
                 store: widget.store,
                 images: widget.images,
-                placeholder: ExcludeSemantics(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: epub
-                          ? Color.alphaBlend(
-                              colors.primary.withValues(alpha: .10),
-                              colors.surface,
-                            )
-                          : colors.surfaceContainerHighest,
-                      border: Border(
-                        left: BorderSide(
-                          width: 4,
-                          color: colors.primary.withValues(alpha: .3),
-                        ),
-                      ),
-                    ),
-                    child: Center(
-                      child: Icon(
-                        epub
-                            ? Icons.auto_stories_outlined
-                            : Icons.description_outlined,
-                        size: 28,
-                        color: colors.primary,
-                      ),
-                    ),
-                  ),
+                placeholder: CoverPlaceholder(
+                  icon: epub
+                      ? Icons.auto_stories_outlined
+                      : Icons.description_outlined,
+                  tinted: epub,
                 ),
               ),
               const SizedBox(width: 16),

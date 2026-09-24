@@ -15,35 +15,50 @@ class BookCover extends StatelessWidget {
   Widget build(BuildContext context) => ClipRRect(
     borderRadius: BorderRadius.circular(ShioriShape.cover),
     child: AspectRatio(
-      aspectRatio: 2 / 3,
+      aspectRatio: ShioriShape.coverRatio,
       child: book.cover != null && images != null
           ? SourceImage(
               media: book.cover!,
               repository: images!,
               semanticLabel: AppLocalizations.of(context).detailCover,
             )
-          : ExcludeSemantics(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  border: Border(
-                    left: BorderSide(
-                      width: 5,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: .25),
-                    ),
-                  ),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.bookmark_outline,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 28,
-                  ),
-                ),
-              ),
-            ),
+          : const CoverPlaceholder(),
     ),
   );
+}
+
+/// Spine-marked stand-in for a missing cover. [tinted] lifts the fill toward
+/// the accent, e.g. to tell EPUB from TXT at a glance.
+class CoverPlaceholder extends StatelessWidget {
+  const CoverPlaceholder({
+    super.key,
+    this.icon = Icons.bookmark_outline,
+    this.tinted = false,
+  });
+  final IconData icon;
+  final bool tinted;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return ExcludeSemantics(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: tinted
+              ? Color.alphaBlend(
+                  colors.primary.withValues(alpha: .10),
+                  colors.surface,
+                )
+              : colors.surfaceContainerHighest,
+          border: Border(
+            left: BorderSide(
+              width: 5,
+              color: colors.primary.withValues(alpha: .25),
+            ),
+          ),
+        ),
+        child: Center(child: Icon(icon, color: colors.primary, size: 28)),
+      ),
+    );
+  }
 }
