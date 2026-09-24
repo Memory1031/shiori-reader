@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show ValueListenable, listEquals;
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/models.dart';
@@ -9,6 +9,7 @@ import 'block_style.dart';
 import 'reader_box.dart';
 import 'paper_turn.dart';
 import '../reader_linked_text.dart';
+import '../reader_tap_zones.dart';
 import '../reader_margin.dart';
 import '../../../domain/contracts/contracts.dart';
 
@@ -44,6 +45,7 @@ class PagedReaderViewport extends StatefulWidget {
     this.onPosition,
     this.onRestoreStart,
     this.onCenterTap,
+    this.chromeVisible,
     this.onBoundary,
     this.onTurning,
     this.onTurnVisual,
@@ -72,6 +74,9 @@ class PagedReaderViewport extends StatefulWidget {
   final double Function(ImageBlock)? imageExtent;
   final Widget Function(BuildContext, ImageBlock)? imageBuilder;
   final VoidCallback? onCenterTap;
+
+  /// While true, taps dismiss the reader chrome instead of turning pages.
+  final ValueListenable<bool>? chromeVisible;
   final ValueChanged<int>? onBoundary;
   final ValueChanged<bool>? onTurning;
   final void Function(double progress, int direction)? onTurnVisual;
@@ -725,13 +730,18 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
             if (_target != null && !_turnAnimation.isAnimating) _finish(false);
           },
           onTapUp: (details) {
-            if (details.localPosition.dx < constraints.maxWidth * .3) {
-              _turn(-1, queueIfTurning: true);
-            } else if (details.localPosition.dx > constraints.maxWidth * .7) {
-              _turn(1, queueIfTurning: true);
-            } else {
-              _queuedDirection = null;
-              widget.onCenterTap?.call();
+            switch (readerTapZone(
+              details.localPosition.dx,
+              constraints.maxWidth,
+              chromeVisible: widget.chromeVisible?.value ?? false,
+            )) {
+              case ReaderTap.previous:
+                _turn(-1, queueIfTurning: true);
+              case ReaderTap.next:
+                _turn(1, queueIfTurning: true);
+              case ReaderTap.center:
+                _queuedDirection = null;
+                widget.onCenterTap?.call();
             }
           },
           child: AnimatedBuilder(

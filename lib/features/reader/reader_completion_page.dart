@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'reader_tap_zones.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -46,7 +47,9 @@ class ReaderCompletionPage extends StatelessWidget {
           if (drag >= 48 || (details.primaryVelocity ?? 0) > 300) onPrevious();
         },
         onTapUp: (details) {
-          if (details.localPosition.dx < MediaQuery.sizeOf(context).width / 3) {
+          final width = (context.findRenderObject()! as RenderBox).size.width;
+          if (readerTapZone(details.localPosition.dx, width) ==
+              ReaderTap.previous) {
             onPrevious();
           }
         },

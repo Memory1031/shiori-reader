@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import 'epub_webview_host.dart';
+import 'reader_tap_zones.dart';
 import 'svg_paper_art.dart';
 import '../../shared/capabilities.dart';
 import '../../domain/contracts/local_content_links.dart';
@@ -16,6 +17,7 @@ class EpubLayoutPage extends StatefulWidget {
     super.key,
     required this.html,
     required this.onCenterTap,
+    this.chromeVisible,
     this.onPrevious,
     this.onNext,
     required this.onReady,
@@ -27,6 +29,9 @@ class EpubLayoutPage extends StatefulWidget {
   final ValueChanged<LocalContentLink>? onLink;
   final String html;
   final VoidCallback onCenterTap, onReady;
+
+  /// While true, taps dismiss the reader chrome instead of turning pages.
+  final ValueListenable<bool>? chromeVisible;
   final VoidCallback? onPrevious, onNext, onFailed;
   @override
   State<EpubLayoutPage> createState() => _EpubLayoutPageState();
@@ -194,12 +199,17 @@ $interactionStyle
               widget.onLink?.call(link);
               return;
             }
-            if (down.dx < bounds.maxWidth * .25) {
-              widget.onPrevious?.call();
-            } else if (down.dx > bounds.maxWidth * .75) {
-              widget.onNext?.call();
-            } else {
-              widget.onCenterTap();
+            switch (readerTapZone(
+              down.dx,
+              bounds.maxWidth,
+              chromeVisible: widget.chromeVisible?.value ?? false,
+            )) {
+              case ReaderTap.previous:
+                widget.onPrevious?.call();
+              case ReaderTap.next:
+                widget.onNext?.call();
+              case ReaderTap.center:
+                widget.onCenterTap();
             }
           }
         },

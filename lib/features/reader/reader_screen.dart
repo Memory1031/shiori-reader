@@ -627,6 +627,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                               }
                                             },
                                             onCenterTap: _toggle,
+                                            chromeVisible: _chrome,
                                             onPrevious:
                                                 widget.onPreviousChapter,
                                             onNext: _presentationNext,
@@ -706,6 +707,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                           paragraphSpacing:
                                               _settings.paragraphSpacing,
                                           onCenterTap: _toggle,
+                                          chromeVisible: _chrome,
                                           onBoundary: (direction) {
                                             if (direction > 0) {
                                               _forwardBoundary();
