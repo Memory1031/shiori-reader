@@ -791,9 +791,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get localCleanupPending => '书籍和进度已移除，剩余文件将在下次启动时清理。';
 
   @override
-  String get localShelfAdded => '已加入书架。';
-
-  @override
   String get localReadNow => '立即阅读';
 
   @override
@@ -816,6 +813,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get localReparseAll => '全部重新解析';
+
+  @override
+  String get localFilterAll => '全部';
 
   @override
   String localReparseAllConfirm(int count) {

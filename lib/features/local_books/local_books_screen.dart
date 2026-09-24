@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'local_cover_index.dart';
+import '../reader/book_progress_label.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../shared/source_image.dart';
 import '../../domain/contracts/local_book_decoder.dart';
@@ -22,12 +23,16 @@ class LocalBooksScreen extends StatefulWidget {
     required this.onRead,
     required this.onImport,
     this.covers,
+    this.progressOf,
   });
   final ImageRepository? images;
 
   /// Cover references kept across visits; without one the page owns an
   /// index for its own lifetime.
   final LocalCoverIndex? covers;
+
+  /// Reading progress of a book, e.g. from the shelf controller.
+  final ReadingProgress? Function(NovelKey key)? progressOf;
   final LocalBookStore store;
   final LocalBookManagement management;
   final LibraryRepository library;
@@ -43,6 +48,10 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       : null;
   LocalCoverIndex get _covers => widget.covers ?? _ownedCovers!;
   final _request = CancellationSource();
+  LocalBookFormat? _filter;
+
+  /// Book currently being reparsed, so its row can show progress.
+  NovelKey? _activeKey;
   late final _books = widget.management.watchBooks();
   CancellationSource? _reparseRequest;
   bool _busy = false;
@@ -57,44 +66,6 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     _reparseRequest?.cancel();
     unawaited(_ownedCovers?.close());
     super.dispose();
-  }
-
-  Future<void> _add(LocalBookInfo info) async {
-    if (_busy) return;
-    setState(() {
-      _busy = true;
-      _failure = null;
-    });
-    final read = await widget.store.read(
-      info.key,
-      cancellation: _request.token,
-    );
-    if (!mounted) return;
-    if (read case Success(value: final book?)) {
-      final result = await widget.library.putBookshelf(
-        BookshelfEntry(
-          snapshot: book.content.detail.summary,
-          addedAt: DateTime.now(),
-        ),
-        cancellation: _request.token,
-      );
-      if (!mounted) return;
-      if (result case Failure(:final failure)) {
-        _failure = failure;
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context).localShelfAdded)),
-        );
-      }
-    } else {
-      _failure = read is Failure<LocalBookRecord?>
-          ? read.failure
-          : AppFailure(
-              kind: FailureKind.notFound,
-              operation: Operation.libraryRead,
-            );
-    }
-    setState(() => _busy = false);
   }
 
   Future<void> _delete(LocalBookInfo info) async {
@@ -191,12 +162,15 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     setState(() {
       _busy = true;
       _failure = null;
+      _batchSummary = null;
+      _activeKey = info.key;
     });
     final result = await _performReparse(info, request, encoding: encoding);
     if (!mounted) return;
     setState(() {
       _busy = false;
       _reparseRequest = null;
+      _activeKey = null;
     });
     switch (result) {
       case Success(:final value):
@@ -314,6 +288,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       setState(() {
         _batchIndex = i + 1;
         _batchTitle = info.title;
+        _activeKey = info.key;
       });
       // No override: each TXT retains its own saved encoding or prompts with
       // this book's samples. A failure never rolls back earlier successes.
@@ -343,6 +318,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       _reparseRequest = null;
       _batchIndex = null;
       _batchSummary = summary;
+      _activeKey = null;
     });
     await showDialog<void>(
       context: context,
@@ -381,6 +357,8 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
         builder: (context, snapshot) => _build(context, snapshot),
       );
 
+  bool get _canReparse => widget.store is LocalBookReparse;
+
   Widget _build(
     BuildContext context,
     AsyncSnapshot<Result<List<LocalBookInfo>>> snapshot,
@@ -390,31 +368,21 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       Success(:final value) => value,
       _ => <LocalBookInfo>[],
     };
+    final hasEpub = books.any((b) => b.format == LocalBookFormat.epub);
+    final hasTxt = books.any((b) => b.format == LocalBookFormat.txt);
+    final filter = hasEpub && hasTxt ? _filter : null;
+    final shown = filter == null
+        ? books
+        : books.where((b) => b.format == filter).toList();
     return Scaffold(
       appBar: AppBar(
         title: Text(l.localBooksTitle),
         actions: [
-          PopupMenuButton<String>(
-            key: const ValueKey('local-books-actions'),
-            tooltip: l.moreActions,
-            enabled: !_busy,
-            onSelected: (action) {
-              if (_busy) return;
-              if (action == 'import') {
-                widget.onImport();
-              } else if (action == 'reparseAll') {
-                _reparseAll(books);
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(value: 'import', child: Text(l.importTitle)),
-              if (widget.store is LocalBookReparse)
-                PopupMenuItem(
-                  value: 'reparseAll',
-                  enabled: books.isNotEmpty,
-                  child: Text(l.localReparseAll),
-                ),
-            ],
+          IconButton(
+            key: const ValueKey('local-books-import'),
+            tooltip: l.importTitle,
+            onPressed: _busy ? null : widget.onImport,
+            icon: const Icon(Icons.add),
           ),
         ],
       ),
@@ -425,23 +393,6 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
             constraints: const BoxConstraints(maxWidth: ShioriLayout.list),
             child: CustomScrollView(
               slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                  sliver: SliverToBoxAdapter(
-                    child: _overview(
-                      context,
-                      books,
-                      snapshot.data is Success<List<LocalBookInfo>>,
-                    ),
-                  ),
-                ),
-                if (_busy || _batchSummary != null || _failure != null)
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    sliver: SliverToBoxAdapter(
-                      child: _operationStatus(context),
-                    ),
-                  ),
                 if (!snapshot.hasData)
                   const SliverFillRemaining(
                     hasScrollBody: false,
@@ -458,6 +409,29 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                     child: _emptyLibrary(context),
                   )
                 else ...[
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      ShioriSpace.page,
+                      ShioriSpace.small,
+                      ShioriSpace.page,
+                      ShioriSpace.item,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: _libraryCard(context, books),
+                    ),
+                  ),
+                  if (hasEpub && hasTxt)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        ShioriSpace.page,
+                        0,
+                        ShioriSpace.page,
+                        ShioriSpace.small,
+                      ),
+                      sliver: SliverToBoxAdapter(
+                        child: _formatFilter(context, books),
+                      ),
+                    ),
                   // Same row shell and gutters as the shelf's list mode.
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
@@ -467,9 +441,9 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                       ShioriSpace.section,
                     ),
                     sliver: SliverList.builder(
-                      itemCount: books.length,
+                      itemCount: shown.length,
                       itemBuilder: (context, index) =>
-                          _bookTile(context, books[index]),
+                          _bookTile(context, shown[index]),
                     ),
                   ),
                 ],
@@ -481,47 +455,138 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     );
   }
 
-  Widget _overview(
-    BuildContext context,
-    List<LocalBookInfo> books,
-    bool ready,
-  ) {
+  /// Library summary and the page's main job: reparsing. While a reparse
+  /// runs the card becomes its progress; results and errors land here too.
+  Widget _libraryCard(BuildContext context, List<LocalBookInfo> books) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final epub = books
-        .where((book) => book.format == LocalBookFormat.epub)
-        .length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (ready)
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                l.localBooksCount(books.length),
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (books.isNotEmpty)
+    final colors = theme.colorScheme;
+    final epub = books.where((b) => b.format == LocalBookFormat.epub).length;
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: colors.onSurfaceVariant,
+    );
+    final failed = _failure != null;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(ShioriShape.card),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(ShioriSpace.item),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
                 Text(
-                  '$epub epub · ${books.length - epub} txt',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  l.localBooksCount(books.length),
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(width: ShioriSpace.medium),
+                Expanded(
+                  child: Text(
+                    'EPUB $epub · TXT ${books.length - epub}',
+                    style: muted,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: ShioriSpace.tight),
+            Text(l.localBooksSubtitle, style: muted),
+            if (_canReparse || _busy) ...[
+              const SizedBox(height: ShioriSpace.item),
+              if (_busy)
+                _reparseProgress(context)
+              else
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: FilledButton.tonalIcon(
+                    key: const ValueKey('local-books-reparse-all'),
+                    onPressed: () => _reparseAll(books),
+                    icon: const Icon(Icons.autorenew, size: 20),
+                    label: Text(l.localReparseAll),
                   ),
                 ),
             ],
+            if (!_busy && (_batchSummary != null || failed)) ...[
+              const SizedBox(height: ShioriSpace.medium),
+              Text(
+                failed ? failureMessage(l, _failure!) : _batchSummary!,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: failed ? colors.error : colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _reparseProgress(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_batchIndex != null) ...[
+          Text(
+            l.localReparseAllProgress(_batchIndex!, _batchTotal, _batchTitle),
+            style: theme.textTheme.bodyMedium,
           ),
-        const SizedBox(height: 6),
-        Text(
-          l.localBooksSubtitle,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+          const SizedBox(height: ShioriSpace.small),
+        ],
+        ClipRRect(
+          borderRadius: BorderRadius.circular(ShioriShape.tag),
+          child: LinearProgressIndicator(
+            value: _batchIndex == null
+                ? null
+                : (_batchIndex! - 1) / _batchTotal,
+            minHeight: 4,
           ),
         ),
+        if (_reparseRequest != null)
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: TextButton(
+              onPressed: _reparseRequest!.token.isCancelled
+                  ? null
+                  : () => setState(() => _reparseRequest?.cancel()),
+              child: Text(
+                _batchIndex == null ? l.importCancel : l.localReparseStop,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _formatFilter(BuildContext context, List<LocalBookInfo> books) {
+    final l = AppLocalizations.of(context);
+    int count(LocalBookFormat? format) => format == null
+        ? books.length
+        : books.where((b) => b.format == format).length;
+    String label(LocalBookFormat? format) => switch (format) {
+      null => l.localFilterAll,
+      LocalBookFormat.epub => 'EPUB',
+      LocalBookFormat.txt => 'TXT',
+    };
+    return Wrap(
+      spacing: ShioriSpace.small,
+      children: [
+        for (final format in <LocalBookFormat?>[
+          null,
+          ...LocalBookFormat.values,
+        ])
+          ChoiceChip(
+            showCheckmark: false,
+            label: Text('${label(format)} ${count(format)}'),
+            selected: _filter == format,
+            onSelected: (_) => setState(() => _filter = format),
+          ),
       ],
     );
   }
@@ -529,6 +594,18 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
   Widget _bookTile(BuildContext context, LocalBookInfo book) {
     final l = AppLocalizations.of(context);
     final epub = book.format == LocalBookFormat.epub;
+    final progress = bookProgressLabel(
+      l,
+      widget.progressOf?.call(book.key)?.bookProgress,
+      descriptive: true,
+      wholePercent: true,
+    );
+    final imported = l.localBooksImportedOn(
+      MaterialLocalizations.of(
+        context,
+      ).formatShortDate(book.importedAt.toLocal()),
+    );
+    final active = _activeKey == book.key;
     return BookListItem(
       key: ValueKey(book.key),
       onTap: _busy ? null : () => widget.onRead(book.key),
@@ -545,9 +622,32 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
           ),
         ),
         title: book.title,
-        metadata:
-            '${book.format.name} · ${l.localBooksImportedOn(MaterialLocalizations.of(context).formatShortDate(book.importedAt.toLocal()))}',
-        trailing: _bookMenu(context, book),
+        subtitle: [book.format.name.toUpperCase(), ?progress].join(' · '),
+        metadata: imported,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (active)
+              Padding(
+                padding: const EdgeInsets.all(ShioriSpace.medium),
+                child: SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    semanticsLabel: l.localReparse,
+                  ),
+                ),
+              )
+            else if (_canReparse)
+              IconButton(
+                key: ValueKey(('local-book-reparse', book.key)),
+                tooltip: l.localReparse,
+                onPressed: _busy ? null : () => _reparse(book),
+                icon: const Icon(Icons.autorenew, size: 20),
+              ),
+            _bookMenu(context, book),
+          ],
+        ),
       ),
     );
   }
@@ -561,81 +661,14 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       enabled: !_busy,
       tooltip: l.moreActions,
       onSelected: (action) {
-        if (action == 'add') {
-          _add(book);
-        } else if (action == 'reparse') {
-          _reparse(book);
-        } else if (action == 'delete') {
-          _delete(book);
-        }
+        if (action == 'reparse') _reparse(book);
+        if (action == 'delete') _delete(book);
       },
       itemBuilder: (_) => [
-        if (widget.store is LocalBookReparse)
+        if (_canReparse)
           PopupMenuItem(value: 'reparse', child: Text(l.localReparse)),
-        PopupMenuItem(value: 'add', child: Text(l.detailAddShelf)),
         PopupMenuItem(value: 'delete', child: Text(l.localDeleteConfirm)),
       ],
-    );
-  }
-
-  Widget _operationStatus(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final failed = _failure != null;
-    return Container(
-      padding: const EdgeInsets.all(ShioriSpace.item),
-      decoration: BoxDecoration(
-        color: failed ? colors.errorContainer : colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(ShioriShape.card),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_busy) ...[
-            if (_batchIndex != null) ...[
-              Text(
-                l.localReparseAllProgress(
-                  _batchIndex!,
-                  _batchTotal,
-                  _batchTitle,
-                ),
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: ShioriSpace.medium),
-            ],
-            ClipRRect(
-              borderRadius: BorderRadius.circular(ShioriShape.tag),
-              child: LinearProgressIndicator(
-                value: _batchIndex == null
-                    ? null
-                    : (_batchIndex! - 1) / _batchTotal,
-                minHeight: 4,
-              ),
-            ),
-          ] else if (_batchSummary != null && !failed)
-            Text(_batchSummary!, style: theme.textTheme.bodyMedium),
-          if (_failure != null)
-            Text(
-              failureMessage(l, _failure!),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colors.onErrorContainer,
-              ),
-            ),
-          if (_reparseRequest != null)
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: TextButton(
-                onPressed: _reparseRequest!.token.isCancelled
-                    ? null
-                    : () => setState(() => _reparseRequest?.cancel()),
-                child: Text(
-                  _batchIndex == null ? l.importCancel : l.localReparseStop,
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 

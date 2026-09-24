@@ -167,14 +167,18 @@ class _ReadingHomeState extends State<ReadingHome> {
           ),
     localBooks: widget.localBooks == null || widget.localManagement == null
         ? null
-        : (_) => LocalBooksScreen(
-            images: widget.images,
-            store: widget.localBooks!,
-            management: widget.localManagement!,
-            library: widget.library,
-            onRead: _continue,
-            onImport: widget.onImport!,
-            covers: _localCovers,
+        : (_) => LibraryObserver(
+            controller: _library,
+            builder: (_, library) => LocalBooksScreen(
+              images: widget.images,
+              store: widget.localBooks!,
+              management: widget.localManagement!,
+              library: widget.library,
+              onRead: _continue,
+              onImport: widget.onImport!,
+              covers: _localCovers,
+              progressOf: library.progressFor,
+            ),
           ),
     readerTarget: (_, key, block) => BookReaderScreen(
       initialBlockKey: block,

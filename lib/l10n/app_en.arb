@@ -375,7 +375,6 @@
   "localDeleteConfirm": "Delete book and progress",
   "localDeleted": "Local book and reading progress deleted.",
   "localCleanupPending": "Book and progress removed. Remaining files will be cleaned up at the next launch.",
-  "localShelfAdded": "Added to bookshelf.",
   "localReadNow": "Read now",
   "@localDeleteMessage": {
     "placeholders": {
@@ -391,6 +390,7 @@
   "appAccentSoftPink": "Soft pink",
   "readerChapterLoadFailed": "Could not open the chapter. Your current page is still available.",
   "localReparseAll": "Reparse all",
+  "localFilterAll": "All",
   "localReparseAllConfirm": "Reparse all {count} local books one at a time and restore reading positions where possible. Failures keep the previous content and do not stop other books. You can stop at any time.",
   "@localReparseAllConfirm": {
     "placeholders": {

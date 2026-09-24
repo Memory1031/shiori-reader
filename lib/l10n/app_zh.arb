@@ -375,7 +375,6 @@
   "localDeleteConfirm": "删除书籍和进度",
   "localDeleted": "本地书籍和阅读进度已删除。",
   "localCleanupPending": "书籍和进度已移除，剩余文件将在下次启动时清理。",
-  "localShelfAdded": "已加入书架。",
   "localReadNow": "立即阅读",
   "@localDeleteMessage": {
     "placeholders": {
@@ -391,6 +390,7 @@
   "appAccentSoftPink": "淡粉",
   "readerChapterLoadFailed": "暂时无法打开目标章节，已保留当前页面。",
   "localReparseAll": "全部重新解析",
+  "localFilterAll": "全部",
   "localReparseAllConfirm": "将依次重新解析全部 {count} 本本地书籍，并尽量恢复阅读位置。失败会保留原内容并继续下一本，可随时停止。",
   "@localReparseAllConfirm": {
     "placeholders": {

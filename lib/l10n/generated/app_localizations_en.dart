@@ -867,9 +867,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Book and progress removed. Remaining files will be cleaned up at the next launch.';
 
   @override
-  String get localShelfAdded => 'Added to bookshelf.';
-
-  @override
   String get localReadNow => 'Read now';
 
   @override
@@ -893,6 +890,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localReparseAll => 'Reparse all';
+
+  @override
+  String get localFilterAll => 'All';
 
   @override
   String localReparseAllConfirm(int count) {

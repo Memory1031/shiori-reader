@@ -1592,12 +1592,6 @@ abstract class AppLocalizations {
   /// **'Book and progress removed. Remaining files will be cleaned up at the next launch.'**
   String get localCleanupPending;
 
-  /// No description provided for @localShelfAdded.
-  ///
-  /// In en, this message translates to:
-  /// **'Added to bookshelf.'**
-  String get localShelfAdded;
-
   /// No description provided for @localReadNow.
   ///
   /// In en, this message translates to:
@@ -1645,6 +1639,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reparse all'**
   String get localReparseAll;
+
+  /// No description provided for @localFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get localFilterAll;
 
   /// No description provided for @localReparseAllConfirm.
   ///
