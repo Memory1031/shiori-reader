@@ -134,9 +134,12 @@ class _BookshelfViewState extends State<BookshelfView> {
             final open = _revealed == book.key;
             final sourceLabel = _sourceBadgeLabel(book.key, format);
             final metadata = [?sourceLabel, ?progressLabel].join(' · ');
+            // The row's own inset keeps content on the page gutter.
             return Padding(
               key: ValueKey(book.key),
-              padding: const EdgeInsets.symmetric(horizontal: ShioriSpace.page),
+              padding: const EdgeInsets.symmetric(
+                horizontal: ShioriSpace.page - BookListItem.inset,
+              ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(ShioriShape.control),
                 child: Stack(

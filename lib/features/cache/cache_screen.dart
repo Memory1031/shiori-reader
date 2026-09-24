@@ -455,6 +455,9 @@ class _CacheScreenState extends State<CacheScreen> {
           trailing: menu,
           children: [
             const Divider(height: 1),
+            // Chapter rows highlight as rounded blocks; keep them off the
+            // divider so a hovered row does not butt against it.
+            const SizedBox(height: ShioriSpace.small),
             for (final chapter in chapters)
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(

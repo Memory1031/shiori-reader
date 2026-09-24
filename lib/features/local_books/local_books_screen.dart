@@ -432,7 +432,8 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                         child: _formatFilter(context, books),
                       ),
                     ),
-                  // Same row shell and gutters as the shelf's list mode.
+                  // Row highlights line up with the library card's edges; the
+                  // row's inset keeps covers clear of the highlight edge.
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
                       ShioriSpace.page,

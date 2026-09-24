@@ -272,6 +272,13 @@ ThemeData shioriTheme(
       ),
     ],
     dividerColor: p.separator,
+    // Soft accent-tinted states instead of Material's grey overlays, and no
+    // ripple: a press only deepens the tint, matching the list rows.
+    hoverColor: p.accent.withValues(alpha: light ? .05 : .08),
+    focusColor: p.accent.withValues(alpha: light ? .08 : .12),
+    highlightColor: p.accent.withValues(alpha: light ? .08 : .12),
+    splashColor: Colors.transparent,
+    splashFactory: NoSplash.splashFactory,
     popupMenuTheme: PopupMenuThemeData(
       color: p.surface,
       surfaceTintColor: Colors.transparent,
