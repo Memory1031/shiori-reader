@@ -42,8 +42,12 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   // Reveal or hide row actions once a swipe commits by distance or speed,
   // not on the first couple of pixels of any horizontal movement.
+  // Actions sit at the trailing edge, so a swipe toward the leading edge
+  // reveals them: leftwards in left-to-right layouts, rightwards otherwise.
   void _dragEnd(NovelKey key, DragEndDetails details) {
-    final velocity = details.primaryVelocity ?? 0;
+    final sign = Directionality.of(context) == TextDirection.rtl ? -1 : 1;
+    final velocity = (details.primaryVelocity ?? 0) * sign;
+    _drag *= sign;
     final open = _revealed == key;
     if (!open && (_drag < -48 || velocity < -300)) {
       setState(() => _revealed = key);
@@ -209,7 +213,11 @@ class _BookshelfViewState extends State<BookshelfView> {
                           ShioriMotion.feedback,
                         ),
                         transform: Matrix4.translationValues(
-                          open ? -148 : 0,
+                          open
+                              ? (Directionality.of(context) == TextDirection.rtl
+                                    ? 148
+                                    : -148)
+                              : 0,
                           0,
                           0,
                         ),

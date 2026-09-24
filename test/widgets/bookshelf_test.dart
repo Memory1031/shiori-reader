@@ -428,4 +428,53 @@ void main() {
       await repo.close();
     });
   });
+
+  testWidgets('list swipe mirrors in right-to-left layouts', (tester) async {
+    final repo = FixtureLibraryRepository();
+    final c = LibraryController(repo)..onStart();
+    final book = const FixtureData().summary(FixtureScenario.shortChapter);
+    await c.add(book);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: ListenableBuilder(
+              listenable: c,
+              builder: (_, _) => BookshelfView(
+                controller: c,
+                onOpen: (_) {},
+                onDetails: (_) {},
+                onSearch: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('List'));
+    await tester.pumpAndSettle();
+    final row = find.byKey(ValueKey(book.key));
+    // Toward the trailing edge does nothing; toward the leading edge reveals.
+    await tester.drag(row, const Offset(-200, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Details'), findsNothing);
+    await tester.drag(row, const Offset(200, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Details'), findsOneWidget);
+    expect(
+      tester.getCenter(find.text('Details')).dx,
+      lessThan(tester.getCenter(row).dx),
+    );
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(() async {
+      c.onDelete();
+      await c.resourcesReleased;
+      c.dispose();
+      await repo.close();
+    });
+  });
 }
