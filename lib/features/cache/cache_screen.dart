@@ -127,7 +127,9 @@ class _CacheScreenState extends State<CacheScreen> {
               child: Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 760),
+                  constraints: const BoxConstraints(
+                    maxWidth: ShioriLayout.list,
+                  ),
                   child: ListView.builder(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
                     itemCount: entries.length + 2,

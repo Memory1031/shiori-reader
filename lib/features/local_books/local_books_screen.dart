@@ -409,7 +409,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
         top: false,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
+            constraints: const BoxConstraints(maxWidth: ShioriLayout.list),
             child: CustomScrollView(
               slivers: [
                 SliverPadding(

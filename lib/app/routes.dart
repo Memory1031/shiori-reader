@@ -1,8 +1,8 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../domain/models/models.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../shared/capabilities.dart';
 import '../shared/widgets/app_scaffold.dart';
 import '../shared/widgets/state_views.dart';
 
@@ -94,13 +94,11 @@ class AppRoutes {
     };
     // Route names deliberately exclude opaque IDs and potential site locators.
     final settings = RouteSettings(name: destination.routeName);
-    return switch (Theme.of(context).platform) {
-      TargetPlatform.iOS || TargetPlatform.macOS => CupertinoPageRoute<void>(
-        builder: builder,
-        settings: settings,
-      ),
-      _ => MaterialPageRoute<void>(builder: builder, settings: settings),
-    };
+    return platformPageRoute<void>(
+      context,
+      builder: builder,
+      settings: settings,
+    );
   }
 
   Future<void> open(BuildContext context, AppDestination destination) async {

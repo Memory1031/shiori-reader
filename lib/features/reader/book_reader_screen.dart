@@ -5,6 +5,7 @@ import '../../domain/contracts/contracts.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/capabilities.dart';
 import '../../shared/widgets/state_views.dart';
 import '../novel_detail/catalog_controller.dart';
 import '../novel_detail/catalog_view.dart';
@@ -780,7 +781,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       child: PopScope(
         // Cupertino's interactive back gesture requires canPop before it starts.
         // Periodic/lifecycle commits remain the durable boundary on every platform.
-        canPop: _canPop || Theme.of(context).platform == TargetPlatform.iOS,
+        canPop: _canPop || ShioriCapabilities.of(context).cupertinoNavigation,
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) {
             unawaited(_exit());

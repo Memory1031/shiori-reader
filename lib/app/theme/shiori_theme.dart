@@ -68,6 +68,11 @@ abstract final class ShioriSpace {
       section = 32.0;
 }
 
+/// Maximum widths for centred content on wide windows.
+abstract final class ShioriLayout {
+  static const page = 840.0, list = 760.0, panel = 560.0;
+}
+
 /// Corner radii: tag for badges / bars, cover for artwork, control for rows,
 /// inputs and menus, card for grouped surfaces, sheet for modal surfaces.
 abstract final class ShioriShape {

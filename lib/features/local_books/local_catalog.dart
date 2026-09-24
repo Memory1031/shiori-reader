@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/capabilities.dart';
 import '../../shared/widgets/state_views.dart';
 
 Future<LocalNavigationEntry?> openLocalCatalog(
@@ -19,9 +19,7 @@ Future<LocalNavigationEntry?> openLocalCatalog(
   );
   const settings = RouteSettings(name: '/local-catalog');
   return Navigator.of(context).push<LocalNavigationEntry>(
-    Theme.of(context).platform == TargetPlatform.iOS
-        ? CupertinoPageRoute(builder: builder, settings: settings)
-        : MaterialPageRoute(builder: builder, settings: settings),
+    platformPageRoute(context, builder: builder, settings: settings),
   );
 }
 

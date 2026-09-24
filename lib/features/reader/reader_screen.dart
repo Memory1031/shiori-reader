@@ -8,6 +8,7 @@ import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/controller_scope.dart';
+import '../../shared/capabilities.dart';
 import '../../shared/widgets/state_views.dart';
 import 'reader_controller.dart';
 import 'reader_completion_page.dart';
@@ -418,7 +419,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     widget.onPageAppearance?.call(Theme.of(context).scaffoldBackgroundColor);
     final pageInsets = MediaQuery.paddingOf(context);
     final theme = Theme.of(context);
-    final bodyTypography = theme.platform == TargetPlatform.windows
+    final bodyTypography = ShioriCapabilities.of(context).explicitUiTypeface
         ? theme.textTheme.bodyLarge
         : null;
     final style = TextStyle(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import '../../app/routes.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -293,7 +294,9 @@ class _ReadingHomeState extends State<ReadingHome> {
               child: Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 840),
+                  constraints: const BoxConstraints(
+                    maxWidth: ShioriLayout.page,
+                  ),
                   child: Column(
                     children: [
                       if (_library.recent.isNotEmpty)

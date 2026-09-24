@@ -137,7 +137,7 @@ class _ImportOverlayState extends State<ImportOverlay>
                       padding: const EdgeInsets.all(12),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxWidth: 560,
+                          maxWidth: ShioriLayout.panel,
                           maxHeight: MediaQuery.sizeOf(context).height * .7,
                         ),
                         child: Material(

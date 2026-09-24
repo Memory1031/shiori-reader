@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 
 class AppScaffold extends StatelessWidget {
   const AppScaffold({
@@ -19,7 +20,7 @@ class AppScaffold extends StatelessWidget {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 840),
+          constraints: const BoxConstraints(maxWidth: ShioriLayout.page),
           child: body,
         ),
       ),

@@ -1,8 +1,8 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
 import '../../app/routes.dart';
+import '../../shared/capabilities.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../fixture_scenarios.dart';
 import 'scenario_page.dart';
@@ -104,9 +104,7 @@ class _DevMenuState extends State<DevMenu> {
     );
     const settings = RouteSettings(name: '/dev/scenario');
     Navigator.of(context).push<void>(
-      Theme.of(context).platform == TargetPlatform.iOS
-          ? CupertinoPageRoute(builder: builder, settings: settings)
-          : MaterialPageRoute(builder: builder, settings: settings),
+      platformPageRoute(context, builder: builder, settings: settings),
     );
   }
 

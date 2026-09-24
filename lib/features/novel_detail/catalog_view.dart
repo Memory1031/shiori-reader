@@ -1,9 +1,9 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/capabilities.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
@@ -19,9 +19,7 @@ Future<ChapterKey?> openCatalog(
       CatalogScreen(novel: novel, repository: repository, current: current);
   const settings = RouteSettings(name: '/catalog');
   return Navigator.of(context).push<ChapterKey>(
-    Theme.of(context).platform == TargetPlatform.iOS
-        ? CupertinoPageRoute(builder: builder, settings: settings)
-        : MaterialPageRoute(builder: builder, settings: settings),
+    platformPageRoute(context, builder: builder, settings: settings),
   );
 }
 

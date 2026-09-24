@@ -102,7 +102,9 @@ class DetailScreen extends StatelessWidget {
             : Align(
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 840),
+                  constraints: const BoxConstraints(
+                    maxWidth: ShioriLayout.page,
+                  ),
                   child: ListView(
                     padding: const EdgeInsets.all(ShioriSpace.page),
                     children: [

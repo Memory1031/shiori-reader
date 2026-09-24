@@ -7,6 +7,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import 'epub_webview_host.dart';
 import 'svg_paper_art.dart';
+import '../../shared/capabilities.dart';
 import '../../domain/contracts/local_content_links.dart';
 
 /// A short authored page, not the renderer for normal long-form reading.
@@ -100,7 +101,7 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
   Color? _paper;
   Color? _foreground;
   Brightness? _brightness;
-  TargetPlatform? _platform;
+  bool? _pointerFirst;
   int _generation = 0;
   String? _document;
 
@@ -109,7 +110,7 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
     Color paper,
     Color foreground,
     Brightness brightness,
-    TargetPlatform platform,
+    bool pointerFirst,
   ) {
     final cached = _document;
     if (cached != null &&
@@ -117,12 +118,13 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
         _paper == paper &&
         _foreground == foreground &&
         _brightness == brightness &&
-        _platform == platform) {
+        _pointerFirst == pointerFirst) {
       return cached;
     }
     final background = paper.toARGB32().toRadixString(16).substring(2);
     final ink = foreground.toARGB32().toRadixString(16).substring(2);
-    final interactionStyle = platform == TargetPlatform.windows
+    // Mouse drags turn pages; keep them from selecting or dragging content.
+    final interactionStyle = pointerFirst
         ? 'html,body,body *{-webkit-user-select:none!important;user-select:none!important;-webkit-user-drag:none!important;}'
         : '';
     final svgTextStyle =
@@ -143,7 +145,7 @@ $interactionStyle
     _paper = paper;
     _foreground = foreground;
     _brightness = brightness;
-    _platform = platform;
+    _pointerFirst = pointerFirst;
     _generation++;
     _ready = false;
     _down = null;
@@ -162,7 +164,7 @@ $interactionStyle
       theme.scaffoldBackgroundColor,
       theme.colorScheme.onSurface,
       theme.brightness,
-      defaultTargetPlatform,
+      ShioriCapabilities.of(context).pointerFirst,
     );
     return LayoutBuilder(
       builder: (context, bounds) => Listener(

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../domain/contracts/app_updates.dart';
 import '../../domain/models/release_identity.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/capabilities.dart';
 import '../../shared/widgets/shiori_logo.dart';
 import 'update_controller.dart';
 import 'release_notes_preview.dart';
@@ -293,7 +294,7 @@ class UpdateScreen extends StatelessWidget {
                             l.updatePackageInvalid,
                           UpdateProblem.cancelled => l.updateCancelled,
                           UpdateProblem.installation =>
-                            defaultTargetPlatform == TargetPlatform.windows
+                            ShioriCapabilities.of(context).updateRestartsApp
                                 ? l.updateInstallFailedWindows
                                 : l.updateInstallFailed,
                           UpdateProblem.busy => l.updateInstallBusy,
@@ -377,7 +378,7 @@ class UpdateScreen extends StatelessWidget {
     final c = controller;
     final theme = Theme.of(context);
     // Windows replaces files after the app exits, then starts it again.
-    final windows = defaultTargetPlatform == TargetPlatform.windows;
+    final windows = ShioriCapabilities.of(context).updateRestartsApp;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
