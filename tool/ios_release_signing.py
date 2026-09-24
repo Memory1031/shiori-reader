@@ -218,18 +218,18 @@ def configure_export_options(source, destination, profile_names):
 
 
 def verify_build_settings(profile_names):
-    settings = json.loads(run(
-        "xcodebuild", "-workspace", "Runner.xcworkspace", "-scheme", "Runner",
-        "-configuration", "Release", "-destination", "generic/platform=iOS",
-        "-showBuildSettings", "-json",
-    ))
-    seen = set()
     fields = ("TARGET_NAME", "PRODUCT_BUNDLE_IDENTIFIER", "CODE_SIGN_STYLE", "CODE_SIGN_IDENTITY", "DEVELOPMENT_TEAM", "PROVISIONING_PROFILE_SPECIFIER")
-    for item in settings:
-        values = item["buildSettings"]
-        target = values.get("TARGET_NAME")
-        if target not in TARGETS:
-            continue
+    for target in TARGETS:
+        settings = json.loads(run(
+            "xcodebuild", "-project", "Runner.xcodeproj", "-target", target,
+            "-configuration", "Release", "-sdk", "iphoneos",
+            "-showBuildSettings", "-json",
+        ))
+        matches = [item["buildSettings"] for item in settings
+                   if item["buildSettings"].get("TARGET_NAME") == target]
+        if len(matches) != 1:
+            raise RuntimeError(f"Could not resolve Release build settings for {target}")
+        values = matches[0]
         expected_bundle = TARGETS[target][0]
         if (values.get("PRODUCT_BUNDLE_IDENTIFIER") != expected_bundle
                 or values.get("CODE_SIGN_STYLE") != "Manual"
@@ -237,10 +237,7 @@ def verify_build_settings(profile_names):
                 or values.get("DEVELOPMENT_TEAM") != TEAM
                 or values.get("PROVISIONING_PROFILE_SPECIFIER") != profile_names[target]):
             raise RuntimeError(f"Unexpected effective Release signing settings for {target}")
-        seen.add(target)
         print(json.dumps({field: values.get(field, "") for field in fields}, ensure_ascii=False))
-    if seen != TARGETS.keys():
-        raise RuntimeError("Runner and ShareExtension must both have manual Distribution signing")
 
 
 def main():

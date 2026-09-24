@@ -2,6 +2,7 @@
 
 import base64
 import datetime as dt
+import json
 import plistlib
 import tempfile
 import unittest
@@ -25,6 +26,27 @@ class FakeApi:
 
 
 class SigningTests(unittest.TestCase):
+    def test_build_settings_query_targets_individually(self):
+        names = {"Runner": "Runner Profile", "ShareExtension": "Extension Profile"}
+        commands = []
+
+        def xcodebuild(*args, **kwargs):
+            commands.append(args)
+            target = args[args.index("-target") + 1]
+            return json.dumps([{"buildSettings": {
+                "TARGET_NAME": target,
+                "PRODUCT_BUNDLE_IDENTIFIER": signing.TARGETS[target][0],
+                "CODE_SIGN_STYLE": "Manual",
+                "CODE_SIGN_IDENTITY": "Apple Distribution",
+                "DEVELOPMENT_TEAM": signing.TEAM,
+                "PROVISIONING_PROFILE_SPECIFIER": names[target],
+            }}]).encode()
+
+        with mock.patch.object(signing, "run", side_effect=xcodebuild):
+            signing.verify_build_settings(names)
+        self.assertEqual([command[command.index("-target") + 1] for command in commands],
+                         ["Runner", "ShareExtension"])
+
     def test_jwt_signature_uses_es256_raw_format(self):
         self.assertEqual(
             signing.der_signature_to_raw(bytes.fromhex("3006020101020102")),
