@@ -16,7 +16,7 @@ import 'reader_completion_transition.dart';
 import 'reader_preferences.dart';
 import 'reader_theme.dart';
 import 'reading_progress_format.dart';
-import 'article_contents.dart';
+import 'reader_contents.dart';
 import 'settings_panel.dart';
 import 'reader_margin.dart';
 import 'reader_image.dart';
@@ -99,7 +99,8 @@ class ReaderContentView extends StatefulWidget {
     this.settings,
     this.session,
     this.initialPosition,
-    this.onCatalog,
+    this.bookContents,
+    this.articleContents = true,
     this.onPreviousChapter,
     this.onNextChapter,
     this.onBookEnd,
@@ -123,7 +124,13 @@ class ReaderContentView extends StatefulWidget {
   final ReaderController? session;
   final ReaderPosition? initialPosition;
   final SettingsStore? settings;
-  final VoidCallback? onCatalog, onPreviousChapter, onNextChapter;
+
+  /// The book-level navigation layer (volume catalog or local contents).
+  final ReaderContentsLayer Function(BuildContext context)? bookContents;
+
+  /// Whether headings recognised inside the article form their own layer.
+  final bool articleContents;
+  final VoidCallback? onPreviousChapter, onNextChapter;
   final VoidCallback? onBookEnd,
       onCompletionPrevious,
       onCompletionExit,
@@ -215,19 +222,29 @@ class _ReaderContentViewState extends State<ReaderContentView>
     await _preferences.flush();
   }
 
-  Future<void> _contents(BuildContext context) async {
-    if (widget.content.key.novelKey.sourceId == LocalBookIdentity.sourceId) {
-      widget.onCatalog?.call();
-      return;
-    }
-    final target = await showArticleContents(
+  List<ReaderContentsLayer> _contentsLayers(BuildContext context) => [
+    if (widget.articleContents)
+      articleContentsLayer(
+        context,
+        widget.content,
+        onSelect: (target) {
+          if (!mounted) return;
+          _position = target;
+          _paged.restore(target);
+        },
+      ),
+    if (widget.bookContents case final book?) book(context),
+  ];
+
+  /// [book] opens on the book-level layer, e.g. from the completion page.
+  Future<void> _contents(BuildContext context, {bool book = false}) async {
+    final layers = _contentsLayers(context);
+    if (layers.isEmpty) return;
+    await showReaderContents(
       context,
-      widget.content,
-      onVolumes: widget.onCatalog,
+      layers: layers,
+      initialLayer: book ? layers.length - 1 : 0,
     );
-    if (!mounted || target == null) return;
-    _position = target;
-    _paged.restore(target);
   }
 
   late final _paged = widget.viewportController ?? PagedReaderController();
@@ -483,7 +500,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                                 onPrevious:
                                     widget.onCompletionPrevious ?? () {},
                                 onExit: widget.onCompletionExit ?? () {},
-                                onCatalog: widget.onCatalog ?? () {},
+                                onCatalog: () => _contents(context, book: true),
                                 onRestart: widget.onRestart ?? () {},
                               ),
                             ),
@@ -831,7 +848,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
                   _paged.restore(target);
                 },
               ),
-              if (widget.onCatalog != null)
+              if (widget.onPreviousChapter != null ||
+                  widget.onNextChapter != null)
                 Row(
                   children: [
                     Expanded(
@@ -1013,10 +1031,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
                 Expanded(
                   child: Tooltip(
                     message:
-                        widget.content.key.novelKey.sourceId ==
-                            LocalBookIdentity.sourceId
-                        ? l.localBookContents
-                        : l.articleContents,
+                        _contentsLayers(context).firstOrNull?.label ??
+                        l.catalogTitle,
                     child: TextButton.icon(
                       onPressed: () => _contents(context),
                       icon: const Icon(Icons.list, size: 20),

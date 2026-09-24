@@ -266,7 +266,8 @@ void main() {
         await tester.tap(find.byTooltip('Book contents'));
         await tester.pumpAndSettle();
         expect(find.byType(LocalNavigationView), findsOneWidget);
-        expect(find.byType(BottomSheet), findsNothing);
+        // Local contents open over the page instead of leaving the reader.
+        expect(find.byType(BottomSheet), findsOneWidget);
         expect(find.text('In-volume contents'), findsNothing);
         expect(
           tester
@@ -306,9 +307,18 @@ void main() {
         view().onPreviousChapter!();
         await tester.pumpAndSettle();
         expect(view().content.key, content.chapters.first.key);
-        view().onCatalog!();
+        if (find.byTooltip('Book contents').evaluate().isEmpty) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.byTooltip('Book contents'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('缺锚点'));
+        await tester.tap(
+          find.descendant(
+            of: find.byType(LocalNavigationView),
+            matching: find.text('缺锚点'),
+          ),
+        );
         await tester.pumpAndSettle();
         expect(view().viewportController!.capture()!.blockIndex, 0);
         // Late local reads must not update a disposed reader.

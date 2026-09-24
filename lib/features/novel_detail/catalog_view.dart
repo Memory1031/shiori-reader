@@ -137,110 +137,140 @@ class _CatalogViewState extends State<CatalogView> {
         rows.addAll(volume.chapters);
       }
     }
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      itemCount: rows.length,
-      itemBuilder: (context, index) {
-        final row = rows[index];
-        if (row is Volume) {
-          return Padding(
-            padding: EdgeInsets.only(top: index == 0 ? 0 : 12),
-            child: Material(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(ShioriShape.cover),
-              clipBehavior: Clip.antiAlias,
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                minTileHeight: 44,
-                dense: true,
-                leading: Container(
-                  width: 3,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: .5),
-                    borderRadius: BorderRadius.circular(ShioriShape.indicator),
-                  ),
-                ),
-                minLeadingWidth: 3,
-                horizontalTitleGap: 10,
-                titleTextStyle: Theme.of(context).textTheme.titleSmall,
-                key: ValueKey(('volume', row.groupId)),
-                title: Text(row.title ?? strings.catalogUnnamedVolume),
-                trailing: Icon(
-                  _collapsed.contains(row.groupId)
-                      ? Icons.expand_more
-                      : Icons.expand_less,
-                ),
-                onTap: () => setState(() {
-                  if (!_collapsed.add(row.groupId)) {
-                    _collapsed.remove(row.groupId);
-                  }
-                }),
-              ),
-            ),
-          );
-        }
-        final chapter = row as Chapter;
-        final selected = chapter.key == (_selected ?? widget.current);
+    Widget buildRow(BuildContext context, int index) {
+      final row = rows[index];
+      if (row is Volume) {
         return Padding(
-          padding: EdgeInsets.only(top: index == 0 ? 0 : 4),
+          padding: EdgeInsets.only(top: index == 0 ? 0 : 12),
           child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(ShioriShape.control),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(ShioriShape.cover),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 2,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(ShioriShape.control),
-              ),
-              key: ValueKey(chapter.key),
-              selected: selected,
-              minLeadingWidth: 28,
-              horizontalTitleGap: 12,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              minTileHeight: 44,
+              dense: true,
               leading: Container(
-                width: 28,
-                height: 28,
-                alignment: Alignment.center,
+                width: 3,
+                height: 18,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(ShioriShape.cover),
-                ),
-                child: selected
-                    ? Icon(
-                        Icons.bookmark,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.primary,
-                      )
-                    : Text(
-                        '${ordinals[chapter.key]}'.padLeft(2, '0'),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-              ),
-              title: Tooltip(
-                message: chapter.title,
-                child: Text(
-                  chapter.title,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
+                  color: Theme.of(
                     context,
-                  ).textTheme.bodyMedium?.copyWith(height: 1.5),
+                  ).colorScheme.primary.withValues(alpha: .5),
+                  borderRadius: BorderRadius.circular(ShioriShape.indicator),
                 ),
               ),
-              trailing: const Icon(Icons.chevron_right, size: 16),
-              onTap: () {
-                setState(() => _selected = chapter.key);
-                widget.onSelect(chapter.key);
-              },
+              minLeadingWidth: 3,
+              horizontalTitleGap: 10,
+              titleTextStyle: Theme.of(context).textTheme.titleSmall,
+              key: ValueKey(('volume', row.groupId)),
+              title: Text(row.title ?? strings.catalogUnnamedVolume),
+              trailing: Icon(
+                _collapsed.contains(row.groupId)
+                    ? Icons.expand_more
+                    : Icons.expand_less,
+              ),
+              onTap: () => setState(() {
+                if (!_collapsed.add(row.groupId)) {
+                  _collapsed.remove(row.groupId);
+                }
+              }),
             ),
           ),
         );
-      },
+      }
+      final chapter = row as Chapter;
+      final selected = chapter.key == (_selected ?? widget.current);
+      return Padding(
+        padding: EdgeInsets.only(top: index == 0 ? 0 : 4),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(ShioriShape.control),
+          clipBehavior: Clip.antiAlias,
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 2,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(ShioriShape.control),
+            ),
+            key: ValueKey(chapter.key),
+            selected: selected,
+            minLeadingWidth: 28,
+            horizontalTitleGap: 12,
+            leading: Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(ShioriShape.cover),
+              ),
+              child: selected
+                  ? Icon(
+                      Icons.bookmark,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.primary,
+                    )
+                  : Text(
+                      '${ordinals[chapter.key]}'.padLeft(2, '0'),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+            ),
+            title: Tooltip(
+              message: chapter.title,
+              child: Text(
+                chapter.title,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(height: 1.5),
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_right, size: 16),
+            onTap: () {
+              setState(() => _selected = chapter.key);
+              widget.onSelect(chapter.key);
+            },
+          ),
+        ),
+      );
+    }
+
+    // Open at the current chapter without measuring the unseen prefix; rows
+    // before the centre sliver grow upwards and stay lazily built.
+    final match = widget.current == null
+        ? -1
+        : rows.indexWhere((row) => row is Chapter && row.key == widget.current);
+    final anchor = match < 0 ? 0 : match;
+    const center = ValueKey('catalog-anchor');
+    return CustomScrollView(
+      key: ValueKey((widget.catalog.novelKey, widget.current)),
+      center: center,
+      semanticChildCount: rows.length,
+      slivers: [
+        if (anchor > 0)
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => buildRow(context, anchor - index - 1),
+              childCount: anchor,
+              semanticIndexCallback: (_, index) => anchor - index - 1,
+            ),
+          ),
+        SliverPadding(
+          key: center,
+          padding: const EdgeInsets.only(bottom: 4),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => buildRow(context, anchor + index),
+              childCount: rows.length - anchor,
+              semanticIndexOffset: anchor,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

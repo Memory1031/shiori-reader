@@ -8,7 +8,6 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
 import '../../shared/widgets/state_views.dart';
 import '../novel_detail/catalog_controller.dart';
-import '../novel_detail/catalog_view.dart';
 import 'reader_controller.dart';
 import 'position/position_resolver.dart';
 import 'reader_screen.dart';
@@ -17,7 +16,7 @@ import '../cache/prefetch_sheet.dart';
 import '../../shared/source_image.dart';
 import 'reader_linked_text.dart';
 import 'viewport/paged_reader_viewport.dart';
-import '../local_books/local_catalog.dart';
+import 'reader_contents.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
 class BookReaderScreen extends StatefulWidget {
@@ -78,6 +77,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   NovelStatus _bookStatus = NovelStatus.unknown;
   List<ChapterKey>? _readingOrder;
   final _navigation = <ChapterKey, List<(LocalNavigationEntry, int)>>{};
+  final _navigationTree = ValueNotifier<Result<List<LocalNavigationEntry>>?>(
+    null,
+  );
   Future<void> _loadNavigation() async {
     final repository = widget.repository;
     if (!_local || repository is! LocalNavigationRepository) return;
@@ -87,6 +89,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           cancellation: _titleRequest.token,
         );
     if (!mounted || _invalidated || _titleRequest.token.isCancelled) return;
+    _navigationTree.value = result;
     if (result case Success<List<LocalNavigationEntry>>(:final value)) {
       void collect(List<LocalNavigationEntry> entries, int depth) {
         for (final entry in entries) {
@@ -302,6 +305,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _catalog.removeListener(_changed);
     _catalog.onDelete();
     _catalog.dispose();
+    _navigationTree.dispose();
     super.dispose();
   }
 
@@ -605,54 +609,38 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     );
   }
 
-  Future<void> _contents() async {
-    final repository = widget.repository;
-    if (_local && repository is LocalNavigationRepository) {
-      final target = await openLocalCatalog(
+  bool get _localNavigation =>
+      _local && widget.repository is LocalNavigationRepository;
+
+  /// Book-level contents, served from the navigation this reader already
+  /// loaded: the local EPUB / TXT tree, or the source's volume catalog
+  /// (cache-only while offline). Called during build, so it stays pure; a
+  /// reparse invalidates this reader rather than relabelling it in place.
+  ReaderContentsLayer _bookContents(BuildContext context) {
+    if (_localNavigation) {
+      return localContentsLayer(
         context,
-        novel: widget.chapter.novelKey,
-        repository: repository as LocalNavigationRepository,
+        navigation: _navigationTree,
         current: _reader.chapter,
+        onRetry: _loadNavigation,
+        onSelect: (target) {
+          if (mounted) _followContentTarget(target.chapterKey, target.blockKey);
+        },
       );
-      if (mounted && target != null) {
-        await _followContentTarget(target.chapterKey, target.blockKey);
-      }
-      return;
     }
-    if (widget.offline) {
-      final entries =
-          _catalog.loaded?.value.flatChapters.toList() ?? <Chapter>[];
-      if (!mounted) return;
-      final selected = await showModalBottomSheet<ChapterKey>(
-        context: context,
-        builder: (context) => SafeArea(
-          child: ListView(
-            children: [
-              if (entries.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(AppLocalizations.of(context).cacheEmpty),
-                ),
-              for (final item in entries)
-                ListTile(
-                  title: Text(item.title),
-                  onTap: () => Navigator.pop(context, item.key),
-                ),
-            ],
-          ),
-        ),
-      );
-      if (mounted && selected != null) await _switch(selected);
-      return;
-    }
-    final key = await openCatalog(
+    return volumeContentsLayer(
       context,
-      novel: widget.chapter.novelKey,
-      repository: widget.repository,
+      catalog: _catalog,
       current: _reader.chapter,
+      refreshable: !widget.offline,
+      onSelect: (key) {
+        if (mounted) _switch(key);
+      },
     );
-    if (mounted && key != null) await _switch(key);
   }
+
+  Future<void> _contents() =>
+      showReaderContents(context, layers: [_bookContents(context)]);
 
   Future<void> _details() async {
     if (_changing || widget.onDetails == null) return;
@@ -723,7 +711,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       ),
       onContentLink: _changing ? null : _followContentLink,
       initialPosition: reader.initialPosition,
-      onCatalog: _changing || widget.linkDepth > 0 ? null : _contents,
+      articleContents: !_local,
+      bookContents: _changing || widget.linkDepth > 0 ? null : _bookContents,
       onLinks: _changing || reader.contentLinks.isEmpty ? null : _links,
       returnToOrigin: widget.linkDepth > 0,
       onPrefetch: !widget.offline && _cache?.prefetch != null
