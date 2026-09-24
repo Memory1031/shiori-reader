@@ -1,13 +1,13 @@
 # 发布操作
 
-本文件只维护通用流程，不记录当前版本进度。版本变化写入 `notes/vX.Y.Z.md`，测试结果在提交 / PR 或发布操作反馈中说明，不单独维护历史验收文档。
+本文件只维护通用流程，不记录当前版本进度。版本变化写入 `docs/release/notes/vX.Y.Z.md`，测试结果在提交 / PR 或发布操作反馈中说明，不单独维护历史验收文档。
 
 ## 每次先读
 
 | 文件 | 核对内容 |
 | --- | --- |
 | [pubspec.yaml](../../pubspec.yaml)、[iOS 工程](../../ios/Runner.xcodeproj/project.pbxproj) | 当前版本、内部构建号、ShareExtension 一致性；Runner 使用 Flutter 变量 |
-| `notes/vX.Y.Z.md`、上个 tag 到 develop 的 Git diff | 实际变更、升级提醒、已知限制 |
+| `docs/release/notes/vX.Y.Z.md`、上个 tag 到 develop 的 Git diff | 实际变更、升级提醒、已知限制 |
 | [开发说明](../development.md) | 固定工具链和本地验证命令 |
 | [CI](../ci.md)、Android / Windows / iOS 工作流 | 签名配置、触发规则和上传方式 |
 | [依赖与分发边界](dependencies.md) | 依赖变化时更新许可清单；分发范围变化时核对许可与隐私 |
@@ -26,7 +26,7 @@ dart tool/publish_release.dart prepare patch --apply
 
 同一基础版本从 beta 转为首次正式发布时使用 `prepare stable`，保持 `X.Y.Z` 并递增构建号；目标正式标签必须尚未发布。发布检查要求构建号高于已公开的所有正式 / beta 包。
 
-按输出版本编写 `notes/vX.Y.Z.md`，执行与改动相关的本地测试及必要分析、构建，记录实际结果和未测项。prepare 不提交、不推送、不打标签。
+按输出版本编写 `docs/release/notes/vX.Y.Z.md`，执行与改动相关的本地测试及必要分析、构建，记录实际结果和未测项。prepare 不提交、不推送、不打标签。
 
 ### 同版本 beta
 
@@ -51,7 +51,7 @@ dart tool/publish_release.dart v1.2.1-beta.1
 dart tool/publish_release.dart v1.2.1-beta.1 --publish
 ```
 
-beta 附注标签直接指向已同步的 develop 提交。Android APK 与 Windows ZIP 进入 GitHub 预发布，Latest 指向正式发布；iOS 使用相同版本号和递增构建号上传 TestFlight。可在 `notes/<beta-tag>.md` 提供说明，缺失时由 GitHub 自动生成。
+beta 附注标签直接指向已同步的 develop 提交。Android APK 与 Windows ZIP 进入 GitHub 预发布，Latest 指向正式发布；iOS 使用相同版本号和递增构建号上传 TestFlight。可在 `docs/release/notes/<beta-tag>.md` 提供说明，缺失时由 GitHub 自动生成。
 
 ## 2. 提交和发布
 
@@ -66,7 +66,7 @@ dart tool/publish_release.dart vX.Y.Z --publish
 
 master 仅是发布中间分支。tag 同时触发 Android 签名 APK、Windows x64 ZIP 与 iOS 签名 / TestFlight 上传；APK 和 ZIP 均构建成功后统一发布到 GitHub Release，不等待日常 CI，也不重复 UT / analyze。CI 绿色不能替代本地测试记录。
 
-GitHub Release 优先读取 `notes/<tag>.md`，缺失时自动生成。新 Release 先建立草稿，资产完整上传后公开；重跑核对已有附件的大小与摘要，只补齐缺失附件，内容变化需分配新的构建号和标签。手动编辑过的正文需在 GitHub 单独更新。
+GitHub Release 优先读取 `docs/release/notes/<tag>.md`，缺失时自动生成。新 Release 先建立草稿，资产完整上传后公开；重跑核对已有附件的大小与摘要，只补齐缺失附件，内容变化需分配新的构建号和标签。手动编辑过的正文需在 GitHub 单独更新。
 
 ## 更新清单签名配置
 

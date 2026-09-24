@@ -210,6 +210,9 @@ class UpdateManifestTest(unittest.TestCase):
 
     def test_publisher_draft_upload_then_publish_and_rerun_no_overwrite(self):
         raw = self.manifest()
+        notes = self.root / "docs/release/notes" / f"{self.tag}.md"
+        notes.parent.mkdir(parents=True)
+        notes.write_text("# Release notes\n")
         (self.assets / "update-manifest.json").write_bytes(raw)
         (self.assets / "update-manifest.sig").write_bytes(
             sign_manifest(raw, self.secret, self.key)
@@ -228,6 +231,7 @@ class UpdateManifestTest(unittest.TestCase):
             [("release", "create"), ("release", "upload"), ("release", "edit")],
         )
         self.assertIn("--draft", calls[1])
+        self.assertEqual(calls[1][calls[1].index("--notes-file") + 1], str(notes))
         self.assertIn("--latest=false", calls[-1])
         self.assertFalse(any("--clobber" in args for args in calls))
         release = {
