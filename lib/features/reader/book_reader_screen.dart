@@ -303,12 +303,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     super.dispose();
   }
 
+  // The active ReaderContentView flushes its own session on lifecycle changes.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!widget.offline) {
       _cache?.prefetch?.active(state == AppLifecycleState.resumed);
     }
-    if (state != AppLifecycleState.resumed) unawaited(_reader.flushProgress());
   }
 
   Future<bool> _save() async {
