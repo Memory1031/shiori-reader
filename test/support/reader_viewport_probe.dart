@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/models/models.dart';
-import 'package:shiori/features/reader/viewport/reader_viewport.dart';
+import 'package:shiori/dev/viewport/reader_viewport.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 
 void main() => runApp(const MaterialApp(home: _Probe()));

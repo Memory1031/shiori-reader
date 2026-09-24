@@ -6,7 +6,7 @@ import '../../../features/reader/reader_preferences.dart';
 import '../../../features/reader/settings_panel.dart';
 import '../../../features/reader/reader_theme.dart';
 import '../../../features/reader/viewport/paged_reader_viewport.dart';
-import '../../../features/reader/viewport/reader_viewport.dart';
+import '../../viewport/reader_viewport.dart';
 import '../../fixture_scenarios.dart';
 import 'lab_cover.dart';
 

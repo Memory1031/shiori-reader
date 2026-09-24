@@ -4,7 +4,7 @@ import 'package:shiori/features/reader/viewport/render_chunk.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/models/models.dart';
-import 'package:shiori/features/reader/viewport/reader_viewport.dart';
+import 'package:shiori/dev/viewport/reader_viewport.dart';
 
 ReaderPosition at(ChapterContent content, int block, [double fraction = 0]) =>
     ReaderPosition(

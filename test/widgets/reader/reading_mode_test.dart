@@ -5,7 +5,7 @@ import 'package:shiori/app/routes.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/dev/ui/viewport_experiment.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
-import 'package:shiori/features/reader/viewport/reader_viewport.dart';
+import 'package:shiori/dev/viewport/reader_viewport.dart';
 
 void main() {
   testWidgets(

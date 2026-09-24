@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-import '../../../domain/models/models.dart';
-import '../position/position_resolver.dart';
-import 'render_chunk.dart';
-import 'block_style.dart';
+import '../../domain/models/models.dart';
+import '../../features/reader/position/position_resolver.dart';
+import '../../features/reader/viewport/render_chunk.dart';
+import '../../features/reader/viewport/block_style.dart';
 
-/// The caller owns the controller. It stores semantic positions, not durable
+/// Development-only scroll viewport kept for position and restore probes;
+/// production reading is paged. The caller owns the controller. It stores semantic positions, not durable
 /// pixel offsets; diagnostics count only mounted lazy render children.
 class ReaderViewportController {
   _ReaderViewportState? _state;

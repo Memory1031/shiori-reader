@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
-import '../../features/reader/viewport/reader_viewport.dart';
+import '../viewport/reader_viewport.dart';
 import '../../features/reader/viewport/paged_reader_viewport.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/state_views.dart';

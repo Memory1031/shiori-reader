@@ -7,7 +7,7 @@ import 'package:shiori/domain/contracts/local_books.dart';
 import 'package:shiori/features/reader/article_contents.dart';
 import 'package:shiori/features/reader/viewport/block_style.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
-import 'package:shiori/features/reader/viewport/reader_viewport.dart';
+import 'package:shiori/dev/viewport/reader_viewport.dart';
 
 void main() {
   test(

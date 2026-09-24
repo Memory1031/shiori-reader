@@ -11,7 +11,7 @@ import 'package:shiori/features/reader/reader_theme.dart';
 import 'package:shiori/features/reader/settings_panel.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/features/reader/viewport/paper_turn.dart';
-import 'package:shiori/features/reader/viewport/reader_viewport.dart';
+import 'package:shiori/dev/viewport/reader_viewport.dart';
 import '../../support/reader_actions.dart';
 import 'settings_test.dart' show Store;
 

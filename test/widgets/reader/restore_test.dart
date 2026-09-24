@@ -8,9 +8,9 @@ import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/position/position_resolver.dart';
-import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/dev/ui/dev_reader_screen.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
-import 'package:shiori/features/reader/viewport/reader_viewport.dart';
+import 'package:shiori/dev/viewport/reader_viewport.dart';
 import 'settings_test.dart' show Store;
 
 class ObservedLibrary implements LibraryRepository {

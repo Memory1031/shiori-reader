@@ -9,9 +9,9 @@ import 'package:shiori/data/repositories/library_repository.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
-import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/dev/ui/dev_reader_screen.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
-import 'package:shiori/features/reader/viewport/reader_viewport.dart';
+import 'package:shiori/dev/viewport/reader_viewport.dart';
 
 T value<T>(Result<T> result) => (result as Success<T>).value;
 void main() =>

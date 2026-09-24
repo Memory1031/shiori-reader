@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/routes.dart';
 import '../../data/media/memory_image_repository.dart';
 import 'viewport_experiment.dart';
-import '../../features/reader/reader_screen.dart';
+import 'dev_reader_screen.dart';
 
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';

@@ -5,9 +5,9 @@ import 'package:shiori/app/routes.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
-import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/dev/ui/dev_reader_screen.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
-import 'package:shiori/features/reader/viewport/reader_viewport.dart';
+import 'package:shiori/dev/viewport/reader_viewport.dart';
 
 void main() {
   for (final mode in [ReaderMode.paged]) {
