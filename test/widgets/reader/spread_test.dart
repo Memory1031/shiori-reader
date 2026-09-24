@@ -272,4 +272,31 @@ void main() {
     expect(find.byKey(const ValueKey('illustration')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('object-replacement-only paragraphs do not count as prose', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    // U+FFFC marks inline objects; a paragraph holding only markers is not
+    // flowing text, so a wide window must stay on single pages.
+    final content = chapter([
+      for (var i = 0; i < 20; i++) ParagraphBlock(text: '\uFFFC \uFFFC'),
+    ]);
+    final store = Store()..value = ReaderSettings(controlsHintSeen: true);
+    await tester.pumpWidget(
+      ShioriApp(
+        routes: AppRoutes(
+          home: (_) => ReaderContentView(content: content, settings: store),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<PagedReaderViewport>(find.byType(PagedReaderViewport))
+          .columns,
+      1,
+    );
+  });
 }

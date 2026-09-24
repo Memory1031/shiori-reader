@@ -317,7 +317,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       (block) =>
           block.box == null &&
           block.alignment == ParagraphAlignment.start &&
-          block.text.replaceAll('FFFC', '').trim().isNotEmpty,
+          block.text.replaceAll('\uFFFC', '').trim().isNotEmpty,
     );
     _prose = (content, value);
     return value;
