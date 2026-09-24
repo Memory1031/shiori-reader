@@ -32,7 +32,12 @@ class ReaderCompletionPage extends StatelessWidget {
     final theme = Theme.of(context);
     final ink = theme.colorScheme.onSurface;
     final muted = theme.colorScheme.onSurfaceVariant;
+    // The page keeps the reading typeface; UI labels use fixed sizes so they
+    // stay compact whatever body size the reader chose, while the title
+    // follows the body size within bounds.
     final type = style.copyWith(height: 1.5);
+    final label = type.copyWith(fontSize: 14);
+    final action = type.copyWith(fontSize: 15, fontWeight: FontWeight.w500);
     final titleSize = ((style.fontSize ?? 20) * 1.25).clamp(24.0, 32.0);
     var drag = 0.0;
     return Semantics(
@@ -78,14 +83,13 @@ class ReaderCompletionPage extends StatelessWidget {
                           const SizedBox(height: 28),
                           Text(
                             heading,
-                            style: type.copyWith(
-                              fontSize: 14,
+                            style: label.copyWith(
                               color: muted,
                               letterSpacing: 1.5,
                             ),
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: ShioriSpace.item),
                           Text(
                             title,
                             style: type.copyWith(
@@ -94,7 +98,7 @@ class ReaderCompletionPage extends StatelessWidget {
                             ),
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 32),
+                          const SizedBox(height: ShioriSpace.section),
                           SizedBox(
                             width: 40,
                             child: Divider(
@@ -119,10 +123,7 @@ class ReaderCompletionPage extends StatelessWidget {
                                     ShioriShape.cover,
                                   ),
                                 ),
-                                textStyle: type.copyWith(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                                textStyle: action,
                               ),
                               onPressed: onExit,
                               child: Text(
@@ -131,7 +132,7 @@ class ReaderCompletionPage extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: ShioriSpace.medium),
                           Wrap(
                             alignment: WrapAlignment.center,
                             spacing: 8,
@@ -139,7 +140,7 @@ class ReaderCompletionPage extends StatelessWidget {
                               TextButton(
                                 style: TextButton.styleFrom(
                                   foregroundColor: muted,
-                                  textStyle: type.copyWith(fontSize: 14),
+                                  textStyle: label,
                                 ),
                                 onPressed: onCatalog,
                                 child: Text(l.readerViewCatalog),
@@ -147,7 +148,7 @@ class ReaderCompletionPage extends StatelessWidget {
                               TextButton(
                                 style: TextButton.styleFrom(
                                   foregroundColor: muted,
-                                  textStyle: type.copyWith(fontSize: 14),
+                                  textStyle: label,
                                 ),
                                 onPressed: onRestart,
                                 child: Text(l.readerRestart),

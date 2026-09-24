@@ -54,7 +54,7 @@ class UpdateScreen extends StatelessWidget {
                 l.updateChooseChannel,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: ShioriSpace.item),
               Flexible(
                 child: SingleChildScrollView(
                   child: Column(
@@ -81,7 +81,7 @@ class UpdateScreen extends StatelessWidget {
                           ),
                           onTap: () => Navigator.pop(context, channel),
                         ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: ShioriSpace.medium),
                       Text(
                         l.updateChannelHint,
                         style: Theme.of(context).textTheme.bodySmall,
@@ -138,7 +138,7 @@ class UpdateScreen extends StatelessWidget {
                             color: muted,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: ShioriSpace.small),
                         Text(
                           _version,
                           style: theme.textTheme.labelMedium?.copyWith(
@@ -198,7 +198,7 @@ class UpdateScreen extends StatelessWidget {
                               color: muted,
                             ),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: ShioriSpace.tight),
                           Icon(Icons.chevron_right, size: 18, color: muted),
                         ],
                       ),
@@ -206,9 +206,11 @@ class UpdateScreen extends StatelessWidget {
                           ? null
                           : () => _chooseChannel(context),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: ShioriSpace.small),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: ShioriSpace.medium,
+                      ),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
                           final checked = Text(
@@ -260,7 +262,7 @@ class UpdateScreen extends StatelessWidget {
                           return Row(
                             children: [
                               Expanded(child: checked),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: ShioriSpace.small),
                               actions,
                             ],
                           );
@@ -269,9 +271,9 @@ class UpdateScreen extends StatelessWidget {
                     ),
                     if (c.phase == UpdatePhase.checking ||
                         c.phase == UpdatePhase.loading) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: ShioriSpace.medium),
                       const LinearProgressIndicator(),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: ShioriSpace.small),
                       Text(l.updateChecking, style: theme.textTheme.bodySmall),
                     ],
                     if (c.issue case final issue?)
@@ -337,7 +339,7 @@ class UpdateScreen extends StatelessWidget {
                       applicationName: 'Shiori',
                       applicationVersion: _version,
                       applicationIcon: const Padding(
-                        padding: EdgeInsets.all(16),
+                        padding: EdgeInsets.all(ShioriSpace.item),
                         child: ShioriLogo(),
                       ),
                     ),
@@ -385,7 +387,7 @@ class UpdateScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(ShioriShape.sheet),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(ShioriSpace.page),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -395,7 +397,7 @@ class UpdateScreen extends StatelessWidget {
                 color: theme.colorScheme.primary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ShioriSpace.small),
             SizedBox(
               width: double.infinity,
               child: Wrap(
@@ -415,18 +417,18 @@ class UpdateScreen extends StatelessWidget {
               ),
             ),
             if (target.notes.trim().isNotEmpty) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: ShioriSpace.item),
               ReleaseNotesPreview(
                 notes: target.notes,
                 key: const ValueKey('update-notes'),
               ),
             ],
-            const SizedBox(height: 20),
+            const SizedBox(height: ShioriSpace.page),
             if (c.phase == UpdatePhase.downloading) ...[
               LinearProgressIndicator(
                 value: (c.received / target.bytes).clamp(0, 1),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: ShioriSpace.small),
               Text(l.updateProgress((c.received * 100 / target.bytes).floor())),
             ] else if (c.installing)
               Row(
@@ -439,7 +441,7 @@ class UpdateScreen extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: ShioriSpace.medium),
                   Expanded(
                     child: Text(
                       windows ? l.updateRestarting : l.updateInstalling,
@@ -457,14 +459,14 @@ class UpdateScreen extends StatelessWidget {
                 style: theme.textTheme.bodySmall,
               ),
               if (c.canInstall) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: ShioriSpace.medium),
                 if (c.installState ==
                     UpdateInstallState.permissionRequired) ...[
                   Text(
                     l.updateInstallPermission,
                     style: theme.textTheme.bodySmall,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: ShioriSpace.medium),
                   FilledButton(
                     onPressed: c.busy ? null : c.openInstallSettings,
                     child: Text(l.updateInstallSettings),
@@ -472,7 +474,7 @@ class UpdateScreen extends StatelessWidget {
                 ] else ...[
                   if (c.installState == UpdateInstallState.cancelled) ...[
                     Text(l.updateInstallCancelled),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: ShioriSpace.medium),
                   ],
                   if (c.installState == UpdateInstallState.failed) ...[
                     Text(
@@ -480,7 +482,7 @@ class UpdateScreen extends StatelessWidget {
                           ? l.updateInstallFailedWindows
                           : l.updateInstallFailed,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: ShioriSpace.medium),
                   ],
                   FilledButton.icon(
                     key: const ValueKey('update-install'),
@@ -501,7 +503,7 @@ class UpdateScreen extends StatelessWidget {
                 icon: const Icon(Icons.download_outlined),
                 label: Text(l.updateDownload),
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ShioriSpace.small),
             TextButton(
               onPressed: () => _openPage(context, target.page),
               child: Text(l.updateReleasePage),
@@ -542,7 +544,9 @@ class _ProjectAction extends StatelessWidget {
             highlightColor: colors.onSurface.withValues(alpha: .06),
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: ShioriSpace.medium,
+            ),
             shape: shape,
             hoverColor: colors.onSurface.withValues(alpha: .04),
             focusColor: colors.onSurface.withValues(alpha: .08),

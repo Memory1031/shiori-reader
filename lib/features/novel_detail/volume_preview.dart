@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../domain/contracts/local_book_decoder.dart';
@@ -80,14 +81,14 @@ class VolumePreview extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(l.allChapters),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: ShioriSpace.tight),
                     const Icon(Icons.chevron_right, size: 18),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: ShioriSpace.item),
           if (localNavigation == null && controller.loading)
             const LinearProgressIndicator(),
           if (localNavigation == null &&
@@ -170,7 +171,7 @@ class VolumePreview extends StatelessWidget {
                         style: theme.textTheme.bodyMedium,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: ShioriSpace.medium),
                     Icon(
                       Icons.chevron_right,
                       size: 18,
@@ -323,7 +324,7 @@ class _LocalNavigationPreviewState extends State<_LocalNavigationPreview> {
                           style: theme.textTheme.bodyMedium,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: ShioriSpace.medium),
                       Icon(
                         Icons.chevron_right,
                         size: 18,

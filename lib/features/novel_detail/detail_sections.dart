@@ -48,14 +48,11 @@ class DetailBookHeader extends StatelessWidget {
                   header: true,
                   child: Text(
                     book.title,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: 22,
-                      height: 1.35,
-                    ),
+                    style: ShioriType.of(context).displayTitle,
                   ),
                 ),
                 if (book.authors.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: ShioriSpace.medium),
                   Text(
                     book.authors.join(', '),
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -64,7 +61,7 @@ class DetailBookHeader extends StatelessWidget {
                   ),
                 ],
                 if (detail.status != NovelStatus.unknown) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: ShioriSpace.medium),
                   Text(switch (detail.status) {
                     NovelStatus.ongoing => strings.detailStatusOngoing,
                     NovelStatus.completed => strings.detailStatusCompleted,
@@ -95,7 +92,7 @@ class DetailBookHeader extends StatelessWidget {
           },
         ),
         if (detail.tags.isNotEmpty) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: ShioriSpace.page),
           _ExpandableText(
             text: detail.tags.join(' · '),
             lines: 2,

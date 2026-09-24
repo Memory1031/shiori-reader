@@ -147,7 +147,9 @@ class _CatalogViewState extends State<CatalogView> {
             borderRadius: BorderRadius.circular(ShioriShape.cover),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: ShioriSpace.medium,
+              ),
               minTileHeight: 44,
               dense: true,
               leading: Container(

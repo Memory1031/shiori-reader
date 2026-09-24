@@ -64,7 +64,7 @@ class _BookshelfViewState extends State<BookshelfView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(ShioriSpace.medium),
                 child: Text(
                   book.title,
                   maxLines: 2,
@@ -131,7 +131,7 @@ class _BookshelfViewState extends State<BookshelfView> {
             final metadata = [?sourceLabel, ?progressLabel].join(' · ');
             return Padding(
               key: ValueKey(book.key),
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: ShioriSpace.page),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(ShioriShape.control),
                 child: Stack(
@@ -227,7 +227,9 @@ class _BookshelfViewState extends State<BookshelfView> {
                               constraints: BoxConstraints(
                                 minHeight: open ? 120 * scale.clamp(1, 2) : 120,
                               ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: ShioriSpace.medium,
+                              ),
                               decoration: BoxDecoration(
                                 border: Border(
                                   bottom: BorderSide(
@@ -333,7 +335,9 @@ class _BookshelfViewState extends State<BookshelfView> {
               SliverToBoxAdapter(child: header),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: ShioriSpace.page,
+                ),
                 child: Row(
                   children: [
                     Expanded(
@@ -393,7 +397,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                       label: Text(strings.searchTitle),
                     ),
                     if (widget.onImport != null) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: ShioriSpace.small),
                       TextButton.icon(
                         onPressed: widget.onImport,
                         icon: const Icon(Icons.file_upload_outlined),
@@ -546,7 +550,6 @@ class _ShelfCover extends StatelessWidget {
   final String? sourceLabel;
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -561,15 +564,16 @@ class _ShelfCover extends StatelessWidget {
                 borderRadius: BorderRadius.circular(ShioriShape.tag),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: ShioriSpace.tight,
+                  vertical: 2,
+                ),
                 child: Text(
                   sourceLabel!,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: Colors.white.withValues(alpha: .90),
-                    fontSize: 10,
-                    height: 1.05,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  // Light ink on the scrim over any cover artwork.
+                  style: ShioriType.of(
+                    context,
+                  ).badge.copyWith(color: Colors.white.withValues(alpha: .90)),
                 ),
               ),
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'theme/shiori_theme.dart';
 import '../l10n/generated/app_localizations.dart';
 
 /// Shown only while real initialization is pending; no artificial startup delay.
@@ -14,7 +15,7 @@ class LaunchView extends StatelessWidget {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(ShioriSpace.section),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -65,16 +66,9 @@ class LaunchView extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Shiori',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontSize: 32,
-                    letterSpacing: 3,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(height: ShioriSpace.tight),
+                Text('Shiori', style: ShioriType.of(context).brand),
+                const SizedBox(height: ShioriSpace.small),
                 Text(
                   l.launchTagline,
                   textAlign: TextAlign.center,
@@ -82,7 +76,7 @@ class LaunchView extends StatelessWidget {
                     color: colors.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: ShioriSpace.section),
                 SizedBox(
                   width: 80,
                   child: LinearProgressIndicator(

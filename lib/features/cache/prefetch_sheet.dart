@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import '../../shared/capabilities.dart';
 import '../../shared/widgets/shiori_sheet.dart';
 import '../../domain/contracts/contracts.dart';
@@ -72,9 +73,9 @@ class _PrefetchPanelState extends State<_PrefetchPanel> {
               l.prefetchTitle,
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: ShioriSpace.medium),
             Text(status),
-            const SizedBox(height: 8),
+            const SizedBox(height: ShioriSpace.small),
             Text(
               l.prefetchExplanation,
               style: Theme.of(context).textTheme.bodySmall,

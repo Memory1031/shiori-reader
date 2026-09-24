@@ -529,7 +529,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       builder: (context) => ListView(
         children: [
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(ShioriSpace.page),
             child: Text(l.readerLinks),
           ),
           for (final link in source.contentLinks)

@@ -134,7 +134,7 @@ class _ImportOverlayState extends State<ImportOverlay>
                   alignment: Alignment.bottomCenter,
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(ShioriSpace.medium),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           maxWidth: ShioriLayout.panel,
@@ -147,7 +147,7 @@ class _ImportOverlayState extends State<ImportOverlay>
                           ),
                           color: Theme.of(context).colorScheme.surfaceContainer,
                           child: Padding(
-                            padding: const EdgeInsets.all(20),
+                            padding: const EdgeInsets.all(ShioriSpace.page),
                             child: c.discarding
                                 ? const LinearProgressIndicator()
                                 : c.panelOpen
@@ -176,10 +176,10 @@ class _ImportOverlayState extends State<ImportOverlay>
     children: [
       Text(l.importIncoming, style: Theme.of(context).textTheme.titleLarge),
       if (c.batchProblem case final problem?) ...[
-        const SizedBox(height: 8),
+        const SizedBox(height: ShioriSpace.small),
         Text(_problemText(l, problem), key: const ValueKey('import-error')),
       ],
-      const SizedBox(height: 12),
+      const SizedBox(height: ShioriSpace.medium),
       Wrap(
         spacing: 12,
         children: [
@@ -206,9 +206,9 @@ class _ImportOverlayState extends State<ImportOverlay>
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Text(l.importReceiving),
-      const SizedBox(height: 8),
+      const SizedBox(height: ShioriSpace.small),
       const LinearProgressIndicator(),
-      const SizedBox(height: 16),
+      const SizedBox(height: ShioriSpace.item),
       Align(
         alignment: Alignment.centerLeft,
         child: TextButton(onPressed: c.cancel, child: Text(l.importStop)),
@@ -225,12 +225,12 @@ class _ImportOverlayState extends State<ImportOverlay>
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       Text(l.importTitle, style: Theme.of(context).textTheme.titleLarge),
-      const SizedBox(height: 12),
+      const SizedBox(height: ShioriSpace.medium),
       if (c.problem case final problem?)
         Text(_problemText(l, problem), key: const ValueKey('import-error'))
       else if (!c.busy)
         Text(l.importHint),
-      if (!c.busy) const SizedBox(height: 16),
+      if (!c.busy) const SizedBox(height: ShioriSpace.item),
       if (!c.busy)
         Align(
           alignment: Alignment.centerLeft,
@@ -256,13 +256,13 @@ class _ImportOverlayState extends State<ImportOverlay>
         children: [
           Text(l.importTitle, style: Theme.of(context).textTheme.titleLarge),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: ShioriSpace.medium),
             child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: ShioriSpace.medium),
           if (c.phase == ImportPhase.importing) ...[
             Text(l.importProcessing),
-            const SizedBox(height: 8),
+            const SizedBox(height: ShioriSpace.small),
             LinearProgressIndicator(value: _progressValue(c, item)),
           ] else if (done)
             Text(l.importSuccess)
@@ -287,7 +287,7 @@ class _ImportOverlayState extends State<ImportOverlay>
             ),
           if (!c.busy && !done && name.toLowerCase().endsWith('.epub'))
             Text(l.importEpubSupport),
-          const SizedBox(height: 16),
+          const SizedBox(height: ShioriSpace.item),
           Wrap(
             spacing: 12,
             runSpacing: 8,
@@ -375,7 +375,7 @@ class _ImportOverlayState extends State<ImportOverlay>
       children: [
         Text(title, style: Theme.of(context).textTheme.titleLarge),
         if (current != null) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: ShioriSpace.tight),
           Text(
             current.candidate.name,
             maxLines: 1,
@@ -386,7 +386,7 @@ class _ImportOverlayState extends State<ImportOverlay>
           ),
         ],
         if (counts != null) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: ShioriSpace.tight),
           Text(
             counts,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -395,7 +395,7 @@ class _ImportOverlayState extends State<ImportOverlay>
           ),
         ],
         if (c.batchProblem case final problem?) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: ShioriSpace.tight),
           Text(
             _problemText(l, problem),
             key: const ValueKey('import-error'),
@@ -404,7 +404,7 @@ class _ImportOverlayState extends State<ImportOverlay>
             ),
           ),
         ],
-        const SizedBox(height: 8),
+        const SizedBox(height: ShioriSpace.small),
         Flexible(
           child: ListView.builder(
             shrinkWrap: true,
@@ -415,12 +415,12 @@ class _ImportOverlayState extends State<ImportOverlay>
           ),
         ),
         if (importing) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: ShioriSpace.small),
           LinearProgressIndicator(
             value: current == null ? null : _progressValue(c, current),
           ),
         ],
-        const SizedBox(height: 16),
+        const SizedBox(height: ShioriSpace.item),
         Wrap(
           spacing: 12,
           runSpacing: 8,
@@ -466,24 +466,24 @@ class _ImportOverlayState extends State<ImportOverlay>
           Text(l.importTitle, style: Theme.of(context).textTheme.titleLarge),
           if (current != null)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(vertical: ShioriSpace.medium),
               child: Text(
                 current.candidate.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: ShioriSpace.medium),
           Text(l.importEncodingHint),
           for (final entry in c.encodingPreview!.samples.entries) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: ShioriSpace.medium),
             Text(entry.value),
             OutlinedButton(
               onPressed: () => c.confirmEncoding(entry.key),
               child: Text(_encodingName(entry.key)),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: ShioriSpace.item),
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(onPressed: c.cancel, child: Text(l.importStop)),
@@ -542,7 +542,7 @@ class _ImportItemTile extends StatelessWidget {
                 ? const CircularProgressIndicator(strokeWidth: 2)
                 : Icon(status.$1, size: 18, color: color),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: ShioriSpace.small),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -566,7 +566,7 @@ class _ImportItemTile extends StatelessWidget {
             ),
           ),
           if (item.candidate.size > 0) ...[
-            const SizedBox(width: 8),
+            const SizedBox(width: ShioriSpace.small),
             Text(
               _formatSize(item.candidate.size),
               style: Theme.of(

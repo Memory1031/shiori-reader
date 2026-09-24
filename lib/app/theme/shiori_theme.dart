@@ -61,7 +61,8 @@ class ShioriPalette extends ThemeExtension<ShioriPalette> {
 }
 
 abstract final class ShioriSpace {
-  static const small = 8.0,
+  static const tight = 4.0,
+      small = 8.0,
       medium = 12.0,
       item = 16.0,
       page = 20.0,
@@ -100,6 +101,70 @@ abstract final class ShioriReaderPaper {
   static const warm = Color(0xfff2e8d5);
   static const warmSecondary = Color(0xff686166);
   static const night = Color(0xff1b181c);
+}
+
+/// Brand and display styles outside the Material type scale. Each derives
+/// from a scale style in [shioriTheme] so font family and colour follow it.
+@immutable
+class ShioriType extends ThemeExtension<ShioriType> {
+  const ShioriType({
+    required this.brand,
+    required this.displayTitle,
+    required this.badge,
+  });
+
+  /// Wordmark text, e.g. the launch screen.
+  final TextStyle brand;
+
+  /// A single work's title on its detail page.
+  final TextStyle displayTitle;
+
+  /// Tiny labels over artwork, e.g. a cover's format badge.
+  final TextStyle badge;
+
+  /// Falls back to the ambient text theme under a theme built elsewhere
+  /// (e.g. a plain `ThemeData()` host).
+  static ShioriType of(BuildContext context) {
+    final theme = Theme.of(context);
+    if (theme.extension<ShioriType>() case final type?) return type;
+    final t = theme.textTheme;
+    return ShioriType(
+      brand: (t.headlineSmall ?? const TextStyle()).copyWith(
+        fontSize: 32,
+        letterSpacing: 3,
+        fontWeight: FontWeight.w400,
+      ),
+      displayTitle: (t.titleLarge ?? const TextStyle()).copyWith(
+        fontSize: 22,
+        height: 1.35,
+      ),
+      badge: (t.labelSmall ?? const TextStyle()).copyWith(
+        fontSize: 10,
+        height: 1.05,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  @override
+  ShioriType copyWith({
+    TextStyle? brand,
+    TextStyle? displayTitle,
+    TextStyle? badge,
+  }) => ShioriType(
+    brand: brand ?? this.brand,
+    displayTitle: displayTitle ?? this.displayTitle,
+    badge: badge ?? this.badge,
+  );
+
+  @override
+  ShioriType lerp(covariant ShioriType? other, double t) => other == null
+      ? this
+      : ShioriType(
+          brand: TextStyle.lerp(brand, other.brand, t)!,
+          displayTitle: TextStyle.lerp(displayTitle, other.displayTitle, t)!,
+          badge: TextStyle.lerp(badge, other.badge, t)!,
+        );
 }
 
 @immutable
@@ -197,7 +262,15 @@ ThemeData shioriTheme(
     brightness: brightness,
     colorScheme: scheme,
     scaffoldBackgroundColor: p.paper,
-    extensions: [p, ShioriAccent(accent)],
+    extensions: [
+      p,
+      ShioriAccent(accent),
+      ShioriType(
+        brand: text(32).copyWith(letterSpacing: 3),
+        displayTitle: text(22, weight: FontWeight.w600).copyWith(height: 1.35),
+        badge: text(10, weight: FontWeight.w500).copyWith(height: 1.05),
+      ),
+    ],
     dividerColor: p.separator,
     popupMenuTheme: PopupMenuThemeData(
       color: p.surface,

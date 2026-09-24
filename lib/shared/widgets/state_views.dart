@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 
 import '../../domain/errors/app_failure.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -141,7 +142,7 @@ class _StateLayout extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           for (var index = 0; index < children.length; index++) ...[
-            if (index > 0) const SizedBox(height: 16),
+            if (index > 0) const SizedBox(height: ShioriSpace.item),
             children[index],
           ],
         ],

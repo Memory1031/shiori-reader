@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -94,7 +95,7 @@ class ReaderImage extends StatelessWidget {
           child: Tooltip(
             message: block.caption!,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: ShioriSpace.small),
               child: Text(
                 block.caption!,
                 style: readerCaptionStyle,

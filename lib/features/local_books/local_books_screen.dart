@@ -452,7 +452,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                     sliver: SliverPadding(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(ShioriSpace.small),
                       sliver: SliverList.separated(
                         itemCount: books.length,
                         itemBuilder: (context, index) =>
@@ -537,7 +537,10 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
         borderRadius: radius,
         onTap: _busy ? null : () => widget.onRead(book.key),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          padding: const EdgeInsets.symmetric(
+            horizontal: ShioriSpace.medium,
+            vertical: ShioriSpace.item,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -553,7 +556,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                   tinted: epub,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: ShioriSpace.item),
               Expanded(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minHeight: 96),
@@ -633,7 +636,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     final colors = theme.colorScheme;
     final failed = _failure != null;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(ShioriSpace.item),
       decoration: BoxDecoration(
         color: failed ? colors.errorContainer : colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(ShioriShape.card),
@@ -651,7 +654,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                 ),
                 style: theme.textTheme.bodyMedium,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: ShioriSpace.medium),
             ],
             ClipRRect(
               borderRadius: BorderRadius.circular(ShioriShape.tag),
@@ -701,13 +704,13 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
             size: 56,
             color: theme.colorScheme.primary,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: ShioriSpace.page),
           Text(
             l.localBooksEmpty,
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: ShioriSpace.page),
           FilledButton.icon(
             onPressed: _busy ? null : widget.onImport,
             icon: const Icon(Icons.add),

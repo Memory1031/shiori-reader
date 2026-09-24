@@ -165,7 +165,7 @@ class DetailScreen extends StatelessWidget {
                                           context,
                                         ).colorScheme.primary,
                                       ),
-                                      const SizedBox(width: 8),
+                                      const SizedBox(width: ShioriSpace.small),
                                       Flexible(
                                         child: Text(
                                           strings.detailOnShelf,
@@ -193,7 +193,7 @@ class DetailScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 read,
-                                const SizedBox(height: 8),
+                                const SizedBox(height: ShioriSpace.small),
                                 shelf,
                               ],
                             );
@@ -201,7 +201,7 @@ class DetailScreen extends StatelessWidget {
                           return Row(
                             children: [
                               Expanded(flex: 3, child: read),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: ShioriSpace.medium),
                               Expanded(flex: 2, child: shelf),
                             ],
                           );
@@ -226,7 +226,7 @@ class DetailScreen extends StatelessWidget {
                         key: ValueKey(('synopsis', novel)),
                         text: loaded.value.synopsis,
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: ShioriSpace.section),
                       VolumePreview(
                         novel: novel,
                         repository: repository,

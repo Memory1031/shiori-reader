@@ -200,7 +200,7 @@ class _ReadingHomeState extends State<ReadingHome> {
               size: 20,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: ShioriSpace.medium),
             Flexible(child: Text(label)),
           ],
         ),

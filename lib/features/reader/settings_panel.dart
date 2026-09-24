@@ -65,7 +65,10 @@ class ReaderSettingsPanel extends StatelessWidget {
             ReaderSettings Function(double) change,
           ) => Container(
             margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: ShioriSpace.item,
+              vertical: ShioriSpace.small,
+            ),
             decoration: BoxDecoration(
               color: Theme.of(
                 context,
@@ -149,7 +152,7 @@ class ReaderSettingsPanel extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: ShioriSpace.small),
                         ],
                         Row(
                           children: [
@@ -174,7 +177,7 @@ class ReaderSettingsPanel extends StatelessWidget {
                   ),
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(ShioriSpace.page),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -185,7 +188,7 @@ class ReaderSettingsPanel extends StatelessWidget {
                                 '${l.readerSettingsFailure} ${l.retryAction}',
                               ),
                             ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: ShioriSpace.item),
                           stepper(
                             l.readerFontSize,
                             s.fontSize,
@@ -214,7 +217,7 @@ class ReaderSettingsPanel extends StatelessWidget {
                             l.readerHorizontalPadding,
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: ShioriSpace.small),
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
@@ -243,14 +246,14 @@ class ReaderSettingsPanel extends StatelessWidget {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: ShioriSpace.small),
                           const Divider(),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: ShioriSpace.item),
                           Text(
                             l.readerColors,
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: ShioriSpace.medium),
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import '../app/theme/shiori_theme.dart';
 
 import '../domain/contracts/contracts.dart';
 import '../domain/models/models.dart';
@@ -399,7 +400,7 @@ class _SourceImageState extends State<SourceImage> {
           child: FittedBox(
             fit: BoxFit.scaleDown,
             child: Padding(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(ShioriSpace.small),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

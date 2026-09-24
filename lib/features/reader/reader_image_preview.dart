@@ -101,7 +101,7 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
               ),
               if (widget.block.caption?.isNotEmpty == true)
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(ShioriSpace.item),
                   child: Text(
                     widget.block.caption!,
                     maxLines: 3,

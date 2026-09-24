@@ -150,7 +150,7 @@ class _CacheScreenState extends State<CacheScreen> {
                               l.cacheBooks,
                               style: theme.textTheme.titleSmall,
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: ShioriSpace.small),
                             if (groups.isEmpty)
                               Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -180,7 +180,7 @@ class _CacheScreenState extends State<CacheScreen> {
                                   (_overview?.textBytes ?? 0) +
                                           (_overview?.imageBytes ?? 0) >
                                       0) ...[
-                                const SizedBox(height: 12),
+                                const SizedBox(height: ShioriSpace.medium),
                                 TextButton(
                                   key: const ValueKey('cache-clear-all'),
                                   style: TextButton.styleFrom(
@@ -227,7 +227,7 @@ class _CacheScreenState extends State<CacheScreen> {
     final textBytes = _overview?.textBytes ?? 0;
     final imageBytes = _overview?.imageBytes ?? 0;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: ShioriSpace.medium),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -237,7 +237,7 @@ class _CacheScreenState extends State<CacheScreen> {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: ShioriSpace.small),
           Text.rich(
             TextSpan(
               children: [
@@ -256,7 +256,7 @@ class _CacheScreenState extends State<CacheScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: ShioriSpace.medium),
           Text(
             l.cacheUsage(
               (textBytes / 1048576).toStringAsFixed(1),
@@ -266,7 +266,7 @@ class _CacheScreenState extends State<CacheScreen> {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: ShioriSpace.page),
           Text(
             l.cacheCounts(books, _overview?.chapters.length ?? 0),
             style: theme.textTheme.bodyMedium,

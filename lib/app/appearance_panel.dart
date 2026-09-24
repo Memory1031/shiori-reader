@@ -48,9 +48,9 @@ class _AppearancePanelState extends State<_AppearancePanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(l.appAppearance, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
+          const SizedBox(height: ShioriSpace.medium),
           Text(l.appAppearanceDescription),
-          const SizedBox(height: 16),
+          const SizedBox(height: ShioriSpace.item),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -73,12 +73,12 @@ class _AppearancePanelState extends State<_AppearancePanel> {
                 ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: ShioriSpace.page),
           Text(
             l.appAccentTitle,
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: ShioriSpace.small),
           Wrap(
             spacing: 8,
             runSpacing: 8,

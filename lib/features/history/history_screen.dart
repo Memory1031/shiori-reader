@@ -1,5 +1,6 @@
 import '../reader/book_progress_label.dart';
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/app_scaffold.dart';
@@ -36,7 +37,9 @@ class HistoryScreen extends StatelessWidget {
                   : library.recent.isEmpty
                   ? EmptyView(message: strings.historyEmpty)
                   : ListView.builder(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: ShioriSpace.medium,
+                      ),
                       itemCount: library.recent.length,
                       itemBuilder: (context, index) {
                         final item = library.recent[index];

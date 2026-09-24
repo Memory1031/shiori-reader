@@ -42,7 +42,7 @@ class ContinueReadingCard extends StatelessWidget {
           style: theme.textTheme.bodySmall,
         ),
         if (bookProgress != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: ShioriSpace.small),
           ExcludeSemantics(
             child: LinearProgressIndicator(
               value: bookProgress.fraction,
@@ -61,7 +61,10 @@ class ContinueReadingCard extends StatelessWidget {
       style: TextButton.styleFrom(
         foregroundColor: colors.primary,
         minimumSize: const Size(48, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 6,
+          vertical: ShioriSpace.small,
+        ),
         textStyle: theme.textTheme.labelMedium,
       ),
       child: Row(
@@ -102,7 +105,7 @@ class ContinueReadingCard extends StatelessWidget {
           onTap: onContinue,
           borderRadius: radius,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(ShioriSpace.item),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -110,7 +113,7 @@ class ContinueReadingCard extends StatelessWidget {
                   width: 64,
                   child: BookCover(book: progress.snapshot, images: images),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: ShioriSpace.item),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,7 +125,7 @@ class ContinueReadingCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: ShioriSpace.small),
                       LayoutBuilder(
                         builder: (context, bounds) {
                           if (bounds.maxWidth < 190 ||
@@ -131,7 +134,7 @@ class ContinueReadingCard extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 progressSummary,
-                                const SizedBox(height: 8),
+                                const SizedBox(height: ShioriSpace.small),
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: continueButton,
@@ -142,7 +145,7 @@ class ContinueReadingCard extends StatelessWidget {
                           return Row(
                             children: [
                               Expanded(child: progressSummary),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: ShioriSpace.medium),
                               continueButton,
                             ],
                           );

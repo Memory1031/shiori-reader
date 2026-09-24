@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
+import '../../app/theme/shiori_theme.dart';
 import 'package:flutter/services.dart';
 
 /// Reader chrome geometry derived from text scale, so running headers and
@@ -185,10 +186,10 @@ class _ReaderStatusRowState extends State<ReaderStatusRow> {
                 ),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: ShioriSpace.tight),
             label('$level%'),
           ],
-          const SizedBox(width: 12),
+          const SizedBox(width: ShioriSpace.medium),
           // Clock and battery keep their size; progress ellipsizes on narrow
           // pages.
           Expanded(

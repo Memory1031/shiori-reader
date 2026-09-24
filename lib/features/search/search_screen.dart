@@ -111,7 +111,7 @@ class _SearchBody extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: ShioriSpace.medium),
                       ],
                       _SearchInput(
                         onChanged: controller.edit,
@@ -270,14 +270,14 @@ class _SearchInputState extends State<_SearchInput> {
         ),
         prefixIcon: const Icon(Icons.search, size: 22),
         suffixIcon: Padding(
-          padding: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(ShioriSpace.tight),
           child: TextButton(
             key: const ValueKey('search-submit'),
 
             onPressed: widget.enabled ? widget.onSubmit : null,
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: ShioriSpace.item),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(ShioriShape.control),
               ),
