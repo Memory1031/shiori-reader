@@ -37,10 +37,7 @@ const minCard = 132.0, maxCard = 168.0, gap = 20.0, rowGap = 24.0;
 const maxDensityScale = 1.3;
 
 /// The shelf frame's inset from the workspace edge for a window [width].
-double desktopShelfGutter(double width) =>
-    width >= ShioriLayout.sidebarBreakpoint
-    ? ShioriLayout.shelfGutterWide
-    : ShioriLayout.shelfGutter;
+double desktopShelfGutter(double width) => ShioriLayout.gutter(width);
 
 /// Opens a book menu from the Menu key or Shift+F10 while [child] or a
 /// descendant has focus.

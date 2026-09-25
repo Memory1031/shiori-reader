@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import '../local_books/local_catalog.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/widgets/book_list_tile.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
 import 'catalog_controller.dart';
@@ -115,7 +117,12 @@ class VolumePreview extends StatelessWidget {
           else if (catalog.flatChapters.isEmpty)
             EmptyView(message: l.catalogEmpty)
           else
-            ..._preview(context, catalog),
+            _Bleed(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: _preview(context, catalog),
+              ),
+            ),
         ],
       );
     },
@@ -131,7 +138,12 @@ class VolumePreview extends StatelessWidget {
       if (!volume.isSynthetic) {
         rows.add(
           Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 4),
+            padding: const EdgeInsetsDirectional.only(
+              start: BookListItem.inset,
+              end: BookListItem.inset,
+              top: 12,
+              bottom: 4,
+            ),
             child: Semantics(
               header: true,
               child: Text(
@@ -145,42 +157,10 @@ class VolumePreview extends StatelessWidget {
       }
       for (final chapter in volume.chapters.take(remaining)) {
         rows.add(
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              key: ValueKey(('preview-chapter', chapter.key)),
-              onTap: onChapter == null ? null : () => onChapter!(chapter.key),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: theme.colorScheme.outlineVariant.withValues(
-                        alpha: .45,
-                      ),
-                    ),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        chapter.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ),
-                    const SizedBox(width: ShioriSpace.medium),
-                    Icon(
-                      Icons.chevron_right,
-                      size: 18,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          _PreviewRow(
+            key: ValueKey(('preview-chapter', chapter.key)),
+            title: chapter.title,
+            onTap: onChapter == null ? null : () => onChapter!(chapter.key),
           ),
         );
         remaining--;
@@ -266,7 +246,9 @@ class _LocalNavigationPreviewState extends State<_LocalNavigationPreview> {
               onPressed: () {
                 _request.cancel();
                 _request = CancellationSource();
-                setState(() => _result = _load());
+                setState(() {
+                  _result = _load();
+                });
               },
               child: Text(l.retryAction),
             ),
@@ -286,57 +268,95 @@ class _LocalNavigationPreviewState extends State<_LocalNavigationPreview> {
       if (rows.isEmpty) {
         return EmptyView(message: AppLocalizations.of(context).catalogEmpty);
       }
-      final theme = Theme.of(context);
-      return Column(
-        children: [
-          for (var i = 0; i < rows.length; i++)
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
+      return _Bleed(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < rows.length; i++)
+              _PreviewRow(
                 key: ValueKey(('preview-local', i)),
+                title: rows[i].$1.title,
+                indent: rows[i].$2.clamp(0, 4) * 12.0,
                 onTap: widget.onTarget != null
                     ? () => widget.onTarget!(rows[i].$1)
                     : widget.onChapter == null
                     ? null
                     : () => widget.onChapter!(rows[i].$1.chapterKey),
-                child: Container(
-                  padding: EdgeInsetsDirectional.only(
-                    start: rows[i].$2.clamp(0, 4) * 12.0,
-                    top: 14,
-                    bottom: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: theme.colorScheme.outlineVariant.withValues(
-                          alpha: .45,
-                        ),
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          rows[i].$1.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ),
-                      const SizedBox(width: ShioriSpace.medium),
-                      Icon(
-                        Icons.chevron_right,
-                        size: 18,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ],
+              ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+/// Lays [child] out [BookListItem.inset] wider on each side, so row tints
+/// reach past the section edge while row content stays on it.
+class _Bleed extends StatelessWidget {
+  const _Bleed({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, bounds) {
+      final width = bounds.maxWidth + 2 * BookListItem.inset;
+      return OverflowBox(
+        minWidth: width,
+        maxWidth: width,
+        fit: OverflowBoxFit.deferToChild,
+        child: child,
+      );
+    },
+  );
+}
+
+/// A catalog preview row in the shelf list's style: a rounded accent tint
+/// on hover, focus and press instead of an edge-to-edge overlay.
+class _PreviewRow extends StatelessWidget {
+  const _PreviewRow({
+    super.key,
+    required this.title,
+    this.indent = 0,
+    this.onTap,
+  });
+  final String title;
+  final double indent;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => BookListItem(
+    minHeight: 0,
+    onTap: onTap,
+    child: Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return Padding(
+          // With the row's own padding, keeps the earlier 14 above and below.
+          padding: EdgeInsetsDirectional.only(start: indent, top: 2, bottom: 2),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: BookListItem.activeOf(context)
+                        ? theme.colorScheme.primary
+                        : null,
                   ),
                 ),
               ),
-            ),
-        ],
-      );
-    },
+              const SizedBox(width: ShioriSpace.medium),
+              Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        );
+      },
+    ),
   );
 }

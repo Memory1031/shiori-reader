@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shiori/app/theme/shiori_theme.dart';
 import 'package:shiori/features/bookshelf/bookshelf_view.dart';
 import 'package:shiori/features/home/desktop_shell.dart';
 import 'package:shiori/features/home/home_navigation.dart';
+import 'package:shiori/features/novel_detail/desktop_detail.dart';
+import 'package:shiori/features/novel_detail/detail_sections.dart';
 import 'package:shiori/features/novel_detail/detail_screen.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/search/search_screen.dart';
@@ -165,6 +168,54 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(BookshelfView), findsOneWidget);
     expect(h.layout, ShellLayout.sidebar);
+    await h.close();
+  }, variant: _desktop);
+
+  testWidgets('details over the reader use the window frame and keep their '
+      'state', (tester) async {
+    final h = ShellHarness(tester);
+    await h.pump();
+    await h.search();
+    await h.openResult();
+    await read(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip(h.l.moreActions));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(h.l.novelDetailsTitle).last);
+    await tester.pumpAndSettle();
+    // The workspace copy stays mounted under the reader; the two share no
+    // keys.
+    expect(find.byType(DesktopDetail, skipOffstage: false), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
+    final over = find.byType(DesktopDetail);
+    expect(Navigator.of(tester.element(over)), same(h.root));
+    final state = tester.state(over);
+
+    Rect back() => tester.getRect(find.byKey(const ValueKey('detail-back')));
+    Rect cover() => tester.getRect(
+      find.descendant(of: over, matching: find.byType(DetailCover)),
+    );
+    expect(back().left, closeTo(ShioriLayout.gutter(1280), .01));
+    expect(cover().width, closeTo(ShioriLayout.detailSideWide, .01));
+
+    for (final width in [900.0, 1600.0, 1280.0]) {
+      await h.resize(width);
+      expect(tester.state(find.byType(DesktopDetail)), same(state));
+      expect(back().left, closeTo(ShioriLayout.gutter(width), .01));
+      expect(tester.takeException(), isNull, reason: '$width');
+    }
+    expect(cover().width, closeTo(ShioriLayout.detailSideWide, .01));
+
+    // Reading from here returns to the reader beneath.
+    final reader = tester.element(
+      find.byType(BookReaderScreen, skipOffstage: false),
+    );
+    await tester.tap(find.byKey(const ValueKey('detail-read')));
+    await tester.pumpAndSettle();
+    expect(tester.element(find.byType(BookReaderScreen)), same(reader));
+    expect(find.byType(DesktopDetail), findsNothing);
+    expect(find.byType(DesktopDetail, skipOffstage: false), findsOneWidget);
     await h.close();
   }, variant: _desktop);
 }

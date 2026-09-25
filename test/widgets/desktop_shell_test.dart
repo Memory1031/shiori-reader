@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/appearance_panel.dart';
+import 'package:shiori/app/theme/shiori_theme.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
@@ -12,6 +13,7 @@ import 'package:shiori/features/bookshelf/desktop_shelf.dart';
 import 'package:shiori/features/home/desktop_shell.dart';
 import 'package:shiori/features/home/home_navigation.dart';
 import 'package:shiori/features/home/reading_home.dart';
+import 'package:shiori/features/novel_detail/desktop_detail.dart';
 import 'package:shiori/features/novel_detail/detail_screen.dart';
 import 'package:shiori/features/search/search_screen.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
@@ -715,6 +717,60 @@ void main() {
     // The list layout chosen before is kept.
     expect(h.shelfGrid, isFalse);
     expect(tester.takeException(), isNull);
+    await h.close();
+  }, variant: _desktop);
+
+  testWidgets('workspace details start on the shelf toolbar edge', (
+    tester,
+  ) async {
+    final h = ShellHarness(tester);
+    await h.pump(onShelf: true);
+    await tester.tap(find.byTooltip(h.l.shelfList));
+    await tester.pumpAndSettle();
+    for (final width in [900.0, 1280.0, 1600.0]) {
+      await h.resize(width);
+      final edge = (width >= 1200 ? 232 : 72) + ShioriLayout.gutter(width);
+      expect(
+        tester.getRect(find.text(h.l.homeShelf)).left,
+        closeTo(edge, .01),
+        reason: '$width',
+      );
+      await tester.tap(find.byTooltip(h.l.moreActions));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(h.l.novelDetailsTitle));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(find.byKey(const ValueKey('detail-back'))).left,
+        closeTo(edge, .01),
+        reason: '$width',
+      );
+      await tester.tap(find.byKey(const ValueKey('detail-back')));
+      await tester.pumpAndSettle();
+      expect(find.byType(DetailScreen, skipOffstage: false), findsNothing);
+    }
+    expect(tester.takeException(), isNull);
+    await h.close();
+  }, variant: _desktop);
+
+  testWidgets('Escape with the details menu open closes the menu, then the '
+      'page', (tester) async {
+    final h = ShellHarness(tester);
+    await h.pump();
+    await h.search();
+    await h.openResult();
+    final search = tester.element(
+      find.byType(SearchScreen, skipOffstage: false),
+    );
+    await tester.tap(find.byKey(const ValueKey('detail-more')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('detail-refresh')), findsOneWidget);
+    await h.key(LogicalKeyboardKey.escape);
+    expect(find.byKey(const ValueKey('detail-refresh')), findsNothing);
+    expect(find.byType(DesktopDetail), findsOneWidget);
+    await h.key(LogicalKeyboardKey.escape);
+    expect(find.byType(DetailScreen, skipOffstage: false), findsNothing);
+    expect(tester.element(find.byType(SearchScreen)), same(search));
+    expect(h.navigation.section, HomeSection.search);
     await h.close();
   }, variant: _desktop);
 }

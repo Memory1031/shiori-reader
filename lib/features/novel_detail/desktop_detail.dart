@@ -1,0 +1,312 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '../../app/theme/shiori_theme.dart';
+import '../../l10n/generated/app_localizations.dart';
+
+/// Gutter, frame and columns for desktop details laid out in [available]
+/// width, in a window [window] wide.
+///
+/// The frame is left-aligned on the window's gutter and capped at
+/// [ShioriLayout.detail]. Two columns need [ShioriLayout.detailColumns]
+/// scaled by the full text scale, so large text falls back to one column
+/// instead of squeezing the side column.
+({double gutter, double frame, bool columns, double side, double main})
+desktopDetailLayout(double available, double window, TextScaler scaler) {
+  final gutter = ShioriLayout.gutter(window);
+  final frame = (available - 2 * gutter).clamp(0.0, ShioriLayout.detail);
+  final scale = math.max(1.0, scaler.scale(15) / 15);
+  final side = frame >= DesktopDetail.wideSide
+      ? ShioriLayout.detailSideWide
+      : ShioriLayout.detailSide;
+  return (
+    gutter: gutter,
+    frame: frame,
+    columns: frame >= ShioriLayout.detailColumns * scale,
+    side: side,
+    main: frame - side - ShioriLayout.detailGap,
+  );
+}
+
+/// Novel details on the desktop: a fixed title bar over one scrolling page,
+/// both on the same left-aligned frame.
+///
+/// Wide frames put the cover and reading actions in a side column beside
+/// the book's text and catalog; narrow frames and large text stack them.
+/// Parts keep their state across that change, so the page never reloads,
+/// collapses expanded text or drops focus when the window is resized.
+class DesktopDetail extends StatefulWidget {
+  const DesktopDetail({
+    super.key,
+    required this.menu,
+    this.placeholder,
+    this.notices = const [],
+    this.cover,
+    this.info,
+    this.tags,
+    this.read,
+    this.shelf,
+    this.actionNotes = const [],
+    this.synopsis,
+    this.catalog,
+  }) : assert(
+         placeholder != null ||
+             cover != null &&
+                 info != null &&
+                 read != null &&
+                 shelf != null &&
+                 catalog != null,
+       );
+
+  /// The more actions button at the end of the title bar.
+  final Widget menu;
+
+  /// Shown in place of the page until details load.
+  final Widget? placeholder;
+
+  /// Loading, stale and refresh failure notes across the frame.
+  final List<Widget> notices;
+  final Widget? cover, info, tags, read, shelf, synopsis, catalog;
+
+  /// Notes about the reading and shelf actions, kept under them.
+  final List<Widget> actionNotes;
+
+  /// Cover width in one column.
+  static const singleCover = 120.0;
+
+  /// From this frame width the side column is [ShioriLayout.detailSideWide].
+  static const wideSide = 1000.0;
+
+  @override
+  State<DesktopDetail> createState() => _DesktopDetailState();
+}
+
+class _DesktopDetailState extends State<DesktopDetail> {
+  // Parts that move between the one and two column trees, keyed so their
+  // state moves with them: the cover image, expanded text, button focus
+  // and the catalog preview's controller. Each page owns its keys.
+  final _cover = GlobalKey(debugLabel: 'detail-cover');
+  final _tags = GlobalKey(debugLabel: 'detail-tags');
+  final _read = GlobalKey(debugLabel: 'detail-read');
+  final _shelf = GlobalKey(debugLabel: 'detail-shelf');
+  final _synopsis = GlobalKey(debugLabel: 'detail-synopsis');
+  final _catalog = GlobalKey(debugLabel: 'detail-catalog');
+
+  Widget get _coverPart => KeyedSubtree(key: _cover, child: widget.cover!);
+  Widget get _readPart => KeyedSubtree(key: _read, child: widget.read!);
+  Widget get _shelfPart => KeyedSubtree(key: _shelf, child: widget.shelf!);
+  Widget get _catalogPart =>
+      KeyedSubtree(key: _catalog, child: widget.catalog!);
+
+  List<Widget> _tagsPart(double gap) => [
+    if (widget.tags case final tags?) ...[
+      SizedBox(height: gap),
+      KeyedSubtree(key: _tags, child: tags),
+    ],
+  ];
+
+  List<Widget> _synopsisPart(BuildContext context) => [
+    if (widget.synopsis case final synopsis?) ...[
+      const SizedBox(height: ShioriSpace.section),
+      Text(
+        AppLocalizations.of(context).detailSynopsis,
+        style: Theme.of(context).textTheme.titleLarge,
+      ),
+      const SizedBox(height: ShioriSpace.medium),
+      KeyedSubtree(key: _synopsis, child: synopsis),
+    ],
+  ];
+
+  Widget _columns(BuildContext context, double side) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(
+        width: side,
+        child: FocusTraversalGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _coverPart,
+              const SizedBox(height: ShioriSpace.page),
+              _readPart,
+              const SizedBox(height: ShioriSpace.small),
+              _shelfPart,
+              ...widget.actionNotes,
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(width: ShioriLayout.detailGap),
+      Expanded(
+        child: FocusTraversalGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              widget.info!,
+              ..._tagsPart(ShioriSpace.item),
+              ..._synopsisPart(context),
+              const SizedBox(height: ShioriSpace.section),
+              _catalogPart,
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+
+  /// The mobile header's arrangement on the frame: cover beside the text,
+  /// tags across below, then the actions in a row until space or text size
+  /// runs out.
+  Widget _single(BuildContext context, double frame) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final stackHeader = frame < 340 || frame < 560 && scaler.scale(20) > 28;
+    final cover = SizedBox(width: DesktopDetail.singleCover, child: _coverPart);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (stackHeader)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: cover),
+              const SizedBox(height: 24),
+              widget.info!,
+            ],
+          )
+        else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              cover,
+              const SizedBox(width: 24),
+              Expanded(child: widget.info!),
+            ],
+          ),
+        ..._tagsPart(ShioriSpace.page),
+        const SizedBox(height: ShioriSpace.section),
+        if (frame < 340 || scaler.scale(14) > 20)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _readPart,
+              const SizedBox(height: ShioriSpace.small),
+              _shelfPart,
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(flex: 3, child: _readPart),
+              const SizedBox(width: ShioriSpace.medium),
+              Expanded(flex: 2, child: _shelfPart),
+            ],
+          ),
+        ...widget.actionNotes,
+        ..._synopsisPart(context),
+        const SizedBox(height: ShioriSpace.section),
+        _catalogPart,
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: LayoutBuilder(
+        builder: (context, bounds) {
+          final layout = desktopDetailLayout(
+            bounds.maxWidth,
+            MediaQuery.sizeOf(context).width,
+            MediaQuery.textScalerOf(context),
+          );
+          Widget framed(Widget child) => Padding(
+            padding: EdgeInsets.symmetric(horizontal: layout.gutter),
+            child: Align(
+              alignment: AlignmentDirectional.topStart,
+              child: SizedBox(width: layout.frame, child: child),
+            ),
+          );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              framed(DesktopDetailBar(menu: widget.menu)),
+              Expanded(
+                child: widget.placeholder != null
+                    ? framed(widget.placeholder!)
+                    : SingleChildScrollView(
+                        key: const ValueKey('detail-scroll'),
+                        padding: const EdgeInsets.only(
+                          top: ShioriSpace.small,
+                          bottom: ShioriSpace.section,
+                        ),
+                        child: framed(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ...widget.notices,
+                              if (layout.columns)
+                                _columns(context, layout.side)
+                              else
+                                _single(context, layout.frame),
+                            ],
+                          ),
+                        ),
+                      ),
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+}
+
+/// The fixed detail title bar on the page frame: back in its own slot at
+/// the frame's start, the page title after it, more actions ending on the
+/// frame's end.
+class DesktopDetailBar extends StatelessWidget {
+  const DesktopDetailBar({super.key, required this.menu});
+  final Widget menu;
+
+  /// The back and more buttons' square slots, and the gap before the title.
+  static const slot = 40.0, backGap = ShioriSpace.small;
+
+  @override
+  Widget build(BuildContext context) {
+    final canPop = ModalRoute.of(context)?.impliesAppBarDismissal ?? false;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 64),
+      child: Padding(
+        padding: const EdgeInsets.only(
+          top: ShioriSpace.item,
+          bottom: ShioriSpace.medium,
+        ),
+        child: Row(
+          children: [
+            if (canPop) ...[
+              const SizedBox.square(
+                dimension: slot,
+                child: BackButton(key: ValueKey('detail-back')),
+              ),
+              const SizedBox(width: backGap),
+            ],
+            Expanded(
+              child: Semantics(
+                header: true,
+                child: Text(
+                  AppLocalizations.of(context).novelDetailsTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+            ),
+            const SizedBox(width: ShioriSpace.item),
+            SizedBox.square(dimension: slot, child: menu),
+          ],
+        ),
+      ),
+    );
+  }
+}
