@@ -297,8 +297,21 @@ class DetailHarness {
 
   /// Scrolls [target] into view and checks it is inside the page's viewport
   /// with nothing over it. Catalog rows may tint [BookListItem.inset] past
-  /// the frame.
+  /// the frame, and are only built once scrolled near.
   Future<void> expectReachable(Finder target) async {
+    if (target.evaluate().isEmpty) {
+      final page = find
+          .descendant(
+            of: key('detail-scroll'),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      tester.state<ScrollableState>(page).position.jumpTo(0);
+      await tester.pump();
+      if (target.evaluate().isEmpty) {
+        await tester.scrollUntilVisible(target, 200, scrollable: page);
+      }
+    }
     await tester.ensureVisible(target);
     await tester.pumpAndSettle();
     final viewport = rect(key('detail-scroll'));
@@ -354,7 +367,6 @@ List<Finder> actions(DetailHarness h, {bool tags = true, bool text = true}) => [
   h.key('detail-shelf'),
   if (tags) h.key('detail-tags-toggle'),
   if (text) h.key('detail-synopsis-toggle'),
-  h.key('detail-catalog'),
   h.novel == local ? h.key(('preview-local', 0)) : find.text('Chapter 1'),
 ];
 
@@ -376,9 +388,23 @@ void expectFrame(DetailHarness h, {required bool columns}) {
     h.rect(h.key('detail-more')).right,
     moreOrLessEquals(start + layout.frame),
   );
+  // The page scroll reaches the window's end; two columns keep the side
+  // column out of it.
   final scroll = h.rect(h.key('detail-scroll'));
-  expect(scroll.left, moreOrLessEquals(h.offset));
+  expect(
+    scroll.left,
+    moreOrLessEquals(columns ? start + layout.side : h.offset),
+  );
   expect(scroll.right, moreOrLessEquals(h.width));
+  if (columns) {
+    final side = h.rect(h.key('detail-side'));
+    expect(side.left, moreOrLessEquals(start));
+    expect(side.width, moreOrLessEquals(layout.side));
+    expect(side.top, moreOrLessEquals(scroll.top));
+    expect(side.bottom, moreOrLessEquals(scroll.bottom));
+  } else {
+    expect(h.key('detail-side'), findsNothing);
+  }
 
   final cover = h.rect(find.byType(DetailCover));
   final info = h.rect(find.byType(DetailBookInfo));
@@ -507,6 +533,31 @@ void main() {
     }
   }, variant: _desktop);
 
+  testWidgets('the side column stays while the text and catalog scroll', (
+    tester,
+  ) async {
+    final h = DetailHarness(tester, Requests(book(online)));
+    await h.pump(width: 1280);
+    expect(h.layout.columns, isTrue);
+    final cover = h.rect(find.byType(DetailCover));
+    final read = h.rect(h.key('detail-read'));
+    final heading = h.rect(find.text(h.l.catalogTitle));
+    await tester.drag(h.key('detail-scroll'), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    expect(h.rect(find.text(h.l.catalogTitle)).top, lessThan(heading.top));
+    expect(h.rect(find.byType(DetailCover)), cover);
+    expect(h.rect(h.key('detail-read')), read);
+
+    // One column scrolls as one page.
+    await h.resize(900);
+    expect(h.layout.columns, isFalse);
+    final stacked = h.rect(find.byType(DetailCover));
+    await tester.drag(h.key('detail-scroll'), const Offset(0, -100));
+    await tester.pumpAndSettle();
+    expect(h.rect(find.byType(DetailCover)).top, lessThan(stacked.top));
+    await h.close();
+  }, variant: _desktop);
+
   for (final novel in [online, local]) {
     final name = novel == local ? 'local' : 'online';
     testWidgets('$name details keep their state and requests across columns, '
@@ -538,6 +589,7 @@ void main() {
           ? tester.state(
               find.byWidgetPredicate(
                 (w) => w.runtimeType.toString() == '_LocalNavigationPreview',
+                skipOffstage: false,
               ),
             )
           : null;
@@ -546,6 +598,7 @@ void main() {
                 .widget<FutureBuilder<Result<List<LocalNavigationEntry>>>>(
                   find.byType(
                     FutureBuilder<Result<List<LocalNavigationEntry>>>,
+                    skipOffstage: false,
                   ),
                 )
                 .future
@@ -562,6 +615,7 @@ void main() {
             tester.state(
               find.byWidgetPredicate(
                 (w) => w.runtimeType.toString() == '_LocalNavigationPreview',
+                skipOffstage: false,
               ),
             ),
             same(localPreview),
@@ -571,6 +625,7 @@ void main() {
                 .widget<FutureBuilder<Result<List<LocalNavigationEntry>>>>(
                   find.byType(
                     FutureBuilder<Result<List<LocalNavigationEntry>>>,
+                    skipOffstage: false,
                   ),
                 )
                 .future,
@@ -579,7 +634,7 @@ void main() {
         }
         expect(find.byType(DetailScreen), findsOneWidget);
         expect(find.byType(DesktopDetail), findsOneWidget);
-        expect(find.byType(VolumePreview), findsOneWidget);
+        expect(find.byType(VolumePreview, skipOffstage: false), findsOneWidget);
         expect(find.text(h.l.detailShowLess), findsNWidgets(2), reason: step);
         expect(primaryFocus, same(read), reason: step);
         expect(repo.details, [ReadMode.cacheFirst], reason: step);
@@ -744,7 +799,7 @@ void main() {
       'detail-shelf',
       'detail-tags-toggle',
       'detail-synopsis-toggle',
-      'detail-catalog',
+      'preview-chapter',
       'preview-chapter',
     ]);
     await h.resize(900);
@@ -755,7 +810,7 @@ void main() {
       'detail-read',
       'detail-shelf',
       'detail-synopsis-toggle',
-      'detail-catalog',
+      'preview-chapter',
       'preview-chapter',
     ]);
     await h.close();
@@ -851,10 +906,18 @@ void main() {
       for (final width in [1280.0, 900.0, 1600.0]) {
         await h.resize(width);
         await h.expectReachable(label);
-        final section = h.rect(find.byType(VolumePreview));
-        final heading = h.rect(find.text(h.l.catalogTitle));
+        // The heading spans the section: the text column on its frame.
+        final section = h.rect(find.text(h.l.catalogTitle));
         final row = h.rect(first);
-        expect(heading.left, moreOrLessEquals(section.left));
+        expect(
+          section.left,
+          moreOrLessEquals(
+            h.layout.columns
+                ? h.start + h.layout.side + ShioriLayout.detailGap
+                : h.start,
+          ),
+        );
+        expect(section.right, moreOrLessEquals(h.start + h.layout.frame));
         expect(h.rect(label).left, moreOrLessEquals(section.left));
         expect(row.left, moreOrLessEquals(section.left - BookListItem.inset));
         expect(row.right, moreOrLessEquals(section.right + BookListItem.inset));
@@ -863,6 +926,15 @@ void main() {
         expect(row.right, lessThan(h.width));
         if (h.layout.columns) {
           expect(row.left, greaterThan(h.start + h.layout.side));
+        }
+        // The whole tint takes the row's taps, bleed included.
+        for (final x in [row.left + 1, row.right - 1]) {
+          final hit = tester.hitTestOnBinding(Offset(x, row.center.dy));
+          expect(
+            hit.path.any((e) => e.target == tester.renderObject(first)),
+            isTrue,
+            reason: '$width $x',
+          );
         }
       }
 
@@ -905,14 +977,19 @@ void main() {
             await h.resize(width);
             // The title wraps in full; authors stop at two lines with the
             // whole list on hover and for assistive technology.
-            final titleText = tester.widget<Text>(find.text(title));
+            final titleText = tester.widget<Text>(
+              find.text(title, skipOffstage: false),
+            );
             expect(titleText.maxLines, isNull);
             expect(titleText.overflow, isNull);
             final authorText = tester.widget<Text>(
-              find.text(authors.join(', ')),
+              find.text(authors.join(', '), skipOffstage: false),
             );
             expect(authorText.maxLines, 2);
-            expect(find.byTooltip(authors.join(', ')), findsOneWidget);
+            expect(
+              find.byTooltip(authors.join(', '), skipOffstage: false),
+              findsOneWidget,
+            );
             for (final target in actions(h)) {
               await h.expectReachable(target);
             }
@@ -1009,7 +1086,7 @@ void main() {
         Success(fresh(Catalog(novelKey: online, volumes: const []))),
       );
       await tester.pumpAndSettle();
-      expect(find.text(h.l.catalogEmpty), findsOneWidget);
+      expect(find.text(h.l.catalogEmpty, skipOffstage: false), findsOneWidget);
       await h.expectReachable(find.text(h.l.catalogEmpty));
       expect(repo.catalogs, [ReadMode.cacheOnly]);
       await h.close();
@@ -1040,7 +1117,10 @@ void main() {
         await tester.tap(retry);
         await tester.pumpAndSettle();
         expect(repo.navigations, 2);
-        expect(find.text(h.l.catalogEmpty), findsOneWidget);
+        expect(
+          find.text(h.l.catalogEmpty, skipOffstage: false),
+          findsOneWidget,
+        );
         await h.resize(1280);
         expect(repo.navigations, 2);
         expect(repo.catalogs, [ReadMode.cacheOnly]);

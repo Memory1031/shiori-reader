@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/shiori_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/widgets/book_list_tile.dart';
 
 /// Gutter, frame and columns for desktop details laid out in [available]
 /// width, in a window [window] wide.
@@ -32,10 +33,14 @@ desktopDetailLayout(double available, double window, TextScaler scaler) {
 /// Novel details on the desktop: a fixed title bar over one scrolling page,
 /// both on the same left-aligned frame.
 ///
-/// Wide frames put the cover and reading actions in a side column beside
-/// the book's text and catalog; narrow frames and large text stack them.
+/// Wide frames put the cover and reading actions in a side column, fixed
+/// beside the book's scrolling text and catalog; narrow frames and large
+/// text stack them in one scrolling column.
 /// Parts keep their state across that change, so the page never reloads,
 /// collapses expanded text or drops focus when the window is resized.
+///
+/// [catalog] is a sliver that continues the text column, laid out
+/// [BookListItem.inset] wider on each side for its row tints.
 class DesktopDetail extends StatefulWidget {
   const DesktopDetail({
     super.key,
@@ -92,6 +97,8 @@ class _DesktopDetailState extends State<DesktopDetail> {
   final _shelf = GlobalKey(debugLabel: 'detail-shelf');
   final _synopsis = GlobalKey(debugLabel: 'detail-synopsis');
   final _catalog = GlobalKey(debugLabel: 'detail-catalog');
+  // The page scroll moves between the two trees too.
+  final _scroll = GlobalKey(debugLabel: 'detail-scroll');
 
   Widget get _coverPart => KeyedSubtree(key: _cover, child: widget.cover!);
   Widget get _readPart => KeyedSubtree(key: _read, child: widget.read!);
@@ -106,6 +113,17 @@ class _DesktopDetailState extends State<DesktopDetail> {
     ],
   ];
 
+  /// Box parts on the frame, inside the catalog's bleed.
+  static Widget _inset(List<Widget> children) => SliverToBoxAdapter(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: BookListItem.inset),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    ),
+  );
+
   List<Widget> _synopsisPart(BuildContext context) => [
     if (widget.synopsis case final synopsis?) ...[
       const SizedBox(height: ShioriSpace.section),
@@ -118,41 +136,46 @@ class _DesktopDetailState extends State<DesktopDetail> {
     ],
   ];
 
-  Widget _columns(BuildContext context, double side) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      SizedBox(
-        width: side,
-        child: FocusTraversalGroup(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _coverPart,
-              const SizedBox(height: ShioriSpace.page),
-              _readPart,
-              const SizedBox(height: ShioriSpace.small),
-              _shelfPart,
-              ...widget.actionNotes,
-            ],
-          ),
+  /// The cover and reading actions, fixed beside the scrolling text. They
+  /// scroll on their own only when large text makes them taller than the
+  /// page.
+  Widget _side(double side) => SizedBox(
+    width: side,
+    child: SingleChildScrollView(
+      key: const ValueKey('detail-side'),
+      padding: const EdgeInsets.only(
+        top: ShioriSpace.small,
+        bottom: ShioriSpace.section,
+      ),
+      child: FocusTraversalGroup(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _coverPart,
+            const SizedBox(height: ShioriSpace.page),
+            _readPart,
+            const SizedBox(height: ShioriSpace.small),
+            _shelfPart,
+            ...widget.actionNotes,
+          ],
         ),
       ),
-      const SizedBox(width: ShioriLayout.detailGap),
-      Expanded(
-        child: FocusTraversalGroup(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              widget.info!,
-              ..._tagsPart(ShioriSpace.item),
-              ..._synopsisPart(context),
-              const SizedBox(height: ShioriSpace.section),
-              _catalogPart,
-            ],
-          ),
-        ),
-      ),
-    ],
+    ),
+  );
+
+  /// The book's text, then its catalog, beside the side column.
+  Widget _text(BuildContext context) => FocusTraversalGroup(
+    child: SliverMainAxisGroup(
+      slivers: [
+        _inset([
+          widget.info!,
+          ..._tagsPart(ShioriSpace.item),
+          ..._synopsisPart(context),
+          const SizedBox(height: ShioriSpace.section),
+        ]),
+        _catalogPart,
+      ],
+    ),
   );
 
   /// The mobile header's arrangement on the frame: cover beside the text,
@@ -162,49 +185,51 @@ class _DesktopDetailState extends State<DesktopDetail> {
     final scaler = MediaQuery.textScalerOf(context);
     final stackHeader = frame < 340 || frame < 560 && scaler.scale(20) > 28;
     final cover = SizedBox(width: DesktopDetail.singleCover, child: _coverPart);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (stackHeader)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: cover),
-              const SizedBox(height: 24),
-              widget.info!,
-            ],
-          )
-        else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              cover,
-              const SizedBox(width: 24),
-              Expanded(child: widget.info!),
-            ],
-          ),
-        ..._tagsPart(ShioriSpace.page),
-        const SizedBox(height: ShioriSpace.section),
-        if (frame < 340 || scaler.scale(14) > 20)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _readPart,
-              const SizedBox(height: ShioriSpace.small),
-              _shelfPart,
-            ],
-          )
-        else
-          Row(
-            children: [
-              Expanded(flex: 3, child: _readPart),
-              const SizedBox(width: ShioriSpace.medium),
-              Expanded(flex: 2, child: _shelfPart),
-            ],
-          ),
-        ...widget.actionNotes,
-        ..._synopsisPart(context),
-        const SizedBox(height: ShioriSpace.section),
+    return SliverMainAxisGroup(
+      slivers: [
+        _inset([
+          ...widget.notices,
+          if (stackHeader)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: cover),
+                const SizedBox(height: 24),
+                widget.info!,
+              ],
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                cover,
+                const SizedBox(width: 24),
+                Expanded(child: widget.info!),
+              ],
+            ),
+          ..._tagsPart(ShioriSpace.page),
+          const SizedBox(height: ShioriSpace.section),
+          if (frame < 340 || scaler.scale(14) > 20)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _readPart,
+                const SizedBox(height: ShioriSpace.small),
+                _shelfPart,
+              ],
+            )
+          else
+            Row(
+              children: [
+                Expanded(flex: 3, child: _readPart),
+                const SizedBox(width: ShioriSpace.medium),
+                Expanded(flex: 2, child: _shelfPart),
+              ],
+            ),
+          ...widget.actionNotes,
+          ..._synopsisPart(context),
+          const SizedBox(height: ShioriSpace.section),
+        ]),
         _catalogPart,
       ],
     );
@@ -227,33 +252,75 @@ class _DesktopDetailState extends State<DesktopDetail> {
               child: SizedBox(width: layout.frame, child: child),
             ),
           );
+          // Scrolled content sits on the frame widened by the catalog's
+          // bleed; the scroll view itself reaches the window's end.
+          final end = math.max(
+            0.0,
+            bounds.maxWidth - layout.gutter - layout.frame - BookListItem.inset,
+          );
+          Widget scroll(double start, Widget sliver) => KeyedSubtree(
+            key: _scroll,
+            child: CustomScrollView(
+              key: const ValueKey('detail-scroll'),
+              slivers: [
+                SliverPadding(
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    start,
+                    ShioriSpace.small,
+                    end,
+                    ShioriSpace.section,
+                  ),
+                  sliver: sliver,
+                ),
+              ],
+            ),
+          );
+          final Widget page;
+          if (widget.placeholder case final placeholder?) {
+            page = framed(placeholder);
+          } else if (layout.columns) {
+            page = Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Loading and refresh notes stay across the frame.
+                if (widget.notices.isNotEmpty)
+                  framed(
+                    Padding(
+                      padding: const EdgeInsets.only(top: ShioriSpace.small),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: widget.notices,
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(width: layout.gutter),
+                      _side(layout.side),
+                      Expanded(
+                        child: scroll(
+                          ShioriLayout.detailGap - BookListItem.inset,
+                          _text(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          } else {
+            page = scroll(
+              layout.gutter - BookListItem.inset,
+              _single(context, layout.frame),
+            );
+          }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               framed(DesktopDetailBar(menu: widget.menu)),
-              Expanded(
-                child: widget.placeholder != null
-                    ? framed(widget.placeholder!)
-                    : SingleChildScrollView(
-                        key: const ValueKey('detail-scroll'),
-                        padding: const EdgeInsets.only(
-                          top: ShioriSpace.small,
-                          bottom: ShioriSpace.section,
-                        ),
-                        child: framed(
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              ...widget.notices,
-                              if (layout.columns)
-                                _columns(context, layout.side)
-                              else
-                                _single(context, layout.frame),
-                            ],
-                          ),
-                        ),
-                      ),
-              ),
+              Expanded(child: page),
             ],
           );
         },

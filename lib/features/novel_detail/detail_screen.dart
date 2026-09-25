@@ -8,6 +8,7 @@ import '../../l10n/generated/app_localizations.dart';
 import 'detail_sections.dart';
 import '../../shared/capabilities.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../../shared/widgets/book_list_tile.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
 import 'desktop_detail.dart';
@@ -207,54 +208,73 @@ class DetailScreen extends StatelessWidget {
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: ShioriLayout.page),
-            child: ListView(
-              padding: const EdgeInsets.all(ShioriSpace.page),
-              children: [
-                ...notices,
-                DetailBookHeader(
-                  key: ValueKey(novel),
-                  detail: loaded.value,
-                  images: images,
-                ),
-                const SizedBox(height: ShioriSpace.section),
-                LayoutBuilder(
-                  builder: (context, bounds) {
-                    if (bounds.maxWidth < 340 ||
-                        MediaQuery.textScalerOf(context).scale(14) > 20) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          read(),
-                          const SizedBox(height: ShioriSpace.small),
-                          shelf(context),
-                        ],
-                      );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(flex: 3, child: read()),
-                        const SizedBox(width: ShioriSpace.medium),
-                        Expanded(flex: 2, child: shelf(context)),
+            child: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(
+                    ShioriSpace.page,
+                    ShioriSpace.page,
+                    ShioriSpace.page,
+                    0,
+                  ),
+                  sliver: SliverList.list(
+                    children: [
+                      ...notices,
+                      DetailBookHeader(
+                        key: ValueKey(novel),
+                        detail: loaded.value,
+                        images: images,
+                      ),
+                      const SizedBox(height: ShioriSpace.section),
+                      LayoutBuilder(
+                        builder: (context, bounds) {
+                          if (bounds.maxWidth < 340 ||
+                              MediaQuery.textScalerOf(context).scale(14) > 20) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                read(),
+                                const SizedBox(height: ShioriSpace.small),
+                                shelf(context),
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(flex: 3, child: read()),
+                              const SizedBox(width: ShioriSpace.medium),
+                              Expanded(flex: 2, child: shelf(context)),
+                            ],
+                          );
+                        },
+                      ),
+                      ...actionNotes,
+                      if (showSynopsis) ...[
+                        const SizedBox(height: ShioriSpace.section),
+                        Text(
+                          strings.detailSynopsis,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: ShioriSpace.medium),
+                        DetailSynopsis(
+                          key: ValueKey(('synopsis', novel)),
+                          text: loaded.value.synopsis,
+                        ),
                       ],
-                    );
-                  },
+                      const SizedBox(height: ShioriSpace.section),
+                    ],
+                  ),
                 ),
-                ...actionNotes,
-                if (showSynopsis) ...[
-                  const SizedBox(height: ShioriSpace.section),
-                  Text(
-                    strings.detailSynopsis,
-                    style: Theme.of(context).textTheme.titleLarge,
+                SliverPadding(
+                  // The catalog's rows bleed past the page padding.
+                  padding: const EdgeInsets.fromLTRB(
+                    ShioriSpace.page - BookListItem.inset,
+                    0,
+                    ShioriSpace.page - BookListItem.inset,
+                    24 + ShioriSpace.page,
                   ),
-                  const SizedBox(height: ShioriSpace.medium),
-                  DetailSynopsis(
-                    key: ValueKey(('synopsis', novel)),
-                    text: loaded.value.synopsis,
-                  ),
-                ],
-                const SizedBox(height: ShioriSpace.section),
-                catalog,
-                const SizedBox(height: 24),
+                  sliver: catalog,
+                ),
               ],
             ),
           ),

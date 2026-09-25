@@ -6,12 +6,13 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/novel_detail/detail_sections.dart';
-import 'package:shiori/features/novel_detail/catalog_view.dart';
 import 'package:shiori/features/novel_detail/volume_preview.dart';
-import 'package:shiori/features/local_books/local_catalog.dart';
 
 import 'catalog_test.dart' show app, catalog;
 import 'detail_test.dart' show Repo, detail;
+
+/// [preview] on a scrolling page, as the detail pages place it.
+Widget page(Widget preview) => app(CustomScrollView(slivers: [preview]));
 
 class PreviewRepo extends Repo {
   PreviewRepo(this.value);
@@ -112,32 +113,26 @@ void main() {
       });
       LocalNavigationEntry? selected;
       await tester.pumpWidget(
-        app(
-          SingleChildScrollView(
-            child: VolumePreview(
-              novel: novel,
-              repository: repo,
-              onTarget: (target) => selected = target,
-            ),
+        page(
+          VolumePreview(
+            novel: novel,
+            repository: repo,
+            onTarget: (target) => selected = target,
           ),
         ),
       );
       await tester.pumpAndSettle();
       expect(find.text('Repeated book title'), findsNothing);
-      for (final entry in entries.take(5)) {
+      // Every entry, with no separate contents screen to open.
+      for (final entry in entries) {
         expect(find.text(entry.title), findsOneWidget);
       }
-      expect(find.text('预览范围外'), findsNothing);
+      expect(find.byKey(const ValueKey('detail-catalog')), findsNothing);
       await tester.tap(find.byKey(const ValueKey(('preview-local', 2))));
       expect(selected, same(entries[2]));
       expect(selected!.blockKey, 'chapter-2-start');
-
-      await tester.tap(find.byKey(const ValueKey('detail-catalog')));
-      await tester.pumpAndSettle();
-      expect(find.byType(LocalCatalogScreen), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey(('local-toc', 1))));
-      await tester.pumpAndSettle();
-      expect(selected, same(entries[1]));
+      await tester.tap(find.byKey(const ValueKey(('preview-local', 5))));
+      expect(selected, same(entries[5]));
     },
   );
 
@@ -170,7 +165,9 @@ void main() {
       await repo.catalogEvents.close();
       await repo.events.close();
     });
-    await tester.pumpWidget(app(VolumePreview(novel: novel, repository: repo)));
+    await tester.pumpWidget(
+      page(VolumePreview(novel: novel, repository: repo)),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Old NCX label'), findsOneWidget);
 
@@ -217,7 +214,7 @@ void main() {
     });
     ChapterKey? selected;
     await tester.pumpWidget(
-      app(
+      page(
         VolumePreview(
           novel: novel,
           repository: repo,
@@ -271,58 +268,74 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'preview is bounded, shares the page scroll and preserves full catalog navigation',
-    (tester) async {
-      final data = catalog(count: 4);
-      final repo = PreviewRepo(data);
-      addTearDown(repo.events.close);
-      ChapterKey? selected;
-      await tester.pumpWidget(
-        app(
-          SingleChildScrollView(
-            child: VolumePreview(
-              novel: data.novelKey,
-              repository: repo,
-              onChapter: (key) => selected = key,
-            ),
-          ),
+  testWidgets('the catalog lists every chapter in the page scroll', (
+    tester,
+  ) async {
+    final data = catalog(count: 4);
+    final repo = PreviewRepo(data);
+    addTearDown(repo.events.close);
+    ChapterKey? selected;
+    await tester.pumpWidget(
+      page(
+        VolumePreview(
+          novel: data.novelKey,
+          repository: repo,
+          onChapter: (key) => selected = key,
         ),
-      );
-      await tester.pumpAndSettle();
-      final preview = find.byType(VolumePreview);
-      expect(
-        find.descendant(of: preview, matching: find.byType(Scrollable)),
-        findsNothing,
-      );
-      expect(find.text('Same title'), findsNWidgets(5));
-      expect(find.text('Untitled volume'), findsNWidgets(2));
-      expect(repo.modes, [ReadMode.cacheOnly]);
-      final fifth = data.flatChapters.elementAt(4);
-      final lastPreview = find.byKey(ValueKey(('preview-chapter', fifth.key)));
-      await tester.ensureVisible(lastPreview);
-      await tester.tap(lastPreview);
-      expect(selected, fifth.key);
-      final all = find.byKey(const ValueKey('detail-catalog'));
-      await tester.ensureVisible(all);
-      await tester.tap(all);
-      await tester.pumpAndSettle();
-      expect(find.byType(CatalogScreen), findsOneWidget);
-      final last = data.flatChapters.last.key;
-      await tester.scrollUntilVisible(
-        find.byKey(ValueKey(last)),
-        200,
-        scrollable: find.descendant(
-          of: find.byType(CatalogView),
-          matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(VolumePreview),
+        matching: find.byType(Scrollable),
+      ),
+      findsNothing,
+    );
+    expect(find.text('Same title'), findsNWidgets(8));
+    expect(find.text('Untitled volume'), findsNWidgets(2));
+    expect(find.byKey(const ValueKey('detail-catalog')), findsNothing);
+    expect(repo.modes, [ReadMode.cacheOnly]);
+    final last = data.flatChapters.last;
+    final row = find.byKey(ValueKey(('preview-chapter', last.key)));
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    expect(selected, last.key);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a long catalog builds its rows as they scroll into view', (
+    tester,
+  ) async {
+    final data = catalog(count: 1000);
+    final repo = PreviewRepo(data);
+    addTearDown(repo.events.close);
+    ChapterKey? selected;
+    await tester.pumpWidget(
+      page(
+        VolumePreview(
+          novel: data.novelKey,
+          repository: repo,
+          onChapter: (key) => selected = key,
         ),
-      );
-      await tester.tap(find.byKey(ValueKey(last)));
-      await tester.pumpAndSettle();
-      expect(selected, last);
-      expect(find.byType(CatalogScreen), findsNothing);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-    },
-  );
+      ),
+    );
+    await tester.pumpAndSettle();
+    final built = find.text('Same title', skipOffstage: false);
+    expect(built.evaluate().length, lessThan(40));
+    final last = data.flatChapters.last;
+    expect(data.flatChapters, hasLength(2000));
+    final row = find.byKey(ValueKey(('preview-chapter', last.key)));
+    await tester.scrollUntilVisible(
+      row,
+      5000,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.pumpAndSettle();
+    expect(built.evaluate().length, lessThan(40));
+    await tester.tap(row);
+    expect(selected, last.key);
+    expect(repo.modes, [ReadMode.cacheOnly]);
+    expect(tester.takeException(), isNull);
+  });
 }
