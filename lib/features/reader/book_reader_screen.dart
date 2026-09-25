@@ -889,7 +889,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     return (order, index);
   }
 
-  Widget _view(ReaderController reader) {
+  Widget _view(ReaderController reader, {required bool active}) {
     final (order, positions) = _readingSequence();
     final index = positions[reader.chapter] ?? -1;
     final previous = index > 0 && widget.linkDepth == 0
@@ -972,6 +972,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       articleContents: !_local,
       returnToOrigin: widget.linkDepth > 0,
       chrome: _chrome,
+      active: active && !_changing,
     );
   }
 
@@ -988,7 +989,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           ignoring: !active || _changing,
           child: AnimatedBuilder(
             animation: _chapterTurn,
-            child: ExcludeSemantics(excluding: !active, child: _view(reader)),
+            child: ExcludeSemantics(
+              excluding: !active,
+              child: _view(reader, active: active),
+            ),
             builder: (context, child) => PageTurnSlot(
               frame: _chapterFrame,
               role: active ? PageTurnRole.leaving : PageTurnRole.entering,

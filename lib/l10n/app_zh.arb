@@ -175,6 +175,17 @@
   },
   "moreActions": "更多",
   "readerProgressLabel": "进度",
+  "readerShortcutTooltip": "{action}（{shortcut}）",
+  "@readerShortcutTooltip": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
   "shelfGrid": "网格",
   "shelfList": "列表",
   "homeShelf": "我的书架",

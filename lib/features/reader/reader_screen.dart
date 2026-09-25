@@ -8,6 +8,7 @@ import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
+import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
 import 'reader_controller.dart';
 import 'reader_completion_page.dart';
@@ -19,6 +20,7 @@ export 'reader_actions.dart' show ReaderActions;
 
 import 'reader_actions.dart';
 import 'reader_chrome.dart';
+import 'reader_commands.dart';
 import 'reader_contents.dart';
 import 'reader_panel.dart';
 import 'reader_progress_panel.dart';
@@ -53,6 +55,7 @@ class ReaderContentView extends StatefulWidget {
     this.viewportController,
     this.returnToOrigin = false,
     this.chrome,
+    this.active = true,
   });
   final ImageRepository? images;
   final ChapterContent content;
@@ -77,6 +80,11 @@ class ReaderContentView extends StatefulWidget {
   /// Toolbar visibility, owned by the caller when it must outlive this view
   /// (e.g. so the screen can close the toolbars on back).
   final ValueNotifier<bool>? chrome;
+
+  /// Whether this page takes commands: false for a chapter still turning in
+  /// and while the host is changing chapters or leaving. It only gates input
+  /// and new panels; the page still lays out, restores and reports ready.
+  final bool active;
   @override
   State<ReaderContentView> createState() => _ReaderContentViewState();
 }
@@ -101,6 +109,37 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _preferences = ReaderPreferences(widget.settings)..addListener(_changed);
     _position = widget.initialPosition;
     unawaited(_loadPreferences());
+  }
+
+  @override
+  void didUpdateWidget(ReaderContentView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active == oldWidget.active) return;
+    if (widget.active) {
+      _claimFocus();
+    } else {
+      _progressRequest++;
+    }
+  }
+
+  /// The page's keyboard focus: shortcuts act while it or a control on the
+  /// page holds focus.
+  final _pageFocus = FocusNode(debugLabel: 'reader-page');
+
+  /// Gives the page focus once it becomes the active chapter. The chapter it
+  /// replaces takes its focus away with it, which leaves focus on the route
+  /// and the keys unheard; focus held anywhere else, or by a route above,
+  /// is left alone.
+  void _claimFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.active) return;
+      if (!_routeCurrent) return;
+      final primary = FocusManager.instance.primaryFocus;
+      if (primary == null ||
+          primary is FocusScopeNode && _pageFocus.ancestors.contains(primary)) {
+        _pageFocus.requestFocus();
+      }
+    });
   }
 
   Future<void> _loadPreferences() async {
@@ -164,7 +203,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     builder,
     GlobalKey? anchor,
   }) {
-    if (_panel != null) return null;
+    if (_panel != null || !widget.active) return null;
     final panel = ReaderPanelHandle.open(
       this,
       placement: placement,
@@ -331,6 +370,188 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   void _toggle() => _chrome.value = !_chrome.value;
 
+  /// Whether this page may take a command now: it is the active chapter,
+  /// nothing covers its route and no completion turn is running. Whether a
+  /// given command exists at all is [_can].
+  bool get _interactive =>
+      mounted && widget.active && !_completionTurning && _routeCurrent;
+
+  /// The page's route, recorded by a leaf of [build] rather than looked up
+  /// here: depending on the route from this state would rebuild the whole
+  /// page, and the EPUB view in it, each time a panel opens or closes.
+  ModalRoute<Object?>? _route;
+
+  bool get _routeCurrent => _route?.isCurrent != false;
+
+  bool get _unsaved {
+    final session = widget.session;
+    return session?.progressFailure != null ||
+        session?.progress?.unsaved == true ||
+        session?.restoreFailure != null;
+  }
+
+  /// Whether [command] exists for this page and session. The completion page
+  /// builds no toolbars, so it offers only what it can open by itself.
+  bool _can(ReaderCommand command) {
+    final text = widget.completion == null;
+    return switch (command) {
+      ReaderCommand.previousPage => text || _actions.completionPrevious != null,
+      ReaderCommand.nextPage ||
+      ReaderCommand.toggleControls ||
+      ReaderCommand.progress => text,
+      ReaderCommand.contents =>
+        widget.articleContents || _actions.bookContents != null,
+      ReaderCommand.settings => true,
+      ReaderCommand.notes => text && _actions.links != null,
+      ReaderCommand.prefetch => text && _actions.prefetch != null,
+      ReaderCommand.details => _actions.details != null,
+      ReaderCommand.retrySave => text && _unsaved,
+      ReaderCommand.retrySettings => text && _preferences.failure != null,
+    };
+  }
+
+  /// The one handler behind toolbar buttons, menus and shortcuts.
+  void _run(BuildContext context, ReaderCommand command) {
+    if (!_interactive || !_can(command)) return;
+    switch (command) {
+      case ReaderCommand.previousPage:
+        _turnPage(false);
+      case ReaderCommand.nextPage:
+        _turnPage(true);
+      case ReaderCommand.toggleControls:
+        _toggle();
+      case ReaderCommand.contents:
+        unawaited(_contents(context, book: widget.completion != null));
+      case ReaderCommand.progress:
+        _requestProgress(context);
+      case ReaderCommand.settings || ReaderCommand.retrySettings:
+        unawaited(_settingsPanel(context));
+      case ReaderCommand.notes:
+        _actions.links?.call(context);
+      case ReaderCommand.prefetch:
+        _actions.prefetch?.call();
+      case ReaderCommand.details:
+        _actions.details?.call();
+      case ReaderCommand.retrySave:
+        widget.session?.retryProgress();
+    }
+  }
+
+  /// Space belongs to a focused control: it turns the page only while the
+  /// page itself holds focus. Other keys always reach [_run].
+  bool _accepts(ReaderCommandIntent intent) =>
+      !intent.yieldsToControls ||
+      identical(FocusManager.instance.primaryFocus, _pageFocus);
+
+  /// Esc hands back to the route, whose back handling closes the toolbars,
+  /// saves before leaving or leaves directly, as the system back does.
+  void _back(BuildContext context) {
+    if (_interactive) unawaited(Navigator.of(context).maybePop());
+  }
+
+  /// Bumped to drop a progress request still waiting for the toolbars.
+  int _progressRequest = 0;
+
+  bool get _progressAnchored {
+    final anchor = _progressAnchor.currentContext?.findRenderObject();
+    return anchor is RenderBox && anchor.attached && anchor.hasSize;
+  }
+
+  /// Opens progress over its control, first showing the toolbars when they
+  /// are hidden and waiting for the control to lay out. The request is
+  /// dropped if, by then, the page is no longer active, the toolbars were
+  /// hidden again or a route covers the page.
+  void _requestProgress(BuildContext context) {
+    final request = ++_progressRequest;
+    if (!_desktopPanels || _chrome.value && _progressAnchored) {
+      unawaited(_progressPanel(context));
+      return;
+    }
+    _chrome.value = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (request != _progressRequest ||
+          !context.mounted ||
+          !_interactive ||
+          !_chrome.value ||
+          !_progressAnchored) {
+        return;
+      }
+      unawaited(_progressPanel(context));
+    });
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
+  /// Context menu entries for the page, in the order of the bottom bar and
+  /// then the overflow menu.
+  List<(ReaderCommand, String)> _contextEntries(AppLocalizations l) => [
+    for (final (command, label) in [
+      (ReaderCommand.contents, l.catalogTitle),
+      (ReaderCommand.progress, l.readerProgressLabel),
+      (ReaderCommand.settings, l.readerSettings),
+      (ReaderCommand.notes, l.readerLinks),
+      (ReaderCommand.details, l.novelDetailsTitle),
+      (
+        ReaderCommand.toggleControls,
+        _chrome.value ? l.hideReaderControls : l.showReaderControls,
+      ),
+    ])
+      if (_can(command)) (command, label),
+  ];
+
+  /// The page's context menu, at [at] for a right click or in the middle of
+  /// the page from the keyboard. The chosen command runs only if this page
+  /// still reads the same session and takes commands.
+  Future<void> _contextMenu(BuildContext context, {Offset? at}) async {
+    if (!_desktopPanels || !_interactive) return;
+    final entries = _contextEntries(AppLocalizations.of(context));
+    if (entries.isEmpty) return;
+    final overlay =
+        Overlay.of(context).context.findRenderObject()! as RenderBox;
+    final page = context.findRenderObject()! as RenderBox;
+    final point = overlay.globalToLocal(
+      at ?? page.localToGlobal(page.size.center(Offset.zero)),
+    );
+    final session = widget.session;
+    final command = await showMenu<ReaderCommand>(
+      context: context,
+      position: RelativeRect.fromRect(
+        point & Size.zero,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        for (final (command, label) in entries)
+          ShioriMenuItem(value: command, label: label),
+      ],
+    );
+    if (command == null ||
+        !mounted ||
+        !context.mounted ||
+        !identical(widget.session, session)) {
+      return;
+    }
+    _run(context, command);
+  }
+
+  // A right press that a right release near it completes opens the menu.
+  // Only the press carries the button, so it is remembered by pointer.
+  int? _secondaryPointer;
+  Offset _secondaryDown = Offset.zero;
+
+  void _pointerDown(PointerDownEvent event) {
+    final secondary =
+        event.kind == PointerDeviceKind.mouse &&
+        event.buttons == kSecondaryMouseButton;
+    _secondaryPointer = secondary ? event.pointer : null;
+    _secondaryDown = event.position;
+  }
+
+  void _pointerUp(BuildContext context, PointerUpEvent event) {
+    if (event.pointer != _secondaryPointer) return;
+    _secondaryPointer = null;
+    if ((event.position - _secondaryDown).distance > kTouchSlop) return;
+    unawaited(_contextMenu(context, at: event.position));
+  }
+
   void _leave(BuildContext context) {
     if (_actions.leave case final leave?) {
       leave();
@@ -340,7 +561,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   void _turnPage(bool forward, {bool queueIfTurning = true}) {
-    if (_completionTurning || ModalRoute.of(context)?.isCurrent == false) {
+    if (!widget.active || _completionTurning || !_routeCurrent) {
       return;
     }
     if (widget.completion != null) {
@@ -388,7 +609,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
         HardwareKeyboard.instance.isMetaPressed ||
         HardwareKeyboard.instance.isAltPressed ||
         HardwareKeyboard.instance.isShiftPressed ||
-        ModalRoute.of(context)?.isCurrent == false) {
+        !_routeCurrent) {
       return;
     }
     // Let nested scrollables claim the event first. A wheel burst advances one
@@ -408,6 +629,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
   void dispose() {
     _panel?.dismiss();
     _panel = null;
+    _progressRequest++;
+    _pageFocus.dispose();
     _wheelCooldown?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _preferences.removeListener(_changed);
@@ -449,7 +672,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       ReaderThemeMode.light => Brightness.light,
       ReaderThemeMode.dark => Brightness.dark,
     };
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    final page = AnnotatedRegion<SystemUiOverlayStyle>(
       // Transparent bars let edge-to-edge pages show paper, not black.
       value:
           (brightness == Brightness.dark
@@ -471,6 +694,14 @@ class _ReaderContentViewState extends State<ReaderContentView>
         ),
         child: Builder(builder: _body),
       ),
+    );
+    // Only this leaf rebuilds when the route changes; it hands back the same
+    // page, which is left as it is.
+    return Builder(
+      builder: (context) {
+        _route = ModalRoute.of(context);
+        return page;
+      },
     );
   }
 
@@ -512,55 +743,56 @@ class _ReaderContentViewState extends State<ReaderContentView>
         fit: StackFit.expand,
         children: [
           Scaffold(
-            body: CallbackShortcuts(
-              bindings: {
-                const SingleActivator(LogicalKeyboardKey.f2): _toggle,
-                const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-                    _turnPage(true),
-                const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-                    _turnPage(false),
-                const SingleActivator(LogicalKeyboardKey.pageDown): () =>
-                    _turnPage(true),
-                const SingleActivator(LogicalKeyboardKey.pageUp): () =>
-                    _turnPage(false),
-              },
-              child: Focus(
-                autofocus: true,
-                child: ReaderCompletionTransition(
-                  style: _settings.pageTurn,
-                  onTurning: (value) => _completionTurning = value,
-                  completion: widget.completion == null
-                      ? null
-                      : _completionPage(context, style),
-                  child: SafeArea(
-                    child: Stack(
-                      fit: StackFit.expand,
-                      // Toolbars paint into the safe-area insets.
-                      clipBehavior: Clip.none,
-                      children: [
-                        Positioned.fill(
-                          child: _page(context, pageBounds, style),
-                        ),
-                        if (widget.completion == null)
-                          ValueListenableBuilder<bool>(
-                            valueListenable: _chrome,
-                            builder: (context, visible, _) => ListenableBuilder(
-                              listenable: _preferences,
-                              builder: (context, _) => visible
-                                  ? _toolbars(context)
-                                  : _runningChrome(context),
+            // Not modal: a key whose command stands aside, such as Space on
+            // a focused button, goes on to the control's own handling.
+            body: Shortcuts(
+              shortcuts: _desktopPanels
+                  ? desktopReaderShortcuts
+                  : readerShortcuts,
+              child: Actions(
+                actions: _commandActions(context),
+                child: Focus(
+                  focusNode: _pageFocus,
+                  autofocus: widget.active,
+                  child: ReaderCompletionTransition(
+                    style: _settings.pageTurn,
+                    onTurning: (value) => _completionTurning = value,
+                    completion: widget.completion == null
+                        ? null
+                        : _completionPage(context, style),
+                    child: SafeArea(
+                      child: Stack(
+                        fit: StackFit.expand,
+                        // Toolbars paint into the safe-area insets.
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned.fill(
+                            child: _page(context, pageBounds, style),
+                          ),
+                          if (widget.completion == null)
+                            ValueListenableBuilder<bool>(
+                              valueListenable: _chrome,
+                              builder: (context, visible, _) =>
+                                  ListenableBuilder(
+                                    listenable: _preferences,
+                                    builder: (context, _) => visible
+                                        ? _toolbars(context)
+                                        : _runningChrome(context),
+                                  ),
                             ),
-                          ),
-                        if (_hintVisible && widget.completion == null)
-                          Positioned(
-                            left: ShioriSpace.item,
-                            right: ShioriSpace.item,
-                            bottom:
-                                ReaderChromeMetrics.of(context).bottomBar +
-                                ShioriSpace.small,
-                            child: ReaderControlsHint(onDismiss: _dismissHint),
-                          ),
-                      ],
+                          if (_hintVisible && widget.completion == null)
+                            Positioned(
+                              left: ShioriSpace.item,
+                              right: ShioriSpace.item,
+                              bottom:
+                                  ReaderChromeMetrics.of(context).bottomBar +
+                                  ShioriSpace.small,
+                              child: ReaderControlsHint(
+                                onDismiss: _dismissHint,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -579,6 +811,19 @@ class _ReaderContentViewState extends State<ReaderContentView>
     );
   }
 
+  Map<Type, Action<Intent>> _commandActions(BuildContext context) => {
+    ReaderCommandIntent: _ReaderAction<ReaderCommandIntent>(
+      enabled: _accepts,
+      run: (intent) => _run(context, intent.command),
+    ),
+    ReaderBackIntent: _ReaderAction<ReaderBackIntent>(
+      run: (_) => _back(context),
+    ),
+    ReaderContextMenuIntent: _ReaderAction<ReaderContextMenuIntent>(
+      run: (_) => unawaited(_contextMenu(context)),
+    ),
+  };
+
   void _dismissHint() {
     setState(() => _hintVisible = false);
     _preferences.update(_settings.copyWith(controlsHintSeen: true));
@@ -590,6 +835,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
     child: SafeArea(
       child: Listener(
         onPointerSignal: _scrollPage,
+        onPointerDown: _pointerDown,
+        onPointerUp: (event) => _pointerUp(context, event),
         child: ReaderCompletionPage(
           state: widget.completion!,
           title:
@@ -599,7 +846,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
           style: style,
           onPrevious: _actions.completionPrevious ?? () {},
           onExit: _actions.exitToShelf ?? () {},
-          onCatalog: () => _contents(context, book: true),
+          onCatalog: () => _run(context, ReaderCommand.contents),
           onRestart: _actions.restart ?? () {},
         ),
       ),
@@ -621,6 +868,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
             2 * readerMinColumnWidth + readerColumnGap;
     return Listener(
       onPointerSignal: _scrollPage,
+      onPointerDown: _pointerDown,
+      onPointerUp: (event) => _pointerUp(context, event),
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -885,47 +1134,23 @@ class _ReaderContentViewState extends State<ReaderContentView>
     );
   }
 
-  List<(ReaderMenuAction, String)> _menu(AppLocalizations l) {
-    final session = widget.session;
-    final unsaved =
-        session?.progressFailure != null ||
-        session?.progress?.unsaved == true ||
-        session?.restoreFailure != null;
-    return [
-      if (_actions.links != null) (ReaderMenuAction.links, l.readerLinks),
-      if (_actions.prefetch != null)
-        (ReaderMenuAction.prefetch, l.prefetchTitle),
-      if (_actions.details != null)
-        (ReaderMenuAction.details, l.novelDetailsTitle),
-      if (unsaved)
-        (
-          ReaderMenuAction.retrySave,
-          session?.restoreFailure != null
-              ? l.readerRestoreReadFailed
-              : l.readerProgressUnsaved,
-        ),
-      if (_preferences.failure != null)
-        (ReaderMenuAction.retrySettings, l.readerSettingsFailure),
-      (ReaderMenuAction.hideControls, l.hideReaderControls),
-    ];
-  }
-
-  void _onMenu(BuildContext context, ReaderMenuAction action) {
-    switch (action) {
-      case ReaderMenuAction.links:
-        _actions.links?.call(context);
-      case ReaderMenuAction.prefetch:
-        _actions.prefetch?.call();
-      case ReaderMenuAction.details:
-        _actions.details?.call();
-      case ReaderMenuAction.retrySave:
-        widget.session?.retryProgress();
-      case ReaderMenuAction.retrySettings:
-        _settingsPanel(context);
-      case ReaderMenuAction.hideControls:
-        _toggle();
-    }
-  }
+  /// Overflow menu entries: what the bottom bar does not already offer.
+  List<(ReaderCommand, String)> _menu(AppLocalizations l) => [
+    for (final (command, label) in [
+      (ReaderCommand.notes, l.readerLinks),
+      (ReaderCommand.prefetch, l.prefetchTitle),
+      (ReaderCommand.details, l.novelDetailsTitle),
+      (
+        ReaderCommand.retrySave,
+        widget.session?.restoreFailure != null
+            ? l.readerRestoreReadFailed
+            : l.readerProgressUnsaved,
+      ),
+      (ReaderCommand.retrySettings, l.readerSettingsFailure),
+      (ReaderCommand.toggleControls, l.hideReaderControls),
+    ])
+      if (_can(command)) (command, label),
+  ];
 
   Widget _toolbars(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -937,17 +1162,37 @@ class _ReaderContentViewState extends State<ReaderContentView>
         returnToOrigin: widget.returnToOrigin,
         onLeave: () => _leave(context),
         menu: _menu(l),
-        onMenu: (action) => _onMenu(context, action),
+        onMenu: (command) => _run(context, command),
       ),
       bottom: ReaderBottomBar(
         contentsTooltip:
             _contentsLayers(context).firstOrNull?.label ?? l.catalogTitle,
-        onContents: () => _contents(context),
+        onContents: _command(context, ReaderCommand.contents),
         progress: _progressLabel(l.readerChapterPercent),
-        onProgress: () => _progressPanel(context),
-        onSettings: () => _settingsPanel(context),
+        onProgress: _command(context, ReaderCommand.progress),
+        onSettings: _command(context, ReaderCommand.settings),
         progressKey: _progressAnchor,
       ),
     );
   }
+
+  /// A control's callback for [command], null while the command is
+  /// unavailable so the control shows as disabled.
+  VoidCallback? _command(BuildContext context, ReaderCommand command) =>
+      _can(command) ? () => _run(context, command) : null;
+}
+
+/// A reader shortcut's action. [enabled] false lets the key go on to the
+/// focused control; otherwise the key is taken even when the command then
+/// finds nothing to do, as the page keys always were.
+class _ReaderAction<T extends Intent> extends Action<T> {
+  _ReaderAction({required this.run, this.enabled});
+  final void Function(T intent) run;
+  final bool Function(T intent)? enabled;
+
+  @override
+  bool isEnabled(T intent) => enabled?.call(intent) ?? true;
+
+  @override
+  void invoke(T intent) => run(intent);
 }

@@ -50,21 +50,23 @@ void main() {
       expect(tester.takeException(), isNull, reason: '$width');
     }
 
-    // Escape in the reader never reaches the workspace.
-    await h.key(LogicalKeyboardKey.escape);
-    await h.key(LogicalKeyboardKey.escape);
+    // Escape leaves the reader, as back does, and goes no further: held
+    // down, its repeats do not go on to close the details beneath.
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    for (var i = 0; i < 5; i++) {
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.escape);
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(BookReaderScreen), findsNothing);
     expect(
       tester.element(find.byType(DetailScreen, skipOffstage: false)),
       same(detail),
     );
     expect(h.workspace.canPop(), isTrue);
     expect(h.navigation.section, HomeSection.search);
-
-    if (find.byType(BookReaderScreen).evaluate().isNotEmpty) {
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-    }
-    expect(find.byType(BookReaderScreen), findsNothing);
     expect(h.layout, ShellLayout.rail);
     expect(tester.element(find.byType(DetailScreen)), same(detail));
     await tester.pageBack();

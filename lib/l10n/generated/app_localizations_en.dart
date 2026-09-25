@@ -502,6 +502,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerProgressLabel => 'Progress';
 
   @override
+  String readerShortcutTooltip(String action, String shortcut) {
+    return '$action ($shortcut)';
+  }
+
+  @override
   String get shelfGrid => 'Grid';
 
   @override

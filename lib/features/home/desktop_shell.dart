@@ -107,7 +107,10 @@ class _DesktopShellState extends State<DesktopShell> {
   @override
   Widget build(BuildContext context) => Shortcuts(
     shortcuts: const {
-      SingleActivator(LogicalKeyboardKey.escape): WorkspaceBackIntent(),
+      // A held Esc goes back once: its repeats must not carry on here after
+      // it closed a reader, dialog or menu above.
+      SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false):
+          WorkspaceBackIntent(),
       SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true):
           WorkspaceBackIntent(keepTextEditing: true),
     },

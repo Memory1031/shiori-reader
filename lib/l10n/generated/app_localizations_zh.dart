@@ -479,6 +479,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerProgressLabel => '进度';
 
   @override
+  String readerShortcutTooltip(String action, String shortcut) {
+    return '$action（$shortcut）';
+  }
+
+  @override
   String get shelfGrid => '网格';
 
   @override

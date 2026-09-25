@@ -169,7 +169,7 @@ void main() {
 
         await key(LogicalKeyboardKey.f2);
         for (final control in [
-          find.byTooltip('Reading settings'),
+          find.byTooltip('Reading settings (Ctrl+,)'),
           find.byIcon(Icons.list),
           find.text('Chapter 0%'),
         ]) {

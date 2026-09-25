@@ -609,7 +609,7 @@ void main() {
       await tester.pumpAndSettle();
       for (final control in [
         find.byIcon(Icons.list),
-        find.byTooltip('Reading settings'),
+        find.byTooltip('Reading settings (Ctrl+,)'),
         find.text('Chapter 100%'),
       ]) {
         await tester.tap(control);

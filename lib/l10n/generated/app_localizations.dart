@@ -1022,6 +1022,12 @@ abstract class AppLocalizations {
   /// **'Progress'**
   String get readerProgressLabel;
 
+  /// No description provided for @readerShortcutTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'{action} ({shortcut})'**
+  String readerShortcutTooltip(String action, String shortcut);
+
   /// No description provided for @shelfGrid.
   ///
   /// In en, this message translates to:

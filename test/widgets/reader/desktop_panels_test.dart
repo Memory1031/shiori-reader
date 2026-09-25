@@ -27,6 +27,9 @@ final windows = TargetPlatformVariant.only(TargetPlatform.windows);
 
 final panel = find.byKey(const ValueKey('reader-panel'));
 
+/// The desktop tooltip names the shortcut.
+const settingsTip = 'Reading settings (Ctrl+,)';
+
 Finder inPanel(Finder finder) => find.descendant(of: panel, matching: finder);
 
 /// Whether [node] sits inside the single widget [finder] finds.
@@ -152,8 +155,12 @@ Future<void> wheel(WidgetTester tester, Offset position) async {
 /// the panel.
 final entries = <(String, Finder, Offset)>[
   ('contents', find.byIcon(Icons.list), const Offset(1400, 400)),
-  ('settings', find.byTooltip('Reading settings'), const Offset(200, 400)),
-  ('progress', find.text('Chapter 0%'), const Offset(800, 200)),
+  ('settings', find.byTooltip(settingsTip), const Offset(200, 400)),
+  (
+    'progress',
+    find.textContaining(RegExp(r'^Chapter \d+%$')),
+    const Offset(800, 200),
+  ),
 ];
 
 Future<void> open(WidgetTester tester, Finder control) async {
@@ -163,7 +170,7 @@ Future<void> open(WidgetTester tester, Finder control) async {
 }
 
 bool chromeVisible(WidgetTester tester) =>
-    find.byTooltip('Reading settings').evaluate().isNotEmpty;
+    find.byTooltip(settingsTip).evaluate().isNotEmpty;
 
 void main() {
   group('desktop reader panels', () {
@@ -215,24 +222,31 @@ void main() {
       }, variant: windows);
     }
 
-    // Space does not turn pages today; this guards the panel isolation
-    // for when M3b binds it, and proves nothing about current page turns.
-    testWidgets(
-      'future regression: Space with a panel open leaves the reader alone',
-      (tester) async {
-        final harness = await pumpReader(tester);
-        final start = harness.pages.capture()!;
-        for (final (_, control, _) in entries) {
-          await open(tester, control);
-          await key(tester, LogicalKeyboardKey.space);
-          expect(harness.pages.capture(), start);
-          expect(chromeVisible(tester), isTrue);
-          await key(tester, LogicalKeyboardKey.escape);
-          expect(panel, findsNothing);
-        }
-      },
-      variant: windows,
-    );
+    testWidgets('Space turns the page, but not under an open panel', (
+      tester,
+    ) async {
+      final harness = await pumpReader(tester);
+      final start = harness.pages.capture()!;
+      await key(tester, LogicalKeyboardKey.space);
+      final next = harness.pages.capture()!;
+      expect(next.chapterFraction, greaterThan(start.chapterFraction));
+      for (final (_, control, _) in entries) {
+        await open(tester, control);
+        await key(tester, LogicalKeyboardKey.space);
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+        await key(tester, LogicalKeyboardKey.space);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+        expect(harness.pages.capture(), next);
+        expect(chromeVisible(tester), isTrue);
+        await key(tester, LogicalKeyboardKey.escape);
+        expect(panel, findsNothing);
+      }
+      // Closed, the page has focus again and Shift+Space turns back.
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await key(tester, LogicalKeyboardKey.space);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      expect(harness.pages.capture(), start);
+    }, variant: windows);
 
     for (final (name, control, _) in entries.take(2)) {
       testWidgets('$name traps keyboard traversal in a closed loop', (
@@ -296,7 +310,7 @@ void main() {
         // there Esc and the panels' own controls close them.
         final barrierNode = defaultTargetPlatform == TargetPlatform.macOS;
         for (final (control, hidden) in [
-          (find.byTooltip('Reading settings'), 'Desktop panels'),
+          (find.byTooltip(settingsTip), 'Desktop panels'),
           (find.text('Chapter 0%'), 'Reading settings'),
         ]) {
           final page = find.semantics.byLabel(RegExp(hidden));
@@ -332,7 +346,7 @@ void main() {
       ) async {
         final harness = await pumpReader(tester);
         final store = harness.store;
-        await open(tester, find.byTooltip('Reading settings'));
+        await open(tester, find.byTooltip(settingsTip));
         await tester.tap(inPanel(find.text('Warm paper')));
         await tester.pump(const Duration(milliseconds: 20));
         expect(store.writes, isEmpty, reason: 'still debouncing');
@@ -358,7 +372,7 @@ void main() {
       tester,
     ) async {
       await pumpReader(tester);
-      await open(tester, find.byTooltip('Reading settings'));
+      await open(tester, find.byTooltip(settingsTip));
       Material surface() =>
           tester.widget<Material>(inPanel(find.byType(Material)).first);
       ThemeData theme() =>
@@ -406,7 +420,7 @@ void main() {
       await open(tester, find.byIcon(Icons.list));
       expect(tester.getRect(panel), const Rect.fromLTWH(12, 12, 320, 676));
       await key(tester, LogicalKeyboardKey.escape);
-      await open(tester, find.byTooltip('Reading settings'));
+      await open(tester, find.byTooltip(settingsTip));
       expect(tester.getRect(panel), const Rect.fromLTWH(628, 12, 360, 676));
       await key(tester, LogicalKeyboardKey.escape);
     }, variant: windows);

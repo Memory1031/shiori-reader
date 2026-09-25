@@ -2,18 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/shiori_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/capabilities.dart';
 import '../../shared/widgets/shiori_menu.dart';
 import 'reader_chrome.dart';
-
-/// Overflow menu entries of the reader top bar.
-enum ReaderMenuAction {
-  links,
-  prefetch,
-  details,
-  retrySave,
-  retrySettings,
-  hideControls,
-}
+import 'reader_commands.dart';
 
 /// Title row with back / return and the overflow menu. Placement agnostic:
 /// it fills whatever box its host gives it.
@@ -31,8 +23,8 @@ class ReaderTopBar extends StatelessWidget {
 
   /// A linked (auxiliary) reader returns to its origin instead of going back.
   final bool returnToOrigin;
-  final List<(ReaderMenuAction, String)> menu;
-  final ValueChanged<ReaderMenuAction> onMenu;
+  final List<(ReaderCommand, String)> menu;
+  final ValueChanged<ReaderCommand> onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +47,7 @@ class ReaderTopBar extends StatelessWidget {
             ),
           ),
         ),
-        PopupMenuButton<ReaderMenuAction>(
+        PopupMenuButton<ReaderCommand>(
           tooltip: l.moreActions,
           icon: const Icon(Icons.more_horiz),
           onSelected: onMenu,
@@ -70,6 +62,10 @@ class ReaderTopBar extends StatelessWidget {
 }
 
 /// Contents, progress and typography entry points.
+///
+/// Phones and tablets spread the three across the bar. Where a pointer is
+/// the primary input they sit together in the middle at their own widths,
+/// and their tooltips name their shortcuts.
 class ReaderBottomBar extends StatelessWidget {
   const ReaderBottomBar({
     super.key,
@@ -81,7 +77,9 @@ class ReaderBottomBar extends StatelessWidget {
     this.progressKey,
   });
   final String contentsTooltip;
-  final VoidCallback onContents, onProgress, onSettings;
+
+  /// Null while the command is unavailable.
+  final VoidCallback? onContents, onProgress, onSettings;
 
   /// Live chapter progress label.
   final Widget progress;
@@ -90,38 +88,78 @@ class ReaderBottomBar extends StatelessWidget {
   /// lays it out.
   final GlobalKey? progressKey;
 
+  /// Least widths of the grouped controls, so the group keeps its shape as
+  /// the percentage changes. Longer labels and larger text widen them.
+  static const contentsWidth = 96.0;
+  static const progressWidth = 120.0;
+  static const settingsWidth = 48.0;
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: Tooltip(
-            message: contentsTooltip,
-            child: TextButton.icon(
-              onPressed: onContents,
-              icon: const Icon(Icons.list, size: 20),
-              label: Text(l.catalogTitle),
+    final grouped = ShioriCapabilities.of(context).pointerFirst;
+    String tip(String action, String shortcut) =>
+        grouped ? l.readerShortcutTooltip(action, shortcut) : action;
+    final contents = Tooltip(
+      message: tip(contentsTooltip, ReaderShortcutLabels.contents),
+      child: TextButton.icon(
+        onPressed: onContents,
+        icon: const Icon(Icons.list, size: 20),
+        label: Text(l.catalogTitle),
+      ),
+    );
+    final progress = TextButton(
+      key: progressKey,
+      onPressed: onProgress,
+      child: this.progress,
+    );
+    final settings = Tooltip(
+      message: tip(l.readerSettings, ReaderShortcutLabels.settings),
+      child: TextButton(
+        onPressed: onSettings,
+        child: Text('Aa', semanticsLabel: l.readerSettings),
+      ),
+    );
+    if (!grouped) {
+      return Row(
+        children: [
+          Expanded(child: contents),
+          Expanded(child: progress),
+          Expanded(child: settings),
+        ],
+      );
+    }
+    Widget least(double width, Widget child) => ConstrainedBox(
+      constraints: BoxConstraints(minWidth: width),
+      child: child,
+    );
+    // Too narrow for the group at a large text size, it scrolls rather
+    // than clipping or shrinking its labels.
+    return Center(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: ShioriSpace.small),
+        child: Row(
+          key: const ValueKey('reader-bottom-group'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            least(contentsWidth, contents),
+            const SizedBox(width: ShioriSpace.small),
+            least(
+              progressWidth,
+              Tooltip(
+                message: tip(
+                  l.readerProgressLabel,
+                  ReaderShortcutLabels.progress,
+                ),
+                child: progress,
+              ),
             ),
-          ),
+            const SizedBox(width: ShioriSpace.small),
+            least(settingsWidth, settings),
+          ],
         ),
-        Expanded(
-          child: TextButton(
-            key: progressKey,
-            onPressed: onProgress,
-            child: progress,
-          ),
-        ),
-        Expanded(
-          child: Tooltip(
-            message: l.readerSettings,
-            child: TextButton(
-              onPressed: onSettings,
-              child: Text('Aa', semanticsLabel: l.readerSettings),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

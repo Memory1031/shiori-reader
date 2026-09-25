@@ -175,6 +175,17 @@
   },
   "moreActions": "More",
   "readerProgressLabel": "Progress",
+  "readerShortcutTooltip": "{action} ({shortcut})",
+  "@readerShortcutTooltip": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "shortcut": {
+        "type": "String"
+      }
+    }
+  },
   "shelfGrid": "Grid",
   "shelfList": "List",
   "homeShelf": "My bookshelf",
