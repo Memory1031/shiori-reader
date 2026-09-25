@@ -1760,6 +1760,24 @@ abstract class AppLocalizations {
   /// **'Widest'**
   String get readerMarginVeryWide;
 
+  /// No description provided for @readerFollowSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow system'**
+  String get readerFollowSystem;
+
+  /// No description provided for @readerFollowSystemHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Switches to Night while the system is dark'**
+  String get readerFollowSystemHint;
+
+  /// No description provided for @readerUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get readerUndo;
+
   /// No description provided for @readerDecrease.
   ///
   /// In en, this message translates to:

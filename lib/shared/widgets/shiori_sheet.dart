@@ -15,14 +15,17 @@ enum ShioriSheetSize {
 /// `useSafeArea` covers the top and sides; the bottom inset is applied here
 /// once so content clears the gesture bar. Hosts that draw their own
 /// surface (e.g. a live-themed reader panel) pass [owned] to drop the
-/// default handle and background.
+/// default handle and background. A lighter [barrierColor] keeps the page
+/// behind readable, e.g. while previewing reading colours.
 Future<T?> showShioriSheet<T>(
   BuildContext context, {
   required WidgetBuilder builder,
   ShioriSheetSize size = ShioriSheetSize.fit,
   bool owned = false,
+  Color? barrierColor,
 }) => showModalBottomSheet<T>(
   context: context,
+  barrierColor: barrierColor,
   isScrollControlled: true,
   useSafeArea: true,
   showDragHandle: !owned,

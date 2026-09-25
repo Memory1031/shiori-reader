@@ -113,8 +113,8 @@ void main() {
       );
       await openReaderSettings(tester);
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Paper'));
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Paper'));
+      await tester.ensureVisible(find.text('Paper'));
+      await tester.tap(find.text('Paper'));
       await tester.pumpAndSettle();
       expect(
         Theme.of(tester.element(find.byType(PagedReaderViewport))).brightness,

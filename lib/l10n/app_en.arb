@@ -450,6 +450,9 @@
   "readerMarginMedium": "Medium",
   "readerMarginWide": "Wide",
   "readerMarginVeryWide": "Widest",
+  "readerFollowSystem": "Follow system",
+  "readerFollowSystemHint": "Switches to Night while the system is dark",
+  "readerUndo": "Undo",
   "readerDecrease": "Decrease {label}",
   "readerIncrease": "Increase {label}",
   "@readerDecrease": {

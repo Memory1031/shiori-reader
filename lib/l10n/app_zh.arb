@@ -450,6 +450,9 @@
   "readerMarginMedium": "适中",
   "readerMarginWide": "宽",
   "readerMarginVeryWide": "极宽",
+  "readerFollowSystem": "跟随系统",
+  "readerFollowSystemHint": "系统为深色时自动切换到夜间",
+  "readerUndo": "撤销",
   "readerDecrease": "减小{label}",
   "readerIncrease": "增大{label}",
   "@readerDecrease": {

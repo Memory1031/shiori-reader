@@ -274,14 +274,19 @@ void main() {
       );
       await tester.pumpAndSettle();
       await openReaderSettings(tester);
-      await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Warm paper'));
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Warm paper'));
+      await tester.ensureVisible(find.text('Warm paper'));
+      await tester.tap(find.text('Warm paper'));
       await tester.pumpAndSettle();
       expect(store.value.paper, ReaderPaper.warm);
+      // Picking a day paper while the system is light keeps following it.
+      expect(store.value.themeMode, ReaderThemeMode.system);
       expect(controller.settings.themeMode, AppThemeMode.dark);
       expect(viewport.controller.capture()!.blockFraction, closeTo(.61, .001));
-      final system = find.byType(SwitchListTile);
+      final system = find.byKey(const ValueKey('reader-follow-system'));
       await tester.ensureVisible(system);
+      await tester.tap(system);
+      await tester.pumpAndSettle();
+      expect(store.value.themeMode, ReaderThemeMode.light);
       await tester.tap(system);
       await tester.pumpAndSettle();
       expect(store.value.themeMode, ReaderThemeMode.system);
@@ -289,10 +294,8 @@ void main() {
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       await tester.pumpAndSettle();
       expect(
-        tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Night'))
-            .selected,
-        isTrue,
+        tester.getSemantics(find.bySemanticsLabel('Night')),
+        containsSemantics(label: 'Night', isButton: true, isSelected: true),
       );
       expect(
         Theme.of(tester.element(find.byType(PagedReaderViewport))).brightness,

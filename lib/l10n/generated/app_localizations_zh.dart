@@ -883,6 +883,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerMarginVeryWide => '极宽';
 
   @override
+  String get readerFollowSystem => '跟随系统';
+
+  @override
+  String get readerFollowSystemHint => '系统为深色时自动切换到夜间';
+
+  @override
+  String get readerUndo => '撤销';
+
+  @override
   String readerDecrease(String label) {
     return '减小$label';
   }

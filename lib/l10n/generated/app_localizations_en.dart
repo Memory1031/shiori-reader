@@ -966,6 +966,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerMarginVeryWide => 'Widest';
 
   @override
+  String get readerFollowSystem => 'Follow system';
+
+  @override
+  String get readerFollowSystemHint =>
+      'Switches to Night while the system is dark';
+
+  @override
+  String get readerUndo => 'Undo';
+
+  @override
   String readerDecrease(String label) {
     return 'Decrease $label';
   }
