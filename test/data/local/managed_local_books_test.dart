@@ -220,7 +220,13 @@ void main() {
       );
       final manifest =
           jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
-      manifest['links'] = <Object>[]; // Previously imported manifest.
+      // Previously imported manifest: no hotspots, no persisted renditions.
+      manifest['links'] = <Object>[];
+      manifest['presentationHash'] = null;
+      manifest.remove('svgHotspotsScanned');
+      await File(
+        '${paths.localBooks.path}/${chapter.key.novelKey.novelId}/presentations.json',
+      ).delete();
       final oldManifest = utf8.encode(jsonEncode(manifest));
       await manifestFile.writeAsBytes(oldManifest, flush: true);
       await db.customStatement(
@@ -269,13 +275,17 @@ void main() {
       final currentRecord = ok(
         await store.read(chapter.key.novelKey, cancellation: token()),
       )!;
+      // The reparse persists the hotspot found by its presentation parse,
+      // and reading it back neither duplicates it nor needs the original.
       expect(
         currentRecord.content.links.where((link) => link.region != null),
-        isEmpty,
+        hasLength(1),
       );
+      await original.rename(hiddenOriginal.path);
       final currentLinks = ok(
         await store.loadContentLinks(chapter.key, cancellation: token()),
       );
+      await hiddenOriginal.rename(original.path);
       expect(currentLinks.where((link) => link.region != null), hasLength(1));
 
       final bundle =
@@ -292,7 +302,9 @@ void main() {
       final bundleData =
           jsonDecode(await bundleManifest.readAsString())
               as Map<String, dynamic>;
+      // An older bundle: renditions persisted, hotspots never scanned.
       bundleData['links'] = <Object>[];
+      bundleData.remove('svgHotspotsScanned');
       final oldBundle = utf8.encode(jsonEncode(bundleData));
       await bundleManifest.writeAsBytes(oldBundle, flush: true);
       await db.customStatement(
@@ -371,6 +383,7 @@ void main() {
         ChapterContent(key: a.key, title: '旧版扉页标题', blocks: a.blocks),
       );
       manifest['links'] = <Object>[];
+      manifest.remove('svgHotspotsScanned');
       final oldBundle = utf8.encode(jsonEncode(manifest));
       await manifestFile.writeAsBytes(oldBundle, flush: true);
       await db.customStatement(
@@ -789,5 +802,248 @@ void main() {
     expect((result as Failure).failure.kind, FailureKind.tooLarge);
     expect(await paths.localImportStaging.list().toList(), isEmpty);
     expect(await db.customSelect('SELECT * FROM local_books').get(), isEmpty);
+  });
+
+  group('persisted EPUB artifacts', () {
+    // An SVG title page with one hotspot, a linkless SVG page and plain text.
+    Map<String, List<int>> svgBook() {
+      final files = epubFiles(ncx: true);
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '''<html><body><svg xmlns="http://www.w3.org/2000/svg"
+ xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1440 2048">
+<image width="1440" height="2048" xlink:href="../images/%E6%98%9F%20%E7%A9%BA.png"/>
+<a xlink:href="b.xhtml"><rect x="245" y="715" width="684" height="114"
+ fill-opacity="0.0"/><text x="275" y="795">第１话</text></a>
+</svg></body></html>''',
+      );
+      files['OPS/text/b.xhtml'] = utf8.encode(
+        '''<html><body><svg xmlns="http://www.w3.org/2000/svg"
+ viewBox="0 0 1440 2048"><image width="1440" height="2048"
+ href="../images/%E6%98%9F%20%E7%A9%BA.png"/>
+<text x="275" y="795">无链接的扉页</text></svg></body></html>''',
+      );
+      return files;
+    }
+
+    Future<LocalBookRecord> importEpub(Map<String, List<int>> files) async =>
+        ok(
+          await store.importBook(
+            bytes: Stream.value(zipFiles(files)),
+            format: LocalBookFormat.epub,
+            cancellation: token(),
+            parse: (session) => const BookDecoder().decode(
+              session,
+              format: LocalBookFormat.epub,
+              filename: 'fixture.epub',
+              cancellation: token(),
+              chooseEncoding: (_) async => TxtEncoding.utf8,
+            ),
+          ),
+        );
+
+    Directory root(NovelKey key) =>
+        Directory('${paths.localBooks.path}/${key.novelId}');
+
+    Future<Map<String, dynamic>> manifestAt(File file) async =>
+        jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+
+    test(
+      'import writes the same pinned artifacts a reparse of it publishes',
+      () async {
+        final imported = await importEpub(svgBook());
+        final key = imported.content.detail.summary.key;
+        final presentations = File('${root(key).path}/presentations.json');
+        final manifestFile = File('${root(key).path}/manifest.json');
+        // Written by the import itself, before any read of the book.
+        expect(await presentations.exists(), isTrue);
+        final manifest = await manifestAt(manifestFile);
+        expect(
+          manifest['presentationHash'],
+          sha256.convert(await presentations.readAsBytes()).toString(),
+        );
+        expect(manifest['svgHotspotsScanned'], isTrue);
+        expect(
+          imported.content.links.where((link) => link.region != null),
+          hasLength(1),
+        );
+        final importedPresentations = await presentations.readAsBytes();
+        final importedManifest = await manifestFile.readAsBytes();
+
+        ok(
+          await store.reparseBook(
+            key,
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+            cancellation: token(),
+          ),
+        );
+        final bundle =
+            (await db
+                    .customSelect(
+                      'SELECT active_bundle FROM local_books WHERE digest=?',
+                      variables: [Variable(key.novelId)],
+                    )
+                    .getSingle())
+                .read<String>('active_bundle');
+        final published = '${root(key).path}/revisions/$bundle';
+        expect(
+          await File('$published/presentations.json').readAsBytes(),
+          importedPresentations,
+        );
+        expect(
+          await File('$published/manifest.json').readAsBytes(),
+          importedManifest,
+        );
+        // The reparse retires the import's root artifacts.
+        expect(await presentations.exists(), isFalse);
+        expect(await manifestFile.exists(), isFalse);
+      },
+    );
+
+    test(
+      'an empty presentation map is persisted and trusted over the original',
+      () async {
+        final imported = await importEpub(epubFiles(ncx: true));
+        final key = imported.content.detail.summary.key;
+        final presentations = File('${root(key).path}/presentations.json');
+        expect(await presentations.readAsString(), '{}');
+        expect(
+          (await manifestAt(
+            File('${root(key).path}/manifest.json'),
+          ))['presentationHash'],
+          sha256.convert(utf8.encode('{}')).toString(),
+        );
+        await store.close();
+        store = ok(await ManagedLocalBooks.open(paths, db));
+        final original = File('${root(key).path}/original');
+        await original.rename('${original.path}.hidden');
+        for (final chapter in imported.content.chapters) {
+          expect(
+            ok(
+              await store.loadPagePresentation(
+                chapter.key,
+                cancellation: token(),
+              ),
+            ),
+            isNull,
+          );
+          expect(
+            await store.loadContentLinks(chapter.key, cancellation: token()),
+            isA<Success<List<LocalContentLink>>>(),
+          );
+        }
+      },
+    );
+
+    test(
+      'renditions the presentation parse rejects persist nothing for them',
+      () async {
+        // The decoder accepted the book, but its renditions are unavailable,
+        // e.g. beyond their size limit: the import still succeeds.
+        final imported = ok(
+          await store.importBook(
+            bytes: Stream.value(utf8.encode('accepted, not renderable')),
+            format: LocalBookFormat.epub,
+            parse: (session) async => fixture(session),
+            cancellation: token(),
+          ),
+        );
+        final key = imported.content.detail.summary.key;
+        expect(
+          await File('${root(key).path}/presentations.json').exists(),
+          isFalse,
+        );
+        final manifest = await manifestAt(
+          File('${root(key).path}/manifest.json'),
+        );
+        expect(manifest['presentationHash'], isNull);
+        expect(manifest.containsKey('svgHotspotsScanned'), isFalse);
+        expect(
+          ok(await store.read(key, cancellation: token()))!.content.chapters,
+          hasLength(1),
+        );
+      },
+    );
+
+    test('a cold first read after import never needs the original', () async {
+      final imported = await importEpub(svgBook());
+      final key = imported.content.detail.summary.key;
+      final a = imported.content.chapters.first;
+      final b = imported.content.chapters.last;
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      final original = File('${root(key).path}/original');
+      // Any extraction reads the original, so hiding it proves there is none.
+      await original.rename('${original.path}.hidden');
+      final links = LocalReadingRepository(
+        local: store,
+        online: ForbiddenOnline(),
+      );
+      // The linkless page first, so no hotspot on it can satisfy the scan.
+      expect(
+        ok(await store.loadPagePresentation(b.key, cancellation: token())),
+        contains('shiori-svg-page'),
+      );
+      expect(
+        ok(await links.loadContentLinks(b.key, cancellation: token())),
+        isEmpty,
+      );
+      expect(
+        ok(await store.loadPagePresentation(a.key, cancellation: token())),
+        contains('shiori-svg-page'),
+      );
+      final hotspots = ok(
+        await links.loadContentLinks(a.key, cancellation: token()),
+      ).where((link) => link.region != null);
+      expect(hotspots, hasLength(1));
+      expect(hotspots.single.target, b.key);
+    });
+
+    test(
+      'reading presentations reuses the manifest the record was decoded from',
+      () async {
+        final imported = await importEpub(svgBook());
+        final key = imported.content.detail.summary.key;
+        final chapter = imported.content.chapters.first;
+        // Reparsed bundles are where presentations used to be validated by
+        // decoding the manifest a second time.
+        ok(
+          await store.reparseBook(
+            key,
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+            cancellation: token(),
+          ),
+        );
+        await store.close();
+        store = ok(await ManagedLocalBooks.open(paths, db));
+        // Decode once, as a read before the Reader opens does.
+        ok(await store.read(key, cancellation: token()));
+        final bundle =
+            (await db
+                    .customSelect(
+                      'SELECT active_bundle FROM local_books WHERE digest=?',
+                      variables: [Variable(key.novelId)],
+                    )
+                    .getSingle())
+                .read<String>('active_bundle');
+        final manifest = File(
+          '${root(key).path}/revisions/$bundle/manifest.json',
+        );
+        final modified = await manifest.lastModified();
+        final length = await manifest.length();
+        // Same size and time keep the decoded record current, but any second
+        // read of the manifest would now fail its checksum.
+        await manifest.writeAsBytes(List.filled(length, 0x20), flush: true);
+        await manifest.setLastModified(modified);
+        expect(
+          ok(
+            await store.loadPagePresentation(
+              chapter.key,
+              cancellation: token(),
+            ),
+          ),
+          contains('shiori-svg-page'),
+        );
+      },
+    );
   });
 }

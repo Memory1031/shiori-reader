@@ -50,7 +50,7 @@ class ManagedLocalBooks
     () => _reparse(this, key, chooseEncoding, encoding, cancellation),
   );
 
-  (NovelKey, String, DateTime, int, LocalBookRecord)? _readCache;
+  (NovelKey, String, DateTime, int, _StoredBook)? _readCache;
   final _presentations = <NovelKey, (LocalBookContent, Map<String, String>)>{};
   final _svgLinksScanned = <NovelKey>{};
   @override
@@ -59,9 +59,11 @@ class ManagedLocalBooks
     required CancellationToken cancellation,
   }) => _run(Operation.chapter, () async {
     checkLocalCancellation(cancellation);
-    final record = await _read(chapter.novelKey, token: cancellation);
-    if (record == null || record.format != LocalBookFormat.epub) return null;
-    await _loadPresentations(chapter.novelKey, record, cancellation);
+    final book = await _readStored(chapter.novelKey, token: cancellation);
+    if (book == null || book.record.format != LocalBookFormat.epub) {
+      return null;
+    }
+    await _loadPresentations(chapter.novelKey, book, cancellation);
     return _presentations[chapter.novelKey]?.$2[chapter.chapterId];
   });
 
@@ -74,8 +76,9 @@ class ManagedLocalBooks
       Operation.chapter,
       () async {
         checkLocalCancellation(cancellation);
-        final record = await _read(source.novelKey, token: cancellation);
-        if (record == null) return null;
+        final book = await _readStored(source.novelKey, token: cancellation);
+        if (book == null) return null;
+        final record = book.record;
         final stored = record.content.links
             .where((link) => link.source == source)
             .toList();
@@ -87,7 +90,7 @@ class ManagedLocalBooks
         // A previously imported book can gain its SVG rendition on demand,
         // while its older manifest still has no hotspot side table. Reuse the
         // already bounded presentation parse without changing stored chapters.
-        await _loadPresentations(source.novelKey, record, cancellation);
+        await _loadPresentations(source.novelKey, book, cancellation);
         var derived = _presentations[source.novelKey];
         if (derived != null &&
             derived.$2[source.chapterId]?.contains('shiori-svg-page') == true &&
@@ -130,44 +133,10 @@ class ManagedLocalBooks
         if (derived == null || !derived.$2.containsKey(source.chapterId)) {
           return stored;
         }
-        final oldChapters = {
-          for (final chapter in [
-            ...record.content.chapters,
-            ...record.content.auxiliaryChapters,
-          ])
-            chapter.key: chapter,
-        };
-        final newChapters = {
-          for (final chapter in [
-            ...derived.$1.chapters,
-            ...derived.$1.auxiliaryChapters,
-          ])
-            chapter.key: chapter,
-        };
-        final oldSource = oldChapters[source];
-        final newSource = newChapters[source];
-        if (oldSource == null ||
-            newSource == null ||
-            oldSource.contentRevision != newSource.contentRevision) {
-          return stored;
-        }
-        final sourceBlocks = oldSource.blocks.map((b) => b.blockKey).toSet();
-        final hotspots = derived.$1.links.where((link) {
-          if (link.source != source ||
-              link.region == null ||
-              !sourceBlocks.contains(link.sourceBlockKey)) {
-            return false;
-          }
-          final target = link.target;
-          if (target == null) return true;
-          final oldTarget = oldChapters[target];
-          return oldTarget != null &&
-              (link.targetBlockKey == null ||
-                  oldTarget.blocks.any(
-                    (block) => block.blockKey == link.targetBlockKey,
-                  ));
-        });
-        return [...stored, ...hotspots];
+        return [
+          ...stored,
+          ..._fittingSvgHotspots(record.content, derived.$1, source: source),
+        ];
       },
     );
     if (result case Failure(:final failure)) return Failure(failure);
@@ -188,6 +157,7 @@ class ManagedLocalBooks
   static const maxMediaBytes = 32 * 1024 * 1024;
   static const maxBundleBytes = 512 * 1024 * 1024;
   static const maxManifestBytes = 32 * 1024 * 1024;
+  static const maxPresentationBytes = 32 * 1024 * 1024;
   static final _digest = RegExp(r'^[a-f0-9]{64}$');
 
   static Future<Result<ManagedLocalBooks>> open(
@@ -310,21 +280,17 @@ class ManagedLocalBooks
       await session.finish();
       checkLocalCancellation(cancellation);
       final importedAt = DateTime.now().toUtc();
-      final manifest = await _encodeManifest(
-        content,
-        key,
-        session.media,
-        format,
-        importedAt,
-        cancellation,
+      final written = await _writeParsedArtifacts(
+        stage: stage,
+        key: key,
+        content: content,
+        session: session,
+        format: format,
+        importedAt: importedAt,
+        original: original,
+        token: cancellation,
       );
-      if (manifest.length > maxManifestBytes ||
-          session.used + manifest.length > maxBundleBytes) {
-        throw const _LimitExceeded();
-      }
-      await File(
-        p.join(stage.path, 'manifest.json'),
-      ).writeAsBytes(manifest, flush: true);
+      final manifest = written.manifest;
       checkLocalCancellation(cancellation);
       final destination = p.join(paths.localBooks.path, digest);
       // The sole owner has already recovered unindexed directories on open.
@@ -357,7 +323,7 @@ class ManagedLocalBooks
       db.notifyUpdates({TableUpdate.onTable(db.localBooks)});
       committed = true;
       return LocalBookRecord(
-        content: content,
+        content: written.content,
         format: format,
         importedAt: importedAt,
       );
@@ -475,6 +441,13 @@ class ManagedLocalBooks
   Future<LocalBookRecord?> _read(
     NovelKey key, {
     required CancellationToken token,
+  }) async => (await _readStored(key, token: token))?.record;
+
+  /// The validated manifest decode together with the storage facts it pins,
+  /// so readers of derived artifacts need not decode the manifest again.
+  Future<_StoredBook?> _readStored(
+    NovelKey key, {
+    required CancellationToken token,
   }) async {
     if (key.sourceId != LocalBookIdentity.sourceId ||
         !_digest.hasMatch(key.novelId)) {
@@ -502,104 +475,94 @@ class ManagedLocalBooks
 
     if (await file.length() > maxManifestBytes) throw const _LimitExceeded();
     final bytes = await file.readAsBytes();
-    final record = await _decodeManifest(
+    final decoded = await _decodeManifest(
       bytes,
       key,
       row.read<String>('manifest_hash'),
       token,
     );
-    if (record.format != LocalBookFormat.epub) {
-      _readCache = (key, hash, stat.modified, stat.size, record);
-      return record;
-    }
-    _readCache = (key, hash, stat.modified, stat.size, record);
-    return record;
+    final book = (
+      record: decoded.record,
+      presentationHash: decoded.presentationHash,
+      svgHotspotsScanned: decoded.svgHotspotsScanned,
+      bundle: bundle,
+    );
+    _readCache = (key, hash, stat.modified, stat.size, book);
+    return book;
   }
 
+  /// Page presentations come from the artifacts pinned by the manifest's
+  /// `presentationHash`; an empty map is as authoritative as any other.
+  /// Only a book without persisted presentations extracts them from the
+  /// original, and never writes the result back.
   Future<void> _loadPresentations(
     NovelKey key,
-    LocalBookRecord record,
+    _StoredBook book,
     CancellationToken token,
   ) async {
     if (_presentations.containsKey(key)) return;
-    final row = await db
-        .customSelect(
-          'SELECT active_bundle,manifest_hash FROM local_books WHERE digest=?',
-          variables: [Variable(key.novelId)],
-        )
-        .getSingle();
-    final bundle = row.readNullable<String>('active_bundle');
-    if (!_presentations.containsKey(key)) {
-      Map<String, String> html;
-      var derivedContent = record.content;
-      if (bundle != null) {
-        final f = await _file(
-          key.novelId,
-          'presentations.json',
-          bundle: bundle,
-        );
-        if (await f.length() > 32 * 1024 * 1024) throw const _LimitExceeded();
-        final manifestFile = await _file(
-          key.novelId,
-          'manifest.json',
-          bundle: bundle,
-        );
-        if (await manifestFile.length() > maxManifestBytes) {
-          throw const _LimitExceeded();
-        }
-        final manifestBytes = await manifestFile.readAsBytes();
-        if (sha256.convert(manifestBytes).toString() !=
-            row.read<String>('manifest_hash')) {
-          throw const FormatException('Manifest checksum');
-        }
-        final manifest =
-            jsonDecode(utf8.decode(manifestBytes)) as Map<String, dynamic>;
-        final bytes = await f.readAsBytes();
-        if (sha256.convert(bytes).toString() != manifest['presentationHash']) {
-          throw const FormatException('Presentation checksum');
-        }
-        html = (jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>)
-            .cast<String, String>();
-      } else {
-        final original = await _file(key.novelId, 'original');
-        if (await original.length() > 64 * 1024 * 1024) {
-          throw const _LimitExceeded();
-        }
-        final extracted = await _extractPresentations(
-          await original.readAsBytes(),
-          key,
-          token,
-        );
-        derivedContent = extracted.$1;
-        // Legacy presentation may be derived, but never replace persisted
-        // semantics or show a rendition for a different content revision.
-        final revisions = {
-          for (final c in [
-            ...record.content.chapters,
-            ...record.content.auxiliaryChapters,
-          ])
-            c.key: c.contentRevision,
-        };
-        html = {
-          for (final c in [
-            ...extracted.$1.chapters,
-            ...extracted.$1.auxiliaryChapters,
-          ])
-            if (revisions[c.key] == c.contentRevision &&
-                extracted.$2.containsKey(c.key.chapterId))
-              c.key.chapterId: extracted.$2[c.key.chapterId]!,
-        };
+    final record = book.record;
+    Map<String, String> html;
+    var derivedContent = record.content;
+    var hotspotsKnown = false;
+    if (book.presentationHash case final expected?) {
+      // The writer scanned the original for SVG hotspots with the same
+      // parse that rendered these pages, and persisted every one it found.
+      hotspotsKnown = book.svgHotspotsScanned;
+      final f = await _file(
+        key.novelId,
+        'presentations.json',
+        bundle: book.bundle,
+      );
+      if (await f.length() > maxPresentationBytes) {
+        throw const _LimitExceeded();
       }
-      checkLocalCancellation(token);
-      _presentations.clear();
-      _svgLinksScanned.clear();
-      _presentations[key] = (derivedContent, html);
-      // The original was fully scanned above. Reparse bundles only persist
-      // rendered HTML; even a current-version manifest may lack SVG links.
-      if (bundle == null) {
-        _svgLinksScanned.add(key);
+      final bytes = await f.readAsBytes();
+      if (sha256.convert(bytes).toString() != expected) {
+        throw const FormatException('Presentation checksum');
       }
+      html = (jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>)
+          .cast<String, String>();
+    } else {
+      // Nothing persisted: an import from before renditions were kept, or
+      // one whose renditions exceeded their limits.
+      final original = await _file(key.novelId, 'original');
+      if (await original.length() > 64 * 1024 * 1024) {
+        throw const _LimitExceeded();
+      }
+      final extracted = await _extractPresentations(
+        await original.readAsBytes(),
+        key,
+        token,
+      );
+      derivedContent = extracted.$1;
+      // Legacy presentation may be derived, but never replace persisted
+      // semantics or show a rendition for a different content revision.
+      final revisions = {
+        for (final c in [
+          ...record.content.chapters,
+          ...record.content.auxiliaryChapters,
+        ])
+          c.key: c.contentRevision,
+      };
+      html = {
+        for (final c in [
+          ...extracted.$1.chapters,
+          ...extracted.$1.auxiliaryChapters,
+        ])
+          if (revisions[c.key] == c.contentRevision &&
+              extracted.$2.containsKey(c.key.chapterId))
+            c.key.chapterId: extracted.$2[c.key.chapterId]!,
+      };
+      hotspotsKnown = true;
     }
+    checkLocalCancellation(token);
+    _presentations.clear();
+    _svgLinksScanned.clear();
+    _presentations[key] = (derivedContent, html);
+    // Older persisted artifacts hold only rendered HTML, so their SVG links
+    // are still recovered from the original on demand.
+    if (hotspotsKnown) _svgLinksScanned.add(key);
   }
 
   @override
@@ -776,7 +739,9 @@ class ManagedLocalBooks
       if (active != null) {
         await for (final entry in root.list(followLinks: false)) {
           final name = p.basename(entry.path);
-          if (name == 'manifest.json' || _digest.hasMatch(name)) {
+          if (name == 'manifest.json' ||
+              name == 'presentations.json' ||
+              _digest.hasMatch(name)) {
             await _deleteChild(root, entry.path);
           }
         }
@@ -907,6 +872,135 @@ class _ImportSession implements LocalImportSession {
   }
 }
 
+/// A decoded manifest and the storage facts it pins: the bundle it was read
+/// from, the checksum of that bundle's page presentations, if any, and
+/// whether its links already include every SVG hotspot of the original.
+typedef _StoredBook = ({
+  LocalBookRecord record,
+  String? presentationHash,
+  bool svgHotspotsScanned,
+  String? bundle,
+});
+
+/// Writes a parsed book's derived artifacts into [stage] and returns the
+/// content it persisted with the manifest bytes that pin them. For EPUB the
+/// page presentations are always persisted, even when there are none, and
+/// the SVG hotspots found by the same parse join the links, so reading the
+/// book never has to parse the original again. Import and reparse both
+/// publish through here, so a parse yields one durable representation.
+Future<({LocalBookContent content, List<int> manifest})> _writeParsedArtifacts({
+  required Directory stage,
+  required NovelKey key,
+  required LocalBookContent content,
+  required _ImportSession session,
+  required LocalBookFormat format,
+  required DateTime importedAt,
+  required File original,
+  required CancellationToken token,
+}) async {
+  (LocalBookContent, List<int>)? rendered;
+  if (format == LocalBookFormat.epub) {
+    try {
+      final extracted = await _extractPresentations(
+        await original.readAsBytes(),
+        key,
+        token,
+      );
+      final html = utf8.encode(jsonEncode(extracted.$2));
+      if (html.length <= ManagedLocalBooks.maxPresentationBytes) {
+        rendered = (extracted.$1, html);
+      }
+    } on LocalParseException {
+      // Renditions beyond their own limits.
+    }
+  }
+  // Without persisted renditions a book the decoder accepted still reads
+  // natively, exactly as imports did before renditions were kept.
+  final html = rendered?.$2;
+  var persisted = content;
+  if (rendered != null) {
+    await File(
+      p.join(stage.path, 'presentations.json'),
+    ).writeAsBytes(rendered.$2, flush: true);
+    if (!content.links.any((link) => link.region != null)) {
+      final hotspots = _fittingSvgHotspots(content, rendered.$1).toList();
+      if (hotspots.isNotEmpty) {
+        persisted = LocalBookContent(
+          detail: content.detail,
+          catalog: content.catalog,
+          chapters: content.chapters,
+          navigation: content.navigation,
+          txtEncoding: content.txtEncoding,
+          auxiliaryChapters: content.auxiliaryChapters,
+          links: [...content.links, ...hotspots],
+          readingOrder: content.readingOrder,
+        );
+      }
+    }
+  }
+  final manifest = await _encodeManifest(
+    persisted,
+    key,
+    session.media,
+    format,
+    importedAt,
+    token,
+    html == null ? null : sha256.convert(html).toString(),
+    html != null,
+  );
+  if (manifest.length > ManagedLocalBooks.maxManifestBytes ||
+      session.used + manifest.length + (html?.length ?? 0) >
+          ManagedLocalBooks.maxBundleBytes) {
+    throw const _LimitExceeded();
+  }
+  await File(
+    p.join(stage.path, 'manifest.json'),
+  ).writeAsBytes(manifest, flush: true);
+  return (content: persisted, manifest: manifest);
+}
+
+/// SVG hotspot links from a presentation parse of the same original that
+/// still fit [content]: the source chapter keeps its revision and block,
+/// and any target chapter and block still exist. [source] limits them to
+/// one chapter.
+Iterable<LocalContentLink> _fittingSvgHotspots(
+  LocalBookContent content,
+  LocalBookContent scanned, {
+  ChapterKey? source,
+}) {
+  final chapters = {
+    for (final c in [...content.chapters, ...content.auxiliaryChapters])
+      c.key: c,
+  };
+  final revisions = {
+    for (final c in [...scanned.chapters, ...scanned.auxiliaryChapters])
+      c.key: c.contentRevision,
+  };
+  final blocks = <ChapterKey, Set<String>>{};
+  bool hasBlock(ChapterContent chapter, String key) => blocks
+      .putIfAbsent(
+        chapter.key,
+        () => {for (final b in chapter.blocks) b.blockKey},
+      )
+      .contains(key);
+  return scanned.links.where((link) {
+    if (link.region == null || source != null && link.source != source) {
+      return false;
+    }
+    final from = chapters[link.source];
+    if (from == null ||
+        revisions[link.source] != from.contentRevision ||
+        !hasBlock(from, link.sourceBlockKey)) {
+      return false;
+    }
+    final target = link.target;
+    if (target == null) return true;
+    final to = chapters[target];
+    return to != null &&
+        (link.targetBlockKey == null || hasBlock(to, link.targetBlockKey!));
+  });
+}
+
 // Keep validation, digest generation and potentially large JSON encoding off
 // the UI isolate. The worker owns only immutable values, never the live store.
 Future<List<int>> _encodeManifest(
@@ -917,12 +1011,14 @@ Future<List<int>> _encodeManifest(
   DateTime importedAt,
   CancellationToken cancellation, [
   String? presentationHash,
+  bool svgHotspotsScanned = false,
 ]) => runParserWorker(() {
   ManagedLocalBooks._validate(content, key, media);
   return utf8.encode(
     jsonEncode({
       'version': 1,
       'presentationHash': presentationHash,
+      if (svgHotspotsScanned) 'svgHotspotsScanned': true,
       'txtEncoding': content.txtEncoding?.name,
       'navigation': content.navigation.map((e) => e.toJson()).toList(),
       'auxiliaryChapters': content.auxiliaryChapters
@@ -940,7 +1036,10 @@ Future<List<int>> _encodeManifest(
   );
 }, cancellation);
 
-Future<LocalBookRecord> _decodeManifest(
+Future<
+  ({LocalBookRecord record, String? presentationHash, bool svgHotspotsScanned})
+>
+_decodeManifest(
   List<int> bytes,
   NovelKey key,
   String hash,
@@ -978,10 +1077,14 @@ Future<LocalBookRecord> _decodeManifest(
     key,
     (map['media'] as List).cast<String>().toSet(),
   );
-  return LocalBookRecord(
-    content: content,
-    format: LocalBookFormat.values.byName(map['format'] as String),
-    importedAt: DateTime.parse(map['importedAt'] as String).toUtc(),
+  return (
+    record: LocalBookRecord(
+      content: content,
+      format: LocalBookFormat.values.byName(map['format'] as String),
+      importedAt: DateTime.parse(map['importedAt'] as String).toUtc(),
+    ),
+    presentationHash: map['presentationHash'] as String?,
+    svgHotspotsScanned: map['svgHotspotsScanned'] == true,
   );
 }, token);
 

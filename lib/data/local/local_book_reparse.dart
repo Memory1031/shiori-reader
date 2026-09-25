@@ -69,7 +69,7 @@ Future<LocalReparseResult> _reparse(
       throw const FormatException('Original checksum');
     }
     session = _ImportSession(key, stage, token, await copy.length());
-    final content = await const BookDecoder().decode(
+    final parsed = await const BookDecoder().decode(
       session,
       format: old.format,
       filename: '${old.content.detail.summary.title}.${old.format.name}',
@@ -78,36 +78,18 @@ Future<LocalReparseResult> _reparse(
       encoding: encoding ?? old.content.txtEncoding,
     );
     await session.finish();
-    List<int>? html;
-    if (old.format == LocalBookFormat.epub) {
-      final extracted = await _extractPresentations(
-        await copy.readAsBytes(),
-        key,
-        token,
-      );
-      html = utf8.encode(jsonEncode(extracted.$2));
-      if (html.length > 32 * 1024 * 1024) throw const _LimitExceeded();
-      await File(
-        p.join(stage.path, 'presentations.json'),
-      ).writeAsBytes(html, flush: true);
-    }
-    final manifest = await _encodeManifest(
-      content,
-      key,
-      session.media,
-      old.format,
-      old.importedAt,
-      token,
-      html == null ? null : sha256.convert(html).toString(),
+    final written = await _writeParsedArtifacts(
+      stage: stage,
+      key: key,
+      content: parsed,
+      session: session,
+      format: old.format,
+      importedAt: old.importedAt,
+      original: copy,
+      token: token,
     );
-    if (manifest.length > ManagedLocalBooks.maxManifestBytes ||
-        session.used + manifest.length + (html?.length ?? 0) >
-            ManagedLocalBooks.maxBundleBytes) {
-      throw const _LimitExceeded();
-    }
-    await File(
-      p.join(stage.path, 'manifest.json'),
-    ).writeAsBytes(manifest, flush: true);
+    final content = written.content;
+    final manifest = written.manifest;
     final migration = await _migrate(old.content, content, progress, token);
     await copy.delete(); // Original stays immutable in the book root.
     checkLocalCancellation(token);

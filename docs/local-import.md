@@ -119,7 +119,7 @@ WHATWG 编码映射与许可保留在工程，生成工具位于 `tool/encoding/
 - 含单张包内位图、定位文字和基础矩形的受限 SVG 短页可保留视觉布局；作者用 `<a>` 包住的矩形热点经校验后交由 Reader 执行书内跳转，原始 href 不进入 WebView。复杂 SVG 仍退回原生正文。
 - Android / iOS / Windows / macOS 共用 `flutter_inappwebview` 呈现封装；初始化、页面加载失败或超时后切回该章的原生语义正文。Windows 在首次使用时检查 WebView2 Runtime，浏览器数据写入环境隔离的应用可写目录。
 - 本地图片、字体内嵌；字体单项上限 8MiB、单文档生成 HTML 上限 16MiB。
-- 旧格式可从原件校验后派生与已发布正文 revision 一致的特殊页；不会替换语义正文。重解析后呈现与 manifest 一起发布并校验；派生缓存有界。
+- 导入与重解析共用同一写入路径：特殊页呈现（包括「没有特殊页」的空结果）与 manifest 一起发布，hash 进入受校验 manifest；同一次呈现解析找到的 SVG 热点并入链接侧表，读取时不再解析原件。呈现超出自身限额时不保存呈现，书籍照常以原生正文导入。未保存呈现的旧导入仍可从原件校验后派生与已发布正文 revision 一致的特殊页，结果只进内存、不回写；不会替换语义正文。派生缓存有界。
 - 通过 `LocalPagePresentationRepository` 提供可选呈现，与 `LocalNavigationRepository` 的目录能力分开；标准阅读进度继续使用本地章节身份。
 
 ## 输入边界
@@ -184,7 +184,7 @@ EPUB 解析结果在 data 层附带最多 100 条固定原因码及截断标记�
 
 位置迁移为纯 Dart 函数：同 revision/块身份、唯一语义及邻近上下文、最多三个相邻块的文本窗口，最后降级到同章比例或最近可读章节起点。文本按 Unicode code points 计数。窗口最多 16384 code points，局部锚点最多前后各 32 个，重复候选不强行当作精确。拆分/合并窗口恢复及比例恢复均显示近似提示；近似结果清 completed，所有结果清像素提示。短文本、不唯一或窗口外的修改允许降级，不承诺原行位置。
 
-旧 EPUB 读取不再把新解析的 catalog/chapters/navigation 替换进内存记录。旧特殊页仅在对应正文 revision 相符时派生；新 bundle 内保存受限呈现 JSON，hash 进入受校验 manifest。原件与媒体仍各自校验 SHA-256。
+旧 EPUB 读取不再把新解析的 catalog/chapters/navigation 替换进内存记录。旧特殊页仅在对应正文 revision 相符时派生；新导入与新 bundle 均保存受限呈现 JSON，hash 进入受校验 manifest。原件与媒体仍各自校验 SHA-256。
 
 - 用户库 v4：local_books 增加 active_bundle、parser_version、maintenance，另增 local_chapter_revisions。NULL bundle 兼容旧根目录格式；升级不自动重新解析。
 - 原件长期只保留根目录一份。暂存副本用于解析，完成后删除副本，manifest/媒体/呈现进入不可变 revisions/bundle。
