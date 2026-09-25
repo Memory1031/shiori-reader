@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/routes.dart';
+import 'package:shiori/data/repositories/local_reading_repository.dart';
 import 'package:shiori/dev/fixtures.dart';
+import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_contents.dart';
@@ -15,6 +17,9 @@ import 'package:shiori/features/reader/settings_panel.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/shared/widgets/state_views.dart';
 
+import '../../data/local/local_reading_test.dart' show ForbiddenOnline;
+import '../../domain/reparse_position_test.dart' as book;
+import '../local_reparse_test.dart' show ReparseStore;
 import 'settings_test.dart' show Store;
 
 const desktop = Size(1600, 1000);
@@ -696,6 +701,79 @@ void main() {
       },
       variant: windows,
     );
+
+    testWidgets('failure page contents close when the book is invalidated', (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = desktop
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final store = _CountingStore();
+      addTearDown(store.events.close);
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          routes: AppRoutes(
+            home: (_) => BookReaderScreen(
+              // Not in the book, so the chapter fails to load.
+              chapter: LocalBookIdentity.chapter(book.key, 'missing'),
+              repository: LocalReadingRepository(
+                local: store,
+                online: ForbiddenOnline(),
+              ),
+              library: FixtureLibraryRepository(),
+              settings: Store()..value = ReaderSettings(controlsHintSeen: true),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(FailureView), findsOneWidget);
+      final back = find.widgetWithText(TextButton, 'Back');
+      await tester.tap(back);
+      await tester.pumpAndSettle();
+      expect(panel, findsOneWidget);
+
+      // Keep the old panel's callbacks to act on after it is gone.
+      final contents = tester.widget<ReaderContentsPanel>(
+        inPanel(find.byType(ReaderContentsPanel)),
+      );
+      final row = tester.widget<InkWell>(
+        find
+            .ancestor(
+              of: inPanel(find.text('Chapter 0')),
+              matching: find.byType(InkWell),
+            )
+            .first,
+      );
+      final route = ModalRoute.of(
+        tester.element(find.byType(ReaderContentsPanel)),
+      )!;
+      final reads = store.reads;
+
+      store.events.add(book.key);
+      await tester.pump();
+      expect(find.byType(BookReaderScreen), findsOneWidget);
+      expect(
+        find.text(
+          'This book is being reparsed. Return to the library and reopen it.',
+        ),
+        findsOneWidget,
+      );
+      await tester.pumpAndSettle();
+      expect(panel, findsNothing);
+      expect(route.isActive, isFalse);
+
+      // The retired panel no longer acts on the reader.
+      contents.onDone();
+      row.onTap!();
+      await tester.pumpAndSettle();
+      expect(store.reads, reads);
+      expect(panel, findsNothing);
+      expect(find.byType(FailureView), findsNothing);
+      expect(tester.takeException(), isNull);
+    }, variant: windows);
   });
 
   testWidgets(
@@ -721,4 +799,17 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
+}
+
+class _CountingStore extends ReparseStore {
+  int reads = 0;
+
+  @override
+  Future<Result<LocalBookRecord?>> read(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  }) {
+    reads++;
+    return super.read(key, cancellation: cancellation);
+  }
 }

@@ -331,6 +331,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         _chapterTurn.stop();
         _reader.onDelete();
         _pending?.onDelete();
+        // The failure page's contents would outlive the page behind it.
+        _contentsPanel?.dismiss();
+        _contentsPanel = null;
         setState(() => _invalidated = true);
       });
     }
@@ -816,7 +819,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (!ShioriCapabilities.of(context).pointerFirst) {
       return showReaderContents(context, layers: [_bookContents(context)]);
     }
-    if (_contentsPanel != null) return;
+    if (_contentsPanel != null || _invalidated) return;
     final layer = _bookContents(context);
     final panel = ReaderPanelHandle.open(
       this,
