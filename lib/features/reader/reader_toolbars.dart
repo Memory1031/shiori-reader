@@ -200,15 +200,21 @@ class ReaderRunningChrome extends StatelessWidget {
             left: margin,
             right: margin,
             height: metrics.header,
-            child: Center(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: muted,
-                  fontWeight: FontWeight.w400,
+            child: Padding(
+              padding: const EdgeInsets.only(
+                top: ReaderChromeMetrics.edge,
+                bottom: ReaderChromeMetrics.inner,
+              ),
+              child: Center(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: muted,
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
               ),
             ),
@@ -218,8 +224,16 @@ class ReaderRunningChrome extends StatelessWidget {
             left: margin,
             right: margin,
             height: metrics.footer,
-            child: Center(
-              child: statusRow ? ReaderStatusRow(progress: progress) : progress,
+            child: Padding(
+              padding: const EdgeInsets.only(
+                top: ReaderChromeMetrics.inner,
+                bottom: ReaderChromeMetrics.edge,
+              ),
+              child: Center(
+                child: statusRow
+                    ? ReaderStatusRow(progress: progress)
+                    : progress,
+              ),
             ),
           ),
         ],

@@ -23,8 +23,8 @@ class ReaderChromeMetrics {
     final scaler = MediaQuery.textScalerOf(context);
     final line = math.max(18.0, scaler.scale(12) * 1.5);
     return ReaderChromeMetrics._(
-      header: line + 16,
-      footer: line + 16,
+      header: line + edge + inner,
+      footer: line + edge + inner,
       topBar: math.max(56, scaler.scale(15) * 1.5 + 32),
       bottomBar: math.max(64, scaler.scale(14) * 1.5 + 40),
     );
@@ -33,6 +33,10 @@ class ReaderChromeMetrics {
   /// Gutters reserved above and below the page for the running header and
   /// the status footer.
   final double header, footer;
+
+  /// Space between a running line and the screen edge, which the hidden
+  /// system bars no longer pad, and between the line and the page.
+  static const edge = 18.0, inner = 8.0;
 
   /// Heights of the top and bottom toolbars.
   final double topBar, bottomBar;
