@@ -261,6 +261,19 @@ ThemeData shioriTheme(
         outline: p.secondary,
         outlineVariant: p.separator,
       );
+  final hover = p.accent.withValues(alpha: light ? .05 : .08);
+  final press = p.accent.withValues(alpha: light ? .08 : .12);
+  // Buttons take the same tints; their own state layers would follow their
+  // ink or grey foreground.
+  final overlay = WidgetStateProperty.resolveWith<Color?>(
+    (states) => states.contains(WidgetState.pressed)
+        ? press
+        : states.contains(WidgetState.focused)
+        ? press
+        : states.contains(WidgetState.hovered)
+        ? hover
+        : null,
+  );
   TextStyle text(
     double size, {
     FontWeight weight = FontWeight.w400,
@@ -293,9 +306,9 @@ ThemeData shioriTheme(
     dividerColor: p.separator,
     // Soft accent-tinted states instead of Material's grey overlays, and no
     // ripple: a press only deepens the tint, matching the list rows.
-    hoverColor: p.accent.withValues(alpha: light ? .05 : .08),
-    focusColor: p.accent.withValues(alpha: light ? .08 : .12),
-    highlightColor: p.accent.withValues(alpha: light ? .08 : .12),
+    hoverColor: hover,
+    focusColor: press,
+    highlightColor: press,
     splashColor: Colors.transparent,
     splashFactory: NoSplash.splashFactory,
     popupMenuTheme: PopupMenuThemeData(
@@ -371,7 +384,7 @@ ThemeData shioriTheme(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ShioriShape.control),
         ),
-      ),
+      ).copyWith(overlayColor: overlay),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
@@ -381,16 +394,23 @@ ThemeData shioriTheme(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ShioriShape.control),
         ),
-      ),
+        // On a dark theme the fill is the accent itself, so the tint would
+        // not show; the default light overlay stays.
+      ).copyWith(overlayColor: light ? overlay : null),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: p.ink,
         minimumSize: const Size(48, 48),
-      ),
+      ).copyWith(overlayColor: overlay),
     ),
     iconButtonTheme: IconButtonThemeData(
-      style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+      style: IconButton.styleFrom(
+        minimumSize: const Size(48, 48),
+      ).copyWith(overlayColor: overlay),
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: ButtonStyle(overlayColor: overlay),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: p.surface,
