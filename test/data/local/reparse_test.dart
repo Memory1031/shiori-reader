@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:shiori/data/local/record_codec.dart';
 import 'package:drift/native.dart';
@@ -136,6 +138,92 @@ void main() {
       );
     },
   );
+  test(
+    'reparse succeeds natively when the renditions exceed their limits',
+    () async {
+      // Two SVG pages embed one ~7 MB bitmap: each image stays under the
+      // per-image cap, but together the renditions pass the 16 MiB bound.
+      // The native parse accepts the book regardless.
+      final random = Random(7);
+      final bitmap = Uint8List.fromList([
+        ...tinyPng,
+        ...List.generate(7000000, (_) => random.nextInt(256)),
+      ]);
+      String svgPage(String label) =>
+          '''<html><body><svg xmlns="http://www.w3.org/2000/svg"
+ xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1440 2048">
+<image width="1440" height="2048" xlink:href="../images/%E6%98%9F%20%E7%A9%BA.png"/>
+<text x="275" y="795">$label</text></svg></body></html>''';
+      final files = epubFiles(ncx: true)
+        ..['OPS/text/a.xhtml'] = utf8.encode(svgPage('扉页一'))
+        ..['OPS/text/b.xhtml'] = utf8.encode(svgPage('扉页二'))
+        ..['OPS/images/星 空.png'] = bitmap;
+      final old = ok(
+        await store.importBook(
+          bytes: Stream.value(zipFiles(files, compress: false)),
+          format: LocalBookFormat.epub,
+          addToShelf: true,
+          cancellation: token(),
+          parse: (s) => const BookDecoder().decode(
+            s,
+            format: LocalBookFormat.epub,
+            filename: 'large-renditions.epub',
+            cancellation: token(),
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+          ),
+        ),
+      );
+      final key = old.content.detail.summary.key;
+      final generation = ok(
+        await library.beginProgressSession(key, cancellation: token()),
+      );
+      final p = fixtures.progress(old.content, chapter: 1);
+      ok(
+        await library.saveProgress(
+          p,
+          stamp: ProgressWriteStamp(generation: generation, sequence: 0),
+          cancellation: token(),
+        ),
+      );
+
+      final result = ok(
+        await store.reparseBook(
+          key,
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+          cancellation: token(),
+        ),
+      );
+      expect(result.approximate, isFalse);
+      final row = await db.select(db.localBooks).getSingle();
+      expect(row.activeBundle, isNotNull);
+      expect(row.maintenance, 0);
+      final published = Directory(
+        '${paths.localBooks.path}/${key.novelId}/revisions/${row.activeBundle}',
+      );
+      expect(await File('${published.path}/manifest.json').exists(), isTrue);
+      expect(
+        await File('${published.path}/presentations.json').exists(),
+        isFalse,
+      );
+      final manifest =
+          jsonDecode(
+                await File('${published.path}/manifest.json').readAsString(),
+              )
+              as Map<String, dynamic>;
+      expect(manifest['presentationHash'], isNull);
+      expect(manifest.containsKey('svgHotspotsScanned'), isFalse);
+
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      final next = ok(await store.read(key, cancellation: token()))!;
+      expect(next.content.chapters, old.content.chapters);
+      final saved = ok(await library.getProgress(key, cancellation: token()))!;
+      expect(saved.chapterKey, p.chapterKey);
+      expect(saved.position.blockKey, p.position.blockKey);
+      expect(saved.lastReadAt, p.lastReadAt);
+    },
+  );
+
   test('bad original leaves active manifest and progress untouched', () async {
     final old = await add();
     final key = old.content.detail.summary.key;

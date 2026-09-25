@@ -964,6 +964,29 @@ void main() {
       },
     );
 
+    test(
+      'tampered persisted presentations fail their pinned checksum',
+      () async {
+        final imported = await importEpub(svgBook());
+        final key = imported.content.detail.summary.key;
+        final chapter = imported.content.chapters.first;
+        final presentations = File('${root(key).path}/presentations.json');
+        final bytes = await presentations.readAsBytes();
+        // Same length, different content.
+        bytes[bytes.length ~/ 2] ^= 0x01;
+        await presentations.writeAsBytes(bytes, flush: true);
+        await store.close();
+        store = ok(await ManagedLocalBooks.open(paths, db));
+        final original = File('${root(key).path}/original');
+        await original.rename('${original.path}.hidden');
+        final result = await store.loadPagePresentation(
+          chapter.key,
+          cancellation: token(),
+        );
+        expect((result as Failure<String?>).failure.kind, FailureKind.parse);
+      },
+    );
+
     test('a cold first read after import never needs the original', () async {
       final imported = await importEpub(svgBook());
       final key = imported.content.detail.summary.key;

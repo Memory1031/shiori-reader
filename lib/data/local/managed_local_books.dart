@@ -517,12 +517,7 @@ class ManagedLocalBooks
       if (await f.length() > maxPresentationBytes) {
         throw const _LimitExceeded();
       }
-      final bytes = await f.readAsBytes();
-      if (sha256.convert(bytes).toString() != expected) {
-        throw const FormatException('Presentation checksum');
-      }
-      html = (jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>)
-          .cast<String, String>();
+      html = await _decodePresentations(await f.readAsBytes(), expected, token);
     } else {
       // Nothing persisted: an import from before renditions were kept, or
       // one whose renditions exceeded their limits.
@@ -1086,6 +1081,20 @@ _decodeManifest(
     presentationHash: map['presentationHash'] as String?,
     svgHotspotsScanned: map['svgHotspotsScanned'] == true,
   );
+}, token);
+
+/// Verifies and decodes persisted page presentations off the UI isolate;
+/// a rendition set can be megabytes of HTML read on every cold open.
+Future<Map<String, String>> _decodePresentations(
+  List<int> bytes,
+  String expected,
+  CancellationToken token,
+) => runParserWorker(() {
+  if (sha256.convert(bytes).toString() != expected) {
+    throw const LocalParseException(LocalParseProblem.invalid);
+  }
+  return (jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>)
+      .cast<String, String>();
 }, token);
 
 Future<(LocalBookContent, Map<String, String>)> _extractPresentations(
