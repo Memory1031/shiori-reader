@@ -331,7 +331,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get labChapter => '第一章 · 末班列车';
 
   @override
-  String get labProgress => '本章 36.00%';
+  String get labProgress => '本章 36%';
 
   @override
   String get labAuthor => '栞文库编辑室';

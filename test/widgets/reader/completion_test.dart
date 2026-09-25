@@ -521,7 +521,7 @@ void main() {
     },
   );
 
-  testWidgets('chapter 42.00%, overall 63.00%, slider remains chapter-only', (
+  testWidgets('chapter 42%, overall 63%, slider remains chapter-only', (
     tester,
   ) async {
     final repo = _WeightedRepository();
@@ -576,13 +576,13 @@ void main() {
       await tester.tapAt(tester.getCenter(find.byType(ReaderContentView)));
       await tester.pumpAndSettle();
     }
-    expect(find.text('Chapter 42.00%'), findsOneWidget);
+    expect(find.text('Chapter 42%'), findsOneWidget);
     final requests = repo.loads;
-    await tester.tap(find.text('Chapter 42.00%'));
+    await tester.tap(find.text('Chapter 42%'));
     await tester.pumpAndSettle();
     expect(find.text('Reading progress'), findsOneWidget);
-    expect(find.text('63.00%'), findsOneWidget);
-    expect(find.text('42.00%'), findsOneWidget);
+    expect(find.text('63%'), findsOneWidget);
+    expect(find.text('42%'), findsOneWidget);
     final slider = tester.widget<Slider>(find.byType(Slider));
     expect(slider.value, closeTo(.42, .0001));
     slider.onChanged!(.2);
@@ -602,8 +602,8 @@ void main() {
     await tester.tapAt(tester.getCenter(find.byType(ReaderContentView)));
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.textContaining('20.00%'), findsOneWidget);
-    expect(find.textContaining('63.00%'), findsNothing);
+    expect(find.textContaining('20%'), findsOneWidget);
+    expect(find.textContaining('63%'), findsNothing);
     await tester.pumpWidget(const SizedBox());
     await tester.pumpAndSettle();
     await repo.updates.close();

@@ -127,7 +127,6 @@ class _BookshelfViewState extends State<BookshelfView> {
             strings,
             controller.progressFor(book.key)?.bookProgress,
             descriptive: true,
-            wholePercent: true,
           );
           final cover = BookCover(book: book, images: widget.images);
           if (!_grid) {

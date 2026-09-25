@@ -82,16 +82,16 @@ void main() {
         await tester.tapAt(center);
         await tester.pumpAndSettle();
       }
-      expect(find.text('Chapter 26.78%'), findsOneWidget);
+      expect(find.text('Chapter 26%'), findsOneWidget);
       await tester.tapAt(center);
       await tester.pumpAndSettle();
-      expect(find.text('Chapter 26.78%'), findsOneWidget);
+      expect(find.text('Chapter 26%'), findsOneWidget);
       await tester.tapAt(center);
       await tester.pumpAndSettle();
-      expect(find.text('Chapter 26.78%'), findsOneWidget);
-      await tester.tap(find.text('Chapter 26.78%'));
+      expect(find.text('Chapter 26%'), findsOneWidget);
+      await tester.tap(find.text('Chapter 26%'));
       await tester.pumpAndSettle();
-      expect(find.text('26.78%'), findsOneWidget);
+      expect(find.text('26%'), findsOneWidget);
       expect(tester.widget<Slider>(find.byType(Slider)).value, .267899);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
@@ -115,14 +115,14 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Chapter 100.00%'), findsOneWidget);
+    expect(find.text('Chapter 100%'), findsOneWidget);
     final viewport = tester.widget<PagedReaderViewport>(
       find.byType(PagedReaderViewport),
     );
     expect(viewport.controller.capture()!.chapterFraction, 0);
-    await tester.tap(find.text('Chapter 100.00%'));
+    await tester.tap(find.text('Chapter 100%'));
     await tester.pumpAndSettle();
-    expect(find.text('100.00%'), findsOneWidget);
+    expect(find.text('100%'), findsOneWidget);
     expect(tester.widget<Slider>(find.byType(Slider)).value, 1);
     expect(tester.takeException(), isNull);
   });
@@ -192,7 +192,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('本章 0.00%'));
+    await tester.tap(find.text('本章 0%'));
     await tester.pumpAndSettle();
     expect(find.byType(Slider), findsOneWidget);
     expect(

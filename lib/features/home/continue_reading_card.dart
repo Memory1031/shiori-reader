@@ -32,12 +32,7 @@ class ContinueReadingCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          bookProgressLabel(
-                strings,
-                bookProgress,
-                descriptive: true,
-                wholePercent: true,
-              ) ??
+          bookProgressLabel(strings, bookProgress, descriptive: true) ??
               strings.readerReadingProgress,
           style: theme.textTheme.bodySmall,
         ),

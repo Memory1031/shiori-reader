@@ -737,7 +737,7 @@ abstract class AppLocalizations {
   /// No description provided for @labProgress.
   ///
   /// In en, this message translates to:
-  /// **'Chapter 36.00%'**
+  /// **'Chapter 36%'**
   String get labProgress;
 
   /// No description provided for @labAuthor.

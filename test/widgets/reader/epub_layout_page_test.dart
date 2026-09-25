@@ -503,7 +503,7 @@ void main() {
       await tester.pumpAndSettle();
     }
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Chapter 100.00%'), findsOneWidget);
+    expect(find.text('Chapter 100%'), findsOneWidget);
     expect(
       tester.widget<EpubLayoutPage>(find.byType(EpubLayoutPage)).onLink,
       isNotNull,

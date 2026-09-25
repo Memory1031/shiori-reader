@@ -348,7 +348,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get labChapter => 'Chapter 1 · The last train';
 
   @override
-  String get labProgress => 'Chapter 36.00%';
+  String get labProgress => 'Chapter 36%';
 
   @override
   String get labAuthor => 'Shiori Studio';

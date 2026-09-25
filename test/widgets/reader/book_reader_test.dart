@@ -52,7 +52,7 @@ void main() {
         expect(tester.widget<Text>(title).data, catalogTitle ?? content.title);
         expect(find.byTooltip(catalogTitle ?? content.title), findsOneWidget);
         await tester.tap(
-          find.widgetWithText(TextButton, l.readerChapterPercent('0.00')),
+          find.widgetWithText(TextButton, l.readerChapterPercent('0')),
         );
         await tester.pumpAndSettle();
         final sheet = find.byType(BottomSheet);

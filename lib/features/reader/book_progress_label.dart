@@ -6,11 +6,9 @@ String? bookProgressLabel(
   AppLocalizations l,
   BookProgressSnapshot? progress, {
   bool descriptive = false,
-  bool wholePercent = false,
 }) {
   if (progress == null) return null;
-  final formatted = formatReadingPercent(progress.fraction);
-  final percent = wholePercent ? formatted.split('.').first : formatted;
+  final percent = formatReadingPercent(progress.fraction);
   return switch (progress.terminal) {
     BookTerminalState.finished => l.bookFinished,
     BookTerminalState.caughtUp => l.bookCaughtUp,

@@ -599,7 +599,6 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       l,
       widget.progressOf?.call(book.key)?.bookProgress,
       descriptive: true,
-      wholePercent: true,
     );
     final imported = l.localBooksImportedOn(
       MaterialLocalizations.of(

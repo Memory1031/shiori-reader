@@ -136,7 +136,7 @@ void main() {
         expect(find.byType(LinearProgressIndicator), findsNothing);
         expect(find.byType(Chip), findsNothing);
         expect(find.textContaining('76 / 120'), findsNothing);
-        expect(find.textContaining('42.00%'), findsNothing);
+        expect(find.textContaining('42%'), findsNothing);
         if (i == 0) {
           await tester.tap(find.byTooltip('列表'));
           await tester.pumpAndSettle();
@@ -170,7 +170,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Reading progress 63%'), findsOneWidget);
-      expect(find.textContaining('42.00%'), findsNothing);
+      expect(find.textContaining('42%'), findsNothing);
       expect(env.source.controls.calls, isEmpty);
       final controller = LibraryController(env.library)..onStart();
       await tester.pumpWidget(
@@ -182,7 +182,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Reading progress 63.99%'), findsOneWidget);
+      expect(find.text('Reading progress 63%'), findsOneWidget);
       expect(env.source.controls.calls, isEmpty);
       await tester.pumpWidget(const SizedBox());
       controller.onDelete();
