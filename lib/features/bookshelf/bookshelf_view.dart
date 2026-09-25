@@ -21,8 +21,18 @@ class BookshelfView extends StatefulWidget {
     this.onImport,
     this.images,
     this.header,
+    this.layout,
+    this.showTitle = true,
   });
   final LibraryController controller;
+
+  /// Grid (true) or list, owned by a host that outlives this view so the
+  /// choice survives leaving the page; the view keeps its own otherwise.
+  final ValueNotifier<bool>? layout;
+
+  /// Hosts that title the page themselves, with a [ShelfLayoutButton] in
+  /// their toolbar, hide the shelf's own title row.
+  final bool showTitle;
 
   /// Scrolls above the shelf title, e.g. the continue-reading card.
   final Widget? header;
@@ -36,9 +46,37 @@ class BookshelfView extends StatefulWidget {
 }
 
 class _BookshelfViewState extends State<BookshelfView> {
-  bool _grid = true;
+  ValueNotifier<bool>? _ownLayout;
+  ValueNotifier<bool> get _layout =>
+      widget.layout ?? (_ownLayout ??= ValueNotifier(true));
+  bool get _grid => _layout.value;
   NovelKey? _revealed;
   double _drag = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _layout.addListener(_layoutChanged);
+  }
+
+  @override
+  void didUpdateWidget(BookshelfView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final old = oldWidget.layout ?? _ownLayout;
+    if (old != _layout) {
+      old?.removeListener(_layoutChanged);
+      _layout.addListener(_layoutChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    _layout.removeListener(_layoutChanged);
+    _ownLayout?.dispose();
+    super.dispose();
+  }
+
+  void _layoutChanged() => setState(() => _revealed = null);
 
   // Reveal or hide row actions once a swipe commits by distance or speed,
   // not on the first couple of pixels of any horizontal movement.
@@ -270,35 +308,25 @@ class _BookshelfViewState extends State<BookshelfView> {
           slivers: [
             if (widget.header case final header?)
               SliverToBoxAdapter(child: header),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: ShioriSpace.page,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        strings.shelfTitle,
-                        style: Theme.of(context).textTheme.headlineSmall,
+            if (widget.showTitle)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ShioriSpace.page,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          strings.shelfTitle,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: _grid ? strings.shelfList : strings.shelfGrid,
-                      icon: Icon(
-                        _grid
-                            ? Icons.grid_view_rounded
-                            : Icons.view_list_rounded,
-                      ),
-                      onPressed: () => setState(() {
-                        _grid = !_grid;
-                        _revealed = null;
-                      }),
-                    ),
-                  ],
+                      ShelfLayoutButton(layout: _layout),
+                    ],
+                  ),
                 ),
               ),
-            ),
             // An invitation for an empty shelf, not a caption for a full one.
             if (controller.shelfReady && books.isEmpty)
               SliverToBoxAdapter(
@@ -376,6 +404,24 @@ class _BookshelfViewState extends State<BookshelfView> {
           ],
         );
       },
+    );
+  }
+}
+
+/// Switches a shelf between grid and list.
+class ShelfLayoutButton extends StatelessWidget {
+  const ShelfLayoutButton({super.key, required this.layout});
+  final ValueNotifier<bool> layout;
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context);
+    return ValueListenableBuilder(
+      valueListenable: layout,
+      builder: (context, grid, _) => IconButton(
+        tooltip: grid ? strings.shelfList : strings.shelfGrid,
+        icon: Icon(grid ? Icons.grid_view_rounded : Icons.view_list_rounded),
+        onPressed: () => layout.value = !grid,
+      ),
     );
   }
 }

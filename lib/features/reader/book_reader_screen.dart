@@ -37,6 +37,7 @@ class BookReaderScreen extends StatefulWidget {
     this.initialBlockOffset,
     this.startAtBeginning = false,
     this.linkDepth = 0,
+    this.onReturnToShelf,
   });
   final ChapterKey chapter;
   final NovelRepository repository;
@@ -55,6 +56,11 @@ class BookReaderScreen extends StatefulWidget {
   final int? initialBlockOffset;
   final bool startAtBeginning;
   final int linkDepth;
+
+  /// Closes the reader and whatever sits beneath it back to the shelf. The
+  /// home decides what that means, e.g. also selecting the desktop shelf;
+  /// without it the reader pops to the first route.
+  final VoidCallback? onReturnToShelf;
   @override
   State<BookReaderScreen> createState() => _BookReaderScreenState();
 }
@@ -596,7 +602,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         if (mounted) {
           _beginLeaving();
           if (toShelf) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            if (widget.onReturnToShelf case final returnToShelf?) {
+              returnToShelf();
+            } else {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
           } else {
             Navigator.of(context).pop();
           }
@@ -745,6 +755,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           initialBlockOffset: blockOffset,
           startAtBeginning: true,
           linkDepth: widget.linkDepth + 1,
+          onReturnToShelf: widget.onReturnToShelf,
         ),
       ),
     );

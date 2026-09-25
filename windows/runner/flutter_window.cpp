@@ -133,6 +133,26 @@ bool FlutterWindow::OnCreate() {
       const auto opened = reinterpret_cast<INT_PTR>(ShellExecuteW(
           nullptr, L"open", target.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
       result->Success(flutter::EncodableValue(opened > 32));
+    } else if (call.method_name() == "setCaption") {
+      // {color: ARGB int, dark: bool}, from the app's current theme.
+      const auto* arguments =
+          call.arguments() ? std::get_if<flutter::EncodableMap>(call.arguments()) : nullptr;
+      const auto find = [arguments](const char* key) -> const flutter::EncodableValue* {
+        if (!arguments) return nullptr;
+        const auto entry = arguments->find(flutter::EncodableValue(key));
+        return entry == arguments->end() ? nullptr : &entry->second;
+      };
+      const auto* color = find("color");
+      const auto* dark = find("dark");
+      const bool* is_dark = dark ? std::get_if<bool>(dark) : nullptr;
+      if (!color || !is_dark || !(std::holds_alternative<int32_t>(*color) ||
+                                  std::holds_alternative<int64_t>(*color))) {
+        result->Success(flutter::EncodableValue(false));
+        return;
+      }
+      const auto argb = static_cast<uint32_t>(color->LongValue());
+      SetCaption(RGB((argb >> 16) & 0xff, (argb >> 8) & 0xff, argb & 0xff), *is_dark);
+      result->Success(flutter::EncodableValue(true));
     } else if (call.method_name() == "startUpdater") {
       result->Success(flutter::EncodableValue(StartUpdater()));
     } else if (call.method_name() == "exit") {

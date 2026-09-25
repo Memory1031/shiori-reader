@@ -1,21 +1,43 @@
 import 'package:flutter/material.dart';
+import '../shared/capabilities.dart';
 import '../shared/widgets/shiori_sheet.dart';
 import '../domain/models/models.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'app_controller.dart';
 import 'theme/shiori_theme.dart';
 
+/// A dialog on pointer-first platforms, a sheet on touch ones. Either way
+/// it opens above the current page and leaves it as it was.
 Future<void> showAppAppearance(
   BuildContext context,
   AppController controller,
-) => showShioriSheet<void>(
-  context,
-  builder: (_) => _AppearancePanel(controller: controller),
-);
+) => ShioriCapabilities.of(context).pointerFirst
+    ? showDialog<void>(
+        context: context,
+        builder: (dialog) => Dialog(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: ShioriLayout.panel),
+            child: Padding(
+              padding: const EdgeInsets.only(top: ShioriSpace.page),
+              child: _AppearancePanel(
+                controller: controller,
+                onClose: () => Navigator.pop(dialog),
+              ),
+            ),
+          ),
+        ),
+      )
+    : showShioriSheet<void>(
+        context,
+        builder: (_) => _AppearancePanel(controller: controller),
+      );
 
 class _AppearancePanel extends StatefulWidget {
-  const _AppearancePanel({required this.controller});
+  const _AppearancePanel({required this.controller, this.onClose});
   final AppController controller;
+
+  /// Set in a dialog, which has no drag handle to close it by.
+  final VoidCallback? onClose;
   @override
   State<_AppearancePanel> createState() => _AppearancePanelState();
 }
@@ -109,6 +131,16 @@ class _AppearancePanelState extends State<_AppearancePanel> {
               onPressed: controller.retrySettings,
               child: Text(l.retryAction),
             ),
+          if (widget.onClose case final close?) ...[
+            const SizedBox(height: ShioriSpace.item),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                onPressed: close,
+                child: Text(MaterialLocalizations.of(context).closeButtonLabel),
+              ),
+            ),
+          ],
         ],
       ),
     );

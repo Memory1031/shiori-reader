@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import '../features/reader/epub_webview_host.dart';
 import '../data/local/book_decoder.dart';
 import '../data/repositories/local_reading_repository.dart';
@@ -18,6 +19,7 @@ import '../data/repositories/library_repository.dart';
 import '../domain/contracts/contracts.dart';
 import '../domain/contracts/app_updates.dart';
 import '../domain/contracts/import_source.dart';
+import '../features/home/home_navigation.dart';
 import '../features/home/reading_home.dart';
 import '../shared/app_logger.dart';
 import '../shared/source_image.dart';
@@ -30,6 +32,7 @@ import 'source_services.dart';
 import 'launch_view.dart';
 import 'import_source.dart';
 import 'update_services.dart';
+import 'window_caption.dart';
 import '../features/updates/update_controller.dart';
 import '../features/updates/update_screen.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -48,6 +51,7 @@ class _ProductionAppState extends State<ProductionApp>
     with WidgetsBindingObserver {
   final _navigator = GlobalKey<NavigatorState>();
   final _messenger = GlobalKey<ScaffoldMessengerState>();
+  final _home = HomeNavigation();
   UpdateController? _updates;
   String? _notifiedUpdate;
   LocalReadingRepository? _novels;
@@ -165,6 +169,7 @@ class _ProductionAppState extends State<ProductionApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _home.dispose();
     unawaited(_close());
     super.dispose();
   }
@@ -227,6 +232,11 @@ class _ProductionAppState extends State<ProductionApp>
     }
     final navigator = _navigator.currentState;
     if (navigator == null) return;
+    // The desktop shell shows updates as one of its sections.
+    if (ShioriCapabilities.of(navigator.context).pointerFirst) {
+      _home.select(HomeSection.updates);
+      return;
+    }
     navigator.push(
       platformPageRoute<void>(
         navigator.context,
@@ -271,6 +281,10 @@ class _ProductionAppState extends State<ProductionApp>
           library: _library!,
           images: _images,
           settings: _reading,
+          onReturnToShelf: () {
+            _navigator.currentState?.popUntil((route) => route.isFirst);
+            _home.returnToShelf();
+          },
         ),
       ),
     );
@@ -293,20 +307,23 @@ class _ProductionAppState extends State<ProductionApp>
           key: const ValueKey('production-ready'),
           navigatorKey: _navigator,
           scaffoldMessengerKey: _messenger,
-          overlayBuilder: (context, child) => EpubWebViewHost(
-            userDataDirectory: _paths!.webView,
-            child: ImportOverlay(
-              controller: _imports!,
-              onRead: _readImported,
-              // Above the navigator, so shelf and local-file covers stay
-              // decoded across pages; the reader nests its own scope.
-              child: SourceImageDecodeScope(
-                maxEntries: 60,
-                maxBytes: 32 * 1024 * 1024,
-                child: child,
+          overlayBuilder: (context, child) {
+            final Widget app = EpubWebViewHost(
+              userDataDirectory: _paths!.webView,
+              child: ImportOverlay(
+                controller: _imports!,
+                onRead: _readImported,
+                // Above the navigator, so shelf and local-file covers stay
+                // decoded across pages; the reader nests its own scope.
+                child: SourceImageDecodeScope(
+                  maxEntries: 60,
+                  maxBytes: 32 * 1024 * 1024,
+                  child: child,
+                ),
               ),
-            ),
-          ),
+            );
+            return Platform.isWindows ? WindowCaptionSync(child: app) : app;
+          },
           createController: () => AppController(settingsStore: _appearance),
           homeBuilder: (context, app) => ReadingHome(
             repository: _novels!,
@@ -317,6 +334,13 @@ class _ProductionAppState extends State<ProductionApp>
             settings: _reading,
             onAppearance: () => showAppAppearance(context, app),
             onUpdates: _openUpdates,
+            navigation: _home,
+            updates: _updates == null
+                ? null
+                : (_) => UpdateScreen(
+                    controller: _updates!,
+                    openPage: openUpdatePage,
+                  ),
             onImport: _imports!.open,
             localBooks: _databases!.localBooks,
             localManagement: _databases!.localBooks,

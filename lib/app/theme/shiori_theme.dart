@@ -69,9 +69,12 @@ abstract final class ShioriSpace {
       section = 32.0;
 }
 
-/// Maximum widths for centred content on wide windows.
+/// Maximum widths for centred content on wide windows, and the desktop
+/// shell's navigation widths. [page] is also where the shell's bottom bar
+/// gives way to the rail, and [sidebarBreakpoint] where the rail gains labels.
 abstract final class ShioriLayout {
   static const page = 840.0, list = 760.0, panel = 560.0;
+  static const rail = 72.0, sidebar = 232.0, sidebarBreakpoint = 1200.0;
 }
 
 /// Corner radii: tag for badges / bars, cover for artwork, control for rows,

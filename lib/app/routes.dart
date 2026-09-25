@@ -9,6 +9,10 @@ import '../shared/widgets/state_views.dart';
 sealed class AppDestination {
   const AppDestination();
   String get routeName;
+
+  /// Covers the whole window, above any desktop shell. Other destinations
+  /// open where they are asked for, e.g. inside the shell's workspace.
+  bool get fullWindow => false;
 }
 
 final class SearchDestination extends AppDestination {
@@ -31,6 +35,8 @@ final class ReaderDestination extends AppDestination {
   final ChapterKey key;
   @override
   String get routeName => '/reader';
+  @override
+  bool get fullWindow => true;
 }
 
 final class ContinueDestination extends AppDestination {
@@ -38,6 +44,8 @@ final class ContinueDestination extends AppDestination {
   final NovelKey key;
   @override
   String get routeName => '/continue';
+  @override
+  bool get fullWindow => true;
 }
 
 /// Reads from the article cache only, without touching the network.
@@ -46,6 +54,8 @@ final class OfflineReaderDestination extends AppDestination {
   final ChapterKey key;
   @override
   String get routeName => '/offline-reader';
+  @override
+  bool get fullWindow => true;
 }
 
 final class LocalBooksDestination extends AppDestination {
@@ -136,7 +146,10 @@ class AppRoutes {
   }
 
   Future<void> open(BuildContext context, AppDestination destination) async {
-    await Navigator.of(context).push<void>(route(context, destination));
+    await Navigator.of(
+      context,
+      rootNavigator: destination.fullWindow,
+    ).push<void>(route(context, destination));
   }
 }
 

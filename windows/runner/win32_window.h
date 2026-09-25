@@ -53,6 +53,10 @@ class Win32Window {
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
+  // Draws the title bar in |color|, with dark or light caption text and
+  // buttons, instead of following the system theme.
+  void SetCaption(COLORREF color, bool dark);
+
  protected:
   // Processes and route salient window messages for mouse handling,
   // size change and DPI. Delegates handling of these to member overloads that
@@ -85,8 +89,9 @@ class Win32Window {
   // Retrieves a class instance pointer for |window|
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
 
-  // Update the window frame's theme to match the system theme.
-  static void UpdateTheme(HWND const window);
+  // Update the window frame's theme to match the app's caption, if set, or
+  // else the system theme.
+  void UpdateTheme(HWND const window);
 
   bool quit_on_close_ = false;
 
@@ -95,6 +100,11 @@ class Win32Window {
 
   // window handle for hosted content.
   HWND child_content_ = nullptr;
+
+  // The caption set by SetCaption, if any.
+  bool has_caption_ = false;
+  COLORREF caption_color_ = 0;
+  bool caption_dark_ = false;
 };
 
 #endif  // RUNNER_WIN32_WINDOW_H_

@@ -1034,6 +1034,18 @@ abstract class AppLocalizations {
   /// **'List'**
   String get shelfList;
 
+  /// No description provided for @homeShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'My bookshelf'**
+  String get homeShelf;
+
+  /// No description provided for @homeNavigation.
+  ///
+  /// In en, this message translates to:
+  /// **'Main navigation'**
+  String get homeNavigation;
+
   /// No description provided for @allChapters.
   ///
   /// In en, this message translates to:

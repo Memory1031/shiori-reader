@@ -508,6 +508,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shelfList => 'List';
 
   @override
+  String get homeShelf => 'My bookshelf';
+
+  @override
+  String get homeNavigation => 'Main navigation';
+
+  @override
   String get allChapters => 'All chapters';
 
   @override

@@ -177,6 +177,8 @@
   "readerProgressLabel": "Progress",
   "shelfGrid": "Grid",
   "shelfList": "List",
+  "homeShelf": "My bookshelf",
+  "homeNavigation": "Main navigation",
   "allChapters": "All chapters",
   "onlineSource": "Online source",
   "shelfDetails": "Details",

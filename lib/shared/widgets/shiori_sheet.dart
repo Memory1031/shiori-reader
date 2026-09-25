@@ -17,6 +17,10 @@ enum ShioriSheetSize {
 /// surface (e.g. a live-themed reader panel) pass [owned] to drop the
 /// default handle and background. A lighter [barrierColor] keeps the page
 /// behind readable, e.g. while previewing reading colours.
+///
+/// Sheets open on the root navigator, like dialogs, so on desktop they cover
+/// the whole window instead of the shell's workspace. Close one with its own
+/// builder context, and open follow-up pages with the caller's context.
 Future<T?> showShioriSheet<T>(
   BuildContext context, {
   required WidgetBuilder builder,
@@ -25,6 +29,7 @@ Future<T?> showShioriSheet<T>(
   Color? barrierColor,
 }) => showModalBottomSheet<T>(
   context: context,
+  useRootNavigator: true,
   barrierColor: barrierColor,
   isScrollControlled: true,
   useSafeArea: true,

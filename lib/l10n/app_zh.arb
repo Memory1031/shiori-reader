@@ -177,6 +177,8 @@
   "readerProgressLabel": "进度",
   "shelfGrid": "网格",
   "shelfList": "列表",
+  "homeShelf": "我的书架",
+  "homeNavigation": "主导航",
   "allChapters": "全部章节",
   "onlineSource": "在线书源",
   "shelfDetails": "详情",

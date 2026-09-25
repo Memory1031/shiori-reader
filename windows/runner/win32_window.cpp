@@ -3,6 +3,8 @@
 #include <dwmapi.h>
 #include <flutter_windows.h>
 
+#include <algorithm>
+
 #include "resource.h"
 
 namespace {
@@ -15,6 +17,16 @@ namespace {
 #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
+
+/// Window attribute for the title bar colour, honoured from Windows 11.
+#ifndef DWMWA_CAPTION_COLOR
+#define DWMWA_CAPTION_COLOR 35
+#endif
+
+/// The smallest client area the app lays out for, in logical pixels: the
+/// width where the desktop shell's rail replaces its bottom bar.
+constexpr int kMinimumClientWidth = 840;
+constexpr int kMinimumClientHeight = 600;
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 
@@ -30,11 +42,51 @@ constexpr const wchar_t kGetPreferredBrightnessRegValue[] = L"AppsUseLightTheme"
 static int g_active_window_count = 0;
 
 using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
+using AdjustWindowRectExForDpiProc = BOOL __stdcall(LPRECT rect, DWORD style,
+                                                    BOOL menu, DWORD ex_style,
+                                                    UINT dpi);
 
 // Scale helper to convert logical scaler values to physical using passed in
 // scale factor
 int Scale(int source, double scale_factor) {
   return static_cast<int>(source * scale_factor);
+}
+
+// The work area of |monitor|, or an empty rect if it cannot be read.
+RECT WorkAreaFor(HMONITOR monitor) {
+  MONITORINFO monitor_info{sizeof(monitor_info)};
+  if (!GetMonitorInfoW(monitor, &monitor_info)) return RECT{};
+  return monitor_info.rcWork;
+}
+
+// The outer size giving |window| the minimum client area at its current
+// DPI, never larger than its monitor's work area. Zero if it can't be
+// computed, which leaves the system's own minimum.
+SIZE MinimumWindowSize(HWND window) {
+  const UINT dpi = FlutterDesktopGetDpiForHWND(window);
+  RECT frame{0, 0, MulDiv(kMinimumClientWidth, dpi, 96),
+             MulDiv(kMinimumClientHeight, dpi, 96)};
+  const auto style = static_cast<DWORD>(GetWindowLongPtr(window, GWL_STYLE));
+  const auto ex_style =
+      static_cast<DWORD>(GetWindowLongPtr(window, GWL_EXSTYLE));
+  // Available from Windows 10 1607; older systems measure the frame at the
+  // system DPI instead.
+  static const auto adjust_for_dpi =
+      reinterpret_cast<AdjustWindowRectExForDpiProc*>(GetProcAddress(
+          GetModuleHandleW(L"user32.dll"), "AdjustWindowRectExForDpi"));
+  const BOOL adjusted =
+      adjust_for_dpi ? adjust_for_dpi(&frame, style, FALSE, ex_style, dpi)
+                     : AdjustWindowRectEx(&frame, style, FALSE, ex_style);
+  if (!adjusted) return SIZE{};
+  LONG width = frame.right - frame.left;
+  LONG height = frame.bottom - frame.top;
+  const RECT work =
+      WorkAreaFor(MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST));
+  if (work.right > work.left && work.bottom > work.top) {
+    width = std::min(width, work.right - work.left);
+    height = std::min(height, work.bottom - work.top);
+  }
+  return SIZE{width, height};
 }
 
 // Dynamically loads the |EnableNonClientDpiScaling| from the User32 module.
@@ -135,22 +187,30 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
+  // A small or highly scaled display may not fit the default size.
+  int window_width = Scale(size.width, scale_factor);
+  int window_height = Scale(size.height, scale_factor);
+  const RECT work = WorkAreaFor(monitor);
+  if (work.right > work.left && work.bottom > work.top) {
+    window_width =
+        std::min(window_width, static_cast<int>(work.right - work.left));
+    window_height =
+        std::min(window_height, static_cast<int>(work.bottom - work.top));
+  }
+
   HWND window = CreateWindow(
       window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
-      Scale(size.width, scale_factor), Scale(size.height, scale_factor),
-      nullptr, nullptr, GetModuleHandle(nullptr), this);
+      window_width, window_height, nullptr, nullptr, GetModuleHandle(nullptr),
+      this);
 
   if (!window) {
     return false;
   }
 
   if (center) {
-    MONITORINFO monitor_info{sizeof(monitor_info)};
     RECT bounds{};
-    if (GetMonitorInfoW(monitor, &monitor_info) &&
-        GetWindowRect(window, &bounds)) {
-      const RECT& work = monitor_info.rcWork;
+    if (work.right > work.left && GetWindowRect(window, &bounds)) {
       const int width = bounds.right - bounds.left;
       const int height = bounds.bottom - bounds.top;
       const int horizontal_space = work.right - work.left - width;
@@ -204,6 +264,16 @@ Win32Window::MessageHandler(HWND hwnd,
         PostQuitMessage(0);
       }
       return 0;
+
+    // Also sent while a DPI change resizes the window, so the minimum
+    // follows the monitor the window is on and its scale.
+    case WM_GETMINMAXINFO: {
+      auto info = reinterpret_cast<MINMAXINFO*>(lparam);
+      const SIZE minimum = MinimumWindowSize(hwnd);
+      info->ptMinTrackSize.x = std::max(info->ptMinTrackSize.x, minimum.cx);
+      info->ptMinTrackSize.y = std::max(info->ptMinTrackSize.y, minimum.cy);
+      return 0;
+    }
 
     case WM_DPICHANGED: {
       auto newRectSize = reinterpret_cast<RECT*>(lparam);
@@ -290,7 +360,24 @@ void Win32Window::OnDestroy() {
   // No-op; provided for subclasses.
 }
 
+void Win32Window::SetCaption(COLORREF color, bool dark) {
+  caption_color_ = color;
+  caption_dark_ = dark;
+  has_caption_ = true;
+  if (window_handle_) UpdateTheme(window_handle_);
+}
+
 void Win32Window::UpdateTheme(HWND const window) {
+  // Failures leave the frame as the system draws it: caption colours need
+  // Windows 11, and dark frames a recent Windows 10.
+  if (has_caption_) {
+    BOOL enable_dark_mode = caption_dark_;
+    DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE,
+                          &enable_dark_mode, sizeof(enable_dark_mode));
+    DwmSetWindowAttribute(window, DWMWA_CAPTION_COLOR, &caption_color_,
+                          sizeof(caption_color_));
+    return;
+  }
   DWORD light_mode;
   DWORD light_mode_size = sizeof(light_mode);
   LSTATUS result = RegGetValue(HKEY_CURRENT_USER, kGetPreferredBrightnessRegKey,

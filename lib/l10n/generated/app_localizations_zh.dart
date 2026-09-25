@@ -485,6 +485,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shelfList => '列表';
 
   @override
+  String get homeShelf => '我的书架';
+
+  @override
+  String get homeNavigation => '主导航';
+
+  @override
   String get allChapters => '全部章节';
 
   @override

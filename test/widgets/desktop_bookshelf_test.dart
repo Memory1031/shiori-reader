@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/features/home/continue_reading_card.dart';
 import 'package:shiori/app/theme.dart';
+import 'package:shiori/app/theme/shiori_theme.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/bookshelf/bookshelf_view.dart';
+import 'package:shiori/features/home/desktop_shell.dart';
 import 'package:shiori/features/home/reading_home.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 import 'package:shiori/shared/widgets/book_cover.dart';
@@ -75,9 +77,30 @@ void main() {
           final shelf = find.byType(BookshelfView);
           final l = AppLocalizations.of(tester.element(shelf));
           final logicalWidth = display.size.width / display.dpr;
+          ShellLayout layout() => tester
+              .widget<ShellNavigation>(find.byType(ShellNavigation))
+              .layout;
+          // Centred in the workspace beside the navigation, not the window.
+          final workspace = find.ancestor(
+            of: shelf,
+            matching: find.byType(Scaffold),
+          );
+          expect(layout(), shellLayoutFor(logicalWidth));
           final shelfRect = tester.getRect(shelf);
           expect(shelfRect.width, lessThanOrEqualTo(840.01));
-          expect(shelfRect.center.dx, closeTo(logicalWidth / 2, .01));
+          expect(
+            shelfRect.center.dx,
+            closeTo(tester.getRect(workspace).center.dx, .01),
+          );
+          expect(
+            tester.getRect(workspace).left,
+            closeTo(
+              logicalWidth >= ShioriLayout.sidebarBreakpoint
+                  ? ShioriLayout.sidebar
+                  : ShioriLayout.rail,
+              .01,
+            ),
+          );
           expect(find.text(l.detailContinue), findsOneWidget);
 
           final covers = find.descendant(
@@ -139,6 +162,7 @@ void main() {
               display.size.height,
             );
             await tester.pumpAndSettle();
+            expect(layout(), shellLayoutFor(width));
             expect(find.byTooltip(l.shelfGrid), findsOneWidget);
             expect(tester.getSize(shelf).width, lessThanOrEqualTo(width));
             for (final element in find.byType(ListTile).evaluate()) {
