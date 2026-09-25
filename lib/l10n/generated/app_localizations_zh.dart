@@ -856,7 +856,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get localReparseReaderClosed => '这本书正在重新解析。请返回书架后重新打开。';
 
   @override
-  String get readerLinks => '本章链接';
+  String get readerLinks => '本章注释';
+
+  @override
+  String get readerNotesFootnotes => '注释';
+
+  @override
+  String get readerNotesLinks => '链接';
+
+  @override
+  String get readerLinkHere => '本章内';
+
+  @override
+  String get readerLinkElsewhere => '书中其他位置';
 
   @override
   String get readerLinkReturn => '返回原位置';

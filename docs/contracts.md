@@ -103,4 +103,4 @@ LocalContentLink 是独立于 ContentBlock 的不可变侧表项：来源 Chapte
 可点击范围使用 sourceOffset / sourceLength，均按来源块内 Unicode code points 计数；跨块链接逐块保存范围，不改正文。sourceOffset 非空且 sourceLength 为空的项兼容旧脚注合同，label 对应数字上标，并有可空 footnoteText（纯文本）。可用脚注的 target 指向来源章，面板直接消费 footnoteText，不进行章节导航；不可用项保留入口位置及原因。旧侧表缺范围字段时仍可通过菜单访问普通链接。解析器替换脚注入口并移除注释正文会正常产生新的正文 revision；交互本身不修改内容身份。
 LocalContentLinkRepository 提供按来源章节的链接和主阅读顺序，所有请求仍携带取消 token。包内 href/fragment 在 data 层解析；远程、越界、缺文档或缺锚点只报告不可用，不能退到网络或错误地跳章首。同资源链接保留当前 occurrence，跨资源链接选择目标第一次出现。非 spine 的 manifest XHTML 可作为有界辅助文档加载；不进入主目录/连续阅读序列。
 
-正文内链、结构化目录和“本章链接”复用目标导航：同章在原视口恢复块位置；readingOrder 内其他章节使用现有切章及进度会话；其余文档打开临时辅助阅读页（不注入 LibraryRepository），最多嵌套 8 层。辅助页的原 Reader 保持挂载，返回使用原页/原 occurrence。维护 invalidation 同时退役主页和辅助页。linear=no 仍可明确选择，但不参与连续翻章。
+正文内链、结构化目录和“本章注释”复用目标导航：同章在原视口恢复块位置；readingOrder 内其他章节使用现有切章及进度会话；其余文档打开临时辅助阅读页（不注入 LibraryRepository），最多嵌套 8 层。辅助页的原 Reader 保持挂载，返回使用原页/原 occurrence。维护 invalidation 同时退役主页和辅助页。linear=no 仍可明确选择，但不参与连续翻章。

@@ -15,10 +15,10 @@ import 'viewport/page_turn.dart';
 import '../cache/prefetch_sheet.dart';
 import '../../shared/source_image.dart';
 import 'reader_linked_text.dart';
+import 'reader_notes.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'reader_chrome.dart';
 import 'reader_contents.dart';
-import 'reader_sheet.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
 class BookReaderScreen extends StatefulWidget {
@@ -574,30 +574,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   Future<void> _links(BuildContext readerContext) async {
     if (_changing || _invalidated) return;
-    final l = AppLocalizations.of(context);
     final source = _reader;
-    final link = await showReaderSheet<LocalContentLink>(
-      context,
-      size: ReaderSheetSize.tall,
-      builder: (context) => ListView(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(ShioriSpace.page),
-            child: Text(l.readerLinks),
-          ),
-          for (final link in source.contentLinks)
-            ListTile(
-              title: Text(link.label),
-              subtitle: link.unavailable == null
-                  ? null
-                  : Text(l.readerLinkUnavailable),
-              trailing: Icon(
-                link.unavailable == null ? Icons.chevron_right : Icons.link_off,
-              ),
-              onTap: () => Navigator.pop(context, link),
-            ),
-        ],
-      ),
+    // Shown from the reader's context so the sheet takes its paper theme.
+    final link = await showReaderNotes(
+      readerContext,
+      links: source.contentLinks,
+      current: source.chapter,
+      titleOf: (target) => _navigation[target]?.first.$1.title,
     );
     if (!mounted ||
         !readerContext.mounted ||

@@ -269,7 +269,7 @@ void main() {
         );
         await tester.tap(find.byTooltip(lang == 'en' ? 'More' : '更多'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text(lang == 'en' ? 'Chapter links' : '本章链接'));
+        await tester.tap(find.text(lang == 'en' ? 'Chapter notes' : '本章注释'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('note'));
         await tester.pumpAndSettle();
@@ -364,7 +364,23 @@ void main() {
             .key,
         c.chapters.first.key,
       );
-      expect(find.textContaining('Link unavailable'), findsOneWidget);
+      // Unavailable targets are listed with their reason but cannot be
+      // followed.
+      expect(
+        tester
+            .widget<ListTile>(find.widgetWithText(ListTile, 'external'))
+            .enabled,
+        isFalse,
+      );
+      expect(
+        find.descendant(
+          of: find.widgetWithText(ListTile, 'external'),
+          matching: find.textContaining('Link unavailable'),
+        ),
+        findsOneWidget,
+      );
+      Navigator.of(tester.element(find.text('external'))).pop();
+      await tester.pumpAndSettle();
       tester
           .widget<ReaderContentView>(find.byType(ReaderContentView))
           .actions

@@ -1709,8 +1709,32 @@ abstract class AppLocalizations {
   /// No description provided for @readerLinks.
   ///
   /// In en, this message translates to:
-  /// **'Chapter links'**
+  /// **'Chapter notes'**
   String get readerLinks;
+
+  /// No description provided for @readerNotesFootnotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get readerNotesFootnotes;
+
+  /// No description provided for @readerNotesLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'Links'**
+  String get readerNotesLinks;
+
+  /// No description provided for @readerLinkHere.
+  ///
+  /// In en, this message translates to:
+  /// **'In this chapter'**
+  String get readerLinkHere;
+
+  /// No description provided for @readerLinkElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Elsewhere in this book'**
+  String get readerLinkElsewhere;
 
   /// No description provided for @readerLinkReturn.
   ///

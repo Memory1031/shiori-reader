@@ -937,7 +937,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'This book is being reparsed. Return to the library and reopen it.';
 
   @override
-  String get readerLinks => 'Chapter links';
+  String get readerLinks => 'Chapter notes';
+
+  @override
+  String get readerNotesFootnotes => 'Notes';
+
+  @override
+  String get readerNotesLinks => 'Links';
+
+  @override
+  String get readerLinkHere => 'In this chapter';
+
+  @override
+  String get readerLinkElsewhere => 'Elsewhere in this book';
 
   @override
   String get readerLinkReturn => 'Return to reading';
