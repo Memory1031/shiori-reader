@@ -30,6 +30,7 @@ dependencies:
   flutter_inappwebview: 6.1.5
   flutter_markdown_plus: 1.0.12
   battery_plus: 7.1.1
+  wakelock_plus: 1.6.1
 
 dependency_overrides:
   flutter_inappwebview_windows:

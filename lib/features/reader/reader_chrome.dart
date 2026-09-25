@@ -3,8 +3,10 @@ import 'dart:math' as math;
 
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
-import '../../app/theme/shiori_theme.dart';
 import 'package:flutter/services.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+
+import '../../app/theme/shiori_theme.dart';
 
 /// Reader chrome geometry derived from text scale, so running headers and
 /// toolbars grow with accessibility sizes instead of clipping. Content
@@ -42,19 +44,28 @@ class ReaderChromeMetrics {
   final double topBar, bottomBar;
 }
 
-/// Hides the status and navigation bars while any reader is open on touch
-/// platforms. Reference-counted so a nested link reader does not restore
-/// them under the outer reader. Bars stay hidden while toolbars toggle, so
-/// safe-area insets, and therefore pagination, never change mid-session;
-/// [ReaderStatusRow] shows the time and battery in their place.
+/// Hides the status and navigation bars and keeps the screen awake while
+/// any reader is open on touch platforms. Reference-counted so a nested
+/// link reader does not restore either under the outer reader. Bars stay
+/// hidden while toolbars toggle, so safe-area insets, and therefore
+/// pagination, never change mid-session; [ReaderStatusRow] shows the time
+/// and battery in their place.
 abstract final class ReaderSystemUi {
   static int _depth = 0;
+
+  /// Holds the screen on; replaced in tests, where no plugin is registered.
+  @visibleForTesting
+  static Future<void> Function(bool enable) keepAwake = _platformKeepAwake;
+
+  static Future<void> _platformKeepAwake(bool enable) =>
+      WakelockPlus.toggle(enable: enable);
 
   static void enter() {
     if (_depth++ == 0) {
       unawaited(
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
       );
+      _keepAwake(true);
     }
   }
 
@@ -62,7 +73,17 @@ abstract final class ReaderSystemUi {
     if (_depth == 0) return;
     if (--_depth == 0) {
       unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+      _keepAwake(false);
     }
+  }
+
+  /// A device that refuses the wake lock only dims as usual.
+  static void _keepAwake(bool enable) {
+    unawaited(
+      keepAwake(enable).catchError((Object error) {
+        debugPrint('Reader keep-awake unavailable: $error');
+      }),
+    );
   }
 }
 
