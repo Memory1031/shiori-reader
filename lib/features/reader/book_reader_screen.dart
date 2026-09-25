@@ -771,6 +771,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       if (mounted) setState(() => _changing = false);
       return;
     }
+    if (!mounted) return;
+    // Details replaces the reader, which is only disposed once the push
+    // transition ends; bring the system bars back as the reader leaves.
+    _beginLeaving();
     widget.onDetails!(widget.chapter.novelKey);
   }
 

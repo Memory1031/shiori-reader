@@ -128,4 +128,72 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
+
+  testWidgets(
+    'system bars return as the reader opens details, not after the push',
+    (tester) async {
+      final modes = <Object?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'SystemChrome.setEnabledSystemUIMode') {
+            modes.add(call.arguments);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      final env = FixtureEnvironment(scenario: FixtureScenario.multiVolume);
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          navigatorKey: navigator,
+          routes: AppRoutes(home: (_) => const Scaffold()),
+        ),
+      );
+      navigator.currentState!.push(
+        MaterialPageRoute<void>(
+          builder: (context) => BookReaderScreen(
+            chapter: fixtureChapterKey(FixtureScenario.multiVolume),
+            repository: env.novels,
+            library: env.library,
+            settings: Store()..value = ReaderSettings(controlsHintSeen: true),
+            // Like the app, details replaces the reader route.
+            onDetails: (_) => navigator.currentState!.pushAndRemoveUntil(
+              MaterialPageRoute<void>(
+                builder: (_) => const Scaffold(body: Text('details')),
+              ),
+              (route) => route.isFirst,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(modes, ['SystemUiMode.immersiveSticky']);
+      await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Novel details'));
+      for (var i = 0; i < 5 && modes.length < 2; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(modes.last, 'SystemUiMode.edgeToEdge');
+      expect(find.byType(BookReaderScreen), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.text('details'), findsOneWidget);
+      expect(find.byType(BookReaderScreen), findsNothing);
+      expect(modes.length, 2);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      await env.close();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
 }
