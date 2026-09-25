@@ -76,10 +76,7 @@ class Harness {
       children: [
         ListTile(
           title: const Text('Volume chapter'),
-          onTap: () {
-            done();
-            picked++;
-          },
+          onTap: () => done(() => picked++),
         ),
       ],
     ),

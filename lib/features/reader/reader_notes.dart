@@ -26,7 +26,7 @@ Future<LocalContentLink?> showReaderNotes(
 );
 
 /// A chapter's footnotes, readable in place, and its cross-references.
-/// Placement agnostic: a sheet on phones, suitable for a side panel.
+/// Placement agnostic: a sheet on phones, a side panel on desktop.
 class ReaderNotesPanel extends StatelessWidget {
   const ReaderNotesPanel({
     super.key,
@@ -34,6 +34,7 @@ class ReaderNotesPanel extends StatelessWidget {
     required this.current,
     required this.titleOf,
     required this.onFollow,
+    this.onClose,
   });
   final List<LocalContentLink> links;
   final ChapterKey current;
@@ -41,6 +42,10 @@ class ReaderNotesPanel extends StatelessWidget {
   /// Display title of a link target, when the book's navigation names it.
   final String? Function(ChapterKey target) titleOf;
   final ValueChanged<LocalContentLink> onFollow;
+
+  /// Ends the header with a close control, for a side panel without a drag
+  /// handle. The panel then fills the height it is given.
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -77,18 +82,43 @@ class ReaderNotesPanel extends StatelessWidget {
       return titleOf(target) ?? l.readerLinkElsewhere;
     }
 
+    final title = Text(l.readerLinks, style: theme.textTheme.titleLarge);
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * .75,
+        maxHeight: onClose == null
+            ? MediaQuery.sizeOf(context).height * .75
+            : double.infinity,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: ShioriSpace.page),
-            child: Text(l.readerLinks, style: theme.textTheme.titleLarge),
-          ),
+          if (onClose case final close?)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ShioriSpace.page,
+                ShioriSpace.small,
+                ShioriSpace.small,
+                0,
+              ),
+              child: Row(
+                children: [
+                  Expanded(child: title),
+                  IconButton(
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).closeButtonTooltip,
+                    onPressed: close,
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: ShioriSpace.page),
+              child: title,
+            ),
           Flexible(
             child: ListView(
               shrinkWrap: true,

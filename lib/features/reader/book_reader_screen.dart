@@ -14,7 +14,6 @@ import 'reader_screen.dart';
 import 'viewport/page_turn.dart';
 import '../cache/prefetch_sheet.dart';
 import '../../shared/source_image.dart';
-import 'reader_linked_text.dart';
 import 'reader_notes.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'reader_chrome.dart';
@@ -621,28 +620,95 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
-  Future<void> _links(BuildContext readerContext) async {
+  /// The chapter's notes in the page's panel slot: a side panel on desktop,
+  /// the sheet elsewhere. The chosen link is followed once the notes have
+  /// closed, only if the page still reads [_reader] and takes commands.
+  Future<void> _links(ReaderPanels panels) async {
     if (_changing || _invalidated) return;
     final source = _reader;
-    // Shown from the reader's context so the sheet takes its paper theme.
-    final link = await showReaderNotes(
-      readerContext,
-      links: source.contentLinks,
-      current: source.chapter,
-      titleOf: (target) => _navigation[target]?.first.$1.title,
-    );
-    if (!mounted ||
-        !readerContext.mounted ||
+    // Targets are named from this reader's navigation only while it still
+    // reads [source]; the links themselves are the chapter's snapshot.
+    String? titleOf(ChapterKey target) =>
+        mounted && !_invalidated && source == _reader
+        ? _navigation[target]?.first.$1.title
+        : null;
+    final LocalContentLink? link;
+    if (panels.desktop) {
+      final panel = panels.open<LocalContentLink>(
+        ReaderPanelPlacement.end,
+        semanticLabel: AppLocalizations.of(context).readerLinks,
+        builder: (context, panel) => ReaderNotesPanel(
+          links: source.contentLinks,
+          current: source.chapter,
+          titleOf: titleOf,
+          onFollow: panel.close,
+          onClose: () => panel.close(),
+        ),
+      );
+      if (panel == null) return;
+      link = await panel.closed;
+    } else {
+      // Shown from the page's context so the sheet takes its paper theme.
+      link = await showReaderNotes(
+        panels.context,
+        links: source.contentLinks,
+        current: source.chapter,
+        titleOf: titleOf,
+      );
+    }
+    if (link == null ||
+        !mounted ||
+        !panels.live ||
         _invalidated ||
-        source != _reader ||
-        link == null) {
+        _changing ||
+        source != _reader) {
       return;
     }
     if (link.isFootnote) {
-      await showReaderFootnote(readerContext, link);
+      await panels.footnote(link);
       return;
     }
     await _followContentLink(link);
+  }
+
+  /// Prefetch settings for [source]: the sheet on phones and tablets, a side
+  /// panel on desktop. Closing either leaves downloads running. From the
+  /// panel, cache management opens above the reader once the panel has
+  /// closed, only if the page still reads [source] and takes commands.
+  Future<void> _prefetch(ReaderPanels panels, ReaderController source) async {
+    final cache = _cache;
+    if (cache?.prefetch == null) return;
+    if (!panels.desktop) {
+      return showPrefetchSheet(
+        context,
+        cache: cache!,
+        catalog: _catalog.loaded?.value,
+        current: source.chapter,
+      );
+    }
+    if (_changing || _invalidated) return;
+    final panel = panels.open<bool>(
+      ReaderPanelPlacement.end,
+      semanticLabel: AppLocalizations.of(context).prefetchTitle,
+      builder: (context, panel) => PrefetchPanel(
+        cache: cache!,
+        catalog: _catalog.loaded?.value,
+        current: source.chapter,
+        onClose: () => panel.close(),
+        onManage: () => panel.close(true),
+      ),
+    );
+    if (panel == null) return;
+    final manage = await panel.closed;
+    if (manage != true ||
+        !mounted ||
+        !panels.live ||
+        _invalidated ||
+        _changing ||
+        source != _reader) {
+      return;
+    }
+    await Navigator.of(context).push(cacheManagementRoute(context, cache!));
   }
 
   Future<void> _followContentLink(LocalContentLink link) async {
@@ -715,11 +781,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
+  /// Set while a link is being validated for an auxiliary reader, so a
+  /// repeated activation opens it once.
+  bool _openingLink = false;
+
   Future<void> _openAuxiliary(
     ChapterKey target,
     String? block,
     int? blockOffset,
   ) async {
+    if (_openingLink) return;
     if (widget.linkDepth >= 8) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).readerLinkDepth)),
@@ -732,12 +803,21 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       return;
     }
     // Validate before replacing any surface; failed targets leave origin intact.
-    final value = await widget.repository.loadChapter(
-      target,
-      mode: ReadMode.cacheOnly,
-      cancellation: _titleRequest.token,
-    );
-    if (!mounted || _invalidated) return;
+    _openingLink = true;
+    final Result<LoadResult<ChapterContent>> value;
+    try {
+      value = await widget.repository.loadChapter(
+        target,
+        mode: ReadMode.cacheOnly,
+        cancellation: _titleRequest.token,
+      );
+    } finally {
+      _openingLink = false;
+    }
+    // A reader covered meanwhile, e.g. by another link's reader, opens none.
+    if (!mounted || _invalidated || ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
     if (value is! Success<LoadResult<ChapterContent>> ||
         block != null &&
             !value.value.value.blocks.any((b) => b.blockKey == block)) {
@@ -813,7 +893,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   /// The contents panel opened from the failure page on desktop. It keeps
   /// the app theme, as the page around it does.
-  ReaderPanelHandle? _contentsPanel;
+  ReaderPanelHandle<VoidCallback>? _contentsPanel;
 
   Future<void> _contents() async {
     if (!ShioriCapabilities.of(context).pointerFirst) {
@@ -821,23 +901,26 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
     if (_contentsPanel != null || _invalidated) return;
     final layer = _bookContents(context);
-    final panel = ReaderPanelHandle.open(
+    final panel = ReaderPanelHandle<VoidCallback>.open(
       this,
       placement: ReaderPanelPlacement.start,
       semanticLabel: layer.label,
       builder: (context, panel) => ReaderContentsPanel(
         layers: [layer],
         closeButton: true,
-        onDone: () {
+        onDone: ([then]) {
           if (mounted && panel.isValid && identical(_contentsPanel, panel)) {
-            panel.close();
+            panel.close(then);
           }
         },
       ),
     );
     _contentsPanel = panel;
-    await panel.closed;
+    // The selection is applied once the panel has closed, unless the book
+    // was invalidated, which retires the panel, meanwhile.
+    final then = await panel.closed;
     if (identical(_contentsPanel, panel)) _contentsPanel = null;
+    if (then != null && mounted && !_invalidated) then();
   }
 
   Future<void> _details() async {
@@ -930,12 +1013,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       links: _changing || reader.contentLinks.isEmpty ? null : _links,
       leave: () => unawaited(_exit()),
       prefetch: !widget.offline && _cache?.prefetch != null
-          ? () => showPrefetchSheet(
-              context,
-              cache: _cache!,
-              catalog: _catalog.loaded?.value,
-              current: reader.chapter,
-            )
+          ? (panels) => unawaited(_prefetch(panels, reader))
           : null,
       details: widget.onDetails == null || _changing ? null : _details,
       previousChapter: !_changing && previous != null

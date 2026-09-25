@@ -16,23 +16,45 @@ Future<void> showPrefetchSheet(
   context,
   size: ShioriSheetSize.tall,
   builder: (context) =>
-      _PrefetchPanel(cache: cache, catalog: catalog, current: current),
+      PrefetchPanel(cache: cache, catalog: catalog, current: current),
 );
 
-class _PrefetchPanel extends StatefulWidget {
-  const _PrefetchPanel({
+/// Cache management, as opened from prefetch settings.
+Route<void> cacheManagementRoute(BuildContext context, CacheManagement cache) =>
+    platformPageRoute<void>(
+      context,
+      settings: const RouteSettings(name: '/cache'),
+      builder: (_) => CacheScreen(cache: cache),
+    );
+
+/// Prefetch settings and progress for the book being read, following the
+/// engine's live state. Placement agnostic: a sheet on phones, a side panel
+/// over the reader on desktop. Closing it leaves running downloads alone.
+class PrefetchPanel extends StatefulWidget {
+  const PrefetchPanel({
+    super.key,
     required this.cache,
     required this.catalog,
     required this.current,
+    this.onClose,
+    this.onManage,
   });
   final CacheManagement cache;
   final Catalog? catalog;
   final ChapterKey current;
+
+  /// Ends the header with a close control, for a side panel without a drag
+  /// handle.
+  final VoidCallback? onClose;
+
+  /// Opens cache management in the host's stead, e.g. once a panel over the
+  /// reader has closed. When null the panel pushes it above itself.
+  final VoidCallback? onManage;
   @override
-  State<_PrefetchPanel> createState() => _PrefetchPanelState();
+  State<PrefetchPanel> createState() => _PrefetchPanelState();
 }
 
-class _PrefetchPanelState extends State<_PrefetchPanel> {
+class _PrefetchPanelState extends State<PrefetchPanel> {
   bool _saving = false;
   Future<void> _save(Future<Result<void>> Function() action) async {
     if (_saving) return;
@@ -66,13 +88,33 @@ class _PrefetchPanelState extends State<_PrefetchPanel> {
           PrefetchPhase.complete => l.prefetchComplete,
           PrefetchPhase.idle => l.prefetchIdle,
         };
+        final title = Text(
+          l.prefetchTitle,
+          style: Theme.of(context).textTheme.titleLarge,
+        );
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            widget.onClose == null ? 0 : ShioriSpace.small,
+            20,
+            24,
+          ),
           children: [
-            Text(
-              l.prefetchTitle,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            if (widget.onClose case final close?)
+              Row(
+                children: [
+                  Expanded(child: title),
+                  IconButton(
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).closeButtonTooltip,
+                    onPressed: close,
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              )
+            else
+              title,
             const SizedBox(height: ShioriSpace.medium),
             Text(status),
             const SizedBox(height: ShioriSpace.small),
@@ -118,13 +160,11 @@ class _PrefetchPanelState extends State<_PrefetchPanel> {
                   child: Text(l.prefetchResume),
                 ),
                 TextButton(
-                  onPressed: () => Navigator.of(context).push(
-                    platformPageRoute<void>(
-                      context,
-                      settings: const RouteSettings(name: '/cache'),
-                      builder: (_) => CacheScreen(cache: widget.cache),
-                    ),
-                  ),
+                  onPressed:
+                      widget.onManage ??
+                      () => Navigator.of(
+                        context,
+                      ).push(cacheManagementRoute(context, widget.cache)),
                   child: Text(l.cacheTitle),
                 ),
               ],

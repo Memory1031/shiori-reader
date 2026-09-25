@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/shiori_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
+import 'reader_panel.dart';
 import 'reading_progress_format.dart';
 
 /// Chapter scrubber with book progress and chapter stepping. Placement
-/// agnostic: [onDone] closes whichever host shows it (sheet or side panel).
+/// agnostic: [onDone] closes whichever host shows it (sheet or popover) and
+/// hands it the chapter step to apply.
 class ReaderProgressPanel extends StatefulWidget {
   const ReaderProgressPanel({
     super.key,
@@ -30,7 +32,7 @@ class ReaderProgressPanel extends StatefulWidget {
   /// Book fraction for a chapter fraction; null when unknown.
   final double? Function(double chapterFraction)? bookFractionAt;
   final ValueChanged<double> onSeek;
-  final VoidCallback onDone;
+  final ReaderPanelDone onDone;
   final VoidCallback? onPreviousChapter, onNextChapter;
   final bool showChapterStepper;
 
@@ -48,9 +50,7 @@ class _ReaderProgressPanelState extends State<ReaderProgressPanel> {
     final theme = Theme.of(context);
     final book = widget.bookFractionAt?.call(_bookBasis);
     void step(VoidCallback? action) {
-      if (action == null) return;
-      widget.onDone();
-      action();
+      if (action != null) widget.onDone(action);
     }
 
     return Padding(

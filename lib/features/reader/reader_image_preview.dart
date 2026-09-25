@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../app/theme/shiori_theme.dart';
 
 import '../../domain/contracts/contracts.dart';
@@ -68,48 +69,57 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
           surfaceContainerHighest: Colors.black,
         ),
       ),
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-          automaticallyImplyLeading: false,
-          actions: [CloseButton(onPressed: () => Navigator.pop(context))],
-        ),
-        body: SafeArea(
-          minimum: const EdgeInsets.only(bottom: 24),
-          child: Column(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onDoubleTapDown: (details) =>
-                      _doubleTap = details.localPosition,
-                  onDoubleTap: _toggleZoom,
-                  child: InteractiveViewer(
-                    transformationController: _transform,
-                    minScale: 1,
-                    maxScale: 4,
-                    child: SizedBox.expand(
-                      child: SourceImage(
-                        media: widget.block.media,
-                        repository: widget.repository,
-                        semanticLabel: widget.block.alt,
-                        decodeScale: 2,
+      // Esc closes the preview wherever focus is, e.g. on the close button
+      // after Tab or an arrow key: the Scaffold's own dismiss action, for
+      // drawers, would otherwise hide the route's from it.
+      child: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): () =>
+              Navigator.maybePop(context),
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            automaticallyImplyLeading: false,
+            actions: [CloseButton(onPressed: () => Navigator.pop(context))],
+          ),
+          body: SafeArea(
+            minimum: const EdgeInsets.only(bottom: 24),
+            child: Column(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onDoubleTapDown: (details) =>
+                        _doubleTap = details.localPosition,
+                    onDoubleTap: _toggleZoom,
+                    child: InteractiveViewer(
+                      transformationController: _transform,
+                      minScale: 1,
+                      maxScale: 4,
+                      child: SizedBox.expand(
+                        child: SourceImage(
+                          media: widget.block.media,
+                          repository: widget.repository,
+                          semanticLabel: widget.block.alt,
+                          decodeScale: 2,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              if (widget.block.caption?.isNotEmpty == true)
-                Padding(
-                  padding: const EdgeInsets.all(ShioriSpace.item),
-                  child: Text(
-                    widget.block.caption!,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
+                if (widget.block.caption?.isNotEmpty == true)
+                  Padding(
+                    padding: const EdgeInsets.all(ShioriSpace.item),
+                    child: Text(
+                      widget.block.caption!,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

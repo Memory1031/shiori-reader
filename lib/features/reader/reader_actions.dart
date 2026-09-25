@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../domain/contracts/contracts.dart';
 import 'reader_contents.dart';
+import 'reader_panel.dart';
 
 /// Commands a reading surface may invoke, supplied by the screen that owns
 /// the book session. A null command hides or disables its control, so one
@@ -37,11 +38,14 @@ class ReaderActions {
   /// Explicit toolbar exit. Unlike system back it never just closes the
   /// toolbars. Defaults to `maybePop`.
   final VoidCallback? leave;
-  final VoidCallback? details, prefetch;
+  final VoidCallback? details;
 
-  /// Lists the chapter's content links; receives the reader's context so a
-  /// footnote can open above the page.
-  final void Function(BuildContext readerContext)? links;
+  /// Prefetch settings and progress, opened in the page's panel slot.
+  final void Function(ReaderPanels panels)? prefetch;
+
+  /// Lists the chapter's content links in the page's panel slot, from which
+  /// a footnote opens over the page too.
+  final void Function(ReaderPanels panels)? links;
   final ValueChanged<LocalContentLink>? contentLink;
 
   /// The book-level contents layer (volume catalog or local navigation).

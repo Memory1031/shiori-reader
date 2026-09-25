@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../app/theme/shiori_theme.dart';
+import '../../domain/contracts/contracts.dart';
 
 /// Where a desktop reader panel sits over the page.
 enum ReaderPanelPlacement {
@@ -14,10 +15,14 @@ enum ReaderPanelPlacement {
 
   /// A popover above the bottom bar's progress control.
   anchored,
+
+  /// A compact dialog in the middle of the window, for a single note.
+  center,
 }
 
-/// A desktop reader panel over the page: side columns for contents and
-/// settings, and a popover for progress.
+/// A desktop reader panel over the page: side columns for contents,
+/// settings, notes and prefetch, a popover for progress and a dialog for a
+/// single footnote.
 ///
 /// The route is modal. Its barrier takes every pointer event bound for the
 /// page, blocks the page's semantics and dismisses on a click or Esc, and
@@ -57,6 +62,10 @@ class ReaderPanelRoute<T> extends PopupRoute<T> {
 
   /// Space between the popover and its anchor.
   static const anchorGap = ShioriSpace.small;
+
+  /// A centred dialog's widest and tallest extent.
+  static const dialogWidth = 480.0;
+  static const dialogHeight = 560.0;
 
   final ReaderPanelPlacement placement;
   final WidgetBuilder builder;
@@ -102,6 +111,13 @@ class ReaderPanelRoute<T> extends PopupRoute<T> {
   /// The popover's width in a window [width] wide.
   static double popoverWidth(double width) =>
       math.max(0, math.min(360, width - 2 * margin));
+
+  /// The centred dialog's limits in a window of [size]: its width, and the
+  /// height it may grow to with its content.
+  static Size dialogExtent(Size size) => Size(
+    math.max(0, math.min(dialogWidth, size.width - 2 * margin)),
+    math.max(0, math.min(dialogHeight, size.height - 2 * margin)),
+  );
 
   Widget _surface(BuildContext context, Widget child) {
     final theme = Theme.of(context);
@@ -154,6 +170,7 @@ class ReaderPanelRoute<T> extends PopupRoute<T> {
       child: LayoutBuilder(
         builder: (context, bounds) => switch (placement) {
           ReaderPanelPlacement.anchored => _popover(context, bounds),
+          ReaderPanelPlacement.center => _dialog(context, bounds),
           _ => _side(context, bounds),
         },
       ),
@@ -174,6 +191,23 @@ class ReaderPanelRoute<T> extends PopupRoute<T> {
       ),
     ),
   );
+
+  /// As tall as its content up to [dialogExtent]; the content scrolls past
+  /// it.
+  Widget _dialog(BuildContext context, BoxConstraints bounds) {
+    final extent = dialogExtent(bounds.biggest);
+    return Center(
+      child: ConstrainedBox(
+        key: const ValueKey('reader-panel'),
+        constraints: BoxConstraints(
+          minWidth: extent.width,
+          maxWidth: extent.width,
+          maxHeight: extent.height,
+        ),
+        child: _surface(context, Builder(builder: builder)),
+      ),
+    );
+  }
 
   Widget _popover(BuildContext context, BoxConstraints bounds) =>
       _AnchoredPopover(
@@ -217,7 +251,10 @@ class ReaderPanelRoute<T> extends PopupRoute<T> {
   ) {
     final curved = _curved;
     final fade = FadeTransition(opacity: curved, child: child);
-    if (placement == ReaderPanelPlacement.anchored) return fade;
+    if (placement
+        case ReaderPanelPlacement.anchored || ReaderPanelPlacement.center) {
+      return fade;
+    }
     final rtl = Directionality.of(context) == TextDirection.rtl;
     final towardStart = (placement == ReaderPanelPlacement.start) != rtl;
     return AnimatedBuilder(
@@ -324,11 +361,33 @@ class _Unchanging implements Listenable {
   void removeListener(VoidCallback listener) {}
 }
 
+/// Closes a reader panel or sheet, then applies [then], the choice made in
+/// it, if any.
+///
+/// A sheet applies the choice as it closes. A desktop panel hands it back
+/// as its result instead: the page that opened the panel applies it once
+/// the panel has closed, and only while that page still reads the same
+/// session and takes commands. Either way only the first call counts.
+typedef ReaderPanelDone = void Function([VoidCallback? then]);
+
+/// [ReaderPanelDone] for a sheet: pops it and applies the choice, once.
+ReaderPanelDone readerSheetDone(BuildContext sheet) => ([then]) {
+  // A sheet already closing, or covered, takes no further choice.
+  if (ModalRoute.of(sheet)?.isCurrent != true) return;
+  Navigator.of(sheet).pop();
+  then?.call();
+};
+
 /// An open [ReaderPanelRoute], held by the reader state that opened it.
 ///
 /// It keeps the route, its navigator and its owner rather than a
 /// [BuildContext], so the owner can take the panel down from `dispose`.
-class ReaderPanelHandle {
+///
+/// Whether the panel still takes input ([isValid], which [close] ends at
+/// once) is kept apart from whether a choice made in it reaches the reader:
+/// the choice travels as the result in [closed], for the opener to check
+/// against its session before acting on it.
+class ReaderPanelHandle<T> {
   ReaderPanelHandle._(this.owner, this.navigator);
 
   /// Pushes a panel for [owner] onto the navigator around it.
@@ -337,7 +396,7 @@ class ReaderPanelHandle {
   factory ReaderPanelHandle.open(
     State owner, {
     required ReaderPanelPlacement placement,
-    required Widget Function(BuildContext context, ReaderPanelHandle panel)
+    required Widget Function(BuildContext context, ReaderPanelHandle<T> panel)
     builder,
     String? semanticLabel,
     ThemeData Function(BuildContext context)? theme,
@@ -345,8 +404,8 @@ class ReaderPanelHandle {
     GlobalKey? anchor,
   }) {
     final context = owner.context;
-    final handle = ReaderPanelHandle._(owner, Navigator.of(context));
-    handle.route = ReaderPanelRoute<void>(
+    final handle = ReaderPanelHandle<T>._(owner, Navigator.of(context));
+    handle.route = ReaderPanelRoute<T>(
       placement: placement,
       builder: (context) => builder(context, handle),
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
@@ -362,34 +421,79 @@ class ReaderPanelHandle {
 
   final State owner;
   final NavigatorState navigator;
-  late final ReaderPanelRoute<void> route;
+  late final ReaderPanelRoute<T> route;
 
-  /// Completes once the panel is closed or removed.
-  late final Future<void> closed;
+  /// The panel's result: what [close] was given, or null once it is
+  /// dismissed by Esc or a click outside, or removed.
+  late final Future<T?> closed;
 
-  bool _valid = true;
+  /// Completes once the panel has finished its exit and left the overlay.
+  Future<void> get completed => route.completed;
 
-  /// Whether the panel still belongs to a mounted owner. Callbacks from the
-  /// panel act only while this holds.
-  bool get isValid => _valid && owner.mounted;
+  bool _accepting = true;
 
-  /// Closes the panel with its exit animation.
-  void close() {
-    if (_valid && route.isCurrent && route.isOpen) navigator.pop();
+  /// Whether the panel still takes input for a mounted owner: it has been
+  /// neither closed, dismissed nor retired. Callbacks from the panel act
+  /// only while this holds.
+  bool get isValid =>
+      _accepting && owner.mounted && route.isActive && route.isOpen;
+
+  /// Closes the panel with its exit animation, handing back [result]. Only
+  /// the first call on an open, uncovered panel counts; the panel takes no
+  /// further input from then on.
+  void close([T? result]) {
+    if (!isValid || !route.isCurrent) return;
+    _accepting = false;
+    navigator.pop(result);
   }
 
   /// Retires the handle and removes the panel without animation, for an
-  /// owner going away.
+  /// owner going away or no longer taking commands. [closed] then resolves
+  /// with null.
   ///
-  /// The owner's `dispose` runs while the tree is locked, so the route is
-  /// removed after the frame, and only if it is still open in a mounted
-  /// navigator; one already closing finishes on its own.
+  /// The owner's `dispose` and `didUpdateWidget` run while the tree is
+  /// locked, so the route is removed after the frame, and only if it is
+  /// still open in a mounted navigator; one already closing finishes on its
+  /// own. Only this route is removed: whatever was pushed above it stays.
   void dismiss() {
-    _valid = false;
+    _accepting = false;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (navigator.mounted && route.isActive && route.isOpen) {
         navigator.removeRoute(route);
       }
     });
   }
+}
+
+/// The panel slot of one reader page, handed to screen-level commands such
+/// as notes and prefetch so that what they open sits over that page, in its
+/// reading theme, and shares its single slot.
+///
+/// It is passed explicitly rather than looked up, so a command always
+/// reaches the page it was invoked from.
+abstract interface class ReaderPanels {
+  /// Whether panels open over the page (pointer-first desktops) rather than
+  /// as sheets.
+  bool get desktop;
+
+  /// The page's context, in its reading theme, for sheets.
+  BuildContext get context;
+
+  /// Whether the page is still mounted, reads the session the command was
+  /// invoked for and takes commands. A choice returned from a panel or a
+  /// sheet is acted on only while this holds.
+  bool get live;
+
+  /// Opens a desktop panel in the page's slot, in the reading theme. Null
+  /// when the slot is taken or the page is not [live].
+  ReaderPanelHandle<T>? open<T>(
+    ReaderPanelPlacement placement, {
+    required String semanticLabel,
+    required Widget Function(BuildContext context, ReaderPanelHandle<T> panel)
+    builder,
+  });
+
+  /// Shows a single footnote over the page: a dialog on desktop, a sheet
+  /// elsewhere.
+  Future<void> footnote(LocalContentLink note);
 }

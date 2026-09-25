@@ -44,6 +44,58 @@ Future<void> showReaderFootnote(BuildContext context, LocalContentLink note) =>
       },
     );
 
+/// A single footnote for the desktop dialog: its number with a close
+/// control, then its text, selectable and scrolling past the dialog's
+/// height.
+class ReaderFootnotePanel extends StatelessWidget {
+  const ReaderFootnotePanel({
+    super.key,
+    required this.note,
+    required this.onClose,
+  });
+  final LocalContentLink note;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 8, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l.readerFootnote(note.label),
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              IconButton(
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                onPressed: onClose,
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+        ),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: SelectableText(
+              note.footnoteText ?? l.readerLinkUnavailable,
+              style: theme.textTheme.bodyLarge,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Uses identical glyphs and metrics to PageLayout; only marker color and
 /// interaction differ. Offsets stay in source-block Unicode code points.
 class ReaderLinkedText extends StatefulWidget {
@@ -57,6 +109,7 @@ class ReaderLinkedText extends StatefulWidget {
     required this.align,
     required this.scaler,
     this.onLink,
+    this.onFootnote,
     this.inlineImages = const [],
     this.inlineRuby = const [],
     this.inlineStyles = const [],
@@ -79,6 +132,9 @@ class ReaderLinkedText extends StatefulWidget {
   final TextAlign align;
   final TextScaler scaler;
   final ValueChanged<LocalContentLink>? onLink;
+
+  /// Shows a tapped footnote; the footnote sheet when null.
+  final ValueChanged<LocalContentLink>? onFootnote;
   @override
   State<ReaderLinkedText> createState() => _ReaderLinkedTextState();
 }
@@ -169,7 +225,11 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
       final recognizer = TapGestureRecognizer()
         ..onTap = () {
           if (note.isFootnote) {
-            showReaderFootnote(context, note);
+            if (widget.onFootnote case final show?) {
+              show(note);
+            } else {
+              showReaderFootnote(context, note);
+            }
           } else {
             widget.onLink?.call(note);
           }

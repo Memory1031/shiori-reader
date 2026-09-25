@@ -11,11 +11,12 @@ import '../local_books/local_catalog.dart';
 import '../novel_detail/catalog_controller.dart';
 import '../novel_detail/catalog_view.dart';
 import 'article_contents.dart';
+import 'reader_panel.dart';
 import 'reader_sheet.dart';
 
 /// One navigation level of the reader contents, e.g. headings inside the
 /// current article or the book's volume catalog. [build] receives `done`,
-/// which closes the host before the selection is applied.
+/// which closes the host and hands it the selection to apply.
 class ReaderContentsLayer {
   const ReaderContentsLayer({
     required this.label,
@@ -23,7 +24,7 @@ class ReaderContentsLayer {
     this.action,
   });
   final String label;
-  final Widget Function(BuildContext context, VoidCallback done) build;
+  final Widget Function(BuildContext context, ReaderPanelDone done) build;
 
   /// Optional header control for this layer, such as refreshing a catalog.
   final Widget? action;
@@ -40,7 +41,7 @@ class ReaderContentsPanel extends StatefulWidget {
     this.closeButton = false,
   });
   final List<ReaderContentsLayer> layers;
-  final VoidCallback onDone;
+  final ReaderPanelDone onDone;
   final int initialLayer;
 
   /// Ends the header with a close control calling [onDone], for a host
@@ -79,7 +80,7 @@ class _ReaderContentsPanelState extends State<ReaderContentsPanel> {
               if (widget.closeButton)
                 IconButton(
                   tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                  onPressed: widget.onDone,
+                  onPressed: () => widget.onDone(),
                   icon: const Icon(Icons.close),
                 ),
             ],
@@ -139,7 +140,7 @@ Future<void> showReaderContents(
   builder: (sheet) => ReaderContentsPanel(
     layers: layers,
     initialLayer: initialLayer,
-    onDone: () => Navigator.of(sheet).pop(),
+    onDone: readerSheetDone(sheet),
   ),
 );
 
@@ -172,10 +173,7 @@ ReaderContentsLayer articleContentsLayer(
                     itemBuilder: (context, i) => ListTile(
                       key: ValueKey(entries[i].position.blockKey),
                       title: Text(entries[i].title),
-                      onTap: () {
-                        done();
-                        onSelect(entries[i].position);
-                      },
+                      onTap: () => done(() => onSelect(entries[i].position)),
                     ),
                   ),
           ),
@@ -268,10 +266,7 @@ ReaderContentsLayer volumeContentsLayer(
                 child: CatalogView(
                   catalog: loaded.value,
                   current: current,
-                  onSelect: (key) {
-                    done();
-                    onSelect(key);
-                  },
+                  onSelect: (key) => done(() => onSelect(key)),
                 ),
               ),
             ),
@@ -302,10 +297,7 @@ ReaderContentsLayer localContentsLayer(
       Success(:final value) => LocalNavigationView(
         entries: value,
         current: current,
-        onSelect: (entry) {
-          done();
-          onSelect(entry);
-        },
+        onSelect: (entry) => done(() => onSelect(entry)),
       ),
     },
   ),

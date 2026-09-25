@@ -54,6 +54,7 @@ class PagedReaderViewport extends StatefulWidget {
     this.startAtEnd = false,
     this.contentLinks = const [],
     this.onLink,
+    this.onFootnote,
     this.images,
     this.columns = 1,
     this.columnGap = readerColumnGap,
@@ -90,6 +91,9 @@ class PagedReaderViewport extends StatefulWidget {
   final bool startAtEnd;
   final List<LocalContentLink> contentLinks;
   final ValueChanged<LocalContentLink>? onLink;
+
+  /// Shows a footnote tapped in the text; the text's own sheet when null.
+  final ValueChanged<LocalContentLink>? onFootnote;
   @override
   State<PagedReaderViewport> createState() => _PagedReaderViewportState();
 }
@@ -617,6 +621,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                       .blockIndex]
                                   .inlineImages,
                               onLink: widget.onLink,
+                              onFootnote: widget.onFootnote,
                               text: fragment.text!,
                               blockOffset:
                                   _layout!.index.chunks[fragment.unit].start +

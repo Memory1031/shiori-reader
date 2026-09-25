@@ -30,6 +30,7 @@ import 'settings_panel.dart';
 import 'reader_margin.dart';
 import 'reader_image.dart';
 import 'reader_image_preview.dart';
+import 'reader_linked_text.dart';
 import 'epub_layout_page.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'viewport/page_turn.dart';
@@ -118,7 +119,12 @@ class _ReaderContentViewState extends State<ReaderContentView>
     if (widget.active) {
       _claimFocus();
     } else {
+      // A page leaving the active chapter drops what it was about to open
+      // and retires its panel; a choice still coming back from it is not
+      // applied, since the page no longer takes commands.
       _progressRequest++;
+      _panel?.dismiss();
+      _panel = null;
     }
   }
 
@@ -178,33 +184,29 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
   }
 
-  /// The open desktop panel, if any. Phones and tablets use sheets.
-  ReaderPanelHandle? _panel;
+  /// The open desktop panel, if any: the page's one slot, shared by every
+  /// panel it opens. Phones and tablets use sheets.
+  ReaderPanelHandle<Object?>? _panel;
   final _progressAnchor = GlobalKey(debugLabel: 'reader-progress');
 
   bool get _desktopPanels => ShioriCapabilities.of(context).pointerFirst;
 
-  /// Whether a callback from [panel] may still act on this reader.
-  bool _owns(ReaderPanelHandle panel) =>
+  /// Whether a live callback from [panel], such as a seek, may still act on
+  /// this reader.
+  bool _owns(ReaderPanelHandle<Object?> panel) =>
       mounted && panel.isValid && identical(_panel, panel);
 
-  VoidCallback? _guarded(ReaderPanelHandle panel, VoidCallback? action) =>
-      action == null
-      ? null
-      : () {
-          if (_owns(panel)) action();
-        };
-
   /// Opens a desktop panel in the reading theme, following live edits.
-  ReaderPanelHandle? _openPanel(
+  /// Null while another panel holds the slot or the page takes no commands.
+  ReaderPanelHandle<T>? _openPanel<T>(
     ReaderPanelPlacement placement, {
     required String semanticLabel,
-    required Widget Function(BuildContext context, ReaderPanelHandle panel)
+    required Widget Function(BuildContext context, ReaderPanelHandle<T> panel)
     builder,
     GlobalKey? anchor,
   }) {
-    if (_panel != null || !widget.active) return null;
-    final panel = ReaderPanelHandle.open(
+    if (_panel?.isValid == true || !_interactive) return null;
+    final panel = ReaderPanelHandle<T>.open(
       this,
       placement: placement,
       semanticLabel: semanticLabel,
@@ -226,6 +228,35 @@ class _ReaderContentViewState extends State<ReaderContentView>
     return panel;
   }
 
+  /// Applies the choice [panel] hands back once it has closed, only if this
+  /// page still reads the session it was opened for and takes commands.
+  /// Esc, a click outside and retirement hand back nothing.
+  Future<void> _deliver(ReaderPanelHandle<VoidCallback>? panel) async {
+    if (panel == null) return;
+    final session = widget.session;
+    final then = await panel.closed;
+    if (then != null &&
+        mounted &&
+        identical(widget.session, session) &&
+        _interactive) {
+      then();
+    }
+  }
+
+  /// A single footnote over the page: a compact dialog in the reading theme
+  /// on desktop, sharing the page's slot, and the sheet elsewhere.
+  Future<void> _footnote(BuildContext context, LocalContentLink note) async {
+    if (!_interactive) return;
+    if (!_desktopPanels) return showReaderFootnote(context, note);
+    final panel = _openPanel<void>(
+      ReaderPanelPlacement.center,
+      semanticLabel: AppLocalizations.of(context).readerFootnote(note.label),
+      builder: (context, panel) =>
+          ReaderFootnotePanel(note: note, onClose: () => panel.close()),
+    );
+    await panel?.closed;
+  }
+
   Future<void> _settingsPanel(BuildContext context) async {
     if (!_desktopPanels) return showReaderSettings(context, _preferences);
     final panel = _openPanel(
@@ -233,7 +264,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       semanticLabel: AppLocalizations.of(context).readerSettings,
       builder: (context, panel) => ReaderSettingsPanel(
         preferences: _preferences,
-        onDone: _guarded(panel, panel.close),
+        onDone: () => panel.close(),
       ),
     );
     if (panel == null) return;
@@ -243,16 +274,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
     await _preferences.flush();
   }
 
-  List<ReaderContentsLayer> _contentsLayers(
-    BuildContext context, {
-    bool Function()? live,
-  }) => [
+  List<ReaderContentsLayer> _contentsLayers(BuildContext context) => [
     if (widget.articleContents)
       articleContentsLayer(
         context,
         widget.content,
         onSelect: (target) {
-          if (mounted && (live?.call() ?? true)) _navigateTo(target);
+          if (mounted) _navigateTo(target);
         },
       ),
     if (_actions.bookContents case final book?) book(context),
@@ -269,22 +297,24 @@ class _ReaderContentViewState extends State<ReaderContentView>
         initialLayer: book ? layers.length - 1 : 0,
       );
     }
-    late final ReaderPanelHandle? panel;
-    final layers = _contentsLayers(context, live: () => _owns(panel!));
+    final layers = _contentsLayers(context);
     if (layers.isEmpty) return;
-    panel = _openPanel(
-      ReaderPanelPlacement.start,
-      semanticLabel: layers.length == 1
-          ? layers.single.label
-          : AppLocalizations.of(context).catalogTitle,
-      builder: (context, panel) => ReaderContentsPanel(
-        layers: layers,
-        initialLayer: book ? layers.length - 1 : 0,
-        closeButton: true,
-        onDone: _guarded(panel, panel.close)!,
+    // The selection comes back as the panel's result and is applied only
+    // after the panel has closed, to the page that opened it.
+    await _deliver(
+      _openPanel<VoidCallback>(
+        ReaderPanelPlacement.start,
+        semanticLabel: layers.length == 1
+            ? layers.single.label
+            : AppLocalizations.of(context).catalogTitle,
+        builder: (context, panel) => ReaderContentsPanel(
+          layers: layers,
+          initialLayer: book ? layers.length - 1 : 0,
+          closeButton: true,
+          onDone: ([then]) => panel.close(then),
+        ),
       ),
     );
-    await panel?.closed;
   }
 
   late final _paged = widget.viewportController ?? PagedReaderController();
@@ -427,9 +457,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
       case ReaderCommand.settings || ReaderCommand.retrySettings:
         unawaited(_settingsPanel(context));
       case ReaderCommand.notes:
-        _actions.links?.call(context);
+        _actions.links?.call(_PagePanels(this, context));
       case ReaderCommand.prefetch:
-        _actions.prefetch?.call();
+        _actions.prefetch?.call(_PagePanels(this, context));
       case ReaderCommand.details:
         _actions.details?.call();
       case ReaderCommand.retrySave:
@@ -1007,6 +1037,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
         onRestoreStart: widget.session?.restoringProgress,
         controller: _paged,
         onLink: _actions.contentLink,
+        // Phones and tablets keep the footnote sheet the text opens itself.
+        onFootnote: _desktopPanels
+            ? (note) => unawaited(_footnote(context, note))
+            : null,
         contentLinks: widget.session?.contentLinks.toList() ?? const [],
         initialPosition: _position,
         textStyle: style,
@@ -1056,41 +1090,40 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   Future<void> _progressPanel(BuildContext context) async {
-    Widget progress(
-      VoidCallback onDone, {
-      ValueChanged<double>? onSeek,
-      VoidCallback? Function(VoidCallback? action)? guard,
-    }) => ReaderProgressPanel(
-      chapterTitle: _effectiveChapterTitle,
-      chapterFraction: _visibleChapterFraction,
-      anchorFraction: _displayChapterFraction,
-      bookFractionAt: (fraction) =>
-          widget.session?.bookProgressAt(fraction)?.fraction,
-      onSeek: onSeek ?? _seekChapter,
-      onDone: onDone,
-      showChapterStepper: _actions.hasChapterStepper,
-      onPreviousChapter: (guard ?? (a) => a)(_actions.previousChapter),
-      onNextChapter: (guard ?? (a) => a)(_actions.nextChapter),
-    );
+    Widget progress(ReaderPanelDone onDone, {ValueChanged<double>? onSeek}) =>
+        ReaderProgressPanel(
+          chapterTitle: _effectiveChapterTitle,
+          chapterFraction: _visibleChapterFraction,
+          anchorFraction: _displayChapterFraction,
+          bookFractionAt: (fraction) =>
+              widget.session?.bookProgressAt(fraction)?.fraction,
+          onSeek: onSeek ?? _seekChapter,
+          onDone: onDone,
+          showChapterStepper: _actions.hasChapterStepper,
+          onPreviousChapter: _actions.previousChapter,
+          onNextChapter: _actions.nextChapter,
+        );
     if (!_desktopPanels) {
       return showReaderSheet<void>(
         context,
-        builder: (sheet) => progress(() => Navigator.of(sheet).pop()),
+        builder: (sheet) => progress(readerSheetDone(sheet)),
       );
     }
-    final panel = _openPanel(
-      ReaderPanelPlacement.anchored,
-      semanticLabel: _effectiveChapterTitle,
-      anchor: _progressAnchor,
-      builder: (context, panel) => progress(
-        _guarded(panel, panel.close)!,
-        onSeek: (fraction) {
-          if (_owns(panel)) _seekChapter(fraction);
-        },
-        guard: (action) => _guarded(panel, action),
+    // A chapter step comes back as the result; a seek acts while the
+    // popover stays open.
+    await _deliver(
+      _openPanel<VoidCallback>(
+        ReaderPanelPlacement.anchored,
+        semanticLabel: _effectiveChapterTitle,
+        anchor: _progressAnchor,
+        builder: (context, panel) => progress(
+          ([then]) => panel.close(then),
+          onSeek: (fraction) {
+            if (_owns(panel)) _seekChapter(fraction);
+          },
+        ),
       ),
     );
-    await panel?.closed;
   }
 
   /// Chapter progress text, rebuilt at most at the sampling rate.
@@ -1185,6 +1218,47 @@ class _ReaderContentViewState extends State<ReaderContentView>
 /// A reader shortcut's action. [enabled] false lets the key go on to the
 /// focused control; otherwise the key is taken even when the command then
 /// finds nothing to do, as the page keys always were.
+/// The panel slot of one page for a screen-level command, bound to the
+/// session the command was invoked for.
+class _PagePanels implements ReaderPanels {
+  _PagePanels(this._page, this.context)
+    : _session = _page.widget.session,
+      desktop = _page._desktopPanels;
+
+  final _ReaderContentViewState _page;
+  final Object? _session;
+  @override
+  final BuildContext context;
+  @override
+  final bool desktop;
+
+  @override
+  bool get live =>
+      _page.mounted &&
+      context.mounted &&
+      identical(_page.widget.session, _session) &&
+      _page._interactive;
+
+  @override
+  ReaderPanelHandle<T>? open<T>(
+    ReaderPanelPlacement placement, {
+    required String semanticLabel,
+    required Widget Function(BuildContext context, ReaderPanelHandle<T> panel)
+    builder,
+  }) => live
+      ? _page._openPanel<T>(
+          placement,
+          semanticLabel: semanticLabel,
+          builder: builder,
+        )
+      : null;
+
+  @override
+  Future<void> footnote(LocalContentLink note) async {
+    if (live) await _page._footnote(context, note);
+  }
+}
+
 class _ReaderAction<T extends Intent> extends Action<T> {
   _ReaderAction({required this.run, this.enabled});
   final void Function(T intent) run;

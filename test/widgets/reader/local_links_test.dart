@@ -12,6 +12,8 @@ import 'package:shiori/data/repositories/local_reading_repository.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
+import 'package:shiori/features/reader/reader_linked_text.dart';
+import 'package:shiori/features/reader/reader_panel.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import '../../data/local/epub_links_test.dart';
 import '../../data/local/support/epub_fixtures.dart';
@@ -348,7 +350,7 @@ void main() {
       tester
           .widget<ReaderContentView>(find.byType(ReaderContentView))
           .actions
-          .links!(tester.element(find.byType(ReaderContentView)));
+          .links!(_SheetPanels(tester.element(find.byType(ReaderContentView))));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('external'),
@@ -431,7 +433,7 @@ void main() {
     tester
         .widget<ReaderContentView>(find.byType(ReaderContentView))
         .actions
-        .links!(tester.element(find.byType(ReaderContentView)));
+        .links!(_SheetPanels(tester.element(find.byType(ReaderContentView))));
     await tester.pumpAndSettle();
     await tester.tap(find.text('note'));
     await tester.pumpAndSettle();
@@ -443,4 +445,26 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pumpAndSettle();
   });
+}
+
+/// The page's panel slot as phones and tablets have it: notes open as a
+/// sheet from the page's context.
+class _SheetPanels implements ReaderPanels {
+  _SheetPanels(this.context);
+  @override
+  final BuildContext context;
+  @override
+  bool get desktop => false;
+  @override
+  bool get live => context.mounted;
+  @override
+  ReaderPanelHandle<T>? open<T>(
+    ReaderPanelPlacement placement, {
+    required String semanticLabel,
+    required Widget Function(BuildContext context, ReaderPanelHandle<T> panel)
+    builder,
+  }) => null;
+  @override
+  Future<void> footnote(LocalContentLink note) =>
+      showReaderFootnote(context, note);
 }
