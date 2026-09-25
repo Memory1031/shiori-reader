@@ -6,6 +6,7 @@ import '../../app/routes.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/capabilities.dart';
 import 'continue_reading_card.dart';
 import '../../shared/widgets/shiori_logo.dart';
 import '../bookshelf/library_controller.dart';
@@ -100,46 +101,7 @@ class _ReadingHomeState extends State<ReadingHome> {
           .supportsSearchPaging,
       routes: _routes,
     ),
-    novel: (_, key) => LibraryObserver(
-      controller: _library,
-      builder: (context, library) => DetailScreen(
-        novel: key,
-        repository: widget.repository,
-        images: widget.images,
-        onTarget: (target) => _routes.open(
-          context,
-          ReaderDestination(target.chapterKey, blockKey: target.blockKey),
-        ),
-        onChapter: (chapter) =>
-            _routes.open(context, ReaderDestination(chapter)),
-        onRead: _continue,
-        continueReading: library.progressFor(key) != null,
-        isOnShelf: library.contains(key),
-        actionFailure: library.writeFailure ?? library.shelfFailure,
-        showPendingActions: false,
-        onShelfSnapshot:
-            !library.shelfReady ||
-                library.shelfFailure != null ||
-                library.writing
-            ? null
-            : (summary) async {
-                if (!library.contains(key)) {
-                  await library.add(summary);
-                  return;
-                }
-                final removed = await removeShelfBook(
-                  context,
-                  library,
-                  summary,
-                );
-                if (removed &&
-                    key.sourceId == LocalBookIdentity.sourceId &&
-                    context.mounted) {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                }
-              },
-      ),
-    ),
+    novel: (context, key) => _detail(context, key),
     continueReader: (_, key) => ContinueReadingScreen(
       novel: key,
       repository: widget.repository,
@@ -200,15 +162,86 @@ class _ReadingHomeState extends State<ReadingHome> {
       cache: widget.cache,
     ),
   );
-  void _readerDetails(NovelKey key) {
-    Navigator.of(context).pushAndRemoveUntil<void>(
-      _routes.route(context, NovelDestination(key)),
-      (route) =>
-          route.isFirst ||
-          route is! PopupRoute &&
-              !{'/reader', '/continue', '/novel'}.contains(route.settings.name),
+
+  /// Opens details over the reader, so back returns to the page.
+  Future<void> _readerDetails(BuildContext readerContext, NovelKey key) {
+    final reader = ModalRoute.of(readerContext);
+    return Navigator.of(readerContext).push<void>(
+      platformPageRoute<void>(
+        readerContext,
+        settings: RouteSettings(name: NovelDestination(key).routeName),
+        builder: (context) => _detail(
+          context,
+          key,
+          reader: reader is Route<void> ? reader : null,
+        ),
+      ),
     );
   }
+
+  /// Opens a reader; from details over [replacing], swaps both for it.
+  void _read(
+    BuildContext context,
+    ReaderDestination destination, {
+    Route<void>? replacing,
+  }) {
+    final navigator = Navigator.of(context);
+    if (replacing == null || !replacing.isActive) {
+      unawaited(_routes.open(context, destination));
+      return;
+    }
+    navigator.removeRoute(replacing);
+    unawaited(
+      navigator.pushReplacement<void, void>(
+        _routes.route(context, destination),
+      ),
+    );
+  }
+
+  /// Details for [key]. Opened over a [reader] route, reading actions go
+  /// back to that reader instead of stacking another one on top.
+  Widget _detail(
+    BuildContext context,
+    NovelKey key, {
+    Route<void>? reader,
+  }) => LibraryObserver(
+    controller: _library,
+    builder: (context, library) => DetailScreen(
+      novel: key,
+      repository: widget.repository,
+      images: widget.images,
+      onTarget: (target) => _read(
+        context,
+        ReaderDestination(target.chapterKey, blockKey: target.blockKey),
+        replacing: reader,
+      ),
+      onChapter: (chapter) =>
+          _read(context, ReaderDestination(chapter), replacing: reader),
+      onRead: reader == null
+          ? _continue
+          // The reader beneath already shows this book's progress.
+          : (_) => Navigator.of(context).pop(),
+      continueReading: library.progressFor(key) != null,
+      isOnShelf: library.contains(key),
+      actionFailure: library.writeFailure ?? library.shelfFailure,
+      showPendingActions: false,
+      onShelfSnapshot:
+          !library.shelfReady || library.shelfFailure != null || library.writing
+          ? null
+          : (summary) async {
+              if (!library.contains(key)) {
+                await library.add(summary);
+                return;
+              }
+              final removed = await removeShelfBook(context, library, summary);
+              if (removed &&
+                  key.sourceId == LocalBookIdentity.sourceId &&
+                  context.mounted) {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              }
+            },
+    ),
+  );
 
   void _continue(NovelKey key) =>
       _routes.open(context, ContinueDestination(key));

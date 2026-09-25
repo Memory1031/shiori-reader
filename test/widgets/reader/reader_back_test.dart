@@ -130,7 +130,7 @@ void main() {
   );
 
   testWidgets(
-    'system bars return as the reader opens details, not after the push',
+    'details open over the reader with bars shown, and back resumes it',
     (tester) async {
       final modes = <Object?>[];
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -164,12 +164,10 @@ void main() {
             repository: env.novels,
             library: env.library,
             settings: Store()..value = ReaderSettings(controlsHintSeen: true),
-            // Like the app, details replaces the reader route.
-            onDetails: (_) => navigator.currentState!.pushAndRemoveUntil(
+            onDetails: (reader, _) => Navigator.of(reader).push<void>(
               MaterialPageRoute<void>(
                 builder: (_) => const Scaffold(body: Text('details')),
               ),
-              (route) => route.isFirst,
             ),
           ),
         ),
@@ -185,11 +183,30 @@ void main() {
         await tester.pump(const Duration(milliseconds: 16));
       }
       expect(modes.last, 'SystemUiMode.edgeToEdge');
-      expect(find.byType(BookReaderScreen), findsOneWidget);
       await tester.pumpAndSettle();
       expect(find.text('details'), findsOneWidget);
-      expect(find.byType(BookReaderScreen), findsNothing);
+      // The covered reader keeps its page and does not grab the bars back.
+      expect(
+        find.byType(BookReaderScreen, skipOffstage: false),
+        findsOneWidget,
+      );
       expect(modes.length, 2);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('details'), findsNothing);
+      expect(find.byType(BookReaderScreen), findsOneWidget);
+      expect(modes, [
+        'SystemUiMode.immersiveSticky',
+        'SystemUiMode.edgeToEdge',
+        'SystemUiMode.immersiveSticky',
+      ]);
+      // Details stay available after returning.
+      await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('More'));
+      await tester.pumpAndSettle();
+      expect(find.text('Novel details'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
       await env.close();

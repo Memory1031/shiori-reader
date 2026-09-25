@@ -6,6 +6,7 @@ import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/home/reading_home.dart';
+import 'package:shiori/features/novel_detail/detail_screen.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'reader/continue_test.dart' show seed;
 import 'bookshelf_test.dart' show RemovalCache;
@@ -50,16 +51,41 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Novel details'));
       await tester.pumpAndSettle();
-      expect(find.byType(ReaderContentView, skipOffstage: false), findsNothing);
+      // Details open over the one reader.
+      expect(
+        find.byType(ReaderContentView, skipOffstage: false),
+        findsOneWidget,
+      );
       expect(find.text('Add to bookshelf'), findsOneWidget);
       if (cycle == 0) {
+        // Reading from details returns to that reader.
         await tester.ensureVisible(find.byKey(const ValueKey('detail-read')));
         await tester.tap(find.byKey(const ValueKey('detail-read')));
-        await tester.pumpAndSettle();
+      } else {
+        await tester.pageBack();
       }
+      await tester.pumpAndSettle();
+      expect(find.text('Add to bookshelf'), findsNothing);
     }
-    await tester.pageBack();
+    expect(find.byType(ReaderContentView, skipOffstage: false), findsOneWidget);
+    if (find.byTooltip('More').evaluate().isEmpty) {
+      await tester.tapAt(tester.getCenter(find.byType(ReaderContentView)));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byTooltip('More'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Novel details'));
+    await tester.pumpAndSettle();
+    // Choosing a chapter replaces both details and the reader beneath.
+    tester.widget<DetailScreen>(find.byType(DetailScreen)).onChapter!(
+      fixtureChapterKey(FixtureScenario.multiVolume),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(DetailScreen, skipOffstage: false), findsNothing);
+    expect(find.byType(ReaderContentView, skipOffstage: false), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(ReaderContentView, skipOffstage: false), findsNothing);
     expect(find.text('Your bookshelf is empty.'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     await tester.pumpAndSettle();

@@ -126,7 +126,8 @@ class ContinueReadingScreen extends StatelessWidget {
   final LibraryRepository library;
   final ImageRepository? images;
   final SettingsStore? settings;
-  final ValueChanged<NovelKey>? onDetails;
+  final Future<void> Function(BuildContext readerContext, NovelKey key)?
+  onDetails;
   final CacheManagement? cache;
   @override
   Widget build(BuildContext context) => ControllerScope<ContinueController>(

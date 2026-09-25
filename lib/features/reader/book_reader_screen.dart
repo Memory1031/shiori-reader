@@ -44,7 +44,11 @@ class BookReaderScreen extends StatefulWidget {
   final LibraryRepository? library;
   final SettingsStore? settings;
   final bool chapterFallback;
-  final ValueChanged<NovelKey>? onDetails;
+
+  /// Opens the book's details over the reader and completes when they
+  /// close; receives the reader's context to place them.
+  final Future<void> Function(BuildContext readerContext, NovelKey key)?
+  onDetails;
   final CacheManagement? cache;
   final bool offline;
   final String? initialBlockKey;
@@ -369,6 +373,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _enterSystemUi();
+  }
+
+  void _enterSystemUi() {
     if (!_immersive &&
         _leavingInsets == null &&
         ShioriCapabilities.of(context).immersiveSystemUi) {
@@ -772,10 +780,18 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       return;
     }
     if (!mounted) return;
-    // Details replaces the reader, which is only disposed once the push
-    // transition ends; bring the system bars back as the reader leaves.
+    // Details cover the reader: bring the system bars back for them now,
+    // with the page insets frozen so the covered reader keeps its layout.
     _beginLeaving();
-    widget.onDetails!(widget.chapter.novelKey);
+    await widget.onDetails!(context, widget.chapter.novelKey);
+    // Back from details returns here; a reader replaced by a new one
+    // from details is no longer active and stays as it is.
+    if (!mounted || !(ModalRoute.of(context)?.isActive ?? false)) return;
+    setState(() {
+      _leavingInsets = null;
+      _changing = false;
+    });
+    _enterSystemUi();
   }
 
   // Rebuilds follow every session notification; derive the reading order
