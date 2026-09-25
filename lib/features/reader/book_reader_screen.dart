@@ -151,6 +151,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         ({
           Object? catalog,
           Object navigation,
+          Object? order,
           String? book,
           Object? content,
           String? chapter,
@@ -164,6 +165,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (cached != null &&
         identical(cached.catalog, catalog) &&
         identical(cached.navigation, _navigationRevision) &&
+        identical(cached.order, _readingOrder) &&
         cached.book == _bookTitle &&
         identical(cached.content, content)) {
       return (cached.chapter, cached.running);
@@ -173,6 +175,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _titles[reader] = (
       catalog: catalog,
       navigation: _navigationRevision,
+      order: _readingOrder,
       book: _bookTitle,
       content: content,
       chapter: chapter,
@@ -209,6 +212,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       }
     }
     return title ??
+        _inheritedNavigationTitle(reader.chapter) ??
         _catalog.loaded?.value.flatChapters
             .where(
               (chapter) =>
@@ -217,6 +221,27 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             )
             .firstOrNull
             ?.title;
+  }
+
+  /// A navigation target marks where a section starts, so a spine item
+  /// without one of its own (e.g. the body after a chapter's title page)
+  /// belongs to the nearest earlier target in reading order. Its own
+  /// document title is often just the book's name.
+  String? _inheritedNavigationTitle(ChapterKey chapter) {
+    if (_navigation.isEmpty) return null;
+    final (order, positions) = _readingSequence();
+    final at = positions[chapter];
+    if (at == null) return null;
+    for (var i = at - 1; i >= 0; i--) {
+      // Entries are collected in navigation order, so the last one is the
+      // section still running at the end of that item.
+      final entries = _navigation[order[i]];
+      if (entries == null) continue;
+      for (final (entry, _) in entries.reversed) {
+        if (entry.title.trim().isNotEmpty) return entry.title;
+      }
+    }
+    return null;
   }
 
   bool get _needsOrder =>

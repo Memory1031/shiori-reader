@@ -121,6 +121,106 @@ void main() {
     }
   }
 
+  testWidgets('spine items without their own target inherit the section title', (
+    tester,
+  ) async {
+    // A common light-novel layout: navigation points at each chapter's
+    // title page, and the body that follows is titled with the book name.
+    const book = '明神凛音不会出错';
+    String page(String body) =>
+        '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>$book'
+        '</title></head><body>$body</body></html>';
+    final items = ['cover', 't1', 'b1', 't2', 'b2'];
+    final files = <String, List<int>>{
+      'mimetype': utf8.encode('application/epub+zip'),
+      'META-INF/container.xml': utf8.encode(
+        '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
+        '<rootfiles><rootfile full-path="OPS/book.opf" '
+        'media-type="application/oebps-package+xml"/></rootfiles></container>',
+      ),
+      'OPS/book.opf': utf8.encode(
+        '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" '
+        'unique-identifier="id"><metadata '
+        'xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">'
+        'ranges</dc:identifier><dc:title>$book</dc:title>'
+        '<dc:language>zh</dc:language></metadata><manifest>'
+        '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" '
+        'properties="nav"/>'
+        '${[for (final i in items) '<item id="$i" href="text/$i.xhtml" media-type="application/xhtml+xml"/>'].join()}'
+        '</manifest><spine>'
+        '${[for (final i in items) '<itemref idref="$i"/>'].join()}'
+        '</spine></package>',
+      ),
+      'OPS/nav.xhtml': utf8.encode(
+        '<html xmlns:epub="http://www.idpf.org/2007/ops"><body>'
+        '<nav epub:type="toc"><ol>'
+        '<li><a href="text/t1.xhtml">第１话　证明</a></li>'
+        '<li><a href="text/t2.xhtml">第２话　逆鳞</a></li>'
+        '</ol></nav></body></html>',
+      ),
+      'OPS/text/cover.xhtml': utf8.encode(page('<p>封面</p>')),
+      'OPS/text/t1.xhtml': utf8.encode(page('<p>第１话</p>')),
+      'OPS/text/b1.xhtml': utf8.encode(page('<p>第１话　证明</p><p>第一话正文。</p>')),
+      'OPS/text/t2.xhtml': utf8.encode(page('<p>第２话</p>')),
+      'OPS/text/b2.xhtml': utf8.encode(page('<p>第２话　逆鳞</p><p>第二话正文。</p>')),
+    };
+    final content = EpubParser(
+      zipFiles(files),
+      LocalBookIdentity.book('d' * 64),
+      'ranges.epub',
+    ).parse().content;
+    // The spine catalog alone would name the bodies after the book.
+    expect(content.catalog.flatChapters.elementAt(2).title, book);
+    final repository = LocalReadingRepository(
+      local: MemoryBooks(
+        LocalBookRecord(
+          content: content,
+          format: LocalBookFormat.epub,
+          importedAt: DateTime.utc(2026),
+        ),
+      ),
+      online: ForbiddenOnline(),
+    );
+    await tester.pumpWidget(
+      ShioriApp(
+        locale: const Locale('zh'),
+        routes: AppRoutes(
+          home: (_) => BookReaderScreen(
+            chapter: content.chapters.first.key,
+            repository: repository,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    ReaderContentView view() =>
+        tester.widget<ReaderContentView>(find.byType(ReaderContentView));
+    final titles = <String?>[view().chapterTitle];
+    for (var i = 1; i < items.length; i++) {
+      view().actions.nextChapter!();
+      await tester.pumpAndSettle();
+      titles.add(view().chapterTitle);
+    }
+    expect(titles, [
+      // Before the first target nothing is inherited.
+      book,
+      '第１话　证明',
+      '第１话　证明',
+      '第２话　逆鳞',
+      '第２话　逆鳞',
+    ]);
+    // Stepping back re-derives the same range title.
+    view().actions.previousChapter!();
+    await tester.pumpAndSettle();
+    expect(view().chapterTitle, '第２话　逆鳞');
+    view().actions.previousChapter!();
+    await tester.pumpAndSettle();
+    expect(view().chapterTitle, '第１话　证明');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
+
   testWidgets(
     'mixed fixed image pages participate in next and previous navigation',
     (tester) async {
