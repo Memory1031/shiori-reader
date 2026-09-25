@@ -216,16 +216,22 @@ class DetailScreen extends StatelessWidget {
                         const SizedBox(height: ShioriSpace.small),
                         Text(strings.detailActionsPending),
                       ],
-                      const SizedBox(height: ShioriSpace.section),
-                      Text(
-                        strings.detailSynopsis,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: ShioriSpace.medium),
-                      DetailSynopsis(
-                        key: ValueKey(('synopsis', novel)),
-                        text: loaded.value.synopsis,
-                      ),
+                      // A local file without a description has nothing more
+                      // to fetch, so its synopsis section is left out; an
+                      // online source says it has none.
+                      if (loaded.value.synopsis.trim().isNotEmpty ||
+                          novel.sourceId != LocalBookIdentity.sourceId) ...[
+                        const SizedBox(height: ShioriSpace.section),
+                        Text(
+                          strings.detailSynopsis,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: ShioriSpace.medium),
+                        DetailSynopsis(
+                          key: ValueKey(('synopsis', novel)),
+                          text: loaded.value.synopsis,
+                        ),
+                      ],
                       const SizedBox(height: ShioriSpace.section),
                       VolumePreview(
                         novel: novel,

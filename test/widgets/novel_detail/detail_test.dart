@@ -263,6 +263,39 @@ void main() {
     },
   );
 
+  testWidgets('a local book without a description omits the synopsis', (
+    tester,
+  ) async {
+    final local = LocalBookIdentity.book('a' * 64);
+    LoadResult<NovelDetail> book(String synopsis) => LoadResult(
+      value: NovelDetail(
+        summary: NovelSummary(key: local, title: 'Local'),
+        synopsis: synopsis,
+      ),
+      origin: LoadOrigin.local,
+      fetchedAt: DateTime.utc(2026),
+    );
+    for (final (synopsis, shown) in [
+      (' \n\t', false),
+      ('From the EPUB.', true),
+    ]) {
+      final repo = Repo();
+      await mount(tester, repo, novel: local);
+      repo.calls.single.pending.complete(Success(book(synopsis)));
+      await tester.pumpAndSettle();
+      expect(find.text('Local'), findsOneWidget);
+      final matcher = shown ? findsOneWidget : findsNothing;
+      expect(find.text('Synopsis', skipOffstage: false), matcher);
+      expect(find.text('From the EPUB.', skipOffstage: false), matcher);
+      expect(
+        find.text('No synopsis available.', skipOffstage: false),
+        findsNothing,
+      );
+      await tester.pumpWidget(const SizedBox());
+      await repo.events.close();
+    }
+  });
+
   testWidgets(
     'initial error retries; stale and refresh failures never erase metadata',
     (tester) async {
