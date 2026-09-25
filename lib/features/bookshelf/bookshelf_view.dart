@@ -299,15 +299,17 @@ class _BookshelfViewState extends State<BookshelfView> {
                 ),
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Text(
-                  strings.shelfTagline,
-                  style: Theme.of(context).textTheme.bodySmall,
+            // An invitation for an empty shelf, not a caption for a full one.
+            if (controller.shelfReady && books.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text(
+                    strings.shelfTagline,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
               ),
-            ),
             if (controller.shelfFailure != null)
               SliverToBoxAdapter(
                 child: FailureView(failure: controller.shelfFailure!),
