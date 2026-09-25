@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/shiori_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/widgets/shiori_menu.dart';
 import 'reader_chrome.dart';
 
 /// Overflow menu entries of the reader top bar.
@@ -60,7 +61,7 @@ class ReaderTopBar extends StatelessWidget {
           onSelected: onMenu,
           itemBuilder: (_) => [
             for (final (action, label) in menu)
-              PopupMenuItem(value: action, child: Text(label)),
+              ShioriMenuItem(value: action, label: label),
           ],
         ),
       ],

@@ -14,6 +14,7 @@ import 'desktop_shell.dart';
 import 'home_navigation.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/shiori_logo.dart';
+import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
 import '../bookshelf/library_controller.dart';
 import '../bookshelf/bookshelf_view.dart';
@@ -315,21 +316,8 @@ class _ReadingHomeState extends State<ReadingHome> {
   void _continue(NovelKey key) =>
       _routes.open(context, ContinueDestination(key));
 
-  PopupMenuItem<String> _menuItem(String value, IconData icon, String label) =>
-      PopupMenuItem(
-        value: value,
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: ShioriSpace.medium),
-            Flexible(child: Text(label)),
-          ],
-        ),
-      );
+  ShioriMenuItem<String> _menuItem(String value, IconData icon, String label) =>
+      ShioriMenuItem(value: value, icon: icon, label: label);
 
   void _search(BuildContext context) {
     if (ShioriCapabilities.of(context).pointerFirst) {

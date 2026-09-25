@@ -11,6 +11,7 @@ import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/book_list_tile.dart';
+import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
 
 class LocalBooksScreen extends StatefulWidget {
@@ -666,8 +667,8 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       },
       itemBuilder: (_) => [
         if (_canReparse)
-          PopupMenuItem(value: 'reparse', child: Text(l.localReparse)),
-        PopupMenuItem(value: 'delete', child: Text(l.localDeleteConfirm)),
+          ShioriMenuItem(value: 'reparse', label: l.localReparse),
+        ShioriMenuItem(value: 'delete', label: l.localDeleteConfirm),
       ],
     );
   }

@@ -5,6 +5,7 @@ import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
+import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
 
 class CacheScreen extends StatefulWidget {
@@ -403,7 +404,7 @@ class _CacheScreenState extends State<CacheScreen> {
       icon: const Icon(Icons.more_horiz, size: 20),
       onSelected: (_) => _clear(key),
       itemBuilder: (_) => [
-        PopupMenuItem(value: 'clear', child: Text(l.cacheClearBook)),
+        ShioriMenuItem(value: 'clear', label: l.cacheClearBook),
       ],
     );
     final card = BoxDecoration(

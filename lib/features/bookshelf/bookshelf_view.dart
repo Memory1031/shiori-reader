@@ -6,6 +6,7 @@ import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/book_list_tile.dart';
+import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
 import 'desktop_shelf.dart';
 import 'library_controller.dart';
@@ -163,21 +164,16 @@ class _BookshelfViewState extends State<BookshelfView> {
       rtl ? anchor.bottomRight : anchor.bottomLeft,
     );
     final started = controller.progressFor(book.key) != null;
-    PopupMenuItem<_BookAction> entry(
+    ShioriMenuItem<_BookAction> entry(
       _BookAction value,
       IconData icon,
       String label, {
       bool enabled = true,
-    }) => PopupMenuItem(
+    }) => ShioriMenuItem(
       value: value,
+      icon: icon,
+      label: label,
       enabled: enabled,
-      child: Row(
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: ShioriSpace.medium),
-          Flexible(child: Text(label)),
-        ],
-      ),
     );
     // On the root navigator the shell sees its route covered, so Escape
     // closes the menu without leaving the workspace page.

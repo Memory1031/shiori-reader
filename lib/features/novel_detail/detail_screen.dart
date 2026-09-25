@@ -10,6 +10,7 @@ import '../../shared/capabilities.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/book_list_tile.dart';
 import '../../shared/widgets/controller_scope.dart';
+import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
 import 'desktop_detail.dart';
 import 'detail_controller.dart';
@@ -69,18 +70,18 @@ class DetailScreen extends StatelessWidget {
           if (value == 'remove') changeShelf();
         },
         itemBuilder: (_) => [
-          PopupMenuItem(
+          ShioriMenuItem(
             key: const ValueKey('detail-refresh'),
             value: 'refresh',
             enabled: controller.canLoad,
-            child: Text(strings.detailRefresh),
+            label: strings.detailRefresh,
           ),
           if (isOnShelf && loaded != null)
-            PopupMenuItem(
+            ShioriMenuItem(
               key: const ValueKey('detail-remove'),
               value: 'remove',
               enabled: canChangeShelf,
-              child: Text(strings.detailRemoveShelf),
+              label: strings.detailRemoveShelf,
             ),
         ],
       );
