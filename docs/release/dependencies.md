@@ -2,7 +2,7 @@
 
 按当前 pubspec.lock 对应包的 LICENSE / NOTICE 文本列出；含开发及传递依赖，不表示全部进入产物。类别为文本识别，不替代原始完整声明。
 
-锁文件 SHA-256：`2d8d019f67ef9aab0a4eb17b1dbd9d35c185476e031655d4a3905c429a929e62`。
+锁文件 SHA-256：`f8876177232e134b96ef57112320a76718c8a90f5d89fe5bcc486b6a3e48aede`（按仓库中 LF 换行的文件内容计算）。
 
 Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Memory1031/flutter_inappwebview/tree/3e48253e4c03beb49fe020fb1168ab1fb2be4818/flutter_inappwebview_windows)，按完整提交 SHA 锁定，保留上游 LICENSE 与源码许可声明。仅 Windows 子包使用 Git override，其余平台包仍取自锁定的 hosted 版本。
 
@@ -13,6 +13,8 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 | archive | 4.2.0 | direct main | MIT 类（含附带声明） | LICENSE, LICENSE-other.md |
 | args | 2.7.0 | transitive | BSD 类 | LICENSE |
 | async | 2.13.1 | transitive | BSD 类 | LICENSE |
+| battery_plus | 7.1.1 | direct main | BSD 类 | LICENSE |
+| battery_plus_platform_interface | 2.0.1 | transitive | BSD 类 | LICENSE |
 | boolean_selector | 2.1.2 | transitive | BSD 类 | LICENSE |
 | characters | 1.4.0 | direct main | BSD 类 | LICENSE |
 | cli_config | 0.2.0 | transitive | BSD 类 | LICENSE |
@@ -24,11 +26,13 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 | cross_file | 0.3.5+5 | transitive | BSD 类 | LICENSE |
 | crypto | 3.0.7 | direct main | BSD 类 | LICENSE |
 | csslib | 1.0.2 | transitive | BSD 类 | LICENSE |
+| dbus | 0.7.15 | transitive | MPL-2.0 类 | LICENSE |
 | dio | 5.11.1 | direct main | MIT 类 | LICENSE |
 | dio_web_adapter | 2.2.2 | transitive | MIT 类 | LICENSE |
 | drift | 2.32.1 | direct main | MIT 类 | LICENSE |
 | fake_async | 1.3.3 | direct dev | Apache 类 | LICENSE |
 | ffi | 2.2.0 | transitive | BSD 类 | LICENSE |
+| ffi_leak_tracker | 0.1.2 | transitive | BSD 类 | LICENSE |
 | file | 7.0.1 | transitive | BSD 类 | LICENSE |
 | file_selector | 1.1.0 | direct main | BSD 类 | LICENSE |
 | file_selector_android | 0.5.2+6 | transitive | BSD 类 | LICENSE |
@@ -80,6 +84,8 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 | node_preamble | 2.0.2 | transitive | MIT 类 | LICENSE |
 | objective_c | 9.5.0 | transitive | BSD 类 | LICENSE |
 | package_config | 2.2.0 | transitive | BSD 类 | LICENSE |
+| package_info_plus | 10.2.1 | transitive | BSD 类 | LICENSE |
+| package_info_plus_platform_interface | 4.1.0 | transitive | BSD 类 | LICENSE |
 | path | 1.9.1 | direct main | BSD 类 | LICENSE |
 | path_provider | 2.1.5 | direct main | BSD 类 | LICENSE |
 | path_provider_android | 2.3.1 | transitive | BSD 类 | LICENSE |
@@ -119,13 +125,17 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 | test_api | 0.7.7 | transitive | BSD 类 | LICENSE |
 | test_core | 0.6.12 | transitive | BSD 类 | LICENSE |
 | typed_data | 1.4.0 | transitive | BSD 类 | LICENSE |
+| upower | 0.7.0 | transitive | MPL-2.0 类 | LICENSE |
 | vector_math | 2.2.0 | transitive | BSD 类 | LICENSE |
 | vm_service | 15.3.0 | transitive | BSD 类 | LICENSE |
+| wakelock_plus | 1.6.1 | direct main | BSD 类 | LICENSE |
+| wakelock_plus_platform_interface | 1.5.1 | transitive | BSD 类 | LICENSE |
 | watcher | 1.2.1 | transitive | BSD 类 | LICENSE |
 | web | 1.1.1 | transitive | BSD 类 | LICENSE |
 | web_socket | 1.0.1 | transitive | BSD 类 | LICENSE |
 | web_socket_channel | 3.0.3 | transitive | BSD 类 | LICENSE |
 | webkit_inspection_protocol | 1.2.1 | transitive | BSD 类 | LICENSE |
+| win32 | 6.4.0 | transitive | BSD 类 | LICENSE |
 | xdg_directories | 1.1.0 | transitive | BSD 类 | LICENSE |
 | xml | 6.6.1 | direct main | MIT 类 | LICENSE |
 | yaml | 3.1.4 | direct dev | MIT 类 | LICENSE |
@@ -133,6 +143,8 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 ## 原生与产物边界
 
 Apple 平台的原生依赖由 CocoaPods 解析，`flutter_inappwebview` 还依赖 OrderedSet；Windows 插件通过 NuGet 引入 WebView2 SDK、Windows Implementation Library 与 nlohmann.json。具体原生声明随包及 SDK 保留，分发时须与实际锁文件和产物核对。Android 原生传递依赖与最终 APK 的 NOTICES、签名、摘要仍须随最终发布产物核对。WHATWG 编码附加声明保留在 assets/licenses/whatwg-encoding.txt。
+
+`dbus` 与 `upower` 采用 MPL-2.0（文件级 copyleft），仅由 `battery_plus` 的 Linux 实现引入；当前不发布 Linux 版本。若将来发布 Linux 产物，须随附其许可声明并说明未修改源码的获取位置；修改这些文件则须按 MPL-2.0 公开修改后的文件。
 
 Windows ZIP 保留 Flutter 的 `data/flutter_assets/NOTICES.Z` 与根 LICENSE，并在 `licenses/` 附带 NuGet 的 WebView2 LICENSE / NOTICE、WIL LICENSE 和 nlohmann.json 3.11.2 的官方 MIT 许可原文。原生依赖升级时需同步打包脚本中的版本目录与许可文件。
 
