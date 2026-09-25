@@ -19,6 +19,7 @@ import 'reader_notes.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'reader_chrome.dart';
 import 'reader_contents.dart';
+import 'reader_panel.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
 class BookReaderScreen extends StatefulWidget {
@@ -418,6 +419,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   void dispose() {
+    _contentsPanel?.dismiss();
+    _contentsPanel = null;
     _restoreSystemUi();
     _invalidation?.cancel();
     _chapterTurn.dispose();
@@ -805,8 +808,34 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
-  Future<void> _contents() =>
-      showReaderContents(context, layers: [_bookContents(context)]);
+  /// The contents panel opened from the failure page on desktop. It keeps
+  /// the app theme, as the page around it does.
+  ReaderPanelHandle? _contentsPanel;
+
+  Future<void> _contents() async {
+    if (!ShioriCapabilities.of(context).pointerFirst) {
+      return showReaderContents(context, layers: [_bookContents(context)]);
+    }
+    if (_contentsPanel != null) return;
+    final layer = _bookContents(context);
+    final panel = ReaderPanelHandle.open(
+      this,
+      placement: ReaderPanelPlacement.start,
+      semanticLabel: layer.label,
+      builder: (context, panel) => ReaderContentsPanel(
+        layers: [layer],
+        closeButton: true,
+        onDone: () {
+          if (mounted && panel.isValid && identical(_contentsPanel, panel)) {
+            panel.close();
+          }
+        },
+      ),
+    );
+    _contentsPanel = panel;
+    await panel.closed;
+    if (identical(_contentsPanel, panel)) _contentsPanel = null;
+  }
 
   Future<void> _details() async {
     if (_changing || widget.onDetails == null) return;

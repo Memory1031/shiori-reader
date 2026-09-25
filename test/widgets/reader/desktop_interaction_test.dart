@@ -175,7 +175,8 @@ void main() {
         ]) {
           await tester.tap(control);
           await tester.pumpAndSettle();
-          expect(find.byType(BottomSheet), findsOneWidget);
+          expect(find.byType(BottomSheet), findsNothing);
+          expect(find.byKey(const ValueKey('reader-panel')), findsOneWidget);
           await key(LogicalKeyboardKey.pageDown);
           await wheel(const Offset(0, 120), position: const Offset(100, 100));
           await tester.pumpAndSettle();
@@ -185,14 +186,14 @@ void main() {
             reason: 'modal must isolate reader input',
           );
           await key(LogicalKeyboardKey.escape);
-          expect(find.byType(BottomSheet), findsNothing);
+          expect(find.byKey(const ValueKey('reader-panel')), findsNothing);
           expect(pages.capture(), start);
         }
         await key(LogicalKeyboardKey.pageDown);
         expect(
           pages.capture(),
           next,
-          reason: 'focus returns after closing sheets',
+          reason: 'focus returns after closing panels',
         );
         for (final width in [850.0, size.width]) {
           tester.view.physicalSize = Size(width, size.height);

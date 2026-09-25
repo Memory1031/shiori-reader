@@ -538,6 +538,112 @@ void main() {
   });
 
   testWidgets(
+    'Windows reader panels cover the page view without reloading it',
+    (tester) async {
+      tester.view
+        ..physicalSize = const Size(1600, 1000)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final parser = svgLinksParser();
+      final content = parser.parse().content;
+      final local = _SvgBooks(
+        LocalBookRecord(
+          content: content,
+          format: LocalBookFormat.epub,
+          importedAt: DateTime.utc(2025),
+        ),
+        parser.presentations,
+      );
+      final repo = LocalReadingRepository(
+        online: ForbiddenOnline(),
+        local: local,
+      );
+      final library = FixtureLibraryRepository();
+      final settings = FixtureSettingsStore();
+      await settings.save(
+        ReaderSettings(controlsHintSeen: true),
+        cancellation: CancellationSource().token,
+      );
+      await tester.pumpWidget(
+        EpubWebViewHost(
+          userDataDirectory: temp,
+          operatingSystem: 'windows',
+          child: ShioriApp(
+            locale: const Locale('en'),
+            routes: AppRoutes(
+              home: (_) => BookReaderScreen(
+                chapter: content.chapters.first.key,
+                repository: repo,
+                library: library,
+                settings: settings,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final hotspot = find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.label == 'Go 1',
+      );
+      for (var i = 0; i < 20 && hotspot.evaluate().isEmpty; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        if (platform.views.isNotEmpty) platform.views.last.finish();
+        await tester.pumpAndSettle();
+      }
+      expect(hotspot, findsOneWidget);
+      expect(platform.heads, isEmpty);
+      final view = platform.views.last;
+      final views = platform.views.length;
+      final layout = tester.state(find.byType(EpubLayoutPage));
+      final first = content.chapters.first.key;
+      ChapterKey showing() => tester
+          .widget<ReaderContentView>(find.byType(ReaderContentView))
+          .content
+          .key;
+      final spot = tester.getCenter(hotspot);
+      final panel = find.byKey(const ValueKey('reader-panel'));
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+      await tester.pumpAndSettle();
+      for (final control in [
+        find.byIcon(Icons.list),
+        find.byTooltip('Reading settings'),
+        find.text('Chapter 100%'),
+      ]) {
+        await tester.tap(control);
+        await tester.pumpAndSettle();
+        expect(panel, findsOneWidget);
+        expect(tester.getRect(panel).contains(spot), isFalse);
+        // The barrier takes the click meant for the link below it, and
+        // only closes the panel.
+        await tester.tapAt(spot);
+        await tester.pumpAndSettle();
+        expect(panel, findsNothing);
+        expect(showing(), first, reason: 'no click reaches the hotspot');
+        expect(platform.views.length, views, reason: 'no new native view');
+        expect(platform.views.last, same(view), reason: 'no reload');
+        expect(platform.heads, isEmpty);
+        expect(tester.state(find.byType(EpubLayoutPage)), same(layout));
+        expect(hotspot, findsOneWidget);
+      }
+
+      // Closed, the same link navigates again.
+      await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+      await tester.pumpAndSettle();
+      await tester.tapAt(spot);
+      await tester.pumpAndSettle();
+      expect(showing(), content.chapters.last.key);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      await library.close();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
+  testWidgets(
     'last main WebView page enters completion and returns without reopening platform view',
     (tester) async {
       final repo = _CompletionPresentation();

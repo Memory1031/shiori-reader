@@ -20,6 +20,7 @@ export 'reader_actions.dart' show ReaderActions;
 import 'reader_actions.dart';
 import 'reader_chrome.dart';
 import 'reader_contents.dart';
+import 'reader_panel.dart';
 import 'reader_progress_panel.dart';
 import 'reader_sheet.dart';
 import 'reader_toolbars.dart';
@@ -138,16 +139,81 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
   }
 
-  Future<void> _settingsPanel(BuildContext context) =>
-      showReaderSettings(context, _preferences);
+  /// The open desktop panel, if any. Phones and tablets use sheets.
+  ReaderPanelHandle? _panel;
+  final _progressAnchor = GlobalKey(debugLabel: 'reader-progress');
 
-  List<ReaderContentsLayer> _contentsLayers(BuildContext context) => [
+  bool get _desktopPanels => ShioriCapabilities.of(context).pointerFirst;
+
+  /// Whether a callback from [panel] may still act on this reader.
+  bool _owns(ReaderPanelHandle panel) =>
+      mounted && panel.isValid && identical(_panel, panel);
+
+  VoidCallback? _guarded(ReaderPanelHandle panel, VoidCallback? action) =>
+      action == null
+      ? null
+      : () {
+          if (_owns(panel)) action();
+        };
+
+  /// Opens a desktop panel in the reading theme, following live edits.
+  ReaderPanelHandle? _openPanel(
+    ReaderPanelPlacement placement, {
+    required String semanticLabel,
+    required Widget Function(BuildContext context, ReaderPanelHandle panel)
+    builder,
+    GlobalKey? anchor,
+  }) {
+    if (_panel != null) return null;
+    final panel = ReaderPanelHandle.open(
+      this,
+      placement: placement,
+      semanticLabel: semanticLabel,
+      anchor: anchor,
+      themeChanges: _preferences,
+      theme: (context) => readerTheme(
+        _preferences.value,
+        MediaQuery.platformBrightnessOf(context),
+        accent: appAccentOf(context),
+      ),
+      builder: builder,
+    );
+    _panel = panel;
+    unawaited(
+      panel.closed.then((_) {
+        if (identical(_panel, panel)) _panel = null;
+      }),
+    );
+    return panel;
+  }
+
+  Future<void> _settingsPanel(BuildContext context) async {
+    if (!_desktopPanels) return showReaderSettings(context, _preferences);
+    final panel = _openPanel(
+      ReaderPanelPlacement.end,
+      semanticLabel: AppLocalizations.of(context).readerSettings,
+      builder: (context, panel) => ReaderSettingsPanel(
+        preferences: _preferences,
+        onDone: _guarded(panel, panel.close),
+      ),
+    );
+    if (panel == null) return;
+    await panel.closed;
+    // As the sheet: edits are flushed once the panel closes; an owner going
+    // away first flushes through the preferences' own dispose.
+    await _preferences.flush();
+  }
+
+  List<ReaderContentsLayer> _contentsLayers(
+    BuildContext context, {
+    bool Function()? live,
+  }) => [
     if (widget.articleContents)
       articleContentsLayer(
         context,
         widget.content,
         onSelect: (target) {
-          if (mounted) _navigateTo(target);
+          if (mounted && (live?.call() ?? true)) _navigateTo(target);
         },
       ),
     if (_actions.bookContents case final book?) book(context),
@@ -155,13 +221,31 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   /// [book] opens on the book-level layer, e.g. from the completion page.
   Future<void> _contents(BuildContext context, {bool book = false}) async {
-    final layers = _contentsLayers(context);
+    if (!_desktopPanels) {
+      final layers = _contentsLayers(context);
+      if (layers.isEmpty) return;
+      return showReaderContents(
+        context,
+        layers: layers,
+        initialLayer: book ? layers.length - 1 : 0,
+      );
+    }
+    late final ReaderPanelHandle? panel;
+    final layers = _contentsLayers(context, live: () => _owns(panel!));
     if (layers.isEmpty) return;
-    await showReaderContents(
-      context,
-      layers: layers,
-      initialLayer: book ? layers.length - 1 : 0,
+    panel = _openPanel(
+      ReaderPanelPlacement.start,
+      semanticLabel: layers.length == 1
+          ? layers.single.label
+          : AppLocalizations.of(context).catalogTitle,
+      builder: (context, panel) => ReaderContentsPanel(
+        layers: layers,
+        initialLayer: book ? layers.length - 1 : 0,
+        closeButton: true,
+        onDone: _guarded(panel, panel.close)!,
+      ),
     );
+    await panel?.closed;
   }
 
   late final _paged = widget.viewportController ?? PagedReaderController();
@@ -322,6 +406,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   @override
   void dispose() {
+    _panel?.dismiss();
+    _panel = null;
     _wheelCooldown?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _preferences.removeListener(_changed);
@@ -720,21 +806,43 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _paged.restore(target);
   }
 
-  Future<void> _progressPanel(BuildContext context) => showReaderSheet<void>(
-    context,
-    builder: (sheet) => ReaderProgressPanel(
+  Future<void> _progressPanel(BuildContext context) async {
+    Widget progress(
+      VoidCallback onDone, {
+      ValueChanged<double>? onSeek,
+      VoidCallback? Function(VoidCallback? action)? guard,
+    }) => ReaderProgressPanel(
       chapterTitle: _effectiveChapterTitle,
       chapterFraction: _visibleChapterFraction,
       anchorFraction: _displayChapterFraction,
       bookFractionAt: (fraction) =>
           widget.session?.bookProgressAt(fraction)?.fraction,
-      onSeek: _seekChapter,
-      onDone: () => Navigator.of(sheet).pop(),
+      onSeek: onSeek ?? _seekChapter,
+      onDone: onDone,
       showChapterStepper: _actions.hasChapterStepper,
-      onPreviousChapter: _actions.previousChapter,
-      onNextChapter: _actions.nextChapter,
-    ),
-  );
+      onPreviousChapter: (guard ?? (a) => a)(_actions.previousChapter),
+      onNextChapter: (guard ?? (a) => a)(_actions.nextChapter),
+    );
+    if (!_desktopPanels) {
+      return showReaderSheet<void>(
+        context,
+        builder: (sheet) => progress(() => Navigator.of(sheet).pop()),
+      );
+    }
+    final panel = _openPanel(
+      ReaderPanelPlacement.anchored,
+      semanticLabel: _effectiveChapterTitle,
+      anchor: _progressAnchor,
+      builder: (context, panel) => progress(
+        _guarded(panel, panel.close)!,
+        onSeek: (fraction) {
+          if (_owns(panel)) _seekChapter(fraction);
+        },
+        guard: (action) => _guarded(panel, action),
+      ),
+    );
+    await panel?.closed;
+  }
 
   /// Chapter progress text, rebuilt at most at the sampling rate.
   Widget _progressLabel(
@@ -838,6 +946,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
         progress: _progressLabel(l.readerChapterPercent),
         onProgress: () => _progressPanel(context),
         onSettings: () => _settingsPanel(context),
+        progressKey: _progressAnchor,
       ),
     );
   }

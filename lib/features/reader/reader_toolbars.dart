@@ -78,12 +78,17 @@ class ReaderBottomBar extends StatelessWidget {
     required this.progress,
     required this.onProgress,
     required this.onSettings,
+    this.progressKey,
   });
   final String contentsTooltip;
   final VoidCallback onContents, onProgress, onSettings;
 
   /// Live chapter progress label.
   final Widget progress;
+
+  /// Keys the progress control, so a popover can find it wherever the bar
+  /// lays it out.
+  final GlobalKey? progressKey;
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +106,11 @@ class ReaderBottomBar extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: TextButton(onPressed: onProgress, child: progress),
+          child: TextButton(
+            key: progressKey,
+            onPressed: onProgress,
+            child: progress,
+          ),
         ),
         Expanded(
           child: Tooltip(

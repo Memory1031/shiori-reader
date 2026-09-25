@@ -37,10 +37,15 @@ class ReaderContentsPanel extends StatefulWidget {
     required this.layers,
     required this.onDone,
     this.initialLayer = 0,
+    this.closeButton = false,
   });
   final List<ReaderContentsLayer> layers;
   final VoidCallback onDone;
   final int initialLayer;
+
+  /// Ends the header with a close control calling [onDone], for a host
+  /// without a drag handle. The header then keeps its own top spacing.
+  final bool closeButton;
   @override
   State<ReaderContentsPanel> createState() => _ReaderContentsPanelState();
 }
@@ -56,9 +61,9 @@ class _ReaderContentsPanelState extends State<ReaderContentsPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
             ShioriSpace.page,
-            0,
+            widget.closeButton ? ShioriSpace.small : 0,
             ShioriSpace.small,
             ShioriSpace.small,
           ),
@@ -71,6 +76,12 @@ class _ReaderContentsPanelState extends State<ReaderContentsPanel> {
                 ),
               ),
               ?layer.action,
+              if (widget.closeButton)
+                IconButton(
+                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                  onPressed: widget.onDone,
+                  icon: const Icon(Icons.close),
+                ),
             ],
           ),
         ),
