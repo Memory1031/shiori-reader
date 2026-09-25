@@ -9,6 +9,7 @@ import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
 import 'continue_reading_card.dart';
+import 'continue_reading_row.dart';
 import 'desktop_shell.dart';
 import 'home_navigation.dart';
 import '../../shared/widgets/app_scaffold.dart';
@@ -490,24 +491,11 @@ class _ReadingHomeState extends State<ReadingHome> {
         : MaterialPage(key: ValueKey(shown), name: name, child: child);
   }
 
-  /// The toolbar carries the shelf's title and actions, so the shelf below
-  /// drops its own title row.
+  /// The shelf titles itself with a fixed toolbar on its left-aligned
+  /// frame, so the page has no app bar.
   Widget _desktopShelf(BuildContext context) {
-    final strings = AppLocalizations.of(context);
+    final recent = _library.recent.firstOrNull;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(strings.homeShelf),
-        actions: [
-          ShelfLayoutButton(layout: _shelfGrid),
-          if (widget.onImport case final import?)
-            IconButton(
-              onPressed: import,
-              tooltip: strings.importTitle,
-              icon: const Icon(Icons.file_upload_outlined),
-            ),
-          const SizedBox(width: ShioriSpace.small),
-        ],
-      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -515,25 +503,25 @@ class _ReadingHomeState extends State<ReadingHome> {
             Expanded(
               child: PageStorage(
                 bucket: _shelfStorage,
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: ShioriLayout.page,
-                    ),
-                    child: BookshelfView(
-                      controller: _library,
-                      images: widget.images,
-                      layout: _shelfGrid,
-                      showTitle: false,
-                      onOpen: _continue,
-                      onDetails: (key) =>
-                          _routes.open(context, NovelDestination(key)),
-                      onSearch: () => _search(context),
-                      onImport: widget.onImport,
-                      header: _continueHeader(context),
-                    ),
-                  ),
+                child: BookshelfView(
+                  desktop: true,
+                  controller: _library,
+                  images: widget.images,
+                  layout: _shelfGrid,
+                  onOpen: _continue,
+                  onDetails: (key) =>
+                      _routes.open(context, NovelDestination(key)),
+                  onSearch: () => _search(context),
+                  onImport: widget.onImport,
+                  // The row scrolls with the shelf so short windows keep
+                  // room for books.
+                  header: recent == null
+                      ? null
+                      : ContinueReadingRow(
+                          progress: recent,
+                          images: widget.images,
+                          onContinue: () => _continue(recent.novelKey),
+                        ),
                 ),
               ),
             ),

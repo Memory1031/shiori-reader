@@ -1070,6 +1070,12 @@ abstract class AppLocalizations {
   /// **'Remove'**
   String get shelfRemove;
 
+  /// No description provided for @shelfBookCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 book} other{{count} books}}'**
+  String shelfBookCount(int count);
+
   /// No description provided for @launchTagline.
   ///
   /// In en, this message translates to:

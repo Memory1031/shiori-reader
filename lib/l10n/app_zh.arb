@@ -183,6 +183,14 @@
   "onlineSource": "在线书源",
   "shelfDetails": "详情",
   "shelfRemove": "移除",
+  "shelfBookCount": "{count} 本",
+  "@shelfBookCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "launchTagline": "故事，即将继续",
   "launchLoading": "正在准备书架…",
   "cacheTitle": "离线内容",

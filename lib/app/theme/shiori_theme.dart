@@ -72,9 +72,15 @@ abstract final class ShioriSpace {
 /// Maximum widths for centred content on wide windows, and the desktop
 /// shell's navigation widths. [page] is also where the shell's bottom bar
 /// gives way to the rail, and [sidebarBreakpoint] where the rail gains labels.
+///
+/// The desktop shelf is left-aligned instead: its toolbar, continue row and
+/// books share one frame of at most [shelfGrid] or [shelfList], inset by
+/// [shelfGutter], or [shelfGutterWide] from the sidebar breakpoint.
 abstract final class ShioriLayout {
   static const page = 840.0, list = 760.0, panel = 560.0;
   static const rail = 72.0, sidebar = 232.0, sidebarBreakpoint = 1200.0;
+  static const shelfGrid = 1600.0, shelfList = 1200.0;
+  static const shelfGutter = 24.0, shelfGutterWide = 32.0;
 }
 
 /// Corner radii: tag for badges / bars, cover for artwork, control for rows,

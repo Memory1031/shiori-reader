@@ -8,6 +8,7 @@ import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/bookshelf/bookshelf_view.dart';
+import 'package:shiori/features/bookshelf/desktop_shelf.dart';
 import 'package:shiori/features/home/desktop_shell.dart';
 import 'package:shiori/features/home/home_navigation.dart';
 import 'package:shiori/features/home/reading_home.dart';
@@ -233,6 +234,12 @@ class ShellHarness {
     await tester.pumpAndSettle();
     expect(find.byType(DetailScreen), findsOneWidget);
   }
+
+  /// The layout the shelf toggle shows: grid (true) or list.
+  bool get shelfGrid => tester
+      .widget<SegmentedButton<bool>>(find.byType(SegmentedButton<bool>))
+      .selected
+      .single;
 
   Future<void> key(LogicalKeyboardKey key) async {
     await tester.sendKeyEvent(key);
@@ -534,8 +541,8 @@ void main() {
     expect(find.byKey(const ValueKey('detail-refresh')), findsNothing);
     expect(tester.element(find.byType(DetailScreen)), same(detail));
 
-    // A sheet from the shelf opens over the window; its details open in
-    // the workspace.
+    // A book menu from the shelf opens over the window; its details open
+    // in the workspace.
     await h.select(h.l.shelfTitle);
     await tester.tap(find.byTooltip(h.l.shelfList));
     await tester.pumpAndSettle();
@@ -588,20 +595,26 @@ void main() {
     await h.select(h.l.searchTitle);
     expect(find.byType(BookshelfView), findsNothing);
     await h.select(h.l.shelfTitle);
-    expect(find.byTooltip(h.l.shelfGrid), findsOneWidget);
+    expect(h.shelfGrid, isFalse);
     expect(find.byType(SliverGrid), findsNothing);
     expect(position().pixels, 400);
 
     // Reselecting the shelf returns to its root but keeps the choice.
     await h.select(h.l.shelfTitle);
-    expect(find.byTooltip(h.l.shelfGrid), findsOneWidget);
+    expect(h.shelfGrid, isFalse);
     await h.close();
   }, variant: _desktop);
 
   testWidgets('import, updates and appearance entries', (tester) async {
     final h = ShellHarness(tester);
     await h.pump();
-    await tester.tap(find.byTooltip(h.l.importTitle));
+    // The toolbar action; an empty shelf offers the same import again.
+    await tester.tap(
+      find.descendant(
+        of: find.byType(DesktopShelfToolbar),
+        matching: find.text(h.l.importTitle),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(h.imports, 1);
 
@@ -700,7 +713,7 @@ void main() {
     expect(h.workspace.canPop(), isFalse);
     expect(h.navigation.section, HomeSection.shelf);
     // The list layout chosen before is kept.
-    expect(find.byTooltip(h.l.shelfGrid), findsOneWidget);
+    expect(h.shelfGrid, isFalse);
     expect(tester.takeException(), isNull);
     await h.close();
   }, variant: _desktop);

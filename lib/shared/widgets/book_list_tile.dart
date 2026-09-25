@@ -99,13 +99,23 @@ class BookListItem extends StatefulWidget {
     required this.child,
     this.onTap,
     this.onLongPress,
+    this.onSecondaryTapUp,
+    this.focusNode,
     this.minHeight = 120,
   });
   final Widget child;
   final VoidCallback? onTap, onLongPress;
+
+  /// A right click, e.g. for a context menu at the pointer.
+  final GestureTapUpCallback? onSecondaryTapUp;
+  final FocusNode? focusNode;
   final double minHeight;
 
   static const inset = ShioriSpace.medium;
+
+  /// Whether the row around [context] is hovered, focused or pressed, for
+  /// content that tints itself like [BookListTile]'s title.
+  static bool activeOf(BuildContext context) => _TitleTint.of(context);
 
   @override
   State<BookListItem> createState() => _BookListItemState();
@@ -130,6 +140,8 @@ class _BookListItemState extends State<BookListItem> {
       child: InkWell(
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
+        onSecondaryTapUp: widget.onSecondaryTapUp,
+        focusNode: widget.focusNode,
         onHover: (value) => setState(() => _hovered = value),
         onHighlightChanged: (value) => setState(() => _pressed = value),
         onFocusChange: (value) => setState(() => _focused = value),

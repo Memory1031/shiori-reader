@@ -142,7 +142,7 @@ void main() {
     expect(find.byType(BookshelfView), findsOneWidget);
     expect(h.workspace.canPop(), isFalse);
     // The layout chosen before reading is kept.
-    expect(find.byTooltip(h.l.shelfGrid), findsOneWidget);
+    expect(h.shelfGrid, isFalse);
     await h.close();
   }, variant: _desktop);
 

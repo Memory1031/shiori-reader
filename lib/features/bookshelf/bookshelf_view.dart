@@ -7,6 +7,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/book_list_tile.dart';
 import '../../shared/widgets/state_views.dart';
+import 'desktop_shelf.dart';
 import 'library_controller.dart';
 import '../reader/book_progress_label.dart';
 import 'remove_shelf_book.dart';
@@ -23,8 +24,15 @@ class BookshelfView extends StatefulWidget {
     this.header,
     this.layout,
     this.showTitle = true,
+    this.desktop = false,
   });
   final LibraryController controller;
+
+  /// The pointer-first shelf: a fixed toolbar over a left-aligned frame,
+  /// a density-driven grid, column rows without swipe actions, and book
+  /// menus on right click, the Menu key and Shift+F10. [showTitle] does not
+  /// apply; the toolbar always titles the shelf.
+  final bool desktop;
 
   /// Grid (true) or list, owned by a host that outlives this view so the
   /// choice survives leaving the page; the view keeps its own otherwise.
@@ -142,8 +150,82 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
+  /// A book menu anchored at [anchor] in global coordinates. Resolves true
+  /// when it closed without a choice, so the caller can take focus back.
+  Future<bool> _menu(NovelSummary book, Rect anchor) async {
+    final strings = AppLocalizations.of(context);
+    final controller = widget.controller;
+    final overlay =
+        Overlay.of(context, rootOverlay: true).context.findRenderObject()!
+            as RenderBox;
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final at = overlay.globalToLocal(
+      rtl ? anchor.bottomRight : anchor.bottomLeft,
+    );
+    final started = controller.progressFor(book.key) != null;
+    PopupMenuItem<_BookAction> entry(
+      _BookAction value,
+      IconData icon,
+      String label, {
+      bool enabled = true,
+    }) => PopupMenuItem(
+      value: value,
+      enabled: enabled,
+      child: Row(
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: ShioriSpace.medium),
+          Flexible(child: Text(label)),
+        ],
+      ),
+    );
+    // On the root navigator the shell sees its route covered, so Escape
+    // closes the menu without leaving the workspace page.
+    final action = await showMenu<_BookAction>(
+      context: context,
+      useRootNavigator: true,
+      position: RelativeRect.fromRect(
+        at & Size.zero,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        entry(
+          _BookAction.open,
+          started ? Icons.play_arrow_rounded : Icons.menu_book_outlined,
+          started ? strings.detailContinue : strings.detailStart,
+        ),
+        entry(
+          _BookAction.details,
+          Icons.info_outline,
+          strings.novelDetailsTitle,
+          enabled: widget.onDetails != null,
+        ),
+        const PopupMenuDivider(),
+        entry(
+          _BookAction.remove,
+          Icons.bookmark_remove_outlined,
+          strings.detailRemoveShelf,
+          enabled: !controller.writing,
+        ),
+      ],
+    );
+    if (!mounted) return false;
+    switch (action) {
+      case null:
+        return true;
+      case _BookAction.open:
+        widget.onOpen(book.key);
+      case _BookAction.details:
+        widget.onDetails?.call(book.key);
+      case _BookAction.remove:
+        removeShelfBook(context, controller, book);
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.desktop) return _desktop(context);
     final controller = widget.controller;
     final strings = AppLocalizations.of(context);
     final books = controller.sorted;
@@ -352,29 +434,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                 child: LoadingView(),
               )
             else if (books.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    EmptyView(message: strings.shelfEmpty),
-                    FilledButton.icon(
-                      onPressed: widget.onSearch,
-                      icon: const Icon(Icons.search),
-                      label: Text(strings.searchTitle),
-                    ),
-                    if (widget.onImport != null) ...[
-                      const SizedBox(height: ShioriSpace.small),
-                      TextButton.icon(
-                        onPressed: widget.onImport,
-                        icon: const Icon(Icons.file_upload_outlined),
-                        label: Text(strings.importTitle),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              )
+              SliverFillRemaining(hasScrollBody: false, child: _empty(strings))
             else if (_grid)
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -406,7 +466,204 @@ class _BookshelfViewState extends State<BookshelfView> {
       },
     );
   }
+
+  Widget _empty(AppLocalizations strings) => Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      EmptyView(message: strings.shelfEmpty),
+      FilledButton.icon(
+        onPressed: widget.onSearch,
+        icon: const Icon(Icons.search),
+        label: Text(strings.searchTitle),
+      ),
+      if (widget.onImport != null) ...[
+        const SizedBox(height: ShioriSpace.small),
+        TextButton.icon(
+          onPressed: widget.onImport,
+          icon: const Icon(Icons.file_upload_outlined),
+          label: Text(strings.importTitle),
+        ),
+      ],
+      const SizedBox(height: 24),
+    ],
+  );
+
+  Widget _desktop(BuildContext context) {
+    final controller = widget.controller;
+    final strings = AppLocalizations.of(context);
+    final books = controller.sorted;
+    final scaler = MediaQuery.textScalerOf(context);
+    final gutter = desktopShelfGutter(MediaQuery.sizeOf(context).width);
+    final maxFrame = _grid ? ShioriLayout.shelfGrid : ShioriLayout.shelfList;
+    // Two title lines at the card style and the real text scale.
+    final titles = TextPainter(
+      text: TextSpan(
+        text: '书 Ag\n书 Ag',
+        style: _ShelfGridCard.titleStyle(Theme.of(context)),
+      ),
+      textScaler: scaler,
+      textDirection: Directionality.of(context),
+      maxLines: 2,
+    )..layout();
+    final titleHeight = titles.height;
+    titles.dispose();
+
+    return LayoutBuilder(
+      builder: (context, bounds) {
+        final frame = (bounds.maxWidth - 2 * gutter).clamp(0.0, maxFrame);
+        // Every part of the shelf shares the frame: inset by the gutter and
+        // left-aligned. A [bleed] lets row tints reach past the frame edge
+        // while their content still lines up with it.
+        Widget framed(Widget sliver, {double bleed = 0}) => SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: gutter - bleed),
+          sliver: SliverConstrainedCrossAxis(
+            maxExtent: frame + 2 * bleed,
+            sliver: sliver,
+          ),
+        );
+        final grid = desktopShelfGrid(frame, scaler);
+
+        Widget item(int index) {
+          final book = books[index].snapshot;
+          final format = controller.localFormats[book.key];
+          final cover = BookCover(book: book, images: widget.images);
+          final sourceLabel = _sourceBadgeLabel(book.key, format);
+          if (_grid) {
+            return _ShelfGridCard(
+              key: ValueKey(book.key),
+              onTap: () => widget.onOpen(book.key),
+              onMenu: (anchor) => _menu(book, anchor),
+              cover: cover,
+              title: book.title,
+              sourceLabel: sourceLabel,
+            );
+          }
+          final progress = controller.progressFor(book.key)?.bookProgress;
+          return DesktopBookRow(
+            key: ValueKey(book.key),
+            moreKey: ValueKey(('shelf-more', book.key)),
+            cover: cover,
+            title: book.title,
+            subtitle: book.authors.isEmpty ? null : book.authors.join(', '),
+            sourceLabel: sourceLabel,
+            progressLabel: bookProgressLabel(
+              strings,
+              progress,
+              descriptive: true,
+            ),
+            progress: progress?.fraction,
+            onTap: () => widget.onOpen(book.key),
+            onMenu: (anchor) => _menu(book, anchor),
+          );
+        }
+
+        return Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: gutter),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: SizedBox(
+                  width: frame,
+                  child: DesktopShelfToolbar(
+                    layout: _layout,
+                    count: controller.shelfReady && books.isNotEmpty
+                        ? books.length
+                        : null,
+                    onImport: widget.onImport,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: CustomScrollView(
+                key: PageStorageKey(_grid ? 'shelf-grid' : 'shelf-list'),
+                slivers: [
+                  if (widget.header case final header?)
+                    framed(
+                      SliverPadding(
+                        padding: const EdgeInsets.only(bottom: rowGap),
+                        sliver: SliverToBoxAdapter(child: header),
+                      ),
+                    ),
+                  if (controller.shelfFailure != null)
+                    framed(
+                      SliverToBoxAdapter(
+                        child: FailureView(failure: controller.shelfFailure!),
+                      ),
+                    ),
+                  if (controller.writeFailure != null)
+                    framed(
+                      SliverToBoxAdapter(
+                        child: FailureView(failure: controller.writeFailure!),
+                      ),
+                    ),
+                  if (!controller.shelfReady)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: LoadingView(),
+                    )
+                  else if (books.isEmpty)
+                    framed(
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _empty(strings),
+                      ),
+                    )
+                  else if (_grid)
+                    framed(
+                      SliverPadding(
+                        padding: const EdgeInsets.only(
+                          top: ShioriSpace.tight,
+                          bottom: ShioriSpace.section,
+                        ),
+                        // Capped cards leave the spare width at the end.
+                        sliver: SliverConstrainedCrossAxis(
+                          maxExtent: grid.extent,
+                          sliver: SliverGrid.builder(
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: grid.columns,
+                                  crossAxisSpacing: gap,
+                                  mainAxisSpacing: rowGap,
+                                  // Cover, the title gap, two title lines
+                                  // and rounding slack.
+                                  mainAxisExtent:
+                                      grid.card / ShioriShape.coverRatio +
+                                      _ShelfGridCard.titleGap +
+                                      titleHeight +
+                                      2,
+                                ),
+                            itemCount: books.length,
+                            itemBuilder: (_, i) => item(i),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    framed(
+                      SliverPadding(
+                        padding: const EdgeInsets.only(
+                          bottom: ShioriSpace.section,
+                        ),
+                        sliver: SliverList.builder(
+                          itemCount: books.length,
+                          itemBuilder: (_, i) => item(i),
+                        ),
+                      ),
+                      bleed: BookListItem.inset,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
+
+enum _BookAction { open, details, remove }
 
 /// Switches a shelf between grid and list.
 class ShelfLayoutButton extends StatelessWidget {
@@ -441,7 +698,8 @@ class _ShelfGridCard extends StatefulWidget {
     required this.cover,
     required this.title,
     required this.onTap,
-    required this.onLongPress,
+    this.onLongPress,
+    this.onMenu,
     this.sourceLabel,
   });
 
@@ -449,16 +707,53 @@ class _ShelfGridCard extends StatefulWidget {
   final String title;
   final String? sourceLabel;
   final VoidCallback onTap;
-  final VoidCallback onLongPress;
+  final VoidCallback? onLongPress;
+
+  /// A book menu at a global anchor for pointer-first shelves, opened by
+  /// right click, the Menu key, Shift+F10, a long press or the more button
+  /// shown on hover and focus. Resolves true when it closed without a
+  /// choice; focus then returns to the card if the keyboard closed it.
+  final Future<bool> Function(Rect anchor)? onMenu;
+
+  static const titleGap = 10.0;
+  static TextStyle titleStyle(ThemeData theme) =>
+      (theme.textTheme.titleSmall ?? const TextStyle()).copyWith(
+        fontWeight: FontWeight.w500,
+      );
 
   @override
   State<_ShelfGridCard> createState() => _ShelfGridCardState();
 }
 
 class _ShelfGridCardState extends State<_ShelfGridCard> {
+  final _focus = FocusNode(debugLabel: 'shelf-card');
+  final _more = GlobalKey();
   bool _hovered = false;
   bool _pressed = false;
   bool _focused = false;
+  bool _menuOpen = false;
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _open(Rect anchor, {bool keyboard = false}) async {
+    setState(() => _menuOpen = true);
+    final restore = await menuClosedFromKeyboard(
+      widget.onMenu!(anchor),
+      keyboard: keyboard,
+    );
+    if (!mounted) return;
+    setState(() => _menuOpen = false);
+    if (restore) _focus.requestFocus();
+  }
+
+  void _openAtMore({bool keyboard = false}) {
+    final box = _more.currentContext!.findRenderObject()! as RenderBox;
+    _open(box.localToGlobal(Offset.zero) & box.size, keyboard: keyboard);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -467,11 +762,16 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
     final active = _hovered || _pressed || _focused;
     final duration = ShioriMotion.of(context, ShioriMotion.feedback);
     final radius = BorderRadius.circular(ShioriShape.cover);
+    final menu = widget.onMenu != null;
 
-    return InkWell(
+    Widget card = InkWell(
+      focusNode: _focus,
       onTap: widget.onTap,
-      onLongPress: widget.onLongPress,
-      onHover: (value) => setState(() => _hovered = value),
+      onLongPress: widget.onLongPress ?? (menu ? _openAtMore : null),
+      onSecondaryTapUp: menu
+          ? (details) => _open(details.globalPosition & Size.zero)
+          : null,
+      onHover: menu ? null : (value) => setState(() => _hovered = value),
       onHighlightChanged: (value) => setState(() => _pressed = value),
       onFocusChange: (value) => setState(() => _focused = value),
       borderRadius: radius,
@@ -510,13 +810,12 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: _ShelfGridCard.titleGap),
           AnimatedDefaultTextStyle(
             duration: duration,
-            style: (theme.textTheme.titleSmall ?? const TextStyle()).copyWith(
-              fontWeight: FontWeight.w500,
-              color: active ? colors.primary : colors.onSurface,
-            ),
+            style: _ShelfGridCard.titleStyle(
+              theme,
+            ).copyWith(color: active ? colors.primary : colors.onSurface),
             child: Text(
               widget.title,
               maxLines: 2,
@@ -525,6 +824,60 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
           ),
         ],
       ),
+    );
+    if (!menu) return card;
+
+    // Shown on hover or focus without its own Tab stop; the Menu key and
+    // Shift+F10 reach the same menu from the focused card.
+    final showMore = _hovered || _focused || _menuOpen;
+    card = Stack(
+      children: [
+        ShelfMenuShortcuts(
+          onMenu: () => _openAtMore(keyboard: true),
+          child: card,
+        ),
+        PositionedDirectional(
+          top: 6,
+          end: 6,
+          child: IgnorePointer(
+            ignoring: !showMore || _menuOpen,
+            child: AnimatedOpacity(
+              opacity: showMore ? 1 : 0,
+              duration: duration,
+              child: ExcludeFocus(
+                child: Tooltip(
+                  message: AppLocalizations.of(context).moreActions,
+                  child: Material(
+                    color: Colors.black.withValues(alpha: .42),
+                    shape: const CircleBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      key: _more,
+                      onTap: _openAtMore,
+                      child: SizedBox.square(
+                        dimension: 28,
+                        child: Icon(
+                          Icons.more_horiz,
+                          size: 18,
+                          // Light ink on the scrim over any cover artwork.
+                          color: Colors.white.withValues(alpha: .90),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+    // Hover spans the card and its more button, so reaching for the
+    // button keeps it visible.
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: card,
     );
   }
 }

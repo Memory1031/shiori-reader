@@ -183,6 +183,14 @@
   "onlineSource": "Online source",
   "shelfDetails": "Details",
   "shelfRemove": "Remove",
+  "shelfBookCount": "{count, plural, =1{1 book} other{{count} books}}",
+  "@shelfBookCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "launchTagline": "Your story continues",
   "launchLoading": "Preparing your library…",
   "cacheTitle": "Offline content",

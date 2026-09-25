@@ -503,6 +503,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shelfRemove => '移除';
 
   @override
+  String shelfBookCount(int count) {
+    return '$count 本';
+  }
+
+  @override
   String get launchTagline => '故事，即将继续';
 
   @override

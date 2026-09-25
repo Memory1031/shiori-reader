@@ -526,6 +526,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shelfRemove => 'Remove';
 
   @override
+  String shelfBookCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count books',
+      one: '1 book',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get launchTagline => 'Your story continues';
 
   @override
