@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/routes.dart';
 import 'package:shiori/dev/fixtures.dart';
+import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 
@@ -201,9 +202,8 @@ void main() {
         'SystemUiMode.edgeToEdge',
         'SystemUiMode.immersiveSticky',
       ]);
-      // Details stay available after returning.
-      await tester.sendKeyEvent(LogicalKeyboardKey.f2);
-      await tester.pumpAndSettle();
+      // The reader comes back as it was left, toolbars included, and details
+      // stay available.
       await tester.tap(find.byTooltip('More'));
       await tester.pumpAndSettle();
       expect(find.text('Novel details'), findsOneWidget);
@@ -213,4 +213,95 @@ void main() {
     },
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
+
+  for (final leave in ['back button', 'system back', 'details and back']) {
+    testWidgets(
+      '$leave keeps the reading position',
+      (tester) async {
+        final env = FixtureEnvironment(scenario: FixtureScenario.longChapter);
+        final navigator = GlobalKey<NavigatorState>();
+        Future<(int, String, double)?> saved() async {
+          final result = await env.library.getProgress(
+            fixtureNovelKey(FixtureScenario.longChapter),
+            cancellation: CancellationSource().token,
+          );
+          final position =
+              (result as Success<ReadingProgress?>).value?.position;
+          if (position == null) return null;
+          return (
+            position.blockIndex,
+            position.blockKey,
+            position.blockFraction,
+          );
+        }
+
+        await tester.pumpWidget(
+          ShioriApp(
+            locale: const Locale('en'),
+            navigatorKey: navigator,
+            routes: AppRoutes(home: (_) => const Scaffold()),
+          ),
+        );
+        navigator.currentState!.push(
+          MaterialPageRoute<void>(
+            builder: (_) => BookReaderScreen(
+              chapter: fixtureChapterKey(FixtureScenario.longChapter),
+              repository: env.novels,
+              library: env.library,
+              settings: Store()..value = ReaderSettings(controlsHintSeen: true),
+              onDetails: (reader, _) => Navigator.of(reader).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (_) => const Scaffold(body: Text('details')),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        for (var i = 0; i < 3; i++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+          await tester.pumpAndSettle();
+        }
+        // Let the throttled write of the last page land.
+        await tester.pump(const Duration(seconds: 1));
+        final read = await saved();
+        expect(read!.$1, greaterThan(0));
+
+        switch (leave) {
+          case 'back button':
+            await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+            await tester.pumpAndSettle();
+            await tester.tap(find.byType(BackButton));
+          case 'system back':
+            await tester.binding.handlePopRoute();
+          default:
+            await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+            await tester.pumpAndSettle();
+            await tester.tap(find.byTooltip('More'));
+            await tester.pumpAndSettle();
+            await tester.tap(find.text('Novel details'));
+            await tester.pumpAndSettle();
+            expect(find.text('details'), findsOneWidget);
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(find.text('details'), findsNothing);
+            // The reader it returns to is still on the page it was left on.
+            expect(await saved(), read);
+            await tester.tap(find.byType(BackButton));
+        }
+        await tester.pumpAndSettle();
+        expect(find.byType(BookReaderScreen), findsNothing);
+        // Leaving must not reopen the chapter where it was entered and save
+        // that over the page being read.
+        expect(await saved(), read);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+        await env.close();
+      },
+      variant: const TargetPlatformVariant({
+        TargetPlatform.android,
+        TargetPlatform.windows,
+      }),
+    );
+  }
 }

@@ -96,6 +96,13 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byType(BookReaderScreen), findsOneWidget);
+    // The reader is back as it was left: toolbars shown, so back first
+    // closes them and then leaves.
+    expect(find.byTooltip(h.l.moreActions), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(BookReaderScreen), findsOneWidget);
+    expect(find.byTooltip(h.l.moreActions), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byType(BookReaderScreen), findsNothing);

@@ -1091,12 +1091,29 @@ class _BookReaderScreenState extends State<BookReaderScreen>
               ),
       ),
     );
-    final frozen = _leavingInsets;
-    if (frozen == null) return screen;
+    // Always wrapped, so freezing the insets never remounts the pages: a
+    // remounted page restarts from where the chapter was opened and saves
+    // that over the reading position.
+    return _FrozenInsets(insets: _leavingInsets, child: screen);
+  }
+}
+
+/// The page insets, frozen to [insets] while the reader closes or is
+/// covered by details.
+class _FrozenInsets extends StatelessWidget {
+  const _FrozenInsets({required this.insets, required this.child});
+  final EdgeInsets? insets;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
+    final frozen = insets;
     return MediaQuery(
-      data: media.copyWith(padding: frozen, viewPadding: frozen),
-      child: screen,
+      data: frozen == null
+          ? media
+          : media.copyWith(padding: frozen, viewPadding: frozen),
+      child: child,
     );
   }
 }
