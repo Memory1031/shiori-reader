@@ -175,34 +175,51 @@ ReaderContentsLayer articleContentsLayer(
 }
 
 /// The source's volume catalog, read from the reader's own catalog session.
+///
+/// Loading policy stays with the host: [onRetry] and [onRefresh] decide the
+/// read mode (an offline reader must stay cache-only), and a null
+/// [onRefresh] hides the refresh control. A failed refresh keeps the loaded
+/// catalog usable and shows its reason above it.
+///
+/// [changes] must notify whenever [catalog] does. It is owned by the host
+/// and outlives it safely: a sheet can still be listening while the reader
+/// that owns [catalog] is torn down, and a disposed controller may not be
+/// unsubscribed from.
 ReaderContentsLayer volumeContentsLayer(
   BuildContext context, {
   required CatalogController catalog,
+  required Listenable changes,
   required ChapterKey current,
   required ValueChanged<ChapterKey> onSelect,
-  bool refreshable = true,
+  required VoidCallback onRetry,
+  VoidCallback? onRefresh,
 }) {
   final l = AppLocalizations.of(context);
   return ReaderContentsLayer(
     label: l.volumesTitle,
-    action: refreshable
-        ? ListenableBuilder(
-            listenable: catalog,
+    action: onRefresh == null
+        ? null
+        : ListenableBuilder(
+            listenable: changes,
             builder: (context, _) => IconButton(
-              onPressed: catalog.canLoad ? catalog.refreshCatalog : null,
+              onPressed: catalog.canLoad ? onRefresh : null,
               tooltip: l.detailRefresh,
               icon: const Icon(Icons.refresh),
             ),
-          )
-        : null,
+          ),
     build: (context, done) => ListenableBuilder(
-      listenable: catalog,
+      listenable: changes,
       builder: (context, _) {
         final loaded = catalog.loaded;
+        final failure = catalog.failure;
         if (loaded == null) {
           if (catalog.loading) return const LoadingView();
-          if (catalog.failure case final failure?) {
-            return FailureView(failure: failure, onRetry: catalog.load);
+          if (failure != null) {
+            return FailureView(
+              failure: failure,
+              onRetry: onRetry,
+              retryAvailable: catalog.canLoad,
+            );
           }
           return EmptyView(message: l.catalogEmpty);
         }
@@ -210,6 +227,18 @@ ReaderContentsLayer volumeContentsLayer(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (catalog.loading) const LinearProgressIndicator(),
+            if (failure != null && !catalog.loading)
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * .3,
+                ),
+                child: FailureView(
+                  key: const ValueKey('catalog-refresh-failure'),
+                  failure: failure,
+                  onRetry: onRetry,
+                  retryAvailable: catalog.canLoad,
+                ),
+              ),
             if (loaded.isStale)
               Padding(
                 padding: const EdgeInsets.symmetric(

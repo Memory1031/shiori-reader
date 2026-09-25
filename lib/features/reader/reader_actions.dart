@@ -30,7 +30,8 @@ class ReaderActions {
   /// Forward past the last page of the book's final chapter.
   final VoidCallback? bookEnd;
 
-  /// Completion page: back to the last page, leave to the shelf, reread.
+  /// Completion page: return to the text (also used before an in-chapter
+  /// jump from the completion page), leave to the shelf, reread.
   final VoidCallback? completionPrevious, exitToShelf, restart;
 
   /// Explicit toolbar exit. Unlike system back it never just closes the

@@ -147,9 +147,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
         context,
         widget.content,
         onSelect: (target) {
-          if (!mounted) return;
-          _position = target;
-          _paged.restore(target);
+          if (mounted) _navigateTo(target);
         },
       ),
     if (_actions.bookContents case final book?) book(context),
@@ -708,7 +706,16 @@ class _ReaderContentViewState extends State<ReaderContentView>
       blockFraction: (scaled - index).clamp(0.0, 1.0),
       chapterFraction: fraction,
     );
+    _navigateTo(target);
+  }
+
+  /// The one entry for user-chosen positions inside this chapter (headings,
+  /// the progress scrubber). It marks the jump as navigation so the session
+  /// drops any book-end state and samples during the transition persist,
+  /// and leaves the completion page first when it is showing.
+  void _navigateTo(ReaderPosition target) {
     widget.session?.beginPositionNavigation();
+    if (widget.completion != null) _actions.completionPrevious?.call();
     _position = target;
     _paged.restore(target);
   }

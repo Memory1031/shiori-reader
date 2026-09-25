@@ -70,6 +70,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   PageTurnStyle _turnStyle = PageTurnStyle.curl;
   late final ImageRepository? _displayImages;
   late final CatalogController _catalog;
+
+  /// Relays catalog changes to sheets, which may outlive [_catalog].
+  final _catalogChanges = ValueNotifier(0);
+  void _catalogChanged() => _catalogChanges.value++;
   bool get _local =>
       widget.chapter.novelKey.sourceId == LocalBookIdentity.sourceId;
   CacheManagement? get _cache => _local ? null : widget.cache;
@@ -274,7 +278,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 : ReadMode.cacheFirst,
           )
           ..onStart()
-          ..addListener(_changed);
+          ..addListener(_changed)
+          ..addListener(_catalogChanged);
     unawaited(_loadBookTitle());
     unawaited(_loadOrder());
     unawaited(_loadNavigation());
@@ -383,6 +388,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (_pending case final pending?) _close(pending);
     _close(_reader);
     _catalog.removeListener(_changed);
+    _catalog.removeListener(_catalogChanged);
+    _catalogChanges.dispose();
     _catalog.onDelete();
     _catalog.dispose();
     _navigationTree.dispose();
@@ -749,12 +756,26 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     return volumeContentsLayer(
       context,
       catalog: _catalog,
+      changes: _catalogChanges,
       current: _reader.chapter,
-      refreshable: !widget.offline,
+      onRetry: _retryCatalog,
+      onRefresh: widget.offline ? null : _catalog.refreshCatalog,
       onSelect: (key) {
         if (mounted) _switch(key);
       },
     );
+  }
+
+  /// Retries keep this reader's read mode: offline never leaves the cache;
+  /// online reloads a missing catalog cache-first and refreshes a loaded one.
+  void _retryCatalog() {
+    if (widget.offline) {
+      unawaited(_catalog.load(mode: ReadMode.cacheOnly));
+    } else if (_catalog.loaded == null) {
+      unawaited(_catalog.load());
+    } else {
+      unawaited(_catalog.refreshCatalog());
+    }
   }
 
   Future<void> _contents() =>
