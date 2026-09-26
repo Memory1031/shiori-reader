@@ -88,6 +88,22 @@ class _Controller extends PlatformInAppWebViewController {
         const PlatformInAppWebViewControllerCreationParams(id: 'test'),
       );
   final documents = <String>[];
+  final scripts = <String>[];
+  Object? scrollPosition = <num>[0, 0];
+  Completer<dynamic>? readScroll, restoreScroll;
+
+  @override
+  Future<dynamic> evaluateJavascript({
+    required String source,
+    ContentWorld? contentWorld,
+  }) async {
+    scripts.add(source);
+    if (source.startsWith('[')) {
+      return readScroll == null ? scrollPosition : readScroll!.future;
+    }
+    return restoreScroll?.future;
+  }
+
   @override
   Future<void> loadData({
     required String data,
@@ -974,6 +990,72 @@ void main() {
       view.finish();
       await tester.pumpAndSettle();
       expect(ready, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Windows retains scroll through pending theme reads, loads and restoration',
+    (tester) async {
+      await tester.pumpWidget(page(os: 'windows'));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pumpAndSettle();
+      final view = platform.views.single;
+      final controller = view.controller;
+      view.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 1);
+      controller.readScroll = Completer<dynamic>();
+      await tester.pumpWidget(page(os: 'windows', brightness: Brightness.dark));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        page(os: 'windows', paper: const Color(0xffffeedd)),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.documents, isEmpty);
+      controller.readScroll!.complete(<num>[12.5, 650.25]);
+      await tester.pumpAndSettle();
+      expect(controller.documents.single, contains('#ffeedd'));
+      await tester.pumpWidget(page(os: 'windows', brightness: Brightness.dark));
+      await tester.pumpAndSettle();
+      view.finish();
+      await tester.pumpAndSettle();
+      expect(controller.documents, hasLength(2));
+      expect(controller.scripts, ['[window.scrollX, window.scrollY]']);
+      controller.restoreScroll = Completer<dynamic>();
+      view.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 1);
+      expect(controller.scripts.last, 'window.scrollTo(12.5, 650.25)');
+      // Another theme arrives while restoration is still in flight.
+      await tester.pumpWidget(page(os: 'windows'));
+      await tester.pumpAndSettle();
+      expect(controller.documents, hasLength(2));
+      controller.restoreScroll!.complete();
+      await tester.pumpAndSettle();
+      expect(controller.documents, hasLength(3));
+      expect(ready, 1);
+      view.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 2);
+      expect(controller.scripts, [
+        '[window.scrollX, window.scrollY]',
+        'window.scrollTo(12.5, 650.25)',
+        'window.scrollTo(12.5, 650.25)',
+      ]);
+      expect(platform.views.single, same(view));
+      expect(view.params.initialSettings!.javaScriptEnabled, isFalse);
+      // The next settled theme change must capture the user's new position.
+      controller.readScroll = Completer<dynamic>();
+      await tester.pumpWidget(page(os: 'windows', brightness: Brightness.dark));
+      await tester.pumpAndSettle();
+      expect(controller.scripts.last, '[window.scrollX, window.scrollY]');
+      await tester.pumpWidget(const SizedBox());
+      controller.readScroll!.complete(<num>[0, 900]);
+      await tester.pumpAndSettle();
+      expect(controller.documents, hasLength(3));
       expect(tester.takeException(), isNull);
     },
   );

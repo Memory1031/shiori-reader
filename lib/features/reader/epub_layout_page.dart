@@ -312,6 +312,8 @@ class _StaticWebViewState extends State<_StaticWebView> {
   InAppWebViewController? _controller;
   InAppWebView? _view;
   String? _loadingDocument;
+  Offset? _themeScrollOffset;
+  bool _restoringScroll = false;
 
   @override
   void didUpdateWidget(_StaticWebView oldWidget) {
@@ -329,10 +331,31 @@ class _StaticWebViewState extends State<_StaticWebView> {
     if (!mounted || _failed || _controller == null) return;
     _loaded = false;
     _ready = false;
-    _loadingDocument = widget.document;
     _deadline?.cancel();
     _deadline = Timer(const Duration(seconds: 15), _fail);
     try {
+      // Keep the original position across superseded theme navigations. The
+      // Windows plugin does not implement getScrollY/scrollTo; ExecuteScript
+      // runs these fixed host commands while authored JavaScript stays disabled.
+      if (_themeScrollOffset == null) {
+        try {
+          final position = await _controller!.evaluateJavascript(
+            source: '[window.scrollX, window.scrollY]',
+          );
+          if (position is List &&
+              position.length == 2 &&
+              position.every((value) => value is num && value.isFinite)) {
+            _themeScrollOffset = Offset(
+              (position[0] as num).toDouble(),
+              (position[1] as num).toDouble(),
+            );
+          }
+        } catch (_) {
+          // An unavailable position must not prevent the theme from loading.
+        }
+      }
+      if (!mounted || _failed) return;
+      _loadingDocument = widget.document;
       await _controller!.loadData(
         data: _loadingDocument!,
         baseUrl: WebUri('about:blank'),
@@ -425,13 +448,32 @@ class _StaticWebViewState extends State<_StaticWebView> {
         : NavigationActionPolicy.CANCEL;
   }
 
-  void _loadFinished() {
-    if (!mounted || _failed) return;
-    _loaded = true;
+  Future<void> _loadFinished() async {
+    if (!mounted || _failed || _restoringScroll) return;
     if (_environment != null && !identical(_loadingDocument, widget.document)) {
       unawaited(_reload());
       return;
     }
+    final offset = _themeScrollOffset;
+    if (offset != null) {
+      _restoringScroll = true;
+      try {
+        await _controller!.evaluateJavascript(
+          source: 'window.scrollTo(${offset.dx}, ${offset.dy})',
+        );
+      } catch (_) {
+        // Keep the readable document if the native view rejects restoration.
+      } finally {
+        _restoringScroll = false;
+      }
+      if (!mounted || _failed) return;
+      if (!identical(_loadingDocument, widget.document)) {
+        unawaited(_reload());
+        return;
+      }
+    }
+    _themeScrollOffset = null;
+    _loaded = true;
     _notifyReady();
   }
 
