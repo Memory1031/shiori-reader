@@ -230,28 +230,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                       ShioriSpace.item,
                     ),
                     sliver: SliverToBoxAdapter(
-                      // A session started in the narrow inline presentation
-                      // keeps its Stop control when the window becomes wide.
-                      child:
-                          desktop &&
-                              !(_operation?.busy == true &&
-                                  _reparseFlow?.modal == false)
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(l.localBooksSubtitle),
-                                if (_deleteFailure != null)
-                                  Text(
-                                    failureMessage(l, _deleteFailure!),
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.error,
-                                    ),
-                                  ),
-                              ],
-                            )
-                          : _libraryCard(context, books),
+                      child: _libraryCard(context, books),
                     ),
                   ),
                   if (hasEpub && hasTxt)
@@ -268,9 +247,9 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                     ),
                   SliverPadding(
                     padding: EdgeInsets.fromLTRB(
-                      desktop ? inset - BookListItem.inset : inset,
+                      inset,
                       0,
-                      desktop ? inset - BookListItem.inset : inset,
+                      inset,
                       ShioriSpace.section,
                     ),
                     sliver: SliverList.builder(
@@ -313,17 +292,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                       ModalRoute.of(context)?.impliesAppBarDismissal == true
                       ? const BackButton()
                       : null,
-                  secondary: snapshot.data is Success
-                      ? Text(l.localBooksCount(books.length))
-                      : null,
                   actions: [
-                    if (_canReparse && books.isNotEmpty)
-                      OutlinedButton.icon(
-                        key: const ValueKey('local-books-reparse-all'),
-                        onPressed: _busy ? null : () => _reparseAll(books),
-                        icon: const Icon(Icons.autorenew, size: 20),
-                        label: Text(l.localReparseAll),
-                      ),
                     OutlinedButton.icon(
                       key: const ValueKey('local-books-import'),
                       onPressed: _busy ? null : widget.onImport,
@@ -349,8 +318,8 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     );
   }
 
-  /// Library summary and the page's main job: reparsing. While a reparse
-  /// runs the card becomes its progress; results and errors land here too.
+  /// Shared library summary. Inline sessions keep their progress here across
+  /// resizing; modal sessions show progress in their owning dialog.
   Widget _libraryCard(BuildContext context, List<LocalBookInfo> books) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
@@ -361,6 +330,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     );
     final failed = _failure != null;
     return DecoratedBox(
+      key: const ValueKey('local-library-summary'),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(ShioriShape.card),
@@ -392,7 +362,8 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
             Text(l.localBooksSubtitle, style: muted),
             if (_canReparse || _busy) ...[
               const SizedBox(height: ShioriSpace.item),
-              if (_operation?.busy == true || _deleting)
+              if ((_operation?.busy == true && _reparseFlow?.modal == false) ||
+                  _deleting)
                 _reparseProgress(context)
               else
                 Align(
@@ -503,7 +474,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       ).formatShortDate(book.importedAt.toLocal()),
     );
     final active = _activeKey == book.key;
-    Widget tile(Widget? more) => BookListTile(
+    final tile = BookListTile(
       cover: _LocalCover(
         book: book,
         covers: _covers,
@@ -516,32 +487,32 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       title: book.title,
       subtitle: [book.format.name.toUpperCase(), ?progress].join(' · '),
       metadata: imported,
-      trailing:
-          more ??
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (active)
-                Padding(
-                  padding: const EdgeInsets.all(ShioriSpace.medium),
-                  child: SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      semanticsLabel: l.localReparse,
+      trailing: desktop
+          ? null
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (active)
+                  Padding(
+                    padding: const EdgeInsets.all(ShioriSpace.medium),
+                    child: SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        semanticsLabel: l.localReparse,
+                      ),
                     ),
+                  )
+                else if (_canReparse)
+                  IconButton(
+                    key: ValueKey(('local-book-reparse', book.key)),
+                    tooltip: l.localReparse,
+                    onPressed: _busy ? null : () => _reparse(book),
+                    icon: const Icon(Icons.autorenew, size: 20),
                   ),
-                )
-              else if (_canReparse)
-                IconButton(
-                  key: ValueKey(('local-book-reparse', book.key)),
-                  tooltip: l.localReparse,
-                  onPressed: _busy ? null : () => _reparse(book),
-                  icon: const Icon(Icons.autorenew, size: 20),
-                ),
-              _bookMenu(context, book),
-            ],
-          ),
+                _bookMenu(context, book),
+              ],
+            ),
     );
     if (desktop) {
       return DesktopLocalBookRow(
@@ -554,7 +525,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     return BookListItem(
       key: ValueKey(book.key),
       onTap: _busy ? null : () => widget.onRead(book.key),
-      child: tile(null),
+      child: tile,
     );
   }
 

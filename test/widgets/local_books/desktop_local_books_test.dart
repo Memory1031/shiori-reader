@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shiori/app/theme/shiori_theme.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/features/local_books/desktop_local_books.dart';
 import 'package:shiori/features/local_books/local_reparse_flow.dart';
@@ -59,8 +60,61 @@ void main() {
       expect(frame.width, expected);
       expect(frame.center.dx, viewport.center.dx);
       final tile = tester.getRect(find.byType(BookListTile).first);
-      expect(tile.left, frame.left);
-      expect(tile.right, frame.right);
+      final row = tester.getRect(find.byType(DesktopLocalBookRow).first);
+      final more = tester.getRect(
+        find.descendant(
+          of: find.byType(DesktopLocalBookRow).first,
+          matching: find.byType(IconButton),
+        ),
+      );
+      expect(row.left, frame.left);
+      expect(row.right, frame.right);
+      expect(tile.left, frame.left + ShioriSpace.item);
+      expect(
+        tile.width,
+        (expected - 3 * ShioriSpace.item - more.width).clamp(
+          0,
+          ShioriLayout.page,
+        ),
+      );
+      expect(more.right, frame.right - ShioriSpace.item);
+      expect(more.top, tile.top);
+      final card = find.byKey(const ValueKey('local-library-summary'));
+      expect(tester.getRect(card).left, frame.left);
+      expect(tester.getRect(card).right, frame.right);
+      expect(
+        find.descendant(of: card, matching: find.text(h.l.localBooksCount(45))),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.text('EPUB 23 · TXT 22')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.text(h.l.localBooksSubtitle)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: card,
+          matching: find.byKey(const ValueKey('local-books-reparse-all')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(DesktopPageToolbar),
+          matching: find.text(h.l.localReparseAll),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(DesktopPageToolbar),
+          matching: find.text(h.l.localBooksCount(45)),
+        ),
+        findsNothing,
+      );
       final scrollbars = find.descendant(
         of: h.page,
         matching: find.byType(Scrollbar),
@@ -224,7 +278,7 @@ void main() {
       final h = LocalHarness(tester, store: LocalStore()..gate = Completer());
       await h.pump();
       final start = tester
-          .widget<OutlinedButton>(
+          .widget<FilledButton>(
             find.byKey(const ValueKey('local-books-reparse-all')),
           )
           .onPressed!;
@@ -348,7 +402,7 @@ void main() {
       final h = LocalHarness(tester, store: LocalStore()..gate = Completer());
       await h.pump();
       final start = tester
-          .widget<OutlinedButton>(
+          .widget<FilledButton>(
             find.byKey(const ValueKey('local-books-reparse-all')),
           )
           .onPressed!;
