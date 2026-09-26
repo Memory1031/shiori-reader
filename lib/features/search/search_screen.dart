@@ -126,7 +126,9 @@ class _SearchBodyState extends State<_SearchBody> {
     }
 
     final content = CustomScrollView(
-      controller: _scroll,
+      // Touch layouts inherit the route primary (including iOS status-bar
+      // scroll-to-top). Pointer layouts keep one owner at every window width.
+      controller: ShioriCapabilities.of(context).pointerFirst ? _scroll : null,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
         SliverPadding(

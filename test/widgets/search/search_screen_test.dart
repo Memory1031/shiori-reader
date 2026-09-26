@@ -45,7 +45,101 @@ final input = find.byKey(const ValueKey('search-input'));
 final submit = find.byKey(const ValueKey('search-submit'));
 final more = find.byKey(const ValueKey('search-more'));
 
+// Select the result list, never the TextField's horizontal Scrollable.
+final resultScrollable = find.descendant(
+  of: find.byType(CustomScrollView),
+  matching: find.byWidgetPredicate(
+    (widget) =>
+        widget is Scrollable && widget.axisDirection == AxisDirection.down,
+  ),
+);
+
+Future<Repository> mountMobileResults(WidgetTester tester) async {
+  tester.view
+    ..physicalSize = const Size(390, 844)
+    ..devicePixelRatio = 1
+    ..padding = const FakeViewPadding(top: 44)
+    ..viewPadding = const FakeViewPadding(top: 44);
+  addTearDown(tester.view.reset);
+  final repository = Repository();
+  await mount(tester, repository);
+  await tester.enterText(input, 'query');
+  await tester.testTextInput.receiveAction(TextInputAction.search);
+  repository.calls.single.pending.complete(
+    Success(page(List.generate(40, (index) => 'Book $index'))),
+  );
+  await tester.pumpAndSettle();
+  expect(find.byType(AppBar), findsOneWidget);
+  expect(tester.widget<TextField>(input).focusNode!.hasFocus, isFalse);
+  return repository;
+}
+
 void main() {
+  for (final platform in [TargetPlatform.iOS, TargetPlatform.android]) {
+    testWidgets(
+      'mobile result position belongs to the route primary controller',
+      (tester) async {
+        final repository = await mountMobileResults(tester);
+        final position = tester
+            .state<ScrollableState>(resultScrollable)
+            .position;
+        final scaffold = tester.state<ScaffoldState>(
+          find.descendant(
+            of: find.byType(SearchScreen),
+            matching: find.byType(Scaffold),
+          ),
+        );
+        // Scaffold's context sees the route primary, above the ScrollView's
+        // PrimaryScrollController.none boundary when inheritance succeeds.
+        final primary = PrimaryScrollController.of(scaffold.context);
+        expect(primary.positions, orderedEquals([position]));
+        await tester.drag(resultScrollable, const Offset(0, -1200));
+        await tester.pumpAndSettle();
+        expect(position.pixels, greaterThan(500));
+        expect(primary.position, same(position));
+        expect(repository.calls.length, 1);
+      },
+      variant: TargetPlatformVariant.only(platform),
+    );
+  }
+
+  testWidgets(
+    'iOS status bar tap returns search results to top without resubmitting',
+    (tester) async {
+      final repository = await mountMobileResults(tester);
+      final text = tester.widget<TextField>(input).controller!;
+      final value = text.value;
+      final position = tester.state<ScrollableState>(resultScrollable).position;
+      await tester.drag(resultScrollable, const Offset(0, -1200));
+      await tester.pumpAndSettle();
+      expect(position.pixels, greaterThan(500));
+      expect(find.text('Book 0'), findsNothing);
+
+      // Flutter 3.38.10 Scaffold installs an opaque tap target in the top
+      // padding on iOS. Exercise its actual hit-test path, not animateTo().
+      await tester.tapAt(const Offset(100, 20));
+      await tester.pumpAndSettle();
+      expect(position.pixels, closeTo(0, .01));
+      expect(
+        tester.state<ScrollableState>(resultScrollable).position,
+        same(position),
+      );
+      expect(tester.widget<TextField>(input).controller, same(text));
+      expect(text.value, value);
+      expect(find.text('Book 0'), findsOneWidget);
+      expect(
+        tester
+            .widget<SliverList>(find.byType(SliverList))
+            .delegate
+            .estimatedChildCount,
+        40,
+      );
+      expect(find.text('Results for “query”'), findsOneWidget);
+      expect(repository.calls.length, 1);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
   testWidgets('source label names the source unless environment overrides it', (
     tester,
   ) async {
