@@ -332,7 +332,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     return DecoratedBox(
       key: const ValueKey('local-library-summary'),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
+        color: summarySurfaceColor(colors),
         borderRadius: BorderRadius.circular(ShioriShape.card),
       ),
       child: Padding(

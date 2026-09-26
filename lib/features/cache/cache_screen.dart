@@ -5,6 +5,9 @@ import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
+import '../../shared/capabilities.dart';
+import '../../shared/widgets/desktop_content_frame.dart';
+import 'desktop_cache.dart';
 import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
 
@@ -30,6 +33,8 @@ class CacheScreen extends StatefulWidget {
 }
 
 class _CacheScreenState extends State<CacheScreen> {
+  final _scroll = ScrollController();
+  final _viewport = GlobalKey(debugLabel: 'cache-viewport');
   CacheOverview? _overview;
   AppFailure? _failure;
   bool _busy = false;
@@ -48,6 +53,7 @@ class _CacheScreenState extends State<CacheScreen> {
   @override
   void dispose() {
     unawaited(_subscription?.cancel());
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -113,28 +119,114 @@ class _CacheScreenState extends State<CacheScreen> {
       groups.putIfAbsent(chapter.key.novelKey, () => []).add(chapter);
     }
     final entries = groups.entries.toList();
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l.cacheTitle),
-        actions: [
-          IconButton(
-            onPressed: _busy ? null : _load,
-            tooltip: l.retryAction,
-            icon: _busy && _overview != null
-                ? SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      semanticsLabel: l.loading,
-                    ),
-                  )
-                : const Icon(Icons.refresh),
+    final desktop = DesktopLayoutScope.useDesktopPage(context);
+    final pointer = ShioriCapabilities.of(context).pointerFirst;
+    final refresh = IconButton(
+      key: const ValueKey('cache-refresh'),
+      onPressed: _busy ? null : _load,
+      tooltip: l.retryAction,
+      icon: _busy && _overview != null
+          ? SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                semanticsLabel: l.loading,
+              ),
+            )
+          : const Icon(Icons.refresh),
+    );
+    final initial = _overview == null;
+    Widget content(EdgeInsets padding) => ListView(
+      key: _viewport,
+      controller: pointer ? _scroll : null,
+      padding: padding,
+      children: [
+        if (initial && _busy)
+          const LoadingView()
+        else if (initial && _failure != null)
+          FailureView(failure: _failure!, onRetry: _load)
+        else ...[
+          if (_failure != null)
+            FailureView(
+              failure: _failure!,
+              onRetry: _load,
+              retryAvailable: !_busy,
+            ),
+          _storage(context, groups.length),
+          const SizedBox(height: ShioriSpace.section),
+          Text(l.cacheBooks, style: theme.textTheme.titleSmall),
+          const SizedBox(height: ShioriSpace.tight),
+          Text(
+            l.cacheOfflineHint,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
+          const SizedBox(height: ShioriSpace.medium),
+          if (groups.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: ShioriSpace.section,
+              ),
+              child: EmptyView(message: l.cacheEmpty),
+            ),
+          for (final group in entries)
+            // Book identity also survives an inserted refresh failure banner.
+            Padding(
+              key: ValueKey(('cache-book', group.key)),
+              padding: const EdgeInsets.only(bottom: ShioriSpace.medium),
+              child: _book(context, group.key, group.value),
+            ),
         ],
-      ),
-      body: _busy && _overview == null
+      ],
+    );
+    return Scaffold(
+      appBar: desktop
+          ? null
+          : AppBar(title: Text(l.cacheTitle), actions: [refresh]),
+      body: desktop
+          ? SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  DesktopContentFrame(
+                    maxWidth: ShioriLayout.list,
+                    child: DesktopPageToolbar(
+                      title: l.cacheTitle,
+                      leading:
+                          ModalRoute.of(context)?.impliesAppBarDismissal == true
+                          ? const BackButton()
+                          : null,
+                      actions: [refresh],
+                    ),
+                  ),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, bounds) {
+                        final geometry = desktopContentGeometry(
+                          availableWidth: bounds.maxWidth,
+                          gutter: ShioriLayout.gutter(
+                            DesktopLayoutScope.widthOf(context),
+                          ),
+                          maxWidth: ShioriLayout.list,
+                        );
+                        return content(
+                          EdgeInsets.fromLTRB(
+                            geometry.inset,
+                            ShioriSpace.small,
+                            geometry.inset,
+                            ShioriSpace.section,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : initial && _busy
           ? const LoadingView()
-          : _failure != null && _overview == null
+          : initial && _failure != null
           ? FailureView(failure: _failure!, onRetry: _load)
           : SafeArea(
               top: false,
@@ -144,49 +236,13 @@ class _CacheScreenState extends State<CacheScreen> {
                   constraints: const BoxConstraints(
                     maxWidth: ShioriLayout.list,
                   ),
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(
+                  child: content(
+                    const EdgeInsets.fromLTRB(
                       ShioriSpace.page,
                       ShioriSpace.small,
                       ShioriSpace.page,
                       ShioriSpace.section,
                     ),
-                    children: [
-                      if (_failure != null)
-                        FailureView(
-                          failure: _failure!,
-                          onRetry: _load,
-                          retryAvailable: !_busy,
-                        ),
-                      _storage(context, groups.length),
-                      const SizedBox(height: ShioriSpace.section),
-                      Text(l.cacheBooks, style: theme.textTheme.titleSmall),
-                      const SizedBox(height: ShioriSpace.tight),
-                      Text(
-                        l.cacheOfflineHint,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: ShioriSpace.medium),
-                      if (groups.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: ShioriSpace.section,
-                          ),
-                          child: EmptyView(message: l.cacheEmpty),
-                        ),
-                      for (final group in entries)
-                        // Keyed so an inserted error banner cannot hand a
-                        // book's expansion state to its neighbour.
-                        Padding(
-                          key: ValueKey(('cache-book', group.key)),
-                          padding: const EdgeInsets.only(
-                            bottom: ShioriSpace.medium,
-                          ),
-                          child: _book(context, group.key, group.value),
-                        ),
-                    ],
                   ),
                 ),
               ),
@@ -222,8 +278,9 @@ class _CacheScreenState extends State<CacheScreen> {
       ],
     );
     return DecoratedBox(
+      key: const ValueKey('cache-storage'),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
+        color: summarySurfaceColor(colors),
         borderRadius: BorderRadius.circular(ShioriShape.card),
       ),
       child: Padding(
@@ -397,7 +454,7 @@ class _CacheScreenState extends State<CacheScreen> {
             )
           : BookCover(book: summary, images: widget.images),
     );
-    final menu = PopupMenuButton<String>(
+    final mobileMenu = PopupMenuButton<String>(
       key: ValueKey(('cache-book-actions', key)),
       enabled: !_busy,
       tooltip: l.moreActions,
@@ -418,90 +475,99 @@ class _CacheScreenState extends State<CacheScreen> {
       ShioriSpace.tight,
       ShioriSpace.small,
     );
-    if (chapters.isEmpty) {
-      return DecoratedBox(
-        key: ValueKey(key),
-        decoration: card,
-        child: ListTile(
-          contentPadding: tilePadding,
-          leading: cover,
-          title: title,
-          subtitle: subtitle,
-          trailing: menu,
-        ),
-      );
-    }
-    return DecoratedBox(
-      decoration: card,
-      child: Material(
-        type: MaterialType.transparency,
-        borderRadius: BorderRadius.circular(ShioriShape.card),
-        clipBehavior: Clip.antiAlias,
-        child: ExpansionTile(
-          key: PageStorageKey(key),
-          tilePadding: tilePadding,
-          childrenPadding: const EdgeInsets.fromLTRB(
-            ShioriSpace.small,
-            0,
-            ShioriSpace.small,
-            ShioriSpace.small,
-          ),
-          shape: const Border(),
-          collapsedShape: const Border(),
-          textColor: colors.onSurface,
-          iconColor: colors.onSurfaceVariant,
-          leading: cover,
-          title: title,
-          subtitle: subtitle,
-          trailing: menu,
-          children: [
-            const Divider(height: 1),
-            // Chapter rows highlight as rounded blocks; keep them off the
-            // divider so a hovered row does not butt against it.
-            const SizedBox(height: ShioriSpace.small),
-            for (final chapter in chapters)
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: ShioriSpace.small,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ShioriShape.control),
-                ),
-                leading: Icon(
-                  chapter.savedImages < chapter.imageCount
-                      ? Icons.image_not_supported_outlined
-                      : Icons.offline_pin_outlined,
-                  size: 20,
-                  color: chapter.savedImages < chapter.imageCount
-                      ? colors.onSurfaceVariant
-                      : colors.primary,
-                ),
-                minLeadingWidth: 20,
-                title: Text(
-                  chapter.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium,
-                ),
-                subtitle: chapter.imageCount == 0
-                    ? null
-                    : Text(
-                        l.cacheChapterStatus(
-                          chapter.savedImages,
-                          chapter.imageCount,
-                        ),
-                        style: muted,
-                      ),
-                trailing: widget.onRead == null
-                    ? null
-                    : const Icon(Icons.chevron_right, size: 18),
-                onTap: _busy || widget.onRead == null
-                    ? null
-                    : () => widget.onRead!(chapter.key),
+    return CacheBookMenu(
+      desktop: DesktopLayoutScope.useDesktopPage(context),
+      enabled: !_busy,
+      onClear: () => _clear(key),
+      mobileMenu: mobileMenu,
+      builder: (menu) {
+        if (chapters.isEmpty) {
+          return DecoratedBox(
+            key: ValueKey(key),
+            decoration: card,
+            child: ListTile(
+              contentPadding: tilePadding,
+              leading: cover,
+              title: title,
+              subtitle: subtitle,
+              trailing: menu,
+            ),
+          );
+        }
+        return DecoratedBox(
+          decoration: card,
+          child: Material(
+            type: MaterialType.transparency,
+            borderRadius: BorderRadius.circular(ShioriShape.card),
+            clipBehavior: Clip.antiAlias,
+            child: ExpansionTile(
+              key: PageStorageKey(key),
+              tilePadding: tilePadding,
+              childrenPadding: const EdgeInsets.fromLTRB(
+                ShioriSpace.small,
+                0,
+                ShioriSpace.small,
+                ShioriSpace.small,
               ),
-          ],
-        ),
-      ),
+              shape: const Border(),
+              collapsedShape: const Border(),
+              textColor: colors.onSurface,
+              iconColor: colors.onSurfaceVariant,
+              leading: cover,
+              title: title,
+              subtitle: subtitle,
+              trailing: menu,
+              children: [
+                const Divider(height: 1),
+                // Chapter rows highlight as rounded blocks; keep them off the
+                // divider so a hovered row does not butt against it.
+                const SizedBox(height: ShioriSpace.small),
+                for (final chapter in chapters)
+                  ListTile(
+                    key: ValueKey(('cache-chapter', chapter.key)),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: ShioriSpace.small,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(ShioriShape.control),
+                    ),
+                    leading: Icon(
+                      chapter.savedImages < chapter.imageCount
+                          ? Icons.image_not_supported_outlined
+                          : Icons.offline_pin_outlined,
+                      size: 20,
+                      color: chapter.savedImages < chapter.imageCount
+                          ? colors.onSurfaceVariant
+                          : colors.primary,
+                    ),
+                    minLeadingWidth: 20,
+                    title: Text(
+                      chapter.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    subtitle: chapter.imageCount == 0
+                        ? null
+                        : Text(
+                            l.cacheChapterStatus(
+                              chapter.savedImages,
+                              chapter.imageCount,
+                            ),
+                            style: muted,
+                          ),
+                    trailing: widget.onRead == null
+                        ? null
+                        : const Icon(Icons.chevron_right, size: 18),
+                    onTap: _busy || widget.onRead == null
+                        ? null
+                        : () => widget.onRead!(chapter.key),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

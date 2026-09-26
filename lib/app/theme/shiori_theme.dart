@@ -224,6 +224,14 @@ Color accentFillColor(AppAccent accent, Brightness brightness) {
 AppAccent appAccentOf(BuildContext context) =>
     Theme.of(context).extension<ShioriAccent>()?.value ?? AppAccent.teal;
 
+/// A subtle accent wash for library/storage summaries, below action emphasis.
+Color summarySurfaceColor(ColorScheme colors) => Color.alphaBlend(
+  colors.primary.withValues(
+    alpha: colors.brightness == Brightness.light ? .06 : .08,
+  ),
+  colors.surface,
+);
+
 ThemeData shioriTheme(
   Brightness brightness, {
   AppAccent accent = AppAccent.teal,
