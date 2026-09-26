@@ -166,7 +166,7 @@ void main() {
             ? 72.0
             : 232.0;
         final gutter = width < 1200 ? 24.0 : 32.0;
-        final frame = (width - nav - 2 * gutter).clamp(0, 1040);
+        final frame = width - nav - 2 * gutter;
         final toolbar = tester.getRect(find.byType(DesktopDetailBar));
         expect(toolbar.width, frame);
         expect(toolbar.left, closeTo(nav + (width - nav - frame) / 2, .01));
@@ -195,11 +195,17 @@ void main() {
         expect(bar.left, closeTo(width - bar.right, .01));
         expect(h.rect(h.key('detail-back')).right, closeTo(bar.right, .01));
         expect(h.rect(h.key('detail-more')).left, closeTo(bar.left, .01));
-        expect(h.rect(find.byType(DetailCover)).right, closeTo(bar.right, .01));
+        expect(
+          h.rect(find.byType(DetailCover)).right,
+          closeTo(width - h.layout.inset, .01),
+        );
         final info = h.rect(find.byType(DetailBookInfo));
-        expect(info.left, closeTo(bar.left, .01));
+        expect(info.left, closeTo(h.layout.inset, .01));
         if (h.layout.columns) {
-          expect(info.right, closeTo(bar.right - h.layout.side - 40, .01));
+          expect(
+            info.right,
+            closeTo(width - h.layout.inset - h.layout.side - 40, .01),
+          );
         }
         expect(tester.takeException(), isNull);
         await h.close();
@@ -216,10 +222,9 @@ void main() {
       final h = DetailHarness(tester, repo);
       await h.pump(width: 1920, settle: false);
       void aligned(Finder finder) {
-        final bar = h.rect(find.byType(DesktopDetailBar));
         final rect = h.rect(finder);
-        expect(rect.left, closeTo(bar.left, .01));
-        expect(rect.right, closeTo(bar.right, .01));
+        expect(rect.left, closeTo(h.start, .01));
+        expect(rect.right, closeTo(h.start + h.layout.frame, .01));
       }
 
       aligned(find.byType(LoadingView));

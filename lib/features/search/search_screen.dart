@@ -29,8 +29,7 @@ class SearchUnavailable extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            DesktopContentFrame(
-              maxWidth: ShioriLayout.shelfList,
+            DesktopPageChrome(
               child: DesktopPageToolbar(
                 title: strings.searchTitle,
                 leading: ModalRoute.of(context)?.impliesAppBarDismissal == true
@@ -301,8 +300,7 @@ class _SearchBodyState extends State<_SearchBody> {
           child: Column(
             children: [
               if (desktop)
-                DesktopContentFrame(
-                  maxWidth: ShioriLayout.shelfList,
+                DesktopPageChrome(
                   child: DesktopPageToolbar(
                     title: strings.searchTitle,
                     leading:

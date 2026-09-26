@@ -189,8 +189,7 @@ class _CacheScreenState extends State<CacheScreen> {
               top: false,
               child: Column(
                 children: [
-                  DesktopContentFrame(
-                    maxWidth: ShioriLayout.list,
+                  DesktopPageChrome(
                     child: DesktopPageToolbar(
                       title: l.cacheTitle,
                       leading:

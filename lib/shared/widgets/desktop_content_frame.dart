@@ -69,6 +69,21 @@ class DesktopContentFrame extends StatelessWidget {
   );
 }
 
+/// Workspace-wide page chrome with the shell's gutter, independent of the
+/// feature's centered content width. The parent supplies the available width.
+class DesktopPageChrome extends StatelessWidget {
+  const DesktopPageChrome({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.symmetric(
+      horizontal: ShioriLayout.gutter(DesktopLayoutScope.widthOf(context)),
+    ),
+    child: SizedBox(width: double.infinity, child: child),
+  );
+}
+
 /// A naturally sized page toolbar; actions wrap instead of squeezing the title.
 class DesktopPageToolbar extends StatelessWidget {
   const DesktopPageToolbar({

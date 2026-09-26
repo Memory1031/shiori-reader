@@ -753,7 +753,7 @@ void main() {
     await h.close();
   }, variant: _desktop);
 
-  testWidgets('shelf and detail center their respective content frames', (
+  testWidgets('shelf and detail share Workspace chrome gutters', (
     tester,
   ) async {
     final h = ShellHarness(tester);
@@ -763,19 +763,10 @@ void main() {
     for (final width in [900.0, 1280.0, 1600.0, 1920.0]) {
       await h.resize(width);
       final navigation = width >= 1200 ? 232.0 : 72.0;
-      final available = width - navigation;
-      final detailWidth = (available - 2 * ShioriLayout.gutter(width)).clamp(
-        0,
-        ShioriLayout.detail,
-      );
-      final edge = navigation + (available - detailWidth) / 2;
-      final frame = (available - 2 * ShioriLayout.gutter(width)).clamp(
-        0,
-        ShioriLayout.shelfList,
-      );
+      final edge = navigation + ShioriLayout.gutter(width);
       expect(
         tester.getRect(find.text(h.l.homeShelf)).left,
-        closeTo(navigation + (available - frame) / 2, .01),
+        closeTo(edge, .01),
         reason: '$width',
       );
       await tester.tap(find.byTooltip(h.l.moreActions));

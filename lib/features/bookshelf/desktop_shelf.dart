@@ -76,7 +76,7 @@ class ShelfLayoutToggle extends StatelessWidget {
   }
 }
 
-/// The fixed shelf title bar, laid out on the shelf frame.
+/// The fixed shelf title bar, laid out in Workspace-wide page chrome.
 class DesktopShelfToolbar extends StatelessWidget {
   const DesktopShelfToolbar({
     super.key,

@@ -333,7 +333,7 @@ class _DesktopDetailState extends State<DesktopDetail> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              framed(DesktopDetailBar(menu: widget.menu)),
+              DesktopPageChrome(child: DesktopDetailBar(menu: widget.menu)),
               Expanded(child: page),
             ],
           );
@@ -343,9 +343,8 @@ class _DesktopDetailState extends State<DesktopDetail> {
   );
 }
 
-/// The fixed detail title bar on the page frame: back in its own slot at
-/// the frame's start, the page title after it, more actions ending on the
-/// frame's end.
+/// The fixed detail title bar in page chrome: back in its own slot at the
+/// chrome's start, the page title after it, more actions at the chrome's end.
 class DesktopDetailBar extends StatelessWidget {
   const DesktopDetailBar({super.key, required this.menu});
   final Widget menu;

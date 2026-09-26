@@ -74,7 +74,7 @@ abstract final class ShioriSpace {
 /// gives way to the rail, and [sidebarBreakpoint] where the rail gains labels.
 ///
 /// Desktop content stays start-aligned inside each page frame. The shelf's
-/// toolbar, continue row and books share a centered frame of at most
+/// continue row and books share a centered frame of at most
 /// [shelfGrid] or [shelfList]; details use at most [detail], in two columns
 /// ([detailSide] or [detailSideWide] beside the rest, [detailGap] apart)
 /// from [detailColumns].

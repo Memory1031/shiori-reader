@@ -107,14 +107,19 @@ class _AppearancePanelState extends State<_AppearancePanel> {
             children: [
               for (final accent in AppAccent.values)
                 ChoiceChip(
-                  avatar: Icon(
-                    Icons.circle,
-                    size: 16,
-                    color: accentFillColor(
-                      accent,
-                      Theme.of(context).brightness,
-                    ),
-                  ),
+                  // An explicit check avoids RawChip's selection scrim over
+                  // the color swatch during avatar/checkmark painting.
+                  showCheckmark: false,
+                  avatar: controller.settings.accent == accent
+                      ? const Icon(Icons.check, size: 18)
+                      : Icon(
+                          Icons.circle,
+                          size: 16,
+                          color: accentFillColor(
+                            accent,
+                            Theme.of(context).brightness,
+                          ),
+                        ),
                   label: Text(switch (accent) {
                     AppAccent.teal => l.appAccentTeal,
                     AppAccent.blueGrey => l.appAccentBlueGrey,

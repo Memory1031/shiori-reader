@@ -135,61 +135,66 @@ void main() {
   );
 
   for (final width in [900.0, 1280.0, 1600.0, 1920.0]) {
-    testWidgets('root layout $width aligns title, input and lazy rows', (
-      tester,
-    ) async {
-      addTearDown(tester.view.reset);
-      final h = SearchHarness(tester);
-      await h.mount(width: width);
-      expect(find.byType(DesktopPageToolbar), findsOneWidget);
-      expect(find.byType(BackButton), findsNothing);
-      expect(h.repository.calls, isEmpty);
-      await h.search(page(List.generate(40, (i) => 'Book $i')));
-      final title = find.descendant(
-        of: find.byType(DesktopPageToolbar),
-        matching: find.byType(Text),
-      );
-      final gutter = ShioriLayout.gutter(width);
-      final frameWidth = (width - 2 * gutter).clamp(0, ShioriLayout.shelfList);
-      final inset = (width - frameWidth) / 2;
-      expect(tester.getRect(title).left, closeTo(inset, .01));
-      expect(tester.getRect(input).left, closeTo(inset, .01));
-      expect(
-        tester.getRect(find.byType(BookCover).first).left,
-        closeTo(inset, .01),
-      );
-      expect(
-        tester.getSize(input).width,
-        closeTo((width - 2 * gutter).clamp(0, ShioriLayout.page), .01),
-      );
-      expect(
-        tester.getSize(find.byType(CustomScrollView)).width,
-        closeTo(width, .01),
-      );
-      expect(
-        find.byType(Scrollable),
-        findsNWidgets(2),
-      ); // Input and content only.
-      expect(find.text('Book 39'), findsNothing);
-      final toolbar = tester.getRect(find.byType(DesktopPageToolbar));
-      final viewport = tester.getRect(find.byType(CustomScrollView));
-      expect(viewport.left, closeTo(width - viewport.right, .01));
-      expect(viewport.left, 0);
-      expect(viewport.right, width);
-      expect(toolbar.left, inset);
-      expect(toolbar.width, frameWidth);
-      final scrollbar = find.descendant(
-        of: find.byType(CustomScrollView),
-        matching: find.byType(Scrollbar),
-      );
-      expect(scrollbar, findsOneWidget);
-      expect(tester.getRect(scrollbar), viewport);
-      h.field.focusNode!.unfocus();
-      await tester.drag(find.byType(CustomScrollView), const Offset(0, -900));
-      await tester.pumpAndSettle();
-      expect(tester.getRect(find.byType(DesktopPageToolbar)), toolbar);
-      expect(h.repository.calls.length, 1);
-    }, variant: windows);
+    testWidgets(
+      'root layout $width separates chrome from aligned input and lazy rows',
+      (tester) async {
+        addTearDown(tester.view.reset);
+        final h = SearchHarness(tester);
+        await h.mount(width: width);
+        expect(find.byType(DesktopPageToolbar), findsOneWidget);
+        expect(find.byType(BackButton), findsNothing);
+        expect(h.repository.calls, isEmpty);
+        await h.search(page(List.generate(40, (i) => 'Book $i')));
+        final title = find.descendant(
+          of: find.byType(DesktopPageToolbar),
+          matching: find.byType(Text),
+        );
+        final gutter = ShioriLayout.gutter(width);
+        final frameWidth = (width - 2 * gutter).clamp(
+          0,
+          ShioriLayout.shelfList,
+        );
+        final inset = (width - frameWidth) / 2;
+        expect(tester.getRect(title).left, closeTo(gutter, .01));
+        expect(tester.getRect(input).left, closeTo(inset, .01));
+        expect(
+          tester.getRect(find.byType(BookCover).first).left,
+          closeTo(inset, .01),
+        );
+        expect(
+          tester.getSize(input).width,
+          closeTo((width - 2 * gutter).clamp(0, ShioriLayout.page), .01),
+        );
+        expect(
+          tester.getSize(find.byType(CustomScrollView)).width,
+          closeTo(width, .01),
+        );
+        expect(
+          find.byType(Scrollable),
+          findsNWidgets(2),
+        ); // Input and content only.
+        expect(find.text('Book 39'), findsNothing);
+        final toolbar = tester.getRect(find.byType(DesktopPageToolbar));
+        final viewport = tester.getRect(find.byType(CustomScrollView));
+        expect(viewport.left, closeTo(width - viewport.right, .01));
+        expect(viewport.left, 0);
+        expect(viewport.right, width);
+        expect(toolbar.left, gutter);
+        expect(toolbar.width, width - 2 * gutter);
+        final scrollbar = find.descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollbar),
+        );
+        expect(scrollbar, findsOneWidget);
+        expect(tester.getRect(scrollbar), viewport);
+        h.field.focusNode!.unfocus();
+        await tester.drag(find.byType(CustomScrollView), const Offset(0, -900));
+        await tester.pumpAndSettle();
+        expect(tester.getRect(find.byType(DesktopPageToolbar)), toolbar);
+        expect(h.repository.calls.length, 1);
+      },
+      variant: windows,
+    );
   }
 
   for (final locale in ['en', 'zh']) {

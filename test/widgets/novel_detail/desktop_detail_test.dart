@@ -384,11 +384,14 @@ void expectFrame(DetailHarness h, {required bool columns}) {
   final layout = h.layout;
   final start = h.start;
   final toolbar = h.rect(find.byType(DesktopDetailBar));
-  expect(toolbar.width, moreOrLessEquals(layout.frame));
+  expect(
+    toolbar.width,
+    moreOrLessEquals(h.width - h.offset - 2 * layout.gutter),
+  );
   expect(toolbar.left - h.offset, moreOrLessEquals(h.width - toolbar.right));
   expect(layout.columns, columns, reason: '${h.width} x${h.scale}');
   final back = h.rect(h.key('detail-back'));
-  expect(back.left, moreOrLessEquals(start));
+  expect(back.left, moreOrLessEquals(h.offset + layout.gutter));
   expect(back.width, DesktopDetailBar.slot);
   final title = h.rect(
     find.descendant(
@@ -396,10 +399,10 @@ void expectFrame(DetailHarness h, {required bool columns}) {
       matching: find.text(h.l.novelDetailsTitle),
     ),
   );
-  expect(title.left, moreOrLessEquals(start + 48));
+  expect(title.left, moreOrLessEquals(h.offset + layout.gutter + 48));
   expect(
     h.rect(h.key('detail-more')).right,
-    moreOrLessEquals(start + layout.frame),
+    moreOrLessEquals(h.width - layout.gutter),
   );
   // Main scroll fills the Workspace, including both blank margins. The side
   // viewport owns hits only within its independent box.

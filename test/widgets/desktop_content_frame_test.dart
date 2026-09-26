@@ -24,6 +24,58 @@ void main() {
 
   for (final direction in TextDirection.values) {
     testWidgets(
+      'chrome uses available width and scoped gutters in $direction',
+      (tester) async {
+        tester.view.physicalSize = const Size(1920, 500);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        for (final sample in [(900.0, 828.0, 24.0), (1920.0, 1688.0, 32.0)]) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Directionality(
+                textDirection: direction,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: sample.$2,
+                    child: DesktopLayoutScope(
+                      width: sample.$1,
+                      child: DesktopPageChrome(
+                        child: DesktopPageToolbar(
+                          title: 'Title',
+                          leading: const SizedBox(width: 40, height: 40),
+                          actions: [
+                            TextButton(
+                              onPressed: () {},
+                              child: const Text('Action'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          final bar = tester.getRect(find.byType(DesktopPageToolbar));
+          expect(bar.left, sample.$3);
+          expect(bar.right, sample.$2 - sample.$3);
+          expect(bar.width, sample.$2 - 2 * sample.$3);
+          final title = tester.getRect(find.text('Title'));
+          final action = tester.getRect(find.byType(TextButton));
+          if (direction == TextDirection.ltr) {
+            expect(title.left, bar.left + 40 + 8);
+            expect(action.right, bar.right);
+          } else {
+            expect(title.right, bar.right - 40 - 8);
+            expect(action.left, bar.left);
+          }
+          expect(find.byType(Scrollable), findsNothing);
+        }
+      },
+    );
+    testWidgets(
       'frame is physically centered with start aligned content $direction',
       (tester) async {
         tester.view.physicalSize = const Size(1920, 500);

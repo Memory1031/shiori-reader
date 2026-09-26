@@ -168,18 +168,22 @@ void main() {
           expect(find.text(l.shelfBookCount(60)), findsOneWidget);
           expect(find.text(l.homeContinueAction), findsOneWidget);
 
-          // Title, continue row and first cover share the frame's left edge.
+          // Chrome uses fixed gutters; continue row and covers share a centered frame.
           final title = find.descendant(
             of: find.byType(DesktopShelfToolbar),
             matching: find.text(l.homeShelf),
           );
-          _near(tester.getRect(title).left, s.left, 'title');
+          _near(
+            tester.getRect(title).left,
+            s.workspace.left + s.gutter,
+            'title',
+          );
           final row = tester.getRect(find.byType(ContinueReadingRow));
           _near(row.left, s.left, 'continue row');
           _near(row.width, s.frame(true), 'continue row width');
           _near(
             tester.getRect(find.byType(DesktopShelfToolbar)).width,
-            s.frame(true),
+            s.workspace.width - 2 * s.gutter,
             'toolbar width',
           );
           final toolbar = tester.getRect(find.byType(DesktopShelfToolbar));
@@ -271,7 +275,7 @@ void main() {
           expect(find.byType(SliverGrid), findsNothing);
           _near(
             tester.getRect(find.byType(DesktopShelfToolbar)).width,
-            s.frame(false),
+            s.workspace.width - 2 * s.gutter,
             'list toolbar width',
           );
           final listRow = tester.getRect(find.byType(ContinueReadingRow));
@@ -390,7 +394,7 @@ void main() {
             ? 72.0
             : 232.0;
         final gutter = width < 1200 ? 24.0 : 32.0;
-        final frame = (width - nav - 2 * gutter).clamp(0, 1600);
+        final frame = width - nav - 2 * gutter;
         final toolbar = tester.getRect(find.byType(DesktopShelfToolbar));
         expect(toolbar.left, closeTo(nav + (width - nav - frame) / 2, .01));
         expect(toolbar.width, frame);

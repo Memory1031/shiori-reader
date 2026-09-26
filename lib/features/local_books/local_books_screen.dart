@@ -284,8 +284,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
         child: Column(
           children: [
             if (desktop)
-              DesktopContentFrame(
-                maxWidth: ShioriLayout.shelfList,
+              DesktopPageChrome(
                 child: DesktopPageToolbar(
                   title: l.localBooksTitle,
                   leading:

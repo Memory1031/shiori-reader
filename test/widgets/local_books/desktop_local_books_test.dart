@@ -52,7 +52,12 @@ void main() {
       final h = LocalHarness(tester);
       await h.pump(width: width, shell: true);
       final viewport = tester.getRect(h.view);
-      final frame = tester.getRect(find.byType(DesktopPageToolbar));
+      final chrome = tester.getRect(find.byType(DesktopPageToolbar));
+      expect(chrome.left, viewport.left + ShioriLayout.gutter(width));
+      expect(chrome.right, viewport.right - ShioriLayout.gutter(width));
+      final frame = tester.getRect(
+        find.byKey(const ValueKey('local-library-summary')),
+      );
       final expected = (viewport.width - 2 * (width < 1200 ? 24 : 32)).clamp(
         0,
         1200,

@@ -42,13 +42,9 @@ void main() {
       final toolbar = tester.getRect(find.byType(DesktopPageToolbar));
       final card = tester.getRect(find.byKey(const ValueKey('cache-storage')));
       expect(viewport.width, width - (width < 1200 ? 72 : 232));
-      expect(
-        toolbar.width,
-        (viewport.width - 2 * ShioriLayout.gutter(width)).clamp(0, 760),
-      );
+      expect(toolbar.width, (viewport.width - 2 * ShioriLayout.gutter(width)));
       expect(toolbar.center.dx, viewport.center.dx);
-      expect(card.left, toolbar.left);
-      expect(card.width, toolbar.width);
+      expect(card.width, toolbar.width.clamp(0, 760));
       expect(card.center.dx, viewport.center.dx);
       expect(tester.getRect(h.book(0)).left, card.left);
       expect(tester.getRect(h.book(0)).right, card.right);
@@ -70,7 +66,7 @@ void main() {
     final h = CacheHarness(tester);
     await h.pump(width: 1920, bounded: 900);
     expect(tester.getRect(h.view).width, 828);
-    expect(tester.getRect(find.byType(DesktopPageToolbar)).width, 760);
+    expect(tester.getRect(find.byType(DesktopPageToolbar)).width, 780);
     await h.close();
     final root = CacheHarness(tester);
     await root.pump(width: 900, shell: false);
@@ -216,8 +212,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(EmptyView), findsOneWidget);
       expect(
-        tester.getRect(find.byKey(const ValueKey('cache-storage'))).left,
-        toolbar.left,
+        tester.getRect(find.byKey(const ValueKey('cache-storage'))).center.dx,
+        toolbar.center.dx,
       );
       cache.data = DesktopCache().data;
       cache.prefetch.emit(PrefetchPhase.running);

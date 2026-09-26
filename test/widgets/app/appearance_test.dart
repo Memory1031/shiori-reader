@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app_controller.dart';
@@ -27,6 +28,50 @@ class AppStore implements AppSettingsStore {
 }
 
 void main() {
+  testWidgets(
+    'accent selection keeps an explicit check through hover and theme changes',
+    (tester) async {
+      final store = AppStore();
+      await tester.pumpWidget(
+        createApp(settings: store, locale: const Locale('en')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('App appearance'));
+      await tester.pumpAndSettle();
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      for (final mode in ['Light', 'Dark']) {
+        await tester.tap(find.widgetWithText(ChoiceChip, mode));
+        await tester.pumpAndSettle();
+        for (final label in ['Soft teal', 'Blue grey']) {
+          final chip = find.widgetWithText(ChoiceChip, label);
+          await tester.tap(chip);
+          await tester.pumpAndSettle();
+          for (final location in [tester.getCenter(chip), Offset.zero]) {
+            await mouse.moveTo(location);
+            await tester.pumpAndSettle();
+            final selected = tester.widget<ChoiceChip>(chip);
+            expect(selected.selected, isTrue);
+            // RawChip must not paint an animated selection scrim over a swatch.
+            expect(selected.showCheckmark, isFalse);
+            expect(
+              find.descendant(of: chip, matching: find.byIcon(Icons.check)),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(of: chip, matching: find.byIcon(Icons.circle)),
+              findsNothing,
+            );
+          }
+        }
+      }
+      await mouse.removePointer();
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
   testWidgets(
     'appearance control persists independently and survives rebuilding the app',
     (tester) async {

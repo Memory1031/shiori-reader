@@ -586,8 +586,7 @@ class _BookshelfViewState extends State<BookshelfView> {
 
         return Column(
           children: [
-            DesktopContentFrame(
-              maxWidth: maxFrame,
+            DesktopPageChrome(
               child: DesktopShelfToolbar(
                 layout: _layout,
                 count: controller.shelfReady && books.isNotEmpty

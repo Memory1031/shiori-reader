@@ -262,7 +262,7 @@ void main() {
     Rect cover() => tester.getRect(
       find.descendant(of: over, matching: find.byType(DetailCover)),
     );
-    expect(back().left, closeTo((1280 - ShioriLayout.detail) / 2, .01));
+    expect(back().left, closeTo(ShioriLayout.gutter(1280), .01));
     expect(cover().width, closeTo(ShioriLayout.detailSideWide, .01));
 
     for (final width in [900.0, 1199.0, 1200.0, 1199.0, 1920.0, 1280.0]) {
@@ -272,7 +272,8 @@ void main() {
         0,
         ShioriLayout.detail,
       );
-      expect(back().left, closeTo((width - frame) / 2, .01));
+      expect(back().left, closeTo(ShioriLayout.gutter(width), .01));
+      expect(cover().left, closeTo((width - frame) / 2, .01));
       expect(tester.takeException(), isNull, reason: '$width');
     }
     expect(cover().width, closeTo(ShioriLayout.detailSideWide, .01));
