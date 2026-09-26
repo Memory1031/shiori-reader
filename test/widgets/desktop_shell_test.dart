@@ -106,6 +106,9 @@ class ShellHarness {
     bool progress = false,
     bool updatesSection = true,
     NovelSummary? local,
+    NovelRepository? repository,
+    bool noSources = false,
+    double? shellWidth,
   }) async {
     tester.view
       ..physicalSize = size
@@ -143,22 +146,32 @@ class ShellHarness {
     await tester.pumpWidget(
       ShioriApp(
         locale: const Locale('en'),
-        homeBuilder: (context, app) => ReadingHome(
-          repository: local == null
-              ? env.novels
-              : LocalDetails(env.novels, local),
-          library: env.library,
-          localManagement: local == null ? null : ShelfLocalBooks(env.library),
-          sources: [env.source.descriptor],
-          settings: Store()..value = ReaderSettings(controlsHintSeen: true),
-          navigation: navigation,
-          onAppearance: () => showAppAppearance(context, app),
-          onImport: () => imports++,
-          onUpdates: () => updateCalls++,
-          updates: updatesSection
-              ? (_) => const Scaffold(body: Text('updates page'))
-              : null,
-        ),
+        homeBuilder: (context, app) {
+          final home = ReadingHome(
+            repository:
+                repository ??
+                (local == null ? env.novels : LocalDetails(env.novels, local)),
+            library: env.library,
+            localManagement: local == null
+                ? null
+                : ShelfLocalBooks(env.library),
+            sources: noSources ? [] : [env.source.descriptor],
+            settings: Store()..value = ReaderSettings(controlsHintSeen: true),
+            navigation: navigation,
+            onAppearance: () => showAppAppearance(context, app),
+            onImport: () => imports++,
+            onUpdates: () => updateCalls++,
+            updates: updatesSection
+                ? (_) => const Scaffold(body: Text('updates page'))
+                : null,
+          );
+          return shellWidth == null
+              ? home
+              : Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(width: shellWidth, child: home),
+                );
+        },
       ),
     );
     await tester.pumpAndSettle();

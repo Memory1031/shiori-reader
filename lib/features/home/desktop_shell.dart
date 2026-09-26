@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../app/theme/shiori_theme.dart';
 import '../../shared/widgets/shiori_logo.dart';
+import '../../shared/widgets/desktop_content_frame.dart';
 import 'home_navigation.dart';
 
 /// How the desktop shell presents its navigation at a given width.
@@ -148,7 +149,10 @@ class _DesktopShellState extends State<DesktopShell> {
                   Expanded(
                     child: KeyedSubtree(
                       key: _workspaceHost,
-                      child: widget.workspace,
+                      child: DesktopLayoutScope(
+                        width: constraints.maxWidth,
+                        child: widget.workspace,
+                      ),
                     ),
                   ),
                 ],

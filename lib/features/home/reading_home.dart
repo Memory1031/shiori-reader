@@ -12,10 +12,8 @@ import 'continue_reading_card.dart';
 import 'continue_reading_row.dart';
 import 'desktop_shell.dart';
 import 'home_navigation.dart';
-import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/shiori_logo.dart';
 import '../../shared/widgets/shiori_menu.dart';
-import '../../shared/widgets/state_views.dart';
 import '../bookshelf/library_controller.dart';
 import '../bookshelf/bookshelf_view.dart';
 import '../bookshelf/library_observer.dart';
@@ -454,13 +452,8 @@ class _ReadingHomeState extends State<ReadingHome> {
   Page<Object?> _sectionPage(BuildContext context, HomeSection section) {
     final WidgetBuilder? root = switch (section) {
       HomeSection.shelf => null,
-      HomeSection.search when widget.sources.isEmpty => (context) {
-        final strings = AppLocalizations.of(context);
-        return AppScaffold(
-          title: strings.searchTitle,
-          body: EmptyView(message: strings.noSources),
-        );
-      },
+      HomeSection.search when widget.sources.isEmpty =>
+        (_) => const SearchUnavailable(),
       HomeSection.search => (context) => _routes.search!(
         context,
         widget.sources.first.sourceId,
