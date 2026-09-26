@@ -5,6 +5,7 @@
   <p>面向 Android、iOS 与 Windows 的开源轻小说阅读器 · Flutter · TXT / EPUB · 在线书源 · 中文 / English</p>
   <p>
     <a href="#功能亮点">功能</a> ·
+    <a href="#截图">截图</a> ·
     <a href="#安装">安装</a> ·
     <a href="#快速开始">使用</a> ·
     <a href="docs/development.md">开发文档</a>
@@ -30,6 +31,37 @@ Shiori 以书架和阅读为中心，支持在线搜索与阅读，也可以导�
 - **个性排版** — 调整字号、行距、段距、页边距与纸张主题，支持插图和部分 EPUB 特殊页面。
 - **外观与语言** — 浅色、深色、跟随系统，多种强调色，中文与英文界面。
 - **缓存管理** — 图片缓存、有限预取，以及按书或统一清理缓存。
+
+## 截图
+
+图中书籍由本地导入，应用不附带这些作品。
+
+### Windows 桌面端
+
+**桌面书架**
+
+![Windows 桌面书架](assets/screenshots/desktop-shelf.png)
+
+**宽屏双页阅读：插图与正文配对**
+
+![Windows 双页阅读器](assets/screenshots/desktop-reader.png)
+
+**小说详情与目录**
+
+![Windows 小说详情](assets/screenshots/desktop-detail.png)
+
+### Android 移动端
+
+<table>
+  <tr>
+    <th>书架与续读</th>
+    <th>单页阅读</th>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/mobile-shelf.png" alt="Android 书架与续读" width="300" /></td>
+    <td><img src="assets/screenshots/mobile-reader.png" alt="Android 单页阅读器" width="300" /></td>
+  </tr>
+</table>
 
 ## 安装
 
