@@ -68,6 +68,18 @@ master 仅是发布中间分支。tag 同时触发 Android 签名 APK、Windows 
 
 GitHub Release 优先读取 `docs/release/notes/<tag>.md`，缺失时自动生成。新 Release 先建立草稿，资产完整上传后公开；重跑核对已有附件的大小与摘要，只补齐缺失附件，内容变化需分配新的构建号和标签。手动编辑过的正文需在 GitHub 单独更新。
 
+## 应用内更新
+
+移动端通过「更多 → 关于与更新」、桌面端通过工作区导航进入更新页。自动检查可关闭，手动检查随时可用；下载由用户显式启动，取消和失败允许重试。检查、取消与资源所有权见[应用更新合同](../contracts.md#应用更新)。首个带更新能力的版本仍需通过现有安装方式获取。
+
+Stable 只选择正式 Release，Beta 同时允许测试版与正式版。候选须匹配应用 ID、平台和架构，基础版本不低于当前版本且内部构建号严格递增；从 Beta 切回 Stable 不降级，等待符合条件的正式包。发布构建嵌入 tag、channel、version、build、commit 和更新公钥，核对实际安装身份后才启用正式更新源；单独执行 Release 编译不保证具备这些条件，开发构建不访问正式更新源。
+
+客户端从本仓库 GitHub Releases 有界读取发布列表，不能仅使用 latest 接口发现 Beta。先验签清单原始字节，再接受平台资产；SHA-256 校验下载完整性，不替代清单签名或 Android 安装签名。扫描未穷尽且没有可靠候选时报告检查不完整，不误报最新版。下载绑定官方仓库的指定 Release / asset，限制重定向与资源大小。更新说明使用受限原生 Markdown 预览，不执行 HTML、加载图片或响应文内链接；完整说明通过独立发布页入口打开。
+
+Android 使用系统 `PackageInstaller` 确认覆盖安装；Android 8+ 需授权当前来源安装应用，授权后重新发起安装。iOS 仍通过签名构建、TestFlight 或 App Store 分发，不从 GitHub 下载 IPA 自行覆盖。Windows 流程见下方 [ZIP 使用](#windows-zip-使用)。
+
+设备验证入口包括 [Android 安装 runner](../../android/app/src/androidTest/kotlin/dev/shiori/reader/UpdateInstallSmokeRunner.kt) 和[进程恢复脚本](../../tool/test_android_update_recovery.py)。runner 需显式指定 mode；恢复脚本的 `--require-retained` 要求 session 真正跨进程保留。同进程清理不代替进程死亡验证，本地安装测试不代替真实发布源升级或用户数据保留验证。
+
 ## 更新清单签名配置
 
 Android / Windows 的 tag 构建将发布身份与更新公钥写入 `assets/release/build-info.json`。发布 job 核对两端包内身份、生成 `update-manifest.json` 并签署原始字节，另附二进制 `update-manifest.sig`。签名协议为 RSA-3072 / PKCS#1 v1.5 / SHA-256，公钥指数为 65537，Windows 使用系统 CNG 验签。
