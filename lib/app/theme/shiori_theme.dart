@@ -73,8 +73,8 @@ abstract final class ShioriSpace {
 /// shell's navigation widths. [page] is also where the shell's bottom bar
 /// gives way to the rail, and [sidebarBreakpoint] where the rail gains labels.
 ///
-/// Desktop pages are left-aligned instead, on one frame inset by [gutter]:
-/// the shelf's toolbar, continue row and books share a frame of at most
+/// Desktop content stays start-aligned inside each page frame. The shelf's
+/// toolbar, continue row and books share a centered frame of at most
 /// [shelfGrid] or [shelfList]; details use at most [detail], in two columns
 /// ([detailSide] or [detailSideWide] beside the rest, [detailGap] apart)
 /// from [detailColumns].

@@ -147,14 +147,21 @@ void main() {
               ? ShioriLayout.rail
               : ShioriLayout.sidebar;
           final gutter = ShioriLayout.gutter(width);
-          expect(tester.getRect(input).left, closeTo(navWidth + gutter, .01));
+          final available = width - navWidth;
+          final content = (available - 2 * gutter).clamp(
+            0,
+            ShioriLayout.shelfList,
+          );
+          expect(
+            tester.getRect(input).left,
+            closeTo(navWidth + (available - content) / 2, .01),
+          );
           expect(
             tester.getSize(find.byType(CustomScrollView)).width,
-            closeTo(
-              (width - navWidth - 2 * gutter).clamp(0, ShioriLayout.shelfList),
-              .01,
-            ),
+            closeTo(available, .01),
           );
+          expect(tester.getRect(find.byType(CustomScrollView)).left, navWidth);
+          expect(tester.getRect(find.byType(CustomScrollView)).right, width);
         } else {
           expect(h.layout, ShellLayout.bar);
         }

@@ -614,6 +614,26 @@ void main() {
     expect(find.byType(SliverGrid), findsNothing);
     expect(position().pixels, 400);
 
+    // Each layout has its own PageStorage entry, also after a section round trip.
+    await tester.tap(find.byTooltip(h.l.shelfGrid));
+    await tester.pumpAndSettle();
+    expect(position().pixels, 0);
+    position().jumpTo(650);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip(h.l.shelfList));
+    await tester.pumpAndSettle();
+    expect(position().pixels, 400);
+    await tester.tap(find.byTooltip(h.l.shelfGrid));
+    await tester.pumpAndSettle();
+    expect(position().pixels, 650);
+    await h.select(h.l.searchTitle);
+    await h.select(h.l.shelfTitle);
+    expect(h.shelfGrid, isTrue);
+    expect(position().pixels, 650);
+    await tester.tap(find.byTooltip(h.l.shelfList));
+    await tester.pumpAndSettle();
+    expect(position().pixels, 400);
+
     // Reselecting the shelf returns to its root but keeps the choice.
     await h.select(h.l.shelfTitle);
     expect(h.shelfGrid, isFalse);
@@ -733,37 +753,45 @@ void main() {
     await h.close();
   }, variant: _desktop);
 
-  testWidgets('workspace details start on the shelf toolbar edge', (
-    tester,
-  ) async {
-    final h = ShellHarness(tester);
-    await h.pump(onShelf: true);
-    await tester.tap(find.byTooltip(h.l.shelfList));
-    await tester.pumpAndSettle();
-    for (final width in [900.0, 1280.0, 1600.0]) {
-      await h.resize(width);
-      final edge = (width >= 1200 ? 232 : 72) + ShioriLayout.gutter(width);
-      expect(
-        tester.getRect(find.text(h.l.homeShelf)).left,
-        closeTo(edge, .01),
-        reason: '$width',
-      );
-      await tester.tap(find.byTooltip(h.l.moreActions));
+  testWidgets(
+    'centered shelf and existing detail preserve their frame geometry',
+    (tester) async {
+      final h = ShellHarness(tester);
+      await h.pump(onShelf: true);
+      await tester.tap(find.byTooltip(h.l.shelfList));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(h.l.novelDetailsTitle));
-      await tester.pumpAndSettle();
-      expect(
-        tester.getRect(find.byKey(const ValueKey('detail-back'))).left,
-        closeTo(edge, .01),
-        reason: '$width',
-      );
-      await tester.tap(find.byKey(const ValueKey('detail-back')));
-      await tester.pumpAndSettle();
-      expect(find.byType(DetailScreen, skipOffstage: false), findsNothing);
-    }
-    expect(tester.takeException(), isNull);
-    await h.close();
-  }, variant: _desktop);
+      for (final width in [900.0, 1280.0, 1600.0]) {
+        await h.resize(width);
+        final edge = (width >= 1200 ? 232 : 72) + ShioriLayout.gutter(width);
+        final navigation = width >= 1200 ? 232.0 : 72.0;
+        final available = width - navigation;
+        final frame = (available - 2 * ShioriLayout.gutter(width)).clamp(
+          0,
+          ShioriLayout.shelfList,
+        );
+        expect(
+          tester.getRect(find.text(h.l.homeShelf)).left,
+          closeTo(navigation + (available - frame) / 2, .01),
+          reason: '$width',
+        );
+        await tester.tap(find.byTooltip(h.l.moreActions));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(h.l.novelDetailsTitle));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(find.byKey(const ValueKey('detail-back'))).left,
+          closeTo(edge, .01),
+          reason: '$width',
+        );
+        await tester.tap(find.byKey(const ValueKey('detail-back')));
+        await tester.pumpAndSettle();
+        expect(find.byType(DetailScreen, skipOffstage: false), findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+      await h.close();
+    },
+    variant: _desktop,
+  );
 
   testWidgets('Escape with the details menu open closes the menu, then the '
       'page', (tester) async {

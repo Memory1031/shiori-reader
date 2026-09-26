@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_list_tile.dart';
+import '../../shared/widgets/desktop_content_frame.dart';
 
 /// Columns and card width for the desktop shelf grid in [width].
 ///
@@ -156,65 +157,35 @@ class DesktopShelfToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final strings = AppLocalizations.of(context);
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 64),
-      child: Padding(
-        padding: const EdgeInsets.only(
-          top: ShioriSpace.item,
-          bottom: ShioriSpace.medium,
-        ),
-        child: LayoutBuilder(
-          builder: (context, bounds) => Row(
-            children: [
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Flexible(
-                      child: Semantics(
-                        header: true,
-                        child: Text(
-                          strings.homeShelf,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleLarge,
-                        ),
-                      ),
-                    ),
-                    if (count case final count?) ...[
-                      const SizedBox(width: ShioriSpace.medium),
-                      Text(
-                        strings.shelfBookCount(count),
-                        maxLines: 1,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ],
+    return LayoutBuilder(
+      builder: (context, bounds) => DesktopPageToolbar(
+        title: strings.homeShelf,
+        secondary: count == null
+            ? null
+            : Text(
+                strings.shelfBookCount(count!),
+                maxLines: 1,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(width: ShioriSpace.item),
-              ShelfLayoutToggle(layout: layout),
-              if (onImport case final onImport?) ...[
-                const SizedBox(width: ShioriSpace.medium),
-                if (bounds.maxWidth < labelledImport)
-                  IconButton(
-                    onPressed: onImport,
-                    tooltip: strings.importTitle,
-                    icon: const Icon(Icons.file_upload_outlined),
-                  )
-                else
-                  OutlinedButton.icon(
-                    onPressed: onImport,
-                    icon: const Icon(Icons.file_upload_outlined, size: 20),
-                    label: Text(strings.importTitle),
-                  ),
-              ],
-            ],
-          ),
-        ),
+        actions: [
+          ShelfLayoutToggle(layout: layout),
+          if (onImport case final onImport?) ...[
+            if (bounds.maxWidth < labelledImport)
+              IconButton(
+                onPressed: onImport,
+                tooltip: strings.importTitle,
+                icon: const Icon(Icons.file_upload_outlined),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: onImport,
+                icon: const Icon(Icons.file_upload_outlined, size: 20),
+                label: Text(strings.importTitle),
+              ),
+          ],
+        ],
       ),
     );
   }

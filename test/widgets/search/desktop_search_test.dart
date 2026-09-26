@@ -1,6 +1,7 @@
 import 'dart:ui' show SemanticsAction, SemanticsActionEvent;
 
 import 'package:flutter/material.dart' hide SearchController;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/routes.dart';
@@ -93,6 +94,46 @@ class SearchHarness {
 }
 
 void main() {
+  testWidgets(
+    'Search scrollbar stays on the Workspace edge and outer margin scrolls',
+    (tester) async {
+      addTearDown(tester.view.reset);
+      final h = SearchHarness(tester);
+      await h.mount(width: 1920);
+      await h.search(page(List.generate(60, (i) => 'Book $i')));
+      h.field.focusNode!.unfocus();
+      await tester.pumpAndSettle();
+      final rect = tester.getRect(find.byType(CustomScrollView));
+      expect(rect.left, 0);
+      expect(rect.right, 1920);
+      final position = h.viewport.controller!.position;
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          kind: PointerDeviceKind.mouse,
+          position: Offset(1900, rect.center.dy),
+          scrollDelta: const Offset(0, 500),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(position.pixels, 500);
+      position.jumpTo(0);
+      await tester.pumpAndSettle();
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset(rect.right - 4, rect.top + 15));
+      await mouse.moveTo(Offset(rect.right - 4, rect.top + 16));
+      await tester.pumpAndSettle();
+      await mouse.down(Offset(rect.right - 4, rect.top + 16));
+      await mouse.moveBy(const Offset(0, 150));
+      await tester.pump();
+      await mouse.up();
+      await tester.pumpAndSettle();
+      expect(position.pixels, greaterThan(0));
+      expect(h.repository.calls.length, 1);
+      await mouse.removePointer();
+    },
+    variant: windows,
+  );
+
   for (final width in [900.0, 1280.0, 1600.0, 1920.0]) {
     testWidgets('root layout $width aligns title, input and lazy rows', (
       tester,
@@ -109,11 +150,13 @@ void main() {
         matching: find.byType(Text),
       );
       final gutter = ShioriLayout.gutter(width);
-      expect(tester.getRect(title).left, closeTo(gutter, .01));
-      expect(tester.getRect(input).left, closeTo(gutter, .01));
+      final frameWidth = (width - 2 * gutter).clamp(0, ShioriLayout.shelfList);
+      final inset = (width - frameWidth) / 2;
+      expect(tester.getRect(title).left, closeTo(inset, .01));
+      expect(tester.getRect(input).left, closeTo(inset, .01));
       expect(
         tester.getRect(find.byType(BookCover).first).left,
-        closeTo(gutter, .01),
+        closeTo(inset, .01),
       );
       expect(
         tester.getSize(input).width,
@@ -121,7 +164,7 @@ void main() {
       );
       expect(
         tester.getSize(find.byType(CustomScrollView)).width,
-        closeTo((width - 2 * gutter).clamp(0, ShioriLayout.shelfList), .01),
+        closeTo(width, .01),
       );
       expect(
         find.byType(Scrollable),
@@ -129,6 +172,18 @@ void main() {
       ); // Input and content only.
       expect(find.text('Book 39'), findsNothing);
       final toolbar = tester.getRect(find.byType(DesktopPageToolbar));
+      final viewport = tester.getRect(find.byType(CustomScrollView));
+      expect(viewport.left, closeTo(width - viewport.right, .01));
+      expect(viewport.left, 0);
+      expect(viewport.right, width);
+      expect(toolbar.left, inset);
+      expect(toolbar.width, frameWidth);
+      final scrollbar = find.descendant(
+        of: find.byType(CustomScrollView),
+        matching: find.byType(Scrollbar),
+      );
+      expect(scrollbar, findsOneWidget);
+      expect(tester.getRect(scrollbar), viewport);
       h.field.focusNode!.unfocus();
       await tester.drag(find.byType(CustomScrollView), const Offset(0, -900));
       await tester.pumpAndSettle();

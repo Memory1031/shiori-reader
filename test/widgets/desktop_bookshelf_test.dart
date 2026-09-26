@@ -12,9 +12,11 @@ import 'package:shiori/features/home/reading_home.dart';
 import 'package:shiori/features/home/continue_reading_row.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 import 'package:shiori/shared/widgets/book_cover.dart';
+import 'package:shiori/shared/widgets/book_list_tile.dart';
 import 'package:shiori/shared/widgets/state_views.dart';
 
 import 'reader/continue_test.dart' show seed;
+import 'desktop_shell_test.dart' show ShellHarness;
 
 /// A desktop home on a shelf of [books] long-titled books.
 class _Shelf {
@@ -92,7 +94,7 @@ class _Shelf {
     find.ancestor(of: shelf, matching: find.byType(Scaffold)).first,
   );
   double get gutter => desktopShelfGutter(width);
-  double get left => workspace.left + gutter;
+  double get left => workspace.left + (workspace.width - frame(grid)) / 2;
   double frame(bool grid) =>
       (workspace.width - 2 * gutter).clamp(0, grid ? 1600 : 1200);
   bool get grid => tester
@@ -180,6 +182,41 @@ void main() {
             s.frame(true),
             'toolbar width',
           );
+          final toolbar = tester.getRect(find.byType(DesktopShelfToolbar));
+          final toggle = tester.getRect(find.byType(SegmentedButton<bool>));
+          final import = tester.getRect(
+            find.descendant(
+              of: find.byType(DesktopShelfToolbar),
+              matching: find.byType(OutlinedButton),
+            ),
+          );
+          _near(toggle.center.dy, import.center.dy, 'toolbar action centers');
+          _near(
+            toolbar.left - s.workspace.left,
+            s.workspace.right - toolbar.right,
+            'centered content',
+          );
+          final scrollView = find.descendant(
+            of: s.shelf,
+            matching: find.byType(CustomScrollView),
+          );
+          final viewport = tester.getRect(scrollView);
+          _near(
+            viewport.left,
+            s.workspace.left,
+            'full Workspace viewport start',
+          );
+          _near(
+            viewport.right,
+            s.workspace.right,
+            'full Workspace viewport end',
+          );
+          final scrollbar = find.descendant(
+            of: scrollView,
+            matching: find.byType(Scrollbar),
+          );
+          expect(scrollbar, findsOneWidget);
+          expect(tester.getRect(scrollbar), viewport);
 
           final covers = s.covers;
           _near(covers.first.left, s.left, 'first cover');
@@ -227,7 +264,7 @@ void main() {
           s.position.jumpTo(0);
           await tester.pumpAndSettle();
 
-          // The list caps at its narrower frame on the same left edge.
+          // The list uses a narrower centered content frame, not a new viewport.
           await tester.tap(find.byTooltip(l.shelfList));
           await tester.pumpAndSettle();
           expect(s.grid, isFalse);
@@ -241,6 +278,23 @@ void main() {
           _near(listRow.left, s.left, 'list continue row');
           _near(listRow.width, s.frame(false), 'list continue row width');
           final firstBook = find.byType(DesktopBookRow).first;
+          final tint = tester.getRect(firstBook);
+          _near(tint.left, s.left - BookListItem.inset, 'list tint bleed');
+          _near(
+            tint.width,
+            s.frame(false) + 2 * BookListItem.inset,
+            'list tint width',
+          );
+          final listViewport = tester.getRect(scrollView);
+          _near(
+            listViewport.right,
+            s.workspace.right,
+            'list scrollbar remains on Workspace edge',
+          );
+          expect(
+            find.descendant(of: scrollView, matching: find.byType(Scrollbar)),
+            findsOneWidget,
+          );
           _near(
             tester
                 .getRect(
@@ -281,6 +335,111 @@ void main() {
       );
     }
   }
+
+  testWidgets(
+    'bounded Shelf uses Shell width and retains viewport across breakpoints',
+    (tester) async {
+      final h = ShellHarness(tester);
+      await h.pump(
+        size: const Size(1920, 720),
+        shellWidth: 900,
+        extraBooks: 60,
+      );
+      final shelf = find.byType(BookshelfView);
+      final scrollView = find.descendant(
+        of: shelf,
+        matching: find.byType(CustomScrollView),
+      );
+      final workspace = h.workspace;
+      final viewport = tester.element(scrollView);
+      final scrollable = tester.state<ScrollableState>(
+        find.descendant(of: shelf, matching: find.byType(Scrollable)).first,
+      );
+      expect(MediaQuery.sizeOf(tester.element(shelf)).width, 1920);
+      expect(tester.getRect(find.byType(DesktopShelfToolbar)).left, 72 + 24);
+      expect(
+        tester.getSize(find.byType(DesktopShelfToolbar)).width,
+        900 - 72 - 48,
+      );
+      scrollable.position.jumpTo(500);
+      await tester.pumpAndSettle();
+      for (final width in [
+        839.0,
+        840.0,
+        839.0,
+        840.0,
+        1199.0,
+        1200.0,
+        1199.0,
+        1920.0,
+      ]) {
+        await h.pump(size: const Size(1920, 720), shellWidth: width);
+        expect(h.workspace, same(workspace));
+        expect(tester.element(scrollView), same(viewport));
+        expect(
+          tester.state<ScrollableState>(
+            find.descendant(of: shelf, matching: find.byType(Scrollable)).first,
+          ),
+          same(scrollable),
+        );
+        expect(scrollable.position.pixels, 500);
+        expect(h.shelfGrid, isTrue);
+        final nav = width < 840
+            ? 0.0
+            : width < 1200
+            ? 72.0
+            : 232.0;
+        final gutter = width < 1200 ? 24.0 : 32.0;
+        final frame = (width - nav - 2 * gutter).clamp(0, 1600);
+        final toolbar = tester.getRect(find.byType(DesktopShelfToolbar));
+        expect(toolbar.left, closeTo(nav + (width - nav - frame) / 2, .01));
+        expect(toolbar.width, frame);
+        expect(tester.takeException(), isNull);
+      }
+      await h.close();
+    },
+    variant: windows,
+  );
+
+  testWidgets(
+    'Shelf scrollbar and outer whitespace remain interactive on Workspace edge',
+    (tester) async {
+      final s = _Shelf(tester);
+      await s.pump(size: const Size(1920, 900));
+      await tester.tap(find.byTooltip(s.l.shelfList));
+      await tester.pumpAndSettle();
+      final viewport = tester.getRect(
+        find.descendant(of: s.shelf, matching: find.byType(CustomScrollView)),
+      );
+      // Well outside the centered 1200 content frame, inside full-width viewport.
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          kind: PointerDeviceKind.mouse,
+          position: Offset(viewport.right - 60, viewport.center.dy),
+          scrollDelta: const Offset(0, 600),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(s.position.pixels, 600);
+      s.position.jumpTo(0);
+      await tester.pumpAndSettle();
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(
+        location: Offset(viewport.right - 4, viewport.top + 15),
+      );
+      await mouse.moveTo(Offset(viewport.right - 4, viewport.top + 16));
+      await tester.pumpAndSettle();
+      await mouse.down(Offset(viewport.right - 4, viewport.top + 16));
+      await mouse.moveBy(const Offset(0, 150));
+      await tester.pump();
+      await mouse.up();
+      await tester.pumpAndSettle();
+      expect(s.position.pixels, greaterThan(0));
+      await mouse.removePointer();
+      await s.close();
+    },
+    variant: windows,
+  );
 
   testWidgets('large text keeps covers dense and lets list rows grow', (
     tester,

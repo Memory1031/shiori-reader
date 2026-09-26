@@ -6,6 +6,7 @@ import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/book_list_tile.dart';
+import '../../shared/widgets/desktop_content_frame.dart';
 import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
 import 'desktop_shelf.dart';
@@ -29,7 +30,7 @@ class BookshelfView extends StatefulWidget {
   });
   final LibraryController controller;
 
-  /// The pointer-first shelf: a fixed toolbar over a left-aligned frame,
+  /// The pointer-first shelf: a fixed toolbar over centered content,
   /// a density-driven grid, column rows without swipe actions, and book
   /// menus on right click, the Menu key and Shift+F10. [showTitle] does not
   /// apply; the toolbar always titles the shelf.
@@ -489,7 +490,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     final strings = AppLocalizations.of(context);
     final books = controller.sorted;
     final scaler = MediaQuery.textScalerOf(context);
-    final gutter = desktopShelfGutter(MediaQuery.sizeOf(context).width);
+    final gutter = desktopShelfGutter(DesktopLayoutScope.widthOf(context));
     final maxFrame = _grid ? ShioriLayout.shelfGrid : ShioriLayout.shelfList;
     // Two title lines at the card style and the real text scale.
     final titles = TextPainter(
@@ -506,16 +507,19 @@ class _BookshelfViewState extends State<BookshelfView> {
 
     return LayoutBuilder(
       builder: (context, bounds) {
-        final frame = (bounds.maxWidth - 2 * gutter).clamp(0.0, maxFrame);
-        // Every part of the shelf shares the frame: inset by the gutter and
-        // left-aligned. A [bleed] lets row tints reach past the frame edge
-        // while their content still lines up with it.
+        final geometry = desktopContentGeometry(
+          availableWidth: bounds.maxWidth,
+          gutter: gutter,
+          maxWidth: maxFrame,
+        );
+        final frame = geometry.contentWidth;
+        // Keep the viewport across the Workspace for edge scrollbar and wheel
+        // access. Only its content is centered; row tints bleed into the gutter.
         Widget framed(Widget sliver, {double bleed = 0}) => SliverPadding(
-          padding: EdgeInsets.symmetric(horizontal: gutter - bleed),
-          sliver: SliverConstrainedCrossAxis(
-            maxExtent: frame + 2 * bleed,
-            sliver: sliver,
+          padding: EdgeInsets.symmetric(
+            horizontal: (geometry.inset - bleed).clamp(0.0, double.infinity),
           ),
+          sliver: sliver,
         );
         final grid = desktopShelfGrid(frame, scaler);
 
@@ -555,20 +559,14 @@ class _BookshelfViewState extends State<BookshelfView> {
 
         return Column(
           children: [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: gutter),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: SizedBox(
-                  width: frame,
-                  child: DesktopShelfToolbar(
-                    layout: _layout,
-                    count: controller.shelfReady && books.isNotEmpty
-                        ? books.length
-                        : null,
-                    onImport: widget.onImport,
-                  ),
-                ),
+            DesktopContentFrame(
+              maxWidth: maxFrame,
+              child: DesktopShelfToolbar(
+                layout: _layout,
+                count: controller.shelfReady && books.isNotEmpty
+                    ? books.length
+                    : null,
+                onImport: widget.onImport,
               ),
             ),
             Expanded(

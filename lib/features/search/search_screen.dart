@@ -31,7 +31,12 @@ class SearchUnavailable extends StatelessWidget {
           children: [
             DesktopContentFrame(
               maxWidth: ShioriLayout.shelfList,
-              child: DesktopPageToolbar(title: strings.searchTitle),
+              child: DesktopPageToolbar(
+                title: strings.searchTitle,
+                leading: ModalRoute.of(context)?.impliesAppBarDismissal == true
+                    ? const BackButton()
+                    : null,
+              ),
             ),
             Expanded(
               child: DesktopContentFrame(
@@ -120,153 +125,176 @@ class _SearchBodyState extends State<_SearchBody> {
     final desktop = DesktopLayoutScope.useDesktopPage(context);
     final strings = AppLocalizations.of(context);
     final state = controller.state;
+    final pointerFirst = ShioriCapabilities.of(context).pointerFirst;
+    final gutter = desktop
+        ? ShioriLayout.gutter(DesktopLayoutScope.widthOf(context))
+        : 0.0;
     void submit() {
       if (!desktop) FocusScope.of(context).unfocus();
       controller.submit();
     }
 
-    final content = CustomScrollView(
-      // Touch layouts inherit the route primary (including iOS status-bar
-      // scroll-to-top). Pointer layouts keep one owner at every window width.
-      controller: ShioriCapabilities.of(context).pointerFirst ? _scroll : null,
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      slivers: [
-        SliverPadding(
-          padding: EdgeInsets.symmetric(
-            horizontal: desktop ? 0 : ShioriSpace.page,
-            vertical: ShioriSpace.page,
-          ),
-          sliver: SliverToBoxAdapter(
-            child: Align(
-              alignment: AlignmentDirectional.topStart,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: desktop ? ShioriLayout.page : double.infinity,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (sourceName != null || environmentLabel != null) ...[
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(
-                              ShioriShape.tag,
-                            ),
+    final slivers = <Widget>[
+      SliverPadding(
+        padding: EdgeInsets.symmetric(
+          horizontal: desktop ? 0 : ShioriSpace.page,
+          vertical: ShioriSpace.page,
+        ),
+        sliver: SliverToBoxAdapter(
+          child: Align(
+            alignment: AlignmentDirectional.topStart,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: desktop ? ShioriLayout.page : double.infinity,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (sourceName != null || environmentLabel != null) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(ShioriShape.tag),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            child: Text(
-                              environmentLabel ??
-                                  sourceName ??
-                                  strings.onlineSource,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
+                          child: Text(
+                            environmentLabel ??
+                                sourceName ??
+                                strings.onlineSource,
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ),
                       ),
-                      const SizedBox(height: ShioriSpace.medium),
-                    ],
-                    _SearchInput(
-                      text: _text,
-                      focusNode: _inputFocus,
-                      keepFocus: desktop,
-                      onChanged: controller.edit,
-                      onSubmit: submit,
-                      enabled:
-                          state.draftKeyword.trim().isNotEmpty &&
-                          state.status != SearchStatus.loading &&
-                          !state.loadingMore,
                     ),
-                    if (state.submittedQuery != null &&
-                        state.status != SearchStatus.idle) ...[
-                      const SizedBox(height: ShioriSpace.item),
-                      Text(
-                        strings.searchResultsFor(state.submittedQuery!),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                    if (state.needsSubmission && state.items.isNotEmpty)
-                      Text(strings.searchDraftNotice),
+                    const SizedBox(height: ShioriSpace.medium),
                   ],
-                ),
+                  _SearchInput(
+                    text: _text,
+                    focusNode: _inputFocus,
+                    keepFocus: desktop,
+                    onChanged: controller.edit,
+                    onSubmit: submit,
+                    enabled:
+                        state.draftKeyword.trim().isNotEmpty &&
+                        state.status != SearchStatus.loading &&
+                        !state.loadingMore,
+                  ),
+                  if (state.submittedQuery != null &&
+                      state.status != SearchStatus.idle) ...[
+                    const SizedBox(height: ShioriSpace.item),
+                    Text(
+                      strings.searchResultsFor(state.submittedQuery!),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                  if (state.needsSubmission && state.items.isNotEmpty)
+                    Text(strings.searchDraftNotice),
+                ],
               ),
             ),
           ),
         ),
-        if (state.status == SearchStatus.ready) ...[
-          SliverList.builder(
-            itemCount: state.items.length,
-            itemBuilder: (context, index) {
-              final book = state.items[index];
-              return _ResultRow(
-                key: ValueKey(book.key),
-                book: book,
-                images: widget.images,
-                desktop: desktop,
-                onTap: () {
-                  if (!desktop) FocusScope.of(context).unfocus();
-                  widget.routes.open(context, NovelDestination(book.key));
-                },
-              );
+      ),
+      if (state.status == SearchStatus.ready) ...[
+        SliverList.builder(
+          itemCount: state.items.length,
+          itemBuilder: (context, index) {
+            final book = state.items[index];
+            return _ResultRow(
+              key: ValueKey(book.key),
+              book: book,
+              images: widget.images,
+              desktop: desktop,
+              onTap: () {
+                if (!desktop) FocusScope.of(context).unfocus();
+                widget.routes.open(context, NovelDestination(book.key));
+              },
+            );
+          },
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(ShioriSpace.page),
+            child: state.loadingMore
+                ? const LoadingView()
+                : state.paginationFailure != null
+                ? FailureView(
+                    failure: state.paginationFailure!,
+                    onRetry: controller.canLoadMore
+                        ? controller.loadMore
+                        : null,
+                  )
+                : state.needsSubmission
+                ? const SizedBox.shrink()
+                : controller.canLoadMore
+                ? Center(
+                    child: OutlinedButton(
+                      key: const ValueKey('search-more'),
+                      onPressed: controller.loadMore,
+                      child: Text(strings.loadMoreAction),
+                    ),
+                  )
+                : Text(
+                    strings.searchNoMore,
+                    style: Theme.of(context).textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+          ),
+        ),
+      ] else
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 32),
+            child: switch (state.status) {
+              SearchStatus.loading => const LoadingView(),
+              SearchStatus.error => FailureView(
+                failure: state.failure!,
+                onRetry: submit,
+              ),
+              SearchStatus.empty => EmptyView(message: strings.searchNoResults),
+              _ => EmptyView(message: strings.searchInitial),
             },
           ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(ShioriSpace.page),
-              child: state.loadingMore
-                  ? const LoadingView()
-                  : state.paginationFailure != null
-                  ? FailureView(
-                      failure: state.paginationFailure!,
-                      onRetry: controller.canLoadMore
-                          ? controller.loadMore
-                          : null,
-                    )
-                  : state.needsSubmission
-                  ? const SizedBox.shrink()
-                  : controller.canLoadMore
-                  ? Center(
-                      child: OutlinedButton(
-                        key: const ValueKey('search-more'),
-                        onPressed: controller.loadMore,
-                        child: Text(strings.loadMoreAction),
-                      ),
-                    )
-                  : Text(
-                      strings.searchNoMore,
-                      style: Theme.of(context).textTheme.bodySmall,
-                      textAlign: TextAlign.center,
-                    ),
-            ),
-          ),
-        ] else
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 32),
-              child: switch (state.status) {
-                SearchStatus.loading => const LoadingView(),
-                SearchStatus.error => FailureView(
-                  failure: state.failure!,
-                  onRetry: submit,
+        ),
+    ];
+    final content = CustomScrollView(
+      // Touch layouts inherit the route primary (including iOS status-bar
+      // scroll-to-top). Pointer layouts keep one owner at every window width.
+      controller: pointerFirst ? _scroll : null,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      // Keep the pointer viewport across the Workspace for edge scrollbar and
+      // wheel access. Persistent sliver wrappers center only the content, also
+      // preserving input and list elements when crossing the desktop breakpoint.
+      slivers: pointerFirst
+          ? [
+              for (final sliver in slivers)
+                SliverLayoutBuilder(
+                  builder: (context, constraints) {
+                    final geometry = desktopContentGeometry(
+                      availableWidth: constraints.crossAxisExtent,
+                      gutter: gutter,
+                      maxWidth: desktop
+                          ? ShioriLayout.shelfList
+                          : ShioriLayout.page,
+                    );
+                    return SliverPadding(
+                      padding: EdgeInsets.symmetric(horizontal: geometry.inset),
+                      sliver: sliver,
+                    );
+                  },
                 ),
-                SearchStatus.empty => EmptyView(
-                  message: strings.searchNoResults,
-                ),
-                _ => EmptyView(message: strings.searchInitial),
-              },
-            ),
-          ),
-      ],
+            ]
+          : slivers,
     );
-    if (ShioriCapabilities.of(context).pointerFirst) {
+    if (pointerFirst) {
       return Scaffold(
         appBar: desktop ? null : AppBar(title: Text(strings.searchTitle)),
         body: SafeArea(
@@ -275,22 +303,17 @@ class _SearchBodyState extends State<_SearchBody> {
               if (desktop)
                 DesktopContentFrame(
                   maxWidth: ShioriLayout.shelfList,
-                  child: DesktopPageToolbar(title: strings.searchTitle),
+                  child: DesktopPageToolbar(
+                    title: strings.searchTitle,
+                    leading:
+                        ModalRoute.of(context)?.impliesAppBarDismissal == true
+                        ? const BackButton()
+                        : null,
+                  ),
                 )
               else
                 const SizedBox.shrink(),
-              Expanded(
-                child: DesktopContentFrame(
-                  // Keep the viewport at the same element path on both sides
-                  // of the breakpoint. Narrow pointer windows use the original
-                  // app bar and inline page padding, with no outer gutter.
-                  maxWidth: desktop
-                      ? ShioriLayout.shelfList
-                      : ShioriLayout.page,
-                  gutter: desktop ? null : 0,
-                  child: content,
-                ),
-              ),
+              Expanded(child: content),
             ],
           ),
         ),
