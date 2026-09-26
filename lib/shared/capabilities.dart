@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../app/window_caption.dart';
+
 /// Width classes shared by layout decisions; values follow Material 3.
 enum WindowClass {
   compact,
@@ -55,6 +57,12 @@ PageRoute<T> platformPageRoute<T>(
   BuildContext context, {
   required WidgetBuilder builder,
   RouteSettings? settings,
-}) => ShioriCapabilities.of(context).cupertinoNavigation
-    ? CupertinoPageRoute<T>(builder: builder, settings: settings)
-    : MaterialPageRoute<T>(builder: builder, settings: settings);
+}) {
+  // Full application pages explicitly own the app appearance. A reader or
+  // image can declare a more specific appearance inside this page.
+  Widget page(BuildContext context) =>
+      WindowCaptionScope.appDefault(child: builder(context));
+  return ShioriCapabilities.of(context).cupertinoNavigation
+      ? CupertinoPageRoute<T>(builder: page, settings: settings)
+      : MaterialPageRoute<T>(builder: page, settings: settings);
+}

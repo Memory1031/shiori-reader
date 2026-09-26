@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../app/window_caption.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
@@ -57,6 +58,7 @@ class ReaderContentView extends StatefulWidget {
     this.returnToOrigin = false,
     this.chrome,
     this.active = true,
+    this.appearanceActive,
   });
   final ImageRepository? images;
   final ChapterContent content;
@@ -86,6 +88,11 @@ class ReaderContentView extends StatefulWidget {
   /// and while the host is changing chapters or leaving. It only gates input
   /// and new panels; the page still lays out, restores and reports ready.
   final bool active;
+
+  /// The host's currently displayed session, independent of temporary input
+  /// locks while saving or preparing another chapter. Pending pages are false.
+  /// Standalone readers default to [active].
+  final bool? appearanceActive;
   @override
   State<ReaderContentView> createState() => _ReaderContentViewState();
 }
@@ -768,75 +775,87 @@ class _ReaderContentViewState extends State<ReaderContentView>
       Directionality.of(context),
     );
     final style = _bodyStyle(context);
-    return LayoutBuilder(
-      builder: (context, pageBounds) => Stack(
-        fit: StackFit.expand,
-        children: [
-          Scaffold(
-            // Not modal: a key whose command stands aside, such as Space on
-            // a focused button, goes on to the control's own handling.
-            body: Shortcuts(
-              shortcuts: _desktopPanels
-                  ? desktopReaderShortcuts
-                  : readerShortcuts,
-              child: Actions(
-                actions: _commandActions(context),
-                child: Focus(
-                  focusNode: _pageFocus,
-                  autofocus: widget.active,
-                  child: ReaderCompletionTransition(
-                    style: _settings.pageTurn,
-                    onTurning: (value) => _completionTurning = value,
-                    completion: widget.completion == null
-                        ? null
-                        : _completionPage(context, style),
-                    child: SafeArea(
-                      child: Stack(
-                        fit: StackFit.expand,
-                        // Toolbars paint into the safe-area insets.
-                        clipBehavior: Clip.none,
-                        children: [
-                          Positioned.fill(
-                            child: _page(context, pageBounds, style),
-                          ),
-                          if (widget.completion == null)
-                            ValueListenableBuilder<bool>(
-                              valueListenable: _chrome,
-                              builder: (context, visible, _) =>
-                                  ListenableBuilder(
-                                    listenable: _preferences,
-                                    builder: (context, _) => visible
-                                        ? _toolbars(context)
-                                        : _runningChrome(context),
-                                  ),
+    return WindowCaptionScope(
+      enabled:
+          (widget.appearanceActive ?? widget.active) &&
+          (widget.session == null ||
+              !widget.session!.isClosed &&
+                  widget.session!.status == ReaderStatus.ready &&
+                  widget.session!.chapter == widget.content.key),
+      appearance: (
+        color: Theme.of(context).scaffoldBackgroundColor,
+        brightness: Theme.of(context).brightness,
+      ),
+      child: LayoutBuilder(
+        builder: (context, pageBounds) => Stack(
+          fit: StackFit.expand,
+          children: [
+            Scaffold(
+              // Not modal: a key whose command stands aside, such as Space on
+              // a focused button, goes on to the control's own handling.
+              body: Shortcuts(
+                shortcuts: _desktopPanels
+                    ? desktopReaderShortcuts
+                    : readerShortcuts,
+                child: Actions(
+                  actions: _commandActions(context),
+                  child: Focus(
+                    focusNode: _pageFocus,
+                    autofocus: widget.active,
+                    child: ReaderCompletionTransition(
+                      style: _settings.pageTurn,
+                      onTurning: (value) => _completionTurning = value,
+                      completion: widget.completion == null
+                          ? null
+                          : _completionPage(context, style),
+                      child: SafeArea(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          // Toolbars paint into the safe-area insets.
+                          clipBehavior: Clip.none,
+                          children: [
+                            Positioned.fill(
+                              child: _page(context, pageBounds, style),
                             ),
-                          if (_hintVisible && widget.completion == null)
-                            Positioned(
-                              left: ShioriSpace.item,
-                              right: ShioriSpace.item,
-                              bottom:
-                                  ReaderChromeMetrics.of(context).bottomBar +
-                                  ShioriSpace.small,
-                              child: ReaderControlsHint(
-                                onDismiss: _dismissHint,
+                            if (widget.completion == null)
+                              ValueListenableBuilder<bool>(
+                                valueListenable: _chrome,
+                                builder: (context, visible, _) =>
+                                    ListenableBuilder(
+                                      listenable: _preferences,
+                                      builder: (context, _) => visible
+                                          ? _toolbars(context)
+                                          : _runningChrome(context),
+                                    ),
                               ),
-                            ),
-                        ],
+                            if (_hintVisible && widget.completion == null)
+                              Positioned(
+                                left: ShioriSpace.item,
+                                right: ShioriSpace.item,
+                                bottom:
+                                    ReaderChromeMetrics.of(context).bottomBar +
+                                    ShioriSpace.small,
+                                child: ReaderControlsHint(
+                                  onDismiss: _dismissHint,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-          ValueListenableBuilder<PageTurnFrame>(
-            valueListenable: _paperTurn,
-            builder: (context, frame, _) => PageTurnOverlay(
-              frame: frame,
-              paper: Theme.of(context).scaffoldBackgroundColor,
+            ValueListenableBuilder<PageTurnFrame>(
+              valueListenable: _paperTurn,
+              builder: (context, frame, _) => PageTurnOverlay(
+                frame: frame,
+                paper: Theme.of(context).scaffoldBackgroundColor,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

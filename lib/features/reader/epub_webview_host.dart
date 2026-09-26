@@ -20,6 +20,13 @@ class EpubWebViewHost extends StatefulWidget {
   /// Composition override for platform-boundary tests.
   final String? operatingSystem;
 
+  /// Windows keeps one inline native owner while its static document changes.
+  static bool usesInlineView(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<_EnvironmentScope>()
+          ?.inlineView ??
+      Platform.isWindows;
+
   static Future<WebViewEnvironment?> prepare(BuildContext context) {
     final scope = context.getInheritedWidgetOfExactType<_EnvironmentScope>();
     if (scope != null) return scope.prepare();
@@ -74,13 +81,23 @@ class _EpubWebViewHostState extends State<EpubWebViewHost> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      _EnvironmentScope(prepare: _prepare, child: widget.child);
+  Widget build(BuildContext context) => _EnvironmentScope(
+    prepare: _prepare,
+    inlineView:
+        (widget.operatingSystem ?? Platform.operatingSystem) == 'windows',
+    child: widget.child,
+  );
 }
 
 class _EnvironmentScope extends InheritedWidget {
-  const _EnvironmentScope({required this.prepare, required super.child});
+  const _EnvironmentScope({
+    required this.prepare,
+    required this.inlineView,
+    required super.child,
+  });
   final Future<WebViewEnvironment?> Function() prepare;
+  final bool inlineView;
   @override
-  bool updateShouldNotify(_EnvironmentScope oldWidget) => false;
+  bool updateShouldNotify(_EnvironmentScope oldWidget) =>
+      inlineView != oldWidget.inlineView;
 }

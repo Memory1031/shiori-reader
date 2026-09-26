@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import '../features/reader/epub_webview_host.dart';
 import '../data/local/book_decoder.dart';
 import '../data/repositories/local_reading_repository.dart';
@@ -32,7 +31,6 @@ import 'source_services.dart';
 import 'launch_view.dart';
 import 'import_source.dart';
 import 'update_services.dart';
-import 'window_caption.dart';
 import '../features/updates/update_controller.dart';
 import '../features/updates/update_screen.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -322,7 +320,7 @@ class _ProductionAppState extends State<ProductionApp>
                 ),
               ),
             );
-            return Platform.isWindows ? WindowCaptionSync(child: app) : app;
+            return app;
           },
           createController: () => AppController(settingsStore: _appearance),
           homeBuilder: (context, app) => ReadingHome(

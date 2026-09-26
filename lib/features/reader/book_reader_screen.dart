@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../app/window_caption.dart';
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
@@ -1051,6 +1052,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       returnToOrigin: widget.linkDepth > 0,
       chrome: _chrome,
       active: active && !_changing,
+      appearanceActive: active && identical(reader, _reader),
     );
   }
 
@@ -1100,7 +1102,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      WindowCaptionScope.appDefault(child: _buildPage(context));
+
+  Widget _buildPage(BuildContext context) {
     if (_invalidated) {
       return Scaffold(
         appBar: AppBar(),

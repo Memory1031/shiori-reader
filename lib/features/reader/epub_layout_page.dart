@@ -24,7 +24,9 @@ class EpubLayoutPage extends StatefulWidget {
     this.onFailed,
     this.links = const [],
     this.onLink,
+    this.prepareArtwork = themedSvgPaperArtwork,
   });
+  final Future<String> Function(String html, Color ink) prepareArtwork;
   final List<LocalContentLink> links;
   final ValueChanged<LocalContentLink>? onLink;
   final String html;
@@ -40,24 +42,39 @@ class EpubLayoutPage extends StatefulWidget {
 class _EpubLayoutPageState extends State<EpubLayoutPage> {
   Offset? _down;
   Duration? _downTime;
-  bool _ready = false;
+  String? _loadedDocument;
+  String? _reportedDocument;
+  bool get _ready =>
+      !_artworkPending &&
+      _document != null &&
+      identical(_loadedDocument, _document);
   String? _preparedHtml;
   String? _preparingSource;
   Color? _preparingInk;
+  bool _artworkPending = false;
+  int _viewGeneration = 0;
+  int _artworkGeneration = 0;
 
-  void _prepareArtwork(String html, Color ink) {
+  void _prepareArtwork(String html, Color ink, {required bool keepView}) {
     if (identical(_preparingSource, html) && _preparingInk == ink) return;
+    final sameSource = identical(_preparingSource, html);
     _preparingSource = html;
     _preparingInk = ink;
-    _preparedHtml = null;
+    final generation = ++_artworkGeneration;
+    if (!keepView || !sameSource) _preparedHtml = null;
+    _artworkPending = false;
     if (!html.contains('class="shiori-svg-page"')) {
       _preparedHtml = html;
       return;
     }
+    _artworkPending = true;
     unawaited(
-      themedSvgPaperArtwork(html, ink).then((prepared) {
-        if (mounted && identical(widget.html, html) && _preparingInk == ink) {
-          setState(() => _preparedHtml = prepared);
+      widget.prepareArtwork(html, ink).then((prepared) {
+        if (mounted && generation == _artworkGeneration) {
+          setState(() {
+            _preparedHtml = prepared;
+            _artworkPending = false;
+          });
         }
       }),
     );
@@ -67,8 +84,10 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
   void didUpdateWidget(covariant EpubLayoutPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.html, widget.html)) {
+      _viewGeneration++;
       _down = null;
-      _ready = false;
+      _loadedDocument = null;
+      _reportedDocument = null;
     }
   }
 
@@ -152,25 +171,42 @@ $interactionStyle
     _brightness = brightness;
     _pointerFirst = pointerFirst;
     _generation++;
-    _ready = false;
     _down = null;
     return _document = document;
+  }
+
+  void _reportReady() {
+    if (!mounted || !_ready || identical(_reportedDocument, _document)) return;
+    _reportedDocument = _document;
+    widget.onReady();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    _prepareArtwork(widget.html, theme.colorScheme.onSurface);
+    final inlineView = EpubWebViewHost.usesInlineView(context);
+    _prepareArtwork(
+      widget.html,
+      theme.colorScheme.onSurface,
+      keepView: inlineView,
+    );
     if (_preparedHtml == null) {
       return ColoredBox(color: theme.scaffoldBackgroundColor);
     }
-    final document = _documentOf(
-      _preparedHtml!,
-      theme.scaffoldBackgroundColor,
-      theme.colorScheme.onSurface,
-      theme.brightness,
-      ShioriCapabilities.of(context).pointerFirst,
-    );
+    final document = _artworkPending && _document != null
+        ? _document!
+        : _documentOf(
+            _preparedHtml!,
+            theme.scaffoldBackgroundColor,
+            theme.colorScheme.onSurface,
+            theme.brightness,
+            ShioriCapabilities.of(context).pointerFirst,
+          );
+    // Artwork may resolve to the document already loaded by the retained
+    // owner. No navigation (and therefore no new load callback) is needed.
+    if (_ready && !identical(_reportedDocument, document)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reportReady());
+    }
     return LayoutBuilder(
       builder: (context, bounds) => Listener(
         behavior: HitTestBehavior.opaque,
@@ -217,14 +253,15 @@ $interactionStyle
           fit: StackFit.expand,
           children: [
             _StaticWebView(
-              key: ValueKey(_generation),
+              key: ValueKey(inlineView ? _viewGeneration : _generation),
               document: document,
               onReady: () {
-                setState(() => _ready = true);
-                widget.onReady();
+                if (!identical(document, _document)) return;
+                setState(() => _loadedDocument = document);
+                _reportReady();
               },
               onFailed: () {
-                setState(() => _ready = false);
+                setState(() => _loadedDocument = null);
                 widget.onFailed?.call();
               },
             ),
@@ -250,7 +287,8 @@ $interactionStyle
   }
 }
 
-/// A fresh owner per document/theme rejects callbacks from retired native views.
+/// Windows reloads static theme data on its inline owner, one document at a
+/// time. Mobile keeps its existing headless owner per document/theme.
 class _StaticWebView extends StatefulWidget {
   const _StaticWebView({
     super.key,
@@ -271,6 +309,38 @@ class _StaticWebViewState extends State<_StaticWebView> {
   Timer? _deadline;
   bool _starting = false, _prepared = false, _attached = false;
   bool _loaded = false, _ready = false, _failed = false;
+  InAppWebViewController? _controller;
+  InAppWebView? _view;
+  String? _loadingDocument;
+
+  @override
+  void didUpdateWidget(_StaticWebView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.document, widget.document) &&
+        _environment != null) {
+      _ready = false;
+      // An in-flight navigation finishes before loading the newest theme.
+      // WebView2's about:blank load callbacks carry no document identity.
+      if (_loaded && _controller != null) unawaited(_reload());
+    }
+  }
+
+  Future<void> _reload() async {
+    if (!mounted || _failed || _controller == null) return;
+    _loaded = false;
+    _ready = false;
+    _loadingDocument = widget.document;
+    _deadline?.cancel();
+    _deadline = Timer(const Duration(seconds: 15), _fail);
+    try {
+      await _controller!.loadData(
+        data: _loadingDocument!,
+        baseUrl: WebUri('about:blank'),
+      );
+    } catch (_) {
+      _fail();
+    }
+  }
 
   InAppWebViewSettings get _settings => InAppWebViewSettings(
     javaScriptEnabled: false,
@@ -309,6 +379,7 @@ class _StaticWebViewState extends State<_StaticWebView> {
       // A Windows environment creates a new inline native view; the plugin
       // does not adopt the headless document. Wait for the visible view's load.
       if (_environment != null) {
+        _loadingDocument = widget.document;
         setState(() => _prepared = true);
         return;
       }
@@ -355,16 +426,27 @@ class _StaticWebViewState extends State<_StaticWebView> {
   }
 
   void _loadFinished() {
+    if (!mounted || _failed) return;
     _loaded = true;
+    if (_environment != null && !identical(_loadingDocument, widget.document)) {
+      unawaited(_reload());
+      return;
+    }
     _notifyReady();
   }
 
   void _notifyReady() {
     if (!mounted || _failed || _ready || !_loaded || !_attached) return;
     _ready = true;
+    final document = widget.document;
     _deadline?.cancel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_failed) widget.onReady();
+      if (mounted &&
+          !_failed &&
+          _ready &&
+          identical(document, widget.document)) {
+        widget.onReady();
+      }
     });
     WidgetsBinding.instance.scheduleFrame();
   }
@@ -397,18 +479,27 @@ class _StaticWebViewState extends State<_StaticWebView> {
   @override
   Widget build(BuildContext context) {
     if (!_prepared || _failed) return const SizedBox.expand();
-    return InAppWebView(
+    // The plugin creates its platform owner in the Widget constructor, so
+    // retaining only a Flutter State/key is insufficient to retain WebView2.
+    return _view ??= InAppWebView(
       headlessWebView: _headless,
       webViewEnvironment: _environment,
       initialSettings: _settings,
       initialData: _headless == null
           ? InAppWebViewInitialData(
-              data: widget.document,
+              data: _loadingDocument ?? widget.document,
               baseUrl: WebUri('about:blank'),
             )
           : null,
-      onWebViewCreated: (_) {
+      onWebViewCreated: (controller) {
+        _controller = controller;
         _attached = true;
+        if (_loaded &&
+            !identical(_loadingDocument, widget.document) &&
+            _environment != null) {
+          unawaited(_reload());
+          return;
+        }
         _notifyReady();
       },
       shouldOverrideUrlLoading: _navigation,

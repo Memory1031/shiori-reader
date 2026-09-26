@@ -15,12 +15,14 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
+import 'package:shiori/app/window_caption.dart';
 import 'package:shiori/app/routes.dart';
 import 'package:shiori/features/reader/epub_layout_page.dart';
 import 'package:shiori/features/reader/epub_webview_host.dart';
 import 'package:shiori/features/reader/svg_paper_art.dart';
 import 'package:shiori/features/reader/reader_controller.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/features/reader/settings_panel.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 
 import '../../support/contract_fakes.dart';
@@ -85,6 +87,20 @@ class _Controller extends PlatformInAppWebViewController {
     : super.implementation(
         const PlatformInAppWebViewControllerCreationParams(id: 'test'),
       );
+  final documents = <String>[];
+  @override
+  Future<void> loadData({
+    required String data,
+    String mimeType = 'text/html',
+    String encoding = 'utf8',
+    WebUri? baseUrl,
+    WebUri? historyUrl,
+    Uri? androidHistoryUrl,
+    Uri? iosAllowingReadAccessTo,
+    WebUri? allowingReadAccessTo,
+  }) async {
+    documents.add(data);
+  }
 }
 
 class _Headless extends PlatformHeadlessInAppWebView {
@@ -227,10 +243,13 @@ void main() {
     Color? paper,
     List<LocalContentLink> links = const [],
     ValueChanged<LocalContentLink>? onLink,
+    Future<String> Function(String, Color) prepareArtwork =
+        themedSvgPaperArtwork,
   }) => EpubWebViewHost(
     userDataDirectory: temp,
     operatingSystem: os,
     child: MaterialApp(
+      themeAnimationDuration: Duration.zero,
       theme: ThemeData(
         brightness: brightness,
       ).copyWith(scaffoldBackgroundColor: paper),
@@ -238,6 +257,7 @@ void main() {
         html: html,
         links: links,
         onLink: onLink,
+        prepareArtwork: prepareArtwork,
         onReady: () => ready++,
         onFailed: () => failed++,
         onPrevious: () => previous++,
@@ -257,6 +277,77 @@ void main() {
     }
     expect(platform.heads.length, greaterThanOrEqualTo(minHeads));
   }
+
+  testWidgets(
+    'Windows A-B-A artwork restores loaded hotspots without navigation',
+    (tester) async {
+      final html = (await tester.runAsync(() async {
+        final html = await svgArtworkPage(paper: Colors.red);
+        expect(await themedSvgPaperArtwork(html, Colors.black), same(html));
+        return html;
+      }))!;
+      final gates = <Completer<String>>[];
+      Future<String> prepare(String source, Color ink) {
+        expect(source, same(html));
+        final gate = Completer<String>();
+        gates.add(gate);
+        return gate.future;
+      }
+
+      final link = svgLinksParser().parse().content.links.singleWhere(
+        (link) => link.region != null,
+      );
+      var taps = 0;
+      Widget themed(Brightness brightness) => page(
+        os: 'windows',
+        html: html,
+        brightness: brightness,
+        prepareArtwork: prepare,
+        links: [link],
+        onLink: (_) => taps++,
+      );
+      await tester.pumpWidget(themed(Brightness.light));
+      gates[0].complete(html);
+      await tester.pumpAndSettle();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pumpAndSettle();
+      final view = platform.views.single;
+      view.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 1);
+      await tester.pumpWidget(themed(Brightness.dark));
+      expect(gates.length, 2);
+      await tester.pumpWidget(themed(Brightness.light));
+      expect(gates.length, 3);
+      gates[2].complete(html);
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel(link.label), findsOneWidget);
+      final size = tester.getSize(find.byType(EpubLayoutPage));
+      final region = link.region!;
+      final width = size.width < size.height * region.aspectRatio
+          ? size.width
+          : size.height * region.aspectRatio;
+      await tester.tapAt(
+        tester.getTopLeft(find.byType(EpubLayoutPage)) +
+            Offset(
+              (size.width - width) / 2 +
+                  width * (region.left + region.right) / 2,
+              width / region.aspectRatio * (region.top + region.bottom) / 2,
+            ),
+      );
+      expect(taps, 1);
+      // Obsolete B must not replace A, even if its output would be different.
+      gates[1].complete(html.replaceFirst('</body>', 'obsolete B</body>'));
+      await tester.pumpAndSettle();
+      expect(view.controller.documents, isEmpty);
+      expect(platform.views.single, same(view));
+      expect(ready, 1);
+      expect(find.bySemanticsLabel(link.label), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 
   testWidgets('only neutral white SVG artwork blends with reader paper', (
     tester,
@@ -560,6 +651,7 @@ void main() {
       );
       final library = FixtureLibraryRepository();
       final settings = FixtureSettingsStore();
+      final captions = <CaptionAppearance>[];
       await settings.save(
         ReaderSettings(controlsHintSeen: true),
         cancellation: CancellationSource().token,
@@ -569,6 +661,9 @@ void main() {
           userDataDirectory: temp,
           operatingSystem: 'windows',
           child: ShioriApp(
+            captionSender: (value) async {
+              captions.add(value);
+            },
             locale: const Locale('en'),
             routes: AppRoutes(
               home: (_) => BookReaderScreen(
@@ -628,6 +723,42 @@ void main() {
         expect(tester.state(find.byType(EpubLayoutPage)), same(layout));
         expect(hotspot, findsOneWidget);
       }
+
+      // The real settings panel changes the paper while keeping both the
+      // Flutter page and Windows native view owner alive, including SVG work.
+      await tester.tap(find.byTooltip('Reading settings (Ctrl+,)'));
+      await tester.pumpAndSettle();
+      final preferences = tester
+          .widget<ReaderSettingsPanel>(find.byType(ReaderSettingsPanel))
+          .preferences;
+      preferences.update(
+        preferences.value.copyWith(themeMode: ReaderThemeMode.dark),
+      );
+      await tester.pumpAndSettle();
+      for (var i = 0; i < 40 && view.controller.documents.isEmpty; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pumpAndSettle();
+      }
+      expect(
+        view.controller.documents,
+        hasLength(1),
+        reason:
+            'views=${platform.views.length}, heads=${platform.heads.length}, last=${platform.views.last.controller.documents.length}',
+      );
+      expect(captions.last.brightness, Brightness.dark);
+      expect(platform.views.length, views);
+      expect(tester.state(find.byType(EpubLayoutPage)), same(layout));
+      view.finish();
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(hotspot, findsOneWidget);
+      expect(view.params.initialSettings!.javaScriptEnabled, isFalse);
+      expect(view.params.initialSettings!.blockNetworkLoads, isTrue);
+      expect(view.params.initialSettings!.allowFileAccess, isFalse);
+      expect(view.params.initialSettings!.disableContextMenu, isTrue);
 
       // Closed, the same link navigates again.
       await tester.sendKeyEvent(LogicalKeyboardKey.f2);
@@ -803,6 +934,49 @@ void main() {
     expect(ready, 1);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets(
+    'Windows theme loads serialize on one owner and acknowledge only the latest document',
+    (tester) async {
+      await tester.pumpWidget(page(os: 'windows'));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pumpAndSettle();
+      final view = platform.views.single;
+      final owner = tester.state(find.byType(EpubLayoutPage));
+      // The first document is still loading. Two changes should load only the
+      // newest one after its completion; neither may acknowledge the old page.
+      await tester.pumpWidget(page(os: 'windows', brightness: Brightness.dark));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        page(os: 'windows', paper: const Color(0xffffeedd)),
+      );
+      await tester.pumpAndSettle();
+      expect(view.controller.documents, isEmpty);
+      view.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 0);
+      expect(view.controller.documents.single, contains('#ffeedd'));
+      expect(platform.views.single, same(view));
+      expect(tester.state(find.byType(EpubLayoutPage)), same(owner));
+      await tester.pumpWidget(page(os: 'windows', brightness: Brightness.dark));
+      await tester.pumpAndSettle();
+      view.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 0);
+      expect(view.controller.documents, hasLength(2));
+      view.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 1);
+      expect(platform.views.single, same(view));
+      await tester.pumpWidget(const SizedBox());
+      view.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('creation failure and stalled load notify fallback once', (
     tester,
