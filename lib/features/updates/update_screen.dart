@@ -10,10 +10,11 @@ import '../../domain/models/release_identity.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
 import '../../shared/widgets/shiori_logo.dart';
+import '../../shared/widgets/desktop_content_frame.dart';
 import 'update_controller.dart';
 import 'release_notes_preview.dart';
 
-class UpdateScreen extends StatelessWidget {
+class UpdateScreen extends StatefulWidget {
   const UpdateScreen({
     super.key,
     required this.controller,
@@ -22,6 +23,21 @@ class UpdateScreen extends StatelessWidget {
   final UpdateController controller;
   final Future<bool> Function(Uri) openPage;
 
+  @override
+  State<UpdateScreen> createState() => _UpdateScreenState();
+}
+
+class _UpdateScreenState extends State<UpdateScreen> {
+  // The page owns only pointer scrolling; the injected update owner survives it.
+  final _scroll = ScrollController();
+  UpdateController get controller => widget.controller;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
   String get _version {
     final current = controller.installed;
     return current.release?.tag ??
@@ -29,7 +45,7 @@ class UpdateScreen extends StatelessWidget {
   }
 
   Future<void> _openPage(BuildContext context, Uri page) async {
-    if (await openPage(page) || !context.mounted) return;
+    if (await widget.openPage(page) || !context.mounted) return;
     await Clipboard.setData(ClipboardData(text: page.toString()));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -111,15 +127,30 @@ class UpdateScreen extends StatelessWidget {
       final muted = theme.colorScheme.onSurfaceVariant;
       final date = c.preferences.lastChecked;
       final locale = Localizations.localeOf(context).toLanguageTag();
-      return Scaffold(
-        appBar: AppBar(title: Text(l.updateTitle)),
-        body: SafeArea(
-          child: Align(
+      final desktop = DesktopLayoutScope.useDesktopPage(context);
+      final pointerFirst = ShioriCapabilities.of(context).pointerFirst;
+      final content = LayoutBuilder(
+        builder: (context, constraints) {
+          final inset = desktop
+              ? desktopContentGeometry(
+                  availableWidth: constraints.maxWidth,
+                  gutter: ShioriLayout.gutter(
+                    DesktopLayoutScope.widthOf(context),
+                  ),
+                  maxWidth: 640,
+                ).inset
+              : 24.0;
+          return Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
+              constraints: BoxConstraints(
+                maxWidth: desktop ? double.infinity : 640,
+              ),
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                // Touch keeps the route primary, including iOS scroll-to-top.
+                // Pointer ownership must not switch at the desktop breakpoint.
+                controller: pointerFirst ? _scroll : null,
+                padding: EdgeInsets.fromLTRB(inset, 8, inset, 32),
                 children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 28),
@@ -246,14 +277,21 @@ class UpdateScreen extends StatelessWidget {
                                 ),
                             ],
                           );
-                          if (constraints.maxWidth < 400 &&
-                              MediaQuery.textScalerOf(context).scale(14) > 18) {
+                          // Desktop keeps a narrow reading column even in a
+                          // wide Workspace. Bound the action Wrap separately
+                          // so Check + Cancel can reflow at large text sizes.
+                          if (desktop ||
+                              (constraints.maxWidth < 400 &&
+                                  MediaQuery.textScalerOf(context).scale(14) >
+                                      18)) {
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 checked,
                                 Align(
-                                  alignment: Alignment.centerRight,
+                                  alignment: desktop
+                                      ? AlignmentDirectional.centerEnd
+                                      : Alignment.centerRight,
                                   child: actions,
                                 ),
                               ],
@@ -369,7 +407,32 @@ class UpdateScreen extends StatelessWidget {
                 ],
               ),
             ),
-          ),
+          );
+        },
+      );
+      return Scaffold(
+        appBar: desktop ? null : AppBar(title: Text(l.updateTitle)),
+        body: SafeArea(
+          child: pointerFirst
+              ? Column(
+                  children: [
+                    if (desktop)
+                      DesktopPageChrome(
+                        child: DesktopPageToolbar(
+                          title: l.updateTitle,
+                          leading:
+                              ModalRoute.of(context)?.impliesAppBarDismissal ==
+                                  true
+                              ? const BackButton()
+                              : null,
+                        ),
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    Expanded(child: content),
+                  ],
+                )
+              : content,
         ),
       );
     },

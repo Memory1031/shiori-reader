@@ -9,10 +9,13 @@ import 'package:shiori/features/home/desktop_shell.dart';
 import 'package:shiori/features/home/home_navigation.dart';
 import 'package:shiori/features/novel_detail/detail_sections.dart';
 import 'package:shiori/features/search/search_screen.dart';
+import 'package:shiori/features/updates/update_controller.dart';
+import 'package:shiori/features/updates/update_screen.dart';
 import 'package:shiori/shared/widgets/desktop_content_frame.dart';
 import 'local_books/harness.dart';
 import 'cache/harness.dart' show DesktopCache;
 import 'desktop_shell_test.dart' show ShellHarness;
+import '../support/fake_update_repository.dart';
 
 final _windows = TargetPlatformVariant.only(TargetPlatform.windows);
 
@@ -21,7 +24,18 @@ void main() {
     testWidgets(
       'real Workspace shares chrome across all pages, bounded=$bounded',
       (tester) async {
-        final h = LocalHarness(tester, cache: DesktopCache());
+        final updates = UpdateController(FakeUpdateRepository());
+        await updates.initialize();
+        addTearDown(() async {
+          await updates.shutdown();
+          updates.dispose();
+        });
+        final h = LocalHarness(
+          tester,
+          cache: DesktopCache(),
+          updates: (_) =>
+              UpdateScreen(controller: updates, openPage: (_) async => true),
+        );
         final book = h.env.source.data.summary(FixtureScenario.shortChapter);
         await h.library.putBookshelf(
           BookshelfEntry(snapshot: book, addedAt: DateTime.utc(2026)),
@@ -123,6 +137,14 @@ void main() {
         final cache = tester.getRect(
           find.byKey(const ValueKey('cache-storage')),
         );
+        await section(HomeSection.updates, strings.updateTitle);
+        record();
+        final updateContent = tester.getRect(
+          find.byKey(const ValueKey('update-channel')),
+        );
+        expect(updateContent.width, 640);
+        expect(updateContent.width, lessThan(chrome().width));
+        expect(updateContent.center.dx, chrome().center.dx);
         await section(HomeSection.search, strings.searchTitle);
         await tester.enterText(
           find.byKey(const ValueKey('search-input')),

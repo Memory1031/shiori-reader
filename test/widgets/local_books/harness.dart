@@ -128,11 +128,12 @@ class LocalStore
 }
 
 class LocalHarness {
-  LocalHarness(this.tester, {LocalStore? store, this.cache})
+  LocalHarness(this.tester, {LocalStore? store, this.cache, this.updates})
     : store = store ?? LocalStore();
   final WidgetTester tester;
   final LocalStore store;
   final CacheManagement? cache;
+  final WidgetBuilder? updates;
   final library = FixtureLibraryRepository();
   final env = FixtureEnvironment();
   final navigation = HomeNavigation(HomeSection.localBooks);
@@ -185,6 +186,7 @@ class LocalHarness {
             final home = ReadingHome(
               repository: repo,
               cache: cache,
+              updates: updates,
               library: library,
               localBooks: screenStore,
               localManagement: store,
