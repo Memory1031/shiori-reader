@@ -311,6 +311,10 @@ ThemeData shioriTheme(
     highlightColor: press,
     splashColor: Colors.transparent,
     splashFactory: NoSplash.splashFactory,
+    dialogTheme: DialogThemeData(
+      backgroundColor: p.surface,
+      surfaceTintColor: Colors.transparent,
+    ),
     popupMenuTheme: PopupMenuThemeData(
       color: p.surface,
       surfaceTintColor: Colors.transparent,

@@ -145,7 +145,8 @@ class _ImportOverlayState extends State<ImportOverlay>
                           borderRadius: BorderRadius.circular(
                             ShioriShape.sheet,
                           ),
-                          color: Theme.of(context).colorScheme.surfaceContainer,
+                          color: Theme.of(context).colorScheme.surface,
+                          surfaceTintColor: Colors.transparent,
                           child: Padding(
                             padding: const EdgeInsets.all(ShioriSpace.page),
                             child: c.discarding
