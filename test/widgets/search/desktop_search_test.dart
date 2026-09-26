@@ -11,6 +11,7 @@ import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/search/search_screen.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 import 'package:shiori/shared/widgets/book_cover.dart';
+import 'package:shiori/shared/widgets/book_list_tile.dart';
 import 'package:shiori/shared/widgets/desktop_content_frame.dart';
 
 import 'search_controller_test.dart' show Repository, sourceId, page;
@@ -136,7 +137,7 @@ void main() {
 
   for (final width in [900.0, 1280.0, 1600.0, 1920.0]) {
     testWidgets(
-      'root layout $width separates chrome from aligned input and lazy rows',
+      'root layout $width centers input and insets lazy row content',
       (tester) async {
         addTearDown(tester.view.reset);
         final h = SearchHarness(tester);
@@ -144,7 +145,8 @@ void main() {
         expect(find.byType(DesktopPageToolbar), findsOneWidget);
         expect(find.byType(BackButton), findsNothing);
         expect(h.repository.calls, isEmpty);
-        await h.search(page(List.generate(40, (i) => 'Book $i')));
+        final results = page(List.generate(40, (i) => 'Book $i'));
+        await h.search(results);
         final title = find.descendant(
           of: find.byType(DesktopPageToolbar),
           matching: find.byType(Text),
@@ -156,15 +158,25 @@ void main() {
         );
         final inset = (width - frameWidth) / 2;
         expect(tester.getRect(title).left, closeTo(gutter, .01));
-        expect(tester.getRect(input).left, closeTo(inset, .01));
+        expect(tester.getRect(input).center.dx, closeTo(width / 2, .01));
         expect(
           tester.getRect(find.byType(BookCover).first).left,
-          closeTo(inset, .01),
+          closeTo(inset + BookListItem.inset, .01),
         );
-        expect(
-          tester.getSize(input).width,
-          closeTo((width - 2 * gutter).clamp(0, ShioriLayout.page), .01),
+        final result = find.byKey(ValueKey(results.items.first.key));
+        final surface = tester.getRect(
+          find.descendant(of: result, matching: find.byType(InkWell)),
         );
+        final rowContent = tester.getRect(
+          find.descendant(of: result, matching: find.byType(Row)),
+        );
+        expect(surface.left, closeTo(inset, .01));
+        expect(surface.width, closeTo(frameWidth, .01));
+        expect(tester.getRect(input).left, surface.left);
+        expect(tester.getRect(input).right, surface.right);
+        expect(rowContent.left - surface.left, BookListItem.inset);
+        expect(surface.right - rowContent.right, BookListItem.inset);
+        expect(tester.getSize(input).width, closeTo(frameWidth, .01));
         expect(
           tester.getSize(find.byType(CustomScrollView)).width,
           closeTo(width, .01),

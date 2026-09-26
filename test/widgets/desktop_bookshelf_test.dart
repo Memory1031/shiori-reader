@@ -283,12 +283,9 @@ void main() {
           _near(listRow.width, s.frame(false), 'list continue row width');
           final firstBook = find.byType(DesktopBookRow).first;
           final tint = tester.getRect(firstBook);
-          _near(tint.left, s.left - BookListItem.inset, 'list tint bleed');
-          _near(
-            tint.width,
-            s.frame(false) + 2 * BookListItem.inset,
-            'list tint width',
-          );
+          _near(tint.left, listRow.left, 'list surface matches header start');
+          _near(tint.right, listRow.right, 'list surface matches header end');
+          _near(tint.width, s.frame(false), 'list tint width');
           final listViewport = tester.getRect(scrollView);
           _near(
             listViewport.right,
@@ -308,7 +305,7 @@ void main() {
                   ),
                 )
                 .left,
-            s.left,
+            s.left + BookListItem.inset,
             'list cover',
           );
           expect(

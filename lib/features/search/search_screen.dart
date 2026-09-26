@@ -12,6 +12,7 @@ import '../../shared/widgets/desktop_content_frame.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
 import '../../shared/widgets/book_cover.dart';
+import '../../shared/widgets/book_list_tile.dart';
 import 'search_controller.dart';
 
 /// The shell can show search without constructing a source or a controller.
@@ -141,10 +142,12 @@ class _SearchBodyState extends State<_SearchBody> {
         ),
         sliver: SliverToBoxAdapter(
           child: Align(
-            alignment: AlignmentDirectional.topStart,
+            alignment: desktop
+                ? Alignment.topCenter
+                : AlignmentDirectional.topStart,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                maxWidth: desktop ? ShioriLayout.page : double.infinity,
+                maxWidth: desktop ? ShioriLayout.shelfList : double.infinity,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -450,7 +453,7 @@ class _ResultRow extends StatelessWidget {
               : null,
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: desktop ? 0 : 14,
+              horizontal: desktop ? BookListItem.inset : 14,
               vertical: 14,
             ),
             child: Row(

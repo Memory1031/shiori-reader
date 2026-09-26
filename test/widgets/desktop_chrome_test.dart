@@ -9,7 +9,6 @@ import 'package:shiori/features/home/desktop_shell.dart';
 import 'package:shiori/features/home/home_navigation.dart';
 import 'package:shiori/features/novel_detail/detail_sections.dart';
 import 'package:shiori/features/search/search_screen.dart';
-import 'package:shiori/shared/widgets/book_list_tile.dart';
 import 'package:shiori/shared/widgets/desktop_content_frame.dart';
 import 'local_books/harness.dart';
 import 'cache/harness.dart' show DesktopCache;
@@ -106,8 +105,12 @@ void main() {
         final result = tester.getRect(find.byKey(ValueKey(book.key)));
         final searchView = tester.getRect(find.byType(CustomScrollView));
         expect(
-          tester.getRect(find.byKey(const ValueKey('search-input'))).left,
-          result.left,
+          tester.getRect(find.byKey(const ValueKey('search-input'))).center.dx,
+          result.center.dx,
+        );
+        expect(
+          tester.getRect(find.byKey(const ValueKey('search-input'))).width,
+          result.width,
         );
         expect(searchView.width, gridView.width);
         await section(HomeSection.localBooks, strings.localBooksTitle);
@@ -205,10 +208,7 @@ void main() {
       await tester.tap(find.byTooltip(h.l.shelfList));
       await tester.pumpAndSettle();
       fixed();
-      expect(
-        tester.getSize(find.byType(DesktopBookRow).first).width,
-        1200 + 2 * BookListItem.inset,
-      );
+      expect(tester.getSize(find.byType(DesktopBookRow).first).width, 1200);
       position().jumpTo(300);
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip(h.l.shelfGrid));

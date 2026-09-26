@@ -541,11 +541,9 @@ class _BookshelfViewState extends State<BookshelfView> {
         );
         final frame = geometry.contentWidth;
         // Keep the viewport across the Workspace for edge scrollbar and wheel
-        // access. Only its content is centered; row tints bleed into the gutter.
-        Widget framed(Widget sliver, {double bleed = 0}) => SliverPadding(
-          padding: EdgeInsets.symmetric(
-            horizontal: (geometry.inset - bleed).clamp(0.0, double.infinity),
-          ),
+        // access. Headers and row surfaces share the centered content edges.
+        Widget framed(Widget sliver) => SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: geometry.inset),
           sliver: sliver,
         );
         final grid = desktopShelfGrid(frame, scaler);
@@ -671,7 +669,6 @@ class _BookshelfViewState extends State<BookshelfView> {
                           itemBuilder: (_, i) => item(i),
                         ),
                       ),
-                      bleed: BookListItem.inset,
                     ),
                 ],
               ),
