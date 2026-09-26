@@ -422,7 +422,10 @@ ThemeData shioriTheme(
       ).copyWith(overlayColor: overlay),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
-      style: ButtonStyle(overlayColor: overlay),
+      style: ButtonStyle(
+        overlayColor: overlay,
+        side: WidgetStatePropertyAll(BorderSide(color: p.separator)),
+      ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: p.surface,
