@@ -198,9 +198,9 @@ class _ReadingHomeState extends State<ReadingHome> {
           ),
     localBooks: widget.localBooks == null || widget.localManagement == null
         ? null
-        : (_) => LibraryObserver(
+        : (context) => LibraryObserver(
             controller: _library,
-            builder: (_, library) => LocalBooksScreen(
+            builder: (context, library) => LocalBooksScreen(
               images: widget.images,
               store: widget.localBooks!,
               management: widget.localManagement!,
@@ -209,6 +209,7 @@ class _ReadingHomeState extends State<ReadingHome> {
               onImport: widget.onImport!,
               covers: _localCovers,
               progressOf: library.progressFor,
+              onDetails: (key) => _routes.open(context, NovelDestination(key)),
             ),
           ),
     readerTarget: (_, key, block) => BookReaderScreen(
@@ -486,6 +487,9 @@ class _ReadingHomeState extends State<ReadingHome> {
                 bucket: _shelfStorage,
                 child: BookshelfView(
                   desktop: true,
+                  localReparse: widget.localBooks is LocalBookReparse
+                      ? widget.localBooks as LocalBookReparse
+                      : null,
                   controller: _library,
                   images: widget.images,
                   layout: _shelfGrid,

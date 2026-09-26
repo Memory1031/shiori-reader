@@ -2,10 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'local_cover_index.dart';
+import 'desktop_local_books.dart';
+import '../../shared/capabilities.dart';
+import '../../shared/widgets/desktop_content_frame.dart';
 import '../reader/book_progress_label.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../shared/source_image.dart';
-import '../../domain/contracts/local_book_decoder.dart';
+import 'local_reparse_controller.dart';
+import 'local_reparse_flow.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -25,6 +29,7 @@ class LocalBooksScreen extends StatefulWidget {
     required this.onImport,
     this.covers,
     this.progressOf,
+    this.onDetails,
   });
   final ImageRepository? images;
 
@@ -38,6 +43,7 @@ class LocalBooksScreen extends StatefulWidget {
   final LocalBookManagement management;
   final LibraryRepository library;
   final ValueChanged<NovelKey> onRead;
+  final ValueChanged<NovelKey>? onDetails;
   final VoidCallback onImport;
   @override
   State<LocalBooksScreen> createState() => _LocalBooksScreenState();
@@ -49,22 +55,44 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       : null;
   LocalCoverIndex get _covers => widget.covers ?? _ownedCovers!;
   final _request = CancellationSource();
+  final _scroll = ScrollController();
+  final _viewport = GlobalKey();
   LocalBookFormat? _filter;
 
-  /// Book currently being reparsed, so its row can show progress.
-  NovelKey? _activeKey;
   late final _books = widget.management.watchBooks();
-  CancellationSource? _reparseRequest;
-  bool _busy = false;
-  int? _batchIndex;
-  int _batchTotal = 0;
-  String _batchTitle = '';
-  String? _batchSummary;
-  AppFailure? _failure;
+  late final LocalReparseFlow? _reparseFlow = widget.store is LocalBookReparse
+      ? (LocalReparseFlow(widget.store as LocalBookReparse)
+          ..addListener(_operationChanged))
+      : null;
+  bool _deleting = false;
+  bool _showDeleteResult = false;
+  AppFailure? _deleteFailure;
+  bool get _busy => _deleting || (_reparseFlow?.busy ?? false);
+  LocalReparseController? get _operation => _reparseFlow?.controller;
+  NovelKey? get _activeKey => _operation?.active?.key;
+  AppFailure? get _failure =>
+      _showDeleteResult ? _deleteFailure : _operation?.failure;
+  int? get _batchIndex =>
+      _operation?.busy == true && _operation!.batch ? _operation!.index : null;
+  int get _batchTotal => _operation?.total ?? 0;
+  String get _batchTitle => _operation?.active?.title ?? '';
+  String? get _batchSummary =>
+      _operation?.phase == LocalReparsePhase.finished && _operation!.batch
+      ? AppLocalizations.of(context).localReparseAllSummary(
+          _operation!.succeeded,
+          _operation!.failed,
+          _operation!.unprocessed,
+        )
+      : null;
+  void _operationChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _request.cancel();
-    _reparseRequest?.cancel();
+    _scroll.dispose();
+    _reparseFlow?.dispose();
     unawaited(_ownedCovers?.close());
     super.dispose();
   }
@@ -91,8 +119,9 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     );
     if (confirmed != true || !mounted) return;
     setState(() {
-      _busy = true;
-      _failure = null;
+      _deleting = true;
+      _showDeleteResult = true;
+      _deleteFailure = null;
     });
     final result = await widget.management.deleteBook(
       info.key,
@@ -100,7 +129,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     );
     if (!mounted) return;
     if (result case Failure(:final failure)) {
-      _failure = failure;
+      _deleteFailure = failure;
     }
     if (result case Success(:final value)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -111,243 +140,31 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
         ),
       );
     }
-    setState(() => _busy = false);
+    setState(() => _deleting = false);
   }
 
   Future<void> _reparse(LocalBookInfo info) async {
-    final service = widget.store;
-    if (_busy || service is! LocalBookReparse) return;
-    final l = AppLocalizations.of(context);
-    TxtEncoding? encoding;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, change) => AlertDialog(
-          title: Text(l.localReparse),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(l.localReparseConfirm),
-              if (info.format == LocalBookFormat.txt)
-                DropdownButton<TxtEncoding>(
-                  isExpanded: true,
-                  value: encoding,
-                  hint: Text(l.importEncodingAuto),
-                  items: [
-                    for (final e in TxtEncoding.values)
-                      DropdownMenuItem(
-                        value: e,
-                        child: Text(e.name.toUpperCase()),
-                      ),
-                  ],
-                  onChanged: (e) => change(() => encoding = e),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(l.importCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(l.localReparse),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (confirm != true || !mounted) return;
-    final request = CancellationSource();
-    _reparseRequest = request;
+    if (_busy) return;
     setState(() {
-      _busy = true;
-      _failure = null;
-      _batchSummary = null;
-      _activeKey = info.key;
+      _deleteFailure = null;
+      _showDeleteResult = false;
     });
-    final result = await _performReparse(info, request, encoding: encoding);
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _reparseRequest = null;
-      _activeKey = null;
-    });
-    switch (result) {
-      case Success(:final value):
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${value.approximate ? l.localReparseApproximate : l.localReparseDone}${value.cleanupPending ? '\n${l.localCleanupPending}' : ''}',
-            ),
-          ),
-        );
-      case Failure(:final failure):
-        if (!request.token.isCancelled) setState(() => _failure = failure);
-    }
-  }
-
-  Future<Result<LocalReparseResult>> _performReparse(
-    LocalBookInfo info,
-    CancellationSource request, {
-    TxtEncoding? encoding,
-  }) async {
-    final l = AppLocalizations.of(context);
-    try {
-      return await (widget.store as LocalBookReparse).reparseBook(
-        info.key,
-        encoding: encoding,
-        cancellation: request.token,
-        chooseEncoding: (preview) async {
-          if (!mounted || request.token.isCancelled) {
-            throw const LocalParseException(LocalParseProblem.encoding);
-          }
-          final chosen = await showDialog<TxtEncoding>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: Text(info.title),
-              content: SizedBox(
-                width: 420,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(l.importEncodingHint),
-                      for (final entry in preview.samples.entries)
-                        ListTile(
-                          title: Text(entry.key.name.toUpperCase()),
-                          subtitle: Text(entry.value),
-                          onTap: () => Navigator.pop(context, entry.key),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(l.importCancel),
-                ),
-              ],
-            ),
-          );
-          if (chosen == null) {
-            request.cancel();
-            throw const LocalParseException(LocalParseProblem.encoding);
-          }
-          return chosen;
-        },
-      );
-    } catch (_) {
-      return Failure(
-        request.token.isCancelled
-            ? AppFailure.cancelled(Operation.libraryWrite)
-            : AppFailure(
-                kind: FailureKind.database,
-                operation: Operation.libraryWrite,
-              ),
-      );
-    }
+    await _reparseFlow?.start(context, [
+      LocalReparseTarget.fromInfo(info),
+    ], desktop: DesktopLayoutScope.useDesktopPage(context));
   }
 
   Future<void> _reparseAll(List<LocalBookInfo> books) async {
-    if (_busy || books.isEmpty || widget.store is! LocalBookReparse) return;
-    final targets = List<LocalBookInfo>.of(books);
-    final l = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l.localReparseAll),
-        content: Text(l.localReparseAllConfirm(targets.length)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l.importCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l.localReparseAll),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted || _busy) return;
-    final request = CancellationSource();
+    if (_busy) return;
     setState(() {
-      _busy = true;
-      _reparseRequest = request;
-      _failure = null;
-      _batchSummary = null;
-      _batchTotal = targets.length;
+      _deleteFailure = null;
+      _showDeleteResult = false;
     });
-    var succeeded = 0, failed = 0, approximate = 0;
-    var cleanupPending = false;
-    final failures = <(String, AppFailure)>[];
-    for (var i = 0; i < targets.length; i++) {
-      if (!mounted || request.token.isCancelled) break;
-      final info = targets[i];
-      setState(() {
-        _batchIndex = i + 1;
-        _batchTitle = info.title;
-        _activeKey = info.key;
-      });
-      // No override: each TXT retains its own saved encoding or prompts with
-      // this book's samples. A failure never rolls back earlier successes.
-      final result = await _performReparse(info, request);
-      switch (result) {
-        case Success(:final value):
-          succeeded++;
-          if (value.approximate) approximate++;
-          cleanupPending |= value.cleanupPending;
-        case Failure(:final failure):
-          if (request.token.isCancelled || failure.isCancellation) {
-            request.cancel();
-          } else {
-            failed++;
-            failures.add((info.title, failure));
-          }
-      }
-    }
-    if (!mounted) return;
-    final summary = l.localReparseAllSummary(
-      succeeded,
-      failed,
-      targets.length - succeeded - failed,
-    );
-    setState(() {
-      _busy = false;
-      _reparseRequest = null;
-      _batchIndex = null;
-      _batchSummary = summary;
-      _activeKey = null;
-    });
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l.localReparseAll),
-        scrollable: true,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(summary),
-            if (approximate > 0)
-              Text(l.localReparseAllApproximate(approximate)),
-            if (cleanupPending) Text(l.localCleanupPending),
-            for (final (title, failure) in failures)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text('$title\n${failureMessage(l, failure)}'),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l.importDone),
-          ),
-        ],
-      ),
+    await _reparseFlow?.start(
+      context,
+      books.map(LocalReparseTarget.fromInfo),
+      batch: true,
+      desktop: DesktopLayoutScope.useDesktopPage(context),
     );
   }
 
@@ -375,83 +192,158 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     final shown = filter == null
         ? books
         : books.where((b) => b.format == filter).toList();
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l.localBooksTitle),
-        actions: [
-          IconButton(
-            key: const ValueKey('local-books-import'),
-            tooltip: l.importTitle,
-            onPressed: _busy ? null : widget.onImport,
-            icon: const Icon(Icons.add),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: ShioriLayout.list),
-            child: CustomScrollView(
+    final desktop = DesktopLayoutScope.useDesktopPage(context);
+    final pointer = ShioriCapabilities.of(context).pointerFirst;
+    final content = CustomScrollView(
+      key: _viewport,
+      controller: pointer ? _scroll : null,
+      slivers: [
+        SliverLayoutBuilder(
+          builder: (context, constraints) {
+            final inset = desktop
+                ? desktopContentGeometry(
+                    availableWidth: constraints.crossAxisExtent,
+                    gutter: ShioriLayout.gutter(
+                      DesktopLayoutScope.widthOf(context),
+                    ),
+                    maxWidth: ShioriLayout.shelfList,
+                  ).inset
+                : ShioriSpace.page;
+            Widget fill(Widget child) => SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: desktop ? inset : 0),
+              sliver: SliverFillRemaining(hasScrollBody: false, child: child),
+            );
+            return SliverMainAxisGroup(
               slivers: [
                 if (!snapshot.hasData)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: LoadingView(),
-                  )
+                  fill(const LoadingView())
                 else if (snapshot.data case Failure(:final failure))
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: FailureView(failure: failure),
-                  )
+                  fill(FailureView(failure: failure))
                 else if (books.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _emptyLibrary(context),
-                  )
+                  fill(_emptyLibrary(context))
                 else ...[
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(
-                      ShioriSpace.page,
+                    padding: EdgeInsets.fromLTRB(
+                      inset,
                       ShioriSpace.small,
-                      ShioriSpace.page,
+                      inset,
                       ShioriSpace.item,
                     ),
                     sliver: SliverToBoxAdapter(
-                      child: _libraryCard(context, books),
+                      // A session started in the narrow inline presentation
+                      // keeps its Stop control when the window becomes wide.
+                      child:
+                          desktop &&
+                              !(_operation?.busy == true &&
+                                  _reparseFlow?.modal == false)
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(l.localBooksSubtitle),
+                                if (_deleteFailure != null)
+                                  Text(
+                                    failureMessage(l, _deleteFailure!),
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                    ),
+                                  ),
+                              ],
+                            )
+                          : _libraryCard(context, books),
                     ),
                   ),
                   if (hasEpub && hasTxt)
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(
-                        ShioriSpace.page,
+                      padding: EdgeInsets.fromLTRB(
+                        inset,
                         0,
-                        ShioriSpace.page,
+                        inset,
                         ShioriSpace.small,
                       ),
                       sliver: SliverToBoxAdapter(
                         child: _formatFilter(context, books),
                       ),
                     ),
-                  // Row highlights line up with the library card's edges; the
-                  // row's inset keeps covers clear of the highlight edge.
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(
-                      ShioriSpace.page,
+                    padding: EdgeInsets.fromLTRB(
+                      desktop ? inset - BookListItem.inset : inset,
                       0,
-                      ShioriSpace.page,
+                      desktop ? inset - BookListItem.inset : inset,
                       ShioriSpace.section,
                     ),
                     sliver: SliverList.builder(
                       itemCount: shown.length,
                       itemBuilder: (context, index) =>
-                          _bookTile(context, shown[index]),
+                          _bookTile(context, shown[index], desktop: desktop),
                     ),
                   ),
                 ],
               ],
+            );
+          },
+        ),
+      ],
+    );
+    return Scaffold(
+      appBar: desktop
+          ? null
+          : AppBar(
+              title: Text(l.localBooksTitle),
+              actions: [
+                IconButton(
+                  key: const ValueKey('local-books-import'),
+                  tooltip: l.importTitle,
+                  onPressed: _busy ? null : widget.onImport,
+                  icon: const Icon(Icons.add),
+                ),
+              ],
             ),
-          ),
+      body: SafeArea(
+        top: desktop,
+        child: Column(
+          children: [
+            if (desktop)
+              DesktopContentFrame(
+                maxWidth: ShioriLayout.shelfList,
+                child: DesktopPageToolbar(
+                  title: l.localBooksTitle,
+                  leading:
+                      ModalRoute.of(context)?.impliesAppBarDismissal == true
+                      ? const BackButton()
+                      : null,
+                  secondary: snapshot.data is Success
+                      ? Text(l.localBooksCount(books.length))
+                      : null,
+                  actions: [
+                    if (_canReparse && books.isNotEmpty)
+                      OutlinedButton.icon(
+                        key: const ValueKey('local-books-reparse-all'),
+                        onPressed: _busy ? null : () => _reparseAll(books),
+                        icon: const Icon(Icons.autorenew, size: 20),
+                        label: Text(l.localReparseAll),
+                      ),
+                    OutlinedButton.icon(
+                      key: const ValueKey('local-books-import'),
+                      onPressed: _busy ? null : widget.onImport,
+                      icon: const Icon(Icons.file_upload_outlined, size: 20),
+                      label: Text(l.importTitle),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: desktop ? double.infinity : ShioriLayout.list,
+                  ),
+                  child: content,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -500,14 +392,14 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
             Text(l.localBooksSubtitle, style: muted),
             if (_canReparse || _busy) ...[
               const SizedBox(height: ShioriSpace.item),
-              if (_busy)
+              if (_operation?.busy == true || _deleting)
                 _reparseProgress(context)
               else
                 Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: FilledButton.tonalIcon(
                     key: const ValueKey('local-books-reparse-all'),
-                    onPressed: () => _reparseAll(books),
+                    onPressed: _busy ? null : () => _reparseAll(books),
                     icon: const Icon(Icons.autorenew, size: 20),
                     label: Text(l.localReparseAll),
                   ),
@@ -550,13 +442,13 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
             minHeight: 4,
           ),
         ),
-        if (_reparseRequest != null)
+        if (_operation?.busy == true)
           Align(
             alignment: AlignmentDirectional.centerEnd,
             child: TextButton(
-              onPressed: _reparseRequest!.token.isCancelled
+              onPressed: _operation!.cancellationRequested
                   ? null
-                  : () => setState(() => _reparseRequest?.cancel()),
+                  : _operation!.cancel,
               child: Text(
                 _batchIndex == null ? l.importCancel : l.localReparseStop,
               ),
@@ -593,7 +485,11 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     );
   }
 
-  Widget _bookTile(BuildContext context, LocalBookInfo book) {
+  Widget _bookTile(
+    BuildContext context,
+    LocalBookInfo book, {
+    bool desktop = false,
+  }) {
     final l = AppLocalizations.of(context);
     final epub = book.format == LocalBookFormat.epub;
     final progress = bookProgressLabel(
@@ -607,50 +503,125 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       ).formatShortDate(book.importedAt.toLocal()),
     );
     final active = _activeKey == book.key;
+    Widget tile(Widget? more) => BookListTile(
+      cover: _LocalCover(
+        book: book,
+        covers: _covers,
+        images: widget.images,
+        placeholder: CoverPlaceholder(
+          icon: epub ? Icons.auto_stories_outlined : Icons.description_outlined,
+          tinted: epub,
+        ),
+      ),
+      title: book.title,
+      subtitle: [book.format.name.toUpperCase(), ?progress].join(' · '),
+      metadata: imported,
+      trailing:
+          more ??
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (active)
+                Padding(
+                  padding: const EdgeInsets.all(ShioriSpace.medium),
+                  child: SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      semanticsLabel: l.localReparse,
+                    ),
+                  ),
+                )
+              else if (_canReparse)
+                IconButton(
+                  key: ValueKey(('local-book-reparse', book.key)),
+                  tooltip: l.localReparse,
+                  onPressed: _busy ? null : () => _reparse(book),
+                  icon: const Icon(Icons.autorenew, size: 20),
+                ),
+              _bookMenu(context, book),
+            ],
+          ),
+    );
+    if (desktop) {
+      return DesktopLocalBookRow(
+        key: ValueKey(book.key),
+        onRead: _busy ? null : () => widget.onRead(book.key),
+        onMenu: (anchor) => _desktopMenu(context, book, anchor),
+        content: tile,
+      );
+    }
     return BookListItem(
       key: ValueKey(book.key),
       onTap: _busy ? null : () => widget.onRead(book.key),
-      child: BookListTile(
-        cover: _LocalCover(
-          book: book,
-          covers: _covers,
-          images: widget.images,
-          placeholder: CoverPlaceholder(
-            icon: epub
-                ? Icons.auto_stories_outlined
-                : Icons.description_outlined,
-            tinted: epub,
-          ),
-        ),
-        title: book.title,
-        subtitle: [book.format.name.toUpperCase(), ?progress].join(' · '),
-        metadata: imported,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (active)
-              Padding(
-                padding: const EdgeInsets.all(ShioriSpace.medium),
-                child: SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    semanticsLabel: l.localReparse,
-                  ),
-                ),
-              )
-            else if (_canReparse)
-              IconButton(
-                key: ValueKey(('local-book-reparse', book.key)),
-                tooltip: l.localReparse,
-                onPressed: _busy ? null : () => _reparse(book),
-                icon: const Icon(Icons.autorenew, size: 20),
-              ),
-            _bookMenu(context, book),
-          ],
-        ),
-      ),
+      child: tile(null),
     );
+  }
+
+  Future<bool> _desktopMenu(
+    BuildContext context,
+    LocalBookInfo book,
+    Rect anchor,
+  ) async {
+    if (_busy) return false;
+    final l = AppLocalizations.of(context);
+    final overlay =
+        Overlay.of(context, rootOverlay: true).context.findRenderObject()!
+            as RenderBox;
+    final at = overlay.globalToLocal(
+      Directionality.of(context) == TextDirection.rtl
+          ? anchor.bottomRight
+          : anchor.bottomLeft,
+    );
+    final action = await showMenu<String>(
+      context: context,
+      useRootNavigator: true,
+      position: RelativeRect.fromRect(
+        at & Size.zero,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        ShioriMenuItem(
+          value: 'read',
+          label: widget.progressOf?.call(book.key) == null
+              ? l.detailStart
+              : l.detailContinue,
+          icon: Icons.menu_book_outlined,
+        ),
+        ShioriMenuItem(
+          value: 'details',
+          label: l.novelDetailsTitle,
+          icon: Icons.info_outline,
+          enabled: widget.onDetails != null,
+        ),
+        const PopupMenuDivider(),
+        if (_canReparse)
+          ShioriMenuItem(
+            value: 'reparse',
+            label: l.localReparse,
+            icon: Icons.autorenew,
+          ),
+        ShioriMenuItem(
+          value: 'delete',
+          label: l.localDeleteConfirm,
+          icon: Icons.delete_outline,
+        ),
+      ],
+    );
+    if (!mounted) return false;
+    switch (action) {
+      case null:
+        return true;
+      case 'read':
+        widget.onRead(book.key);
+      case 'details':
+        widget.onDetails?.call(book.key);
+      case 'reparse':
+        _reparse(book);
+      case 'delete':
+        _delete(book);
+    }
+    return false;
   }
 
   Widget _bookMenu(BuildContext context, LocalBookInfo book) {

@@ -262,7 +262,7 @@ class _DesktopDetailState extends State<DesktopDetail> {
           Widget framed(Widget child) =>
               DesktopContentFrame(maxWidth: ShioriLayout.detail, child: child);
           // Scrolled content sits on the frame widened by the catalog's
-          // bleed; the scroll view itself reaches the window's end.
+          // bleed; the scroll view itself reaches the Workspace's end.
           final end = math.max(0.0, layout.inset - BookListItem.inset);
           Widget scroll(double start, Widget sliver) => KeyedSubtree(
             key: _scroll,

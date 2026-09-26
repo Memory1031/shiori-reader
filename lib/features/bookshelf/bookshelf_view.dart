@@ -10,6 +10,9 @@ import '../../shared/widgets/desktop_content_frame.dart';
 import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
 import 'desktop_shelf.dart';
+import '../../shared/widgets/desktop_menu.dart';
+import '../local_books/local_reparse_flow.dart';
+import '../local_books/local_reparse_controller.dart';
 import 'library_controller.dart';
 import '../reader/book_progress_label.dart';
 import 'remove_shelf_book.dart';
@@ -21,6 +24,7 @@ class BookshelfView extends StatefulWidget {
     required this.onOpen,
     required this.onSearch,
     this.onDetails,
+    this.localReparse,
     this.onImport,
     this.images,
     this.header,
@@ -29,6 +33,7 @@ class BookshelfView extends StatefulWidget {
     this.desktop = false,
   });
   final LibraryController controller;
+  final LocalBookReparse? localReparse;
 
   /// The pointer-first shelf: a fixed toolbar over centered content,
   /// a density-driven grid, column rows without swipe actions, and book
@@ -60,6 +65,9 @@ class _BookshelfViewState extends State<BookshelfView> {
   ValueNotifier<bool> get _layout =>
       widget.layout ?? (_ownLayout ??= ValueNotifier(true));
   bool get _grid => _layout.value;
+  late final LocalReparseFlow? _reparse = widget.localReparse == null
+      ? null
+      : LocalReparseFlow(widget.localReparse!);
   NovelKey? _revealed;
   double _drag = 0;
 
@@ -83,6 +91,9 @@ class _BookshelfViewState extends State<BookshelfView> {
   void dispose() {
     _layout.removeListener(_layoutChanged);
     _ownLayout?.dispose();
+
+    _reparse?.dispose();
+
     super.dispose();
   }
 
@@ -198,6 +209,15 @@ class _BookshelfViewState extends State<BookshelfView> {
           enabled: widget.onDetails != null,
         ),
         const PopupMenuDivider(),
+        if (book.key.sourceId == LocalBookIdentity.sourceId &&
+            _reparse != null &&
+            controller.localFormats.containsKey(book.key))
+          entry(
+            _BookAction.reparse,
+            Icons.autorenew,
+            strings.localReparse,
+            enabled: !_reparse.busy,
+          ),
         entry(
           _BookAction.remove,
           Icons.bookmark_remove_outlined,
@@ -214,6 +234,13 @@ class _BookshelfViewState extends State<BookshelfView> {
         widget.onOpen(book.key);
       case _BookAction.details:
         widget.onDetails?.call(book.key);
+      case _BookAction.reparse:
+        final format = controller.localFormats[book.key];
+        if (format != null) {
+          _reparse?.start(context, [
+            LocalReparseTarget(book.key, book.title, format),
+          ], desktop: true);
+        }
       case _BookAction.remove:
         removeShelfBook(context, controller, book);
     }
@@ -657,7 +684,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 }
 
-enum _BookAction { open, details, remove }
+enum _BookAction { open, details, reparse, remove }
 
 /// Switches a shelf between grid and list.
 class ShelfLayoutButton extends StatelessWidget {
@@ -826,7 +853,7 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
     final showMore = _hovered || _focused || _menuOpen;
     card = Stack(
       children: [
-        ShelfMenuShortcuts(
+        DesktopMenuShortcuts(
           onMenu: () => _openAtMore(keyboard: true),
           child: card,
         ),

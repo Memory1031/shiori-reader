@@ -1,8 +1,7 @@
 import 'dart:math' as math;
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../shared/widgets/desktop_menu.dart';
 
 import '../../app/theme/shiori_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -39,65 +38,6 @@ const maxDensityScale = 1.3;
 
 /// The shelf frame's inset from the workspace edge for a window [width].
 double desktopShelfGutter(double width) => ShioriLayout.gutter(width);
-
-/// Opens a book menu from the Menu key or Shift+F10 while [child] or a
-/// descendant has focus.
-class ShelfMenuShortcuts extends StatelessWidget {
-  const ShelfMenuShortcuts({
-    super.key,
-    required this.onMenu,
-    required this.child,
-  });
-  final VoidCallback onMenu;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Shortcuts(
-    shortcuts: const {
-      SingleActivator(LogicalKeyboardKey.contextMenu): _MenuIntent(),
-      SingleActivator(LogicalKeyboardKey.f10, shift: true): _MenuIntent(),
-    },
-    child: Actions(
-      actions: {
-        _MenuIntent: CallbackAction<_MenuIntent>(onInvoke: (_) => onMenu()),
-      },
-      child: child,
-    ),
-  );
-}
-
-class _MenuIntent extends Intent {
-  const _MenuIntent();
-}
-
-/// Whether a book menu that resolves [dismissed] closed from the keyboard,
-/// so focus goes back to its book. The answer starts from how the menu was
-/// opened ([keyboard]) and each key or pointer press while it is open takes
-/// over: Escape returns focus, while clicking outside leaves focus alone so
-/// the book doesn't keep a focus ring the pointer never asked for.
-Future<bool> menuClosedFromKeyboard(
-  Future<bool> dismissed, {
-  required bool keyboard,
-}) async {
-  var fromKeyboard = keyboard;
-  bool onKey(KeyEvent event) {
-    if (event is KeyDownEvent) fromKeyboard = true;
-    return false;
-  }
-
-  void onPointer(PointerEvent event) {
-    if (event is PointerDownEvent) fromKeyboard = false;
-  }
-
-  HardwareKeyboard.instance.addHandler(onKey);
-  GestureBinding.instance.pointerRouter.addGlobalRoute(onPointer);
-  try {
-    return await dismissed && fromKeyboard;
-  } finally {
-    HardwareKeyboard.instance.removeHandler(onKey);
-    GestureBinding.instance.pointerRouter.removeGlobalRoute(onPointer);
-  }
-}
 
 /// Grid or list as two segments sharing the host layout choice.
 class ShelfLayoutToggle extends StatelessWidget {
@@ -311,7 +251,7 @@ class _DesktopBookRowState extends State<DesktopBookRow> {
       secondary: secondary,
     );
 
-    return ShelfMenuShortcuts(
+    return DesktopMenuShortcuts(
       onMenu: () => _openAtMore(keyboard: true),
       child: BookListItem(
         focusNode: _focus,
