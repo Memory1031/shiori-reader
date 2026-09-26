@@ -22,6 +22,46 @@ void main() {
     expect(find.byType(BookReaderScreen), findsOneWidget);
   }
 
+  testWidgets(
+    'Shelf Detail Reader round trip retains Workspace and Detail across breakpoints',
+    (tester) async {
+      final h = ShellHarness(tester);
+      await h.pump(onShelf: true, size: const Size(1920, 720));
+      await tester.tap(find.byTooltip(h.l.shelfList));
+      await tester.pumpAndSettle();
+      final shelf = tester.element(find.byType(BookshelfView));
+      final workspace = h.workspace;
+      await tester.tap(find.byTooltip(h.l.moreActions));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(h.l.novelDetailsTitle));
+      await tester.pumpAndSettle();
+      final detail = tester.element(find.byType(DetailScreen));
+      final route = ModalRoute.of(detail);
+      await read(tester);
+      final reader = tester.element(find.byType(BookReaderScreen));
+      for (final width in [1199.0, 1200.0, 1199.0, 1920.0]) {
+        await h.resize(width);
+        expect(h.workspace, same(workspace));
+        expect(tester.element(find.byType(BookReaderScreen)), same(reader));
+        expect(
+          tester.element(find.byType(DetailScreen, skipOffstage: false)),
+          same(detail),
+        );
+        expect(ModalRoute.of(detail), same(route));
+      }
+      await h.key(LogicalKeyboardKey.escape);
+      expect(tester.element(find.byType(DetailScreen)), same(detail));
+      expect(Navigator.of(detail), same(workspace));
+      await tester.tap(find.byKey(const ValueKey('detail-back')));
+      await tester.pumpAndSettle();
+      expect(tester.element(find.byType(BookshelfView)), same(shelf));
+      expect(h.shelfGrid, isFalse);
+      expect(workspace.canPop(), isFalse);
+      await h.close();
+    },
+    variant: _desktop,
+  );
+
   testWidgets('the reader covers the shell and resizing keeps both', (
     tester,
   ) async {
@@ -94,10 +134,27 @@ void main() {
     // Full window, above the reader rather than in the workspace.
     expect(Navigator.of(tester.element(over)), same(h.root));
     expect(find.byType(ShellNavigation), findsNothing);
+    final root = h.root;
+    final workspace = h.workspace;
+    final detail = tester.element(over);
+    final reader = tester.element(
+      find.byType(BookReaderScreen, skipOffstage: false),
+    );
+    for (final width in [1199.0, 1200.0, 1920.0]) {
+      await h.resize(width);
+      expect(h.root, same(root));
+      expect(h.workspace, same(workspace));
+      expect(tester.element(over), same(detail));
+      expect(
+        tester.element(find.byType(BookReaderScreen, skipOffstage: false)),
+        same(reader),
+      );
+    }
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byType(BookReaderScreen), findsOneWidget);
+    expect(tester.element(find.byType(BookReaderScreen)), same(reader));
     // The reader is back as it was left: toolbars shown, so back first
     // closes them and then leaves.
     expect(find.byTooltip(h.l.moreActions), findsOneWidget);
@@ -205,13 +262,17 @@ void main() {
     Rect cover() => tester.getRect(
       find.descendant(of: over, matching: find.byType(DetailCover)),
     );
-    expect(back().left, closeTo(ShioriLayout.gutter(1280), .01));
+    expect(back().left, closeTo((1280 - ShioriLayout.detail) / 2, .01));
     expect(cover().width, closeTo(ShioriLayout.detailSideWide, .01));
 
-    for (final width in [900.0, 1600.0, 1280.0]) {
+    for (final width in [900.0, 1199.0, 1200.0, 1199.0, 1920.0, 1280.0]) {
       await h.resize(width);
       expect(tester.state(find.byType(DesktopDetail)), same(state));
-      expect(back().left, closeTo(ShioriLayout.gutter(width), .01));
+      final frame = (width - 2 * ShioriLayout.gutter(width)).clamp(
+        0,
+        ShioriLayout.detail,
+      );
+      expect(back().left, closeTo((width - frame) / 2, .01));
       expect(tester.takeException(), isNull, reason: '$width');
     }
     expect(cover().width, closeTo(ShioriLayout.detailSideWide, .01));

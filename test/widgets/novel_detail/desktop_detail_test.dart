@@ -180,15 +180,23 @@ class DetailHarness {
   final chapters = <ChapterKey>[];
   final targets = <LocalNavigationEntry>[];
   var brightness = Brightness.light, locale = 'en', scale = 1.0;
+  TextDirection? direction;
   late double width;
 
   static double navigation(double width) => width >= 1200 ? 232 : 72;
 
   double get offset => host == Host.workspace ? navigation(width) : 0;
-  ({double gutter, double frame, bool columns, double side, double main})
+  ({
+    double gutter,
+    double frame,
+    double inset,
+    bool columns,
+    double side,
+    double main,
+  })
   get layout =>
       desktopDetailLayout(width - offset, width, TextScaler.linear(scale));
-  double get start => offset + layout.gutter;
+  double get start => offset + layout.inset;
 
   AppLocalizations get l =>
       AppLocalizations.of(tester.element(find.byType(DetailScreen)));
@@ -240,7 +248,9 @@ class DetailHarness {
         data: MediaQuery.of(
           context,
         ).copyWith(textScaler: TextScaler.linear(scale)),
-        child: child!,
+        child: direction == null
+            ? child!
+            : Directionality(textDirection: direction!, child: child!),
       ),
       home: host == Host.root
           ? const Scaffold(body: Text('reader'))
@@ -373,6 +383,9 @@ List<Finder> actions(DetailHarness h, {bool tags = true, bool text = true}) => [
 void expectFrame(DetailHarness h, {required bool columns}) {
   final layout = h.layout;
   final start = h.start;
+  final toolbar = h.rect(find.byType(DesktopDetailBar));
+  expect(toolbar.width, moreOrLessEquals(layout.frame));
+  expect(toolbar.left - h.offset, moreOrLessEquals(h.width - toolbar.right));
   expect(layout.columns, columns, reason: '${h.width} x${h.scale}');
   final back = h.rect(h.key('detail-back'));
   expect(back.left, moreOrLessEquals(start));
@@ -388,14 +401,17 @@ void expectFrame(DetailHarness h, {required bool columns}) {
     h.rect(h.key('detail-more')).right,
     moreOrLessEquals(start + layout.frame),
   );
-  // The page scroll reaches the window's end; two columns keep the side
-  // column out of it.
+  // Main scroll fills the Workspace, including both blank margins. The side
+  // viewport owns hits only within its independent box.
   final scroll = h.rect(h.key('detail-scroll'));
-  expect(
-    scroll.left,
-    moreOrLessEquals(columns ? start + layout.side : h.offset),
-  );
+  expect(scroll.left, moreOrLessEquals(h.offset));
   expect(scroll.right, moreOrLessEquals(h.width));
+  final scrollbar = find.descendant(
+    of: h.key('detail-scroll'),
+    matching: find.byType(Scrollbar),
+  );
+  expect(scrollbar, findsOneWidget);
+  expect(h.rect(scrollbar), scroll);
   if (columns) {
     final side = h.rect(h.key('detail-side'));
     expect(side.left, moreOrLessEquals(start));
@@ -464,6 +480,17 @@ void main() {
     check(900 - 72, 900, 780, false);
     check(1280 - 232, 1280, 984, true, 200);
     check(1600 - 232, 1600, 1040, true, 240);
+    check(1920 - 232, 1920, 1040, true, 240);
+    for (final sample in [
+      (828.0, 900.0, 24.0),
+      (1048.0, 1280.0, 32.0),
+      (1368.0, 1600.0, 164.0),
+      (1688.0, 1920.0, 324.0),
+    ]) {
+      final layout = desktopDetailLayout(sample.$1, sample.$2, one);
+      expect(layout.inset, sample.$3);
+      expect(sample.$1 - layout.inset - layout.frame, sample.$3);
+    }
     // Over the reader, across the window.
     check(900, 900, 852, false);
     check(1280, 1280, 1040, true, 240);
@@ -498,7 +525,7 @@ void main() {
         await h.pump(width: 900);
         for (final scale in [1.0, 1.3, 2.0]) {
           await h.restyle(scale: scale);
-          for (final width in [900.0, 1280.0, 1600.0]) {
+          for (final width in [900.0, 1280.0, 1600.0, 1920.0]) {
             await h.resize(width);
             // Both hosts split at 1280 and 1600 with standard text only.
             expectFrame(h, columns: scale == 1 && width > 900);
@@ -585,6 +612,17 @@ void main() {
       final detail = state<ControllerScope<DetailController>>();
       final catalog = state<ControllerScope<CatalogController>>();
       final cover = tester.element(find.byType(DetailCover));
+      final screen = tester.element(find.byType(DetailScreen));
+      final viewport = tester.element(h.key('detail-scroll'));
+      ScrollableState pageScroll() => tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: h.key('detail-scroll'),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      final scrollState = pageScroll();
       final localPreview = novel == local
           ? tester.state(
               find.byWidgetPredicate(
@@ -610,6 +648,9 @@ void main() {
         expect(state<ControllerScope<DetailController>>(), same(detail));
         expect(state<ControllerScope<CatalogController>>(), same(catalog));
         expect(tester.element(find.byType(DetailCover)), same(cover));
+        expect(tester.element(find.byType(DetailScreen)), same(screen));
+        expect(tester.element(h.key('detail-scroll')), same(viewport));
+        expect(pageScroll(), same(scrollState));
         if (localPreview != null) {
           expect(
             tester.state(
@@ -657,6 +698,16 @@ void main() {
       await expectKept('rail', columns: true);
       await h.resize(1280);
       await expectKept('back', columns: true);
+      for (final width in [839.0, 840.0, 1199.0, 1200.0, 1199.0, 1920.0]) {
+        await h.resize(width);
+        await expectKept('breakpoint $width', columns: width >= 1199);
+      }
+      // At this scale the Shell rail/sidebar change also changes column mode.
+      await h.restyle(scale: 1.15);
+      for (final width in [1199.0, 1200.0, 1199.0]) {
+        await h.resize(width);
+        await expectKept('combined $width', columns: width == 1199);
+      }
 
       // Asked-for requests still go out.
       await tester.tap(h.key('detail-more'));

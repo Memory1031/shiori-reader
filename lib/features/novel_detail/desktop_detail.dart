@@ -5,18 +5,31 @@ import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_list_tile.dart';
+import '../../shared/widgets/desktop_content_frame.dart';
 
 /// Gutter, frame and columns for desktop details laid out in [available]
 /// width, in a window [window] wide.
 ///
-/// The frame is left-aligned on the window's gutter and capped at
+/// The frame is centered in the available width and capped at
 /// [ShioriLayout.detail]. Two columns need [ShioriLayout.detailColumns]
 /// scaled by the full text scale, so large text falls back to one column
 /// instead of squeezing the side column.
-({double gutter, double frame, bool columns, double side, double main})
+({
+  double gutter,
+  double frame,
+  double inset,
+  bool columns,
+  double side,
+  double main,
+})
 desktopDetailLayout(double available, double window, TextScaler scaler) {
   final gutter = ShioriLayout.gutter(window);
-  final frame = (available - 2 * gutter).clamp(0.0, ShioriLayout.detail);
+  final geometry = desktopContentGeometry(
+    availableWidth: available,
+    gutter: gutter,
+    maxWidth: ShioriLayout.detail,
+  );
+  final frame = geometry.contentWidth;
   final scale = math.max(1.0, scaler.scale(15) / 15);
   final side = frame >= DesktopDetail.wideSide
       ? ShioriLayout.detailSideWide
@@ -24,6 +37,7 @@ desktopDetailLayout(double available, double window, TextScaler scaler) {
   return (
     gutter: gutter,
     frame: frame,
+    inset: geometry.inset,
     columns: frame >= ShioriLayout.detailColumns * scale,
     side: side,
     main: frame - side - ShioriLayout.detailGap,
@@ -31,7 +45,7 @@ desktopDetailLayout(double available, double window, TextScaler scaler) {
 }
 
 /// Novel details on the desktop: a fixed title bar over one scrolling page,
-/// both on the same left-aligned frame.
+/// both on the same centered content frame, with a full-width main viewport.
 ///
 /// Wide frames put the cover and reading actions in a side column, fixed
 /// beside the book's scrolling text and catalog; narrow frames and large
@@ -242,22 +256,14 @@ class _DesktopDetailState extends State<DesktopDetail> {
         builder: (context, bounds) {
           final layout = desktopDetailLayout(
             bounds.maxWidth,
-            MediaQuery.sizeOf(context).width,
+            DesktopLayoutScope.widthOf(context),
             MediaQuery.textScalerOf(context),
           );
-          Widget framed(Widget child) => Padding(
-            padding: EdgeInsets.symmetric(horizontal: layout.gutter),
-            child: Align(
-              alignment: AlignmentDirectional.topStart,
-              child: SizedBox(width: layout.frame, child: child),
-            ),
-          );
+          Widget framed(Widget child) =>
+              DesktopContentFrame(maxWidth: ShioriLayout.detail, child: child);
           // Scrolled content sits on the frame widened by the catalog's
           // bleed; the scroll view itself reaches the window's end.
-          final end = math.max(
-            0.0,
-            bounds.maxWidth - layout.gutter - layout.frame - BookListItem.inset,
-          );
+          final end = math.max(0.0, layout.inset - BookListItem.inset);
           Widget scroll(double start, Widget sliver) => KeyedSubtree(
             key: _scroll,
             child: CustomScrollView(
@@ -265,7 +271,7 @@ class _DesktopDetailState extends State<DesktopDetail> {
               slivers: [
                 SliverPadding(
                   padding: EdgeInsetsDirectional.fromSTEB(
-                    start,
+                    math.max(0.0, start),
                     ShioriSpace.small,
                     end,
                     ShioriSpace.section,
@@ -294,16 +300,24 @@ class _DesktopDetailState extends State<DesktopDetail> {
                     ),
                   ),
                 Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      SizedBox(width: layout.gutter),
-                      _side(layout.side),
-                      Expanded(
-                        child: scroll(
-                          ShioriLayout.detailGap - BookListItem.inset,
-                          _text(context),
-                        ),
+                      // Full-width main scroll owns the blank margins. The
+                      // independent side viewport takes hits only on its box.
+                      scroll(
+                        layout.inset +
+                            layout.side +
+                            ShioriLayout.detailGap -
+                            BookListItem.inset,
+                        _text(context),
+                      ),
+                      PositionedDirectional(
+                        start: layout.inset,
+                        top: 0,
+                        bottom: 0,
+                        width: layout.side,
+                        child: _side(layout.side),
                       ),
                     ],
                   ),
@@ -312,7 +326,7 @@ class _DesktopDetailState extends State<DesktopDetail> {
             );
           } else {
             page = scroll(
-              layout.gutter - BookListItem.inset,
+              layout.inset - BookListItem.inset,
               _single(context, layout.frame),
             );
           }
@@ -336,44 +350,21 @@ class DesktopDetailBar extends StatelessWidget {
   const DesktopDetailBar({super.key, required this.menu});
   final Widget menu;
 
-  /// The back and more buttons' square slots, and the gap before the title.
-  static const slot = 40.0, backGap = ShioriSpace.small;
+  /// The back and more buttons' square slots; spacing belongs to the toolbar.
+  static const slot = 40.0;
 
   @override
   Widget build(BuildContext context) {
     final canPop = ModalRoute.of(context)?.impliesAppBarDismissal ?? false;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 64),
-      child: Padding(
-        padding: const EdgeInsets.only(
-          top: ShioriSpace.item,
-          bottom: ShioriSpace.medium,
-        ),
-        child: Row(
-          children: [
-            if (canPop) ...[
-              const SizedBox.square(
-                dimension: slot,
-                child: BackButton(key: ValueKey('detail-back')),
-              ),
-              const SizedBox(width: backGap),
-            ],
-            Expanded(
-              child: Semantics(
-                header: true,
-                child: Text(
-                  AppLocalizations.of(context).novelDetailsTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-            ),
-            const SizedBox(width: ShioriSpace.item),
-            SizedBox.square(dimension: slot, child: menu),
-          ],
-        ),
-      ),
+    return DesktopPageToolbar(
+      title: AppLocalizations.of(context).novelDetailsTitle,
+      leading: canPop
+          ? const SizedBox.square(
+              dimension: slot,
+              child: BackButton(key: ValueKey('detail-back')),
+            )
+          : null,
+      actions: [SizedBox.square(dimension: slot, child: menu)],
     );
   }
 }

@@ -239,7 +239,7 @@ void main() {
         Navigator.of(tester.element(find.byType(BookReaderScreen))),
         same(h.root),
       );
-      for (final width in [839.0, 840.0, 1199.0, 1200.0, 1280.0]) {
+      for (final width in [839.0, 840.0, 1199.0, 1200.0, 1920.0, 1280.0]) {
         await h.resize(width);
         expect(h.workspace, same(workspace));
         expect(
