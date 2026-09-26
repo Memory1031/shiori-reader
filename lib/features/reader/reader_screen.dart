@@ -992,10 +992,12 @@ class _ReaderContentViewState extends State<ReaderContentView>
     required TextStyle style,
     required double contentTop,
   }) {
+    final columnWidth =
+        (bounds.maxWidth - (columns - 1) * readerColumnGap) / columns;
     ({double height, double caption}) extent(ImageBlock block) =>
         readerImageExtent(
           block,
-          width: bounds.maxWidth.clamp(0, readerMaxPageWidth),
+          width: columnWidth,
           maxHeight: bounds.maxHeight,
           scaler: MediaQuery.textScalerOf(context),
           direction: Directionality.of(context),

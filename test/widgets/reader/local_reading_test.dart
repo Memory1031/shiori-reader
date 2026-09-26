@@ -16,6 +16,7 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/features/reader/viewport/page_turn.dart';
 import 'package:shiori/features/local_books/local_catalog.dart';
 import '../../data/local/support/epub_fixtures.dart';
 import '../../data/local/support/mixed_epub_fixture.dart';
@@ -50,6 +51,127 @@ class MemoryBooks implements LocalBookStore {
 }
 
 void main() {
+  for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
+    testWidgets(
+      'local contents turn by reading order on $platform',
+      (tester) async {
+        await tester.binding.setSurfaceSize(
+          platform == TargetPlatform.windows
+              ? const Size(1600, 900)
+              : const Size(800, 600),
+        );
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final files = epubFiles();
+        files['OPS/text/a.xhtml'] = utf8.encode(
+          '<html><body><h1>First</h1><p id="one">Anchor destination</p>'
+          '${List.generate(60, (i) => '<p>Later $i. ${'Body text. ' * 20}</p>').join()}'
+          '</body></html>',
+        );
+        final content = EpubParser(
+          zipFiles(files),
+          LocalBookIdentity.book('e' * 64),
+          'direction.epub',
+        ).parse().content;
+        final store = MemoryBooks(
+          LocalBookRecord(
+            content: content,
+            format: LocalBookFormat.epub,
+            importedAt: DateTime.utc(2026),
+          ),
+        );
+        final settings = FixtureSettingsStore();
+        await settings.save(
+          ReaderSettings(controlsHintSeen: true),
+          cancellation: CancellationSource().token,
+        );
+        await tester.pumpWidget(
+          ShioriApp(
+            locale: const Locale('en'),
+            routes: AppRoutes(
+              home: (_) => BookReaderScreen(
+                chapter: content.chapters.last.key,
+                repository: LocalReadingRepository(
+                  local: store,
+                  online: ForbiddenOnline(),
+                ),
+                settings: settings,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        ReaderContentView view() =>
+            tester.widget<ReaderContentView>(find.byType(ReaderContentView));
+        Future<void> select(String label, int direction) async {
+          if (find.byIcon(Icons.list).evaluate().isEmpty) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+            await tester.pumpAndSettle();
+          }
+          await tester.tap(find.byIcon(Icons.list));
+          await tester.pumpAndSettle();
+          final row = find.descendant(
+            of: find.byType(LocalNavigationView),
+            matching: find.text(label),
+          );
+          // Earlier TOC rows grow above the current-chapter scroll anchor.
+          if (row.evaluate().isEmpty) {
+            await tester.drag(
+              find.descendant(
+                of: find.byType(LocalNavigationView),
+                matching: find.byType(CustomScrollView),
+              ),
+              const Offset(0, 250),
+            );
+            await tester.pumpAndSettle();
+          }
+          await tester.ensureVisible(row);
+          store.delay = Completer<void>();
+          await tester.tap(row);
+          await tester.pumpAndSettle();
+          final previous = view().content.key;
+          store.delay!.complete();
+          store.delay = null;
+          final slots = find.ancestor(
+            of: find.byType(ReaderContentView),
+            matching: find.byType(PageTurnSlot),
+          );
+          for (var frame = 0; frame < 30; frame++) {
+            await tester.pump(const Duration(milliseconds: 16));
+            if (tester
+                .widgetList<PageTurnSlot>(slots)
+                .any((slot) => slot.frame.turning)) {
+              break;
+            }
+          }
+          final turning = tester.widgetList<PageTurnSlot>(slots).toList();
+          expect(turning, hasLength(2));
+          for (final slot in turning) {
+            expect(slot.frame.turning, isTrue);
+            expect(slot.frame.direction, direction);
+          }
+          await tester.pumpAndSettle();
+          expect(view().content.key, isNot(previous));
+          expect(view().session!.startAtEnd, isFalse);
+          expect(tester.takeException(), isNull);
+        }
+
+        // The fixture TOC lists chapter B before A; use spine reading order,
+        // not TOC row order, while preserving each entry's fragment target.
+        await select('第一段', -1);
+        expect(view().content.key, content.chapters.first.key);
+        expect(
+          view().viewportController!.capture()!.blockKey,
+          content.navigation.last.blockKey,
+        );
+        await select('先列第二章', 1);
+        expect(view().content.key, content.chapters.last.key);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      },
+      variant: TargetPlatformVariant({platform}),
+    );
+  }
+
   for (final ncx in [true, false]) {
     for (final toc in [true, false]) {
       testWidgets(

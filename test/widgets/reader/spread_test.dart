@@ -100,61 +100,58 @@ void main() {
     },
   );
 
-  test(
-    'a spread consumes consecutive pages and keeps illustrations standalone',
-    () {
-      final content = chapter([
-        ParagraphBlock(text: 'Before image. ' * 90),
-        ImageBlock(media: fixtureMediaRef(0), width: 300, height: 500),
-        ParagraphBlock(text: 'After image. ' * 90),
-      ]);
-      PageLayout layout(int columns) => PageLayout(
-        index: ChunkIndex(content),
-        width: 300,
-        height: 300,
-        style: style,
-        scaler: TextScaler.noScaling,
-        direction: TextDirection.ltr,
-        columns: columns,
-      );
-      final single = layout(1);
-      final spreads = PageBoundaries(layout(2));
-      var cursor = const PageCursor(0, 0);
-      final pages = <ReaderPage>[];
-      while (true) {
-        final page = spreads.forward(cursor);
-        if (page == null) break;
-        pages.add(page);
-        final left = single.forward(cursor)!;
-        if (page.fullWidth) {
-          expect(page.fragments, hasLength(1));
-          expect(page.fragments.single.text, isNull);
-          expect(page.columnBreak, isNull);
-        } else if (page.columnBreak != null) {
-          final right = single.forward(left.end)!;
-          expect(textOf(page), textOf(left) + textOf(right));
-          expect(page.columnBreak, left.fragments.length);
-        } else {
-          expect(textOf(page), textOf(left));
-        }
-        cursor = page.end;
-        expect(pages.length, lessThan(100));
+  test('a spread consumes consecutive columns including illustrations', () {
+    final content = chapter([
+      ParagraphBlock(text: 'Before image. ' * 90),
+      ImageBlock(media: fixtureMediaRef(0), width: 300, height: 500),
+      ParagraphBlock(text: 'After image. ' * 90),
+    ]);
+    PageLayout layout(int columns) => PageLayout(
+      index: ChunkIndex(content),
+      width: 300,
+      height: 300,
+      style: style,
+      scaler: TextScaler.noScaling,
+      direction: TextDirection.ltr,
+      columns: columns,
+    );
+    final single = layout(1);
+    final spreads = PageBoundaries(layout(2));
+    var cursor = const PageCursor(0, 0);
+    final pages = <ReaderPage>[];
+    while (true) {
+      final page = spreads.forward(cursor);
+      if (page == null) break;
+      pages.add(page);
+      final left = single.forward(cursor)!;
+      if (page.fullWidth) {
+        expect(page.fragments, hasLength(1));
+        expect(page.fragments.single.text, isNull);
+        expect(page.columnBreak, isNull);
+      } else if (page.columnBreak != null) {
+        final right = single.forward(left.end)!;
+        expect(textOf(page), textOf(left) + textOf(right));
+        expect(page.columnBreak, left.fragments.length);
+      } else {
+        expect(textOf(page), textOf(left));
       }
-      expect(pages.where((p) => p.fullWidth), hasLength(1));
-      expect(
-        pages.map(textOf).join(),
-        'Before image. ' * 90 + 'After image. ' * 90,
-      );
-      for (final original in pages.reversed) {
-        final previous = spreads.backward(cursor)!;
-        expect(textOf(previous), textOf(original));
-        expect(previous.columnBreak, original.columnBreak);
-        expect(previous.fullWidth, original.fullWidth);
-        cursor = previous.start;
-      }
-      expect(spreads.backward(cursor), isNull);
-    },
-  );
+      cursor = page.end;
+      expect(pages.length, lessThan(100));
+    }
+    expect(pages.where((p) => p.fullWidth), isEmpty);
+    expect(
+      pages.map(textOf).join(),
+      'Before image. ' * 90 + 'After image. ' * 90,
+    );
+    for (final original in pages.reversed) {
+      final previous = spreads.backward(cursor)!;
+      expect(textOf(previous), textOf(original));
+      expect(previous.columnBreak, original.columnBreak);
+      expect(previous.fullWidth, original.fullWidth);
+      cursor = previous.start;
+    }
+    expect(spreads.backward(cursor), isNull);
+  });
 
   testWidgets(
     'wide reader shows two capped columns, turns spreads and preserves resize anchor',
@@ -230,7 +227,7 @@ void main() {
     },
   );
 
-  testWidgets('an illustration remains centered across a spread', (
+  testWidgets('an illustration shares a spread with following prose', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1408, 800);
@@ -257,10 +254,10 @@ void main() {
     );
     await tester.pumpAndSettle();
     final rect = tester.getRect(find.byKey(const ValueKey('illustration')));
-    expect(rect.width, 680);
-    expect(rect.center.dx, 704);
-    expect(find.byType(ReaderLinkedText), findsNothing);
-    expect(find.byKey(const ValueKey('reader-spread-gutter')), findsNothing);
+    expect(rect.width, 668);
+    expect(rect.center.dx, 334);
+    expect(find.byType(ReaderLinkedText), findsWidgets);
+    expect(find.byKey(const ValueKey('reader-spread-gutter')), findsOneWidget);
     final next = controller.next();
     await tester.pumpAndSettle();
     await next;

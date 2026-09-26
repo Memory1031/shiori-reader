@@ -51,8 +51,9 @@ final class ReaderPage {
   final bool centered;
 }
 
-/// Only lays out bounded chunks around a requested semantic anchor. It does not
-/// calculate a global page count or paginate the unseen chapter prefix.
+/// Forward layout measures bounded chunks without a global page count. Cold
+/// reverse spread layout replays the prefix to recover canonical pairing;
+/// the viewport normally reuses PageBoundaries from its incremental forward seek.
 final class PageLayout {
   PageLayout({
     required this.index,
@@ -335,7 +336,8 @@ final class PageLayout {
         .clamp(1.0, height);
   }
 
-  bool _standaloneImageFragments(List<PageFragment> fragments) =>
+  /// A large illustration owns one column, not necessarily the whole spread.
+  bool isIllustrationColumn(List<PageFragment> fragments) =>
       fragments.length == 1 &&
       index.content.blocks[index.chunks[fragments.single.unit].blockIndex]
           is ImageBlock &&
@@ -346,13 +348,11 @@ final class PageLayout {
       index.content.blocks[blockIndex] is ImageBlock &&
       (extent >= height * .6 || index.content.blocks.length == 1);
 
-  bool _standaloneImage(ReaderPage page) =>
-      _standaloneImageFragments(page.fragments);
-
   ReaderPage? forward(PageCursor from) {
     final first = _forwardColumn(from);
     if (first == null || columns == 1) return first;
-    if (_standaloneImage(first)) {
+    if (index.content.blocks.length == 1 &&
+        index.content.blocks.single is ImageBlock) {
       return ReaderPage(
         first.start,
         first.end,
@@ -362,7 +362,7 @@ final class PageLayout {
       );
     }
     final second = _forwardColumn(first.end);
-    if (second == null || _standaloneImage(second)) return first;
+    if (second == null) return first;
     return ReaderPage(first.start, second.end, [
       ...first.fragments,
       ...second.fragments,
@@ -370,23 +370,24 @@ final class PageLayout {
   }
 
   ReaderPage? backward(PageCursor until) {
-    final second = _backwardColumn(until);
-    if (second == null || columns == 1) return second;
-    if (_standaloneImage(second)) {
-      return ReaderPage(
-        second.start,
-        second.end,
-        second.fragments,
-        fullWidth: true,
-        centered: true,
-      );
+    if (columns == 1) return _backwardColumn(until);
+    final end = normalize(until);
+    if (end.unit == 0 && end.offset == 0) return null;
+    // Packing from the end loses column parity (and text/heading boundaries).
+    // A caller without known boundaries must recover the forward chain. No
+    // rendered pages or persistent page numbers are retained here.
+    var cursor = const PageCursor(0, 0);
+    ReaderPage? previous;
+    while (true) {
+      final page = forward(cursor);
+      if (page == null) return previous;
+      if (page.end.unit > end.unit ||
+          page.end.unit == end.unit && page.end.offset >= end.offset) {
+        return page;
+      }
+      previous = page;
+      cursor = page.end;
     }
-    final first = _backwardColumn(second.start);
-    if (first == null || _standaloneImage(first)) return second;
-    return ReaderPage(first.start, second.end, [
-      ...first.fragments,
-      ...second.fragments,
-    ], columnBreak: first.fragments.length);
   }
 
   ReaderPage? _forwardColumn(PageCursor from) {
@@ -486,7 +487,7 @@ final class PageLayout {
             start,
             cursor,
             fragments,
-            centered: _standaloneImageFragments(fragments),
+            centered: isIllustrationColumn(fragments),
           );
   }
 
@@ -556,7 +557,7 @@ final class PageLayout {
             PageCursor(fragments.last.unit, fragments.last.start),
             end,
             fragments.reversed.toList(),
-            centered: _standaloneImageFragments(fragments),
+            centered: isIllustrationColumn(fragments),
           );
   }
 }

@@ -484,7 +484,17 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       return;
     }
     _animateChapter = fromStart || fromEnd;
-    _turnDirection = fromEnd ? -1 : 1;
+    // Entry position is independent of turn direction: a contents link to an
+    // earlier chapter still opens its start/fragment, not its final page.
+    final (_, positions) = _readingSequence();
+    final currentIndex = positions[_reader.chapter];
+    final targetIndex = positions[chapter];
+    _turnDirection =
+        currentIndex != null &&
+            targetIndex != null &&
+            currentIndex != targetIndex
+        ? (targetIndex > currentIndex ? 1 : -1)
+        : (fromEnd ? -1 : 1);
     setState(() => _changing = true);
     if (!await _save()) {
       if (mounted) setState(() => _changing = false);

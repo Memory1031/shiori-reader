@@ -115,6 +115,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   );
   double _dragDistance = 0;
   final _pages = <int, ReaderPage>{};
+  // Only mounted illustration owners: reflow can move an image between
+  // columns without releasing its lease and immediately requesting it again.
+  final _imageKeys = <String, GlobalKey>{};
   PageLayout? _layout;
   PageBoundaries? _boundaries;
   List<double>? _imageGeometry;
@@ -157,6 +160,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   @override
   void didUpdateWidget(PagedReaderViewport oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.content != widget.content) _imageKeys.clear();
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller._state = null;
       _attach();
@@ -673,6 +677,14 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
               ),
           ],
         );
+        Widget spreadColumn(List<PageFragment> fragments) {
+          final centered = _layout!.isIllustrationColumn(fragments);
+          return Align(
+            alignment: centered ? Alignment.center : Alignment.topCenter,
+            child: column(fragments, columnWidth, centered: centered),
+          );
+        }
+
         return Semantics(
           container: true,
           explicitChildNodes: true,
@@ -699,11 +711,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: column(
+                      child: spreadColumn(
                         page.fragments
                             .take(page.columnBreak ?? page.fragments.length)
                             .toList(),
-                        columnWidth,
                       ),
                     ),
                     VerticalDivider(
@@ -717,11 +728,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                       ).colorScheme.onSurface.withValues(alpha: .10),
                     ),
                     Expanded(
-                      child: column(
+                      child: spreadColumn(
                         page.columnBreak == null
                             ? []
                             : page.fragments.skip(page.columnBreak!).toList(),
-                        columnWidth,
                       ),
                     ),
                   ],
@@ -733,6 +743,13 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       // Built once per turn: _target only changes through setState, so the
       // animation frames reuse it instead of re-measuring every fragment.
       final targetPage = _target == null ? null : buildPage(context, _target!);
+      final visibleBlocks = <String>{
+        for (final number in [_current, ?_target])
+          for (final fragment in _pages[number]?.fragments ?? <PageFragment>[])
+            if (fragmentBlock(fragment) case ImageBlock(:final blockKey))
+              blockKey,
+      };
+      _imageKeys.removeWhere((key, _) => !visibleBlocks.contains(key));
       _seekPreview = null;
       return Semantics(
         key: const ValueKey('paper-reader-pages'),
@@ -820,8 +837,12 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     final block =
         widget.content.blocks[_layout!.index.chunks[fragment.unit].blockIndex];
     if (block is ImageBlock) {
-      return widget.imageBuilder?.call(context, block) ??
-          Center(child: Text(block.alt ?? ''));
+      return KeyedSubtree(
+        key: _imageKeys.putIfAbsent(block.blockKey, GlobalKey.new),
+        child:
+            widget.imageBuilder?.call(context, block) ??
+            Center(child: Text(block.alt ?? '')),
+      );
     }
     return const Divider();
   }
