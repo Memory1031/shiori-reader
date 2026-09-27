@@ -116,6 +116,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   String? _bookTitle;
   NovelStatus _bookStatus = NovelStatus.unknown;
   List<ChapterKey>? _readingOrder;
+  final _readingOrderChanges = ValueNotifier(0);
   final _navigation = <ChapterKey, List<(LocalNavigationEntry, int)>>{};
   Object _navigationRevision = Object();
   final _navigationTree = ValueNotifier<Result<List<LocalNavigationEntry>>?>(
@@ -263,6 +264,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (!mounted || _invalidated || _titleRequest.token.isCancelled) return;
     if (result case Success<List<ChapterKey>>(:final value)) {
       setState(() => _readingOrder = value);
+      _readingOrderChanges.value++;
     }
   }
 
@@ -438,6 +440,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _catalog.onDelete();
     _catalog.dispose();
     _navigationTree.dispose();
+    _readingOrderChanges.dispose();
     _chrome.dispose();
     super.dispose();
   }
@@ -870,6 +873,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       return localContentsLayer(
         context,
         navigation: _navigationTree,
+        readingOrder: () => _readingSequence().$1,
+        readingOrderChanges: Listenable.merge([
+          _readingOrderChanges,
+          _catalogChanges,
+        ]),
         current: _reader.chapter,
         onRetry: _loadNavigation,
         onSelect: (target) {

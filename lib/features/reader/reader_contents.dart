@@ -281,14 +281,16 @@ ReaderContentsLayer volumeContentsLayer(
 ReaderContentsLayer localContentsLayer(
   BuildContext context, {
   required ValueListenable<Result<List<LocalNavigationEntry>>?> navigation,
+  required List<ChapterKey> Function() readingOrder,
+  required Listenable readingOrderChanges,
   required ChapterKey current,
   required VoidCallback onRetry,
   required ValueChanged<LocalNavigationEntry> onSelect,
 }) => ReaderContentsLayer(
   label: AppLocalizations.of(context).localBookContents,
-  build: (context, done) => ValueListenableBuilder(
-    valueListenable: navigation,
-    builder: (context, result, _) => switch (result) {
+  build: (context, done) => AnimatedBuilder(
+    animation: Listenable.merge([navigation, readingOrderChanges]),
+    builder: (context, _) => switch (navigation.value) {
       null => const LoadingView(),
       Failure(:final failure) => FailureView(
         failure: failure,
@@ -297,6 +299,7 @@ ReaderContentsLayer localContentsLayer(
       Success(:final value) => LocalNavigationView(
         entries: value,
         current: current,
+        readingOrder: readingOrder(),
         onSelect: (entry) => done(() => onSelect(entry)),
       ),
     },

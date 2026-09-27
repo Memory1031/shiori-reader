@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
@@ -74,16 +77,35 @@ class _LocalCatalogScreenState extends State<LocalCatalogScreen> {
   );
 }
 
-class LocalNavigationView extends StatelessWidget {
+class LocalNavigationView extends StatefulWidget {
   const LocalNavigationView({
     super.key,
     required this.entries,
     required this.onSelect,
     this.current,
+    this.readingOrder = const [],
   });
   final List<LocalNavigationEntry> entries;
   final ValueChanged<LocalNavigationEntry> onSelect;
   final ChapterKey? current;
+  final List<ChapterKey> readingOrder;
+  @override
+  State<LocalNavigationView> createState() => _LocalNavigationViewState();
+}
+
+class _LocalNavigationViewState extends State<LocalNavigationView> {
+  final _currentRow = GlobalKey();
+  final _followingRows = GlobalKey();
+  (ChapterKey?, int, Size, TextScaler)? _positionTarget;
+  int _anchor = 0;
+  double _viewportAnchor = 0;
+
+  @override
+  void didUpdateWidget(LocalNavigationView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.entries, widget.entries)) _positionTarget = null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final rows = <(LocalNavigationEntry, int)>[];
@@ -94,58 +116,129 @@ class LocalNavigationView extends StatelessWidget {
       }
     }
 
-    flatten(entries, 0);
+    flatten(widget.entries, 0);
     if (rows.isEmpty) {
       return EmptyView(message: AppLocalizations.of(context).catalogEmpty);
     }
+    final targets = {for (final (entry, _) in rows) entry.chapterKey};
+    final current = widget.current;
+    ChapterKey? selectedChapter = current;
+    if (current != null && !targets.contains(current)) {
+      selectedChapter = null;
+      // A title page's TOC target also owns the following body files, up to
+      // the next target in the actual spine, independently of TOC row order.
+      for (var i = widget.readingOrder.indexOf(current) - 1; i >= 0; i--) {
+        if (targets.contains(widget.readingOrder[i])) {
+          selectedChapter = widget.readingOrder[i];
+          break;
+        }
+      }
+    }
+    final match = rows.indexWhere(
+      (row) => row.$1.chapterKey == selectedChapter,
+    );
     Widget buildRow(BuildContext context, int index) {
       final (entry, depth) = rows[index];
-      return ListTile(
+      final tile = ListTile(
         key: ValueKey(('local-toc', index)),
         contentPadding: EdgeInsetsDirectional.only(
           start: 16 + depth.clamp(0, 4) * 16,
           end: 16,
         ),
-        selected: entry.chapterKey == current,
+        selected: entry.chapterKey == selectedChapter,
         leading: Icon(
-          entry.chapterKey == current
+          entry.chapterKey == selectedChapter
               ? Icons.bookmark
               : entry.children.isEmpty
               ? Icons.article_outlined
               : Icons.folder_outlined,
         ),
         title: Text(entry.title, maxLines: 3, overflow: TextOverflow.ellipsis),
-        onTap: () => onSelect(entry),
+        onTap: () => widget.onSelect(entry),
       );
+      return index == match
+          ? KeyedSubtree(key: _currentRow, child: tile)
+          : tile;
     }
 
-    final match = rows.indexWhere((row) => row.$1.chapterKey == current);
-    final anchor = match < 0 ? 0 : match;
-    const center = ValueKey('local-toc-anchor');
-    // Start at the current chapter without measuring the unseen prefix. Rows
-    // before the center grow upwards, retaining variable-height, lazy layout.
-    return CustomScrollView(
-      key: ValueKey((current, anchor)),
-      center: center,
-      semanticChildCount: rows.length,
-      slivers: [
-        if (anchor > 0)
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => buildRow(context, anchor - index - 1),
-              childCount: anchor,
-              semanticIndexCallback: (_, index) => anchor - index - 1,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final target = (
+          current,
+          match,
+          constraints.biggest,
+          MediaQuery.textScalerOf(context),
+        );
+        if (_positionTarget != target) {
+          _positionTarget = target;
+          _anchor = 0;
+          _viewportAnchor = 0;
+          if (match > 0) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || _positionTarget != target) return;
+              final rowContext = _currentRow.currentContext;
+              if (rowContext != null) {
+                final row = rowContext.findRenderObject()!;
+                final viewport = RenderAbstractViewport.of(row);
+                final position = Scrollable.of(rowContext).position;
+                final start = viewport.getOffsetToReveal(row, 0).offset;
+                final end = viewport.getOffsetToReveal(row, 1).offset;
+                // Leave fully visible rows alone; otherwise show surrounding
+                // chapters, clamped by the list's natural start/end bounds.
+                if (position.pixels > start || position.pixels < end) {
+                  position.ensureVisible(row, alignment: 1 / 3);
+                }
+              } else {
+                // The target is beyond the lazily built first screen. Anchor
+                // directly there without laying out thousands of preceding rows.
+                setState(() => _anchor = match);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted || _positionTarget != target) return;
+                  final row = _currentRow.currentContext?.findRenderObject();
+                  final following = _followingRows.currentContext
+                      ?.findRenderObject();
+                  if (row is! RenderBox || following is! RenderSliver) return;
+                  final height = constraints.maxHeight;
+                  if (height <= 0) return;
+                  final tail = following.geometry!.scrollExtent;
+                  // Near the end, move the target down enough to fill the
+                  // viewport. A centered sliver must not create trailing space.
+                  final top = math.max(
+                    math.max(0.0, (height - row.size.height) / 3),
+                    height - tail,
+                  );
+                  setState(() => _viewportAnchor = top / height);
+                });
+              }
+            });
+          }
+        }
+        final anchor = _anchor;
+        return CustomScrollView(
+          key: ValueKey((target, anchor)),
+          center: _followingRows,
+          anchor: _viewportAnchor,
+          semanticChildCount: rows.length,
+          slivers: [
+            if (anchor > 0)
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => buildRow(context, anchor - index - 1),
+                  childCount: anchor,
+                  semanticIndexCallback: (_, index) => anchor - index - 1,
+                ),
+              ),
+            SliverList(
+              key: _followingRows,
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => buildRow(context, anchor + index),
+                childCount: rows.length - anchor,
+                semanticIndexOffset: anchor,
+              ),
             ),
-          ),
-        SliverList(
-          key: center,
-          delegate: SliverChildBuilderDelegate(
-            (context, index) => buildRow(context, anchor + index),
-            childCount: rows.length - anchor,
-            semanticIndexOffset: anchor,
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }
