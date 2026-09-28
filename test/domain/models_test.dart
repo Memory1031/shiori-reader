@@ -494,7 +494,12 @@ void main() {
             );
           }
           expect(
-            uri.startsWith('package:') && uri != 'package:crypto/crypto.dart',
+            uri.startsWith('package:') &&
+                !{
+                  'package:crypto/crypto.dart',
+                  // Pure Dart Unicode boundaries, used to validate source ranges.
+                  'package:characters/characters.dart',
+                }.contains(uri),
             false,
             reason: '${file.path} imports $uri',
           );

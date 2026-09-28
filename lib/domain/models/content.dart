@@ -1,3 +1,5 @@
+import 'package:characters/characters.dart';
+
 import '../content_identity.dart';
 import 'identity.dart';
 import 'value_model.dart';
@@ -56,6 +58,8 @@ sealed class ContentBlock extends ValueModel {
     final ContentBlock block = switch (json['type']) {
       'paragraph' => ParagraphBlock(
         authoredGapEm: (json['authoredGapEm'] as num?)?.toDouble(),
+        hangingIndentEm: (json['hangingIndentEm'] as num?)?.toDouble(),
+        trailingLabelStart: json['trailingLabelStart'] as int?,
         inlineStyles: styles,
         inlineRuby: (json['inlineRuby'] as List? ?? const []).map(
           (v) => InlineRuby.fromJson(v as Map<String, dynamic>),
@@ -171,6 +175,8 @@ final class ParagraphBlock extends ContentBlock {
     this.alignment = ParagraphAlignment.start,
     this.leadingIndent = 0,
     this.authoredGapEm,
+    this.hangingIndentEm,
+    this.trailingLabelStart,
     int occurrence = 0,
   }) : inlineRuby = List.unmodifiable(inlineRuby),
        inlineStyles = List.unmodifiable(inlineStyles),
@@ -184,6 +190,31 @@ final class ParagraphBlock extends ContentBlock {
             this.text.isNotEmpty)) {
       throw ArgumentError('Invalid authored gap');
     }
+    if (hangingIndentEm != null &&
+        (!hangingIndentEm!.isFinite ||
+            hangingIndentEm! <= 0 ||
+            hangingIndentEm! > 32 ||
+            this.text.isEmpty)) {
+      throw ArgumentError('Invalid hanging indent');
+    }
+    if (trailingLabelStart case final start?) {
+      final runes = this.text.runes.toList();
+      final boundaries = <int>{0};
+      var end = 0;
+      for (final cluster in this.text.characters) {
+        end += cluster.runes.length;
+        boundaries.add(end);
+      }
+      if (start <= 0 ||
+          start >= runes.length ||
+          runes.length - start > 64 ||
+          !boundaries.contains(start) ||
+          String.fromCharCodes(runes.skip(start)).trim().isEmpty ||
+          runes.skip(start).any((r) => r == 10 || r == 0xfffc) ||
+          this.inlineRuby.any((r) => r.end > start)) {
+        throw ArgumentError('Invalid trailing label range');
+      }
+    }
     validateInlineRuby(this.text, this.inlineRuby);
     validateInlineStyles(this.text, this.inlineStyles);
     validateInlineImages(this.text, this.inlineImages);
@@ -195,6 +226,13 @@ final class ParagraphBlock extends ContentBlock {
 
   /// Relative height of explicit blank lines in an authored container.
   final double? authoredGapEm;
+
+  /// LTR continuation inset; the first line remains at the ordinary origin.
+  /// Layout metadata only, never a semantic indent or a persisted pixel value.
+  final double? hangingIndentEm;
+
+  /// Code point start of a short, right-aligned suffix ending at text.runes.length.
+  final int? trailingLabelStart;
   @override
   final List<InlineImage> inlineImages;
   @override
@@ -225,6 +263,8 @@ final class ParagraphBlock extends ContentBlock {
     if (inlineRuby.isNotEmpty)
       'inlineRuby': inlineRuby.map((r) => r.toJson()).toList(),
     if (authoredGapEm != null) 'authoredGapEm': authoredGapEm,
+    if (hangingIndentEm != null) 'hangingIndentEm': hangingIndentEm,
+    if (trailingLabelStart != null) 'trailingLabelStart': trailingLabelStart,
     if (inlineStyles.isNotEmpty)
       'inlineStyles': inlineStyles.map((s) => s.toJson()).toList(),
     if (inlineImages.isNotEmpty)
@@ -236,6 +276,8 @@ final class ParagraphBlock extends ContentBlock {
   ParagraphBlock withOccurrence(int occurrence) => ParagraphBlock(
     text: text,
     authoredGapEm: authoredGapEm,
+    hangingIndentEm: hangingIndentEm,
+    trailingLabelStart: trailingLabelStart,
     inlineImages: inlineImages,
     inlineRuby: inlineRuby,
     inlineStyles: inlineStyles,
@@ -250,6 +292,8 @@ final class ParagraphBlock extends ContentBlock {
     inlineImages,
     inlineStyles,
     authoredGapEm,
+    hangingIndentEm,
+    trailingLabelStart,
     box,
     occurrence,
   ];

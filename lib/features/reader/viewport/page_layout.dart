@@ -1,3 +1,4 @@
+import 'paragraph_flow.dart';
 import 'package:flutter/material.dart';
 
 import '../../../domain/models/models.dart';
@@ -21,6 +22,7 @@ final class PageFragment {
     this.end,
     this.height,
     this.text, {
+    this.flow,
     this.boxTop = 0,
     this.boxBottom = 0,
   });
@@ -30,6 +32,7 @@ final class PageFragment {
   final double height;
   final String? text;
   final double boxTop, boxBottom;
+  final ParagraphFlow? flow;
 }
 
 final class ReaderPage {
@@ -135,7 +138,14 @@ final class PageLayout {
 
   String _slice(String text, int start, int end) =>
       String.fromCharCodes(text.runes.skip(start).take(end - start));
-  ({String text, int count, double height, double boxTop, double boxBottom})?
+  ({
+    String text,
+    int count,
+    double height,
+    double boxTop,
+    double boxBottom,
+    ParagraphFlow? flow,
+  })?
   _fit(
     String text,
     double available, {
@@ -146,7 +156,14 @@ final class PageLayout {
     required int blockIndex,
   }) {
     if (text.isEmpty) {
-      return (text: '', count: 0, height: 16, boxTop: 0, boxBottom: 0);
+      return (
+        text: '',
+        count: 0,
+        height: 16,
+        boxTop: 0,
+        boxBottom: 0,
+        flow: null,
+      );
     }
     measuredChunks++;
     final textWidth = readerBlockWidth(
@@ -158,6 +175,50 @@ final class PageLayout {
       chapter: index.content.key,
       locale: locale,
     );
+    if (readerUsesParagraphFlow(block, direction)) {
+      final paragraph = block as ParagraphBlock;
+      final flow = readerParagraphFlow(
+        block: paragraph,
+        text: text,
+        offset: blockOffset,
+        maxHeight: available,
+        width: textWidth,
+        style: readerBlockStyle(block, style, chapter: index.content.key),
+        scaler: scaler,
+        locale: locale,
+        textHeightBehavior: textHeightBehavior,
+      );
+      final edges = readerBoxEdges(index.content, blockIndex);
+      final top = startsBlock ? edges.top : 0.0;
+      final spacing = readerBlockSpacing(
+        block,
+        paragraphSpacing,
+        chapter: index.content.key,
+      );
+      var count = 0;
+      for (final line in flow.lines) {
+        final bottom = blockOffset + line.end == paragraph.text.runes.length
+            ? edges.bottom
+            : 0.0;
+        if (line.top + line.height + spacing + top + bottom > available + .01) {
+          break;
+        }
+        count++;
+      }
+      if (count == 0) return null;
+      final selected = flow.take(count);
+      final bottom = blockOffset + selected.end == paragraph.text.runes.length
+          ? edges.bottom
+          : 0.0;
+      return (
+        text: _slice(text, 0, selected.end),
+        count: selected.end,
+        height: selected.height + spacing + top + bottom,
+        boxTop: top,
+        boxBottom: bottom,
+        flow: selected,
+      );
+    }
     final prefix = readerIndentPrefix(
       block,
       startsBlock,
@@ -240,6 +301,7 @@ final class PageLayout {
           height: fullHeight,
           boxTop: top,
           boxBottom: bottom,
+          flow: null,
         );
       }
       // A split box keeps only its outermost top/bottom edges, like CSS slice.
@@ -310,6 +372,7 @@ final class PageLayout {
         height: used,
         boxTop: keptTop,
         boxBottom: keptBottom,
+        flow: null,
       );
     } finally {
       painter.dispose();
@@ -370,7 +433,12 @@ final class PageLayout {
   }
 
   ReaderPage? backward(PageCursor until) {
-    if (columns == 1) return _backwardColumn(until);
+    if (columns == 1 &&
+        !index.content.blocks.any(
+          (b) => readerUsesParagraphFlow(b, direction),
+        )) {
+      return _backwardColumn(until);
+    }
     final end = normalize(until);
     if (end.unit == 0 && end.offset == 0) return null;
     // Packing from the end loses column parity (and text/heading boundaries).
@@ -471,6 +539,7 @@ final class PageLayout {
             cursor.offset + fitted.count,
             fitted.height,
             fitted.text,
+            flow: fitted.flow,
             boxTop: fitted.boxTop,
             boxBottom: fitted.boxBottom,
           ),
@@ -543,6 +612,7 @@ final class PageLayout {
             cursor.offset,
             fitted.height,
             fitted.text,
+            flow: fitted.flow,
             boxTop: fitted.boxTop,
             boxBottom: fitted.boxBottom,
           ),

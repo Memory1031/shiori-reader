@@ -1,3 +1,4 @@
+import 'epub_paragraph_layout.dart';
 import '../../html/prose_semantics.dart';
 import '../../html/prose_ruby.dart';
 import 'dart:convert';
@@ -721,6 +722,8 @@ class EpubParser {
     BlockBox? activeBox;
     var boxGroup = 0;
     final styleSpans = <(EpubRichStyle, int, int)>[];
+    dom.Element? activeFloat;
+    final floatSpans = <dom.Element, (int, int)>{};
     dom.Element? paragraphOwner;
     String? property(String name) {
       for (var node = paragraphOwner; node != null; node = node.parent) {
@@ -758,6 +761,9 @@ class EpubParser {
     var explicitGapEm = 0.0;
     final buffer = ProseTextBuffer(
       onWrite: (start, end) {
+        if (activeFloat case final node?) {
+          floatSpans[node] = (floatSpans[node]?.$1 ?? start, end);
+        }
         if (!activeStyle.isDefault) {
           if (styleSpans.isNotEmpty &&
               identical(styleSpans.last.$1, activeStyle) &&
@@ -789,6 +795,23 @@ class EpubParser {
       final value = buffer.take();
       final trimStart = rawText.indexOf(value);
       final ruby = rubyRanges.take(rawText, value);
+      final flow = value.isEmpty || heading != null
+          ? (hanging: null, label: null)
+          : epubParagraphLayout(
+              paragraphOwner,
+              styles,
+              floatSpans.keys,
+              richStyles,
+            );
+      final labelRange = floatSpans[flow.label];
+      final labelStart = labelRange == null
+          ? null
+          : epubTrailingLabelStart(
+              value,
+              (labelRange.$1 - trimStart).clamp(0, value.length),
+              (labelRange.$2 - trimStart).clamp(0, value.length),
+            );
+      floatSpans.clear();
       // Normalize against the emitted block, then convert UTF-16 to code points.
       for (final id in pendingAnchors) {
         final anchor = anchors[id]!;
@@ -872,6 +895,8 @@ class EpubParser {
       blocks.add(
         heading == null
             ? ParagraphBlock(
+                hangingIndentEm: flow.hanging,
+                trailingLabelStart: labelStart,
                 inlineImages: images,
                 inlineRuby: ruby,
                 inlineStyles: textStyles,
@@ -885,12 +910,12 @@ class EpubParser {
                 leadingIndent: (() {
                   final indent = property('text-indent');
                   if (indent == null || !indent.endsWith('em')) return 0;
-                  return (double.tryParse(
-                            indent.substring(0, indent.length - 2),
-                          ) ??
-                          0)
-                      .round()
-                      .clamp(0, 8);
+                  final value = double.tryParse(
+                    indent.substring(0, indent.length - 2),
+                  );
+                  return value != null && value.isFinite
+                      ? value.round().clamp(0, 8)
+                      : 0;
                 })(),
               )
             : HeadingBlock(
@@ -1263,7 +1288,13 @@ class EpubParser {
           boxGroup++;
         }
       }
+      final previousFloat = activeFloat;
+      if (node is dom.Element &&
+          !{null, 'none', 'initial'}.contains(styles[node]?['float'])) {
+        activeFloat = node;
+      }
       visit(node);
+      activeFloat = previousFloat;
       activeBox = previousBox;
     };
     walk(doc.body!);

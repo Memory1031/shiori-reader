@@ -1,3 +1,5 @@
+import '../../features/reader/viewport/paragraph_flow.dart';
+import '../../features/reader/reader_linked_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
@@ -182,6 +184,21 @@ class _ReaderViewportState extends State<ReaderViewport> {
     widget.content.blocks[chunk.blockIndex],
     chapter: widget.content.key,
   );
+  ParagraphFlow? _flow(RenderChunk chunk, double width) {
+    final block = widget.content.blocks[chunk.blockIndex];
+    if (!readerUsesParagraphFlow(block, _direction) || chunk.text == null) {
+      return null;
+    }
+    return readerParagraphFlow(
+      block: block as ParagraphBlock,
+      text: chunk.text!,
+      offset: chunk.start,
+      width: width,
+      style: _style(chunk),
+      scaler: _scaler,
+    );
+  }
+
   TextPainter _painter(RenderChunk chunk, double width) => TextPainter(
     text: TextSpan(
       text: _prefix(chunk, width) + (chunk.text ?? ''),
@@ -205,6 +222,24 @@ class _ReaderViewportState extends State<ReaderViewport> {
     final y = (-_top(box)).clamp(0.0, box.size.height);
     double fraction;
     if (chunk.text != null && chunk.total > 0) {
+      final flow = _flow(chunk, box.size.width);
+      if (flow != null) {
+        final localY =
+            y -
+            readerBlockSpacing(
+                  widget.content.blocks[chunk.blockIndex],
+                  widget.paragraphSpacing,
+                  chapter: widget.content.key,
+                ) /
+                2;
+        final line =
+            flow.lines.where((l) => l.top + l.height > localY).firstOrNull ??
+            flow.lines.last;
+        return _last = _index.position(
+          unit,
+          (chunk.start + line.start) / chunk.total,
+        );
+      }
       final painter = _painter(chunk, box.size.width);
       try {
         final position = painter.getPositionForOffset(
@@ -282,8 +317,11 @@ class _ReaderViewportState extends State<ReaderViewport> {
                     (chunk.end - chunk.start - 1).clamp(0, chunk.total),
                   );
           final utf16 = String.fromCharCodes(chunk.text!.runes.take(cp)).length;
-          final painter = _painter(chunk, box.size.width);
-          try {
+          final flow = _flow(chunk, box.size.width);
+          if (flow != null) {
+            final line =
+                flow.lines.where((l) => l.end > cp).firstOrNull ??
+                flow.lines.last;
             within =
                 readerBlockSpacing(
                       widget.content.blocks[chunk.blockIndex],
@@ -291,16 +329,28 @@ class _ReaderViewportState extends State<ReaderViewport> {
                       chapter: widget.content.key,
                     ) /
                     2 +
-                painter
-                    .getOffsetForCaret(
-                      TextPosition(
-                        offset: utf16 + _prefix(chunk, box.size.width).length,
-                      ),
-                      Rect.zero,
-                    )
-                    .dy;
-          } finally {
-            painter.dispose();
+                line.top;
+          } else {
+            final painter = _painter(chunk, box.size.width);
+            try {
+              within =
+                  readerBlockSpacing(
+                        widget.content.blocks[chunk.blockIndex],
+                        widget.paragraphSpacing,
+                        chapter: widget.content.key,
+                      ) /
+                      2 +
+                  painter
+                      .getOffsetForCaret(
+                        TextPosition(
+                          offset: utf16 + _prefix(chunk, box.size.width).length,
+                        ),
+                        Rect.zero,
+                      )
+                      .dy;
+            } finally {
+              painter.dispose();
+            }
           }
         }
         final desired = (_scroll.offset + _top(box) + within).clamp(
@@ -354,13 +404,27 @@ class _ReaderViewportState extends State<ReaderViewport> {
               ) /
               2,
         ),
-        child: Text(
-          key: ValueKey('reader-text-$unit'),
-          _prefix(chunk, _width) + chunk.text!,
-          style: _style(chunk),
-          textAlign: _align(chunk),
-          textScaler: _scaler,
-        ),
+        child: readerUsesParagraphFlow(block, _direction)
+            ? ReaderLinkedText(
+                text: chunk.text!,
+                prefix: '',
+                blockOffset: chunk.start,
+                links: const [],
+                style: _style(chunk),
+                align: _align(chunk),
+                scaler: _scaler,
+                inlineStyles: block.inlineStyles,
+                inlineRuby: block.inlineRuby,
+                inlineImages: block.inlineImages,
+                flow: _flow(chunk, _width),
+              )
+            : Text(
+                key: ValueKey('reader-text-$unit'),
+                _prefix(chunk, _width) + chunk.text!,
+                style: _style(chunk),
+                textAlign: _align(chunk),
+                textScaler: _scaler,
+              ),
       );
     } else if (block is ImageBlock) {
       body =

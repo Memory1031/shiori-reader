@@ -17,6 +17,7 @@
 - Paragraph / Heading 可携带有序、不重叠的 inlineRuby：start / length 按基字的 Unicode 码点定位，annotation 独立保存注音。基字仍属于正文文本，注音参与语义身份；旧 JSON 缺字段时为空。
 - Paragraph / Heading 可携带有序的 inlineImages：每项用 Unicode 码点偏移引用文本中的单个 U+FFFC，保存 MediaRef、alt 和 em 宽高；图片参与相同的资源校验与生命周期。无行内图片的旧记录及内容身份保持兼容，em 尺寸只影响布局，不改变语义身份。
 - Paragraph / Heading 可携带按 Unicode 码点定位的有序、不重叠 inlineStyles，保存颜色与相对字号、粗斜体；相邻块可通过 BlockBox.group 共享简单容器。两者均为纯 Dart、可序列化的排版元数据，不改变 blockKey / contentRevision，旧记录缺字段时使用默认值。排版缓存通过完整内容值变化失效。
+- Paragraph 可带 `hangingIndentEm`（0–32 范围内的正数，表示 LTR 续行缩进）与 `trailingLabelStart`（至段末的短文本码点范围）。两者是排版元数据，参与完整内容值与缓存失效，不改变原文、leadingIndent 或内容身份；旧 JSON 缺字段时保持普通排版。
 - 图片尺寸各自可未知；已知值须正数。封面和正文图片必须属于相同 Source。ImageBlock 尺寸为后续可发现的布局元数据，更新尺寸不改变 blockKey / contentRevision；mediaId、alt、caption 的改变会改变语义身份。
 - ReadingProgress 的全书进度快照与计算所依据的目录及章节身份绑定；全书终点状态独立于章节级 completed。全书算法与终点交互见[阅读器](reader.md)。
 - ReadingProgress 持有 NovelSummary 快照以保留离线标题 / 封面，并检查 ChapterKey 与快照属于同一本书；是否收藏由独立 BookshelfEntry 表示。lastReadAt 统一为 UTC 毫秒，写入先后由持久化 sequence 控制。

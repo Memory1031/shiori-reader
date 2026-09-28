@@ -70,6 +70,8 @@ String readerIndentPrefix(
 }) {
   if (block is! ParagraphBlock ||
       !startsBlock ||
+      block.hangingIndentEm != null ||
+      block.trailingLabelStart != null ||
       block.text.trim().isEmpty ||
       block.alignment != ParagraphAlignment.start ||
       _isChapterHeading(block, chapter) ||
@@ -118,7 +120,11 @@ double readerBlockWidth(
   Locale? locale,
 }) {
   available = readerBoxInnerWidth(block, available);
-  if (block.inlineStyles.isNotEmpty) return available;
+  if (block.inlineStyles.isNotEmpty ||
+      block is ParagraphBlock &&
+          (block.hangingIndentEm != null || block.trailingLabelStart != null)) {
+    return available;
+  }
   if (block is! ParagraphBlock ||
       block.alignment != ParagraphAlignment.start ||
       _isChapterHeading(block, chapter) ||

@@ -84,6 +84,14 @@ List<InlineSpan> readerInlineSpans({
               image,
               readerAuthoredStyle(style, styles, ordered[i]),
               TextScaler.noScaling,
+              maxWidth:
+                  maxWidth *
+                  (readerAuthoredStyle(style, styles, ordered[i]).fontSize ??
+                      20) /
+                  scaler.scale(
+                    readerAuthoredStyle(style, styles, ordered[i]).fontSize ??
+                        20,
+                  ),
             ).width,
             height: readerInlineSize(
               image,

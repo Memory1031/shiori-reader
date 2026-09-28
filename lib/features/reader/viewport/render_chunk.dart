@@ -78,7 +78,13 @@ final class ChunkIndex {
         final insideRuby =
             rubyIndex < block.inlineRuby.length &&
             block.inlineRuby[rubyIndex].start < start + length;
-        if (length + count > maxCodePoints && !insideRuby) flush();
+        final insideLabel =
+            block is ParagraphBlock &&
+            block.trailingLabelStart != null &&
+            start + length > block.trailingLabelStart!;
+        if (length + count > maxCodePoints && !insideRuby && !insideLabel) {
+          flush();
+        }
         buffer.write(grapheme);
         length += count;
       }

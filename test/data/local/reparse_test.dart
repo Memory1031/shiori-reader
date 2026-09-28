@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Variable;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -69,6 +70,105 @@ void main() {
         chooseEncoding: (_) async => TxtEncoding.utf8,
       ),
     ),
+  );
+  test(
+    'hanging metadata reparse preserves exact legacy offsets after reopening',
+    () async {
+      final files = epubFiles();
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '<html><body><div style="margin-left:7em;text-indent:-7em;clear:both">甲　　${'合成消息😀。' * 40}<span style="float:right;text-indent:0">-09:41</span></div></body></html>',
+      );
+      final originalBytes = zipFiles(files);
+      final imported = ok(
+        await store.importBook(
+          bytes: Stream.value(originalBytes),
+          format: LocalBookFormat.epub,
+          cancellation: token(),
+          parse: (session) => const BookDecoder().decode(
+            session,
+            format: LocalBookFormat.epub,
+            filename: 'hanging.epub',
+            cancellation: token(),
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+          ),
+        ),
+      );
+      final key = imported.content.detail.summary.key;
+      final parsed = imported.content.chapters.first;
+      final styled = parsed.blocks.single as ParagraphBlock;
+      for (final fraction in [
+        .5,
+        (styled.trailingLabelStart! + 2) / styled.text.runes.length,
+      ]) {
+        final legacy = ChapterContent(
+          key: parsed.key,
+          title: parsed.title,
+          blocks: [ParagraphBlock(text: styled.text)],
+        );
+        final root = '${paths.localBooks.path}/${key.novelId}';
+        final row = await db
+            .customSelect(
+              'SELECT active_bundle FROM local_books WHERE digest=?',
+              variables: [Variable(key.novelId)],
+            )
+            .getSingle();
+        final bundle = row.readNullable<String>('active_bundle');
+        final manifest = File(
+          bundle == null
+              ? '$root/manifest.json'
+              : '$root/revisions/$bundle/manifest.json',
+        );
+        final map =
+            jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+        map['chapters'] = [
+          RecordCodec.chapter(legacy),
+          ...imported.content.chapters.skip(1).map(RecordCodec.chapter),
+        ];
+        final bytes = utf8.encode(jsonEncode(map));
+        await manifest.writeAsBytes(bytes, flush: true);
+        await db.customStatement(
+          'UPDATE local_books SET manifest_hash=? WHERE digest=?',
+          [sha256.convert(bytes).toString(), key.novelId],
+        );
+        final before = ok(await store.read(key, cancellation: token()))!;
+        final progress = fixtures.progress(before.content, fraction: fraction);
+        final generation = ok(
+          await library.beginProgressSession(key, cancellation: token()),
+        );
+        ok(
+          await library.saveProgress(
+            progress,
+            stamp: ProgressWriteStamp(generation: generation, sequence: 0),
+            cancellation: token(),
+          ),
+        );
+        final result = ok(
+          await store.reparseBook(
+            key,
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+            cancellation: token(),
+          ),
+        );
+        expect(result.approximate, isFalse);
+        await store.close();
+        store = ok(await ManagedLocalBooks.open(paths, db));
+        final next = ok(await store.read(key, cancellation: token()))!;
+        final block =
+            next.content.chapters.first.blocks.single as ParagraphBlock;
+        expect(block, styled);
+        expect(
+          next.content.chapters.first.contentRevision,
+          legacy.contentRevision,
+        );
+        final saved = ok(
+          await library.getProgress(key, cancellation: token()),
+        )!;
+        expect(saved.position.blockFraction, fraction);
+        expect(saved.position.blockKey, legacy.blocks.single.blockKey);
+        expect(saved.position.pixelOffset, isNull);
+        expect(saved.position.layoutKey, isNull);
+      }
+    },
   );
   test(
     'EPUB reparse restores explicit gaps and preserves the following position',

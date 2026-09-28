@@ -603,6 +603,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                   2,
                             ),
                             child: ReaderLinkedText(
+                              flow: fragment.flow,
                               locale: locale,
                               textHeightBehavior: heightBehavior,
                               images: widget.images,

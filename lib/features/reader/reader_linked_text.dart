@@ -1,3 +1,4 @@
+import 'viewport/paragraph_flow.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../domain/models/models.dart';
@@ -108,6 +109,7 @@ class ReaderLinkedText extends StatefulWidget {
     required this.style,
     required this.align,
     required this.scaler,
+    this.flow,
     this.onLink,
     this.onFootnote,
     this.inlineImages = const [],
@@ -118,6 +120,7 @@ class ReaderLinkedText extends StatefulWidget {
     this.locale,
     this.textHeightBehavior,
   });
+  final ParagraphFlow? flow;
   final String text, prefix;
   final List<InlineImage> inlineImages;
   final List<InlineRuby> inlineRuby;
@@ -162,6 +165,43 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
 
   Widget _buildText(BuildContext context, double maxWidth) {
     _clear();
+    if (widget.flow case final flow?) {
+      final runes = widget.text.runes.toList();
+      return SizedBox(
+        height: flow.height,
+        child: Stack(
+          children: [
+            for (final line in flow.lines)
+              for (final piece in line.pieces)
+                Positioned(
+                  left: piece.rect.left,
+                  top: piece.rect.top,
+                  width: piece.width,
+                  child: ReaderLinkedText(
+                    text: String.fromCharCodes(
+                      runes.sublist(piece.start, piece.end),
+                    ).replaceFirst(RegExp(r'\n$'), ''),
+                    prefix: '',
+                    blockOffset: widget.blockOffset + piece.start,
+                    links: widget.links,
+                    style: widget.style,
+                    align: TextAlign.left,
+                    scaler: widget.scaler,
+                    onLink: widget.onLink,
+                    onFootnote: widget.onFootnote,
+                    inlineImages: widget.inlineImages,
+                    inlineRuby: widget.inlineRuby,
+                    inlineStyles: widget.inlineStyles,
+                    authoredBackground: widget.authoredBackground,
+                    images: widget.images,
+                    locale: widget.locale,
+                    textHeightBehavior: widget.textHeightBehavior,
+                  ),
+                ),
+          ],
+        ),
+      );
+    }
     final colors = ReaderAuthoredColors(Theme.of(context));
     final background = widget.authoredBackground == null
         ? colors.paper
