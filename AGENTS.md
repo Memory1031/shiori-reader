@@ -52,6 +52,7 @@ If unsure whether a documentation change is necessary, do not make it.
 - Presentation consumes domain contracts. Keep site-specific protocols, parsing, credentials, and transport/storage details behind the data layer boundaries.
 - Use explicit dependency injection and clear resource ownership. Avoid hidden global service dependencies; handle asynchronous cancellation and lifecycle cleanup deliberately.
 - Preserve existing model and contract semantics. Read [docs/architecture.md](docs/architecture.md) and [docs/contracts.md](docs/contracts.md) when affected, and update specifications and consumers together when contracts change.
+- Increment `BookDecoder.parserVersion` whenever EPUB / TXT parsing behavior or output changes. This version is independent of the application version, manifest codec, and database schema; incrementing it does not automatically reparse existing books.
 - Keep development fixtures and test infrastructure separate from production behavior.
 - Design user-facing UI for localization; currently support Chinese and English. Keep translatable copy in shared language resources and account for different text lengths. See [docs/architecture.md](docs/architecture.md) for the implementation convention.
 

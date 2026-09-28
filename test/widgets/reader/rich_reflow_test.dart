@@ -12,10 +12,171 @@ import 'package:flutter/gestures.dart';
 import 'package:shiori/features/reader/reader_linked_text.dart';
 import 'package:shiori/features/reader/viewport/block_style.dart';
 import 'package:shiori/features/reader/viewport/page_layout.dart';
+import 'package:shiori/features/reader/viewport/page_boundaries.dart';
 import 'package:shiori/features/reader/viewport/render_chunk.dart';
 import 'package:shiori/features/reader/viewport/reader_box.dart';
 
 void main() {
+  ChapterContent blankLines() => ChapterContent(
+    key: LocalBookIdentity.chapter(LocalBookIdentity.book('a' * 64), 'gap'),
+    title: 'Explicit blank lines',
+    blocks: [
+      ParagraphBlock(text: 'Before'),
+      ParagraphBlock(text: '', authoredGapEm: 1),
+      ParagraphBlock(text: '', authoredGapEm: 1),
+      ParagraphBlock(text: 'After'),
+    ],
+  );
+
+  for (final columns in [1, 2]) {
+    for (final scale in [1.0, 2.0]) {
+      test('ordinary gaps occupy height and preserve page boundaries: '
+          '$columns columns, scale $scale', () {
+        PageLayout layout(double height) => PageLayout(
+          index: ChunkIndex(blankLines()),
+          width: 300,
+          height: height,
+          style: const TextStyle(fontSize: 20, height: 1.5),
+          scaler: TextScaler.linear(scale),
+          direction: TextDirection.ltr,
+          paragraphSpacing: 10,
+          columns: columns,
+        );
+        final middle = layout(500).forward(const PageCursor(0, 0))!;
+        expect(middle.fragments.map((f) => f.text), [
+          'Before',
+          '',
+          '',
+          'After',
+        ]);
+        expect(middle.columnBreak, isNull);
+        expect(middle.fragments[1].height, 30 * scale);
+        expect(middle.fragments[2].height, 30 * scale);
+
+        // Leave enough space for Before and both gaps, but not After.
+        final height = middle.fragments
+            .take(3)
+            .fold(0.0, (h, f) => h + f.height);
+        final boundaries = PageBoundaries(layout(height));
+        final pages = <ReaderPage>[];
+        var cursor = const PageCursor(0, 0);
+        while (true) {
+          final page = boundaries.forward(cursor);
+          if (page == null) break;
+          expect(PageBoundaries.compare(page.end, cursor), greaterThan(0));
+          pages.add(page);
+          expect(pages.length, lessThanOrEqualTo(2));
+          cursor = page.end;
+        }
+        expect(pages.expand((p) => p.fragments).map((f) => f.unit), [
+          0,
+          1,
+          2,
+          3,
+        ]);
+        expect(pages.expand((p) => p.fragments).map((f) => f.text), [
+          'Before',
+          '',
+          '',
+          'After',
+        ]);
+        expect(pages.length, columns == 1 ? 2 : 1);
+        if (columns == 2) {
+          expect(pages.single.columnBreak, 3);
+          expect(pages.single.fullWidth, isFalse);
+        } else {
+          expect(pages.last.fragments.single.text, 'After');
+        }
+        for (final original in pages.reversed) {
+          final previous = boundaries.backward(cursor)!;
+          expect(PageBoundaries.compare(previous.start, original.start), 0);
+          expect(PageBoundaries.compare(previous.end, original.end), 0);
+          expect(previous.columnBreak, original.columnBreak);
+          expect(
+            previous.fragments.map((f) => (f.unit, f.start, f.end, f.height)),
+            original.fragments.map((f) => (f.unit, f.start, f.end, f.height)),
+          );
+          cursor = previous.start;
+        }
+        expect(boundaries.backward(cursor), isNull);
+      });
+    }
+    testWidgets('ordinary gaps render and turn in $columns columns', (
+      tester,
+    ) async {
+      final controller = PagedReaderController();
+      Widget view(double height, {required bool gaps}) => MaterialApp(
+        home: Center(
+          child: SizedBox(
+            width: columns == 1 ? 300 : 700,
+            height: height,
+            child: PagedReaderViewport(
+              content: gaps
+                  ? blankLines()
+                  : ChapterContent(
+                      key: blankLines().key,
+                      title: blankLines().title,
+                      blocks: [
+                        ParagraphBlock(text: 'Before'),
+                        ParagraphBlock(text: 'After'),
+                      ],
+                    ),
+              controller: controller,
+              columns: columns,
+              paragraphSpacing: 10,
+              textStyle: const TextStyle(fontSize: 20, height: 1.5),
+            ),
+          ),
+        ),
+      );
+      Finder text(String value) => find.byWidgetPredicate(
+        (w) => w is ReaderLinkedText && w.text == value,
+      );
+      await tester.pumpWidget(view(300, gaps: false));
+      await tester.pumpAndSettle();
+      final ordinaryDistance =
+          tester.getTopLeft(text('After')).dy -
+          tester.getTopLeft(text('Before')).dy;
+      await tester.pumpWidget(view(300, gaps: true));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(text('After')).dy -
+            tester.getTopLeft(text('Before')).dy,
+        closeTo(ordinaryDistance + 60, .01),
+      );
+
+      await tester.pumpWidget(view(100, gaps: true));
+      await tester.pumpAndSettle();
+      expect(text('Before'), findsOneWidget);
+      if (columns == 1) {
+        expect(text('After'), findsNothing);
+        final next = controller.next();
+        await tester.pumpAndSettle();
+        await next;
+        expect(text('Before'), findsNothing);
+        expect(text('After'), findsOneWidget);
+        expect(controller.capture()!.blockIndex, 3);
+        final previous = controller.previous();
+        await tester.pumpAndSettle();
+        await previous;
+        expect(text('Before'), findsOneWidget);
+        expect(text('After'), findsNothing);
+        expect(controller.capture()!.blockIndex, 0);
+      } else {
+        expect(text('After'), findsOneWidget);
+        expect(
+          tester.getTopLeft(text('After')).dx,
+          greaterThan(tester.getTopLeft(text('Before')).dx),
+        );
+        expect(
+          tester.getTopLeft(text('After')).dy,
+          closeTo(tester.getTopLeft(text('Before')).dy, .01),
+        );
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final width in [240.0, 800.0]) {
     for (final centered in [false, true]) {
       testWidgets('box placement at width $width, centered=$centered', (

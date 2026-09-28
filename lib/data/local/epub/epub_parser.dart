@@ -857,7 +857,7 @@ class EpubParser {
       final gap = explicitGapEm;
       explicitGapEm = 0;
       if (value.trim().isEmpty) {
-        if (activeBox != null && gap > 0) {
+        if (gap > 0) {
           blocks.add(
             ParagraphBlock(
               text: '',

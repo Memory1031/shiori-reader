@@ -71,6 +71,120 @@ void main() {
     ),
   );
   test(
+    'EPUB reparse restores explicit gaps and preserves the following position',
+    () async {
+      final files = epubFiles();
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '<html><body><p>Before</p><p><br/></p><p><br/></p>'
+        '<p>After</p></body></html>',
+      );
+      final originalBytes = zipFiles(files);
+      final imported = ok(
+        await store.importBook(
+          bytes: Stream.value(originalBytes),
+          format: LocalBookFormat.epub,
+          cancellation: token(),
+          parse: (s) => const BookDecoder().decode(
+            s,
+            format: LocalBookFormat.epub,
+            filename: 'blank-lines.epub',
+            cancellation: token(),
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+          ),
+        ),
+      );
+      final key = imported.content.detail.summary.key;
+      final chapter = imported.content.chapters.first;
+      // Simulate a manifest produced before explicit gaps were retained in prose.
+      // The managed original still contains both authored blank paragraphs.
+      final legacy = ChapterContent(
+        key: chapter.key,
+        title: chapter.title,
+        blocks: [
+          ParagraphBlock(text: 'Before'),
+          ParagraphBlock(text: 'After'),
+        ],
+      );
+      final manifest = File(
+        '${paths.localBooks.path}/${key.novelId}/manifest.json',
+      );
+      final map =
+          jsonDecode(await manifest.readAsString()) as Map<String, dynamic>;
+      map['chapters'] = [
+        RecordCodec.chapter(legacy),
+        ...imported.content.chapters.skip(1).map(RecordCodec.chapter),
+      ];
+      final bytes = utf8.encode(jsonEncode(map));
+      await manifest.writeAsBytes(bytes, flush: true);
+      await db.customStatement(
+        'UPDATE local_books SET manifest_hash=? WHERE digest=?',
+        [sha256.convert(bytes).toString(), key.novelId],
+      );
+      final before = ok(await store.read(key, cancellation: token()))!;
+      expect(before.content.chapters.first.blocks, legacy.blocks);
+      final progress = fixtures.progress(
+        before.content,
+        index: 1,
+        fraction: .4,
+      );
+      final generation = ok(
+        await library.beginProgressSession(key, cancellation: token()),
+      );
+      ok(
+        await library.saveProgress(
+          progress,
+          stamp: ProgressWriteStamp(generation: generation, sequence: 0),
+          cancellation: token(),
+        ),
+      );
+
+      final result = ok(
+        await store.reparseBook(
+          key,
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+          cancellation: token(),
+        ),
+      );
+      expect(result.approximate, isFalse);
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      final next = ok(await store.read(key, cancellation: token()))!;
+      final reparsed = next.content.chapters.first;
+      final blocks = reparsed.blocks.cast<ParagraphBlock>();
+      expect(blocks.map((b) => b.text), ['Before', '', '', 'After']);
+      expect(blocks.map((b) => b.authoredGapEm), [null, 1, 1, null]);
+      expect(blocks.first.blockKey, legacy.blocks.first.blockKey);
+      expect(blocks.last.blockKey, legacy.blocks.last.blockKey);
+      expect(reparsed.contentRevision, isNot(legacy.contentRevision));
+      final saved = ok(await library.getProgress(key, cancellation: token()))!;
+      expect(saved.chapterKey, progress.chapterKey);
+      expect(saved.position.contentRevision, reparsed.contentRevision);
+      expect(saved.position.blockKey, blocks.last.blockKey);
+      expect(saved.position.blockIndex, 3);
+      expect(saved.position.blockFraction, .4);
+      expect(saved.position.chapterFraction, .85);
+      expect(saved.position.pixelOffset, isNull);
+      expect(saved.position.layoutKey, isNull);
+      expect(saved.lastReadAt, progress.lastReadAt);
+      expect(saved.completed, progress.completed);
+      expect(
+        saved.bookProgress,
+        next.content.progressMetrics.at(
+          saved.chapterKey,
+          saved.position.chapterFraction,
+        ),
+      );
+      expect(next.importedAt, imported.importedAt);
+      expect(
+        await File(
+          '${paths.localBooks.path}/${key.novelId}/original',
+        ).readAsBytes(),
+        originalBytes,
+      );
+    },
+  );
+
+  test(
     'atomic reparse preserves progress, original and dates; old writer rejected even with new generation',
     () async {
       final old = await add();

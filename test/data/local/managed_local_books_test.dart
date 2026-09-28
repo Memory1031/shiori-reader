@@ -1038,8 +1038,6 @@ void main() {
         );
         await store.close();
         store = ok(await ManagedLocalBooks.open(paths, db));
-        // Decode once, as a read before the Reader opens does.
-        ok(await store.read(key, cancellation: token()));
         final bundle =
             (await db
                     .customSelect(
@@ -1051,12 +1049,22 @@ void main() {
         final manifest = File(
           '${root(key).path}/revisions/$bundle/manifest.json',
         );
-        final modified = await manifest.lastModified();
-        final length = await manifest.length();
+        // Use a whole-second timestamp and the same stat API as the cache;
+        // lastModified() can expose a different precision on some platforms.
+        await manifest.setLastModified(DateTime.utc(2025));
+        final originalStat = await manifest.stat();
+        // Decode once, as a read before the Reader opens does.
+        ok(await store.read(key, cancellation: token()));
         // Same size and time keep the decoded record current, but any second
         // read of the manifest would now fail its checksum.
-        await manifest.writeAsBytes(List.filled(length, 0x20), flush: true);
-        await manifest.setLastModified(modified);
+        await manifest.writeAsBytes(
+          List.filled(originalStat.size, 0x20),
+          flush: true,
+        );
+        await manifest.setLastModified(originalStat.modified);
+        final restoredStat = await manifest.stat();
+        expect(restoredStat.modified, originalStat.modified);
+        expect(restoredStat.size, originalStat.size);
         expect(
           ok(
             await store.loadPagePresentation(

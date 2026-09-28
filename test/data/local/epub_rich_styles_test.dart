@@ -15,6 +15,69 @@ void main() {
     return EpubParser(zipFiles(files), key, 'rich.epub').parse().content;
   }
 
+  test('ordinary prose preserves consecutive explicit blank paragraphs', () {
+    final content = parse(
+      '<p>A</p><p id="gap"><br/></p><p><br/></p>'
+          '<p id="after">B</p><p><a href="#gap">Gap</a> '
+          '<a href="#after">After</a></p>',
+      '',
+    );
+    final chapter = content.chapters.first;
+    final blocks = chapter.blocks.cast<ParagraphBlock>();
+    expect(blocks.map((b) => b.text), ['A', '', '', 'B', 'Gap After']);
+    expect(blocks.map((b) => b.authoredGapEm), [null, 1, 1, null, null]);
+    expect(blocks.every((b) => b.box == null), isTrue);
+    expect(blocks[1].blockKey, isNot(blocks[2].blockKey));
+    expect(content.links[0].targetBlockKey, blocks[1].blockKey);
+    expect(content.links[1].targetBlockKey, blocks[3].blockKey);
+    expect(
+      content.links.every((l) => l.sourceBlockKey == blocks[4].blockKey),
+      isTrue,
+    );
+    expect(ChapterContent.fromJson(chapter.toJson()), chapter);
+  });
+  for (final (name, between) in [
+    ('source indentation', '\n   \t\n'),
+    ('empty paragraph', '<p> \n\t </p>'),
+    ('display none', '<p style="display:none"><br/></p>'),
+    ('hidden attribute', '<p hidden="hidden"><br/></p>'),
+    (
+      'inherited visibility',
+      '<div style="visibility:hidden"><p><br/></p></div>',
+    ),
+    ('collapsed visibility', '<p style="visibility:collapse"><br/></p>'),
+    ('hidden inline break', '<p><br style="visibility:hidden"/></p>'),
+  ]) {
+    test('$name does not create an authored blank paragraph', () {
+      final blocks = parse(
+        '<p>A</p>$between<p>B</p>',
+        '',
+      ).chapters.first.blocks.cast<ParagraphBlock>();
+      expect(blocks.map((b) => b.text), ['A', 'B']);
+      expect(blocks.every((b) => b.authoredGapEm == null), isTrue);
+    });
+  }
+  test('inline br remains inside a nonempty paragraph without extra gaps', () {
+    final block =
+        parse('<p>A<br/>B</p>', '').chapters.first.blocks.single
+            as ParagraphBlock;
+    expect(block.text, 'A\nB');
+    expect(block.authoredGapEm, isNull);
+  });
+  test('ordinary authored gaps retain relative scale and the safety bound', () {
+    final chapter = parse(
+      '<p>A</p><p style="font-size:.4em"><br/></p>'
+          '<p>${'<br/>' * 20}</p><p>B</p>',
+      '',
+    ).chapters.first;
+    final blocks = chapter.blocks.cast<ParagraphBlock>();
+    expect(blocks.map((b) => b.text), ['A', '', '', 'B']);
+    expect(blocks[1].authoredGapEm, .4);
+    expect(blocks[2].authoredGapEm, 16);
+    expect(blocks.every((b) => b.box == null), isTrue);
+    expect(ChapterContent.fromJson(chapter.toJson()), chapter);
+  });
+
   test(
     'nested relative styles preserve code point offsets, links and identity',
     () {
