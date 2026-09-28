@@ -1295,21 +1295,30 @@ class EpubParser {
     }
     // EPUB authors often use h4–h6 for the document's chapter heading.
     // Promote only an opening heading at the document's highest heading rank.
-    if (blocks.firstOrNull case HeadingBlock(
+    // Ordinary authored blanks do not displace the opening heading.
+    final openingIndex = blocks.indexWhere(
+      (block) =>
+          block is! ParagraphBlock ||
+          block.text.isNotEmpty ||
+          block.authoredGapEm == null ||
+          block.box != null,
+    );
+    final opening = openingIndex < 0 ? null : blocks[openingIndex];
+    if (opening case HeadingBlock(
       :final text,
       :final level,
       :final alignment,
     )) {
       if (level > 2 &&
           !blocks.whereType<HeadingBlock>().any((h) => h.level < level)) {
-        blocks[0] = HeadingBlock(
+        blocks[openingIndex] = HeadingBlock(
           text: text,
           level: 2,
           alignment: alignment,
-          inlineImages: blocks[0].inlineImages,
-          inlineRuby: blocks[0].inlineRuby,
-          inlineStyles: blocks[0].inlineStyles,
-          box: blocks[0].box,
+          inlineImages: opening.inlineImages,
+          inlineRuby: opening.inlineRuby,
+          inlineStyles: opening.inlineStyles,
+          box: opening.box,
         );
       }
     }

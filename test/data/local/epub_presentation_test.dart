@@ -8,6 +8,58 @@ import 'package:html/parser.dart';
 import 'package:shiori/data/local/epub/epub_presentation.dart';
 
 void main() {
+  for (final (name, prefix, level) in [
+    ('one authored blank', '<p><br/></p>', 2),
+    ('consecutive authored blanks', '<p><br/></p><p><br/></p>', 2),
+    ('body text', '<p>Before</p>', 4),
+    ('blank followed by body text', '<p><br/></p><p>Before</p>', 4),
+    ('image', '<p><br/></p><img src="../images/星 空.png"/>', 4),
+    ('divider', '<p><br/></p><hr/>', 4),
+    ('boxed blank', '<div style="border:1px solid red"><p><br/></p></div>', 4),
+  ]) {
+    test('opening heading promotion after $name', () {
+      final files = epubFiles();
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '<html><body>$prefix<h4><b>Opening chapter</b></h4>'
+        '<p>Body</p></body></html>',
+      );
+      final chapter = EpubParser(
+        zipFiles(files),
+        NovelKey(sourceId: SourceId('local'), novelId: 'test'),
+        'fixture.epub',
+      ).parse().content.chapters.first;
+      final heading = chapter.blocks.whereType<HeadingBlock>().single;
+      expect(heading.text, 'Opening chapter');
+      expect(heading.level, level);
+      expect(heading.inlineStyles.single.bold, isTrue);
+      expect((chapter.blocks.last as ParagraphBlock).text, 'Body');
+      final gaps = chapter.blocks
+          .whereType<ParagraphBlock>()
+          .where((b) => b.authoredGapEm != null)
+          .toList();
+      expect(gaps.length, '<br/>'.allMatches(prefix).length);
+      expect(gaps.every((b) => b.text.isEmpty && b.authoredGapEm == 1), isTrue);
+      expect(ChapterContent.fromJson(chapter.toJson()), chapter);
+    });
+  }
+  test('leading authored blank does not bypass the highest heading rank', () {
+    final files = epubFiles();
+    files['OPS/text/a.xhtml'] = utf8.encode(
+      '<html><body><p><br/></p><h4>Opening</h4><p>Body</p>'
+      '<h3>Higher rank</h3><p>More body</p></body></html>',
+    );
+    final chapter = EpubParser(
+      zipFiles(files),
+      NovelKey(sourceId: SourceId('local'), novelId: 'test'),
+      'fixture.epub',
+    ).parse().content.chapters.first;
+    expect(chapter.blocks.whereType<HeadingBlock>().map((h) => h.level), [
+      4,
+      3,
+    ]);
+    expect((chapter.blocks.first as ParagraphBlock).authoredGapEm, 1);
+  });
+
   test(
     'opening h4 is a chapter heading but inner headings retain their level',
     () {
