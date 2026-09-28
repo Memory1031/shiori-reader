@@ -1,13 +1,162 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shiori/app/app.dart';
+import 'package:shiori/app/routes.dart';
+import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/features/reader/reader_chrome.dart';
 import 'package:shiori/features/reader/reader_completion_page.dart';
 import 'package:shiori/features/reader/reader_completion_transition.dart';
+import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/reader_theme.dart';
+import 'package:shiori/features/reader/reader_toolbars.dart';
+import 'package:shiori/features/reader/viewport/page_turn.dart';
 import 'package:shiori/features/reader/viewport/paper_turn.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
+import 'settings_test.dart' show Store;
 
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'completion status follows its page at text scale $scale',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 568);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        const battery = MethodChannel('dev.fluttercommunity.plus/battery');
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          battery,
+          (call) async => switch (call.method) {
+            'getBatteryLevel' => 82,
+            'getBatteryState' => 'discharging',
+            _ => throw MissingPluginException(),
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            battery,
+            null,
+          ),
+        );
+        final completion = ValueNotifier<BookTerminalState?>(null);
+        final chrome = ValueNotifier(false);
+        addTearDown(completion.dispose);
+        addTearDown(chrome.dispose);
+        final settings = Store()
+          ..value = ReaderSettings(
+            controlsHintSeen: true,
+            horizontalPadding: 30,
+          );
+        await tester.pumpWidget(
+          ShioriApp(
+            locale: const Locale('en'),
+            routes: AppRoutes(
+              home: (context) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(scale),
+                  alwaysUse24HourFormat: true,
+                  padding: const EdgeInsets.only(top: 24, bottom: 20),
+                ),
+                child: ValueListenableBuilder<BookTerminalState?>(
+                  valueListenable: completion,
+                  builder: (context, value, _) => ReaderContentView(
+                    content: ChapterContent(
+                      key: fixtureChapterKey(FixtureScenario.shortChapter),
+                      title: 'Last chapter',
+                      blocks: [ParagraphBlock(text: 'Last page.')],
+                    ),
+                    runningTitle: 'Book',
+                    settings: settings,
+                    chrome: chrome,
+                    completion: value,
+                    actions: ReaderActions(
+                      completionPrevious: () => completion.value = null,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final immersive = defaultTargetPlatform != TargetPlatform.windows;
+        final status = find.byType(ReaderStatusRow);
+        final progress = find.textContaining(RegExp(r'^Chapter \d+%$'));
+        expect(progress, findsOneWidget);
+        Rect? ordinaryStatus;
+        if (immersive) ordinaryStatus = tester.getRect(status);
+
+        for (final state in [
+          BookTerminalState.finished,
+          BookTerminalState.caughtUp,
+          BookTerminalState.currentEnd,
+        ]) {
+          completion.value = state;
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 100));
+          final endLayer = find.byKey(const ValueKey('completion-end-layer'));
+          if (immersive) {
+            expect(
+              find.descendant(of: endLayer, matching: status),
+              findsOneWidget,
+            );
+            expect(
+              find.ancestor(of: status, matching: find.byType(PageTurnSlot)),
+              findsOneWidget,
+            );
+          }
+          await tester.pumpAndSettle();
+          expect(find.byType(ReaderCompletionPage), findsOneWidget);
+          expect(find.byType(ReaderRunningChrome), findsNothing);
+          expect(progress, findsNothing);
+          expect(status, immersive ? findsOneWidget : findsNothing);
+          if (immersive) {
+            expect(tester.getRect(status), ordinaryStatus);
+            expect(
+              find.textContaining(RegExp(r'\d{1,2}:\d{2}')),
+              findsOneWidget,
+            );
+            expect(find.text('82%'), findsOneWidget);
+            expect(
+              find.descendant(of: status, matching: find.byType(CustomPaint)),
+              findsOneWidget,
+            );
+            expect(
+              tester.widget<ReaderStatusRow>(status).progress,
+              isA<SizedBox>(),
+            );
+          } else {
+            expect(find.text('82%'), findsNothing);
+          }
+          expect(tester.takeException(), isNull);
+          await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 100));
+          if (immersive) {
+            expect(
+              find.descendant(of: endLayer, matching: status),
+              findsOneWidget,
+            );
+          }
+          await tester.pumpAndSettle();
+          expect(find.byType(ReaderCompletionPage), findsNothing);
+          expect(find.byType(ReaderRunningChrome), findsOneWidget);
+          expect(progress, findsOneWidget);
+          expect(status, immersive ? findsOneWidget : findsNothing);
+          expect(tester.takeException(), isNull);
+        }
+        await tester.pumpWidget(const SizedBox());
+      },
+      variant: TargetPlatformVariant({
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+        TargetPlatform.windows,
+      }),
+    );
+  }
+
   testWidgets('reduced motion switches immediately and retains the reader', (
     tester,
   ) async {

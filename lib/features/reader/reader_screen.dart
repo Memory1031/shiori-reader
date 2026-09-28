@@ -886,17 +886,38 @@ class _ReaderContentViewState extends State<ReaderContentView>
         onPointerSignal: _scrollPage,
         onPointerDown: _pointerDown,
         onPointerUp: (event) => _pointerUp(context, event),
-        child: ReaderCompletionPage(
-          state: widget.completion!,
-          title:
-              widget.session?.progress?.snapshot.title ??
-              widget.runningTitle ??
-              widget.content.title,
-          style: style,
-          onPrevious: _actions.completionPrevious ?? () {},
-          onExit: _actions.exitToShelf ?? () {},
-          onCatalog: () => _run(context, ReaderCommand.contents),
-          onRestart: _actions.restart ?? () {},
+        child: Column(
+          children: [
+            Expanded(
+              child: ReaderCompletionPage(
+                state: widget.completion!,
+                title:
+                    widget.session?.progress?.snapshot.title ??
+                    widget.runningTitle ??
+                    widget.content.title,
+                style: style,
+                onPrevious: _actions.completionPrevious ?? () {},
+                onExit: _actions.exitToShelf ?? () {},
+                onCatalog: () => _run(context, ReaderCommand.contents),
+                onRestart: _actions.restart ?? () {},
+              ),
+            ),
+            if (ShioriCapabilities.of(context).immersiveSystemUi)
+              SizedBox(
+                height: ReaderChromeMetrics.of(context).footer,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    _margin,
+                    ReaderChromeMetrics.inner,
+                    _margin,
+                    ReaderChromeMetrics.edge,
+                  ),
+                  child: const Center(
+                    child: ReaderStatusRow(progress: SizedBox.shrink()),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     ),
