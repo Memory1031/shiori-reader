@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
+import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/bookshelf/library_controller.dart';
 import 'package:shiori/features/bookshelf/bookshelf_view.dart';
@@ -480,4 +481,117 @@ void main() {
       await repo.close();
     });
   });
+
+  testWidgets('touch sheet offers the pointer menu actions, reparse included', (
+    tester,
+  ) async {
+    final repo = FixtureLibraryRepository();
+    final book = NovelSummary(
+      key: LocalBookIdentity.book('c' * 64),
+      title: 'Imported book',
+      authors: const ['Author'],
+    );
+    final local = ShelfReparseBooks(repo, book);
+    final controller = LibraryController(repo, localBooks: local)..onStart();
+    await controller.add(book);
+    final opened = <NovelKey>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: ListenableBuilder(
+            listenable: controller,
+            builder: (_, _) => BookshelfView(
+              controller: controller,
+              localReparse: local,
+              onOpen: opened.add,
+              onDetails: (_) {},
+              onSearch: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.longPress(find.byKey(ValueKey(book.key)));
+    await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet);
+    for (final label in [
+      'Start reading',
+      'Novel details',
+      'Reparse',
+      'Remove from bookshelf',
+    ]) {
+      expect(
+        find.descendant(of: sheet, matching: find.text(label)),
+        findsOneWidget,
+      );
+    }
+    expect(
+      find.descendant(of: sheet, matching: find.text('Author')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: sheet, matching: find.text('txt')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Reparse'));
+    await tester.pumpAndSettle();
+    expect(sheet, findsNothing);
+    await tester.tap(find.widgetWithText(FilledButton, 'Reparse'));
+    await tester.pumpAndSettle();
+    expect(local.reparsed, [book.key]);
+    // The shelf has no inline progress, so the result stays in the dialog.
+    expect(
+      find.text('Reparsed. Your reading position is preserved.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    await tester.longPress(find.byKey(ValueKey(book.key)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Start reading'));
+    await tester.pumpAndSettle();
+    expect(opened, [book.key]);
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(() async {
+      controller.onDelete();
+      await controller.resourcesReleased;
+      controller.dispose();
+      await repo.close();
+    });
+  });
+}
+
+class ShelfReparseBooks extends ShelfLocalBooks implements LocalBookReparse {
+  ShelfReparseBooks(super.repo, this.book);
+  final NovelSummary book;
+  final reparsed = <NovelKey>[];
+  @override
+  Stream<Result<List<LocalBookInfo>>> watchBooks() => Stream.value(
+    Success([
+      LocalBookInfo(
+        key: book.key,
+        title: book.title,
+        format: LocalBookFormat.txt,
+        importedAt: DateTime.utc(2025),
+      ),
+    ]),
+  );
+  @override
+  Stream<NovelKey> get invalidations => const Stream.empty();
+  @override
+  Stream<NovelKey> get changes => const Stream.empty();
+  @override
+  Future<Result<LocalReparseResult>> reparseBook(
+    NovelKey key, {
+    required ChooseTxtEncoding chooseEncoding,
+    TxtEncoding? encoding,
+    required CancellationToken cancellation,
+  }) async {
+    reparsed.add(key);
+    return const Success(LocalReparseResult(approximate: false));
+  }
 }

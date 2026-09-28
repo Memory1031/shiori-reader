@@ -116,48 +116,163 @@ class _BookshelfViewState extends State<BookshelfView> {
     _drag = 0;
   }
 
+  /// The book's actions, shared by the pointer menu and the touch sheet so
+  /// both offer the same choices. A null entry separates groups.
+  List<_BookEntry?> _entries(NovelSummary book) {
+    final strings = AppLocalizations.of(context);
+    final controller = widget.controller;
+    final reparse = _reparse;
+    final started = controller.progressFor(book.key) != null;
+    return [
+      _BookEntry(
+        _BookAction.open,
+        started ? Icons.play_arrow_rounded : Icons.menu_book_outlined,
+        started ? strings.detailContinue : strings.detailStart,
+      ),
+      _BookEntry(
+        _BookAction.details,
+        Icons.info_outline,
+        strings.novelDetailsTitle,
+        enabled: widget.onDetails != null,
+      ),
+      null,
+      if (book.key.sourceId == LocalBookIdentity.sourceId &&
+          reparse != null &&
+          controller.localFormats.containsKey(book.key))
+        _BookEntry(
+          _BookAction.reparse,
+          Icons.autorenew,
+          strings.localReparse,
+          enabled: !reparse.busy,
+        ),
+      _BookEntry(
+        _BookAction.remove,
+        Icons.bookmark_remove_outlined,
+        strings.detailRemoveShelf,
+        enabled: !controller.writing,
+      ),
+    ];
+  }
+
+  void _perform(NovelSummary book, _BookAction action) {
+    final controller = widget.controller;
+    switch (action) {
+      case _BookAction.open:
+        widget.onOpen(book.key);
+      case _BookAction.details:
+        widget.onDetails?.call(book.key);
+      case _BookAction.reparse:
+        final format = controller.localFormats[book.key];
+        // The shelf has no inline progress row, so the operation always
+        // runs in its dialog.
+        if (format != null) {
+          _reparse?.start(context, [
+            LocalReparseTarget(book.key, book.title, format),
+          ], desktop: true);
+        }
+      case _BookAction.remove:
+        removeShelfBook(context, controller, book);
+    }
+  }
+
   Future<void> _actions(NovelSummary book) async {
-    final l = AppLocalizations.of(context);
+    final strings = AppLocalizations.of(context);
+    final controller = widget.controller;
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final metadata = [
+      ?_sourceBadgeLabel(book.key, controller.localFormats[book.key]),
+      ?bookProgressLabel(
+        strings,
+        controller.progressFor(book.key)?.bookProgress,
+        descriptive: true,
+      ),
+    ].join(' · ');
+    final entries = _entries(book);
     await showShioriSheet<void>(
       context,
-      builder: (sheet) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(ShioriSpace.medium),
-                child: Text(
-                  book.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
+      builder: (sheet) => Padding(
+        padding: const EdgeInsets.fromLTRB(
+          ShioriSpace.small,
+          0,
+          ShioriSpace.small,
+          ShioriSpace.small,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // The book the actions apply to, as the shelf row shows it.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ShioriSpace.medium,
+                0,
+                ShioriSpace.medium,
+                ShioriSpace.item,
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 44,
+                    child: BookCover(book: book, images: widget.images),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          book.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        if (book.authors.isNotEmpty)
+                          Text(
+                            book.authors.join(', '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: muted,
+                          ),
+                        if (metadata.isNotEmpty)
+                          Text(
+                            metadata,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: muted,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            const SizedBox(height: ShioriSpace.small),
+            for (final entry in entries)
+              if (entry == null)
+                const Divider(
+                  height: ShioriSpace.item + 1,
+                  indent: ShioriSpace.page,
+                  endIndent: ShioriSpace.page,
+                )
+              else
+                ListTile(
+                  leading: Icon(entry.icon),
+                  title: Text(entry.label),
+                  enabled: entry.enabled,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(ShioriShape.control),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheet);
+                    _perform(book, entry.action);
+                  },
                 ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: Text(l.novelDetailsTitle),
-                onTap: widget.onDetails == null
-                    ? null
-                    : () {
-                        Navigator.pop(sheet);
-                        widget.onDetails!(book.key);
-                      },
-              ),
-              ListTile(
-                leading: const Icon(Icons.bookmark_remove_outlined),
-                title: Text(l.detailRemoveShelf),
-                onTap: widget.controller.writing
-                    ? null
-                    : () {
-                        Navigator.pop(sheet);
-                        removeShelfBook(context, widget.controller, book);
-                      },
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -166,26 +281,12 @@ class _BookshelfViewState extends State<BookshelfView> {
   /// A book menu anchored at [anchor] in global coordinates. Resolves true
   /// when it closed without a choice, so the caller can take focus back.
   Future<bool> _menu(NovelSummary book, Rect anchor) async {
-    final strings = AppLocalizations.of(context);
-    final controller = widget.controller;
     final overlay =
         Overlay.of(context, rootOverlay: true).context.findRenderObject()!
             as RenderBox;
     final rtl = Directionality.of(context) == TextDirection.rtl;
     final at = overlay.globalToLocal(
       rtl ? anchor.bottomRight : anchor.bottomLeft,
-    );
-    final started = controller.progressFor(book.key) != null;
-    ShioriMenuItem<_BookAction> entry(
-      _BookAction value,
-      IconData icon,
-      String label, {
-      bool enabled = true,
-    }) => ShioriMenuItem(
-      value: value,
-      icon: icon,
-      label: label,
-      enabled: enabled,
     );
     // On the root navigator the shell sees its route covered, so Escape
     // closes the menu without leaving the workspace page.
@@ -197,53 +298,21 @@ class _BookshelfViewState extends State<BookshelfView> {
         Offset.zero & overlay.size,
       ),
       items: [
-        entry(
-          _BookAction.open,
-          started ? Icons.play_arrow_rounded : Icons.menu_book_outlined,
-          started ? strings.detailContinue : strings.detailStart,
-        ),
-        entry(
-          _BookAction.details,
-          Icons.info_outline,
-          strings.novelDetailsTitle,
-          enabled: widget.onDetails != null,
-        ),
-        const PopupMenuDivider(),
-        if (book.key.sourceId == LocalBookIdentity.sourceId &&
-            _reparse != null &&
-            controller.localFormats.containsKey(book.key))
-          entry(
-            _BookAction.reparse,
-            Icons.autorenew,
-            strings.localReparse,
-            enabled: !_reparse.busy,
-          ),
-        entry(
-          _BookAction.remove,
-          Icons.bookmark_remove_outlined,
-          strings.detailRemoveShelf,
-          enabled: !controller.writing,
-        ),
+        for (final entry in _entries(book))
+          if (entry == null)
+            const PopupMenuDivider()
+          else
+            ShioriMenuItem(
+              value: entry.action,
+              icon: entry.icon,
+              label: entry.label,
+              enabled: entry.enabled,
+            ),
       ],
     );
     if (!mounted) return false;
-    switch (action) {
-      case null:
-        return true;
-      case _BookAction.open:
-        widget.onOpen(book.key);
-      case _BookAction.details:
-        widget.onDetails?.call(book.key);
-      case _BookAction.reparse:
-        final format = controller.localFormats[book.key];
-        if (format != null) {
-          _reparse?.start(context, [
-            LocalReparseTarget(book.key, book.title, format),
-          ], desktop: true);
-        }
-      case _BookAction.remove:
-        removeShelfBook(context, controller, book);
-    }
+    if (action == null) return true;
+    _perform(book, action);
     return false;
   }
 
@@ -681,6 +750,14 @@ class _BookshelfViewState extends State<BookshelfView> {
 }
 
 enum _BookAction { open, details, reparse, remove }
+
+class _BookEntry {
+  const _BookEntry(this.action, this.icon, this.label, {this.enabled = true});
+  final _BookAction action;
+  final IconData icon;
+  final String label;
+  final bool enabled;
+}
 
 /// Switches a shelf between grid and list.
 class ShelfLayoutButton extends StatelessWidget {
