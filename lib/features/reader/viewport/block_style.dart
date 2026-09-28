@@ -71,7 +71,6 @@ String readerIndentPrefix(
   if (block is! ParagraphBlock ||
       !startsBlock ||
       block.hangingIndentEm != null ||
-      block.trailingLabelStart != null ||
       block.text.trim().isEmpty ||
       block.alignment != ParagraphAlignment.start ||
       _isChapterHeading(block, chapter) ||

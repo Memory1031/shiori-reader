@@ -1,3 +1,4 @@
+import '../../data/local/epub_prose_semantics_test.dart' show paragraphs;
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/dev/viewport/reader_viewport.dart';
@@ -35,6 +36,142 @@ ParagraphFlow flow(
   scaler: TextScaler.linear(scale),
 );
 void main() {
+  testWidgets(
+    'label-only flow keeps authored whitespace and narrow indent limits',
+    (tester) async {
+      for (final (body, indent, width, scale, expected) in [
+        ('正文内容', 8, 320.0, 1.0, 40.0),
+        ('　正文内容', 2, 320.0, 1.0, 0.0),
+        ('正文内容', 2, 70.0, 2.0, 0.0),
+      ]) {
+        final block = paragraphs(
+          '<p style="text-indent:${indent}em;clear:both">$body<span style="float:right;text-indent:0">-09:41</span></p>',
+        ).single;
+        final measured = flow(block, width, scale: scale);
+        expect(measured.lines.first.pieces.first.rect.left, expected);
+        expect(measured.end, block.text.runes.length);
+        for (final line in measured.lines.skip(1)) {
+          for (final piece in line.pieces.where((p) => !p.label)) {
+            expect(piece.rect.left, 0);
+          }
+        }
+      }
+    },
+  );
+  testWidgets(
+    'parsed trailing labels preserve ordinary first-line indent in layout and paint',
+    (tester) async {
+      for (final body in ['正文。', '普通正文😀é内容。' * 100]) {
+        const css = 'text-indent:2em;clear:both';
+        final block = paragraphs(
+          '<p style="$css">$body<span style="float:right;text-indent:0">-09:41</span></p><p>${'后续正文' * 900}</p>',
+        ).first;
+        final plain = paragraphs(
+          '<p style="$css">$body<span style="text-indent:0">-09:41</span></p>',
+        ).single;
+        expect(block.leadingIndent, 2);
+        expect(block.hangingIndentEm, isNull);
+        expect(block.trailingLabelStart, body.runes.length);
+        expect(block.text, plain.text);
+        expect(block.blockKey, plain.blockKey);
+        for (final scale in [1.0, 2.0]) {
+          for (final columns in [1, 2]) {
+            const width = 320.0;
+            final content = chapter(block);
+            final layout = PageLayout(
+              index: ChunkIndex(content),
+              width: width,
+              height: 170,
+              style: style,
+              scaler: TextScaler.linear(scale),
+              direction: TextDirection.ltr,
+              columns: columns,
+            );
+            var cursor = const PageCursor(0, 0);
+            final fragments = <PageFragment>[];
+            while (true) {
+              final page = layout.forward(cursor);
+              if (page == null) break;
+              fragments.addAll(
+                page.fragments.where(
+                  (f) => layout.index.chunks[f.unit].blockIndex == 0,
+                ),
+              );
+              cursor = page.end;
+            }
+            expect(fragments.map((f) => f.text).join(), block.text);
+            var labels = 0;
+            for (final fragment in fragments) {
+              final sourceOffset =
+                  layout.index.chunks[fragment.unit].start + fragment.start;
+              for (final line in fragment.flow!.lines) {
+                for (final piece in line.pieces) {
+                  if (piece.label) {
+                    labels++;
+                    expect(piece.rect.right, closeTo(width, .01));
+                  } else {
+                    expect(
+                      piece.rect.left,
+                      sourceOffset + piece.start == 0 ? 40 * scale : 0,
+                    );
+                  }
+                }
+                if (line.pieces.length == 2) {
+                  expect(
+                    line.pieces.first.rect.overlaps(line.pieces.last.rect),
+                    isFalse,
+                  );
+                }
+              }
+            }
+            expect(labels, 1);
+            for (final fragment in {fragments.first, fragments.last}) {
+              final sourceOffset =
+                  layout.index.chunks[fragment.unit].start + fragment.start;
+              await tester.pumpWidget(
+                MaterialApp(
+                  home: Center(
+                    child: SizedBox(
+                      width: width,
+                      child: ReaderLinkedText(
+                        text: fragment.text!,
+                        prefix: '',
+                        blockOffset: sourceOffset,
+                        links: const [],
+                        style: style,
+                        align: TextAlign.left,
+                        scaler: TextScaler.linear(scale),
+                        flow: fragment.flow,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+              final root = tester.getRect(find.byType(ReaderLinkedText).first);
+              final painted = tester
+                  .widgetList<ReaderLinkedText>(find.byType(ReaderLinkedText))
+                  .where((w) => w.flow == null)
+                  .toList();
+              final pieces = fragment.flow!.lines
+                  .expand((l) => l.pieces)
+                  .toList();
+              expect(painted.length, pieces.length);
+              for (var i = 0; i < pieces.length; i++) {
+                final rect = tester.getRect(find.byWidget(painted[i]));
+                expect(
+                  rect.left - root.left,
+                  closeTo(pieces[i].rect.left, .01),
+                );
+                expect(rect.top - root.top, closeTo(pieces[i].rect.top, .01));
+                expect(painted[i].blockOffset, sourceOffset + pieces[i].start);
+              }
+              expect(tester.takeException(), isNull);
+            }
+          }
+        }
+      }
+    },
+  );
   testWidgets(
     'label moves to the next page and narrow labels wrap without loss',
     (tester) async {

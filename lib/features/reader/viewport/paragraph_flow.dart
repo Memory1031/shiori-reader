@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../domain/models/models.dart';
 import '../reader_inline_images.dart';
+import 'block_style.dart';
 
 bool readerUsesParagraphFlow(ContentBlock block, TextDirection direction) =>
     direction == TextDirection.ltr &&
@@ -54,6 +55,7 @@ ParagraphFlow readerParagraphFlow({
   required double width,
   required TextStyle style,
   required TextScaler scaler,
+  ChapterKey? chapter,
   double maxHeight = double.infinity,
   Locale? locale,
   TextHeightBehavior? textHeightBehavior,
@@ -68,6 +70,27 @@ ParagraphFlow readerParagraphFlow({
     (block.hangingIndentEm ?? 0) * em,
     math.max(0.0, width - em * 4),
   );
+  // Keep the existing indentation policy (including authored whitespace and
+  // narrow-width limits), but express its measured width as source-free geometry.
+  final prefix = readerIndentPrefix(
+    block,
+    offset == 0,
+    width,
+    style,
+    scaler,
+    chapter: chapter,
+  );
+  var firstInset = 0.0;
+  if (prefix.isNotEmpty) {
+    final indent = TextPainter(
+      text: TextSpan(text: prefix, style: style),
+      textDirection: TextDirection.ltr,
+      textScaler: scaler,
+      locale: locale,
+    )..layout(maxWidth: width);
+    firstInset = indent.width.clamp(0.0, math.max(0.0, width - 1));
+    indent.dispose();
+  }
   final label = block.trailingLabelStart;
   final bodyEnd = label == null
       ? runes.length
@@ -171,7 +194,7 @@ ParagraphFlow readerParagraphFlow({
   var lastBaseline = 0.0;
   while (cursor < bodyEnd) {
     if (top > maxHeight) return ParagraphFlow(lines);
-    final x = offset + cursor == 0 ? 0.0 : inset;
+    final x = offset + cursor == 0 ? firstInset : inset;
     final available = math.max(1.0, width - x);
     final m = measure(cursor, bodyEnd, available);
     lines.add(

@@ -179,6 +179,7 @@ final class PageLayout {
       final paragraph = block as ParagraphBlock;
       final flow = readerParagraphFlow(
         block: paragraph,
+        chapter: index.content.key,
         text: text,
         offset: blockOffset,
         maxHeight: available,

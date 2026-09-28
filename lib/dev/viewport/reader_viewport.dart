@@ -191,6 +191,7 @@ class _ReaderViewportState extends State<ReaderViewport> {
     }
     return readerParagraphFlow(
       block: block as ParagraphBlock,
+      chapter: widget.content.key,
       text: chunk.text!,
       offset: chunk.start,
       width: width,
