@@ -58,9 +58,29 @@ void main() {
               find.descendant(of: chip, matching: find.byIcon(Icons.check)),
               findsOneWidget,
             );
+            final other = find.widgetWithText(
+              ChoiceChip,
+              label == 'Soft teal' ? 'Blue grey' : 'Soft teal',
+            );
             expect(
-              find.descendant(of: chip, matching: find.byIcon(Icons.circle)),
+              find.descendant(of: other, matching: find.byIcon(Icons.check)),
               findsNothing,
+            );
+            // The swatch keeps its size and accent color when selected.
+            final swatch = find.descendant(
+              of: chip,
+              matching: find.byWidgetPredicate(
+                (w) =>
+                    w is DecoratedBox &&
+                    w.decoration is BoxDecoration &&
+                    (w.decoration as BoxDecoration).shape == BoxShape.circle,
+              ),
+            );
+            expect(tester.getSize(swatch), const Size.square(18));
+            expect(
+              (tester.widget<DecoratedBox>(swatch).decoration as BoxDecoration)
+                  .color,
+              Theme.of(tester.element(chip)).colorScheme.primary,
             );
           }
         }

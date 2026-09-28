@@ -62,6 +62,7 @@ class _AppearancePanelState extends State<_AppearancePanel> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context), controller = widget.controller;
+    final theme = Theme.of(context), scheme = theme.colorScheme;
     // showShioriSheet already applies the safe-area insets.
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -69,7 +70,7 @@ class _AppearancePanelState extends State<_AppearancePanel> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(l.appAppearance, style: Theme.of(context).textTheme.titleLarge),
+          Text(l.appAppearance, style: theme.textTheme.titleLarge),
           const SizedBox(height: ShioriSpace.medium),
           Text(l.appAppearanceDescription),
           const SizedBox(height: ShioriSpace.item),
@@ -80,11 +81,19 @@ class _AppearancePanelState extends State<_AppearancePanel> {
               for (final mode in AppThemeMode.values)
                 ChoiceChip(
                   showCheckmark: false,
-                  avatar: Icon(switch (mode) {
-                    AppThemeMode.system => Icons.brightness_auto_outlined,
-                    AppThemeMode.light => Icons.light_mode_outlined,
-                    AppThemeMode.dark => Icons.dark_mode_outlined,
-                  }, size: 18),
+                  avatar: Icon(
+                    switch (mode) {
+                      AppThemeMode.system => Icons.brightness_auto_outlined,
+                      AppThemeMode.light => Icons.light_mode_outlined,
+                      AppThemeMode.dark => Icons.dark_mode_outlined,
+                    },
+                    size: 18,
+                    // Follow the label in both states; the chip default tints
+                    // only unselected icons with the accent.
+                    color: controller.settings.themeMode == mode
+                        ? scheme.onSecondaryContainer
+                        : scheme.onSurfaceVariant,
+                  ),
                   label: Text(switch (mode) {
                     AppThemeMode.system => l.readerThemeSystem,
                     AppThemeMode.light => l.readerThemeLight,
@@ -96,10 +105,7 @@ class _AppearancePanelState extends State<_AppearancePanel> {
             ],
           ),
           const SizedBox(height: ShioriSpace.page),
-          Text(
-            l.appAccentTitle,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text(l.appAccentTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: ShioriSpace.small),
           Wrap(
             spacing: 8,
@@ -110,16 +116,11 @@ class _AppearancePanelState extends State<_AppearancePanel> {
                   // An explicit check avoids RawChip's selection scrim over
                   // the color swatch during avatar/checkmark painting.
                   showCheckmark: false,
-                  avatar: controller.settings.accent == accent
-                      ? const Icon(Icons.check, size: 18)
-                      : Icon(
-                          Icons.circle,
-                          size: 16,
-                          color: accentFillColor(
-                            accent,
-                            Theme.of(context).brightness,
-                          ),
-                        ),
+                  avatar: _AccentSwatch(
+                    color: accentColor(accent, theme.brightness),
+                    check: scheme.onPrimary,
+                    selected: controller.settings.accent == accent,
+                  ),
                   label: Text(switch (accent) {
                     AppAccent.teal => l.appAccentTeal,
                     AppAccent.blueGrey => l.appAccentBlueGrey,
@@ -150,4 +151,25 @@ class _AppearancePanelState extends State<_AppearancePanel> {
       ),
     );
   }
+}
+
+/// The accent the choice applies, at a fixed size whether or not selected,
+/// with the selection check drawn on it rather than in its place.
+class _AccentSwatch extends StatelessWidget {
+  const _AccentSwatch({
+    required this.color,
+    required this.check,
+    required this.selected,
+  });
+  final Color color, check;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: 18,
+    child: DecoratedBox(
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      child: selected ? Icon(Icons.check, size: 13, color: check) : null,
+    ),
+  );
 }
