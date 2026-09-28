@@ -1,3 +1,6 @@
+import 'image_export.dart';
+import '../shared/image_export_scope.dart';
+import '../domain/contracts/image_export.dart';
 import 'dart:async';
 import '../features/reader/epub_webview_host.dart';
 import '../data/local/book_decoder.dart';
@@ -64,6 +67,7 @@ class _ProductionAppState extends State<ProductionApp>
   bool _opening = false;
   bool _storesClosed = false;
   AppPaths? _paths;
+  ImageExporter? _imageExporter;
   @override
   void initState() {
     super.initState();
@@ -84,6 +88,7 @@ class _ProductionAppState extends State<ProductionApp>
               AppPaths.resolve(StorageEnvironment.production));
       unownedImports = createImportSource(paths);
       _paths = paths;
+      _imageExporter = createImageExporter(paths);
       final result = await LocalDatabases.open(paths);
       if (!mounted) {
         if (result case Success(:final value)) await value.close();
@@ -320,7 +325,7 @@ class _ProductionAppState extends State<ProductionApp>
                 ),
               ),
             );
-            return app;
+            return ImageExportScope(exporter: _imageExporter!, child: app);
           },
           createController: () => AppController(settingsStore: _appearance),
           homeBuilder: (context, app) => ReadingHome(

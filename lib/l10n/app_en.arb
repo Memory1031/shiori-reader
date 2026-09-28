@@ -616,5 +616,17 @@
   "updateNewVersion": "New version available",
   "updateLicenses": "Open-source licenses",
   "updateCopyVersion": "Copy version info",
-  "updateVersionCopied": "Version info copied"
+  "updateVersionCopied": "Version info copied",
+  "imageExportSave": "Save original image",
+  "imageExportSaving": "Saving image…",
+  "imageExportSavedPhotos": "Saved to Photos / Gallery",
+  "imageExportSavedFile": "Saved to file",
+  "imageExportPermissionDenied": "Photo access was denied. You can allow adding photos in system settings.",
+  "imageExportUnsupported": "Photos / Gallery does not support this original format. You can save it as a file.",
+  "imageExportAsFile": "Save as file",
+  "imageExportInvalidFormat": "The original image format could not be verified. Keep the original file extension when saving.",
+  "imageExportStorageFailure": "Could not write the image. Check available space and the save location, then retry.",
+  "imageExportSourceUnavailable": "The original image is unavailable. Check that it is downloaded, then retry.",
+  "imageExportExists": "A file already exists at this location. Please choose a different name.",
+  "imageExportUnavailable": "Image saving is currently unavailable. Please try again."
 }

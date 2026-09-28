@@ -1149,4 +1149,40 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get updateVersionCopied => '版本信息已复制';
+
+  @override
+  String get imageExportSave => '保存原图';
+
+  @override
+  String get imageExportSaving => '正在保存图片…';
+
+  @override
+  String get imageExportSavedPhotos => '已保存到照片/图库';
+
+  @override
+  String get imageExportSavedFile => '已保存到文件';
+
+  @override
+  String get imageExportPermissionDenied => '未获得添加照片权限，可在系统设置中允许。';
+
+  @override
+  String get imageExportUnsupported => '照片/图库不支持此原始格式，可另存为文件。';
+
+  @override
+  String get imageExportAsFile => '另存为文件';
+
+  @override
+  String get imageExportInvalidFormat => '无法确认原图格式。保存时请保留原始文件扩展名。';
+
+  @override
+  String get imageExportStorageFailure => '图片写入失败，请检查可用空间与保存位置后重试。';
+
+  @override
+  String get imageExportSourceUnavailable => '暂时无法读取原图，请确认图片已下载后重试。';
+
+  @override
+  String get imageExportExists => '该位置已有同名文件，请重试并选择其他文件名。';
+
+  @override
+  String get imageExportUnavailable => '当前无法保存图片，请重试。';
 }

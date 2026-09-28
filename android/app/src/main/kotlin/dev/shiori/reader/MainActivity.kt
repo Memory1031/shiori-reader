@@ -13,6 +13,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : FlutterActivity() {
+    private var imageExport: ImageExportBridge? = null
     private val worker = Executors.newSingleThreadExecutor()
     private var events: EventChannel.EventSink? = null
     private var selection: MethodChannel.Result? = null
@@ -23,6 +24,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(engine: FlutterEngine) {
         super.configureFlutterEngine(engine)
+        imageExport = ImageExportBridge(this, engine.dartExecutor.binaryMessenger)
         val updater = UpdateInstaller(this)
         MethodChannel(engine.dartExecutor.binaryMessenger, "dev.shiori.reader/update")
             .setMethodCallHandler { call, result ->
@@ -111,6 +113,12 @@ class MainActivity : FlutterActivity() {
         accept(intent)
     }
 
+    override fun cleanUpFlutterEngine(engine: FlutterEngine) {
+        imageExport?.close()
+        imageExport = null
+        super.cleanUpFlutterEngine(engine)
+    }
+
     private fun pick(result: MethodChannel.Result) {
         if (selection != null || copying) {
             result.error("busy", null, null)
@@ -157,6 +165,7 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Activity callback required by FlutterActivity")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (imageExport?.onActivityResult(requestCode, resultCode, data) == true) return
         if (requestCode != PICK_REQUEST || selection == null) return
         if (resultCode != Activity.RESULT_OK) {
             selection?.success(null)
@@ -216,6 +225,8 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        imageExport?.close()
+        imageExport = null
         cancelled.set(true)
         events = null
         worker.shutdown()

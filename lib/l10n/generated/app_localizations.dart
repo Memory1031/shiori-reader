@@ -2239,6 +2239,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Version info copied'**
   String get updateVersionCopied;
+
+  /// No description provided for @imageExportSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save original image'**
+  String get imageExportSave;
+
+  /// No description provided for @imageExportSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving image…'**
+  String get imageExportSaving;
+
+  /// No description provided for @imageExportSavedPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to Photos / Gallery'**
+  String get imageExportSavedPhotos;
+
+  /// No description provided for @imageExportSavedFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to file'**
+  String get imageExportSavedFile;
+
+  /// No description provided for @imageExportPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo access was denied. You can allow adding photos in system settings.'**
+  String get imageExportPermissionDenied;
+
+  /// No description provided for @imageExportUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos / Gallery does not support this original format. You can save it as a file.'**
+  String get imageExportUnsupported;
+
+  /// No description provided for @imageExportAsFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as file'**
+  String get imageExportAsFile;
+
+  /// No description provided for @imageExportInvalidFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'The original image format could not be verified. Keep the original file extension when saving.'**
+  String get imageExportInvalidFormat;
+
+  /// No description provided for @imageExportStorageFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not write the image. Check available space and the save location, then retry.'**
+  String get imageExportStorageFailure;
+
+  /// No description provided for @imageExportSourceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The original image is unavailable. Check that it is downloaded, then retry.'**
+  String get imageExportSourceUnavailable;
+
+  /// No description provided for @imageExportExists.
+  ///
+  /// In en, this message translates to:
+  /// **'A file already exists at this location. Please choose a different name.'**
+  String get imageExportExists;
+
+  /// No description provided for @imageExportUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Image saving is currently unavailable. Please try again.'**
+  String get imageExportUnavailable;
 }
 
 class _AppLocalizationsDelegate

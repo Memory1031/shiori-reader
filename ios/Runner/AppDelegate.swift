@@ -3,6 +3,7 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private var imageExportBridge: ImageExportBridge?
   private var importBridge: ImportBridge?
 
   override func application(
@@ -37,6 +38,7 @@ import UIKit
             result(FlutterMethodNotImplemented)
           }
         }
+      imageExportBridge = ImageExportBridge(messenger: controller.binaryMessenger, host: controller)
       importBridge = ImportBridge(messenger: controller.binaryMessenger, host: controller)
       if let url = launchOptions?[.url] as? URL { importBridge?.receive(url) }
     }

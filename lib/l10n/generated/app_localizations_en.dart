@@ -1259,4 +1259,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateVersionCopied => 'Version info copied';
+
+  @override
+  String get imageExportSave => 'Save original image';
+
+  @override
+  String get imageExportSaving => 'Saving image…';
+
+  @override
+  String get imageExportSavedPhotos => 'Saved to Photos / Gallery';
+
+  @override
+  String get imageExportSavedFile => 'Saved to file';
+
+  @override
+  String get imageExportPermissionDenied =>
+      'Photo access was denied. You can allow adding photos in system settings.';
+
+  @override
+  String get imageExportUnsupported =>
+      'Photos / Gallery does not support this original format. You can save it as a file.';
+
+  @override
+  String get imageExportAsFile => 'Save as file';
+
+  @override
+  String get imageExportInvalidFormat =>
+      'The original image format could not be verified. Keep the original file extension when saving.';
+
+  @override
+  String get imageExportStorageFailure =>
+      'Could not write the image. Check available space and the save location, then retry.';
+
+  @override
+  String get imageExportSourceUnavailable =>
+      'The original image is unavailable. Check that it is downloaded, then retry.';
+
+  @override
+  String get imageExportExists =>
+      'A file already exists at this location. Please choose a different name.';
+
+  @override
+  String get imageExportUnavailable =>
+      'Image saving is currently unavailable. Please try again.';
 }

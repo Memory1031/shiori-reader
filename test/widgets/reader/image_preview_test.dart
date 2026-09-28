@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/media/memory_image_repository.dart';
@@ -67,21 +68,20 @@ void main() {
           .widget<InteractiveViewer>(viewer)
           .transformationController!;
       final center = tester.getCenter(viewer);
-      Future<void> doubleTap() async {
-        await tester.tapAt(center);
-        await tester.pump(const Duration(milliseconds: 60));
-        await tester.tapAt(center);
-        await tester.pumpAndSettle();
-      }
-
-      await doubleTap();
-      expect(transform.value.getMaxScaleOnAxis(), 2.5);
-      final beforePan = transform.value.clone();
-      await tester.drag(viewer, const Offset(60, 40));
-      await tester.pumpAndSettle();
-      expect(transform.value, isNot(beforePan));
-      await doubleTap();
-      expect(transform.value.getMaxScaleOnAxis(), 1);
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          position: center,
+          scrollDelta: const Offset(0, -100),
+        ),
+      );
+      await tester.pump();
+      expect(transform.value.getMaxScaleOnAxis(), greaterThan(1));
+      expect(find.byType(ReaderImagePreview), findsOneWidget);
+      await tester.sendEventToBinding(
+        PointerScrollEvent(position: center, scrollDelta: const Offset(0, 100)),
+      );
+      await tester.pump();
+      expect(transform.value.getMaxScaleOnAxis(), closeTo(1, .001));
       final first = await tester.startGesture(
         center - const Offset(40, 0),
         pointer: 1,
@@ -102,20 +102,59 @@ void main() {
       await first.up();
       await second.up();
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(CloseButton));
+      final beforePan = transform.value.clone();
+      await tester.drag(viewer, const Offset(60, 40));
+      await tester.pumpAndSettle();
+      expect(transform.value, isNot(beforePan));
+      await tester.sendEventToBinding(
+        PointerScrollEvent(position: center, scrollDelta: const Offset(0, -40)),
+      );
+      await tester.pump();
+      expect(find.byType(ReaderImagePreview), findsOneWidget);
+      // An independent tap still dismisses after scale/pan/scroll.
+      final route = ModalRoute.of(
+        tester.element(find.byType(ReaderImagePreview)),
+      )!;
+      await tester.tapAt(center);
+      // Pop is synchronous on tap release, without pumping a double-tap timeout.
+      expect(route.isCurrent, isFalse);
+
       await frames(tester);
       expect(find.byType(ReaderImagePreview), findsNothing);
       expect(controller.capture(), position);
       expect(boundaries, 0);
       await tester.tap(find.byType(SourceImage).first);
       await frames(tester);
+      // A tap released after Esc must not pop the Reader a second time.
+      final pendingTap = await tester.startGesture(
+        tester.getCenter(find.byType(InteractiveViewer)),
+      );
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await pendingTap.up();
+      await tester.pump();
       await frames(tester);
       expect(find.byType(ReaderImagePreview), findsNothing);
       expect(controller.capture(), position);
       await tester.tap(find.byType(SourceImage).first);
       await frames(tester);
       await tester.binding.handlePopRoute();
+      await frames(tester);
+      expect(find.byType(ReaderImagePreview), findsNothing);
+      expect(controller.capture(), position);
+      await tester.tap(find.byType(SourceImage).first);
+      await frames(tester);
+      final stage = tester.getRect(find.byType(InteractiveViewer));
+      final blankRoute = ModalRoute.of(
+        tester.element(find.byType(ReaderImagePreview)),
+      )!;
+      await tester.tapAt(stage.topLeft + const Offset(3, 3));
+      expect(blankRoute.isCurrent, isFalse);
+      await frames(tester);
+      expect(find.byType(ReaderImagePreview), findsNothing);
+      expect(controller.capture(), position);
+      await tester.tap(find.byType(SourceImage).first);
+      await frames(tester);
+      await tester.tap(find.byType(CloseButton));
       await frames(tester);
       expect(find.byType(ReaderImagePreview), findsNothing);
       expect(controller.capture(), position);

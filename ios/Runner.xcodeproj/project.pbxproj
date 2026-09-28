@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        E90100000000000000000007 = {isa = PBXBuildFile; fileRef = E90100000000000000000008; };
+        E90100000000000000000001 /* ImageExportBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90100000000000000000002; };
+        E90100000000000000000003 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = E90100000000000000000004; };
         B00500000000000000000005 /* ImportProviderBatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00500000000000000000004 /* ImportProviderBatchTests.swift */; };
         B00500000000000000000002 /* ImportProviderBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00500000000000000000001 /* ImportProviderBatch.swift */; };
         B00500000000000000000003 /* ImportProviderBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00500000000000000000001 /* ImportProviderBatch.swift */; };
@@ -70,6 +73,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+        E90100000000000000000008 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageExportTests.swift; sourceTree = "<group>"; };
+        E90100000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageExportBridge.swift; sourceTree = "<group>"; };
+        E90100000000000000000005 = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+        E90100000000000000000006 = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
         B00500000000000000000004 /* ImportProviderBatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportProviderBatchTests.swift; sourceTree = "<group>"; };
         B00500000000000000000001 /* ImportProviderBatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportProviderBatch.swift; sourceTree = "<group>"; };
 		09DE50DF7925D857668E1C5D /* ShareExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
@@ -149,6 +156,7 @@
 			isa = PBXGroup;
 			children = (
 				331C807B294A618700263BE5 /* RunnerTests.swift */,
+                E90100000000000000000008 /* ImageExportTests.swift */,
 				B00500000000000000000004 /* ImportProviderBatchTests.swift */,
 			);
 			path = RunnerTests;
@@ -212,6 +220,8 @@
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
 				785D662C1911B7A2C5952F10 /* ImportBridge.swift */,
+                E90100000000000000000002 /* ImageExportBridge.swift */,
+                E90100000000000000000004 /* InfoPlist.strings */,
 				2C365910F7713B3C3DB0BC2E /* Runner.entitlements */,
 			);
 			path = Runner;
@@ -367,6 +377,7 @@
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+                E90100000000000000000003 /* InfoPlist.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -481,6 +492,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */,
+                E90100000000000000000007 /* ImageExportTests.swift in Sources */,
 				B00500000000000000000005 /* ImportProviderBatchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -504,6 +516,7 @@
 				116AF7243DBA7D14C4348C1C /* ImportInbox.swift in Sources */,
 				B00500000000000000000002 /* ImportProviderBatch.swift in Sources */,
 				E0343B58AB5F90B360C5F99A /* ImportBridge.swift in Sources */,
+                E90100000000000000000001 /* ImageExportBridge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -524,6 +537,7 @@
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
+        E90100000000000000000004 = {isa = PBXVariantGroup; children = (E90100000000000000000005, E90100000000000000000006); name = InfoPlist.strings; sourceTree = "<group>"; };
 		409A788E27047772D7F21D4B /* Localizable.strings */ = {
 			isa = PBXVariantGroup;
 			children = (

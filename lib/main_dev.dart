@@ -1,3 +1,5 @@
+import 'app/image_export.dart';
+import 'shared/image_export_scope.dart';
 import 'package:flutter/material.dart';
 import 'features/reader/epub_webview_host.dart';
 
@@ -52,17 +54,20 @@ Future<void> main() async {
     (database as Success<LocalDatabases>).value.users,
   );
   runApp(
-    EpubWebViewHost(
-      userDataDirectory: paths.webView,
-      child: createDevApp(
-        appSettings: PreferencesAppSettingsStore(
-          preferences: SharedPreferencesAsync(),
-          paths: paths,
-          logger: AppLogger(),
+    ImageExportScope(
+      exporter: createImageExporter(paths),
+      child: EpubWebViewHost(
+        userDataDirectory: paths.webView,
+        child: createDevApp(
+          appSettings: PreferencesAppSettingsStore(
+            preferences: SharedPreferencesAsync(),
+            paths: paths,
+            logger: AppLogger(),
+          ),
+          settings: settings,
+          library: library,
+          scenarioId: const String.fromEnvironment('SHIORI_SCENARIO'),
         ),
-        settings: settings,
-        library: library,
-        scenarioId: const String.fromEnvironment('SHIORI_SCENARIO'),
       ),
     ),
   );
