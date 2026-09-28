@@ -9,6 +9,7 @@ import '../domain/contracts/contracts.dart';
 import '../domain/models/models.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'widgets/state_views.dart';
+import 'paper_diagram.dart';
 
 class ImageDecodeLimit implements Exception {
   const ImageDecodeLimit();
@@ -43,7 +44,12 @@ class ImageDecodeLimit implements Exception {
 }
 
 class DecodedSourceImage {
-  const DecodedSourceImage(this.image, this.intrinsicSize);
+  const DecodedSourceImage(
+    this.image,
+    this.intrinsicSize, {
+    this.isPaperMask = false,
+  });
+  final bool isPaperMask;
   final ui.Image image;
   final Size intrinsicSize;
 }
@@ -91,12 +97,17 @@ class _DecodeOwner extends InheritedWidget {
 class _DecodedCache {
   _DecodedCache(this.maxEntries, this.maxBytes);
   final int maxEntries, maxBytes;
-  final _entries = <(Object, int), DecodedSourceImage>{};
+  final _entries = <(Object, int, bool), DecodedSourceImage>{};
   int _bytes = 0;
   bool _closed = false;
   Future<void> _tail = Future.value();
-  Future<DecodedSourceImage> decode(MediaData data, int width, MediaRef ref) {
-    final result = _tail.then((_) => _decode(data, width, ref));
+  Future<DecodedSourceImage> decode(
+    MediaData data,
+    int width,
+    MediaRef ref,
+    bool paper,
+  ) {
+    final result = _tail.then((_) => _decode(data, width, ref, paper));
     _tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return result;
   }
@@ -105,6 +116,7 @@ class _DecodedCache {
     MediaData data,
     int width,
     MediaRef ref,
+    bool paper,
   ) async {
     if (_closed) throw StateError('Decode scope closed');
     // Keys must change whenever the bytes can: persisted paths are content
@@ -114,14 +126,18 @@ class _DecodedCache {
       _ when ref.sourceId == LocalBookIdentity.sourceId => ref,
       _ => null,
     };
-    if (identity == null) return decodeSourceImage(data, width);
-    final key = (identity, width);
+    if (identity == null) return _decodeForDisplay(data, width, paper);
+    final key = (identity, width, paper);
     final existing = _entries.remove(key);
     if (existing != null) {
       _entries[key] = existing;
-      return DecodedSourceImage(existing.image.clone(), existing.intrinsicSize);
+      return DecodedSourceImage(
+        existing.image.clone(),
+        existing.intrinsicSize,
+        isPaperMask: existing.isPaperMask,
+      );
     }
-    final decoded = await decodeSourceImage(data, width);
+    final decoded = await _decodeForDisplay(data, width, paper);
     if (_closed) return decoded;
     final duplicate = _entries.remove(key);
     if (duplicate != null) {
@@ -129,6 +145,7 @@ class _DecodedCache {
       duplicate.image.dispose();
     }
     final size = decoded.image.width * decoded.image.height * 4;
+    if (size > maxBytes || maxEntries < 1) return decoded;
     while (_entries.isNotEmpty &&
         (_bytes + size > maxBytes || _entries.length >= maxEntries)) {
       final old = _entries.remove(_entries.keys.first)!;
@@ -138,6 +155,7 @@ class _DecodedCache {
     _entries[key] = DecodedSourceImage(
       decoded.image.clone(),
       decoded.intrinsicSize,
+      isPaperMask: decoded.isPaperMask,
     );
     _bytes += size;
     return decoded;
@@ -151,6 +169,22 @@ class _DecodedCache {
     _entries.clear();
     _bytes = 0;
   }
+}
+
+Future<DecodedSourceImage> _decodeForDisplay(
+  MediaData data,
+  int width,
+  bool paper,
+) async {
+  final original = await decodeSourceImage(data, width);
+  return paper ? _paperDisplay(original) : original;
+}
+
+Future<DecodedSourceImage> _paperDisplay(DecodedSourceImage original) async {
+  final mask = await paperDiagramMask(original.image);
+  if (mask == null) return original;
+  original.image.dispose();
+  return DecodedSourceImage(mask, original.intrinsicSize, isPaperMask: true);
 }
 
 Future<DecodedSourceImage> decodeSourceImage(
@@ -209,6 +243,7 @@ class SourceImage extends StatefulWidget {
     this.onIntrinsicSize,
     this.decoder = decodeSourceImage,
     this.decodeScale = 1,
+    this.paperInk,
   }) : assert(decodeScale > 0 && decodeScale <= 4);
   final MediaRef media;
   final ImageRepository repository;
@@ -218,6 +253,9 @@ class SourceImage extends StatefulWidget {
   final ValueChanged<Size>? onIntrinsicSize;
   final SourceImageDecoder decoder;
   final double decodeScale;
+
+  /// Reader-only opt-in. Null preserves original pixels (covers and preview).
+  final Color? paperInk;
   @override
   State<SourceImage> createState() => _SourceImageState();
 }
@@ -226,6 +264,7 @@ class _SourceImageState extends State<SourceImage> {
   CancellationSource? _request;
   MediaLease? _lease;
   ui.Image? _image;
+  bool _isPaperMask = false;
   AppFailure? _failure;
   Timer? _cooldown;
   Timer? _loadingDelay;
@@ -239,7 +278,8 @@ class _SourceImageState extends State<SourceImage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.media != widget.media ||
         oldWidget.repository != widget.repository ||
-        oldWidget.decoder != widget.decoder) {
+        oldWidget.decoder != widget.decoder ||
+        (oldWidget.paperInk == null) != (widget.paperInk == null)) {
       _generation++;
       _request?.cancel();
       _release();
@@ -274,6 +314,8 @@ class _SourceImageState extends State<SourceImage> {
     _request?.cancel();
     final request = _request = CancellationSource();
     final generation = ++_generation;
+    final paper = widget.paperInk != null;
+    final decoder = widget.decoder;
     _loadingDelay?.cancel();
     _showLoading = false;
     _loadingDelay = Timer(const Duration(milliseconds: 180), () {
@@ -299,10 +341,12 @@ class _SourceImageState extends State<SourceImage> {
       final loaded = (result as Success<LoadResult<MediaLease>>).value;
       pendingLease = loaded.value;
       if (!_current(generation)) return;
-      final decoded =
-          await (widget.decoder == decodeSourceImage && shared != null
-              ? shared.decode(pendingLease.data, width, widget.media)
-              : widget.decoder(pendingLease.data, width));
+      var decoded = await (decoder == decodeSourceImage && shared != null
+          ? shared.decode(pendingLease.data, width, widget.media, paper)
+          : decoder(pendingLease.data, width));
+      if (paper && !(decoder == decodeSourceImage && shared != null)) {
+        decoded = await _paperDisplay(decoded);
+      }
       pendingImage = decoded.image;
       if (!_current(generation)) return;
       _release();
@@ -310,6 +354,7 @@ class _SourceImageState extends State<SourceImage> {
         _lease = pendingLease;
         pendingLease = null;
         _image = pendingImage;
+        _isPaperMask = decoded.isPaperMask;
         pendingImage = null;
         _loading = false;
         _failure = loaded.refreshFailure ?? _lease!.persistenceFailure;
@@ -399,6 +444,8 @@ class _SourceImageState extends State<SourceImage> {
               label: widget.semanticLabel ?? strings.readerImagePlaceholder,
               child: RawImage(
                 image: _image,
+                color: _isPaperMask ? widget.paperInk : null,
+                colorBlendMode: _isPaperMask ? BlendMode.srcIn : null,
                 fit: BoxFit.contain,
                 filterQuality: FilterQuality.medium,
               ),

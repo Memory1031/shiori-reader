@@ -89,6 +89,21 @@ final class PageLayout {
   final Map<MediaRef, double> imageHeights;
   final double Function(ImageBlock)? imageExtent;
   int measuredChunks = 0;
+  late final Map<int, double> _tableWidths = () {
+    final widths = <int, double>{};
+    for (final block in index.content.blocks) {
+      if (block is! ParagraphBlock || block.tableRow == null) continue;
+      final group = block.tableRow!.group;
+      final measured = readerTableLabelWidth(
+        block,
+        readerBlockStyle(block, style, chapter: index.content.key),
+        scaler,
+        locale: locale,
+      );
+      if (measured > (widths[group] ?? 0)) widths[group] = measured;
+    }
+    return widths;
+  }();
   int _length(int unit) =>
       (index.chunks[unit].text?.runes.length ?? 1).clamp(1, 1000000000);
   PageCursor normalize(PageCursor cursor) {
@@ -175,20 +190,18 @@ final class PageLayout {
       chapter: index.content.key,
       locale: locale,
     );
-    if (readerUsesParagraphFlow(block, direction)) {
+    final table = block is ParagraphBlock ? block.tableRow : null;
+    final em = scaler.scale(style.fontSize ?? 20);
+    final tableFits =
+        table == null ||
+        ((_tableWidths[table.group] ?? 0) > table.leftWidthEm * em
+                    ? _tableWidths[table.group]!
+                    : table.leftWidthEm * em) +
+                (table.leftPaddingEm + table.rightPaddingEm) * em +
+                table.dividerWidth <=
+            textWidth - em;
+    if (readerUsesParagraphFlow(block, direction) && tableFits) {
       final paragraph = block as ParagraphBlock;
-      final flow = readerParagraphFlow(
-        block: paragraph,
-        chapter: index.content.key,
-        text: text,
-        offset: blockOffset,
-        maxHeight: available,
-        width: textWidth,
-        style: readerBlockStyle(block, style, chapter: index.content.key),
-        scaler: scaler,
-        locale: locale,
-        textHeightBehavior: textHeightBehavior,
-      );
       final edges = readerBoxEdges(index.content, blockIndex);
       final top = startsBlock ? edges.top : 0.0;
       final spacing = readerBlockSpacing(
@@ -196,12 +209,30 @@ final class PageLayout {
         paragraphSpacing,
         chapter: index.content.key,
       );
+      final flow = readerParagraphFlow(
+        block: paragraph,
+        tableLeftWidth: paragraph.tableRow == null
+            ? null
+            : _tableWidths[paragraph.tableRow!.group],
+        chapter: index.content.key,
+        text: text,
+        offset: blockOffset,
+        maxHeight: available,
+        // Gaps may shrink; the containing box's required edges may not.
+        pageHeight: (height - top - edges.bottom - spacing).clamp(0.0, height),
+        width: textWidth,
+        style: readerBlockStyle(block, style, chapter: index.content.key),
+        scaler: scaler,
+        locale: locale,
+        textHeightBehavior: textHeightBehavior,
+      );
       var count = 0;
       for (final line in flow.lines) {
         final bottom = blockOffset + line.end == paragraph.text.runes.length
             ? edges.bottom
             : 0.0;
-        if (line.top + line.height + spacing + top + bottom > available + .01) {
+        if (flow.heightThrough(line) + spacing + top + bottom >
+            available + .01) {
           break;
         }
         count++;

@@ -301,6 +301,28 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
         'font-style',
         'max-width',
         'padding',
+        'padding-left',
+        'padding-right',
+        'padding-top',
+        'padding-bottom',
+        'border-collapse',
+        'border-right',
+        'border-left',
+        'border-top',
+        'border-bottom',
+        'border-left-width',
+        'border-left-color',
+        'border-left-style',
+        'border-top-width',
+        'border-top-color',
+        'border-top-style',
+        'border-bottom-width',
+        'border-bottom-color',
+        'border-bottom-style',
+        'border-right-width',
+        'border-right-color',
+        'border-right-style',
+        'vertical-align',
         'margin',
         'margin-left',
         'margin-right',
@@ -378,6 +400,76 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
             };
           }
         }
+        if (name == 'padding') {
+          final t = value.split(RegExp(r'\s+'));
+          if (t.isEmpty || t.length > 4) continue;
+          properties = {
+            name: value,
+            'padding-top': t[0],
+            'padding-right': t.length > 1 ? t[1] : t[0],
+            'padding-bottom': t.length > 2 ? t[2] : t[0],
+            'padding-left': t.length > 3
+                ? t[3]
+                : t.length > 1
+                ? t[1]
+                : t[0],
+          };
+        }
+        if ({'border-width', 'border-color', 'border-style'}.contains(name)) {
+          final t = value.split(RegExp(r'\s+'));
+          if (t.isEmpty || t.length > 4) continue;
+          final suffix = name.substring(7);
+          properties = {
+            ...properties,
+            'border-top-$suffix': t[0],
+            'border-right-$suffix': t.length > 1 ? t[1] : t[0],
+            'border-bottom-$suffix': t.length > 2 ? t[2] : t[0],
+            'border-left-$suffix': t.length > 3
+                ? t[3]
+                : t.length > 1
+                ? t[1]
+                : t[0],
+          };
+        }
+        if (name == 'border-right' || name == 'border') {
+          final t = value.split(RegExp(r'\s+'));
+          properties = {
+            ...properties,
+            'border-right-width':
+                t
+                    .where((v) => RegExp(r'^(0|[0-9.]+px)$').hasMatch(v))
+                    .firstOrNull ??
+                'medium',
+            'border-right-style':
+                t
+                    .where(
+                      (v) => {
+                        'none',
+                        'solid',
+                        'dashed',
+                        'dotted',
+                        'double',
+                      }.contains(v),
+                    )
+                    .firstOrNull ??
+                'none',
+            'border-right-color':
+                t
+                    .where(
+                      (v) =>
+                          !RegExp(r'^(0|[0-9.]+px)$').hasMatch(v) &&
+                          !{
+                            'none',
+                            'solid',
+                            'dashed',
+                            'dotted',
+                            'double',
+                          }.contains(v),
+                    )
+                    .firstOrNull ??
+                'currentcolor',
+          };
+        }
         final priorities = important[element] ??= {};
         for (final property in properties.entries) {
           if (!priority && priorities.contains(property.key)) continue;
@@ -390,7 +482,19 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
 
   for (final i in order) {
     try {
-      for (final element in doc.querySelectorAll(rules[i].$1)) {
+      final selector = rules[i].$1;
+      // html 0.15 counts raw nodes for nth-child. Resolve the two terminal
+      // cell positions against element siblings, independent of source whitespace.
+      final nth = RegExp(r':nth-child\(\s*([12])\s*\)$').firstMatch(selector);
+      final selected = doc.querySelectorAll(
+        nth == null ? selector : selector.substring(0, nth.start),
+      );
+      for (final element in selected) {
+        if (nth != null &&
+            element.parent?.children.indexOf(element) !=
+                int.parse(nth[1]!) - 1) {
+          continue;
+        }
         apply(element, rules[i].$2);
       }
     } on FormatException {

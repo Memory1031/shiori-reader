@@ -6,6 +6,7 @@ import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../shared/source_image.dart';
+import 'reader_authored_colors.dart';
 import '../../l10n/generated/app_localizations.dart';
 
 const readerCaptionStyle = TextStyle(fontSize: 14, height: 1.4);
@@ -74,6 +75,9 @@ class ReaderImage extends StatelessWidget {
               child: SourceImage(
                 media: block.media,
                 repository: repository,
+                paperInk: ReaderAuthoredColors(
+                  Theme.of(context),
+                ).resolve(Colors.black, ReaderColorRole.foreground),
                 backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                 semanticLabel: block.alt,
                 onIntrinsicSize: (size) {

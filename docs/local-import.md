@@ -211,6 +211,7 @@ EPUB 2 重复引用保持拒绝；只有明确 package version=3.0 使用 EPUB 3
 | 路径与 fragment | Unicode、百分号一次解码、大小写精确；目录缺锚点可回章首，正文链接缺锚点明确不可用 | epub_structure、epub_links |
 | 重复 spine | EPUB 3 occurrence 独立身份，同文档链接保留 occurrence；跨文档指向首个 occurrence；EPUB 2 重复拒绝 | reparse、epub_links |
 | 正文语义 | 段落、标题、br、缩进、对齐、常见 ruby 基字/注音；复杂 ruby 保留括注降级；强调/上下标无完整富文本样式 | epub_compatibility、epub_prose_semantics |
+| 双列表格 | LTR 两个 td、短左标签与右正文；同组 em 左列宽/内边距、单条 solid px 竖线、有限 em 空行。支持直接 tr 或 tbody，不按类名/时间文本识别；跨列跨行、嵌套表格、复杂块/Ruby/图片或冲突几何整表回退原有文本 | epub_table；widget table_flow；reparse |
 | CSS | 受限选择器、顺序/media、important、white-space 与 visibility；隐藏元素不保留原生几何占位，非完整 cascade | epub_stylesheet、epub_prose_semantics |
 | 图片 | PNG/JPEG/GIF/WebP 字节识别、SVG image 包装、srcset/picture 包内候选；确定性选图，不按 viewport/sizes 计算；缺图占位 | epub_compatibility、epub_resources |
 | 特殊页 | 受限静态 HTML；保留部分复杂排版，脚本/外链受限；不保证完整出版方布局 | epub_presentation |

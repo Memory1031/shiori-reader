@@ -1,4 +1,5 @@
 import 'epub_paragraph_layout.dart';
+import 'epub_table_layout.dart';
 import '../../html/prose_semantics.dart';
 import '../../html/prose_ruby.dart';
 import 'dart:convert';
@@ -718,6 +719,10 @@ class EpubParser {
       ).map((sheet) => sheet.$2),
     );
     final richStyles = epubRichStyles(doc, styles);
+    final tableRows = epubTableRows(doc, styles, richStyles);
+    dom.Element? activeCell;
+    final cellSpans = <dom.Element, (int, int)>{};
+    final pendingTableLayouts = <int, TableRowLayout>{};
     var activeStyle = const EpubRichStyle();
     BlockBox? activeBox;
     var boxGroup = 0;
@@ -761,6 +766,9 @@ class EpubParser {
     var explicitGapEm = 0.0;
     final buffer = ProseTextBuffer(
       onWrite: (start, end) {
+        if (activeCell case final cell?) {
+          cellSpans[cell] = (cellSpans[cell]?.$1 ?? start, end);
+        }
         if (activeFloat case final node?) {
           floatSpans[node] = (floatSpans[node]?.$1 ?? start, end);
         }
@@ -812,6 +820,39 @@ class EpubParser {
               (labelRange.$2 - trimStart).clamp(0, value.length),
             );
       floatSpans.clear();
+      TableRowLayout? tableLayout;
+      if (tableRows[paragraphOwner] case final row?) {
+        final l = cellSpans[row.left], r = cellSpans[row.right];
+        if (l != null && r != null && value.isNotEmpty) {
+          final leftEnd = value
+              .substring(0, (l.$2 - trimStart).clamp(0, value.length))
+              .runes
+              .length;
+          final rightStart = value
+              .substring(0, (r.$1 - trimStart).clamp(0, value.length))
+              .runes
+              .length;
+          if (leftEnd > 0 &&
+              leftEnd <= 64 &&
+              rightStart >= leftEnd &&
+              rightStart <= 128 &&
+              rightStart < value.runes.length) {
+            final base = row.layout;
+            tableLayout = TableRowLayout(
+              group: base.group,
+              leftEnd: leftEnd,
+              rightStart: rightStart,
+              leftWidthEm: base.leftWidthEm,
+              leftPaddingEm: base.leftPaddingEm,
+              rightPaddingEm: base.rightPaddingEm,
+              dividerWidth: base.dividerWidth,
+              dividerColor: base.dividerColor,
+              gapAfterEm: base.gapAfterEm,
+            );
+          }
+        }
+      }
+      cellSpans.clear();
       // Normalize against the emitted block, then convert UTF-16 to code points.
       for (final id in pendingAnchors) {
         final anchor = anchors[id]!;
@@ -892,6 +933,7 @@ class EpubParser {
         }
         return;
       }
+      if (tableLayout != null) pendingTableLayouts[blocks.length] = tableLayout;
       blocks.add(
         heading == null
             ? ParagraphBlock(
@@ -1293,12 +1335,53 @@ class EpubParser {
           !{null, 'none', 'initial'}.contains(styles[node]?['float'])) {
         activeFloat = node;
       }
+      final previousCell = activeCell;
+      if (node is dom.Element && node.localName == 'td') activeCell = node;
       visit(node);
+      activeCell = previousCell;
       activeFloat = previousFloat;
       activeBox = previousBox;
     };
     walk(doc.body!);
     flush();
+    // Source normalization may reveal unsupported empty/range combinations.
+    // Publish geometry atomically per group, only after every row validates.
+    final expectedRows = <int, int>{};
+    for (final row in tableRows.values) {
+      expectedRows.update(row.layout.group, (n) => n + 1, ifAbsent: () => 1);
+    }
+    final groupedLayouts = <int, Map<int, TableRowLayout>>{};
+    for (final entry in pendingTableLayouts.entries) {
+      (groupedLayouts[entry.value.group] ??= {})[entry.key] = entry.value;
+    }
+    for (final group in groupedLayouts.entries) {
+      final entries = group.value.entries;
+      if (entries.length != expectedRows[group.key]) continue;
+      final converted = <int, ParagraphBlock>{};
+      try {
+        for (final entry in entries) {
+          final b = blocks[entry.key] as ParagraphBlock;
+          converted[entry.key] = ParagraphBlock(
+            text: b.text,
+            alignment: b.alignment,
+            leadingIndent: b.leadingIndent,
+            inlineStyles: b.inlineStyles,
+            inlineImages: b.inlineImages,
+            inlineRuby: b.inlineRuby,
+            authoredGapEm: b.authoredGapEm,
+            hangingIndentEm: b.hangingIndentEm,
+            trailingLabelStart: b.trailingLabelStart,
+            box: b.box,
+            tableRow: entry.value,
+          );
+        }
+      } on ArgumentError {
+        continue;
+      }
+      for (final entry in converted.entries) {
+        blocks[entry.key] = entry.value;
+      }
+    }
     if (!blocks.any(
       (b) => b is ImageBlock || b is ParagraphBlock && b.text.trim().isNotEmpty,
     )) {

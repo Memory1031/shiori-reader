@@ -171,6 +171,18 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
         height: flow.height,
         child: Stack(
           children: [
+            if (flow.dividerX case final x?)
+              Positioned(
+                left: x,
+                top: 0,
+                width: flow.dividerWidth,
+                height: flow.height,
+                child: ColoredBox(
+                  color: ReaderAuthoredColors(
+                    Theme.of(context),
+                  ).resolve(Color(flow.dividerColor), ReaderColorRole.border),
+                ),
+              ),
             for (final line in flow.lines)
               for (final piece in line.pieces)
                 Positioned(

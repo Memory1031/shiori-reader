@@ -71,6 +71,7 @@ String readerIndentPrefix(
   if (block is! ParagraphBlock ||
       !startsBlock ||
       block.hangingIndentEm != null ||
+      block.tableRow != null ||
       block.text.trim().isEmpty ||
       block.alignment != ParagraphAlignment.start ||
       _isChapterHeading(block, chapter) ||
@@ -100,7 +101,9 @@ double readerBlockSpacing(
   double paragraphSpacing, {
   ChapterKey? chapter,
 }) {
-  if (block.box != null) return 0;
+  if (block.box != null || block is ParagraphBlock && block.tableRow != null) {
+    return 0;
+  }
   if (_isChapterHeading(block, chapter)) return paragraphSpacing + 64;
   if (block is HeadingBlock) return paragraphSpacing + 28;
   return paragraphSpacing;
@@ -121,7 +124,9 @@ double readerBlockWidth(
   available = readerBoxInnerWidth(block, available);
   if (block.inlineStyles.isNotEmpty ||
       block is ParagraphBlock &&
-          (block.hangingIndentEm != null || block.trailingLabelStart != null)) {
+          (block.hangingIndentEm != null ||
+              block.trailingLabelStart != null ||
+              block.tableRow != null)) {
     return available;
   }
   if (block is! ParagraphBlock ||

@@ -7,7 +7,9 @@ import 'block_style.dart';
 bool readerUsesParagraphFlow(ContentBlock block, TextDirection direction) =>
     direction == TextDirection.ltr &&
     block is ParagraphBlock &&
-    (block.hangingIndentEm != null || block.trailingLabelStart != null);
+    (block.hangingIndentEm != null ||
+        block.trailingLabelStart != null ||
+        block.tableRow != null);
 
 /// Transient source positions (code points) and shared measurement/paint boxes.
 final class ParagraphFlowPiece {
@@ -38,12 +40,31 @@ final class ParagraphFlowLine {
 }
 
 final class ParagraphFlow {
-  ParagraphFlow(List<ParagraphFlowLine> lines)
-    : lines = List.unmodifiable(lines);
+  ParagraphFlow(
+    List<ParagraphFlowLine> lines, {
+    this.minimumHeight = 0,
+    this.dividerX,
+    this.dividerWidth = 0,
+    this.dividerColor = 0xff000000,
+  }) : lines = List.unmodifiable(lines);
   final List<ParagraphFlowLine> lines;
-  double get height => lines.isEmpty ? 0 : lines.last.top + lines.last.height;
+
+  /// A top-aligned cell must fit even when only a prefix of its neighbor fits.
+  final double minimumHeight;
+  final double? dividerX;
+  final double dividerWidth;
+  final int dividerColor;
+  double heightThrough(ParagraphFlowLine line) =>
+      math.max(minimumHeight, line.top + line.height);
+  double get height => lines.isEmpty ? 0 : heightThrough(lines.last);
   int get end => lines.isEmpty ? 0 : lines.last.end;
-  ParagraphFlow take(int count) => ParagraphFlow(lines.take(count).toList());
+  ParagraphFlow take(int count) => ParagraphFlow(
+    lines.take(count).toList(),
+    minimumHeight: minimumHeight,
+    dividerX: dividerX,
+    dividerWidth: dividerWidth,
+    dividerColor: dividerColor,
+  );
 }
 
 /// Bounded to the current render chunk. A first line is special only at source
@@ -56,6 +77,8 @@ ParagraphFlow readerParagraphFlow({
   required TextStyle style,
   required TextScaler scaler,
   ChapterKey? chapter,
+  double? tableLeftWidth,
+  double pageHeight = double.infinity,
   double maxHeight = double.infinity,
   Locale? locale,
   TextHeightBehavior? textHeightBehavior,
@@ -188,6 +211,85 @@ ParagraphFlow readerParagraphFlow({
     }
   }
 
+  if (block.tableRow case final row?) {
+    final naturalLeft =
+        tableLeftWidth ??
+        readerTableLabelWidth(block, style, scaler, locale: locale);
+    final divider = row.dividerWidth;
+    final lp = row.leftPaddingEm * em, rp = row.rightPaddingEm * em;
+    // Preserve a readable right column at very narrow widths. The label can
+    // wrap within its capped cell; source offsets still appear exactly once.
+    final left = math.max(
+      1.0,
+      math.min(
+        math.max(row.leftWidthEm * em, naturalLeft),
+        width - lp - rp - divider - em,
+      ),
+    );
+    final dividerX = math.min(width - 1, left + lp);
+    final rightX = math.min(width - 1, dividerX + divider + rp);
+    final available = math.max(1.0, width - rightX);
+    final lines = <ParagraphFlowLine>[];
+    var cursor = (row.rightStart - offset).clamp(0, runes.length);
+    var top = 0.0;
+    TextPainter? labelPainter;
+    if (offset < row.leftEnd) {
+      labelPainter = painter(
+        0,
+        (row.leftEnd - offset).clamp(0, runes.length),
+        left,
+      );
+    }
+    final labelHeight = labelPainter?.height ?? 0.0;
+    try {
+      while (cursor < runes.length) {
+        if (top > maxHeight) break;
+        final m = measure(cursor, runes.length, available);
+        final first = lines.isEmpty;
+        final start = first ? 0 : cursor;
+        final endsRow = offset + m.end == block.text.runes.length;
+        // The right cell advances by its own line height. Only the fragment's
+        // extent (and final gap) must also contain the independently laid-out label.
+        final lastExtent = math.max(m.height, labelHeight - top);
+        final h = endsRow
+            ? lastExtent +
+                  math.min(
+                    row.gapAfterEm * em,
+                    math.max(0.0, pageHeight - lastExtent),
+                  )
+            : m.height;
+        lines.add(
+          ParagraphFlowLine(start, m.end, top, h, [
+            if (first && labelPainter != null)
+              ParagraphFlowPiece(
+                0,
+                (row.leftEnd - offset).clamp(0, runes.length),
+                Rect.fromLTWH(0, top, labelPainter.width, labelPainter.height),
+                left,
+              ),
+            ParagraphFlowPiece(
+              cursor,
+              m.end,
+              Rect.fromLTWH(rightX, top, m.width, m.height),
+              available,
+            ),
+          ]),
+        );
+        top += m.height;
+        cursor = m.end;
+      }
+    } finally {
+      labelPainter?.dispose();
+    }
+    return ParagraphFlow(
+      lines,
+      minimumHeight: labelHeight,
+      dividerX: dividerX,
+      dividerWidth: divider,
+      dividerColor: row.dividerColor,
+    );
+  }
+
   final lines = <ParagraphFlowLine>[];
   var cursor = 0;
   var top = 0.0;
@@ -269,4 +371,39 @@ ParagraphFlow readerParagraphFlow({
     cursor = m.end;
   }
   return ParagraphFlow(lines);
+}
+
+/// Measures only the short source label, never the right-hand prose.
+double readerTableLabelWidth(
+  ParagraphBlock block,
+  TextStyle style,
+  TextScaler scaler, {
+  Locale? locale,
+}) {
+  final row = block.tableRow!;
+  final label = String.fromCharCodes(block.text.runes.take(row.leftEnd));
+  final painter = TextPainter(
+    text: TextSpan(
+      style: style,
+      children: readerInlineSpans(
+        text: label,
+        offset: 0,
+        images: const [],
+        ruby: const [],
+        styles: block.inlineStyles,
+        style: style,
+        scaler: scaler,
+        maxWidth: double.infinity,
+        locale: locale,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+    textScaler: scaler,
+    locale: locale,
+  )..layout();
+  try {
+    return painter.width + .01;
+  } finally {
+    painter.dispose();
+  }
 }

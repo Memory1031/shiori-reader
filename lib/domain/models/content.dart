@@ -2,6 +2,8 @@ import 'package:characters/characters.dart';
 
 import '../content_identity.dart';
 import 'identity.dart';
+import 'table_row.dart';
+export 'table_row.dart';
 import 'value_model.dart';
 import 'content_style.dart';
 export 'content_style.dart';
@@ -60,6 +62,11 @@ sealed class ContentBlock extends ValueModel {
         authoredGapEm: (json['authoredGapEm'] as num?)?.toDouble(),
         hangingIndentEm: (json['hangingIndentEm'] as num?)?.toDouble(),
         trailingLabelStart: json['trailingLabelStart'] as int?,
+        tableRow: json['tableRow'] == null
+            ? null
+            : TableRowLayout.fromJson(
+                Map<String, Object?>.from(json['tableRow'] as Map),
+              ),
         inlineStyles: styles,
         inlineRuby: (json['inlineRuby'] as List? ?? const []).map(
           (v) => InlineRuby.fromJson(v as Map<String, dynamic>),
@@ -177,6 +184,7 @@ final class ParagraphBlock extends ContentBlock {
     this.authoredGapEm,
     this.hangingIndentEm,
     this.trailingLabelStart,
+    this.tableRow,
     int occurrence = 0,
   }) : inlineRuby = List.unmodifiable(inlineRuby),
        inlineStyles = List.unmodifiable(inlineStyles),
@@ -215,6 +223,31 @@ final class ParagraphBlock extends ContentBlock {
         throw ArgumentError('Invalid trailing label range');
       }
     }
+    if (tableRow case final row?) {
+      final boundaries = <int>{0};
+      var offset = 0;
+      for (final cluster in this.text.characters) {
+        offset += cluster.runes.length;
+        boundaries.add(offset);
+      }
+      if (row.rightStart >= offset ||
+          !boundaries.contains(row.leftEnd) ||
+          !boundaries.contains(row.rightStart) ||
+          this.text.runes.take(row.leftEnd).any((r) => r == 10) ||
+          String.fromCharCodes(
+            this.text.runes.take(row.leftEnd),
+          ).trim().isEmpty ||
+          String.fromCharCodes(
+            this.text.runes.skip(row.rightStart),
+          ).trim().isEmpty ||
+          hangingIndentEm != null ||
+          trailingLabelStart != null ||
+          authoredGapEm != null ||
+          this.inlineImages.isNotEmpty ||
+          this.inlineRuby.isNotEmpty) {
+        throw ArgumentError('Invalid table row');
+      }
+    }
     validateInlineRuby(this.text, this.inlineRuby);
     validateInlineStyles(this.text, this.inlineStyles);
     validateInlineImages(this.text, this.inlineImages);
@@ -233,6 +266,7 @@ final class ParagraphBlock extends ContentBlock {
 
   /// Code point start of a short, right-aligned suffix ending at text.runes.length.
   final int? trailingLabelStart;
+  final TableRowLayout? tableRow;
   @override
   final List<InlineImage> inlineImages;
   @override
@@ -265,6 +299,7 @@ final class ParagraphBlock extends ContentBlock {
     if (authoredGapEm != null) 'authoredGapEm': authoredGapEm,
     if (hangingIndentEm != null) 'hangingIndentEm': hangingIndentEm,
     if (trailingLabelStart != null) 'trailingLabelStart': trailingLabelStart,
+    if (tableRow != null) 'tableRow': tableRow!.toJson(),
     if (inlineStyles.isNotEmpty)
       'inlineStyles': inlineStyles.map((s) => s.toJson()).toList(),
     if (inlineImages.isNotEmpty)
@@ -278,6 +313,7 @@ final class ParagraphBlock extends ContentBlock {
     authoredGapEm: authoredGapEm,
     hangingIndentEm: hangingIndentEm,
     trailingLabelStart: trailingLabelStart,
+    tableRow: tableRow,
     inlineImages: inlineImages,
     inlineRuby: inlineRuby,
     inlineStyles: inlineStyles,
@@ -294,6 +330,7 @@ final class ParagraphBlock extends ContentBlock {
     authoredGapEm,
     hangingIndentEm,
     trailingLabelStart,
+    tableRow,
     box,
     occurrence,
   ];
