@@ -1,6 +1,7 @@
 package dev.shiori.reader
 
 import android.system.Os
+import android.system.ErrnoException
 import android.system.OsConstants
 import org.json.JSONObject
 import java.io.File
@@ -11,7 +12,7 @@ import java.nio.channels.OverlappingFileLockException
 import java.util.Locale
 import java.util.UUID
 
-/** One app-owned batch. Only the working -> pending rename publishes receipts. */
+/** Bounded mobile inbox. Only working -> batches/batch-<sequence> publishes a batch. */
 internal class ImportInbox internal constructor(
     root: File,
     private val maxFiles: Int = MAX_FILES,
@@ -64,10 +65,9 @@ internal class ImportInbox internal constructor(
         val receipt = inspect().firstOrNull { it.id == id } ?: return@locked
         val trash = File(root, "ack-trash-${UUID.randomUUID()}")
         Os.rename(receipt.directory.path, trash.path)
-        val pending = File(root, "pending")
-        if (pending.exists()) syncDirectory(pending)
+        syncDirectory(receipt.directory.parentFile!!)
         syncDirectory(root)
-        removeEmptyPending()
+        removeEmptyBatches()
         // A crash or deletion failure here cannot damage the remaining batch.
         runCatching { deleteTree(trash) }
     }
@@ -78,9 +78,15 @@ internal class ImportInbox internal constructor(
         progress: (Long) -> Unit = {},
     ) = locked {
         recover()
-        if (inspect().isNotEmpty()) throw Issue("busy")
+        val existing = inspect()
         if (inputs.isEmpty()) throw Issue("unreadable")
         if (inputs.size > maxFiles) throw Issue("batchLimit")
+        if (existing.size + inputs.size > maxFiles) throw Issue("inboxFull")
+        val existingBytes = existing.sumOf { it.size }
+        fun checkBytes(bytes: Long) {
+            if (bytes > maxBatchBytes) throw Issue("batchLimit")
+            if (bytes > maxBatchBytes - existingBytes) throw Issue("inboxFull")
+        }
         fun checkCancellation() { if (cancelled()) throw Issue("cancelled") }
         checkCancellation()
         // Resolve all metadata before creating working or opening any stream.
@@ -94,6 +100,7 @@ internal class ImportInbox internal constructor(
             if (source.size != null && source.size > maxFileBytes) throw Issue("tooLarge")
             source
         }
+        checkBytes(prepared.sumOf { (it.size ?: 0L).coerceAtLeast(0) })
         checkCancellation()
         val working = File(root, "working")
         if (!working.mkdir()) throw Issue("storage")
@@ -119,7 +126,7 @@ internal class ImportInbox internal constructor(
                             size += count
                             total += count
                             if (size > maxFileBytes) throw Issue("tooLarge")
-                            if (total > maxBatchBytes) throw Issue("batchLimit")
+                            checkBytes(total)
                             output.write(buffer, 0, count)
                             if (total - reported >= PROGRESS_BYTES) {
                                 progress(total)
@@ -140,9 +147,16 @@ internal class ImportInbox internal constructor(
                 syncDirectory(item)
             }
             syncDirectory(working)
+            val destination = reserveBatch()
             checkCancellation()
-            Os.rename(working.path, File(root, "pending").path)
-            syncDirectory(root)
+            Os.rename(working.path, destination.path)
+            try {
+                syncDirectory(destination.parentFile!!)
+                syncDirectory(root)
+            } catch (e: Exception) {
+                // Already published: never roll back or invite automatic replay.
+                throw Issue("publicationUncertain", e)
+            }
         } finally {
             // After publication working no longer exists. Never roll back pending.
             deleteTree(working)
@@ -168,32 +182,81 @@ internal class ImportInbox internal constructor(
 
     private fun recover() {
         deleteTree(File(root, "working"))
+        deleteTree(File(root, "sequence-working"))
         children(root).filter { TRASH_NAME.matches(it.name) }.forEach {
             runCatching { deleteTree(it) }
         }
-        removeEmptyPending()
+        removeEmptyBatches()
     }
 
-    private fun removeEmptyPending() {
+    private fun publishedBatches(): List<File> {
+        val batches = File(root, "batches")
+        requireOwned(batches)
+        if (!exists(batches)) return emptyList()
+        if (!batches.isDirectory) throw Issue("storage")
+        return children(batches).onEach {
+            requireOwned(it)
+            if (!Regex("batch-[0-9]{19}").matches(it.name) ||
+                (it.name.removePrefix("batch-").toLongOrNull() ?: 0L) <= 0L ||
+                !it.isDirectory) throw Issue("storage")
+        }.sortedBy { it.name }
+    }
+
+    private fun reserveBatch(): File {
+        val batches = File(root, "batches")
+        requireOwned(batches)
+        if (!exists(batches) && !batches.mkdir()) throw Issue("storage")
+        val published = publishedBatches()
+        val counter = File(root, "sequence")
+        requireOwned(counter)
+        val last = if (exists(counter)) {
+            if (!counter.isFile || counter.length() !in 1..32) throw Issue("storage")
+            counter.readText(Charsets.UTF_8).toLongOrNull()?.takeIf { it > 0 } ?: throw Issue("storage")
+        } else 0L
+        val highest = published.lastOrNull()?.name?.removePrefix("batch-")?.toLong() ?: 0L
+        if (last < highest || last == Long.MAX_VALUE) throw Issue("storage")
+        val next = last + 1
+        val temporary = File(root, "sequence-working")
+        FileOutputStream(temporary).use {
+            it.write(next.toString().toByteArray(Charsets.UTF_8))
+            it.fd.sync()
+        }
+        Os.rename(temporary.path, counter.path)
+        syncDirectory(root)
+        return File(batches, "batch-${next.toString().padStart(19, '0')}")
+    }
+
+    private fun removeEmptyBatches() {
         val pending = File(root, "pending")
         requireOwned(pending)
-        if (pending.exists() && pending.isDirectory && children(pending).isEmpty()) {
-            if (!pending.delete()) throw Issue("storage")
-            syncDirectory(root)
+        val directories = publishedBatches() + if (exists(pending)) listOf(pending) else emptyList()
+        directories.forEach {
+            if (!it.isDirectory) throw Issue("storage")
+            if (children(it).isEmpty()) {
+                if (!it.delete()) throw Issue("storage")
+                syncDirectory(it.parentFile!!)
+            }
         }
     }
 
     private fun inspect(): List<Receipt> {
         val pending = File(root, "pending")
         requireOwned(pending)
-        if (!pending.exists()) return emptyList()
-        if (!pending.isDirectory) throw Issue("storage")
-        val entries = children(pending)
-        // Keep old installations readable without migrating their published copy.
-        if (entries.any { it.name == "receipt.json" || it.name == "payload" }) {
-            if (entries.map { it.name }.toSet() != setOf("receipt.json", "payload")) throw Issue("storage")
-            return listOf(readReceipt(pending, legacy = true))
+        val legacy = if (!exists(pending)) emptyList() else {
+            if (!pending.isDirectory) throw Issue("storage")
+            val entries = children(pending)
+            if (entries.any { it.name == "receipt.json" || it.name == "payload" }) {
+                listOf(readReceipt(pending, legacy = true))
+            } else inspectBatch(pending)
         }
+        val receipts = legacy + publishedBatches().flatMap { inspectBatch(it) }
+        if (receipts.size > maxFiles || receipts.map { it.id }.toSet().size != receipts.size ||
+            receipts.sumOf { it.size } > maxBatchBytes) throw Issue("storage")
+        return receipts
+    }
+
+    private fun inspectBatch(directory: File): List<Receipt> {
+        val entries = children(directory)
         if (entries.size > maxFiles) throw Issue("storage")
         val receipts = entries.map {
             if (!ITEM_NAME.matches(it.name)) throw Issue("storage")
@@ -203,6 +266,14 @@ internal class ImportInbox internal constructor(
             receipts.map { it.order }.toSet().size != receipts.size ||
             receipts.sumOf { it.size } > maxBatchBytes) throw Issue("storage")
         return receipts.sortedBy { it.order }
+    }
+
+    private fun exists(file: File): Boolean = try {
+        Os.lstat(file.path)
+        true
+    } catch (e: ErrnoException) {
+        if (e.errno != OsConstants.ENOENT) throw Issue("storage", e)
+        false
     }
 
     private fun readReceipt(directory: File, legacy: Boolean): Receipt {
@@ -242,7 +313,7 @@ internal class ImportInbox internal constructor(
             if (!file.delete()) throw Issue("storage") // Unlink, do not follow symlinks.
             return
         }
-        if (!file.exists()) return
+        if (!exists(file)) return
         if (file.isDirectory) children(file).forEach { deleteTree(it) }
         if (!file.delete()) throw Issue("storage")
     }

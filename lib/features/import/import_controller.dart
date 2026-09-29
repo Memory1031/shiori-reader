@@ -54,16 +54,19 @@ class ImportController extends ChangeNotifier {
   int copiedBytes = 0;
   bool panelOpen = false, snoozed = false, _closed = false, _refreshing = false;
   ImportProblem? _problem;
+  ImportProblem? _deferredSourceProblem;
   StreamSubscription<ImportSourceEvent>? _subscription;
   CancellationSource? _cancellation;
   Future<void>? _operation;
   bool _externalCopy = false;
   bool _discarding = false;
+  bool _running = false, _needsRefresh = false;
   int _refreshEpoch = 0;
   bool get discarding => _discarding;
   Completer<TxtEncoding>? _encodingChoice;
   bool get busy =>
       _discarding ||
+      _running ||
       phase == ImportPhase.receiving ||
       phase == ImportPhase.importing;
 
@@ -117,6 +120,7 @@ class ImportController extends ChangeNotifier {
     panelOpen = true;
     snoozed = false;
     _emit();
+    unawaited(refresh());
   }
 
   /// Hides the panel without consuming pending receipts or cancelling work.
@@ -145,7 +149,6 @@ class ImportController extends ChangeNotifier {
         await source.acknowledge(item.candidate.id);
         items.remove(item);
       }
-      items.clear();
       copiedBytes = 0;
       encodingPreview = null;
       panelOpen = false;
@@ -161,6 +164,7 @@ class ImportController extends ChangeNotifier {
     } finally {
       _discarding = false;
       _emit();
+      await refresh();
     }
   }
 
@@ -198,6 +202,12 @@ class ImportController extends ChangeNotifier {
   Future<void> start() async {
     _subscription = source.changes.listen(
       (event) {
+        if (_running || _discarding) {
+          // Intake events are independent of the confirmed parsing snapshot.
+          _needsRefresh = true;
+          _deferredSourceProblem = event.problem ?? _deferredSourceProblem;
+          return;
+        }
         if (event.problem case final issue?) {
           _problem = issue;
           snoozed = false;
@@ -231,14 +241,18 @@ class ImportController extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    if (_closed || busy || _refreshing || phase == ImportPhase.succeeded) {
-      return;
-    }
+    if (_closed) return;
+    _needsRefresh = true;
+    if (busy || _refreshing) return;
+    _needsRefresh = false;
     _refreshing = true;
     final epoch = _refreshEpoch;
     try {
       final pending = await source.pending();
-      if (_closed || busy || epoch != _refreshEpoch) return;
+      if (_closed || busy || epoch != _refreshEpoch) {
+        _needsRefresh = true;
+        return;
+      }
       var added = false;
       final known = {for (final item in items) item.candidate.id};
       for (final value in pending) {
@@ -255,19 +269,35 @@ class ImportController extends ChangeNotifier {
         added = true;
       }
       if (added) {
+        // Keep only the current interaction, not an unbounded success history.
+        // A committed item with a failed ack remains distinct until finish.
+        final pendingIds = pending.map((value) => value.id).toSet();
+        items.removeWhere(
+          (item) =>
+              item.phase == ImportItemPhase.succeeded &&
+              !pendingIds.contains(item.candidate.id),
+        );
         _problem = null;
         snoozed = false;
         _syncPhase();
         _emit();
       }
-    } catch (_) {
+    } catch (error) {
       if (!_closed && epoch == _refreshEpoch) {
-        _problem = ImportProblem.unreadable;
+        _problem = error is ImportSourceException
+            ? error.problem
+            : ImportProblem.unreadable;
         _emit();
       }
     } finally {
       _refreshing = false;
-      if (epoch != _refreshEpoch && !busy) unawaited(refresh());
+      if (!busy && !_closed && _deferredSourceProblem != null) {
+        _problem ??= _deferredSourceProblem;
+        _deferredSourceProblem = null;
+        snoozed = false;
+        _emit();
+      }
+      if (_needsRefresh && !busy && !_closed) unawaited(refresh());
     }
   }
 
@@ -315,16 +345,29 @@ class ImportController extends ChangeNotifier {
     if (busy || _closed || view == null) return;
     if (view.phase == ImportItemPhase.succeeded) return;
     _problem = null;
+    final confirmed = List<ImportItemState>.unmodifiable(items);
     final cancellation = _cancellation = CancellationSource();
+    _running = true;
+    _refreshEpoch++;
     phase = ImportPhase.importing;
     _emit();
-    _operation = _runBatch(cancellation);
-    await _operation;
-    _cancellation = null;
+    final operation = _operation = _runBatch(confirmed, cancellation);
+    try {
+      await operation;
+    } finally {
+      _running = false;
+      _cancellation = null;
+      if (identical(_operation, operation)) _operation = null;
+      _emit();
+      await refresh();
+    }
   }
 
-  Future<void> _runBatch(CancellationSource cancellation) async {
-    for (final item in items) {
+  Future<void> _runBatch(
+    List<ImportItemState> confirmed,
+    CancellationSource cancellation,
+  ) async {
+    for (final item in confirmed) {
       if (item.phase == ImportItemPhase.succeeded) continue;
       if (cancellation.token.isCancelled) break;
       copiedBytes = 0;
@@ -562,9 +605,13 @@ class ImportController extends ChangeNotifier {
     );
     _encodingChoice = null;
     encodingPreview = null;
-    try {
-      await source.cancelCopy();
-    } catch (_) {}
+    // A new external receive may now coexist with this confirmed import.
+    // Stopping parsing must not cancel that independently owned receive.
+    if (!_running) {
+      try {
+        await source.cancelCopy();
+      } catch (_) {}
+    }
     await _operation;
     if (phase == ImportPhase.succeeded) return;
     // Stopping keeps committed successes and leaves every unacknowledged
@@ -578,6 +625,7 @@ class ImportController extends ChangeNotifier {
 
   Future<void> finish() async {
     if (busy) return;
+    _refreshEpoch++;
     items.clear();
     copiedBytes = 0;
     _problem = null;

@@ -15,6 +15,8 @@ String _problemText(AppLocalizations l, ImportProblem p) => switch (p) {
   ImportProblem.parseLimit => l.importParseLimit,
   ImportProblem.tooLarge => l.importTooLarge,
   ImportProblem.batchLimit => l.importBatchLimit,
+  ImportProblem.inboxFull => l.importInboxFull,
+  ImportProblem.publicationUncertain => l.importPublicationUncertain,
   ImportProblem.multiple => l.importMultiple,
   ImportProblem.busy => l.importBusy,
   ImportProblem.unsupported => l.importUnsupported,
@@ -175,7 +177,16 @@ class _ImportOverlayState extends State<ImportOverlay>
     mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Text(l.importIncoming, style: Theme.of(context).textTheme.titleLarge),
+      Text(
+        c.items.isEmpty
+            ? l.importIncoming
+            : l.importPendingCount(
+                c.items
+                    .where((item) => item.phase != ImportItemPhase.succeeded)
+                    .length,
+              ),
+        style: Theme.of(context).textTheme.titleLarge,
+      ),
       if (c.batchProblem case final problem?) ...[
         const SizedBox(height: ShioriSpace.small),
         Text(_problemText(l, problem), key: const ValueKey('import-error')),
@@ -185,6 +196,8 @@ class _ImportOverlayState extends State<ImportOverlay>
         spacing: 12,
         children: [
           FilledButton(onPressed: c.open, child: Text(l.importReview)),
+          if (!c.busy)
+            TextButton(onPressed: c.dismiss, child: Text(l.importLater)),
           TextButton(
             onPressed: c.busy ? c.cancel : c.discard,
             child: Text(c.busy ? l.importStop : l.importCancel),

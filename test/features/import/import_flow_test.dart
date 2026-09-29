@@ -211,6 +211,125 @@ void main() {
   Future<int> committed() async =>
       (await db.customSelect('SELECT * FROM local_books').get()).length;
 
+  test(
+    'late receipt after unclosed success waits for a new confirmation',
+    () async {
+      source.receive(id: 'a', content: utf8.encode('alpha'));
+      await controller.start();
+      await controller.submit();
+      expect(controller.phase, ImportPhase.succeeded);
+      source.receive(id: 'b', content: utf8.encode('beta'));
+      await controller.refresh();
+      await untilImport(() => controller.candidate?.id == 'b');
+      expect(controller.items.map((item) => item.candidate.id), ['b']);
+      expect(parses, 1);
+      expect(await committed(), 1);
+      controller.dismiss();
+      controller.open();
+      expect(source.inbox.map((item) => item.id), ['b']);
+      expect(parses, 1);
+      await controller.submit();
+      expect(await committed(), 2);
+    },
+  );
+
+  test(
+    'discard consumes only the snapshot and discovers arrivals before returning',
+    () async {
+      source.receive(id: 'a');
+      await controller.start();
+      source.ackGate = Completer<void>();
+      final discard = controller.discard();
+      source.receive(id: 'b');
+      await controller.refresh();
+      source.ackGate!.complete();
+      await discard;
+      expect(source.acked, ['a']);
+      expect(source.inbox.map((item) => item.id), ['b']);
+      expect(controller.items.map((item) => item.candidate.id), ['b']);
+      expect(parses, 0);
+    },
+  );
+
+  test(
+    'confirmed snapshot excludes arrivals and intake bytes during parsing',
+    () async {
+      await controller.shutdown();
+      controller.dispose();
+      final entered = Completer<void>();
+      final resume = Completer<void>();
+      final names = <String>[];
+      controller = ImportController(
+        source: source,
+        store: store,
+        parsers: {
+          LocalBookFormat.txt: (session) async {
+            names.add(session.key.toString());
+            if (names.length == 1) {
+              entered.complete();
+              await resume.future;
+            }
+            return fakeParser(session);
+          },
+        },
+      );
+      source.receive(id: 'a', content: utf8.encode('alpha'));
+      source.receive(id: 'b', content: utf8.encode('beta'));
+      await controller.start();
+      final run = controller.submit();
+      await entered.future;
+      final bytes = controller.copiedBytes;
+      source.events.add(const ImportSourceEvent(copiedBytes: 999999));
+      source.receive(id: 'c', content: utf8.encode('gamma'));
+      source.events.add(const ImportSourceEvent(completed: true));
+      source.events.add(
+        const ImportSourceEvent(problem: ImportProblem.inboxFull),
+      );
+      await controller.refresh();
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.copiedBytes, bytes);
+      expect(controller.importingItem?.candidate.id, 'a');
+      expect(controller.items.map((item) => item.candidate.id), ['a', 'b']);
+      resume.complete();
+      await run;
+      expect(source.acked, ['a', 'b']);
+      expect(names, hasLength(2));
+      expect(controller.batchProblem, ImportProblem.inboxFull);
+      expect(controller.items.map((item) => item.candidate.id), ['c']);
+      expect(controller.phase, ImportPhase.ready);
+      expect(await committed(), 2);
+      await controller.submit();
+      expect(source.acked, ['a', 'b', 'c']);
+      expect(await committed(), 3);
+    },
+  );
+
+  test(
+    'ack failure and new arrival keep committed identity separate',
+    () async {
+      source.receive(id: 'a', content: utf8.encode('alpha'));
+      source.failAckIds.add('a');
+      await controller.start();
+      await controller.submit();
+      source.receive(id: 'b', content: utf8.encode('beta'));
+      await controller.refresh();
+      await untilImport(() => controller.items.length == 2);
+      expect(controller.items.first.phase, ImportItemPhase.succeeded);
+      await controller.submit();
+      expect(parses, 2);
+      expect(await committed(), 2);
+      await controller.finish();
+      expect(controller.candidate?.id, 'a');
+      await controller.submit();
+      expect(
+        parses,
+        2,
+      ); // Real ManagedLocalBooks SHA-256 dedup, no second parse.
+      expect(await committed(), 2);
+      expect(source.inbox, isEmpty);
+    },
+  );
+
   test('empty pending inbox leaves the controller idle', () async {
     await controller.start();
     expect(controller.phase, ImportPhase.idle);
@@ -473,10 +592,13 @@ void main() {
       await controller.start();
       final work = controller.submit();
       await entered.future;
+      source.picking = Completer<void>(); // Independent late native receive.
+      source.events.add(const ImportSourceEvent(copiedBytes: 100));
       final stop = controller.cancel();
       resume.complete();
       await work;
       await stop;
+      expect(source.picking!.isCompleted, false);
       expect(controller.result, null);
       expect(controller.phase, ImportPhase.idle);
       expect(await db.customSelect('SELECT * FROM local_books').get(), isEmpty);
@@ -975,10 +1097,10 @@ void main() {
       source.receive();
       await tester.pumpAndSettle();
       expect(find.text('Reader position unchanged'), findsOneWidget);
-      expect(find.text('有文件等待导入'), findsOneWidget);
+      expect(find.text('1 个文件待导入'), findsOneWidget);
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
-      expect(find.text('有文件等待导入'), findsNothing);
+      expect(find.text('1 个文件待导入'), findsNothing);
       expect(source.inbox, isEmpty);
       expect(controller.items, isEmpty);
       source.receive(id: 'replacement', error: ImportProblem.unreadable);
@@ -990,7 +1112,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(controller.phase, ImportPhase.idle);
       expect(source.inbox, isEmpty);
-      expect(find.text('有文件等待导入'), findsNothing);
+      expect(find.text('1 个文件待导入'), findsNothing);
       expect(tester.takeException(), null);
     },
   );
@@ -1684,7 +1806,7 @@ void main() {
       expect(source.acked, ['a']); // Committed item survives the stop.
       expect(source.inbox.map((c) => c.id), ['b', 'c']);
       expect(find.text('导入全部'), findsNothing); // Snoozed, nothing deleted.
-      expect(find.text('有文件等待导入'), findsNothing);
+      expect(find.text('1 个文件待导入'), findsNothing);
       expect(tester.takeException(), null);
     });
 

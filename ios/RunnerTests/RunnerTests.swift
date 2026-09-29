@@ -53,7 +53,7 @@ final class RunnerTests: XCTestCase {
     issue(.storage) { _ = try inbox.pending() }
     issue(.storage) { _ = try session(1) }
     issue(.storage) { try inbox.acknowledge("anything") }
-    XCTAssertTrue(exists("pending"))
+    XCTAssertTrue(exists("batches"))
   }
   private func legacy() throws {
     let pending = inbox.root.appendingPathComponent("pending")
@@ -63,6 +63,119 @@ final class RunnerTests: XCTestCase {
       .write(to: pending.appendingPathComponent("receipt.json"))
   }
 
+  func testContinuousBatchesReopenAndPartialAcknowledgement() throws {
+    try stage([input("A.txt"), input("B.txt")])
+    let old = try inbox.pending()
+    try stage([input("C.txt")])
+    inbox = try ImportInbox(directory: inbox.root, limits: limits)
+    XCTAssertEqual(try inbox.pending().map { $0["name"] as! String }, ["A.txt", "B.txt", "C.txt"])
+    XCTAssertEqual(try inbox.pending()[0]["path"] as? String, old[0]["path"] as? String)
+    try inbox.acknowledge(old[0]["id"] as! String)
+    try inbox.acknowledge(old[0]["id"] as! String)
+    try stage([input("D.txt")])
+    try inbox.acknowledge(old[1]["id"] as! String)
+    XCTAssertEqual(try inbox.pending().map { $0["name"] as! String }, ["C.txt", "D.txt"])
+  }
+  func testGlobalCountAndBytesReleaseAfterAck() throws {
+    let full = try input(bytes: Int(limits.maxFileBytes))
+    try stage([full])
+    try stage([full])
+    let before = try ids()
+    issue(.inboxFull) { try stage([input("extra.txt", bytes: 1)]) }
+    XCTAssertEqual(try ids(), before)
+    try inbox.acknowledge(before[0])
+    try stage([input("small.txt"), input("small.txt"), input("small.txt")])
+    issue(.inboxFull) { try stage([input("one.txt")]) }
+    XCTAssertEqual(try ids().count, 4)
+  }
+  func testFailedAndCancelledNextBatchPreserveOldBytes() throws {
+    try stage([input("old.txt")])
+    let before = try inbox.pending()
+    let payload = URL(fileURLWithPath: before[0]["path"] as! String)
+    let bytes = try Data(contentsOf: payload)
+    issue(.unreadable) { try stage([input(), directory.appendingPathComponent("missing.txt")]) }
+    let token = ImportCancellation()
+    let next = try session(2, cancellation: token)
+    try next.append(url: input())
+    token.cancel()
+    issue(.cancelled) { try next.append(url: input()) }
+    XCTAssertEqual(try ids(), before.map { $0["id"] as! String })
+    XCTAssertEqual(try Data(contentsOf: payload), bytes)
+  }
+  func testLegacyBatchPathsRemainValidBesideNewBatches() throws {
+    try stage([input("old-A.txt"), input("old-B.txt")])
+    let published = try itemDirectories()[0].deletingLastPathComponent()
+    try fm.moveItem(at: published, to: inbox.root.appendingPathComponent("pending"))
+    let oldPaths = try inbox.pending().map { $0["path"] as! String }
+    try stage([input("new.txt")])
+    inbox = try ImportInbox(directory: inbox.root, limits: limits)
+    XCTAssertEqual(Array(try inbox.pending().map { $0["path"] as! String }.prefix(2)), oldPaths)
+    try inbox.acknowledge(try ids()[0])
+    XCTAssertEqual(try inbox.pending().map { $0["name"] as! String }, ["old-B.txt", "new.txt"])
+  }
+  func testActualGrowthBeyondDeclaredSizeRollsBackOnlyNewBatch() throws {
+    let mib = 1024 * 1024
+    inbox = try ImportInbox(directory: inbox.root,
+      limits: ImportLimits(maxFiles: 4, maxFileBytes: Int64(8 * mib), maxBatchBytes: Int64(4 * mib)))
+    try stage([input("old.txt", bytes: mib)])
+    let before = try ids()
+    let growing = try input("growing.txt", bytes: 2 * mib)
+    var grew = false
+    issue(.inboxFull) {
+      try inbox.stage([growing], cancellation: ImportCancellation()) { _ in
+        if !grew {
+          grew = true
+          let file = try! FileHandle(forWritingTo: growing)
+          file.seekToEndOfFile()
+          file.write(Data(repeating: 66, count: 2 * mib))
+          file.closeFile()
+        }
+      }
+    }
+    XCTAssertTrue(grew)
+    XCTAssertEqual(try ids(), before)
+  }
+  func testSequenceSurvivesEmptyQueueAndInterruptedReservation() throws {
+    try stage([input()])
+    let firstBatch = try itemDirectories()[0].deletingLastPathComponent().lastPathComponent
+    try inbox.acknowledge(try ids()[0])
+    try Data("17".utf8).write(to: inbox.root.appendingPathComponent("sequence"))
+    try Data("18".utf8).write(to: inbox.root.appendingPathComponent("sequence-working"))
+    try stage([input()])
+    let nextBatch = try itemDirectories()[0].deletingLastPathComponent().lastPathComponent
+    XCTAssertGreaterThan(nextBatch, firstBatch)
+    XCTAssertTrue(nextBatch.hasSuffix("00018"))
+  }
+  func testDuplicateIdAcrossBatchesIsPreservedAsCorruption() throws {
+    try stage([input()])
+    try stage([input()])
+    let first = try ids()[0]
+    try changeReceipt(1) { $0["id"] = first }
+    try corrupted()
+  }
+  func testLegacyReceiptsCountTowardsGlobalCapacity() throws {
+    try legacy()
+    try stage([input(), input(), input()])
+    issue(.inboxFull) { try stage([input()]) }
+    XCTAssertEqual(try ids().count, 4)
+  }
+  #if os(macOS)
+  func testCrossProcessLockHeldUntilAbort() throws {
+    let batch = try session(1)
+    try batch.append(url: input())
+    func childStatus() throws -> Int32 {
+      let child = Process()
+      child.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+      child.arguments = ["-c", "import fcntl,sys; f=open(sys.argv[1], 'r+');\ntry: fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)\nexcept BlockingIOError: sys.exit(0)\nsys.exit(1)", inbox.root.appendingPathComponent("lock").path]
+      try child.run()
+      child.waitUntilExit()
+      return child.terminationStatus
+    }
+    XCTAssertEqual(try childStatus(), 0)
+    try batch.abort()
+    XCTAssertEqual(try childStatus(), 1)
+  }
+  #endif
   func testProductionConstantsAndPickerMultiSelection() {
     XCTAssertEqual(ImportLimits.production.maxFiles, 64)
     XCTAssertEqual(ImportLimits.production.maxFileBytes, 128 * 1024 * 1024)
@@ -78,7 +191,7 @@ final class RunnerTests: XCTestCase {
     let receipts = try reopened.pending()
     XCTAssertEqual(receipts.count, 1)
     let path = try XCTUnwrap(receipts.first?["path"] as? String)
-    XCTAssertTrue(path.contains("/pending/item-0000-"))
+    XCTAssertTrue(path.contains("/batches/batch-"))
     XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), Data([65, 65, 65]))
   }
   func testThreeItemsPreserveInputOrderAndDuplicateNames() throws {
@@ -95,7 +208,7 @@ final class RunnerTests: XCTestCase {
     try batch.append(url: input(), displayName: "../../outside.txt")
     try batch.commit()
     XCTAssertEqual(try inbox.pending().first?["name"] as? String, "../../outside.txt")
-    XCTAssertTrue(try itemDirectories()[0].path.hasPrefix(inbox.root.path + "/pending/item-0000-"))
+    XCTAssertTrue(try itemDirectories()[0].path.hasPrefix(inbox.root.path + "/batches/batch-"))
   }
   func testProductionCount64AcceptedAnd65Rejected() throws {
     inbox = try ImportInbox(directory: inbox.root)
@@ -208,15 +321,15 @@ final class RunnerTests: XCTestCase {
     try inbox.acknowledge(before[2])
     try unpublished()
   }
-  func testLegacyReadBusyAndAck() throws {
+  func testLegacyCoexistsWithNewBatchAndAck() throws {
     try legacy()
     XCTAssertEqual(try inbox.pending().first?["id"] as? String, "legacy-id")
-    issue(.busy) { try stage([input()]) }
+    try stage([input()])
     try inbox.acknowledge("unknown")
     XCTAssertTrue(exists("pending/receipt.json"))
     try inbox.acknowledge("legacy-id")
     try inbox.acknowledge("legacy-id")
-    try unpublished()
+    XCTAssertEqual(try inbox.pending().count, 1)
   }
   func testRecoveryOfWorkingTrashAndEmptyPending() throws {
     for name in ["working", "pending", "ack-trash-\(UUID().uuidString)"] {
@@ -269,7 +382,7 @@ final class RunnerTests: XCTestCase {
       try stage([input()])
       try changeReceipt { $0["size"] = size }
       try corrupted()
-      try fm.removeItem(at: inbox.root.appendingPathComponent("pending")) // Test fixture reset only.
+      try fm.removeItem(at: inbox.root.appendingPathComponent("batches")) // Test fixture reset only.
     }
   }
   func testInvalidOrderAndSizeMismatchRejected() throws {
@@ -284,7 +397,7 @@ final class RunnerTests: XCTestCase {
   }
   func testUnexpectedPublishedChildRejected() throws {
     try stage([input()])
-    try Data([1]).write(to: inbox.root.appendingPathComponent("pending/unexpected"))
+    try Data([1]).write(to: try itemDirectories()[0].deletingLastPathComponent().appendingPathComponent("unexpected"))
     try corrupted()
   }
   func testPublishedSymlinkRejectedWithoutFollowingIt() throws {
@@ -317,8 +430,9 @@ final class RunnerTests: XCTestCase {
   func testExistingBatchIsNeverOverwritten() throws {
     try stage([input(), input()])
     let before = try ids()
-    issue(.busy) { try stage([input("new.txt")]) }
-    XCTAssertEqual(try ids(), before)
+    try stage([input("new.txt")])
+    XCTAssertEqual(Array(try ids().prefix(2)), before)
+    XCTAssertEqual(try ids().count, 3)
   }
   func testOldAbortedSessionCannotRemoveNewWorking() throws {
     let old = try session(1)

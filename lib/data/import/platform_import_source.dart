@@ -27,10 +27,20 @@ class PlatformImportSource implements ImportSource {
         );
       });
   Future<T?> _call<T>(String method, [Object? args]) async {
-    try {
-      return await _channel.invokeMethod<T>(method, args);
-    } on PlatformException catch (e) {
-      throw ImportSourceException(_problem(e.code));
+    // A foreground scan may race an extension holding flock. Bound retries
+    // here so the only resume notification still has a chance to see publish.
+    const delays = [100, 300, 900, 2000, 4000, 8000];
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await _channel.invokeMethod<T>(method, args);
+      } on PlatformException catch (e) {
+        if (e.code != 'busy' ||
+            (method != 'pending' && method != 'ack') ||
+            attempt == delays.length) {
+          throw ImportSourceException(_problem(e.code));
+        }
+        await Future<void>.delayed(Duration(milliseconds: delays[attempt]));
+      }
     }
   }
 
@@ -41,8 +51,17 @@ class PlatformImportSource implements ImportSource {
       );
   @override
   Future<void> pick() => _call<void>('pick');
+  Future<void> _tail = Future<void>.value();
+  Future<T> _serialized<T>(Future<T> Function() action) {
+    final result = _tail.then((_) => action());
+    _tail = result.then<void>((_) {}, onError: (Object _) {});
+    return result;
+  }
+
   @override
-  Future<List<ImportCandidate>> pending() async {
+  Future<List<ImportCandidate>> pending() => _serialized(_pending);
+
+  Future<List<ImportCandidate>> _pending() async {
     final response = await _call<Object?>('pending');
     final List<Object?> values = switch (response) {
       null => const [],
@@ -104,10 +123,10 @@ class PlatformImportSource implements ImportSource {
   }
 
   @override
-  Future<void> acknowledge(String id) async {
+  Future<void> acknowledge(String id) => _serialized(() async {
     await _call<void>('ack', {'id': id});
     _paths.remove(id);
-  }
+  });
 
   @override
   Future<void> cancelCopy() => _call<void>('cancel');

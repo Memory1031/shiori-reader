@@ -18,6 +18,8 @@ enum ImportProblem {
   unreadable,
   tooLarge,
   batchLimit,
+  inboxFull,
+  publicationUncertain,
   unsupported,
   multiple,
   busy,

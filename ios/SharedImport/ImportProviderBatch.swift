@@ -46,7 +46,13 @@ struct ImportProviderSelection {
 
 /// Serial provider materialization. All session state belongs to worker.
 /// Cancellation alone is thread-safe and may interrupt a running stream.
-final class ImportProviderBatch {
+protocol ImportBatchReceiving: AnyObject {
+  func start(_ providers: [ImportFileProvider], progress: @escaping (Int, Int) -> Void,
+             completion: @escaping (Result<ImportReceiptSummary, ImportIssue>) -> Void)
+  func cancel()
+}
+
+final class ImportProviderBatch: ImportBatchReceiving {
   private let worker = DispatchQueue(label: "dev.shiori.reader.share-import", qos: .userInitiated)
   private let workerKey = DispatchSpecificKey<Bool>()
   private let cancellation = ImportCancellation()
@@ -59,7 +65,7 @@ final class ImportProviderBatch {
   private var started = false
   private var finished = false
   private var progress: ((Int, Int) -> Void)?
-  private var completion: ((Result<Int, ImportIssue>) -> Void)?
+  private var completion: ((Result<ImportReceiptSummary, ImportIssue>) -> Void)?
 
   init(limits: ImportLimits = .production, makeInbox: @escaping () throws -> ImportInbox = { try ImportInbox() }) {
     self.limits = limits
@@ -68,7 +74,7 @@ final class ImportProviderBatch {
   }
 
   func start(_ providers: [ImportFileProvider], progress: @escaping (Int, Int) -> Void,
-             completion: @escaping (Result<Int, ImportIssue>) -> Void) {
+             completion: @escaping (Result<ImportReceiptSummary, ImportIssue>) -> Void) {
     worker.async {
       guard !self.started else { return }
       self.started = true
@@ -99,8 +105,8 @@ final class ImportProviderBatch {
       try cancellation.check()
       guard let session = session else { throw ImportIssue.storage }
       if index == selections.count {
-        try session.commit()
-        finish(.success(selections.count))
+        let summary = try session.commit()
+        finish(.success(summary))
         return
       }
       let selection = selections[index]
@@ -128,7 +134,7 @@ final class ImportProviderBatch {
     } catch { finish(.failure((error as? ImportIssue) ?? .storage)) }
   }
 
-  private func finish(_ result: Result<Int, ImportIssue>) {
+  private func finish(_ result: Result<ImportReceiptSummary, ImportIssue>) {
     guard !finished else { return }
     var outcome = result
     do { try session?.abort() }

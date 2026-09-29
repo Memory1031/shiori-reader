@@ -2311,6 +2311,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Image saving is currently unavailable. Please try again.'**
   String get imageExportUnavailable;
+
+  /// No description provided for @importPendingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file awaiting import} other{{count} files awaiting import}}'**
+  String importPendingCount(int count);
+
+  /// No description provided for @importInboxFull.
+  ///
+  /// In en, this message translates to:
+  /// **'The inbox is full (64 files / 512 MiB). Import or discard pending files in Shiori, then share again.'**
+  String get importInboxFull;
+
+  /// No description provided for @importPublicationUncertain.
+  ///
+  /// In en, this message translates to:
+  /// **'Files may have been received. Check pending files in Shiori before sharing again.'**
+  String get importPublicationUncertain;
+
+  /// No description provided for @importLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get importLater;
 }
 
 class _AppLocalizationsDelegate

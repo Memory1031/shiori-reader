@@ -57,6 +57,92 @@ class ImportInboxTest : AndroidTestCase() {
         }
     }
 
+    fun testContinuousBatchesReopenAndPartialAcknowledgement() {
+        inbox.stage(listOf(input("A.txt"), input("B.txt")), { false })
+        val old = inbox.pending()
+        inbox.stage(listOf(input("C.txt")), { false })
+        inbox = newInbox()
+        assertEquals(listOf("A.txt", "B.txt", "C.txt"), inbox.pending().map { it["name"] })
+        assertEquals(old, inbox.pending().take(2))
+        inbox.acknowledge(old[0]["id"] as String)
+        inbox.acknowledge(old[0]["id"] as String)
+        inbox.stage(listOf(input("D.txt")), { false })
+        inbox.acknowledge(old[1]["id"] as String)
+        assertEquals(listOf("C.txt", "D.txt"), inbox.pending().map { it["name"] })
+    }
+    fun testGlobalCountAndBytesReleaseAfterAck() {
+        repeat(4) { inbox.stage(listOf(sized(testMaxFileBytes)), { false }) }
+        val before = inbox.pending()
+        issue("inboxFull") { inbox.stage(listOf(sized(1)), { false }) }
+        assertEquals(before, inbox.pending())
+        inbox.acknowledge(before[0]["id"] as String)
+        inbox.stage(List(5) { input() }, { false })
+        issue("inboxFull") { inbox.stage(listOf(input()), { false }) }
+        assertEquals(8, inbox.pending().size)
+    }
+    fun testFailedAndCancelledNextBatchPreserveOldBytes() {
+        inbox.stage(listOf(input("old.txt")), { false })
+        val before = inbox.pending()
+        val payload = File(before[0]["path"] as String)
+        val bytes = payload.readBytes().toList()
+        issue("unreadable") { inbox.stage(listOf(input(), input(bytes = byteArrayOf())), { false }) }
+        var cancelled = false
+        val second = { ImportInbox.Input("second.txt") {
+            cancelled = true
+            ByteArrayInputStream(byteArrayOf(1))
+        } }
+        issue("cancelled") { inbox.stage(listOf(input(), second), { cancelled }) }
+        assertEquals(before, inbox.pending())
+        assertEquals(bytes, payload.readBytes().toList())
+    }
+    fun testLegacyBatchPathsRemainValidBesideNewBatches() {
+        inbox.stage(listOf(input("old-A.txt"), input("old-B.txt")), { false })
+        val batch = File(inbox.pending()[0]["path"] as String).parentFile!!.parentFile!!
+        Os.rename(batch.path, File(root, "pending").path)
+        val old = inbox.pending()
+        inbox.stage(listOf(input("new.txt")), { false })
+        assertEquals(old, newInbox().pending().take(2))
+        inbox.acknowledge(old[0]["id"] as String)
+        assertEquals(listOf("old-B.txt", "new.txt"), inbox.pending().map { it["name"] })
+    }
+    fun testGlobalActualBytesDespiteLyingDeclaration() {
+        inbox.stage(List(3) { sized(testMaxFileBytes) }, { false })
+        val before = inbox.pending()
+        issue("inboxFull") { inbox.stage(listOf(sized(testMaxFileBytes, 1), sized(1, 0)), { false }) }
+        assertEquals(before, inbox.pending())
+    }
+
+    fun testDuplicateIdAcrossBatchesIsPreservedAsCorruption() {
+        repeat(2) { inbox.stage(listOf(input()), { false }) }
+        val before = inbox.pending()
+        val receipt = File(File(before[1]["path"] as String).parentFile, "receipt.json")
+        receipt.writeText(JSONObject(receipt.readText()).put("id", before[0]["id"]).toString())
+        issue("storage") { inbox.pending() }
+        issue("storage") { inbox.acknowledge(before[0]["id"] as String) }
+        assertTrue(receipt.exists())
+    }
+    fun testPublishedSymlinkRejectedWithoutFollowingIt() {
+        inbox.stage(listOf(input()), { false })
+        val payload = File(inbox.pending()[0]["path"] as String)
+        val outside = File(root.parentFile, "synthetic-${UUID.randomUUID()}.txt")
+        try {
+            outside.writeText("preserved")
+            payload.delete()
+            Os.symlink(outside.path, payload.path)
+            issue("storage") { inbox.pending() }
+            issue("storage") { inbox.stage(listOf(input()), { false }) }
+            assertEquals("preserved", outside.readText())
+        } finally { outside.delete() }
+    }
+    fun testSequenceSurvivesEmptyQueueAndInterruptedReservation() {
+        inbox.stage(listOf(input()), { false })
+        inbox.acknowledge(inbox.pending()[0]["id"] as String)
+        File(root, "sequence").writeText("17")
+        File(root, "sequence-working").writeText("18")
+        inbox.stage(listOf(input()), { false })
+        val batch = File(inbox.pending()[0]["path"] as String).parentFile!!.parentFile!!.name
+        assertTrue(batch.endsWith("00018"))
+    }
     fun testThreeFilesPublishInOrderAndSurviveReopen() {
         inbox.stage(listOf(input("z.TXT"), input("same.epub"), input("same.epub")), { false })
         val receipts = newInbox().pending()
@@ -71,7 +157,7 @@ class ImportInboxTest : AndroidTestCase() {
         inbox.stage(listOf(input("../../outside.TXT")), { false })
         val receipt = inbox.pending().single()
         assertEquals("../../outside.TXT", receipt["name"])
-        assertTrue((receipt["path"] as String).startsWith(File(root, "pending/item-0000-").path))
+        assertTrue((receipt["path"] as String).startsWith(File(root.canonicalFile, "batches/batch-").path))
         assertEquals(3L, receipt["size"])
     }
     fun testSecondFileReadFailureRollsBackWholeBatch() {
@@ -203,8 +289,9 @@ class ImportInboxTest : AndroidTestCase() {
     fun testExistingPendingCannotBeOverwritten() {
         inbox.stage(listOf(input()), { false })
         val before = inbox.pending()
-        issue("busy") { inbox.stage(listOf(input("new.txt")), { false }) }
-        assertEquals(before, inbox.pending())
+        inbox.stage(listOf(input("new.txt")), { false })
+        assertEquals(before, inbox.pending().take(1))
+        assertEquals(2, inbox.pending().size)
     }
     fun testAcknowledgeMiddleUnknownAndLastPreservesOtherReceipts() {
         inbox.stage(List(3) { input() }, { false })
@@ -218,17 +305,17 @@ class ImportInboxTest : AndroidTestCase() {
         inbox.acknowledge(before[2]["id"] as String)
         assertFalse(File(root, "pending").exists())
     }
-    fun testLegacyReceiptIsBusyReadableAndAcknowledgedById() {
+    fun testLegacyCoexistsWithNewBatchAndAck() {
         val pending = File(root, "pending").apply { mkdir() }
         File(pending, "payload").writeBytes(byteArrayOf(1, 2, 3))
         File(pending, "receipt.json").writeText(JSONObject(mapOf("id" to "legacy-id", "name" to "old.txt", "size" to 3)).toString())
         assertEquals("legacy-id", inbox.pending().single()["id"])
-        issue("busy") { inbox.stage(listOf(input()), { false }) }
+        inbox.stage(listOf(input()), { false })
         inbox.acknowledge("wrong")
         assertTrue(pending.exists())
         inbox.acknowledge("legacy-id")
         inbox.acknowledge("legacy-id")
-        unpublished()
+        assertEquals(1, inbox.pending().size)
     }
     fun testRecoveryAfterDetachBeforeTrashDeletion() {
         inbox.stage(List(3) { input() }, { false })
@@ -258,7 +345,7 @@ class ImportInboxTest : AndroidTestCase() {
         issue("storage") { inbox.stage(listOf(input()), { false }) }
         issue("storage") { inbox.acknowledge(receipt["id"] as String) }
         assertEquals("broken", metadata.readText())
-        assertEquals(3, File(root, "pending").listFiles()!!.size)
+        assertEquals(3, metadata.parentFile!!.parentFile!!.listFiles()!!.size)
     }
     fun testLockPreventsRecoveryDeletingActiveWorking() {
         File(root, "working").mkdir()

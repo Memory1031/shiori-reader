@@ -52,9 +52,9 @@ final class ImportProviderBatchTests: XCTestCase {
     try Data(text.utf8).write(to: url)
     return FileProviderDouble(url)
   }
-  private func run(_ providers: [ImportFileProvider]) -> Result<Int, ImportIssue> {
+  private func run(_ providers: [ImportFileProvider]) -> Result<ImportReceiptSummary, ImportIssue> {
     let done = expectation(description: "provider batch")
-    var result: Result<Int, ImportIssue>!
+    var result: Result<ImportReceiptSummary, ImportIssue>!
     let ownedInbox = inbox!
     let batch = ImportProviderBatch(limits: limits, makeInbox: { ownedInbox })
     batch.start(providers, progress: { _, _ in }, completion: { outcome in
@@ -64,17 +64,52 @@ final class ImportProviderBatchTests: XCTestCase {
     wait(for: [done], timeout: 5)
     return result ?? .failure(.storage)
   }
-  private func issue(_ expected: ImportIssue, _ outcome: Result<Int, ImportIssue>,
+  private func issue(_ expected: ImportIssue, _ outcome: Result<ImportReceiptSummary, ImportIssue>,
                      file: StaticString = #filePath, line: UInt = #line) {
     switch outcome {
     case .failure(let actual): XCTAssertEqual(actual, expected, file: file, line: line)
     case .success: XCTFail("Expected \(expected)", file: file, line: line)
     }
   }
+  func testPublishedSummaryAndLateCancelPreserveEarlierAndCurrentBatches() throws {
+    try inbox.stage(provider("old.txt").url!, cancellation: ImportCancellation()) { _ in }
+    let p = try provider("new.txt")
+    let summary = try run([p]).get()
+    XCTAssertEqual(summary.names, ["new.txt"])
+    XCTAssertEqual(summary.pendingCount, 2)
+    let done = expectation(description: "published")
+    let receiver = ImportProviderBatch(limits: limits, makeInbox: { self.inbox })
+    receiver.start([p], progress: { _, _ in }, completion: { outcome in
+      XCTAssertEqual(try? outcome.get().pendingCount, 3)
+      done.fulfill()
+    })
+    wait(for: [done], timeout: 5)
+    receiver.cancel()
+    XCTAssertEqual(try inbox.pending().count, 3)
+  }
+  func testPublishedSummaryDoesNotDependOnLaterStatisticsRead() throws {
+    let p = try provider("saved.txt")
+    let done = expectation(description: "published summary")
+    let receiver = ImportProviderBatch(limits: limits, makeInbox: { self.inbox })
+    receiver.start([p], progress: { _, _ in }, completion: { outcome in
+      do {
+        let summary = try outcome.get()
+        // Another session can take the lock before UI feedback is delivered.
+        let next = try self.inbox.beginBatch(expectedCount: 1, cancellation: ImportCancellation())
+        XCTAssertThrowsError(try self.inbox.pending()) { XCTAssertEqual($0 as? ImportIssue, .busy) }
+        XCTAssertEqual(summary.names, ["saved.txt"])
+        XCTAssertEqual(summary.pendingCount, 1)
+        try next.abort()
+      } catch { XCTFail("Publication was lost: \(error)") }
+      done.fulfill()
+    })
+    wait(for: [done], timeout: 5)
+    XCTAssertEqual(try inbox.pending().count, 1)
+  }
   func testEPUBPreferredWhenProviderSupportsBothTypes() throws {
     let p = try provider("both.epub")
     p.types.insert(ImportProviderSelection.epub)
-    XCTAssertEqual(try run([p]).get(), 1)
+    XCTAssertEqual(try run([p]).get().names.count, 1)
     XCTAssertEqual(p.requestedTypes, [ImportProviderSelection.epub])
   }
   func testUnsupportedLaterProviderRejectsWholeBatchBeforeLoad() throws {
@@ -100,7 +135,7 @@ final class ImportProviderBatchTests: XCTestCase {
   func testOrderAndDuplicatesArePreserved() throws {
     let first = try provider("z.txt")
     let next = try provider("a.txt")
-    XCTAssertEqual(try run([first, next, first]).get(), 3)
+    XCTAssertEqual(try run([first, next, first]).get().names.count, 3)
     XCTAssertEqual(try inbox.pending().map { $0["name"] as! String }, ["z.txt", "a.txt", "z.txt"])
     XCTAssertEqual(first.loadCount, 2)
     XCTAssertEqual(Set(try inbox.pending().map { $0["id"] as! String }).count, 3)
@@ -120,7 +155,7 @@ final class ImportProviderBatchTests: XCTestCase {
         removed.fulfill()
       }
     }
-    XCTAssertEqual(try run([first, second]).get(), 2)
+    XCTAssertEqual(try run([first, second]).get().names.count, 2)
     wait(for: [removed], timeout: 5)
     XCTAssertFalse(FileManager.default.fileExists(atPath: first.url!.path))
     XCTAssertFalse(FileManager.default.fileExists(atPath: second.url!.path))
@@ -192,12 +227,13 @@ final class ImportProviderBatchTests: XCTestCase {
     wait(for: [done], timeout: 5)
     XCTAssertEqual(p.loadCount, 0)
   }
-  func testExistingPendingRejectsShareBeforeLoading() throws {
+  func testExistingPendingIsPreservedAndNextShareLoads() throws {
     try inbox.stage(provider("old.txt").url!, cancellation: ImportCancellation()) { _ in }
     let before = try inbox.pending().map { $0["id"] as! String }
     let p = try provider("new.txt")
-    issue(.busy, run([p]))
-    XCTAssertEqual(p.loadCount, 0)
-    XCTAssertEqual(try inbox.pending().map { $0["id"] as! String }, before)
+    XCTAssertEqual(try run([p]).get().names.count, 1)
+    XCTAssertEqual(p.loadCount, 1)
+    XCTAssertEqual(Array(try inbox.pending().map { $0["id"] as! String }.prefix(1)), before)
+    XCTAssertEqual(try inbox.pending().count, 2)
   }
 }

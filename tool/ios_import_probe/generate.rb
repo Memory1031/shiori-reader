@@ -25,9 +25,33 @@ test.build_configurations.each do |c|
   c.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'dev.shiori.importfixture.uitests'
   c.build_settings['TEST_TARGET_NAME'] = 'ImportFixture'
 end
+# Compile the real UIKit extension view in this synthetic native host too.
+['ios/SharedImport/ImportInbox.swift', 'ios/SharedImport/ImportProviderBatch.swift',
+ 'ios/ShareExtension/ShareViewController.swift'].each do |file|
+  app.source_build_phase.add_file_reference(project.main_group.new_file(File.join(root, file)))
+end
+strings = project.main_group.new_variant_group('Localizable.strings')
+['en', 'zh-Hans'].each do |locale|
+  ref = strings.new_file(File.join(root, 'ios/ShareExtension', locale + '.lproj/Localizable.strings'))
+  ref.name = locale
+end
+app.resources_build_phase.add_file_reference(strings)
+unit = project.new_target(:unit_test_bundle, 'ShareViewTests', :ios, '15.0')
+unit.add_dependency(app)
+unit.source_build_phase.add_file_reference(project.main_group.new_file(File.join(__dir__, 'ShareViewTests.swift')))
+unit.build_configurations.each do |config|
+  config.build_settings.merge!({
+    'PRODUCT_BUNDLE_IDENTIFIER' => 'dev.shiori.importfixture.tests',
+    'GENERATE_INFOPLIST_FILE' => 'YES', 'SWIFT_VERSION' => '5.0',
+    'CODE_SIGNING_ALLOWED' => 'NO', 'TEST_HOST' => '$(BUILT_PRODUCTS_DIR)/ImportFixture.app/ImportFixture',
+    'BUNDLE_LOADER' => '$(TEST_HOST)', 'TARGETED_DEVICE_FAMILY' => '1,2'
+  })
+end
+app.build_configurations.each { |c| c.build_settings['ENABLE_TESTABILITY'] = 'YES' }
 project.save
 scheme = Xcodeproj::XCScheme.new
 scheme.add_build_target(app)
 scheme.add_test_target(test)
+scheme.add_test_target(unit)
 scheme.set_launch_target(app)
 scheme.save_as(project.path, 'ImportFixture', true)

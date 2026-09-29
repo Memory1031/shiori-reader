@@ -15,6 +15,7 @@ final class FixtureApp: UIResponder, UIApplicationDelegate {
 }
 
 final class FixtureViewController: UIViewController {
+  private var shareNumber = 0
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = .systemBackground
@@ -37,9 +38,10 @@ final class FixtureViewController: UIViewController {
   }
   @objc private func share(_ button: UIButton) {
     let root = FileManager.default.temporaryDirectory
-    let txt = root.appendingPathComponent("share-fixture.txt")
+    shareNumber += 1
+    let txt = root.appendingPathComponent("synthetic-share-\(shareNumber).txt")
     let epub = root.appendingPathComponent("share-fixture.epub")
-    try! Data("Offline TXT fixture".utf8).write(to: txt)
+    try! Data("Synthetic chapter \(shareNumber). Offline TXT fixture.".utf8).write(to: txt)
     // Intake fixture only; real EPUB parsing is a separate task.
     try! Data([0x50, 0x4b, 3, 4, 65]).write(to: epub)
     let items = button.tag == 2 ? [txt, epub] : [button.tag == 0 ? txt : epub]

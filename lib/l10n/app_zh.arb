@@ -628,5 +628,16 @@
   "imageExportStorageFailure": "图片写入失败，请检查可用空间与保存位置后重试。",
   "imageExportSourceUnavailable": "暂时无法读取原图，请确认图片已下载后重试。",
   "imageExportExists": "该位置已有同名文件，请重试并选择其他文件名。",
-  "imageExportUnavailable": "当前无法保存图片，请重试。"
+  "imageExportUnavailable": "当前无法保存图片，请重试。",
+  "importPendingCount": "{count} 个文件待导入",
+  "@importPendingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importInboxFull": "收件箱已满（64 个文件 / 512 MiB）。请先在 Shiori 导入或放弃部分待处理文件，再重新分享。",
+  "importPublicationUncertain": "文件可能已收下。请先在 Shiori 检查待导入文件，再决定是否重新分享。",
+  "importLater": "稍后"
 }

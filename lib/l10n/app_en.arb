@@ -628,5 +628,16 @@
   "imageExportStorageFailure": "Could not write the image. Check available space and the save location, then retry.",
   "imageExportSourceUnavailable": "The original image is unavailable. Check that it is downloaded, then retry.",
   "imageExportExists": "A file already exists at this location. Please choose a different name.",
-  "imageExportUnavailable": "Image saving is currently unavailable. Please try again."
+  "imageExportUnavailable": "Image saving is currently unavailable. Please try again.",
+  "importPendingCount": "{count, plural, =1{1 file awaiting import} other{{count} files awaiting import}}",
+  "@importPendingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importInboxFull": "The inbox is full (64 files / 512 MiB). Import or discard pending files in Shiori, then share again.",
+  "importPublicationUncertain": "Files may have been received. Check pending files in Shiori before sharing again.",
+  "importLater": "Later"
 }

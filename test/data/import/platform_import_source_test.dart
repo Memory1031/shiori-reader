@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
@@ -48,6 +49,52 @@ void main() {
       source.read(candidate).transform(utf8.decoder).join();
   Matcher problem(ImportProblem value) =>
       isA<ImportSourceException>().having((e) => e.problem, 'problem', value);
+
+  test('one resume scan retries transient native lock contention', () async {
+    final item = await receipt('new', 'new payload');
+    var attempts = 0;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'pending' && ++attempts == 1) {
+        throw PlatformException(code: 'busy');
+      }
+      return [item];
+    });
+    expect((await source.pending()).single.id, 'new');
+    expect(attempts, 2);
+  });
+
+  test('persistent lock contention ends after bounded retries', () async {
+    failure = 'busy';
+    await expectLater(source.pending(), throwsA(problem(ImportProblem.busy)));
+    expect(calls.where((call) => call.method == 'pending'), hasLength(7));
+  });
+
+  test(
+    'ack and newer scan cannot be overwritten by an older in-flight scan',
+    () async {
+      final a = await receipt('a', 'alpha');
+      final b = await receipt('b', 'beta');
+      final gate = Completer<Object?>();
+      var scans = 0;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        if (call.method == 'pending') {
+          return ++scans == 1 ? await gate.future : [b];
+        }
+        return null;
+      });
+      final first = source.pending();
+      final ack = source.acknowledge('a');
+      final second = source.pending();
+      gate.complete([a]);
+      final old = (await first).single;
+      await ack;
+      final current = (await second).single;
+      expect(calls.map((call) => call.method), ['pending', 'ack', 'pending']);
+      expect(await read(current), 'beta');
+      await expectLater(read(old), throwsA(problem(ImportProblem.unreadable)));
+    },
+  );
 
   test('null and empty list are empty inbox snapshots', () async {
     expect(await source.pending(), isEmpty);

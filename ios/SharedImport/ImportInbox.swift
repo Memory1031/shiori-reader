@@ -3,7 +3,7 @@ import Darwin
 import Foundation
 
 enum ImportIssue: String, Error {
-  case unreadable, tooLarge, batchLimit, unsupported, multiple, busy, storage, cancelled
+  case unreadable, tooLarge, batchLimit, unsupported, multiple, busy, storage, cancelled, inboxFull, publicationUncertain
 }
 
 struct ImportLimits {
@@ -37,8 +37,13 @@ final class ImportCancellation {
   }
 }
 
-/// One app-group batch. A session owns flock across all provider callbacks;
-/// only working -> pending publishes files. Call session methods serially.
+struct ImportReceiptSummary {
+  let names: [String]
+  let pendingCount: Int
+}
+
+/// Bounded app-group inbox. A session owns flock across all provider callbacks;
+/// working -> batches/batch-<sequence> publishes one immutable receive batch.
 final class ImportInbox {
   let root: URL
   let limits: ImportLimits
@@ -129,10 +134,10 @@ final class ImportInbox {
       let trash = root.appendingPathComponent("ack-trash-\(UUID().uuidString)")
       // Lookup by metadata only; caller ids never become paths.
       try rename(receipt.directory, trash)
-      let pending = root.appendingPathComponent("pending")
-      if try node(pending) != nil { try sync(pending, directory: true) }
+      let parent = receipt.directory.deletingLastPathComponent()
+      try sync(parent, directory: true)
       try sync(root, directory: true)
-      try removeEmptyPending()
+      try removeEmptyBatches()
       try? removeTemporary(trash)
     }
   }
@@ -143,12 +148,14 @@ final class ImportInbox {
     let lock = try acquire()
     do {
       try recover()
-      guard try inspect().isEmpty else { throw ImportIssue.busy }
+      let existing = try inspect()
+      guard existing.count + expectedCount <= limits.maxFiles else { throw ImportIssue.inboxFull }
       try cancellation.check()
       try fm.createDirectory(at: root.appendingPathComponent("working"),
                              withIntermediateDirectories: false)
       return Session(inbox: self, lock: lock, expectedCount: expectedCount,
-                     cancellation: cancellation)
+                     cancellation: cancellation, existingCount: existing.count,
+                     existingBytes: existing.reduce(0) { $0 + $1.size })
     } catch {
       lock.release()
       throw (error as? ImportIssue) ?? ImportIssue.storage
@@ -158,16 +165,21 @@ final class ImportInbox {
   func stage(_ urls: [URL], cancellation: ImportCancellation, progress: (Int64) -> Void) throws {
     try limits.checkCount(urls.count)
     // Validate every picker URL before working or any InputStream is created.
+    var declaredTotal: Int64 = 0
     for url in urls {
       try validate(url, name: url.lastPathComponent, cancellation: cancellation)
       let scoped = url.startAccessingSecurityScopedResource()
       defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-      if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-        Int64(size) > limits.maxFileBytes { throw ImportIssue.tooLarge }
+      if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+        guard Int64(size) <= limits.maxFileBytes else { throw ImportIssue.tooLarge }
+        declaredTotal += Int64(size)
+        guard declaredTotal <= limits.maxBatchBytes else { throw ImportIssue.batchLimit }
+      }
       try cancellation.check()
     }
     let session = try beginBatch(expectedCount: urls.count, cancellation: cancellation)
     defer { try? session.abort() }
+    try session.checkDeclaredBytes(declaredTotal)
     for url in urls { try session.append(url: url, progress: progress) }
     try session.commit()
   }
@@ -195,6 +207,8 @@ final class ImportInbox {
     private let lock: Lock
     private let expectedCount: Int
     private let cancellation: ImportCancellation
+    private let existingCount: Int
+    private let existingBytes: Int64
     private var nextOrder = 0
     private var total: Int64 = 0
     private var reported: Int64 = 0
@@ -202,11 +216,17 @@ final class ImportInbox {
     private var working: URL { inbox.root.appendingPathComponent("working") }
 
     fileprivate init(inbox: ImportInbox, lock: Lock, expectedCount: Int,
-                     cancellation: ImportCancellation) {
+                     cancellation: ImportCancellation, existingCount: Int, existingBytes: Int64) {
+      self.existingCount = existingCount
+      self.existingBytes = existingBytes
       self.inbox = inbox
       self.lock = lock
       self.expectedCount = expectedCount
       self.cancellation = cancellation
+    }
+    func checkDeclaredBytes(_ bytes: Int64) throws {
+      guard bytes <= inbox.limits.maxBatchBytes else { throw ImportIssue.batchLimit }
+      guard bytes <= inbox.limits.maxBatchBytes - existingBytes else { throw ImportIssue.inboxFull }
     }
     func append(url: URL, displayName: String? = nil, progress: (Int64) -> Void = { _ in }) throws {
       guard !finished else { throw ImportIssue.storage }
@@ -237,6 +257,10 @@ final class ImportInbox {
     }
     private func copy(_ url: URL, name: String, progress: (Int64) -> Void) throws {
       try cancellation.check()
+      if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+        guard Int64(size) <= inbox.limits.maxFileBytes else { throw ImportIssue.tooLarge }
+        try checkDeclaredBytes(total + Int64(size))
+      }
       let id = UUID().uuidString
       let dir = working.appendingPathComponent(String(format: "item-%04d-%@", nextOrder, id))
       try inbox.fm.createDirectory(at: dir, withIntermediateDirectories: false)
@@ -258,7 +282,7 @@ final class ImportInbox {
           size += Int64(n)
           total += Int64(n)
           guard size <= inbox.limits.maxFileBytes else { throw ImportIssue.tooLarge }
-          guard total <= inbox.limits.maxBatchBytes else { throw ImportIssue.batchLimit }
+          try checkDeclaredBytes(total)
           var offset = 0
           while offset < n {
             try cancellation.check()
@@ -282,12 +306,12 @@ final class ImportInbox {
       try inbox.sync(metadata)
       try inbox.sync(dir, directory: true)
     }
-    func commit() throws {
+    @discardableResult
+    func commit() throws -> ImportReceiptSummary {
       guard !finished else { throw ImportIssue.storage }
       do {
         try cancellation.check()
-        guard nextOrder == expectedCount, total <= inbox.limits.maxBatchBytes,
-          try inbox.node(inbox.root.appendingPathComponent("pending")) == nil
+        guard nextOrder == expectedCount, total <= inbox.limits.maxBatchBytes
         else { throw ImportIssue.storage }
         let receipts = try inbox.inspectBatch(working)
         guard receipts.count == expectedCount,
@@ -295,12 +319,19 @@ final class ImportInbox {
           receipts.reduce(Int64(0), { $0 + $1.size }) == total
         else { throw ImportIssue.storage }
         try inbox.sync(working, directory: true)
+        let destination = try inbox.reserveBatch()
         try cancellation.check()
-        try inbox.rename(working, inbox.root.appendingPathComponent("pending"))
-        // Publication wins even when the following directory sync fails.
+        try inbox.rename(working, destination)
+        // No read/stat after publication: feedback cannot turn a saved batch
+        // into a retryable receive failure. A failed durability sync is explicit.
         finished = true
         defer { lock.release() }
-        try inbox.sync(inbox.root, directory: true)
+        do {
+          try inbox.sync(destination.deletingLastPathComponent(), directory: true)
+          try inbox.sync(inbox.root, directory: true)
+        } catch { throw ImportIssue.publicationUncertain }
+        return ImportReceiptSummary(names: receipts.map { $0.name },
+                                    pendingCount: existingCount + expectedCount)
       } catch {
         try abort()
         throw (error as? ImportIssue) ?? ImportIssue.storage
@@ -317,16 +348,62 @@ final class ImportInbox {
     deinit { try? abort() }
   }
 
+  private var batches: URL { root.appendingPathComponent("batches") }
+
+  private func publishedBatches() throws -> [URL] {
+    guard try node(batches) != nil else { return [] }
+    let entries = try children(batches)
+    for url in entries {
+      guard url.lastPathComponent.range(of: "^batch-[0-9]{19}$", options: .regularExpression) != nil,
+        let sequence = Int64(url.lastPathComponent.dropFirst(6)), sequence > 0
+      else { throw ImportIssue.storage }
+      try requireDirectory(url)
+    }
+    return entries.sorted { $0.lastPathComponent < $1.lastPathComponent }
+  }
+  private func reserveBatch() throws -> URL {
+    if try node(batches) == nil {
+      try fm.createDirectory(at: batches, withIntermediateDirectories: false)
+    }
+    try requireDirectory(batches)
+    let counter = root.appendingPathComponent("sequence")
+    var last: Int64 = 0
+    if try node(counter) != nil {
+      guard (1...32).contains(try regularSize(counter)),
+        let value = Int64(try String(contentsOf: counter, encoding: .utf8)), value > 0
+      else { throw ImportIssue.storage }
+      last = value
+    }
+    let published = try publishedBatches()
+    let highest = published.last.flatMap { Int64($0.lastPathComponent.dropFirst(6)) } ?? 0
+    guard last >= highest, last < Int64.max else { throw ImportIssue.storage }
+    let next = last + 1
+    // Reserve durably before publication. Interrupted reservations leave gaps,
+    // never duplicate/reorder live batches, even across wall-clock changes.
+    let temporary = root.appendingPathComponent("sequence-working")
+    try Data(String(next).utf8).write(to: temporary)
+    try sync(temporary)
+    try rename(temporary, counter)
+    try sync(root, directory: true)
+    return batches.appendingPathComponent(String(format: "batch-%019lld", next))
+  }
   private func inspect() throws -> [Receipt] {
     let pending = root.appendingPathComponent("pending")
-    guard try node(pending) != nil else { return [] }
-    let entries = try children(pending)
-    if entries.contains(where: { ["receipt.json", "payload"].contains($0.lastPathComponent) }) {
-      let receipt = try readReceipt(pending, legacy: true)
-      guard receipt.size <= limits.maxBatchBytes else { throw ImportIssue.storage }
-      return [receipt]
+    var receipts: [Receipt] = []
+    if try node(pending) != nil {
+      let entries = try children(pending)
+      if entries.contains(where: { ["receipt.json", "payload"].contains($0.lastPathComponent) }) {
+        receipts = [try readReceipt(pending, legacy: true)]
+      } else {
+        receipts = try inspectBatch(pending)
+      }
     }
-    return try inspectBatch(pending)
+    for batch in try publishedBatches() { receipts += try inspectBatch(batch) }
+    guard receipts.count <= limits.maxFiles,
+      Set(receipts.map { $0.id }).count == receipts.count,
+      receipts.reduce(Int64(0), { $0 + $1.size }) <= limits.maxBatchBytes
+    else { throw ImportIssue.storage }
+    return receipts
   }
   private func inspectBatch(_ directory: URL) throws -> [Receipt] {
     let entries = try children(directory)
@@ -366,16 +443,20 @@ final class ImportInbox {
   }
   private func recover() throws {
     try removeTemporary(root.appendingPathComponent("working"))
+    try removeTemporary(root.appendingPathComponent("sequence-working"))
     for url in try children(root) where Self.trashName(url.lastPathComponent) {
       try? removeTemporary(url)
     }
-    try removeEmptyPending()
+    try removeEmptyBatches()
   }
-  private func removeEmptyPending() throws {
+  private func removeEmptyBatches() throws {
     let pending = root.appendingPathComponent("pending")
-    if try node(pending) != nil, try children(pending).isEmpty {
-      try fm.removeItem(at: pending)
-      try sync(root, directory: true)
+    var directories = try publishedBatches()
+    if try node(pending) != nil { directories.append(pending) }
+    for directory in directories where try children(directory).isEmpty {
+      // Called only under flock; another receive cannot publish in between.
+      try fm.removeItem(at: directory)
+      try sync(directory.deletingLastPathComponent(), directory: true)
     }
   }
   private static func itemName(_ name: String) -> Bool {
@@ -403,7 +484,7 @@ final class ImportInbox {
   }
   private func children(_ url: URL) throws -> [URL] {
     try requireDirectory(url)
-    return try fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+    return try fm.contentsOfDirectory(atPath: url.path).map { url.appendingPathComponent($0) }
   }
   private func regularSize(_ url: URL) throws -> Int64 {
     guard let info = try node(url), isType(info, mode_t(S_IFREG)),
@@ -413,7 +494,7 @@ final class ImportInbox {
   }
   private func removeTemporary(_ url: URL) throws {
     guard url.deletingLastPathComponent().path == root.path,
-      url.lastPathComponent == "working" || Self.trashName(url.lastPathComponent)
+      ["working", "sequence-working"].contains(url.lastPathComponent) || Self.trashName(url.lastPathComponent)
     else { throw ImportIssue.storage }
     try unlinkTree(url)
   }

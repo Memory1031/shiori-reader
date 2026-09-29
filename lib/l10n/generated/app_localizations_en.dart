@@ -1302,4 +1302,26 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get imageExportUnavailable =>
       'Image saving is currently unavailable. Please try again.';
+
+  @override
+  String importPendingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files awaiting import',
+      one: '1 file awaiting import',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get importInboxFull =>
+      'The inbox is full (64 files / 512 MiB). Import or discard pending files in Shiori, then share again.';
+
+  @override
+  String get importPublicationUncertain =>
+      'Files may have been received. Check pending files in Shiori before sharing again.';
+
+  @override
+  String get importLater => 'Later';
 }

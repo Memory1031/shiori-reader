@@ -1185,4 +1185,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get imageExportUnavailable => '当前无法保存图片，请重试。';
+
+  @override
+  String importPendingCount(int count) {
+    return '$count 个文件待导入';
+  }
+
+  @override
+  String get importInboxFull =>
+      '收件箱已满（64 个文件 / 512 MiB）。请先在 Shiori 导入或放弃部分待处理文件，再重新分享。';
+
+  @override
+  String get importPublicationUncertain =>
+      '文件可能已收下。请先在 Shiori 检查待导入文件，再决定是否重新分享。';
+
+  @override
+  String get importLater => '稍后';
 }
