@@ -220,3 +220,20 @@ const pageTurnCentreGrip = .5;
 /// the very edge would fold along the page border and read as a glitch.
 double pageTurnGrip(double y, double height) =>
     height <= 0 ? pageTurnCentreGrip : (y / height).clamp(.15, .85);
+
+/// One gesture owns one handle, even if its host replaces the candidate.
+/// Late updates/end/cancel therefore cannot act on a subsequent operation.
+class BoundaryPageDrag {
+  const BoundaryPageDrag({
+    required this.update,
+    required this.end,
+    required this.cancel,
+  });
+  final ValueChanged<double> update;
+  final ValueChanged<bool> end;
+  final VoidCallback cancel;
+}
+
+/// Velocity is normalized towards the operation's fixed target.
+bool pageTurnCommits(double progress, double velocity) =>
+    velocity > 600 || velocity >= -600 && progress > .28;

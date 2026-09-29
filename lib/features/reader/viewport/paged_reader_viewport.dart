@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show ValueListenable, listEquals;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../../domain/models/models.dart';
 import 'page_layout.dart';
@@ -22,6 +23,7 @@ class PagedReaderController {
   Future<void> previous({bool queueIfTurning = false}) =>
       _state?._turn(-1, queueIfTurning: queueIfTurning) ?? Future.value();
   int get measuredChunks => _state?._layout?.measuredChunks ?? 0;
+  int get layoutGeneration => _state?._epoch ?? 0;
   int get cachedPages => _state?._pages.length ?? 0;
   bool get usedFallback => _state?._usedFallback ?? false;
   bool get isRestoring => _state?._restoring ?? false;
@@ -47,6 +49,9 @@ class PagedReaderViewport extends StatefulWidget {
     this.onCenterTap,
     this.chromeVisible,
     this.onBoundary,
+    this.onBoundaryDrag,
+    this.onEdges,
+    this.inputEnabled = true,
     this.onTurning,
     this.onTurnVisual,
     this.pageSize,
@@ -80,6 +85,9 @@ class PagedReaderViewport extends StatefulWidget {
   /// While true, taps dismiss the reader chrome instead of turning pages.
   final ValueListenable<bool>? chromeVisible;
   final ValueChanged<int>? onBoundary;
+  final BoundaryPageDrag? Function(int direction, double grip)? onBoundaryDrag;
+  final void Function(bool first, bool last)? onEdges;
+  final bool inputEnabled;
   final ValueChanged<bool>? onTurning;
 
   /// Reports each frame of a turn so the host can paint the curl over the
@@ -114,6 +122,15 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     grip: _grip,
   );
   double _dragDistance = 0;
+  int? _dragDirection;
+  BoundaryPageDrag? _boundaryDrag;
+  bool _gestureAccepted = false;
+  bool get _acceptsDrag => widget.inputEnabled || _gestureAccepted;
+  double get _dragProgress =>
+      (-_dragDistance *
+              (_dragDirection ?? 1) /
+              (widget.pageSize?.width ?? _layout?.width ?? 360))
+          .clamp(0.0, 1.0);
   final _pages = <int, ReaderPage>{};
   // Only mounted illustration owners: reflow can move an image between
   // columns without releasing its lease and immediately requesting it again.
@@ -144,10 +161,25 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     _turnAnimation = AnimationController(
       vsync: this,
       duration: PaperTurnMotion.duration,
-    )..addListener(() => widget.onTurnVisual?.call(_frame));
+    )..addListener(_reportTurn);
     _attach();
     _position = widget.initialPosition;
     _anchorAtEnd = widget.startAtEnd;
+  }
+
+  bool _visualQueued = false;
+  void _reportTurn() {
+    if (WidgetsBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      if (_visualQueued) return;
+      _visualQueued = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _visualQueued = false;
+        if (mounted) widget.onTurnVisual?.call(_frame);
+      });
+    } else {
+      widget.onTurnVisual?.call(_frame);
+    }
   }
 
   void _attach() {
@@ -161,6 +193,11 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   void didUpdateWidget(PagedReaderViewport oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.content != widget.content) _imageKeys.clear();
+    if (oldWidget.onEdges == null && widget.onEdges != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _sample();
+      });
+    }
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller._state = null;
       _attach();
@@ -327,7 +364,12 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   }
 
   Future<void> _turn(int direction, {bool queueIfTurning = false}) async {
-    if (_layout == null || _restoring) return;
+    if (!widget.inputEnabled ||
+        _boundaryDrag != null ||
+        _layout == null ||
+        _restoring) {
+      return;
+    }
     if (_target != null) {
       if (queueIfTurning && _acceptsQueuedTurn) {
         // Repeated input coalesces; reversing intent drops the pending turn
@@ -354,38 +396,63 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   }
 
   void _dragUpdate(DragUpdateDetails details) {
-    if (_layout == null || _restoring || _turnAnimation.isAnimating) return;
-    _dragDistance += details.delta.dx;
-    final direction = _dragDistance < 0 ? 1 : -1;
-    if (_target == null) {
-      if (_page(_current + direction) == null) return;
-      setState(() {
-        _acceptsQueuedTurn = false;
-        _direction = direction;
-        _target = _current + direction;
-        _userScrolling = true;
-      });
-      widget.onTurning?.call(true);
+    if (!_gestureAccepted ||
+        _layout == null ||
+        _restoring ||
+        _turnAnimation.isAnimating) {
+      return;
     }
-    _turnAnimation.value =
-        (-_dragDistance *
-                _direction /
-                (widget.pageSize?.width ?? _layout!.width))
-            .clamp(0.0, 1.0);
+    _dragDistance += details.delta.dx;
+    _dragDirection ??= _dragDistance < 0 ? 1 : -1;
+    final direction = _dragDirection!;
+    if (_target == null && _boundaryDrag == null) {
+      if (_page(_current + direction) == null) {
+        _boundaryDrag = widget.onBoundaryDrag?.call(direction, _grip);
+      } else {
+        setState(() {
+          _acceptsQueuedTurn = false;
+          _direction = direction;
+          _target = _current + direction;
+          _userScrolling = true;
+        });
+        widget.onTurning?.call(true);
+      }
+    }
+    if (_boundaryDrag case final drag?) {
+      drag.update(_dragProgress);
+    } else if (_target != null) {
+      _turnAnimation.value = _dragProgress;
+    }
   }
 
   void _dragEnd(DragEndDetails details) {
-    if (_turnAnimation.isAnimating) return;
-    if (_target != null) {
-      final velocity = -(details.primaryVelocity ?? 0) * _direction;
-      _finish(velocity > 600 || velocity >= -600 && _turnAnimation.value > .28);
-    } else if (_dragDistance.abs() >= 48 &&
-        (_dragDistance.abs() >=
-                (widget.pageSize?.width ?? _layout?.width ?? 360) * .28 ||
-            (details.primaryVelocity ?? 0) * _dragDistance.sign > 600)) {
-      widget.onBoundary?.call(_dragDistance < 0 ? 1 : -1);
+    if (!_gestureAccepted || _turnAnimation.isAnimating) return;
+    _gestureAccepted = false;
+    final direction = _dragDirection;
+    final commit = pageTurnCommits(
+      _dragProgress,
+      -(details.primaryVelocity ?? 0) * (direction ?? 1),
+    );
+    if (_boundaryDrag case final drag?) {
+      _boundaryDrag = null;
+      drag.end(commit);
+    } else if (_target != null) {
+      _finish(commit);
+    } else if (direction != null && commit) {
+      widget.onBoundary?.call(direction);
     }
     _dragDistance = 0;
+    _dragDirection = null;
+  }
+
+  void _dragCancel() {
+    _gestureAccepted = false;
+    _dragDistance = 0;
+    _dragDirection = null;
+    final drag = _boundaryDrag;
+    _boundaryDrag = null;
+    drag?.cancel();
+    if (_target != null && !_turnAnimation.isAnimating) _finish(false);
   }
 
   void _sample() {
@@ -398,6 +465,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         : _layout!.position(page.start);
     widget.onPosition?.call(
       _position!,
+      page.end.unit >= _layout!.index.chunks.length,
+    );
+    widget.onEdges?.call(
+      PageBoundaries.compare(page.start, const PageCursor(0, 0)) == 0,
       page.end.unit >= _layout!.index.chunks.length,
     );
     _pages.removeWhere((key, _) => (key - number).abs() > 3);
@@ -426,7 +497,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         constraints.maxHeight,
         scaler,
         direction,
-        textStyle,
+        textStyle.copyWith(
+          color: Colors.black,
+          backgroundColor: Colors.transparent,
+        ),
         locale,
         heightBehavior,
         widget.content,
@@ -475,10 +549,12 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           _signature = signature;
         }
         _usedFallback = _layout!.index.resolve(_position).usedFallback;
+        final wasTurning = _target != null;
         _turnAnimation.stop(canceled: true);
         _turnAnimation.value = 0;
         _target = null;
         _userScrolling = false;
+        if (wasTurning) widget.onTurning?.call(false);
         _deferredLayout = false;
         _positionReset = false;
         _current = 0;
@@ -757,78 +833,90 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         container: true,
         onScrollLeft: () => _turn(1),
         onScrollRight: () => _turn(-1),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onHorizontalDragStart: (details) {
-            _queuedDirection = null;
-            _dragDistance = 0;
-            _grip = pageTurnGrip(
-              details.localPosition.dy,
-              constraints.maxHeight,
-            );
-          },
-          onHorizontalDragUpdate: _dragUpdate,
-          onHorizontalDragEnd: _dragEnd,
-          onHorizontalDragCancel: () {
-            _dragDistance = 0;
-            if (_target != null && !_turnAnimation.isAnimating) _finish(false);
-          },
-          onTapUp: (details) {
-            switch (readerTapZone(
-              details.localPosition.dx,
-              constraints.maxWidth,
-              chromeVisible: widget.chromeVisible?.value ?? false,
-            )) {
-              case ReaderTap.previous:
-                _turn(-1, queueIfTurning: true);
-              case ReaderTap.next:
-                _turn(1, queueIfTurning: true);
-              case ReaderTap.center:
-                _queuedDirection = null;
-                widget.onCenterTap?.call();
-            }
-          },
-          child: AnimatedBuilder(
-            animation: _turnAnimation,
-            builder: (context, _) {
-              final frame = _frame;
-              final paper = Theme.of(context).scaffoldBackgroundColor;
-              Widget slot(int number) => ExcludeSemantics(
-                key: ValueKey((widget.content.key, number)),
-                excluding: number != _current,
-                child: PageTurnSlot(
-                  frame: frame,
-                  role: number == _current
-                      ? PageTurnRole.leaving
-                      : PageTurnRole.entering,
-                  paper: paper,
-                  pageSize: widget.pageSize,
-                  contentOrigin: widget.contentOrigin,
-                  child: number == _current ? _lastReadyPage! : targetPage!,
-                ),
-              );
-              final target = _target;
-              final lower = target != null && frame.enteringOnTop
-                  ? _current
-                  : target;
-              final upper = target != null && frame.enteringOnTop
-                  ? target
-                  : _current;
-              return ClipRect(
-                clipper: _PageBoundsClip(widget.pageSize, widget.contentOrigin),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (lower != null) slot(lower),
-                    if (target != null)
-                      PageTurnShade(frame: frame, pageSize: widget.pageSize),
-                    slot(upper),
-                    if (widget.onTurnVisual == null)
-                      PageTurnOverlay(frame: frame, paper: paper),
-                  ],
-                ),
-              );
+        child: Listener(
+          // Flutter's accepted drag recognizer reports PointerCancel as end.
+          // This local listener only cancels our already owned gesture.
+          onPointerCancel: (_) => _dragCancel(),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragStart: !_acceptsDrag
+                ? null
+                : (details) {
+                    _gestureAccepted =
+                        widget.inputEnabled && !_turnAnimation.isAnimating;
+                    _queuedDirection = null;
+                    _dragDirection = null;
+                    _boundaryDrag = null;
+                    _dragDistance = 0;
+                    _grip = pageTurnGrip(
+                      details.localPosition.dy + widget.contentOrigin.dy,
+                      widget.pageSize?.height ?? constraints.maxHeight,
+                    );
+                  },
+            onHorizontalDragUpdate: _acceptsDrag ? _dragUpdate : null,
+            onHorizontalDragEnd: _acceptsDrag ? _dragEnd : null,
+            onHorizontalDragCancel: _acceptsDrag ? _dragCancel : null,
+            onTapUp: (details) {
+              if (!widget.inputEnabled) return;
+              switch (readerTapZone(
+                details.localPosition.dx,
+                constraints.maxWidth,
+                chromeVisible: widget.chromeVisible?.value ?? false,
+              )) {
+                case ReaderTap.previous:
+                  _turn(-1, queueIfTurning: true);
+                case ReaderTap.next:
+                  _turn(1, queueIfTurning: true);
+                case ReaderTap.center:
+                  _queuedDirection = null;
+                  widget.onCenterTap?.call();
+              }
             },
+            child: AnimatedBuilder(
+              animation: _turnAnimation,
+              builder: (context, _) {
+                final frame = _frame;
+                final paper = Theme.of(context).scaffoldBackgroundColor;
+                Widget slot(int number) => ExcludeSemantics(
+                  key: ValueKey((widget.content.key, number)),
+                  excluding: number != _current,
+                  child: PageTurnSlot(
+                    frame: frame,
+                    role: number == _current
+                        ? PageTurnRole.leaving
+                        : PageTurnRole.entering,
+                    paper: paper,
+                    pageSize: widget.pageSize,
+                    contentOrigin: widget.contentOrigin,
+                    child: number == _current ? _lastReadyPage! : targetPage!,
+                  ),
+                );
+                final target = _target;
+                final lower = target != null && frame.enteringOnTop
+                    ? _current
+                    : target;
+                final upper = target != null && frame.enteringOnTop
+                    ? target
+                    : _current;
+                return ClipRect(
+                  clipper: _PageBoundsClip(
+                    widget.pageSize,
+                    widget.contentOrigin,
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (lower != null) slot(lower),
+                      if (target != null)
+                        PageTurnShade(frame: frame, pageSize: widget.pageSize),
+                      slot(upper),
+                      if (widget.onTurnVisual == null)
+                        PageTurnOverlay(frame: frame, paper: paper),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ),
       );

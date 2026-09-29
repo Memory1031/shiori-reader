@@ -31,6 +31,7 @@ class ReaderController extends ScopedController {
   void activateProgress() {
     if (isClosed || _progressActive) return;
     _progressActive = true;
+    if (_sample case final sample?) onPosition?.call(sample.$1.blockIndex);
     unawaited(_openProgress());
   }
 
@@ -38,7 +39,7 @@ class ReaderController extends ScopedController {
   final ChapterKey chapter;
   final LibraryRepository? library;
   final CacheManagement? cache;
-  final ReadMode readMode;
+  ReadMode readMode;
   final String? initialBlockKey;
   final int? initialBlockOffset;
   final bool startAtBeginning;
@@ -117,7 +118,7 @@ class ReaderController extends ScopedController {
     finishRestoringProgress();
     hasPendingNavigation = false;
     _sample = (position, completed);
-    onPosition?.call(position.blockIndex);
+    if (_progressActive) onPosition?.call(position.blockIndex);
     progress?.sample(position, completed: completed);
   }
 

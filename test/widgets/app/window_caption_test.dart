@@ -164,8 +164,8 @@ void main() {
           expect(tester.state(find.byType(ReaderContentView)), same(oldState));
           expect(h.sent.skip(count), isEmpty);
         } else {
-          // The pending session loads a different paper; it cannot claim that
-          // appearance until BookReader commits it after layout/transition.
+          // A candidate shares the active layout preferences; changing the
+          // stored snapshot does not give a hidden page a new appearance.
           settings.value = ReaderSettings(
             paper: ReaderPaper.warm,
             controlsHintSeen: true,
@@ -176,7 +176,7 @@ void main() {
           await tester.pump();
           await tester.pump();
           final pages = tester.widgetList<ReaderContentView>(
-            find.byType(ReaderContentView),
+            find.byType(ReaderContentView, skipOffstage: false),
           );
           expect(pages.length, 2);
           expect(
@@ -193,6 +193,9 @@ void main() {
           );
           expect(current.content.key, repository.keys[1]);
           expect(current.appearanceActive, isTrue);
+          expect(h.sent.skip(count), isEmpty);
+          current.preferences!.update(settings.value);
+          await tester.pumpAndSettle();
           expect(h.sent.skip(count), [readerLook(settings.value)]);
         }
         await tester.pumpWidget(const SizedBox());

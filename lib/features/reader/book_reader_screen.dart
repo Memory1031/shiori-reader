@@ -10,6 +10,7 @@ import '../../shared/capabilities.dart';
 import '../../shared/widgets/state_views.dart';
 import '../novel_detail/catalog_controller.dart';
 import 'reader_controller.dart';
+import 'reader_preferences.dart';
 import 'position/position_resolver.dart';
 import 'reader_screen.dart';
 import 'viewport/page_turn.dart';
@@ -73,6 +74,127 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   StreamSubscription<NovelKey>? _invalidation;
   bool _invalidated = false;
   ReaderController? _pending;
+  _ChapterOperation? _operation;
+  late final ReaderPreferences _preferences;
+  Future<void>? _preferencesLoading;
+  Future<void> get _preferencesReady =>
+      _preferencesLoading ??= _preferences.load();
+  ReaderPanelHandle<Object?>? _activePanel;
+  bool _closingPanelForSwitch = false;
+  late final ImageRepository? _candidateImages;
+  ModalRoute<dynamic>? _route;
+  double _turnGrip = pageTurnCentreGrip;
+  ReaderController? _edgeSource;
+  bool _edgeFirst = false, _edgeLast = false;
+  int _lastDirection = 1;
+  Object? _warmAttempt;
+  bool _warmScheduled = false;
+  (ChapterKey, AppFailure)? _preparationFailure;
+  AppFailure? _rateLimit;
+
+  bool _canPrepare(ChapterKey chapter) {
+    final failed = _preparationFailure;
+    if (failed == null) return true;
+    final (key, failure) = failed;
+    return failure.kind == FailureKind.rateLimited ||
+        key != chapter ||
+        failure.retryPolicy != RetryPolicy.never;
+  }
+
+  // Source cooldown restricts network work, never access to cached chapters.
+  bool get _allowRemote {
+    if (widget.offline) return false;
+    final failure = _rateLimit;
+    return failure == null ||
+        failure.retryNotBefore != null &&
+            !DateTime.now().isBefore(failure.retryNotBefore!);
+  }
+
+  void _preparationBlocked() {
+    if (!mounted || _route?.isCurrent == false) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context).readerChapterLoadFailed),
+      ),
+    );
+  }
+
+  void _edges(ReaderController reader, bool first, bool last) {
+    if (reader != _reader) return;
+    _edgeSource = reader;
+    _edgeFirst = first;
+    _edgeLast = last;
+    _scheduleWarm();
+  }
+
+  void _scheduleWarm() {
+    if (_warmScheduled) return;
+    _warmScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _warmScheduled = false;
+      if (!mounted ||
+          _changing ||
+          _invalidated ||
+          _completion != null ||
+          _leavingInsets != null ||
+          _route?.isCurrent == false ||
+          _edgeSource != _reader ||
+          _reader.pagePresentation != null ||
+          _viewports[_reader]?.isRestoring == true ||
+          WidgetsBinding.instance.lifecycleState != null &&
+              WidgetsBinding.instance.lifecycleState !=
+                  AppLifecycleState.resumed) {
+        return;
+      }
+      final direction = _edgeFirst && _edgeLast
+          ? (_adjacent(_lastDirection) != null
+                ? _lastDirection
+                : -_lastDirection)
+          : (_edgeLast ? 1 : -1);
+      final chapter = _edgeFirst || _edgeLast ? _adjacent(direction) : null;
+      final stamp = (
+        _reader,
+        chapter,
+        direction,
+        _readingSequence().$1,
+        _viewports[_reader]?.layoutGeneration,
+      );
+      if (_warmAttempt == stamp) return;
+      _warmAttempt = stamp;
+      if (_operation?.intent != null &&
+          _operation!.intent != _ChapterIntent.none) {
+        return;
+      }
+      if (chapter == null) {
+        _cancelChapter(immediate: true);
+        return;
+      }
+      if (!_canPrepare(chapter)) return;
+      setState(() {
+        _prepare(
+          chapter,
+          direction: direction,
+          passive: true,
+          fromStart: direction > 0,
+          fromEnd: direction < 0,
+        );
+      });
+    });
+  }
+
+  bool get _visualTurn => _operation?.visible == true;
+  bool _valid(_ChapterOperation operation) =>
+      mounted &&
+      identical(_operation, operation) &&
+      identical(_reader, operation.source) &&
+      operation.source.content == operation.sourceContent &&
+      identical(_pending, operation.target) &&
+      operation.intent != _ChapterIntent.cancelling &&
+      !_invalidated &&
+      _leavingInsets == null &&
+      _route?.isCurrent != false &&
+      identical(operation.basis, _readingSequence().$1);
+
   late final AnimationController _chapterTurn;
   int _turnDirection = 1;
   bool _animateChapter = false;
@@ -303,9 +425,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       vsync: this,
       duration: PaperTurnMotion.duration,
     );
-    _displayImages = widget.offline && widget.images != null
-        ? _OfflineImages(widget.images!)
-        : widget.images;
+    _preferences = ReaderPreferences(widget.settings);
+    _candidateImages = widget.images == null
+        ? null
+        : _ReaderImages(widget.images!, cacheOnly: () => true);
+    _displayImages = widget.images == null
+        ? null
+        : _ReaderImages(widget.images!, cacheOnly: () => !_allowRemote);
     WidgetsBinding.instance.addObserver(this);
     _catalog =
         CatalogController(
@@ -330,7 +456,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (widget.repository case LocalBookInvalidation changes) {
       _invalidation = changes.invalidations.listen((key) {
         if (!mounted || key != widget.chapter.novelKey || _invalidated) return;
-        _chapterTurn.stop();
+        _cancelChapter(immediate: true);
         _reader.onDelete();
         _pending?.onDelete();
         // The failure page's contents would outlive the page behind it.
@@ -359,6 +485,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     bool fromStart = false,
     bool fromEnd = false,
     bool deferProgress = false,
+    bool passive = false,
   }) =>
       ReaderController(
           repository: widget.repository,
@@ -370,8 +497,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           deferProgress: deferProgress,
           library: widget.linkDepth > 0 ? null : widget.library,
           cache: _cache,
-          readMode: widget.offline ? ReadMode.cacheOnly : ReadMode.cacheFirst,
-          onPosition: widget.offline ? null : _cache?.prefetch?.position,
+          readMode: !_allowRemote || passive
+              ? ReadMode.cacheOnly
+              : ReadMode.cacheFirst,
+          onPosition: widget.offline
+              ? null
+              : (position) {
+                  if (_allowRemote) _cache?.prefetch?.position(position);
+                },
         )
         ..onStart()
         ..addListener(_changed);
@@ -388,11 +521,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (pending != null &&
         (pending.status == ReaderStatus.error ||
             pending.status == ReaderStatus.cancelled)) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _rejectPending(pending),
-      );
+      final attempt = pending.restoreAttempt;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (pending.restoreAttempt == attempt) _rejectPending(pending);
+      });
     }
-    if (!widget.offline && _reader.content != null) {
+    if (_allowRemote && _reader.content != null) {
       unawaited(
         _cache?.prefetch?.enter(_reader.content!, _catalog.loaded?.value),
       );
@@ -428,7 +562,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _contentsPanel = null;
     _restoreSystemUi();
     _invalidation?.cancel();
+    _operation?.deadline?.cancel();
     _chapterTurn.dispose();
+    _preferences.dispose();
     _titleRequest.cancel();
     if (!widget.offline) _cache?.prefetch?.leave();
     WidgetsBinding.instance.removeObserver(this);
@@ -448,14 +584,20 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   // The active ReaderContentView flushes its own session on lifecycle changes.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _cancelChapter(immediate: true);
     if (!widget.offline) {
       _cache?.prefetch?.active(state == AppLifecycleState.resumed);
     }
   }
 
-  Future<bool> _save() async {
-    await _reader.flushProgress();
-    if (!mounted) return false;
+  Future<bool> _save([_ChapterOperation? operation]) async {
+    final reader = _reader;
+    await reader.flushProgress();
+    if (!mounted ||
+        reader != _reader ||
+        operation != null && !_valid(operation)) {
+      return false;
+    }
     if (_reader.progress?.unsaved == true || _reader.progressFailure != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -466,10 +608,164 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           ),
         ),
       );
-      return _reader.progress == null;
+      // Existing read-only/error exits remain possible without a tracker;
+      // a new chapter must never take over through a failed save gate.
+      return operation == null && _reader.progress == null;
     }
     return true;
   }
+
+  ChapterKey? _adjacent(int direction) {
+    if (widget.linkDepth > 0) return null;
+    final (order, positions) = _readingSequence();
+    final index = positions[_reader.chapter];
+    if (index == null ||
+        index + direction < 0 ||
+        index + direction >= order.length) {
+      return null;
+    }
+    return order[index + direction];
+  }
+
+  _ChapterOperation _prepare(
+    ChapterKey chapter, {
+    required int direction,
+    bool passive = false,
+    String? blockKey,
+    int? blockOffset,
+    bool fromStart = false,
+    bool fromEnd = false,
+  }) {
+    final existing = _operation;
+    if (existing != null &&
+        _valid(existing) &&
+        existing.intent == _ChapterIntent.none &&
+        existing.target.chapter == chapter &&
+        existing.target.initialBlockKey == blockKey &&
+        existing.target.initialBlockOffset == blockOffset &&
+        existing.target.startAtBeginning == fromStart &&
+        existing.target.startAtEnd == fromEnd) {
+      if (!passive && existing.passive) {
+        existing.passive = false;
+        _armDeadline(existing);
+        existing.target.readMode = !_allowRemote
+            ? ReadMode.cacheOnly
+            : ReadMode.cacheFirst;
+        if (existing.target.status != ReaderStatus.ready) {
+          existing.ready = false;
+          // A passive cache miss is absence of prepared data, not a failed
+          // foreground request subject to a non-retryable Source policy.
+          if (existing.target.failure?.context == FailureContext.cacheMiss) {
+            existing.target.failure = null;
+          }
+          unawaited(existing.target.load());
+        }
+      }
+      return existing;
+    }
+    _cancelChapter(immediate: true);
+    final target = _create(
+      chapter,
+      deferProgress: true,
+      passive: passive,
+      blockKey: blockKey,
+      blockOffset: blockOffset,
+      fromStart: fromStart,
+      fromEnd: fromEnd,
+    );
+    final operation = _ChapterOperation(
+      _reader,
+      target,
+      direction,
+      passive: passive,
+      basis: _readingSequence().$1,
+    );
+    _operation = operation;
+    _pending = target;
+    _armDeadline(operation);
+    return operation;
+  }
+
+  void _armDeadline(_ChapterOperation operation) {
+    operation.deadline?.cancel();
+    if (operation.ready) return;
+    // Also bounds layout preparation, including platform readiness callbacks.
+    operation.deadline = Timer(const Duration(seconds: 45), () {
+      if (!_valid(operation) || operation.ready) return;
+      _rejectPending(operation.target, timedOut: true);
+    });
+  }
+
+  BoundaryPageDrag? _beginChapterDrag(int direction, double grip) {
+    if (_changing ||
+        _invalidated ||
+        _completion != null ||
+        _route?.isCurrent == false) {
+      return null;
+    }
+    final chapter = _adjacent(direction);
+    if (chapter == null) return null;
+    if (!_canPrepare(chapter)) {
+      return BoundaryPageDrag(
+        update: (_) {},
+        cancel: () {},
+        end: (commit) {
+          if (commit) _preparationBlocked();
+        },
+      );
+    }
+    _lastDirection = direction;
+    // Cancelling this explicit attempt must not immediately recreate the same
+    // boundary candidate just because the host rebuilt.
+    _warmAttempt = (
+      _reader,
+      chapter,
+      direction,
+      _readingSequence().$1,
+      _viewports[_reader]?.layoutGeneration,
+    );
+    final operation = _prepare(
+      chapter,
+      direction: direction,
+      fromStart: direction > 0,
+      fromEnd: direction < 0,
+    );
+    setState(() {
+      _changing = true;
+      _animateChapter = true;
+      _turnDirection = direction;
+      _turnGrip = grip;
+      operation.engaged = true;
+      operation.intent = _ChapterIntent.dragging;
+      operation.visible = operation.ready && _nativePair(operation);
+    });
+    return BoundaryPageDrag(
+      update: (progress) {
+        if (!_valid(operation) || operation.intent != _ChapterIntent.dragging) {
+          return;
+        }
+        operation.progress = progress;
+        if (operation.visible) _chapterTurn.value = progress;
+      },
+      end: (commit) {
+        if (!_valid(operation) || operation.intent != _ChapterIntent.dragging) {
+          return;
+        }
+        if (commit) {
+          unawaited(_confirmChapter(operation));
+        } else {
+          unawaited(_cancelChapter());
+        }
+      },
+      cancel: () {
+        if (identical(_operation, operation)) unawaited(_cancelChapter());
+      },
+    );
+  }
+
+  bool _nativePair(_ChapterOperation operation) =>
+      operation.source.pagePresentation == null &&
+      operation.target.pagePresentation == null;
 
   Future<void> _switch(
     ChapterKey chapter, {
@@ -478,7 +774,20 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     bool fromStart = false,
     bool fromEnd = false,
   }) async {
+    if (_closingPanelForSwitch) return;
+    if (_route?.isCurrent == false) {
+      final panel = _activePanel;
+      if (panel == null || !panel.isValid || !panel.route.isCurrent) return;
+      final source = _reader;
+      _closingPanelForSwitch = true;
+      panel.dismiss();
+      WidgetsBinding.instance.scheduleFrame();
+      await panel.completed;
+      _closingPanelForSwitch = false;
+      if (!mounted || _reader != source || _route?.isCurrent == false) return;
+    }
     if (_changing ||
+        _invalidated ||
         chapter == _reader.chapter &&
             blockKey == null &&
             !fromStart &&
@@ -486,90 +795,262 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         chapter.novelKey != widget.chapter.novelKey) {
       return;
     }
-    _animateChapter = fromStart || fromEnd;
-    // Entry position is independent of turn direction: a contents link to an
-    // earlier chapter still opens its start/fragment, not its final page.
+    if (!_canPrepare(chapter)) {
+      _preparationBlocked();
+      return;
+    }
     final (_, positions) = _readingSequence();
-    final currentIndex = positions[_reader.chapter];
-    final targetIndex = positions[chapter];
-    _turnDirection =
+    final currentIndex = positions[_reader.chapter],
+        targetIndex = positions[chapter];
+    final direction =
         currentIndex != null &&
             targetIndex != null &&
             currentIndex != targetIndex
         ? (targetIndex > currentIndex ? 1 : -1)
         : (fromEnd ? -1 : 1);
-    setState(() => _changing = true);
-    if (!await _save()) {
-      if (mounted) setState(() => _changing = false);
+    final operation = _prepare(
+      chapter,
+      direction: direction,
+      blockKey: blockKey,
+      blockOffset: blockOffset,
+      fromStart: fromStart,
+      fromEnd: fromEnd,
+    );
+    _animateChapter = fromStart || fromEnd;
+    _turnDirection = direction;
+    _turnGrip = pageTurnCentreGrip;
+    await _confirmChapter(operation);
+  }
+
+  Future<void> _confirmChapter(_ChapterOperation operation) async {
+    if (!_valid(operation) ||
+        operation.intent == _ChapterIntent.confirmed ||
+        operation.intent == _ChapterIntent.settling) {
       return;
     }
-    if (!mounted) return;
     setState(() {
-      _pending = _create(
-        chapter,
-        deferProgress: true,
-        blockKey: blockKey,
-        blockOffset: blockOffset,
-        fromStart: fromStart,
-        fromEnd: fromEnd,
-      );
+      operation.engaged = true;
+      operation.intent = _ChapterIntent.confirmed;
+      _changing = true;
+    });
+    if (operation.target.status == ReaderStatus.error ||
+        operation.target.status == ReaderStatus.cancelled) {
+      _rejectPending(operation.target);
+      return;
+    }
+    final saved = await _save(operation);
+    if (!_valid(operation)) return;
+    if (!saved) {
+      await _cancelChapter();
+      return;
+    }
+    operation.saved = true;
+    await _commitPending(operation.target);
+  }
+
+  void _targetReady(ReaderController reader) {
+    final operation = _operation;
+    if (operation == null || !_valid(operation) || operation.target != reader) {
+      return;
+    }
+    setState(() {
+      operation.ready = true;
+      operation.readyContent = reader.content;
+      operation.readyLayout = _viewports[reader]?.layoutGeneration;
+      operation.deadline?.cancel();
+      if (operation.intent == _ChapterIntent.dragging &&
+          _nativePair(operation)) {
+        operation.visible = true;
+        _chapterTurn.value = operation.progress;
+      }
+    });
+    unawaited(_commitPending(reader));
+  }
+
+  // Called during layout. Invalidate synchronously; defer mutations of the
+  // widget tree until the frame is finished. No old ready can pass the gate.
+  void _layoutInvalidated(ReaderController reader) {
+    final operation = _operation;
+    if (operation == null) return;
+    if (reader == operation.target) operation.ready = false;
+    if (!operation.visible && reader != operation.source) return;
+    // A source geometry change invalidates its boundary/width even while
+    // waiting for an unready target. Candidate-only initial layout may proceed.
+    operation.intent = _ChapterIntent.cancelling;
+    _chapterTurn.stop(canceled: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && identical(_operation, operation)) {
+        _cancelChapter(immediate: true);
+      }
     });
   }
 
   Future<void> _commitPending(ReaderController reader) async {
-    if (!mounted || _pending != reader || _committing) return;
-    _committing = true;
-    if (_animateChapter &&
-        _turnStyle != PageTurnStyle.none &&
-        !MediaQuery.disableAnimationsOf(context)) {
-      try {
-        await PaperTurnMotion.settle(_chapterTurn, curve: _chapterFrame.curve);
-      } on TickerCanceled {
-        return;
-      }
+    final operation = _operation;
+    if (operation == null ||
+        !_valid(operation) ||
+        operation.target != reader ||
+        operation.intent != _ChapterIntent.confirmed ||
+        !operation.ready ||
+        !operation.saved ||
+        operation.readyContent != reader.content ||
+        operation.readyLayout != _viewports[reader]?.layoutGeneration ||
+        _viewports[reader]?.isRestoring == true ||
+        _committing) {
+      return;
     }
-    if (!mounted || _pending != reader) return;
+    setState(() {
+      _committing = true;
+      operation.intent = _ChapterIntent.settling;
+      operation.visible = true;
+    });
+    try {
+      await PaperTurnMotion.settle(
+        _chapterTurn,
+        curve: _chapterFrame.curve,
+        reduced:
+            !_animateChapter ||
+            _turnStyle == PageTurnStyle.none ||
+            MediaQuery.disableAnimationsOf(context),
+      );
+    } on TickerCanceled {
+      if (identical(_operation, operation) &&
+          operation.intent != _ChapterIntent.cancelling) {
+        await _cancelChapter(immediate: true);
+      }
+      return;
+    }
+    if (!_valid(operation) ||
+        !operation.ready ||
+        operation.readyContent != reader.content ||
+        operation.readyLayout != _viewports[reader]?.layoutGeneration ||
+        _viewports[reader]?.isRestoring == true) {
+      if (identical(_operation, operation) &&
+          operation.intent != _ChapterIntent.cancelling) {
+        await _cancelChapter(immediate: true);
+      }
+      return;
+    }
+    operation.deadline?.cancel();
     final previous = _reader;
     setState(() {
       _reader = reader;
       _completion = null;
       _pending = null;
+      _operation = null;
       _committing = false;
       _chapterTurn.value = 0;
       _changing = false;
     });
     _close(previous);
+    if (_allowRemote && reader.content != null) {
+      unawaited(
+        _cache?.prefetch?.enter(reader.content!, _catalog.loaded?.value),
+      );
+    }
     reader.activateProgress();
   }
 
-  void _rejectPending(ReaderController reader) {
-    if (!mounted || _pending != reader) return;
+  Future<void> _cancelChapter({bool immediate = false}) {
+    final operation = _operation;
+    if (!mounted || operation == null) return Future.value();
+    // Repeated input shares the current rebound. Lifecycle cancellation may
+    // supersede it; an interrupted animation must never clean up its successor.
+    if (!immediate && operation.cancellation != null) {
+      return operation.cancellation!;
+    }
+    final phase = ++operation.cancelPhase;
+    return operation.cancellation = _cancelOperation(
+      operation,
+      phase,
+      immediate,
+    );
+  }
+
+  Future<void> _cancelOperation(
+    _ChapterOperation operation,
+    int phase,
+    bool immediate,
+  ) async {
+    setState(() => operation.intent = _ChapterIntent.cancelling);
+    operation.deadline?.cancel();
     _chapterTurn.stop(canceled: true);
-    _chapterTurn.value = 0;
-    _committing = false;
-    final target = reader.chapter;
-    final blockKey = reader.initialBlockKey;
-    final blockOffset = reader.initialBlockOffset;
-    final fromStart = reader.startAtBeginning, fromEnd = reader.startAtEnd;
+    if (!immediate && operation.visible && mounted) {
+      try {
+        await PaperTurnMotion.settle(
+          _chapterTurn,
+          target: 0,
+          curve: _chapterFrame.curve,
+          reduced:
+              _turnStyle == PageTurnStyle.none ||
+              MediaQuery.disableAnimationsOf(context),
+        );
+      } on TickerCanceled {
+        // The newer cancellation owns cleanup below.
+      }
+    }
+    if (!mounted ||
+        !identical(_operation, operation) ||
+        operation.cancelPhase != phase) {
+      return;
+    }
     setState(() {
+      _operation = null;
       _pending = null;
-      _changing = false;
+      if (operation.engaged) _changing = false;
+      _committing = false;
+      _chapterTurn.value = 0;
     });
-    _close(reader);
+    _close(operation.target);
+  }
+
+  void _rejectPending(ReaderController reader, {bool timedOut = false}) {
+    final operation = _operation;
+    if (operation == null || !_valid(operation) || operation.target != reader) {
+      return;
+    }
+    if (reader.failure case final failure?
+        when failure.context != FailureContext.cacheMiss &&
+            !failure.isCancellation) {
+      _preparationFailure = (reader.chapter, failure);
+      if (failure.kind == FailureKind.rateLimited) _rateLimit = failure;
+    }
+    if (operation.intent == _ChapterIntent.none ||
+        operation.intent == _ChapterIntent.dragging) {
+      operation.ready = false;
+      operation.deadline?.cancel();
+      if (timedOut) unawaited(_cancelChapter(immediate: true));
+      return;
+    }
+    final target = reader.chapter;
+    final blockKey = reader.initialBlockKey,
+        blockOffset = reader.initialBlockOffset;
+    final fromStart = reader.startAtBeginning, fromEnd = reader.startAtEnd;
+    final failure = reader.failure;
+    unawaited(_cancelChapter());
     final l = AppLocalizations.of(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(l.readerChapterLoadFailed),
-        action: SnackBarAction(
-          label: l.retryAction,
-          onPressed: () => _switch(
-            target,
-            blockKey: blockKey,
-            blockOffset: blockOffset,
-            fromStart: fromStart,
-            fromEnd: fromEnd,
-          ),
-        ),
+        action: failure?.retryPolicy == RetryPolicy.never
+            ? null
+            : SnackBarAction(
+                label: l.retryAction,
+                onPressed: () {
+                  if (failure?.kind == FailureKind.rateLimited &&
+                      (failure?.retryNotBefore == null ||
+                          DateTime.now().isBefore(failure!.retryNotBefore!))) {
+                    return;
+                  }
+                  _switch(
+                    target,
+                    blockKey: blockKey,
+                    blockOffset: blockOffset,
+                    fromStart: fromStart,
+                    fromEnd: fromEnd,
+                  );
+                },
+              ),
       ),
     );
   }
@@ -608,6 +1089,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   Future<void> _exit({bool toShelf = false}) async {
+    if (_operation case final operation?) {
+      final wasInteraction = operation.engaged;
+      await _cancelChapter(immediate: true);
+      if (wasInteraction) return;
+    }
     if (_changing || _canPop) return;
     setState(() => _changing = true);
     final saved = await _save();
@@ -1009,6 +1495,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             ? _bookStatus
             : reader.novelStatus,
       );
+      _cancelChapter(immediate: true);
       setState(() => _completion = state);
       reader.enterBookEnd(state);
       unawaited(reader.flushProgress());
@@ -1048,7 +1535,19 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       content: reader.content!,
       completion: reader == _reader ? _completion : null,
       actions: actions,
-      onReady: () => _commitPending(reader),
+      onReady: () => _targetReady(reader),
+      onCancelChapter: active && _changing && _operation != null
+          ? () => _cancelChapter()
+          : null,
+      onPanelChanged: (panel) {
+        if (reader == _reader) _activePanel = panel;
+      },
+      onLayoutInvalidated: () => _layoutInvalidated(reader),
+      onBoundaryDrag: active ? _beginChapterDrag : null,
+      onEdges: active ? (first, last) => _edges(reader, first, last) : null,
+      crossChapterTurning: _visualTurn,
+      preferences: _preferences,
+      preferencesReady: _preferencesReady,
       onPageAppearance: (paper, turn) {
         if (reader == _reader) {
           _paper = paper;
@@ -1058,7 +1557,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       onLoadFailure: () => _rejectPending(reader),
       runningTitle: _runningTitle(reader),
       chapterTitle: _chapterTitle(reader),
-      images: _displayImages,
+      images: reader == _pending && _operation?.passive == true
+          ? _candidateImages
+          : _displayImages,
       settings: widget.settings,
       session: reader,
       viewportController: _viewports.putIfAbsent(
@@ -1078,23 +1579,32 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     style: _turnStyle,
     progress: _chapterTurn.value,
     direction: _turnDirection,
+    grip: _turnGrip,
   );
 
   Widget _pageLayer(ReaderController reader, {required bool active}) =>
       Positioned.fill(
         key: ValueKey(reader),
         child: IgnorePointer(
-          ignoring: !active || _changing,
+          ignoring:
+              !active ||
+              _changing && _operation?.intent != _ChapterIntent.dragging,
           child: AnimatedBuilder(
             animation: _chapterTurn,
             child: ExcludeSemantics(
               excluding: !active,
-              child: _view(reader, active: active),
+              child: ExcludeFocus(
+                excluding: !active,
+                child: _view(reader, active: active),
+              ),
             ),
-            builder: (context, child) => PageTurnSlot(
-              frame: _chapterFrame,
-              role: active ? PageTurnRole.leaving : PageTurnRole.entering,
-              child: child!,
+            builder: (context, child) => Offstage(
+              offstage: !active && !_visualTurn,
+              child: PageTurnSlot(
+                frame: _chapterFrame,
+                role: active ? PageTurnRole.leaving : PageTurnRole.entering,
+                child: child!,
+              ),
             ),
           ),
         ),
@@ -1104,7 +1614,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   /// paint order for the current style.
   List<Widget> _chapterLayers() {
     final pending = _pending;
-    final ready = pending != null && pending.status == ReaderStatus.ready;
+    final ready =
+        pending != null &&
+        pending.status == ReaderStatus.ready &&
+        (pending.pagePresentation == null ||
+            _operation?.intent == _ChapterIntent.confirmed ||
+            _operation?.intent == _ChapterIntent.settling);
     final leaving = _pageLayer(_reader, active: true);
     if (!ready) return [leaving];
     final entering = _pageLayer(pending, active: false);
@@ -1124,6 +1639,26 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       WindowCaptionScope.appDefault(child: _buildPage(context));
 
   Widget _buildPage(BuildContext context) {
+    _route = ModalRoute.of(context);
+    _scheduleWarm();
+    if (_operation case final operation?
+        when !identical(operation.basis, _readingSequence().$1)) {
+      operation.intent = _ChapterIntent.cancelling;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && identical(_operation, operation)) {
+          _cancelChapter(immediate: true);
+        }
+      });
+    }
+    if (_route?.isCurrent == false && _operation != null) {
+      final operation = _operation!;
+      operation.intent = _ChapterIntent.cancelling;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && identical(_operation, operation)) {
+          _cancelChapter(immediate: true);
+        }
+      });
+    }
     if (_invalidated) {
       return Scaffold(
         appBar: AppBar(),
@@ -1143,6 +1678,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           canPop: _backLeaves(context, chromeVisible),
           onPopInvokedWithResult: (didPop, _) {
             if (didPop) {
+              _cancelChapter(immediate: true);
               _beginLeaving();
               unawaited(_flushAfterPop());
             } else if (chromeVisible && _backClosesChrome(context)) {
@@ -1165,6 +1701,44 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                           PageTurnOverlay(frame: _chapterFrame, paper: _paper),
                     ),
                   ),
+                  if (_operation?.intent == _ChapterIntent.confirmed)
+                    Positioned(
+                      left: 24,
+                      right: 24,
+                      bottom: 32,
+                      child: SafeArea(
+                        child: Material(
+                          elevation: 4,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: Icon(Icons.hourglass_top, size: 20),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    AppLocalizations.of(context).loading,
+                                  ),
+                                ),
+                                TextButton(
+                                  key: const ValueKey('cancel-chapter-turn'),
+                                  onPressed: () => _cancelChapter(),
+                                  child: Text(
+                                    MaterialLocalizations.of(
+                                      context,
+                                    ).cancelButtonLabel,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               )
             : Scaffold(
@@ -1223,13 +1797,45 @@ class _FrozenInsets extends StatelessWidget {
   }
 }
 
-class _OfflineImages implements ImageRepository {
-  _OfflineImages(this.inner);
+class _ReaderImages implements ImageRepository {
+  _ReaderImages(this.inner, {required this.cacheOnly});
   final ImageRepository inner;
+  final bool Function() cacheOnly;
   @override
   Future<Result<LoadResult<MediaLease>>> load(
     MediaRef ref, {
     required ReadMode mode,
     required CancellationToken cancellation,
-  }) => inner.load(ref, mode: ReadMode.cacheOnly, cancellation: cancellation);
+  }) => inner.load(
+    ref,
+    mode: cacheOnly() ? ReadMode.cacheOnly : mode,
+    cancellation: cancellation,
+  );
+}
+
+enum _ChapterIntent { none, dragging, confirmed, cancelling, settling }
+
+/// Identity is the operation token; every async continuation checks it.
+class _ChapterOperation {
+  _ChapterOperation(
+    this.source,
+    this.target,
+    this.direction, {
+    required this.passive,
+    required this.basis,
+  }) : sourceContent = source.content;
+  final ReaderController source, target;
+  final ChapterContent? sourceContent;
+  ChapterContent? readyContent;
+  int? readyLayout;
+  final int direction;
+  final List<ChapterKey> basis;
+  bool passive;
+  bool engaged = false;
+  bool ready = false, saved = false, visible = false;
+  double progress = 0;
+  _ChapterIntent intent = _ChapterIntent.none;
+  Timer? deadline;
+  Future<void>? cancellation;
+  int cancelPhase = 0;
 }

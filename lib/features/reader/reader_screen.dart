@@ -45,6 +45,14 @@ class ReaderContentView extends StatefulWidget {
     this.runningTitle,
     this.chapterTitle,
     this.onReady,
+    this.onLayoutInvalidated,
+    this.onPanelChanged,
+    this.onCancelChapter,
+    this.onBoundaryDrag,
+    this.onEdges,
+    this.crossChapterTurning = false,
+    this.preferences,
+    this.preferencesReady,
     this.onLoadFailure,
     this.onPageAppearance,
     this.images,
@@ -64,7 +72,16 @@ class ReaderContentView extends StatefulWidget {
   final ChapterContent content;
   final String? runningTitle;
   final String? chapterTitle;
-  final VoidCallback? onReady, onLoadFailure;
+  final VoidCallback? onReady,
+      onLoadFailure,
+      onLayoutInvalidated,
+      onCancelChapter;
+  final BoundaryPageDrag? Function(int direction, double grip)? onBoundaryDrag;
+  final void Function(bool first, bool last)? onEdges;
+  final bool crossChapterTurning;
+  final ValueChanged<ReaderPanelHandle<Object?>?>? onPanelChanged;
+  final ReaderPreferences? preferences;
+  final Future<void>? preferencesReady;
 
   /// Paper colour and page-turn style, so the host can match chapter and
   /// completion transitions to the page.
@@ -114,7 +131,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _preferences = ReaderPreferences(widget.settings)..addListener(_changed);
+    _preferences = widget.preferences ?? ReaderPreferences(widget.settings);
+    _settings = _preferences.value;
+    _preferences.addListener(_changed);
     _position = widget.initialPosition;
     unawaited(_loadPreferences());
   }
@@ -122,6 +141,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void didUpdateWidget(ReaderContentView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.crossChapterTurning && !widget.crossChapterTurning) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applySizes());
+    }
     if (widget.active == oldWidget.active) return;
     if (widget.active) {
       _claimFocus();
@@ -156,16 +178,17 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   Future<void> _loadPreferences() async {
-    await _preferences.load();
+    await (widget.preferencesReady ?? _preferences.load());
     if (!mounted) return;
     setState(() {
       _settingsReady = true;
-      _hintVisible = !_settings.controlsHintSeen;
-      _chrome.value = _hintVisible;
+      _settings = _preferences.value;
+      _hintVisible = widget.active && !_settings.controlsHintSeen;
+      if (widget.active) _chrome.value = _hintVisible;
     });
-    if (widget.session?.usedFallback == true) {
+    if (widget.active && widget.session?.usedFallback == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
+        if (!mounted || !widget.active) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.of(context).readerRestoreNearby),
@@ -227,9 +250,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
       builder: builder,
     );
     _panel = panel;
+    widget.onPanelChanged?.call(panel);
     unawaited(
       panel.closed.then((_) {
-        if (identical(_panel, panel)) _panel = null;
+        if (identical(_panel, panel)) {
+          _panel = null;
+          widget.onPanelChanged?.call(null);
+        }
       }),
     );
     return panel;
@@ -338,6 +365,14 @@ class _ReaderContentViewState extends State<ReaderContentView>
       _lastPageVisible ? 1 : _displayChapterFraction;
   Timer? _positionLabelTimer;
   bool _announcedReady = false;
+  int _layoutEpoch = 0;
+  void _layoutInvalidated() {
+    _layoutEpoch++;
+    _announcedReady = false;
+    widget.session?.restoringProgress();
+    widget.onLayoutInvalidated?.call();
+  }
+
   void _sample(ReaderPosition position, bool completed) {
     widget.session?.finishRestoringProgress();
     if ((widget.completion != null || _completionTurning) &&
@@ -346,8 +381,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
     if (!_announcedReady) {
       _announcedReady = true;
+      final epoch = _layoutEpoch;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) widget.onReady?.call();
+        if (mounted && epoch == _layoutEpoch) widget.onReady?.call();
       });
       WidgetsBinding.instance.scheduleFrame();
     }
@@ -390,14 +426,20 @@ class _ReaderContentViewState extends State<ReaderContentView>
   final _sizes = <MediaRef, Size>{};
   final _pendingSizes = <MediaRef, Size>{};
   bool _dragging = false;
+  bool get _layoutFrozen => _dragging || widget.crossChapterTurning;
   void _dimensions(MediaRef ref, Size size) {
     if (_sizes[ref] == size) return;
     _pendingSizes[ref] = size;
-    if (!_dragging) _applySizes();
+    if (!_layoutFrozen) _applySizes();
   }
 
   void _applySizes() {
-    if (!mounted || _dragging || _pendingSizes.isEmpty) return;
+    if (!mounted ||
+        _layoutFrozen ||
+        widget.session?.isClosed == true ||
+        _pendingSizes.isEmpty) {
+      return;
+    }
     _position = _paged.capture();
     setState(() {
       _sizes.addAll(_pendingSizes);
@@ -483,6 +525,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
   /// Esc hands back to the route, whose back handling closes the toolbars,
   /// saves before leaving or leaves directly, as the system back does.
   void _back(BuildContext context) {
+    if (_routeCurrent && widget.onCancelChapter != null) {
+      widget.onCancelChapter!();
+      return;
+    }
     if (_interactive) unawaited(Navigator.of(context).maybePop());
   }
 
@@ -671,7 +717,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _wheelCooldown?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _preferences.removeListener(_changed);
-    _preferences.dispose();
+    if (widget.preferences == null) _preferences.dispose();
     _paperTurn.dispose();
     if (widget.chrome == null) _chrome.dispose();
     _positionLabelTimer?.cancel();
@@ -1031,11 +1077,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
         child: widget.images == null
             ? _image(context, block)
             : ReaderImage(
-                onTap: () => showReaderImagePreview(
-                  context,
-                  block: block,
-                  repository: widget.images!,
-                ),
+                onTap: !_interactive
+                    ? null
+                    : () => showReaderImagePreview(
+                        context,
+                        block: block,
+                        repository: widget.images!,
+                      ),
                 block: block,
                 repository: widget.images!,
                 captionHeight: geometry.caption,
@@ -1053,6 +1101,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
     return ExcludeSemantics(
       excluding: widget.completion != null,
       child: PagedReaderViewport(
+        inputEnabled: widget.active,
+        onBoundaryDrag: widget.onBoundaryDrag,
+        onEdges: widget.onEdges,
         columns: columns,
         images: widget.images,
         content: widget.content,
@@ -1076,11 +1127,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
           }
         },
         onPosition: _sample,
-        onRestoreStart: widget.session?.restoringProgress,
+        onRestoreStart: _layoutInvalidated,
         controller: _paged,
         onLink: _actions.contentLink,
         // Phones and tablets keep the footnote sheet the text opens itself.
-        onFootnote: _desktopPanels
+        onFootnote: !widget.active
+            ? (_) {}
+            : _desktopPanels
             ? (note) => unawaited(_footnote(context, note))
             : null,
         contentLinks: widget.session?.contentLinks.toList() ?? const [],
