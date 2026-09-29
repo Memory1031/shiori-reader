@@ -38,7 +38,7 @@ dart bin/source_probe.dart --live --max-requests 30 --report reports/my-live.jso
 - API 只允许已验证的五个 HTTPS POST 路径；API 重定向直接停止。图片仅允许 `api.lightnovel.fun` 的已知图片路径形状，最多 3 次同站 HTTPS 重定向，每跳重新校验、计入总预算。没有 live 重定向样本，行为由合成测试验证。
 - HTTP 非 200、非零业务 code、HTML challenge、身份缺失/变化/重复、locked 或正文缺失均停止。不读取拒绝响应正文，不导入 Cookie / Authorization，不接入 WebView，不尝试解锁或其他端点。
 - 连接超时 15 秒，每次请求总超时 30 秒；每个响应最多 16 MiB（同时检查 Content-Length 和流式累计字节）。图像必须 MIME 与识别格式一致、单帧、正尺寸且不超过 2,000 万像素；先查尺寸，再解码。
-- 此工具针对 SRC-002 单页目录样本；页数变多时报告 `catalog_shape_changed`，要求重新调查，不自动扩大采集。长期稳定性、签名寿命和生产分页逻辑不在此包中实现。
+- 此工具针对固定的单页目录样本；页数变多时报告 `catalog_shape_changed`，要求重新调查，不自动扩大采集。长期稳定性、签名寿命和生产分页逻辑不在此包中实现。
 
 ## 证据与脱敏
 
@@ -65,8 +65,8 @@ dart bin/source_probe.dart --live --max-requests 30 --report reports/my-live.jso
 
 ## 依赖范围
 
-锁文件固定本次解析结果：`html 0.15.7`（DOM 结构统计）、`image 4.9.2`（本工具仅启用 PNG/JPEG 解码）、`crypto 3.0.7`（样本/图片哈希）、`test 1.31.1` / `lints 6.1.0`（开发检查）。版本以 pubspec.lock 为准，沿用宿主的 pub.flutter-io.cn 镜像配置。
+锁文件固定依赖版本：`html 0.15.7`（DOM 结构统计）、`image 4.9.2`（本工具仅启用 PNG/JPEG 解码）、`crypto 3.0.7`（样本/图片哈希）、`test 1.31.1` / `lints 6.1.0`（开发检查）。版本以 pubspec.lock 为准，沿用宿主的 pub.flutter-io.cn 镜像配置。
 
-尺寸边界测试发现 `image 4.9.2` 的 JPEG `startDecode/readInfo` 已分配系数缓冲，不能在它返回后才检查上限。工具现在先检查 JPEG 帧头 / PNG IHDR，再调用库解码；超大 JPEG 合成测试覆盖这一停止点。多帧和未验证的格式/特殊 JPEG 采样布局直接停止，不扩展格式支持。
+`image 4.9.2` 的 JPEG `startDecode/readInfo` 会分配系数缓冲，因此工具先检查 JPEG 帧头 / PNG IHDR 的尺寸上限，再调用库解码。多帧和未验证的格式/特殊 JPEG 采样布局直接停止，不扩展格式支持。
 
-图像解码是本次唯一媒体调查依赖；留在本包，不选择主 App 的渲染/缓存实现。官方 API 依据：[image decodeImage / decoder 文档](https://pub.dev/documentation/image/4.9.2/image/Decoder-class.html)、[html](https://pub.dev/packages/html/versions/0.15.7)、[Dart test](https://pub.dev/packages/test/versions/1.31.1)。依赖许可证保留在各包分发内；本包没有复制 Aidoku / 源站代码，内容与 fixture 许可边界见项目发布说明。
+图像解码依赖仅用于此调查包，不决定主 App 的渲染 / 缓存实现。官方 API 依据：[image decodeImage / decoder 文档](https://pub.dev/documentation/image/4.9.2/image/Decoder-class.html)、[html](https://pub.dev/packages/html/versions/0.15.7)、[Dart test](https://pub.dev/packages/test/versions/1.31.1)。依赖许可证保留在各包分发内；本包没有复制 Aidoku / 源站代码，内容与 fixture 许可边界见项目发布说明。

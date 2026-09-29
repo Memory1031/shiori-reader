@@ -1,6 +1,6 @@
 # Shiori 字标概念预览
 
-使用内置 image_gen 生成。用户认可后，首页使用亮色透明原图（复制到 assets/brand/shiori.png）作为唯一形状母版，暗色模式通过 Flutter ShaderMask 仅将文字区域渲染为暖白，图形不变；预览暗色图不直接打包。两次透明暗图生成尝试存在杂点或棋盘背景，已弃用，未覆盖原图。此方式避免两张位图几何差异和背景色块。
+字标使用 image_gen 生成。首页以 `assets/brand/shiori.png` 的亮色透明原图为唯一形状母版；暗色模式通过 Flutter ShaderMask 仅将文字区域渲染为暖白，图形不变。暗色概念预览不打包进应用。
 
 ## Light prompt
 

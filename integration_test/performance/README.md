@@ -1,4 +1,4 @@
-# TEST-003 Android Profile 探针
+# Android Profile 探针
 
 仅显式入口，不被生产 main 引用。使用真实 ProductionApp / ReaderScreen / Viewport / SQLite / 图片持久层，合成内容与平台无关；只有存储根目录通过 ProductionApp 的可选参数注入。
 

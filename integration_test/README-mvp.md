@@ -1,4 +1,4 @@
-# TEST-004 离线 MVP 真机回归
+# 离线 MVP 真机回归
 
 `mvp_test.dart` 是显式 Profile 入口。组合真实 LightNovelSource、Repository、Drift 双库、持久图片层、ReadingHome 与 Reader；HTTP adapter 只返回自制 JSON / HTML / PNG，绝不委托 socket adapter。生产 main 不引用此入口。
 

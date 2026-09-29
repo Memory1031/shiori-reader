@@ -35,9 +35,9 @@ Windows 产物为 `shiori-reader-<tag>-windows-x64.zip`、`SHA256SUMS-windows-x6
 
 ## Android tag 发布
 
-APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前执行 `release_android.py tools` 预检，不依赖 PATH 中的 sdkmanager，也不自动选 runner 上最高版本：更高预装版本的 `apksigner --print-certs` 输出 `V2 Signer: certificate SHA-256 digest`，与校验器预期的 `Signer #1 certificate SHA-256 digest` 格式不同，会导致校验失败。该差异已用官方工具复现确认；固定版本是规避手段，未绕过签名检查。
+APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前执行 `release_android.py tools` 预检，不依赖 PATH 中的 sdkmanager，也不自动选 runner 上最高版本：更高预装版本的 `apksigner --print-certs` 输出 `V2 Signer: certificate SHA-256 digest`，与校验器预期的 `Signer #1 certificate SHA-256 digest` 格式不同，会导致校验失败。固定工具版本不替代签名检查。
 
-已知校验错误现在输出受控原因（版本、证书、工具），不会输出工具参数、原始 stderr 或签名秘密；未知异常仍使用通用提示。
+已知校验错误输出受控原因（版本、证书、工具），不会输出工具参数、原始 stderr 或签名秘密；未知异常仍使用通用提示。
 
 按用户约定，tag 发布直接并行进入 `android-release` 与 `windows-release`，不查询或等待 CI、不重复执行格式 / 分析 / UT。develop 日常 CI 保持独立；master 仅作为发布中间分支，不因推送触发 CI 或 Release。发布脚本优先快进 master，保留最终提交与标签的可追溯性。Android 构建仍保留工具预检、版本一致性、签名和 APK 校验；失败时不上传 Release。签名需要四个仓库 Actions secrets：
 
@@ -53,6 +53,20 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 本地缺少 `key.properties` 时构建配置可回退 Debug 签名，因此 **Release 编译不等于正式签名**。密钥和密码需自行安全备份，不提交 Git。换电脑需要恢复同一密钥才能保持 Android 更新身份。
 
 标签不会自动修改包内版本；发版时人工对齐 `pubspec.yaml`、build number、iOS 扩展版本和 tag。发布准备与许可边界见[发布说明](release/README.md)。iOS 发布链路见[iOS TestFlight 发布](#ios-testflight-发布)。
+
+### Android 产物校验
+
+发布工具为 `tool/release_android.py`（Python 3 标准库），离线测试入口为 `tool/test_release_android.py`。
+
+正式入口明确为 `lib/main.dart`。构建后用 Android SDK apksigner 验证签名有效，再对比配置密钥导出的证书 SHA-256；aapt 检查 applicationId=dev.shiori.reader、versionName / versionCode 与 pubspec 一致且不可调试。检查通过才生成并上传：
+
+- `shiori-reader-<tag>-android.apk`
+- `SHA256SUMS.txt`（APK 校验值）
+- `release-info.json`（tag、commit、包版本、APK 哈希、证书指纹，不含私钥 / 密码）
+
+产物先保存为 14 天的 Actions artifact。发布 job 签署更新清单、核对历史构建号和已有资产摘要，通过草稿完成上传后再公开 Release；重跑只补齐内容一致的缺失附件。beta 标签标为 prerelease，Latest 指向正式版本。更新签名配置见[发布操作](release/README.md#更新清单签名配置)。
+
+参考：[apksigner](https://developer.android.com/tools/apksigner)、[GitHub job 权限](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)。
 
 ## iOS TestFlight 发布
 
@@ -75,26 +89,4 @@ Apple 侧一次性准备（都在个人团队上下文操作，注意右上角�
 3. 生成 App Store Connect API 密钥（`.p8` 仅能下载一次）；
 4. 生成分发证书：在有 Xcode 的机器上创建 Apple Distribution 并从钥匙串导出 p12，base64 后存入 secret。工作流不在 runner 上自动建证——证书产物含未加密私钥，而公开仓库的 Actions 产物任何登录用户都能下载。
 
-发版与安装：与 Android 相同，人工对齐版本后推 tag（ASC 要求同一 versionName 下 CFBundleVersion 严格递增）；构建经数分钟至一小时处理后出现在 TestFlight，内部测试不走 Beta 审核，构建 90 天未安装会过期。iOS runtime 证据从此具备来源（真机 TestFlight 使用），但 CI 构建成功不等于 runtime verified；对外分发前 RELEASE-001 审查同样适用。
-
-## 已有证据
-
-2026-09-08 用户截图确认质量 job，以及旧工作流的「Android Debug 与 Release smoke」job 成功，CI-001 / CI-002 按调整范围完成。截图未包含 run URL / commit，不能定位到某次最终配置，也不能证明正式 tag 签名发布通过。
-
-本地曾验证 YAML、生成一致性、Debug / Release 构建；锁文件 hosted 源漂移修复后严格安装通过。正式 tag 工作流远端运行、签名产物安装仍待发版阶段验证。
-
-## RELEASE-002 工作流补齐（2026-09-08）
-
-发布工具为 `tool/release_android.py`（Python3标准库，无额外包）；`tool/test_release_android.py` 在提交前本地执行。普通 CI 只做质量检查，发布仍仅推送 `v*` tag 触发。仅发布 job 获得 contents:write。
-
-正式入口明确为 `lib/main.dart`。构建后用 Android SDK apksigner 验证签名有效，再对比配置密钥导出的证书SHA-256；aapt检查 applicationId=dev.shiori.reader、versionName / versionCode与pubspec一致且不可调试。检查通过才生成并上传：
-
-- `shiori-reader-<tag>-android.apk`
-- `SHA256SUMS.txt`（APK校验值）
-- `release-info.json`（tag、commit、包版本、APK哈希、证书指纹，不含私钥 / 密码）
-
-产物先保存为 14 天的 Actions artifact。发布 job 签署更新清单、核对历史构建号和已有资产摘要，通过草稿完成上传后再公开 Release；重跑只补齐内容一致的缺失附件。beta 标签标为 prerelease，Latest 指向正式版本。更新签名配置见[发布操作](release/README.md#更新清单签名配置)。
-
-本地验证：发布工具4项离线测试通过，覆盖tag/版本/非法build、缺Secret/错误Base64、密码转义、错误包身份/可调试包/错误或多个签名证书；工作流YAML与步骤顺序 / Secret绑定 / 清理检查通过，Dart检查工具分析通过。另用临时合成JKS和已有本地Release APK完成实际keytool → Java Properties读取 → apksigner签名与验证 → aapt版本检查 → 哈希文件生成冒烟，错误证书拒绝通过。未使用用户正式密钥，未重新构建并发修改中的应用，未推tag、未发布、未验证远端Secrets或runner。首次正式签名发布及设备安装仍待完成。
-
-参考：[apksigner](https://developer.android.com/tools/apksigner)、[GitHub job权限](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)。
+发版与安装：与 Android 相同，人工对齐版本后推 tag（ASC 要求同一 versionName 下 CFBundleVersion 严格递增）；构建经数分钟至一小时处理后出现在 TestFlight，内部测试不走 Beta 审核，构建 90 天未安装会过期。CI 构建成功不代表设备运行通过；对外分发前仍需按[发布操作](release/README.md#3-验收)完成验收。
