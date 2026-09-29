@@ -1,77 +1,173 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'viewport/page_turn.dart';
 
-/// Keeps the real last page mounted while revealing or leaving reader chrome.
+/// Owns only a visual operation. The book host accepts the terminal commit;
+/// both real surfaces stay mounted, including throughout cancellation.
 class ReaderCompletionTransition extends StatefulWidget {
   const ReaderCompletionTransition({
     super.key,
     required this.child,
     required this.completion,
     required this.onTurning,
+    this.preview,
+    this.basis,
+    this.canTurn,
+    this.onCommit,
+    this.animate = true,
     this.style = PageTurnStyle.curl,
   });
   final PageTurnStyle style;
   final Widget child;
-  final Widget? completion;
+  final Widget? completion, preview;
+  final Object? basis;
+  final bool Function(bool entering)? canTurn;
+  final bool Function(bool entering)? onCommit;
+  final bool animate;
   final ValueChanged<bool> onTurning;
 
   @override
-  State<ReaderCompletionTransition> createState() =>
-      _ReaderCompletionTransitionState();
+  ReaderCompletionTransitionState createState() =>
+      ReaderCompletionTransitionState();
 }
 
-class _ReaderCompletionTransitionState extends State<ReaderCompletionTransition>
+class ReaderCompletionTransitionState extends State<ReaderCompletionTransition>
     with SingleTickerProviderStateMixin {
-  late final _turn = AnimationController(vsync: this, value: 1);
-  Widget? _outgoing;
-  bool _reduced = false;
+  late final _turn = AnimationController(vsync: this);
+  late bool _shown = widget.completion != null;
+  _CompletionTurn? _operation;
+  bool get busy => _operation != null;
+  bool _allowed(bool entering) => widget.canTurn?.call(entering) ?? true;
+  bool _valid(_CompletionTurn operation) =>
+      mounted &&
+      identical(operation, _operation) &&
+      operation.basis == widget.basis &&
+      _allowed(operation.entering);
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _reduced = MediaQuery.disableAnimationsOf(context);
-    if (_reduced && _turn.isAnimating) _turn.value = 1;
+  void _changed() {
+    // Layout/route invalidation can arrive during a parent's build. Retire
+    // ownership synchronously, but notify the tree only after that frame.
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          widget.onTurning(busy);
+          setState(() {});
+        }
+      });
+    } else {
+      widget.onTurning(busy);
+      setState(() {});
+    }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _turn.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        widget.onTurning(false);
-        if (_outgoing != null) setState(() => _outgoing = null);
+  BoundaryPageDrag? begin(bool entering, double grip) {
+    if (busy ||
+        entering == _shown ||
+        !_allowed(entering) ||
+        entering && widget.preview == null) {
+      return null;
+    }
+    final operation = _CompletionTurn(entering, widget.basis, grip);
+    _operation = operation;
+    _turn.value = 0;
+    _changed();
+    return BoundaryPageDrag(
+      update: (progress) {
+        if (_valid(operation) && operation.phase == _Phase.dragging) {
+          _turn.value = progress.clamp(0, 1);
+        }
+      },
+      end: (commit) {
+        if (!_valid(operation) || operation.phase != _Phase.dragging) return;
+        if (commit) {
+          unawaited(_settle(operation));
+        } else {
+          unawaited(cancel());
+        }
+      },
+      cancel: () {
+        if (identical(operation, _operation)) unawaited(cancel());
+      },
+    );
+  }
+
+  void turn(bool entering) => begin(entering, pageTurnCentreGrip)?.end(true);
+
+  Future<void> _settle(_CompletionTurn operation) async {
+    operation.phase = _Phase.settling;
+    try {
+      await _animate(1);
+    } on TickerCanceled {
+      // A cancel owns the rebound; this old continuation must not retire it.
+      return;
+    }
+    if (!_valid(operation) || operation.phase != _Phase.settling) {
+      if (identical(operation, _operation) &&
+          operation.phase != _Phase.cancelling) {
+        await cancel(immediate: true);
       }
-    });
+      return;
+    }
+    if (widget.onCommit?.call(operation.entering) ?? false) {
+      _shown = operation.entering;
+    }
+    _operation = null;
+    _changed();
+  }
+
+  Future<void> _animate(double target) => PaperTurnMotion.settle(
+    _turn,
+    target: target,
+    curve: PageTurnFrame(
+      style: widget.style,
+      progress: _turn.value,
+      direction: 1,
+    ).curve,
+    reduced:
+        !widget.animate ||
+        widget.style == PageTurnStyle.none ||
+        MediaQuery.disableAnimationsOf(context),
+  );
+
+  Future<void> cancel({bool immediate = false}) {
+    final operation = _operation;
+    if (operation == null) return Future.value();
+    if (!immediate && operation.cancellation != null) {
+      return operation.cancellation!;
+    }
+    operation.phase = _Phase.cancelling;
+    _turn.stop(canceled: true);
+    if (immediate) {
+      _operation = null;
+      _changed();
+      return Future.value();
+    }
+    return operation.cancellation = _rebound(operation);
+  }
+
+  Future<void> _rebound(_CompletionTurn operation) async {
+    try {
+      await _animate(0);
+    } on TickerCanceled {
+      return;
+    }
+    if (!mounted || !identical(_operation, operation)) return;
+    _operation = null;
+    _changed();
   }
 
   @override
   void didUpdateWidget(ReaderCompletionTransition oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if ((oldWidget.completion == null) == (widget.completion == null)) return;
-    _outgoing = widget.completion == null ? oldWidget.completion : null;
-    if (_reduced || widget.style == PageTurnStyle.none) {
-      _outgoing = null;
-      _turn.value = 1;
-      widget.onTurning(false);
-      return;
-    }
-    widget.onTurning(true);
-    _turn.value = 0;
-    _animate();
-  }
-
-  Future<void> _animate() async {
-    try {
-      await PaperTurnMotion.settle(
-        _turn,
-        curve: PageTurnFrame(
-          style: widget.style,
-          progress: 0,
-          direction: 1,
-        ).curve,
-      );
-    } on TickerCanceled {
-      // Replacement/disposal owns the next visual state.
+    if (oldWidget.basis != widget.basis) cancel(immediate: true);
+    // Our commit has already reached its endpoint. Parent acknowledgment is
+    // not a second navigation request. External navigation is authoritative.
+    if ((oldWidget.completion != null) != (widget.completion != null)) {
+      cancel(immediate: true);
+      _shown = widget.completion != null;
     }
   }
 
@@ -85,54 +181,57 @@ class _ReaderCompletionTransitionState extends State<ReaderCompletionTransition>
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _turn,
     builder: (context, _) {
-      final entering = widget.completion != null;
-      final completion = widget.completion ?? _outgoing;
+      final operation = _operation;
+      final entering = operation?.entering ?? _shown;
+      final completion = widget.completion ?? widget.preview;
       final paper = Theme.of(context).scaffoldBackgroundColor;
-      // Entering the completion page turns forward away from the reader;
-      // leaving it turns back, so the completion page is the one leaving.
       final frame = PageTurnFrame(
         style: widget.style,
-        progress: _turn.value,
+        progress: operation == null ? 1 : _turn.value,
         direction: entering ? 1 : -1,
+        grip: operation?.grip ?? pageTurnCentreGrip,
       );
-      final reader = Positioned.fill(
-        key: const ValueKey('completion-reader-layer'),
-        child: IgnorePointer(
-          ignoring: entering || _turn.isAnimating,
-          child: ExcludeSemantics(
-            excluding: entering,
-            child: PageTurnSlot(
-              frame: frame,
-              role: entering ? PageTurnRole.leaving : PageTurnRole.entering,
-              child: widget.child,
+      Widget layer({required bool end, required Widget child}) =>
+          Positioned.fill(
+            key: ValueKey(
+              end ? 'completion-end-layer' : 'completion-reader-layer',
             ),
-          ),
-        ),
-      );
-      final end = Positioned.fill(
-        key: const ValueKey('completion-end-layer'),
-        child: IgnorePointer(
-          ignoring: _turn.isAnimating || !entering,
-          child: ExcludeSemantics(
-            excluding: !entering,
-            child: PageTurnSlot(
-              frame: frame,
-              role: entering ? PageTurnRole.entering : PageTurnRole.leaving,
-              child: completion ?? const SizedBox.shrink(),
+            child: Offstage(
+              offstage: !busy && (end != _shown),
+              child: IgnorePointer(
+                // The recognizer that accepted a drag stays in the tree and
+                // keeps receiving its existing pointer sequence.
+                ignoring: busy || end != _shown,
+                child: ExcludeFocus(
+                  excluding: busy || end != _shown,
+                  child: ExcludeSemantics(
+                    excluding: busy || end != _shown,
+                    child: PageTurnSlot(
+                      frame: frame,
+                      role: end == entering
+                          ? PageTurnRole.entering
+                          : PageTurnRole.leaving,
+                      child: child,
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+      final reader = layer(end: false, child: widget.child);
+      final end = layer(
+        end: true,
+        child: completion ?? const SizedBox.shrink(),
       );
-      // Leaving above entering, except a forward cover slides in on top.
       final endOnTop = entering ? frame.enteringOnTop : !frame.enteringOnTop;
       return Stack(
         fit: StackFit.expand,
         children: [
-          if (!endOnTop && completion != null) end,
+          if (!endOnTop) end,
           reader,
-          if (_turn.isAnimating) PageTurnShade(frame: frame),
-          if (endOnTop && completion != null) end,
-          if (_turn.isAnimating)
+          if (busy) PageTurnShade(frame: frame),
+          if (endOnTop) end,
+          if (busy)
             Positioned.fill(
               child: PageTurnOverlay(frame: frame, paper: paper),
             ),
@@ -140,4 +239,15 @@ class _ReaderCompletionTransitionState extends State<ReaderCompletionTransition>
       );
     },
   );
+}
+
+enum _Phase { dragging, settling, cancelling }
+
+class _CompletionTurn {
+  _CompletionTurn(this.entering, this.basis, this.grip);
+  final bool entering;
+  final Object? basis;
+  final double grip;
+  _Phase phase = _Phase.dragging;
+  Future<void>? cancellation;
 }

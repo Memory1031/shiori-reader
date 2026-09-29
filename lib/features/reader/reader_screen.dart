@@ -62,6 +62,10 @@ class ReaderContentView extends StatefulWidget {
     this.actions = const ReaderActions(),
     this.articleContents = true,
     this.completion,
+    this.completionTarget,
+    this.completionBasis,
+    this.onCompletionTurn,
+    this.bookTitle,
     this.viewportController,
     this.returnToOrigin = false,
     this.chrome,
@@ -93,7 +97,11 @@ class ReaderContentView extends StatefulWidget {
 
   /// Whether headings recognised inside the article form their own layer.
   final bool articleContents;
-  final BookTerminalState? completion;
+  final BookTerminalState? completion, completionTarget;
+  final Object? completionBasis;
+  final String? bookTitle;
+  final ValueChanged<({VoidCallback cancel, VoidCallback invalidate})?>?
+  onCompletionTurn;
   final PagedReaderController? viewportController;
   final bool returnToOrigin;
 
@@ -120,6 +128,61 @@ class _ReaderContentViewState extends State<ReaderContentView>
   ReaderSettings _settings = ReaderSettings();
   final _paperTurn = ValueNotifier<PageTurnFrame>(PageTurnFrame.rest);
   bool _completionTurning = false;
+  final _completionTransition = GlobalKey<ReaderCompletionTransitionState>();
+  void _cancelCompletion({bool immediate = false}) {
+    unawaited(_completionTransition.currentState?.cancel(immediate: immediate));
+  }
+
+  void _completionTurnChanged(bool value) {
+    if (!mounted || _completionTurning == value) return;
+    setState(() => _completionTurning = value);
+    widget.onCompletionTurn?.call(
+      value
+          ? (
+              cancel: () => _cancelCompletion(),
+              invalidate: () => _cancelCompletion(immediate: true),
+            )
+          : null,
+    );
+    if (!value) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _applySizes();
+      });
+    }
+  }
+
+  bool _canCompletionTurn(bool entering) =>
+      mounted &&
+      widget.active &&
+      _routeCurrent &&
+      widget.session?.isClosed != true &&
+      !_dragging &&
+      !widget.crossChapterTurning &&
+      (!_usesPresentation ? !_paged.isRestoring && _lastPageVisible : true) &&
+      (entering
+          ? widget.completion == null && _actions.bookEnd != null
+          : widget.completion != null && _actions.completionPrevious != null);
+
+  bool _commitCompletion(bool entering) {
+    if (!_canCompletionTurn(entering)) return false;
+    if (entering) {
+      if (!_usesPresentation) _paged.anchorAtEnd();
+      _actions.bookEnd!.call();
+    } else {
+      _actions.completionPrevious!.call();
+    }
+    return true;
+  }
+
+  BoundaryPageDrag? _boundaryDrag(int direction, double grip) {
+    if (direction > 0 &&
+        _actions.nextChapter == null &&
+        _actions.bookEnd != null) {
+      return _completionTransition.currentState?.begin(true, grip);
+    }
+    return widget.onBoundaryDrag?.call(direction, grip);
+  }
+
   bool _settingsReady = false;
   bool _hintVisible = false;
   String? _failedPresentation;
@@ -141,6 +204,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void didUpdateWidget(ReaderContentView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!widget.active || widget.session?.isClosed == true) {
+      _cancelCompletion(immediate: true);
+    }
     if (oldWidget.crossChapterTurning && !widget.crossChapterTurning) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _applySizes());
     }
@@ -209,6 +275,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
+      _cancelCompletion(immediate: true);
       unawaited(_preferences.flush());
       unawaited(widget.session?.flushProgress());
     }
@@ -369,12 +436,14 @@ class _ReaderContentViewState extends State<ReaderContentView>
   void _layoutInvalidated() {
     _layoutEpoch++;
     _announcedReady = false;
+    _cancelCompletion(immediate: true);
     widget.session?.restoringProgress();
     widget.onLayoutInvalidated?.call();
   }
 
   void _sample(ReaderPosition position, bool completed) {
     widget.session?.finishRestoringProgress();
+    _lastPageVisible = _usesPresentation || completed;
     if ((widget.completion != null || _completionTurning) &&
         widget.session?.hasPendingNavigation != true) {
       return;
@@ -426,7 +495,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
   final _sizes = <MediaRef, Size>{};
   final _pendingSizes = <MediaRef, Size>{};
   bool _dragging = false;
-  bool get _layoutFrozen => _dragging || widget.crossChapterTurning;
+  bool get _layoutFrozen =>
+      _dragging || widget.crossChapterTurning || _completionTurning;
   void _dimensions(MediaRef ref, Size size) {
     if (_sizes[ref] == size) return;
     _pendingSizes[ref] = size;
@@ -469,23 +539,21 @@ class _ReaderContentViewState extends State<ReaderContentView>
         session?.restoreFailure != null;
   }
 
-  /// Whether [command] exists for this page and session. The completion page
-  /// builds no toolbars, so it offers only what it can open by itself.
+  /// Shared permission checks for text, completion, menus and shortcuts.
   bool _can(ReaderCommand command) {
     final text = widget.completion == null;
     return switch (command) {
       ReaderCommand.previousPage => text || _actions.completionPrevious != null,
-      ReaderCommand.nextPage ||
-      ReaderCommand.toggleControls ||
-      ReaderCommand.progress => text,
+      ReaderCommand.nextPage || ReaderCommand.progress => text,
+      ReaderCommand.toggleControls => true,
       ReaderCommand.contents =>
         widget.articleContents || _actions.bookContents != null,
       ReaderCommand.settings => true,
       ReaderCommand.notes => text && _actions.links != null,
       ReaderCommand.prefetch => text && _actions.prefetch != null,
       ReaderCommand.details => _actions.details != null,
-      ReaderCommand.retrySave => text && _unsaved,
-      ReaderCommand.retrySettings => text && _preferences.failure != null,
+      ReaderCommand.retrySave => _unsaved,
+      ReaderCommand.retrySettings => _preferences.failure != null,
     };
   }
 
@@ -525,6 +593,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
   /// Esc hands back to the route, whose back handling closes the toolbars,
   /// saves before leaving or leaves directly, as the system back does.
   void _back(BuildContext context) {
+    if (_routeCurrent && _completionTurning) {
+      _cancelCompletion();
+      return;
+    }
     if (_routeCurrent && widget.onCancelChapter != null) {
       widget.onCancelChapter!();
       return;
@@ -648,7 +720,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       return;
     }
     if (widget.completion != null) {
-      if (!forward) _actions.completionPrevious?.call();
+      if (!forward) _completionTransition.currentState?.turn(false);
       return;
     }
     if (_usesPresentation) {
@@ -666,7 +738,14 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
   }
 
-  void _forwardBoundary() => (_actions.nextChapter ?? _actions.bookEnd)?.call();
+  void _forwardBoundary() {
+    if (_actions.nextChapter case final next?) {
+      next();
+    } else if (_actions.bookEnd != null) {
+      _completionTransition.currentState?.turn(true);
+    }
+  }
+
   void _presentationNext() {
     final last = widget.content.blocks.length - 1;
     _sample(
@@ -783,6 +862,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     return Builder(
       builder: (context) {
         _route = ModalRoute.of(context);
+        if (!_routeCurrent) _cancelCompletion(immediate: true);
         return page;
       },
     );
@@ -849,11 +929,29 @@ class _ReaderContentViewState extends State<ReaderContentView>
                     focusNode: _pageFocus,
                     autofocus: widget.active,
                     child: ReaderCompletionTransition(
+                      key: _completionTransition,
                       style: _settings.pageTurn,
-                      onTurning: (value) => _completionTurning = value,
+                      animate: !_usesPresentation,
+                      basis: (widget.completionBasis, widget.content),
+                      canTurn: _canCompletionTurn,
+                      onCommit: _commitCompletion,
+                      onTurning: _completionTurnChanged,
+                      preview: widget.completionTarget == null
+                          ? null
+                          : _completionPage(
+                              context,
+                              style,
+                              pageBounds.biggest,
+                              widget.completionTarget!,
+                            ),
                       completion: widget.completion == null
                           ? null
-                          : _completionPage(context, style),
+                          : _completionPage(
+                              context,
+                              style,
+                              pageBounds.biggest,
+                              widget.completion!,
+                            ),
                       child: SafeArea(
                         child: Stack(
                           fit: StackFit.expand,
@@ -863,17 +961,16 @@ class _ReaderContentViewState extends State<ReaderContentView>
                             Positioned.fill(
                               child: _page(context, pageBounds, style),
                             ),
-                            if (widget.completion == null)
-                              ValueListenableBuilder<bool>(
-                                valueListenable: _chrome,
-                                builder: (context, visible, _) =>
-                                    ListenableBuilder(
-                                      listenable: _preferences,
-                                      builder: (context, _) => visible
-                                          ? _toolbars(context)
-                                          : _runningChrome(context),
-                                    ),
-                              ),
+                            ValueListenableBuilder<bool>(
+                              valueListenable: _chrome,
+                              builder: (context, visible, _) =>
+                                  ListenableBuilder(
+                                    listenable: _preferences,
+                                    builder: (context, _) => visible
+                                        ? _toolbars(context)
+                                        : _runningChrome(context),
+                                  ),
+                            ),
                             if (_hintVisible && widget.completion == null)
                               Positioned(
                                 left: ShioriSpace.item,
@@ -925,49 +1022,91 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _preferences.flush();
   }
 
-  Widget _completionPage(BuildContext context, TextStyle style) => ColoredBox(
-    color: Theme.of(context).scaffoldBackgroundColor,
-    child: SafeArea(
-      child: Listener(
-        onPointerSignal: _scrollPage,
-        onPointerDown: _pointerDown,
-        onPointerUp: (event) => _pointerUp(context, event),
-        child: Column(
-          children: [
-            Expanded(
-              child: ReaderCompletionPage(
-                state: widget.completion!,
-                title:
-                    widget.session?.progress?.snapshot.title ??
-                    widget.runningTitle ??
-                    widget.content.title,
-                style: style,
-                onPrevious: _actions.completionPrevious ?? () {},
-                onExit: _actions.exitToShelf ?? () {},
-                onCatalog: () => _run(context, ReaderCommand.contents),
-                onRestart: _actions.restart ?? () {},
-              ),
-            ),
-            if (ShioriCapabilities.of(context).immersiveSystemUi)
-              SizedBox(
-                height: ReaderChromeMetrics.of(context).footer,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    _margin,
-                    ReaderChromeMetrics.inner,
-                    _margin,
-                    ReaderChromeMetrics.edge,
+  String get _bookTitle =>
+      widget.bookTitle ??
+      widget.session?.progress?.snapshot.title ??
+      widget.runningTitle ??
+      widget.content.title;
+
+  Widget _completionPage(
+    BuildContext context,
+    TextStyle style,
+    Size pageSize,
+    BookTerminalState state,
+  ) {
+    final metrics = ReaderChromeMetrics.of(context);
+    return ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: SafeArea(
+        child: Listener(
+          onPointerSignal: _scrollPage,
+          onPointerDown: _pointerDown,
+          onPointerUp: (event) => _pointerUp(context, event),
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _chrome,
+            builder: (context, visible, _) => Stack(
+              clipBehavior: Clip.none,
+              fit: StackFit.expand,
+              children: [
+                ReaderCompletionPage(
+                  state: state,
+                  title: _bookTitle,
+                  style: style,
+                  chromeVisible: visible,
+                  pageSize: pageSize,
+                  contentOrigin: Offset(_pageInsets.left, _pageInsets.top),
+                  padding: EdgeInsets.only(
+                    top: metrics.topBar,
+                    bottom: metrics.bottomBar,
                   ),
-                  child: const Center(
-                    child: ReaderStatusRow(progress: SizedBox.shrink()),
-                  ),
+                  onPrevious: () => _run(context, ReaderCommand.previousPage),
+                  onToggleChrome: () =>
+                      _run(context, ReaderCommand.toggleControls),
+                  onDrag: _usesPresentation
+                      ? null
+                      : (grip) => _completionTransition.currentState?.begin(
+                          false,
+                          grip,
+                        ),
+                  onExit: () {
+                    if (_interactive) _actions.exitToShelf?.call();
+                  },
+                  onCatalog: () => _run(context, ReaderCommand.contents),
+                  onRestart: () {
+                    if (_interactive) _actions.restart?.call();
+                  },
                 ),
-              ),
-          ],
+                if (visible)
+                  ListenableBuilder(
+                    listenable: _preferences,
+                    builder: (context, _) =>
+                        _toolbars(context, completion: true),
+                  )
+                else if (ShioriCapabilities.of(context).immersiveSystemUi)
+                  Positioned(
+                    bottom: 0,
+                    left: _margin,
+                    right: _margin,
+                    height: metrics.footer,
+                    child: IgnorePointer(
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          top: ReaderChromeMetrics.inner,
+                          bottom: ReaderChromeMetrics.edge,
+                        ),
+                        child: const Center(
+                          child: ReaderStatusRow(progress: SizedBox.shrink()),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   /// The paginated page (native or EPUB presentation) inside stable gutters
   /// that keep showing / hiding the toolbars from repaginating content.
@@ -1101,8 +1240,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
     return ExcludeSemantics(
       excluding: widget.completion != null,
       child: PagedReaderViewport(
-        inputEnabled: widget.active,
-        onBoundaryDrag: widget.onBoundaryDrag,
+        inputEnabled:
+            widget.active && widget.completion == null && !_completionTurning,
+        onBoundaryDrag: _boundaryDrag,
         onEdges: widget.onEdges,
         columns: columns,
         images: widget.images,
@@ -1280,13 +1420,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
       if (_can(command)) (command, label),
   ];
 
-  Widget _toolbars(BuildContext context) {
+  Widget _toolbars(BuildContext context, {bool completion = false}) {
     final l = AppLocalizations.of(context);
     return ReaderToolbars(
       metrics: ReaderChromeMetrics.of(context),
       insets: _pageInsets,
       top: ReaderTopBar(
-        title: _effectiveChapterTitle,
+        title: completion ? _bookTitle : _effectiveChapterTitle,
         returnToOrigin: widget.returnToOrigin,
         onLeave: () => _leave(context),
         menu: _menu(l),
@@ -1296,10 +1436,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
         contentsTooltip:
             _contentsLayers(context).firstOrNull?.label ?? l.catalogTitle,
         onContents: _command(context, ReaderCommand.contents),
-        progress: _progressLabel(l.readerChapterPercent),
+        showProgress: !completion,
+        progress: completion
+            ? const SizedBox.shrink()
+            : _progressLabel(l.readerChapterPercent),
         onProgress: _command(context, ReaderCommand.progress),
         onSettings: _command(context, ReaderCommand.settings),
-        progressKey: _progressAnchor,
+        progressKey: completion ? null : _progressAnchor,
       ),
     );
   }

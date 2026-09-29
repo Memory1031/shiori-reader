@@ -75,8 +75,10 @@ class ReaderBottomBar extends StatelessWidget {
     required this.onProgress,
     required this.onSettings,
     this.progressKey,
+    this.showProgress = true,
   });
   final String contentsTooltip;
+  final bool showProgress;
 
   /// Null while the command is unavailable.
   final VoidCallback? onContents, onProgress, onSettings;
@@ -108,11 +110,13 @@ class ReaderBottomBar extends StatelessWidget {
         label: Text(l.catalogTitle),
       ),
     );
-    final progress = TextButton(
-      key: progressKey,
-      onPressed: onProgress,
-      child: this.progress,
-    );
+    final progress = !showProgress
+        ? const SizedBox.shrink()
+        : TextButton(
+            key: progressKey,
+            onPressed: onProgress,
+            child: this.progress,
+          );
     final settings = Tooltip(
       message: tip(l.readerSettings, ReaderShortcutLabels.settings),
       child: TextButton(
@@ -147,13 +151,15 @@ class ReaderBottomBar extends StatelessWidget {
             const SizedBox(width: ShioriSpace.small),
             least(
               progressWidth,
-              Tooltip(
-                message: tip(
-                  l.readerProgressLabel,
-                  ReaderShortcutLabels.progress,
-                ),
-                child: progress,
-              ),
+              !showProgress
+                  ? const SizedBox.shrink()
+                  : Tooltip(
+                      message: tip(
+                        l.readerProgressLabel,
+                        ReaderShortcutLabels.progress,
+                      ),
+                      child: progress,
+                    ),
             ),
             const SizedBox(width: ShioriSpace.small),
             least(settingsWidth, settings),

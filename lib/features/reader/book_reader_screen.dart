@@ -136,6 +136,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           _changing ||
           _invalidated ||
           _completion != null ||
+          _completionTurn != null ||
           _leavingInsets != null ||
           _route?.isCurrent == false ||
           _edgeSource != _reader ||
@@ -234,6 +235,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   BookTerminalState? _completion;
+  ({VoidCallback cancel, VoidCallback invalidate})? _completionTurn;
   final _titleRequest = CancellationSource();
   String? _bookTitle;
   NovelStatus _bookStatus = NovelStatus.unknown;
@@ -456,6 +458,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (widget.repository case LocalBookInvalidation changes) {
       _invalidation = changes.invalidations.listen((key) {
         if (!mounted || key != widget.chapter.novelKey || _invalidated) return;
+        _completionTurn?.invalidate();
         _cancelChapter(immediate: true);
         _reader.onDelete();
         _pending?.onDelete();
@@ -774,6 +777,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     bool fromStart = false,
     bool fromEnd = false,
   }) async {
+    _completionTurn?.invalidate();
     if (_closingPanelForSwitch) return;
     if (_route?.isCurrent == false) {
       final panel = _activePanel;
@@ -1070,7 +1074,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (_canPop || ShioriCapabilities.of(context).cupertinoNavigation) {
       return true;
     }
-    if (chromeVisible) return false;
+    if (chromeVisible || _completionTurn != null) return false;
     return !_changing &&
         _reader.progressFailure == null &&
         _reader.progress?.unsaved != true;
@@ -1089,6 +1093,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   Future<void> _exit({bool toShelf = false}) async {
+    if (_completionTurn case final turn?) {
+      turn.cancel();
+      return;
+    }
     if (_operation case final operation?) {
       final wasInteraction = operation.engaged;
       await _cancelChapter(immediate: true);
@@ -1487,8 +1495,31 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         ? order[index + 1]
         : null;
 
+    final terminal =
+        !_changing &&
+            widget.linkDepth == 0 &&
+            index >= 0 &&
+            index == order.length - 1
+        ? bookEndState(
+            local: _local,
+            status: reader.novelStatus == NovelStatus.unknown
+                ? _bookStatus
+                : reader.novelStatus,
+          )
+        : null;
     void bookEnd() {
-      if (_completion != null || reader != _reader) return;
+      if (!mounted ||
+          _invalidated ||
+          _changing ||
+          _route?.isCurrent == false ||
+          _completion != null ||
+          reader != _reader ||
+          reader.isClosed ||
+          terminal == null ||
+          !identical(order, _readingSequence().$1) ||
+          _viewports[reader]?.isRestoring == true) {
+        return;
+      }
       final state = bookEndState(
         local: _local,
         status: reader.novelStatus == NovelStatus.unknown
@@ -1507,13 +1538,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       restart: order.isEmpty
           ? null
           : () => _switch(order.first, fromStart: true),
-      bookEnd:
-          !_changing &&
-              widget.linkDepth == 0 &&
-              index >= 0 &&
-              index == order.length - 1
-          ? bookEnd
-          : null,
+      bookEnd: terminal == null ? null : bookEnd,
       contentLink: _changing ? null : _followContentLink,
       bookContents: _changing || widget.linkDepth > 0 ? null : _bookContents,
       links: _changing || reader.contentLinks.isEmpty ? null : _links,
@@ -1534,6 +1559,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       key: ValueKey(reader),
       content: reader.content!,
       completion: reader == _reader ? _completion : null,
+      completionTarget: terminal,
+      completionBasis: (reader, order, terminal),
+      bookTitle: _bookTitle ?? reader.progress?.snapshot.title,
+      onCompletionTurn: (turn) {
+        if (!mounted || reader != _reader) return;
+        if (turn != null) _cancelChapter(immediate: true);
+        setState(() => _completionTurn = turn);
+      },
       actions: actions,
       onReady: () => _targetReady(reader),
       onCancelChapter: active && _changing && _operation != null
@@ -1678,9 +1711,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           canPop: _backLeaves(context, chromeVisible),
           onPopInvokedWithResult: (didPop, _) {
             if (didPop) {
+              _completionTurn?.invalidate();
               _cancelChapter(immediate: true);
               _beginLeaving();
               unawaited(_flushAfterPop());
+            } else if (_completionTurn case final turn?) {
+              turn.cancel();
             } else if (chromeVisible && _backClosesChrome(context)) {
               _chrome.value = false;
             } else {

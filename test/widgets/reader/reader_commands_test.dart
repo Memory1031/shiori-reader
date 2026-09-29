@@ -473,20 +473,23 @@ void main() {
     }, variant: windows);
   });
 
-  testWidgets('the completion page offers contents and settings but no '
-      'progress or toolbars', (tester) async {
+  testWidgets('the completion page offers contents, settings and chrome but no '
+      'progress', (tester) async {
     await pumpReader(tester, completion: BookTerminalState.finished);
     await rightClick(tester, const Offset(800, 500));
     expect(menuLabels(tester), [
       'Contents',
       'Reading settings',
       'Novel details',
+      'Show reading controls',
     ]);
     await key(tester, LogicalKeyboardKey.escape);
 
     await chord(tester, LogicalKeyboardKey.keyG, control: true);
     await key(tester, LogicalKeyboardKey.f2);
     expect(panel, findsNothing);
+    expect(chromeVisible(), isTrue);
+    await key(tester, LogicalKeyboardKey.f2);
     expect(chromeVisible(), isFalse);
 
     await chord(tester, LogicalKeyboardKey.keyT, control: true);

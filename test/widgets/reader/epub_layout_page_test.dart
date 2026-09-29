@@ -4,6 +4,7 @@ import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_completion_page.dart';
+import 'package:shiori/features/reader/reader_toolbars.dart';
 import 'completion_test.dart' show CompletionRepository;
 import 'dart:async';
 import 'dart:convert';
@@ -829,6 +830,28 @@ void main() {
               .value!;
       expect(saved.bookProgress!.terminal, BookTerminalState.finished);
       expect(saved.position.chapterFraction, 1);
+      final owner = platform.heads.single;
+      final completionReader = tester.widget<ReaderContentView>(
+        find.byType(ReaderContentView),
+      );
+      if (!completionReader.chrome!.value) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+        await tester.pumpAndSettle();
+      }
+      expect(
+        tester.widget<ReaderTopBar>(find.byType(ReaderTopBar)).title,
+        'Book',
+      );
+      expect(
+        tester
+            .widget<ReaderBottomBar>(find.byType(ReaderBottomBar))
+            .showProgress,
+        isFalse,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+      await tester.pumpAndSettle();
+      expect(platform.heads.single, same(owner));
+      expect(owner.disposed, isFalse);
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pumpAndSettle();
       expect(find.byType(ReaderCompletionPage), findsNothing);

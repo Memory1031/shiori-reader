@@ -22,6 +22,13 @@ class PagedReaderController {
       _state?._turn(1, queueIfTurning: queueIfTurning) ?? Future.value();
   Future<void> previous({bool queueIfTurning = false}) =>
       _state?._turn(-1, queueIfTurning: queueIfTurning) ?? Future.value();
+
+  /// Keep the already visible last page anchored to the canonical end on
+  /// later geometry changes, without replacing or restoring the current page.
+  void anchorAtEnd() {
+    if (_state case final state?) state._anchorAtEnd = true;
+  }
+
   int get measuredChunks => _state?._layout?.measuredChunks ?? 0;
   int get layoutGeneration => _state?._epoch ?? 0;
   int get cachedPages => _state?._pages.length ?? 0;

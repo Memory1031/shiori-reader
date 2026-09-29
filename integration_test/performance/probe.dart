@@ -1,5 +1,6 @@
 // Explicit profile entry. Only the dedicated test003 directory is touched.
 import 'dart:async';
+import 'completion_probe.dart' show runCompletionProbe;
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -45,6 +46,10 @@ T value<T>(Result<T> result) => (result as Success<T>).value;
 final token = CancellationSource().token;
 
 Future<void> main() async {
+  if (const bool.fromEnvironment('SHIORI_PROFILE_COMPLETION')) {
+    await runCompletionProbe();
+    return;
+  }
   started
       .start(); // Force initialization at entry, not at the first metric read.
   WidgetsFlutterBinding.ensureInitialized();
