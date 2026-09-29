@@ -4,12 +4,82 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/viewport/page_layout.dart';
+import 'package:shiori/features/reader/viewport/page_turn.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/features/reader/viewport/render_chunk.dart';
 
 import 'viewport_test.dart' show at;
 
 void main() {
+  testWidgets('reflow cancels a boundary handle once outside layout', (
+    tester,
+  ) async {
+    final controller = PagedReaderController();
+    final content = ChapterContent(
+      key: fixtureChapterKey(FixtureScenario.shortChapter),
+      title: 'Long boundary',
+      blocks: [
+        for (var i = 0; i < 100; i++)
+          ParagraphBlock(text: 'Paragraph $i ${'synthetic text ' * 10}'),
+      ],
+    );
+    late StateSetter rebuild;
+    var width = 300.0;
+    var starts = 0, cancels = 0, ends = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return Center(
+              child: SizedBox(
+                width: width,
+                height: 500,
+                child: PagedReaderViewport(
+                  content: content,
+                  controller: controller,
+                  startAtEnd: true,
+                  onBoundaryDrag: (_, _) {
+                    starts++;
+                    return BoundaryPageDrag(
+                      update: (_) {},
+                      end: (_) => ends++,
+                      cancel: () => setState(() => cancels++),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(PagedReaderViewport)),
+    );
+    await gesture.moveBy(const Offset(-24, 0));
+    await gesture.moveBy(const Offset(-90, 0));
+    await tester.pump();
+    expect(starts, 1);
+    rebuild(() => width = 260);
+    await tester.pump();
+    expect(controller.isRestoring, isTrue);
+    expect(cancels, 1);
+    expect(tester.takeException(), isNull);
+    await gesture.up();
+    rebuild(() => width = 240);
+    await tester.pumpAndSettle();
+    expect(cancels, 1);
+    expect(ends, 0);
+    final end = controller.capture();
+    final previous = controller.previous();
+    await tester.pumpAndSettle();
+    await previous;
+    expect(controller.capture(), isNot(end));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('target image state survives turn commit and reverse turn', (
     tester,
   ) async {

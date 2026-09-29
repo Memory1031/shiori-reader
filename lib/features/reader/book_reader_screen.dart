@@ -1507,7 +1507,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 : reader.novelStatus,
           )
         : null;
-    void bookEnd() {
+    bool bookEnd() {
       if (!mounted ||
           _invalidated ||
           _changing ||
@@ -1518,7 +1518,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           terminal == null ||
           !identical(order, _readingSequence().$1) ||
           _viewports[reader]?.isRestoring == true) {
-        return;
+        return false;
       }
       final state = bookEndState(
         local: _local,
@@ -1530,6 +1530,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       setState(() => _completion = state);
       reader.enterBookEnd(state);
       unawaited(reader.flushProgress());
+      return true;
     }
 
     final actions = ReaderActions(

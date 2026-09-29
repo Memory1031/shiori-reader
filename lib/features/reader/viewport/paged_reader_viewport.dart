@@ -452,13 +452,17 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     _dragDirection = null;
   }
 
-  void _dragCancel() {
+  BoundaryPageDrag? _retireGesture() {
     _gestureAccepted = false;
     _dragDistance = 0;
     _dragDirection = null;
     final drag = _boundaryDrag;
     _boundaryDrag = null;
-    drag?.cancel();
+    return drag;
+  }
+
+  void _dragCancel() {
+    _retireGesture()?.cancel();
     if (_target != null && !_turnAnimation.isAnimating) _finish(false);
   }
 
@@ -528,6 +532,12 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           _signature != signature || !listEquals(_imageGeometry, imageGeometry);
       if (changed && _userScrolling) _deferredLayout = true;
       if ((changed && !_userScrolling) || _positionReset) {
+        // A seek may remove the recognizer before it receives end/cancel.
+        // Retire its handle now; notify the host outside layout so cancellation
+        // can safely rebuild ancestors. Repeated retirement is a no-op.
+        if (_retireGesture() case final drag?) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => drag.cancel());
+        }
         _queuedDirection = null;
         _restoring = true;
         widget.onRestoreStart?.call();

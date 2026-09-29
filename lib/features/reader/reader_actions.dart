@@ -28,8 +28,9 @@ class ReaderActions {
   /// Step to the neighbouring chapter in reading order.
   final VoidCallback? previousChapter, nextChapter;
 
-  /// Forward past the last page of the book's final chapter.
-  final VoidCallback? bookEnd;
+  /// Commit completion after revalidating the book's final chapter. False
+  /// means the host rejected a stale request; the text must stay visible.
+  final bool Function()? bookEnd;
 
   /// Completion page: return to the text (also used before an in-chapter
   /// jump from the completion page), leave to the shelf, reread.

@@ -166,8 +166,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
   bool _commitCompletion(bool entering) {
     if (!_canCompletionTurn(entering)) return false;
     if (entering) {
+      if (!_actions.bookEnd!.call()) return false;
       if (!_usesPresentation) _paged.anchorAtEnd();
-      _actions.bookEnd!.call();
     } else {
       _actions.completionPrevious!.call();
     }

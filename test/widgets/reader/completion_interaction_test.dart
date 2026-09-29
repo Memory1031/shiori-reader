@@ -98,6 +98,7 @@ class Harness {
     Size size = const Size(600, 800),
     double scale = 1,
     Locale locale = const Locale('en'),
+    int? chapterIndex,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
@@ -111,7 +112,9 @@ class Harness {
               context,
             ).copyWith(textScaler: TextScaler.linear(scale)),
             child: BookReaderScreen(
-              chapter: repo.order.last,
+              chapter: chapterIndex == null
+                  ? repo.order.last
+                  : repo.keys[chapterIndex],
               repository: repo,
               library: library,
               settings: settings,
@@ -406,6 +409,133 @@ void main() {
       await h.close(tester);
     },
   );
+
+  testWidgets(
+    'catalog growth before the settling callback rejects completion without hiding text',
+    (tester) async {
+      final h = Harness();
+      await h.open(tester);
+      final source = h.view(tester);
+      final viewport = tester.state(find.byType(PagedReaderViewport));
+      final gesture = await drag(tester, true);
+      await gesture.up();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 30));
+      expect(frame(tester).progress, inExclusiveRange(.4, 1));
+      final beforeCatalog = h.view(tester);
+      var updated = false;
+      // Tickers run before the frame's microtasks and build. Publish the new
+      // catalog in that same phase, so the settling Future sees the new host
+      // basis while ReaderContentView still holds the previous callbacks.
+      tester.binding.scheduleFrameCallback((_) {
+        h.repo.count = 3;
+        h.repo.updates.add(h.repo.result(h.repo.catalog));
+        expect(h.view(tester), same(beforeCatalog));
+        updated = true;
+      });
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(updated, isTrue);
+      expect(h.view(tester).completion, isNull);
+      expect(h.view(tester).completionTarget, isNull);
+      expect(h.view(tester).session, same(source.session));
+      expect(terminals(h), 0);
+      expect(find.text('Visible final sentence.'), findsOneWidget);
+      expect(tester.state(find.byType(PagedReaderViewport)), same(viewport));
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pumpAndSettle();
+      expect(h.view(tester).content.key, h.repo.keys[2]);
+      expect(terminals(h), 0);
+      expect(tester.takeException(), isNull);
+      await h.close(tester);
+    },
+  );
+
+  for (final completion in [false, true]) {
+    testWidgets(
+      'held ${completion ? "completion" : "chapter"} drag retires during a long resize seek',
+      (tester) async {
+        final h = Harness();
+        h.repo.blocks = [
+          for (var i = 0; i < 80; i++)
+            ParagraphBlock(text: 'Paragraph $i ${'synthetic prose ' * 14}'),
+          ParagraphBlock(text: 'HELD RESIZE EOF'),
+        ];
+        await h.open(tester, chapterIndex: completion ? 1 : 0);
+        final source = h.view(tester);
+        final controller = source.viewportController!;
+        final content = source.content;
+        controller.restore(
+          ReaderPosition(
+            contentRevision: content.contentRevision,
+            blockKey: content.blocks.last.blockKey,
+            blockIndex: content.blocks.length - 1,
+            blockFraction: 1,
+            chapterFraction: 1,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('HELD RESIZE EOF'), findsOneWidget);
+        final viewport = tester.state(find.byType(PagedReaderViewport).first);
+        final generation = controller.layoutGeneration;
+        final gesture = await drag(tester, true);
+        if (completion) {
+          expect(frame(tester).progress, closeTo(.4, .001));
+        } else {
+          expect(h.view(tester).crossChapterTurning, isTrue);
+        }
+        tester.view.physicalSize = const Size(420, 700);
+        await tester.pump();
+        expect(controller.layoutGeneration, greaterThan(generation));
+        expect(controller.isRestoring, isTrue);
+        final sourceViewport = find.byWidgetPredicate(
+          (widget) =>
+              widget is PagedReaderViewport && widget.controller == controller,
+        );
+        expect(
+          find.descendant(
+            of: sourceViewport,
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: sourceViewport,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is GestureDetector &&
+                  widget.onHorizontalDragUpdate != null,
+            ),
+          ),
+          findsNothing,
+        );
+        // Release while the original recognizer is absent. No new horizontal
+        // drag may be needed to make discrete navigation work again.
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(controller.isRestoring, isFalse);
+        expect(h.view(tester).session, same(source.session));
+        expect(h.view(tester).completion, isNull);
+        expect(tester.state(sourceViewport), same(viewport));
+        expect(find.text('HELD RESIZE EOF'), findsOneWidget);
+        final end = controller.capture();
+        await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+        await tester.pumpAndSettle();
+        expect(controller.capture(), isNot(end));
+        expect(find.text('HELD RESIZE EOF'), findsNothing);
+        final previous = controller.capture();
+        await tester.tapAt(const Offset(50, 350));
+        await tester.pumpAndSettle();
+        expect(controller.capture(), isNot(previous));
+        expect(h.view(tester).content.key, source.content.key);
+        expect(h.library.sessions, 1);
+        expect(terminals(h), 0);
+        expect(tester.takeException(), isNull);
+        await h.close(tester);
+      },
+    );
+  }
 
   for (final event in [
     'background',
