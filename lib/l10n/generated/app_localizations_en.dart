@@ -789,7 +789,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importBusy =>
-      'Handle the pending file first, then open or share this file again.';
+      'The inbox is processing other files. Try again shortly, or check the files already waiting to be imported.';
 
   @override
   String get importUnsupported =>

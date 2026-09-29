@@ -1469,7 +1469,7 @@ abstract class AppLocalizations {
   /// No description provided for @importBusy.
   ///
   /// In en, this message translates to:
-  /// **'Handle the pending file first, then open or share this file again.'**
+  /// **'The inbox is processing other files. Try again shortly, or check the files already waiting to be imported.'**
   String get importBusy;
 
   /// No description provided for @importUnsupported.

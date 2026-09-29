@@ -357,7 +357,7 @@
   "importTooLarge": "文件超过 128 MiB，请选择较小的文件。",
   "importBatchLimit": "选择的文件过多或总大小超过批量导入限制，请减少文件后重试。",
   "importMultiple": "每次仅支持一个文件，请重新选择。",
-  "importBusy": "请先处理已有的待导入文件，再重新打开或分享此文件。",
+  "importBusy": "收件箱正在处理其他文件，请稍后重试；也可以先查看已有的待导入文件。",
   "importUnsupported": "请选择 TXT 或 EPUB 文件；不支持导入网页链接。",
   "importInvalid": "文件为空或内容与格式不符，请检查文件。",
   "importParserUnavailable": "当前版本暂不支持解析此格式。文件尚未导入，你可以取消并稍后重新选择。",

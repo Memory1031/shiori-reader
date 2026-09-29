@@ -725,7 +725,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importMultiple => '每次仅支持一个文件，请重新选择。';
 
   @override
-  String get importBusy => '请先处理已有的待导入文件，再重新打开或分享此文件。';
+  String get importBusy => '收件箱正在处理其他文件，请稍后重试；也可以先查看已有的待导入文件。';
 
   @override
   String get importUnsupported => '请选择 TXT 或 EPUB 文件；不支持导入网页链接。';

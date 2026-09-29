@@ -357,7 +357,7 @@
   "importTooLarge": "The file exceeds 128 MiB. Choose a smaller file.",
   "importBatchLimit": "The selection exceeds the batch import limit. Choose fewer or smaller files.",
   "importMultiple": "Only one file can be received at a time. Select again.",
-  "importBusy": "Handle the pending file first, then open or share this file again.",
+  "importBusy": "The inbox is processing other files. Try again shortly, or check the files already waiting to be imported.",
   "importUnsupported": "Choose a TXT or EPUB file. Web links cannot be imported.",
   "importInvalid": "The file is empty or its contents do not match the format.",
   "importParserUnavailable": "This version cannot parse this format yet. Nothing was imported. You can cancel and choose the file again later.",

@@ -181,14 +181,21 @@ class MainActivity : FlutterActivity() {
 
     private fun prepare(uri: Uri): ImportInbox.Input {
         if (uri.scheme != "content") throw ImportInbox.Issue("unsupported")
+        var size: Long? = null
         val name = try {
-            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-                if (it.moveToFirst()) it.getString(0) else null
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use {
+                if (!it.moveToFirst()) return@use null
+                val sizeColumn = it.getColumnIndex(OpenableColumns.SIZE)
+                if (sizeColumn >= 0 && !it.isNull(sizeColumn)) {
+                    size = it.getString(sizeColumn)?.toLongOrNull()?.takeIf { value -> value >= 0 }
+                }
+                val nameColumn = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (nameColumn >= 0) it.getString(nameColumn) else null
             }
         } catch (e: Exception) { throw ImportInbox.Issue("unreadable", e) }
         if (name.isNullOrEmpty()) throw ImportInbox.Issue("unreadable")
         // Providers may omit or lie about SIZE. The inbox enforces actual bytes.
-        return ImportInbox.Input(name) {
+        return ImportInbox.Input(name, size) {
             contentResolver.openInputStream(uri) ?: throw ImportInbox.Issue("unreadable")
         }
     }
