@@ -583,6 +583,9 @@ class _ReadingHomeState extends State<ReadingHome> {
                     maxWidth: ShioriLayout.page,
                   ),
                   child: BookshelfView(
+                    localReparse: widget.localBooks is LocalBookReparse
+                        ? widget.localBooks as LocalBookReparse
+                        : null,
                     controller: _library,
                     images: widget.images,
                     onOpen: _continue,

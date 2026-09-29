@@ -3,6 +3,8 @@ import '../../support/reader_actions.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/routes.dart';
@@ -10,6 +12,8 @@ import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/reader_preferences.dart';
+import 'package:shiori/features/reader/reader_linked_text.dart';
+import 'package:shiori/features/reader/viewport/render_chunk.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/settings_panel.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
@@ -207,32 +211,52 @@ void main() {
   });
 
   testWidgets(
-    'panel previews typography and theme; both modes preserve anchor at large scale',
+    'panel previews typography and theme; paged reflow keeps the visible anchor',
     (tester) async {
       tester.view.physicalSize = const Size(400, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final env = FixtureEnvironment();
+      // One paragraph crosses default chunks and several pages before its
+      // 60% target. Numbered Chinese text prevents a wrong page matching it.
+      final source = List.generate(
+        400,
+        (i) => '第${i.toString().padLeft(3, '0')}段内合成文字星空山川😀。',
+      ).join().runes.toList();
+      final targetOffset = (source.length * .6).round();
+      const marker = '📚';
+      source[targetOffset] = marker.runes.single;
+      final content = ChapterContent(
+        key: fixtureChapterKey(FixtureScenario.extremeParagraph),
+        title: 'Settings reflow',
+        blocks: [ParagraphBlock(text: String.fromCharCodes(source))],
+      );
       final store = Store();
       await tester.pumpWidget(
         ShioriApp(
           locale: const Locale('en'),
           routes: AppRoutes(
-            home: (_) => ReaderContentView(
-              content: env.source.data.content(
-                FixtureScenario.extremeParagraph,
-              ),
-              settings: store,
-            ),
+            home: (_) => ReaderContentView(content: content, settings: store),
           ),
         ),
       );
       await tester.pumpAndSettle();
-      var paged = tester.widget<PagedReaderViewport>(
-        find.byType(PagedReaderViewport),
+      final viewport = find.byType(PagedReaderViewport);
+      var paged = tester.widget<PagedReaderViewport>(viewport);
+      final controller = paged.controller;
+      final readerState = tester.state(find.byType(ReaderContentView));
+      final viewportState = tester.state(viewport);
+      final chunks = ChunkIndex(
+        content,
+        maxCodePoints: paged.maxChunkCodePoints,
       );
-      final content = paged.content;
+      expect(chunks.chunks.length, greaterThan(1));
+      expect(
+        chunks.chunks.indexWhere(
+          (c) => c.start <= targetOffset && c.end > targetOffset,
+        ),
+        greaterThan(0),
+      );
       final anchor = ReaderPosition(
         contentRevision: content.contentRevision,
         blockKey: content.blocks.first.blockKey,
@@ -240,62 +264,165 @@ void main() {
         blockFraction: .6,
         chapterFraction: .6 / content.blocks.length,
       );
-      paged.controller.restore(anchor);
+      List<(int, int)> visibleRanges() => tester
+          .widgetList<ReaderLinkedText>(find.byType(ReaderLinkedText))
+          .map((w) => (w.blockOffset, w.blockOffset + w.text.runes.length))
+          .toList();
+      // The initial page ends before the target, rather than fitting the
+      // shortened fixture or its deep anchor onto the first screen.
+      expect(visibleRanges().last.$2, lessThan(targetOffset));
+      final initialPaper = Theme.of(
+        tester.element(viewport),
+      ).scaffoldBackgroundColor;
+      controller.restore(anchor);
+      await tester.pump();
+      expect(
+        controller.isRestoring,
+        isTrue,
+        reason: 'deep seek still spans frames',
+      );
       await tester.pumpAndSettle();
+
+      void expectVisibleAnchor({
+        required double font,
+        required double height,
+        required double scale,
+      }) {
+        expect(tester.state(find.byType(ReaderContentView)), same(readerState));
+        expect(tester.state(viewport), same(viewportState));
+        expect(
+          tester.widget<PagedReaderViewport>(viewport).controller,
+          same(controller),
+        );
+        expect(controller.isRestoring, isFalse);
+        expect(controller.capture()!.blockKey, anchor.blockKey);
+        final ranges = visibleRanges();
+        expect(ranges.first.$1, greaterThan(0), reason: 'not the first page');
+        expect(
+          ranges.last.$2,
+          lessThan(source.length),
+          reason: 'more pages remain',
+        );
+        final fragment = find.byWidgetPredicate(
+          (w) => w is ReaderLinkedText && w.text.contains(marker),
+        );
+        expect(fragment, findsOneWidget);
+        final text = tester.widget<ReaderLinkedText>(fragment);
+        expect(text.blockOffset, lessThanOrEqualTo(targetOffset));
+        expect(
+          text.blockOffset + text.text.runes.length,
+          greaterThan(targetOffset),
+        );
+        expect(
+          text.text,
+          String.fromCharCodes(
+            source.skip(text.blockOffset).take(text.text.runes.length),
+          ),
+        );
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: fragment, matching: find.byType(RichText)),
+        );
+        expect(paragraph.text.style!.fontSize, font);
+        expect(paragraph.text.style!.height, height);
+        expect(paragraph.textScaler.scale(font), font * scale);
+        // Source offsets are code points; RenderParagraph selections include
+        // the indentation prefix and use UTF-16 (including the emoji marker).
+        final start =
+            text.prefix.length +
+            String.fromCharCodes(
+              source.sublist(text.blockOffset, targetOffset),
+            ).length;
+        final boxes = paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: start, extentOffset: start + marker.length),
+        );
+        expect(boxes, isNotEmpty);
+        final page = tester.getRect(viewport);
+        for (final box in boxes) {
+          final rect = box.toRect().shift(paragraph.localToGlobal(Offset.zero));
+          expect(rect.isEmpty, isFalse);
+          expect(page.contains(rect.topLeft), isTrue);
+          expect(page.contains(rect.bottomRight), isTrue);
+        }
+      }
+
+      expectVisibleAnchor(font: 20, height: 1.6, scale: 1);
+      final beforeSettings = visibleRanges();
+      final generation = controller.layoutGeneration;
       await openReaderSettings(tester);
       await tester.pumpAndSettle();
       final panel = tester.widget<ReaderSettingsPanel>(
         find.byType(ReaderSettingsPanel),
       );
-      panel.preferences.update(
-        ReaderSettings(
-          fontSize: 30,
-          horizontalPadding: 40,
-          paragraphSpacing: 24,
-          lineHeight: 2,
-          themeMode: ReaderThemeMode.dark,
-        ),
+      final updated = ReaderSettings(
+        fontSize: 30,
+        horizontalPadding: 40,
+        paragraphSpacing: 24,
+        lineHeight: 2,
+        themeMode: ReaderThemeMode.dark,
       );
+      panel.preferences.update(updated);
       await tester.pumpAndSettle();
-      paged = tester.widget<PagedReaderViewport>(
-        find.byType(PagedReaderViewport),
-      );
+      paged = tester.widget<PagedReaderViewport>(viewport);
       expect(paged.textStyle.fontSize, 30);
+      expect(paged.textStyle.height, 2);
       expect(paged.paragraphSpacing, 24);
       expect(
-        tester.getSize(find.byType(PagedReaderViewport)).width,
+        tester.getSize(viewport).width,
         400 -
             2 *
                 readerHorizontalMargin(
                   panel.preferences.value,
-                  MediaQuery.textScalerOf(
-                    tester.element(find.byType(PagedReaderViewport)),
-                  ),
+                  MediaQuery.textScalerOf(tester.element(viewport)),
                   TextDirection.ltr,
                 ),
       );
+      expect(Theme.of(tester.element(viewport)).brightness, Brightness.dark);
       expect(
-        Theme.of(tester.element(find.byType(PagedReaderViewport))).brightness,
-        Brightness.dark,
+        Theme.of(tester.element(viewport)).scaffoldBackgroundColor,
+        isNot(initialPaper),
       );
-      expect(paged.controller.capture()!.blockFraction, closeTo(.6, .002));
+      expect(controller.capture()!.blockFraction, closeTo(.6, .002));
+      expect(controller.layoutGeneration, greaterThan(generation));
+      expect(visibleRanges(), isNot(beforeSettings));
+      expectVisibleAnchor(font: 30, height: 2, scale: 1);
       Navigator.of(tester.element(find.byType(ReaderSettingsPanel))).pop();
       await tester.pumpAndSettle();
+      expect(controller.capture()!.blockFraction, closeTo(.6, .002));
+      expectVisibleAnchor(font: 30, height: 2, scale: 1);
+      final beforeRotation = visibleRanges();
+      final rotationGeneration = controller.layoutGeneration;
       tester.platformDispatcher.textScaleFactorTestValue = 2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       tester.view.physicalSize = const Size(900, 400);
       await tester.pumpAndSettle();
-      paged = tester.widget<PagedReaderViewport>(
-        find.byType(PagedReaderViewport),
-      );
+      paged = tester.widget<PagedReaderViewport>(viewport);
       expect(paged.controller.capture()!.blockFraction, closeTo(.6, .004));
+      expect(controller.layoutGeneration, greaterThan(rotationGeneration));
+      expect(visibleRanges(), isNot(beforeRotation));
+      expectVisibleAnchor(font: 30, height: 2, scale: 2);
+      final rotatedRanges = visibleRanges();
+      // Continue reading through actual keyboard input, then return to the
+      // target before checking that the rotated settings panel still opens.
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pumpAndSettle();
+      expect(controller.capture()!.blockFraction, greaterThan(.6));
+      expect(visibleRanges(), isNot(rotatedRanges));
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+      await tester.pumpAndSettle();
+      expectVisibleAnchor(font: 30, height: 2, scale: 2);
       await openReaderSettings(tester);
       await tester.pumpAndSettle();
+      expect(find.byType(ReaderSettingsPanel), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
       expect(store.value.mode, ReaderMode.paged);
-      await env.close();
+      expect(store.value.fontSize, updated.fontSize);
+      expect(store.value.horizontalPadding, updated.horizontalPadding);
+      expect(store.value.paragraphSpacing, updated.paragraphSpacing);
+      expect(store.value.lineHeight, updated.lineHeight);
+      expect(store.value.themeMode, updated.themeMode);
+      expect(store.writes.last, store.value);
     },
   );
 }
