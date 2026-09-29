@@ -1,5 +1,98 @@
 import 'dart:io';
 
+const _extensionConfigPath = 'ios/ShareExtension/ShareExtension.xcconfig';
+
+// Read the committed Xcode object graph rather than counting version strings:
+// an unused configuration must not stand in for a target's actual configuration.
+void _validateExtensionVersioning(String project, String config) {
+  Never invalid() => throw StateError(
+    'ShareExtension Debug/Release/Profile must use ShareExtension.xcconfig '
+    'and inherit Flutter versions without target overrides.',
+  );
+
+  final objects = <String, String>{
+    for (final match in RegExp(
+      r'^\t\t([A-F0-9]{24}) /\* [^\r\n]* \*/ = \{\r?\n(.*?)^\t\t\};',
+      multiLine: true,
+      dotAll: true,
+    ).allMatches(project))
+      match[1]!: match[2]!,
+  };
+  String value(String object, String key) {
+    final matches = RegExp(
+      '${RegExp.escape(key)} = ([^;]+);',
+    ).allMatches(object).toList();
+    if (matches.length != 1) invalid();
+    return matches.single[1]!
+        .replaceAll(RegExp(r'/\*.*?\*/'), '')
+        .trim()
+        .replaceAll('"', '');
+  }
+
+  final targets = objects.values
+      .where(
+        (object) =>
+            object.contains('isa = PBXNativeTarget;') &&
+            value(object, 'name') == 'ShareExtension',
+      )
+      .toList();
+  if (targets.length != 1) invalid();
+  final list = objects[value(targets.single, 'buildConfigurationList')];
+  if (list == null || !list.contains('isa = XCConfigurationList;')) invalid();
+  final ids = RegExp(
+    r'buildConfigurations = \((.*?)\);',
+    dotAll: true,
+  ).firstMatch(list);
+  if (ids == null) invalid();
+  final configurations = RegExp(
+    r'[A-F0-9]{24}',
+  ).allMatches(ids[1]!).map((match) => objects[match[0]!]).toList();
+  if (configurations.length != 3 || configurations.any((c) => c == null)) {
+    invalid();
+  }
+  final names = <String>{};
+  final references = <String>{};
+  for (final configuration in configurations.cast<String>()) {
+    if (!configuration.contains('isa = XCBuildConfiguration;') ||
+        RegExp(
+          r'^\s*"?(?:MARKETING_VERSION|CURRENT_PROJECT_VERSION|FLUTTER_BUILD_NAME|FLUTTER_BUILD_NUMBER)(?:\[[^\n]+\])?"?\s*=',
+          multiLine: true,
+        ).hasMatch(configuration)) {
+      invalid();
+    }
+    names.add(value(configuration, 'name'));
+    references.add(value(configuration, 'baseConfigurationReference'));
+  }
+  if (names.length != 3 ||
+      !names.containsAll(['Debug', 'Release', 'Profile']) ||
+      references.length != 1) {
+    invalid();
+  }
+  final reference = RegExp(
+    '^\\t\\t${RegExp.escape(references.single)} /\\* [^\\r\\n]* \\*/ = \\{([^\\r\\n]+)\\};',
+    multiLine: true,
+  ).firstMatch(project)?[1];
+  if (reference == null ||
+      value(reference, 'isa') != 'PBXFileReference' ||
+      value(reference, 'path') != 'ShareExtension/ShareExtension.xcconfig' ||
+      value(reference, 'sourceTree') != 'SOURCE_ROOT') {
+    invalid();
+  }
+  // This small file is deliberately limited to one include and two mappings.
+  // Extra assignments or includes could silently override the version source.
+  final lines = config
+      .split('\n')
+      .map((line) => line.split('//').first.trim())
+      .where((line) => line.isNotEmpty)
+      .toList();
+  if (lines.length != 3 ||
+      lines[0] != '#include "../Flutter/Generated.xcconfig"' ||
+      lines[1] != r'MARKETING_VERSION = $(FLUTTER_BUILD_NAME)' ||
+      lines[2] != r'CURRENT_PROJECT_VERSION = $(FLUTTER_BUILD_NUMBER)') {
+    invalid();
+  }
+}
+
 /// Preview by default. Publishing requires an explicit --publish argument.
 void main(List<String> args) {
   const usage =
@@ -91,22 +184,8 @@ void publishRelease(String directory, String tag, {bool publish = false}) {
     );
   }
   final project = git(['show', '$source:ios/Runner.xcodeproj/project.pbxproj']);
-  final extensions = RegExp(r'buildSettings = \{([^}]+)\};')
-      .allMatches(project)
-      .where(
-        (match) =>
-            match[1]!.contains('INFOPLIST_FILE = ShareExtension/Info.plist;'),
-      );
-  if (extensions.isEmpty ||
-      extensions.any(
-        (match) =>
-            !match[1]!.contains('MARKETING_VERSION = ${version[1]};') ||
-            !match[1]!.contains('CURRENT_PROJECT_VERSION = ${version[2]};'),
-      )) {
-    throw StateError(
-      'ShareExtension version/build must match pubspec in every configuration.',
-    );
-  }
+  final extensionConfig = git(['show', '$source:$_extensionConfigPath']);
+  _validateExtensionVersioning(project, extensionConfig);
   final remote = git([
     'ls-remote',
     'origin',
@@ -200,7 +279,8 @@ void publishRelease(String directory, String tag, {bool publish = false}) {
   // Validate the merged tree, not just the source branch: master-only changes
   // must not silently alter the version used by the release workflow.
   if (git(['show', 'HEAD:pubspec.yaml']) != pubspec ||
-      git(['show', 'HEAD:ios/Runner.xcodeproj/project.pbxproj']) != project) {
+      git(['show', 'HEAD:ios/Runner.xcodeproj/project.pbxproj']) != project ||
+      git(['show', 'HEAD:$_extensionConfigPath']) != extensionConfig) {
     throw StateError(
       'Merged version configuration differs from develop. Review master before tagging.',
     );
@@ -290,28 +370,10 @@ String prepareRelease(
     }
     tag = 'v$next-beta.${highest + 1}';
   }
-  final project = File('$directory/ios/Runner.xcodeproj/project.pbxproj');
-  final projectOriginal = project.readAsStringSync();
-  var count = 0;
-  final updated = projectOriginal.replaceAllMapped(
-    RegExp(r'buildSettings = \{([^}]+)\};'),
-    (block) {
-      if (!block[1]!.contains('INFOPLIST_FILE = ShareExtension/Info.plist;')) {
-        return block[0]!;
-      }
-      count++;
-      final marketing = RegExp(r'MARKETING_VERSION = [^;]+;');
-      final number = RegExp(r'CURRENT_PROJECT_VERSION = [^;]+;');
-      if (marketing.allMatches(block[0]!).length != 1 ||
-          number.allMatches(block[0]!).length != 1) {
-        throw StateError('Invalid ShareExtension version configuration.');
-      }
-      return block[0]!
-          .replaceAll(marketing, 'MARKETING_VERSION = $next;')
-          .replaceAll(number, 'CURRENT_PROJECT_VERSION = $build;');
-    },
+  _validateExtensionVersioning(
+    File('$directory/ios/Runner.xcodeproj/project.pbxproj').readAsStringSync(),
+    File('$directory/$_extensionConfigPath').readAsStringSync(),
   );
-  if (count == 0) throw StateError('ShareExtension configuration missing.');
   stdout.writeln(
     'Version: ${match[1]}.${match[2]}.${match[3]} -> $next\nInternal build: ${match[4]} -> $build\nRelease tag: $tag',
   );
@@ -319,12 +381,11 @@ String prepareRelease(
     pubspec.writeAsStringSync(
       original.replaceRange(match.start, match.end, 'version: $next+$build'),
     );
-    project.writeAsStringSync(updated);
     stdout.writeln(
       'Prepared $tag. Review, commit and push develop; after CI passes run:\ndart tool/publish_release.dart $tag --publish',
     );
   } else {
-    stdout.writeln('Preview only. Add --apply to update version files.');
+    stdout.writeln('Preview only. Add --apply to update pubspec.yaml.');
   }
   return next;
 }

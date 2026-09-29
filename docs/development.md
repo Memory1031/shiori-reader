@@ -34,7 +34,7 @@ Windows 拉取固定提交的 WebView Git 依赖需要 Git 支持长路径；可
 
 iOS 安装依赖后在 `ios` 目录执行 `pod install`，打开 `ios/Runner.xcworkspace`。不要打开单独的 `.xcodeproj` 来构建 CocoaPods 工程。选择实际设备，给 Runner 和 ShareExtension 配置自己的 Team、匹配的 App Group 与唯一 Bundle ID；不要借用公司 Team。签名及个人安装边界见[发布说明](release/README.md)。
 
-更改 pubspec 版本后，直接在 Xcode 构建前先同步本地 Flutter 参数，避免 Runner 使用旧构建号而 ShareExtension 已更新：
+版本与构建号只修改 `pubspec.yaml`。Runner 与 ShareExtension 共用 Flutter 生成的版本变量；更改 pubspec 后，直接在 Xcode 构建前先同步本地 Flutter 参数，避免使用旧版本：
 
 ```sh
 fvm flutter build ios --config-only --release --no-codesign --no-pub

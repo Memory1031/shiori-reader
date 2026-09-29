@@ -112,6 +112,7 @@
 		D61C133A31F7C3E5EB1B5253 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		D8FB0406F4F764B9E502D618 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E2680F65CFFC6F10CA9EB0AA /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E70200000000000000000001 /* ShareExtension.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = ShareExtension.xcconfig; path = ShareExtension/ShareExtension.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -165,6 +166,7 @@
 		46169B5208DDFC4C4D89CFFB /* ShareExtension */ = {
 			isa = PBXGroup;
 			children = (
+				E70200000000000000000001 /* ShareExtension.xcconfig */,
 				7AF0D59409E30866AC69D77B /* ShareViewController.swift */,
 				D8FB0406F4F764B9E502D618 /* Info.plist */,
 				09DE50DF7925D857668E1C5D /* ShareExtension.entitlements */,
@@ -568,16 +570,15 @@
 /* Begin XCBuildConfiguration section */
 		006068B0FCA81F3AA7B4D9E7 /* Profile */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E70200000000000000000001 /* ShareExtension.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_TEAM = V95CZH463Y;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.shiori.reader.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -717,16 +718,15 @@
 		};
 		36049AA6F05B2752A0E63A78 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E70200000000000000000001 /* ShareExtension.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_TEAM = V95CZH463Y;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.shiori.reader.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -739,16 +739,15 @@
 		};
 		85C1EC4F835BA79CAF20E01B /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E70200000000000000000001 /* ShareExtension.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_TEAM = V95CZH463Y;
 				INFOPLIST_FILE = ShareExtension/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.shiori.reader.ShareExtension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

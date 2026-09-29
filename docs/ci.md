@@ -52,7 +52,7 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 
 本地缺少 `key.properties` 时构建配置可回退 Debug 签名，因此 **Release 编译不等于正式签名**。密钥和密码需自行安全备份，不提交 Git。换电脑需要恢复同一密钥才能保持 Android 更新身份。
 
-标签不会自动修改包内版本；发版时人工对齐 `pubspec.yaml`、build number、iOS 扩展版本和 tag。发布准备与许可边界见[发布说明](release/README.md)。iOS 发布链路见[iOS TestFlight 发布](#ios-testflight-发布)。
+标签不会自动修改包内版本；发版时在 `pubspec.yaml` 准备版本和构建号，并对齐 tag。iOS Runner 与 ShareExtension 从 Flutter 生成配置继承版本，不在 Xcode 工程中维护数字。发布准备与许可边界见[发布说明](release/README.md)。iOS 发布链路见[iOS TestFlight 发布](#ios-testflight-发布)。
 
 ### Android 产物校验
 

@@ -15,6 +15,15 @@ class _CapturedStdout implements Stdout {
 }
 
 void main() {
+  final projectTemplate = File(
+    'ios/Runner.xcodeproj/project.pbxproj',
+  ).readAsStringSync();
+  final configTemplate = File(
+    'ios/ShareExtension/ShareExtension.xcconfig',
+  ).readAsStringSync();
+  const configPath = 'ios/ShareExtension/ShareExtension.xcconfig';
+  const configReference =
+      'baseConfigurationReference = E70200000000000000000001 /* ShareExtension.xcconfig */;';
   late Directory temporary;
   late String repo;
   late String remote;
@@ -44,11 +53,10 @@ void main() {
     File('$repo/pubspec.yaml').writeAsStringSync('version: 1.0.0+2\n');
     final project = File('$repo/ios/Runner.xcodeproj/project.pbxproj');
     project.parent.createSync(recursive: true);
-    project.writeAsStringSync(
-      'buildSettings = {\n'
-      'INFOPLIST_FILE = ShareExtension/Info.plist;\n'
-      'MARKETING_VERSION = 1.0.0;\nCURRENT_PROJECT_VERSION = 2;\n};',
-    );
+    project.writeAsStringSync(projectTemplate);
+    final config = File('$repo/$configPath');
+    config.parent.createSync(recursive: true);
+    config.writeAsStringSync(configTemplate);
     commit('initial');
     git(['remote', 'add', 'origin', remote]);
     git(['push', '-u', 'origin', 'develop']);
@@ -62,7 +70,7 @@ void main() {
     'minor': '1.3.0',
     'major': '2.0.0',
   }.entries) {
-    test('prepare ${entry.key} synchronizes version without publishing', () {
+    test('prepare ${entry.key} only updates pubspec without publishing', () {
       File('$repo/pubspec.yaml').writeAsStringSync('version: 1.2.3+9\n');
       commit('version-base');
       final before = git(['show-ref']);
@@ -76,8 +84,9 @@ void main() {
       final project = File(
         '$repo/ios/Runner.xcodeproj/project.pbxproj',
       ).readAsStringSync();
-      expect(project, contains('MARKETING_VERSION = ${entry.value};'));
-      expect(project, contains('CURRENT_PROJECT_VERSION = 10;'));
+      expect(project, projectTemplate);
+      expect(File('$repo/$configPath').readAsStringSync(), configTemplate);
+      expect(git(['diff', '--name-only']), 'pubspec.yaml');
       expect(git(['show-ref']), before);
       expect(
         () => prepareRelease(repo, entry.key, apply: true),
@@ -167,6 +176,94 @@ void main() {
     },
   );
 
+  for (final (id, configuration) in [
+    ('36049AA6F05B2752A0E63A78', 'Debug'),
+    ('85C1EC4F835BA79CAF20E01B', 'Release'),
+    ('006068B0FCA81F3AA7B4D9E7', 'Profile'),
+  ]) {
+    for (final setting in [
+      'CURRENT_PROJECT_VERSION = 18;',
+      'MARKETING_VERSION = 1.3.0;',
+      'FLUTTER_BUILD_NUMBER = 18;',
+      '"MARKETING_VERSION[sdk=iphoneos*]" = 1.3.0;',
+    ]) {
+      test('rejects $configuration version override $setting', () {
+        final project = File('$repo/ios/Runner.xcodeproj/project.pbxproj');
+        final start = projectTemplate.indexOf('$id /* $configuration */ = {');
+        final end = projectTemplate.indexOf('\n\t\t};', start);
+        project.writeAsStringSync(
+          projectTemplate.replaceRange(
+            start,
+            end,
+            projectTemplate
+                .substring(start, end)
+                .replaceFirst(
+                  'buildSettings = {',
+                  'buildSettings = {\n\t\t\t\t$setting',
+                ),
+          ),
+        );
+        commit('override');
+        git(['push', 'origin', 'develop']);
+        final before = git(['show-ref']);
+        expect(
+          () => prepareRelease(repo, 'patch', apply: true),
+          throwsStateError,
+        );
+        expect(
+          () => publishRelease(repo, 'v1.0.0-beta.1', publish: true),
+          throwsStateError,
+        );
+        expect(git(['status', '--porcelain']), isEmpty);
+        expect(git(['show-ref']), before);
+      });
+    }
+  }
+
+  for (final invalidConfig in [
+    '#include? "../Flutter/Generated.xcconfig"\n'
+        r'MARKETING_VERSION = $(FLUTTER_BUILD_NAME)'
+        '\n'
+        r'CURRENT_PROJECT_VERSION = $(FLUTTER_BUILD_NUMBER)',
+    configTemplate.replaceFirst(r'$(FLUTTER_BUILD_NUMBER)', '18'),
+    configTemplate.replaceFirst(r'$(FLUTTER_BUILD_NAME)', '1.3.0'),
+    '${configTemplate}FLUTTER_BUILD_NUMBER = 18\n',
+    '$configTemplate#include "Other.xcconfig"\n',
+  ]) {
+    test('rejects xcconfig that can bypass the pubspec version source', () {
+      File('$repo/$configPath').writeAsStringSync(invalidConfig);
+      commit('invalid-config');
+      git(['push', 'origin', 'develop']);
+      expect(() => publishRelease(repo, 'v1.0.0'), throwsStateError);
+    });
+  }
+
+  for (final replacement in [
+    '',
+    'baseConfigurationReference = 9740EEB31CF90195004384FC /* Generated.xcconfig */;',
+  ]) {
+    test('rejects a disconnected extension configuration', () {
+      File('$repo/ios/Runner.xcodeproj/project.pbxproj').writeAsStringSync(
+        projectTemplate.replaceFirst(configReference, replacement),
+      );
+      commit('disconnected-config');
+      git(['push', 'origin', 'develop']);
+      expect(() => publishRelease(repo, 'v1.0.0'), throwsStateError);
+    });
+  }
+
+  test('rejects an incomplete extension target configuration list', () {
+    File('$repo/ios/Runner.xcodeproj/project.pbxproj').writeAsStringSync(
+      projectTemplate.replaceFirst(
+        '\t\t\t\t006068B0FCA81F3AA7B4D9E7 /* Profile */,\n',
+        '',
+      ),
+    );
+    commit('missing-profile');
+    git(['push', 'origin', 'develop']);
+    expect(() => publishRelease(repo, 'v1.0.0'), throwsStateError);
+  });
+
   test('preview leaves branch and tag refs unchanged', () {
     final before = git(['show-ref']);
     publishRelease(repo, 'v1.0.0');
@@ -250,21 +347,28 @@ void main() {
     expect(() => publishRelease(repo, 'v1.0.0'), throwsStateError);
   });
 
-  test('rejects mismatched extension and diverged local master', () {
-    final project = File('$repo/ios/Runner.xcodeproj/project.pbxproj');
-    project.writeAsStringSync(
-      project.readAsStringSync().replaceAll('1.0.0;', '0.1.0;'),
-    );
-    commit('bad-extension');
-    git(['push', 'origin', 'develop']);
-    expect(() => publishRelease(repo, 'v1.0.0'), throwsStateError);
-    project.writeAsStringSync(
-      project.readAsStringSync().replaceAll('0.1.0;', '1.0.0;'),
-    );
-    commit('fixed-extension');
-    git(['push', 'origin', 'develop']);
+  test('rejects diverged local master', () {
     git(['branch', 'master']);
     expect(() => publishRelease(repo, 'v1.0.0'), throwsStateError);
+  });
+
+  test('rejects master-only xcconfig changes before tagging', () {
+    git(['switch', '-c', 'master']);
+    File(
+      '$repo/$configPath',
+    ).writeAsStringSync('$configTemplate\nFLUTTER_BUILD_NUMBER = 18\n');
+    commit('master-version-override');
+    git(['push', 'origin', 'master']);
+    final previous = git(['rev-parse', 'master']);
+    git(['switch', 'develop']);
+    commit('next');
+    git(['push', 'origin', 'develop']);
+    expect(
+      () => publishRelease(repo, 'v1.0.0', publish: true),
+      throwsStateError,
+    );
+    expect(git(['rev-parse', 'master'], cwd: remote), previous);
+    expect(git(['tag', '--list']), isEmpty);
   });
 
   test('merge conflict leaves remote untouched and creates no tag', () {

@@ -6,7 +6,7 @@
 
 | 文件 | 核对内容 |
 | --- | --- |
-| [pubspec.yaml](../../pubspec.yaml)、[iOS 工程](../../ios/Runner.xcodeproj/project.pbxproj) | 当前版本、内部构建号、ShareExtension 一致性；Runner 使用 Flutter 变量 |
+| [pubspec.yaml](../../pubspec.yaml)、[ShareExtension 配置](../../ios/ShareExtension/ShareExtension.xcconfig) | pubspec 是版本与构建号的唯一来源；iOS Runner 与 ShareExtension 均继承 Flutter 生成变量 |
 | `docs/release/notes/vX.Y.Z.md`、上个 tag 到 develop 的 Git diff | 实际变更、升级提醒、已知限制 |
 | [开发说明](../development.md) | 固定工具链和本地验证命令 |
 | [CI](../ci.md)、Android / Windows / iOS 工作流 | 签名配置、触发规则和上传方式 |
@@ -22,7 +22,7 @@ dart tool/publish_release.dart prepare patch
 dart tool/publish_release.dart prepare patch --apply
 ```
 
-支持 patch / minor / major，内部构建号递增，同步 pubspec 与全部 ShareExtension 配置。已 prepare 的版本不要重复执行，先检查 diff；提交后再次 prepare 会继续递增。
+支持 patch / minor / major，内部构建号递增，只修改 `pubspec.yaml`。ShareExtension 的 Debug / Release / Profile 共用 xcconfig，从 `Flutter/Generated.xcconfig` 继承版本；prepare 与发布预检会拒绝缺失配置或 target 版本覆盖。已 prepare 的版本不要重复执行，先检查 diff；提交后再次 prepare 会继续递增。
 
 同一基础版本从 beta 转为首次正式发布时使用 `prepare stable`，保持 `X.Y.Z` 并递增构建号；目标正式标签必须尚未发布。发布检查要求构建号高于已公开的所有正式 / beta 包。
 
@@ -30,7 +30,7 @@ dart tool/publish_release.dart prepare patch --apply
 
 ### 同版本 beta
 
-日常测试版本使用 `prepare beta`，保留当前 `X.Y.Z`，递增内部构建号并同步全部 ShareExtension 配置：
+日常测试版本使用 `prepare beta`，保留当前 `X.Y.Z`，仅递增 pubspec 中的内部构建号：
 
 ```sh
 dart tool/publish_release.dart prepare beta
@@ -62,7 +62,7 @@ dart tool/publish_release.dart vX.Y.Z
 dart tool/publish_release.dart vX.Y.Z --publish
 ```
 
-第一条只预览；第二条用于已获授权的正式发布。要求工作区干净、develop 与 origin/develop 一致、标签不存在、包内与扩展版本一致。脚本优先快进 master，创建附注标签并原子推送 master / tag，成功后回到 develop。
+第一条只预览；第二条用于已获授权的正式发布。要求工作区干净、develop 与 origin/develop 一致、标签不存在、标签版本与 pubspec 一致，且 ShareExtension 版本继承结构完整。脚本优先快进 master，核对合并后的 pubspec、iOS 工程及扩展 xcconfig 与已验证的 develop 一致，再创建附注标签并原子推送 master / tag，成功后回到 develop。
 
 master 仅是发布中间分支。tag 同时触发 Android 签名 APK、Windows x64 ZIP 与 iOS 签名 / TestFlight 上传；APK 和 ZIP 均构建成功后统一发布到 GitHub Release，不等待日常 CI，也不重复 UT / analyze。CI 绿色不能替代本地测试记录。
 
