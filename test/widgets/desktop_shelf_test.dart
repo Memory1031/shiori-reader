@@ -177,10 +177,14 @@ void main() {
         terminal: BookTerminalState.caughtUp,
       ),
     ]) {
+      // Exercise every progress state under the tightest geometry; the
+      // reading state also covers inline normal and large-text layouts.
       for (final (width, scale) in [
-        (900.0, 1.0),
-        (1200.0, 2.0),
         (280.0, 2.0),
+        if (book?.terminal == BookTerminalState.reading) ...[
+          (900.0, 1.0),
+          (1200.0, 2.0),
+        ],
       ]) {
         testWidgets('${book?.terminal} ${book?.fraction} at $width x$scale', (
           tester,

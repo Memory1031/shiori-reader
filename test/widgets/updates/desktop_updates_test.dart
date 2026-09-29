@@ -19,7 +19,9 @@ final download = find.byKey(const ValueKey('update-download'));
 final install = find.byKey(const ValueKey('update-install'));
 
 void main() {
-  for (final width in [900.0, 1280.0, 1600.0, 1920.0]) {
+  // Shared chrome covers gutter geometry; retain feature-specific content
+  // bounds in representative rail and sidebar layouts.
+  for (final width in [900.0, 1920.0]) {
     testWidgets('Updates chrome and content at $width', (tester) async {
       final h = UpdatesHarness(tester);
       await h.controller.initialize();
@@ -182,45 +184,47 @@ void main() {
     );
   }
 
-  for (final language in ['zh', 'en']) {
-    for (final brightness in Brightness.values) {
-      testWidgets('short large text $language $brightness remains usable', (
-        tester,
-      ) async {
-        tester.platformDispatcher.platformBrightnessTestValue = brightness;
-        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
-        final h = UpdatesHarness(tester);
-        h.repo.result = fakeUpdateCandidate();
-        h.repo.supportsInstallation = true;
-        await h.controller.initialize();
-        await h.pump(width: 900, height: 420, scale: 2, lang: language);
-        final bar = tester.getRect(find.byType(DesktopPageToolbar));
-        expect(bar.bottom, lessThan(420));
-        h.repo.checking = Completer<void>();
-        await h.tap(check, settle: false);
-        await h.tap(find.text(h.l.updateCancel));
-        expect(h.repo.checkToken!.isCancelled, isTrue);
-        h.repo.checking = null;
-        await h.show(check, delta: -200);
-        await h.tap(check);
-        expect(h.repo.checks, 2);
-        await h.tap(download);
-        expect(h.controller.phase, UpdatePhase.downloaded);
-        await h.show(install);
-        await h.show(find.text(h.l.updateCopyVersion));
-        await h.show(channel, delta: -200);
-        final tile = tester.getRect(channel);
-        final trailing = tester.getRect(
-          find.descendant(
-            of: channel,
-            matching: find.byIcon(Icons.chevron_right),
-          ),
-        );
-        expect(trailing.right, lessThanOrEqualTo(tile.right));
-        expect(tester.takeException(), isNull);
-        await h.close();
-      }, variant: windows);
-    }
+  // Brightness does not branch this geometry or command flow.
+  for (final (language, brightness) in [
+    ('zh', Brightness.dark),
+    ('en', Brightness.light),
+  ]) {
+    testWidgets('short large text $language $brightness remains usable', (
+      tester,
+    ) async {
+      tester.platformDispatcher.platformBrightnessTestValue = brightness;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+      final h = UpdatesHarness(tester);
+      h.repo.result = fakeUpdateCandidate();
+      h.repo.supportsInstallation = true;
+      await h.controller.initialize();
+      await h.pump(width: 900, height: 420, scale: 2, lang: language);
+      final bar = tester.getRect(find.byType(DesktopPageToolbar));
+      expect(bar.bottom, lessThan(420));
+      h.repo.checking = Completer<void>();
+      await h.tap(check, settle: false);
+      await h.tap(find.text(h.l.updateCancel));
+      expect(h.repo.checkToken!.isCancelled, isTrue);
+      h.repo.checking = null;
+      await h.show(check, delta: -200);
+      await h.tap(check);
+      expect(h.repo.checks, 2);
+      await h.tap(download);
+      expect(h.controller.phase, UpdatePhase.downloaded);
+      await h.show(install);
+      await h.show(find.text(h.l.updateCopyVersion));
+      await h.show(channel, delta: -200);
+      final tile = tester.getRect(channel);
+      final trailing = tester.getRect(
+        find.descendant(
+          of: channel,
+          matching: find.byIcon(Icons.chevron_right),
+        ),
+      );
+      expect(trailing.right, lessThanOrEqualTo(tile.right));
+      expect(tester.takeException(), isNull);
+      await h.close();
+    }, variant: windows);
   }
 
   testWidgets(

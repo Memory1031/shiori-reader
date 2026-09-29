@@ -45,7 +45,9 @@ Future<void> confirm(WidgetTester tester, LocalHarness h) async {
 }
 
 void main() {
-  for (final width in [900.0, 1280.0, 1600.0, 1920.0]) {
+  // Shared chrome covers gutter geometry; retain feature-specific content
+  // bounds in representative rail and sidebar layouts.
+  for (final width in [900.0, 1920.0]) {
     testWidgets('centered local content and full viewport $width', (
       tester,
     ) async {

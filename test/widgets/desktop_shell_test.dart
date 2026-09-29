@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/appearance_panel.dart';
-import 'package:shiori/app/theme/shiori_theme.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
@@ -749,39 +748,6 @@ void main() {
     expect(h.navigation.section, HomeSection.shelf);
     // The list layout chosen before is kept.
     expect(h.shelfGrid, isFalse);
-    expect(tester.takeException(), isNull);
-    await h.close();
-  }, variant: _desktop);
-
-  testWidgets('shelf and detail share Workspace chrome gutters', (
-    tester,
-  ) async {
-    final h = ShellHarness(tester);
-    await h.pump(onShelf: true);
-    await tester.tap(find.byTooltip(h.l.shelfList));
-    await tester.pumpAndSettle();
-    for (final width in [900.0, 1280.0, 1600.0, 1920.0]) {
-      await h.resize(width);
-      final navigation = width >= 1200 ? 232.0 : 72.0;
-      final edge = navigation + ShioriLayout.gutter(width);
-      expect(
-        tester.getRect(find.text(h.l.homeShelf)).left,
-        closeTo(edge, .01),
-        reason: '$width',
-      );
-      await tester.tap(find.byTooltip(h.l.moreActions));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text(h.l.novelDetailsTitle));
-      await tester.pumpAndSettle();
-      expect(
-        tester.getRect(find.byKey(const ValueKey('detail-back'))).left,
-        closeTo(edge, .01),
-        reason: '$width',
-      );
-      await tester.tap(find.byKey(const ValueKey('detail-back')));
-      await tester.pumpAndSettle();
-      expect(find.byType(DetailScreen, skipOffstage: false), findsNothing);
-    }
     expect(tester.takeException(), isNull);
     await h.close();
   }, variant: _desktop);

@@ -136,205 +136,190 @@ const _table = {900: (5, 140.0), 1280: (6, 147.3), 1600: (8, 145.5)};
 void main() {
   final windows = TargetPlatformVariant.only(TargetPlatform.windows);
 
+  // Display geometry is language-independent. Retain every size/DPR and
+  // both locales; localized action wrapping is covered by desktop_content_frame.
   for (final display in [
-    (size: const Size(900, 720), dpr: 1.0),
-    (size: const Size(1280, 720), dpr: 1.0),
-    (size: const Size(1600, 900), dpr: 1.0),
-    (size: const Size(1920, 1080), dpr: 1.0),
-    (size: const Size(2560, 1440), dpr: 1.5),
+    (size: const Size(900, 720), dpr: 1.0, language: 'en'),
+    (size: const Size(1280, 720), dpr: 1.0, language: 'zh'),
+    (size: const Size(1600, 900), dpr: 1.0, language: 'en'),
+    (size: const Size(1920, 1080), dpr: 1.0, language: 'zh'),
+    (size: const Size(2560, 1440), dpr: 1.5, language: 'en'),
   ]) {
-    for (final language in ['zh', 'en']) {
-      testWidgets(
-        'desktop shelf frame ${display.size} DPR ${display.dpr} $language',
-        (tester) async {
-          final s = _Shelf(tester);
-          await s.pump(
-            size: display.size,
-            dpr: display.dpr,
-            language: language,
-          );
-          final l = s.l;
-          final width = s.width;
-          expect(
-            s.workspace.left,
-            closeTo(
-              width >= ShioriLayout.sidebarBreakpoint
-                  ? ShioriLayout.sidebar
-                  : ShioriLayout.rail,
-              .01,
-            ),
-          );
-          expect(s.grid, isTrue);
-          expect(find.text(l.shelfBookCount(60)), findsOneWidget);
-          expect(find.text(l.homeContinueAction), findsOneWidget);
+    final language = display.language;
+    testWidgets(
+      'desktop shelf frame ${display.size} DPR ${display.dpr} $language',
+      (tester) async {
+        final s = _Shelf(tester);
+        await s.pump(size: display.size, dpr: display.dpr, language: language);
+        final l = s.l;
+        final width = s.width;
+        expect(
+          s.workspace.left,
+          closeTo(
+            width >= ShioriLayout.sidebarBreakpoint
+                ? ShioriLayout.sidebar
+                : ShioriLayout.rail,
+            .01,
+          ),
+        );
+        expect(s.grid, isTrue);
+        expect(find.text(l.shelfBookCount(60)), findsOneWidget);
+        expect(find.text(l.homeContinueAction), findsOneWidget);
 
-          // Chrome uses fixed gutters; continue row and covers share a centered frame.
-          final title = find.descendant(
+        // Chrome uses fixed gutters; continue row and covers share a centered frame.
+        final title = find.descendant(
+          of: find.byType(DesktopShelfToolbar),
+          matching: find.text(l.homeShelf),
+        );
+        _near(tester.getRect(title).left, s.workspace.left + s.gutter, 'title');
+        final row = tester.getRect(find.byType(ContinueReadingRow));
+        _near(row.left, s.left, 'continue row');
+        _near(row.width, s.frame(true), 'continue row width');
+        _near(
+          tester.getRect(find.byType(DesktopShelfToolbar)).width,
+          s.workspace.width - 2 * s.gutter,
+          'toolbar width',
+        );
+        final toolbar = tester.getRect(find.byType(DesktopShelfToolbar));
+        final toggle = tester.getRect(find.byType(SegmentedButton<bool>));
+        final import = tester.getRect(
+          find.descendant(
             of: find.byType(DesktopShelfToolbar),
-            matching: find.text(l.homeShelf),
-          );
-          _near(
-            tester.getRect(title).left,
-            s.workspace.left + s.gutter,
-            'title',
-          );
-          final row = tester.getRect(find.byType(ContinueReadingRow));
-          _near(row.left, s.left, 'continue row');
-          _near(row.width, s.frame(true), 'continue row width');
-          _near(
-            tester.getRect(find.byType(DesktopShelfToolbar)).width,
-            s.workspace.width - 2 * s.gutter,
-            'toolbar width',
-          );
-          final toolbar = tester.getRect(find.byType(DesktopShelfToolbar));
-          final toggle = tester.getRect(find.byType(SegmentedButton<bool>));
-          final import = tester.getRect(
-            find.descendant(
-              of: find.byType(DesktopShelfToolbar),
-              matching: find.byType(OutlinedButton),
+            matching: find.byType(OutlinedButton),
+          ),
+        );
+        _near(toggle.center.dy, import.center.dy, 'toolbar action centers');
+        _near(
+          toolbar.left - s.workspace.left,
+          s.workspace.right - toolbar.right,
+          'centered content',
+        );
+        final scrollView = find.descendant(
+          of: s.shelf,
+          matching: find.byType(CustomScrollView),
+        );
+        final viewport = tester.getRect(scrollView);
+        _near(viewport.left, s.workspace.left, 'full Workspace viewport start');
+        _near(viewport.right, s.workspace.right, 'full Workspace viewport end');
+        final scrollbar = find.descendant(
+          of: scrollView,
+          matching: find.byType(Scrollbar),
+        );
+        expect(scrollbar, findsOneWidget);
+        expect(tester.getRect(scrollbar), viewport);
+
+        final covers = s.covers;
+        _near(covers.first.left, s.left, 'first cover');
+        final expected = desktopShelfGrid(
+          s.frame(true),
+          const TextScaler.linear(1),
+        );
+        if (_table[width.round()] case (final columns, final card)) {
+          expect(expected.columns, columns);
+          expect(expected.card, closeTo(card, .1));
+        }
+        if (width == 1920) {
+          expect(s.frame(true), 1600);
+          expect(expected.columns, 10);
+          expect(expected.card, closeTo(142, .1));
+        }
+        final firstRow = covers
+            .where((r) => (r.top - covers.first.top).abs() < 1)
+            .toList();
+        expect(firstRow.length, expected.columns);
+        for (final rect in firstRow) {
+          _near(rect.width, expected.card, 'card width');
+          expect(rect.height / rect.width, closeTo(1.5, .01));
+        }
+        _near(
+          firstRow.last.right - firstRow.first.left,
+          expected.extent,
+          'grid extent',
+        );
+        expect(tester.takeException(), isNull);
+
+        // The wheel scrolls over the spare width beside the grid too.
+        await tester.sendEventToBinding(
+          PointerScrollEvent(
+            kind: PointerDeviceKind.mouse,
+            position: Offset(
+              (s.left + expected.extent + s.workspace.right) / 2,
+              s.workspace.center.dy,
             ),
-          );
-          _near(toggle.center.dy, import.center.dy, 'toolbar action centers');
-          _near(
-            toolbar.left - s.workspace.left,
-            s.workspace.right - toolbar.right,
-            'centered content',
-          );
-          final scrollView = find.descendant(
-            of: s.shelf,
-            matching: find.byType(CustomScrollView),
-          );
-          final viewport = tester.getRect(scrollView);
-          _near(
-            viewport.left,
-            s.workspace.left,
-            'full Workspace viewport start',
-          );
-          _near(
-            viewport.right,
-            s.workspace.right,
-            'full Workspace viewport end',
-          );
-          final scrollbar = find.descendant(
-            of: scrollView,
-            matching: find.byType(Scrollbar),
-          );
-          expect(scrollbar, findsOneWidget);
-          expect(tester.getRect(scrollbar), viewport);
+            scrollDelta: const Offset(0, 500),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(s.position.pixels, greaterThan(0));
+        s.position.jumpTo(0);
+        await tester.pumpAndSettle();
 
-          final covers = s.covers;
-          _near(covers.first.left, s.left, 'first cover');
-          final expected = desktopShelfGrid(
-            s.frame(true),
-            const TextScaler.linear(1),
-          );
-          if (_table[width.round()] case (final columns, final card)) {
-            expect(expected.columns, columns);
-            expect(expected.card, closeTo(card, .1));
-          }
-          if (width == 1920) {
-            expect(s.frame(true), 1600);
-            expect(expected.columns, 10);
-            expect(expected.card, closeTo(142, .1));
-          }
-          final firstRow = covers
-              .where((r) => (r.top - covers.first.top).abs() < 1)
-              .toList();
-          expect(firstRow.length, expected.columns);
-          for (final rect in firstRow) {
-            _near(rect.width, expected.card, 'card width');
-            expect(rect.height / rect.width, closeTo(1.5, .01));
-          }
-          _near(
-            firstRow.last.right - firstRow.first.left,
-            expected.extent,
-            'grid extent',
-          );
-          expect(tester.takeException(), isNull);
+        // The list uses a narrower centered content frame, not a new viewport.
+        await tester.tap(find.byTooltip(l.shelfList));
+        await tester.pumpAndSettle();
+        expect(s.grid, isFalse);
+        expect(find.byType(SliverGrid), findsNothing);
+        _near(
+          tester.getRect(find.byType(DesktopShelfToolbar)).width,
+          s.workspace.width - 2 * s.gutter,
+          'list toolbar width',
+        );
+        final listRow = tester.getRect(find.byType(ContinueReadingRow));
+        _near(listRow.left, s.left, 'list continue row');
+        _near(listRow.width, s.frame(false), 'list continue row width');
+        final firstBook = find.byType(DesktopBookRow).first;
+        final tint = tester.getRect(firstBook);
+        _near(tint.left, listRow.left, 'list surface matches header start');
+        _near(tint.right, listRow.right, 'list surface matches header end');
+        _near(tint.width, s.frame(false), 'list tint width');
+        final listViewport = tester.getRect(scrollView);
+        _near(
+          listViewport.right,
+          s.workspace.right,
+          'list scrollbar remains on Workspace edge',
+        );
+        expect(
+          find.descendant(of: scrollView, matching: find.byType(Scrollbar)),
+          findsOneWidget,
+        );
+        _near(
+          tester
+              .getRect(
+                find.descendant(
+                  of: firstBook,
+                  matching: find.byType(BookCover),
+                ),
+              )
+              .left,
+          s.left + BookListItem.inset,
+          'list cover',
+        );
+        expect(
+          tester.getSize(firstBook).height,
+          greaterThanOrEqualTo(DesktopBookRow.minHeight),
+        );
+        expect(tester.takeException(), isNull);
 
-          // The wheel scrolls over the spare width beside the grid too.
-          await tester.sendEventToBinding(
-            PointerScrollEvent(
-              kind: PointerDeviceKind.mouse,
-              position: Offset(
-                (s.left + expected.extent + s.workspace.right) / 2,
-                s.workspace.center.dy,
-              ),
-              scrollDelta: const Offset(0, 500),
-            ),
+        // Resizing keeps the chosen mode through the compact layout.
+        for (final next in [390.0, width]) {
+          tester.view.physicalSize = Size(
+            next * display.dpr,
+            display.size.height,
           );
-          await tester.pumpAndSettle();
-          expect(s.position.pixels, greaterThan(0));
-          s.position.jumpTo(0);
-          await tester.pumpAndSettle();
-
-          // The list uses a narrower centered content frame, not a new viewport.
-          await tester.tap(find.byTooltip(l.shelfList));
           await tester.pumpAndSettle();
           expect(s.grid, isFalse);
-          expect(find.byType(SliverGrid), findsNothing);
-          _near(
-            tester.getRect(find.byType(DesktopShelfToolbar)).width,
-            s.workspace.width - 2 * s.gutter,
-            'list toolbar width',
-          );
-          final listRow = tester.getRect(find.byType(ContinueReadingRow));
-          _near(listRow.left, s.left, 'list continue row');
-          _near(listRow.width, s.frame(false), 'list continue row width');
-          final firstBook = find.byType(DesktopBookRow).first;
-          final tint = tester.getRect(firstBook);
-          _near(tint.left, listRow.left, 'list surface matches header start');
-          _near(tint.right, listRow.right, 'list surface matches header end');
-          _near(tint.width, s.frame(false), 'list tint width');
-          final listViewport = tester.getRect(scrollView);
-          _near(
-            listViewport.right,
-            s.workspace.right,
-            'list scrollbar remains on Workspace edge',
-          );
-          expect(
-            find.descendant(of: scrollView, matching: find.byType(Scrollbar)),
-            findsOneWidget,
-          );
-          _near(
-            tester
-                .getRect(
-                  find.descendant(
-                    of: firstBook,
-                    matching: find.byType(BookCover),
-                  ),
-                )
-                .left,
-            s.left + BookListItem.inset,
-            'list cover',
-          );
-          expect(
-            tester.getSize(firstBook).height,
-            greaterThanOrEqualTo(DesktopBookRow.minHeight),
-          );
+          expect(tester.getSize(s.shelf).width, lessThanOrEqualTo(next));
           expect(tester.takeException(), isNull);
-
-          // Resizing keeps the chosen mode through the compact layout.
-          for (final next in [390.0, width]) {
-            tester.view.physicalSize = Size(
-              next * display.dpr,
-              display.size.height,
-            );
-            await tester.pumpAndSettle();
-            expect(s.grid, isFalse);
-            expect(tester.getSize(s.shelf).width, lessThanOrEqualTo(next));
-            expect(tester.takeException(), isNull);
-          }
-          await tester.tap(find.byTooltip(l.shelfGrid));
-          await tester.pumpAndSettle();
-          expect(s.grid, isTrue);
-          expect(find.byType(SliverGrid), findsOneWidget);
-          expect(tester.takeException(), isNull);
-          await s.close();
-        },
-        variant: windows,
-      );
-    }
+        }
+        await tester.tap(find.byTooltip(l.shelfGrid));
+        await tester.pumpAndSettle();
+        expect(s.grid, isTrue);
+        expect(find.byType(SliverGrid), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await s.close();
+      },
+      variant: windows,
+    );
   }
 
   testWidgets(

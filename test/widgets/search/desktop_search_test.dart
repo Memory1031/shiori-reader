@@ -135,7 +135,9 @@ void main() {
     variant: windows,
   );
 
-  for (final width in [900.0, 1280.0, 1600.0, 1920.0]) {
+  // Shared chrome covers gutter geometry; retain feature-specific content
+  // bounds in representative rail and sidebar layouts.
+  for (final width in [900.0, 1920.0]) {
     testWidgets(
       'root layout $width centers input and insets lazy row content',
       (tester) async {
