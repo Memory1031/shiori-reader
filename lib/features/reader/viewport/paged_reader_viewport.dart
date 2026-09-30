@@ -630,8 +630,68 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
 
       ContentBlock fragmentBlock(PageFragment f) =>
           widget.content.blocks[_layout!.index.chunks[f.unit].blockIndex];
-      double fragmentInnerWidth(PageFragment f) =>
-          readerBoxInnerWidth(fragmentBlock(f), columnWidth);
+      double fragmentInnerWidth(PageFragment f) => readerBoxInnerWidth(
+        fragmentBlock(f),
+        columnWidth,
+        style: textStyle,
+        scaler: scaler,
+      );
+      Widget frameFragment(PageFragment f, double width, Widget child) {
+        final chunk = _layout!.index.chunks[f.unit], block = fragmentBlock(f);
+        final boxes = readerBlockBoxes(
+          block,
+          width,
+          textStyle,
+          scaler,
+          pageHeight: constraints.maxHeight,
+        );
+        final edges = readerBoxEdges(
+          widget.content,
+          chunk.blockIndex,
+          width: width,
+          style: textStyle,
+          scaler: scaler,
+          pageHeight: constraints.maxHeight,
+        );
+        final starts = chunk.start + f.start == 0;
+        final ends =
+            chunk.text == null ||
+            chunk.text!.isEmpty ||
+            chunk.start + f.end == chunk.total;
+        final outerTop = starts ? edges.outerTop.clamp(0.0, f.boxTop) : 0.0;
+        final outerBottom = ends
+            ? edges.outerBottom.clamp(0.0, f.boxBottom)
+            : 0.0;
+        final local = ReaderBoxFrame(
+          box: block.layout,
+          width: boxes.local?.width ?? boxes.innerWidth,
+          geometry: boxes.local,
+          top: f.boxTop - outerTop,
+          bottom: f.boxBottom - outerBottom,
+          starts: starts,
+          ends: ends,
+          child: child,
+        );
+        return ReaderBoxFrame(
+          box: block.box,
+          width: boxes.outer?.width ?? width,
+          geometry: boxes.outer,
+          top: outerTop,
+          bottom: outerBottom,
+          starts:
+              starts &&
+              (chunk.blockIndex == 0 ||
+                  widget.content.blocks[chunk.blockIndex - 1].box?.group !=
+                      block.box?.group),
+          ends:
+              ends &&
+              (chunk.blockIndex + 1 == widget.content.blocks.length ||
+                  widget.content.blocks[chunk.blockIndex + 1].box?.group !=
+                      block.box?.group),
+          child: local,
+        );
+      }
+
       Widget? buildPage(BuildContext context, int number) {
         final page = _page(number);
         if (page == null) return null;
@@ -653,12 +713,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                             .chunks[fragment.unit]
                             .blockIndex]
                         is HeadingBlock,
-                child: ReaderBoxFrame(
-                  box: fragmentBlock(fragment).box,
-                  width: readerBoxOuterWidth(fragmentBlock(fragment), width),
-                  top: fragment.boxTop,
-                  bottom: fragment.boxBottom,
-                  child: SizedBox(
+                child: frameFragment(
+                  fragment,
+                  width,
+                  SizedBox(
                     height:
                         fragment.height - fragment.boxTop - fragment.boxBottom,
                     child: fragment.text == ''
@@ -681,6 +739,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                         .chunks[fragment.unit]
                                         .blockIndex],
                                     widget.paragraphSpacing,
+                                    pageHeight: constraints.maxHeight,
                                     chapter: widget.content.key,
                                   ) /
                                   2,
@@ -691,12 +750,19 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                         .chunks[fragment.unit]
                                         .blockIndex],
                                     widget.paragraphSpacing,
+                                    pageHeight: constraints.maxHeight,
                                     chapter: widget.content.key,
                                   ) /
                                   2,
                             ),
                             child: ReaderLinkedText(
+                              decoration: fragment.linkLayout == null
+                                  ? null
+                                  : (fragmentBlock(fragment) as ParagraphBlock)
+                                        .linkDecoration,
+                              linkLayout: fragment.linkLayout,
                               flow: fragment.flow,
+                              readerFontSize: textStyle.fontSize,
                               locale: locale,
                               textHeightBehavior: heightBehavior,
                               images: widget.images,

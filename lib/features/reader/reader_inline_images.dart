@@ -11,6 +11,7 @@ List<InlineSpan> readerInlineSpans({
   required List<InlineImage> images,
   List<InlineTextStyle> styles = const [],
   required TextStyle style,
+  double? readerFontSize,
   Widget Function(InlineImage)? imageBuilder,
   List<InlineRuby> ruby = const [],
   TextScaler scaler = TextScaler.noScaling,
@@ -50,7 +51,12 @@ List<InlineSpan> readerInlineSpans({
         WidgetSpan(
           alignment: PlaceholderAlignment.baseline,
           baseline: TextBaseline.alphabetic,
-          style: readerAuthoredStyle(style, styles, pair.start),
+          style: readerAuthoredStyle(
+            style,
+            styles,
+            pair.start,
+            readerFontSize: readerFontSize,
+          ),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onRubyTap,
@@ -70,6 +76,7 @@ List<InlineSpan> readerInlineSpans({
                 locale: locale,
                 maxWidth: maxWidth,
                 resolveColor: resolveColor,
+                readerFontSize: readerFontSize,
               ),
             ),
           ),
@@ -78,24 +85,49 @@ List<InlineSpan> readerInlineSpans({
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           // Flutter scales the child once using this authored font size.
-          style: readerAuthoredStyle(style, styles, ordered[i]),
+          style: readerAuthoredStyle(
+            style,
+            styles,
+            ordered[i],
+            readerFontSize: readerFontSize,
+          ),
           child: SizedBox(
             width: readerInlineSize(
               image,
-              readerAuthoredStyle(style, styles, ordered[i]),
+              readerAuthoredStyle(
+                style,
+                styles,
+                ordered[i],
+                readerFontSize: readerFontSize,
+              ),
               TextScaler.noScaling,
               maxWidth:
                   maxWidth *
-                  (readerAuthoredStyle(style, styles, ordered[i]).fontSize ??
+                  (readerAuthoredStyle(
+                        style,
+                        styles,
+                        ordered[i],
+                        readerFontSize: readerFontSize,
+                      ).fontSize ??
                       20) /
                   scaler.scale(
-                    readerAuthoredStyle(style, styles, ordered[i]).fontSize ??
+                    readerAuthoredStyle(
+                          style,
+                          styles,
+                          ordered[i],
+                          readerFontSize: readerFontSize,
+                        ).fontSize ??
                         20,
                   ),
             ).width,
             height: readerInlineSize(
               image,
-              readerAuthoredStyle(style, styles, ordered[i]),
+              readerAuthoredStyle(
+                style,
+                styles,
+                ordered[i],
+                readerFontSize: readerFontSize,
+              ),
               TextScaler.noScaling,
             ).height,
             child: imageBuilder?.call(image),
@@ -111,6 +143,7 @@ List<InlineSpan> readerInlineSpans({
             styles,
             ordered[i],
             resolveColor: resolveColor,
+            readerFontSize: readerFontSize,
           ),
         ),
   ];
@@ -121,6 +154,7 @@ TextStyle readerAuthoredStyle(
   List<InlineTextStyle> styles,
   int offset, {
   Color Function(Color)? resolveColor,
+  double? readerFontSize,
 }) {
   final range = styles
       .where((s) => s.start <= offset && offset < s.start + s.length)
@@ -130,7 +164,11 @@ TextStyle readerAuthoredStyle(
     color: range.color == null
         ? base.color
         : (resolveColor?.call(Color(range.color!)) ?? Color(range.color!)),
-    fontSize: (base.fontSize ?? 20) * range.fontScale,
+    fontSize:
+        (range.fontSizeFromReader
+            ? readerFontSize ?? base.fontSize ?? 20
+            : base.fontSize ?? 20) *
+        range.fontScale,
     fontWeight: switch (range.bold) {
       true => FontWeight.bold,
       false => FontWeight.normal,
@@ -149,6 +187,7 @@ ReaderRubyLayout readerRubyLayout({
   required InlineRuby ruby,
   required List<InlineTextStyle> styles,
   required TextStyle style,
+  double? readerFontSize,
   required TextScaler scaler,
   required TextDirection direction,
   required double maxWidth,
@@ -164,6 +203,7 @@ ReaderRubyLayout readerRubyLayout({
       styles: styles,
       style: style,
       resolveColor: resolveColor,
+      readerFontSize: readerFontSize,
     ),
   ),
   annotation: ruby.annotation,
@@ -172,6 +212,7 @@ ReaderRubyLayout readerRubyLayout({
     styles,
     ruby.start,
     resolveColor: resolveColor,
+    readerFontSize: readerFontSize,
   ),
   scaler: scaler,
   direction: direction,
@@ -189,6 +230,7 @@ List<PlaceholderDimensions> readerInlineDimensions({
   TextDirection direction = TextDirection.ltr,
   Locale? locale,
   required TextStyle style,
+  double? readerFontSize,
   required TextScaler scaler,
   required double maxWidth,
 }) {
@@ -200,7 +242,12 @@ List<PlaceholderDimensions> readerInlineDimensions({
           PlaceholderDimensions(
             size: readerInlineSize(
               image,
-              readerAuthoredStyle(style, styles, image.offset),
+              readerAuthoredStyle(
+                style,
+                styles,
+                image.offset,
+                readerFontSize: readerFontSize,
+              ),
               scaler,
               maxWidth: maxWidth,
             ),
@@ -223,6 +270,7 @@ List<PlaceholderDimensions> readerInlineDimensions({
               direction: direction,
               locale: locale,
               maxWidth: maxWidth,
+              readerFontSize: readerFontSize,
             );
             return PlaceholderDimensions(
               size: layout.metrics.size,

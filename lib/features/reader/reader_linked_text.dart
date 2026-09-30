@@ -1,6 +1,8 @@
 import 'viewport/paragraph_flow.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'viewport/reader_box.dart';
 import '../../domain/models/models.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../shared/source_image.dart';
@@ -107,6 +109,9 @@ class ReaderLinkedText extends StatefulWidget {
     required this.blockOffset,
     required this.links,
     required this.style,
+    this.readerFontSize,
+    this.decoration,
+    this.linkLayout,
     required this.align,
     required this.scaler,
     this.flow,
@@ -132,6 +137,9 @@ class ReaderLinkedText extends StatefulWidget {
   final int blockOffset;
   final List<LocalContentLink> links;
   final TextStyle style;
+  final double? readerFontSize;
+  final LinkDecoration? decoration;
+  final ReaderLinkLayout? linkLayout;
   final TextAlign align;
   final TextScaler scaler;
   final ValueChanged<LocalContentLink>? onLink;
@@ -143,6 +151,7 @@ class ReaderLinkedText extends StatefulWidget {
 }
 
 class _ReaderLinkedTextState extends State<ReaderLinkedText> {
+  final _linkFocus = FocusNode(debugLabel: 'reader-authored-link');
   final _recognizers = <TapGestureRecognizer>[];
   void _clear() {
     for (final recognizer in _recognizers) {
@@ -153,6 +162,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
 
   @override
   void dispose() {
+    _linkFocus.dispose();
     _clear();
     super.dispose();
   }
@@ -160,8 +170,97 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) =>
-        _buildText(context, constraints.maxWidth),
+        widget.decoration != null && widget.linkLayout != null
+        ? _buildDecorated(context)
+        : _buildText(context, constraints.maxWidth),
   );
+
+  Widget _buildDecorated(BuildContext context) {
+    final decoration = widget.decoration!, layout = widget.linkLayout!;
+    final link = widget.links
+        .where(
+          (l) =>
+              !l.isFootnote &&
+              l.sourceOffset == 0 &&
+              l.sourceLength == widget.text.runes.length,
+        )
+        .firstOrNull;
+    void activate() {
+      if (link != null) widget.onLink?.call(link);
+    }
+
+    final background = ReaderAuthoredColors(
+      Theme.of(context),
+    ).resolve(Color(decoration.backgroundColor), ReaderColorRole.background);
+    return Align(
+      alignment: switch (widget.align) {
+        TextAlign.center => Alignment.center,
+        TextAlign.right || TextAlign.end => AlignmentDirectional.centerEnd,
+        _ => AlignmentDirectional.centerStart,
+      },
+      child: Semantics(
+        link: true,
+        label: widget.text,
+        onTap: link == null ? null : activate,
+        child: ExcludeSemantics(
+          child: FocusableActionDetector(
+            focusNode: _linkFocus,
+            mouseCursor: SystemMouseCursors.click,
+            shortcuts: const {
+              SingleActivator(LogicalKeyboardKey.enter, includeRepeats: false):
+                  ActivateIntent(),
+              SingleActivator(LogicalKeyboardKey.space, includeRepeats: false):
+                  ActivateIntent(),
+            },
+            actions: {
+              ActivateIntent: CallbackAction<ActivateIntent>(
+                onInvoke: (_) {
+                  activate();
+                  return null;
+                },
+              ),
+            },
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: link == null
+                  ? null
+                  : () {
+                      _linkFocus.requestFocus();
+                      activate();
+                    },
+              child: SizedBox(
+                width: layout.width,
+                height: layout.height,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: background,
+                    borderRadius: BorderRadius.circular(layout.radius),
+                  ),
+                  child: Padding(
+                    padding: layout.padding,
+                    child: ReaderLinkedText(
+                      text: widget.text,
+                      prefix: '',
+                      blockOffset: widget.blockOffset,
+                      links: const [],
+                      style: widget.style,
+                      readerFontSize: widget.readerFontSize,
+                      align: TextAlign.start,
+                      scaler: widget.scaler,
+                      inlineStyles: widget.inlineStyles,
+                      authoredBackground: decoration.backgroundColor,
+                      locale: widget.locale,
+                      textHeightBehavior: widget.textHeightBehavior,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildText(BuildContext context, double maxWidth) {
     _clear();
@@ -197,6 +296,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
                     blockOffset: widget.blockOffset + piece.start,
                     links: widget.links,
                     style: widget.style,
+                    readerFontSize: widget.readerFontSize,
                     align: TextAlign.left,
                     scaler: widget.scaler,
                     onLink: widget.onLink,
@@ -245,6 +345,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
           onRubyTap: onTap,
           resolveColor: foreground,
           style: displayStyle,
+          readerFontSize: widget.readerFontSize,
           imageBuilder: (image) => GestureDetector(
             onTap: onTap,
             child: widget.images == null

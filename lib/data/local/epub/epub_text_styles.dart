@@ -1,3 +1,4 @@
+import 'epub_rich_styles.dart';
 import 'package:html/dom.dart' as dom;
 
 /// Shared screen-sheet media policy for native prose and inert authored
@@ -326,6 +327,9 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
         'margin',
         'margin-left',
         'margin-right',
+        'margin-top',
+        'margin-bottom',
+        'border-radius',
         'border',
         'border-width',
         'border-color',
@@ -375,101 +379,8 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
           continue;
         }
 
-        var properties = {name: value};
-        if (name.startsWith('margin')) {
-          final tokens = value.split(RegExp(r'\s+'));
-          if (tokens.isEmpty ||
-              tokens.length > (name == 'margin' ? 4 : 1) ||
-              tokens.any(
-                (t) => !RegExp(
-                  r'^(auto|initial|inherit|unset|0|[+-]?(?:\d*\.)?\d+(?:px|em|rem|%))$',
-                ).hasMatch(t),
-              )) {
-            continue;
-          }
-          // Expand before cascading so shorthand, longhand and !important
-          // compete per side. Vertical margins remain reader-owned.
-          if (name == 'margin') {
-            properties = {
-              'margin-left': tokens.length == 4
-                  ? tokens[3]
-                  : tokens.length >= 2
-                  ? tokens[1]
-                  : tokens[0],
-              'margin-right': tokens.length >= 2 ? tokens[1] : tokens[0],
-            };
-          }
-        }
-        if (name == 'padding') {
-          final t = value.split(RegExp(r'\s+'));
-          if (t.isEmpty || t.length > 4) continue;
-          properties = {
-            name: value,
-            'padding-top': t[0],
-            'padding-right': t.length > 1 ? t[1] : t[0],
-            'padding-bottom': t.length > 2 ? t[2] : t[0],
-            'padding-left': t.length > 3
-                ? t[3]
-                : t.length > 1
-                ? t[1]
-                : t[0],
-          };
-        }
-        if ({'border-width', 'border-color', 'border-style'}.contains(name)) {
-          final t = value.split(RegExp(r'\s+'));
-          if (t.isEmpty || t.length > 4) continue;
-          final suffix = name.substring(7);
-          properties = {
-            ...properties,
-            'border-top-$suffix': t[0],
-            'border-right-$suffix': t.length > 1 ? t[1] : t[0],
-            'border-bottom-$suffix': t.length > 2 ? t[2] : t[0],
-            'border-left-$suffix': t.length > 3
-                ? t[3]
-                : t.length > 1
-                ? t[1]
-                : t[0],
-          };
-        }
-        if (name == 'border-right' || name == 'border') {
-          final t = value.split(RegExp(r'\s+'));
-          properties = {
-            ...properties,
-            'border-right-width':
-                t
-                    .where((v) => RegExp(r'^(0|[0-9.]+px)$').hasMatch(v))
-                    .firstOrNull ??
-                'medium',
-            'border-right-style':
-                t
-                    .where(
-                      (v) => {
-                        'none',
-                        'solid',
-                        'dashed',
-                        'dotted',
-                        'double',
-                      }.contains(v),
-                    )
-                    .firstOrNull ??
-                'none',
-            'border-right-color':
-                t
-                    .where(
-                      (v) =>
-                          !RegExp(r'^(0|[0-9.]+px)$').hasMatch(v) &&
-                          !{
-                            'none',
-                            'solid',
-                            'dashed',
-                            'dotted',
-                            'double',
-                          }.contains(v),
-                    )
-                    .firstOrNull ??
-                'currentcolor',
-          };
-        }
+        final properties = _expandNativeDeclaration(name, value);
+        if (properties == null) continue;
         final priorities = important[element] ??= {};
         for (final property in properties.entries) {
           if (!priority && priorities.contains(property.key)) continue;
@@ -507,4 +418,109 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
     apply(e, e.attributes['style']!);
   }
   return values;
+}
+
+const _borderStyles = {
+  'none',
+  'hidden',
+  'solid',
+  'dashed',
+  'dotted',
+  'double',
+  'ridge',
+  'groove',
+  'inset',
+  'outset',
+};
+const _sides = ['top', 'right', 'bottom', 'left'];
+List<String> _four(List<String> t) => [
+  t[0],
+  t.length > 1 ? t[1] : t[0],
+  t.length > 2 ? t[2] : t[0],
+  t.length > 3
+      ? t[3]
+      : t.length > 1
+      ? t[1]
+      : t[0],
+];
+bool _borderWidth(String t) =>
+    {'thin', 'medium', 'thick'}.contains(t) ||
+    RegExp(r'^(0|(?:\d*\.)?\d+(?:px|em))$').hasMatch(t);
+bool _borderColor(String t) => t == 'currentcolor' || epubColor(t) != null;
+
+Map<String, String>? _expandNativeDeclaration(String name, String value) {
+  final tokens = RegExp(
+    r'rgb\([^)]*\)|[^\s]+',
+  ).allMatches(value).map((m) => m[0]!).toList();
+  if (tokens.isEmpty) return null;
+  if (name == 'font-size' &&
+      !{'inherit', 'unset', 'initial'}.contains(value) &&
+      epubFontScale(value, 1) == null) {
+    return null;
+  }
+  if (name.startsWith('margin') || name.startsWith('padding')) {
+    final shorthand = name == 'margin' || name == 'padding';
+    if (tokens.length > (shorthand ? 4 : 1) ||
+        tokens.any(
+          (t) =>
+              !RegExp(
+                r'^(auto|initial|inherit|unset|0|[+-]?(?:\d*\.)?\d+(?:px|em|rem|%))$',
+              ).hasMatch(t) ||
+              name.startsWith('padding') && (t == 'auto' || t.startsWith('-')),
+        )) {
+      return null;
+    }
+    if (!shorthand) return {name: value};
+    final values = _four(tokens);
+    return {
+      name: value,
+      for (var i = 0; i < 4; i++) '$name-${_sides[i]}': values[i],
+    };
+  }
+  if ({'border-width', 'border-style', 'border-color'}.contains(name)) {
+    bool valid(String t) => name == 'border-width'
+        ? _borderWidth(t)
+        : name == 'border-style'
+        ? _borderStyles.contains(t)
+        : _borderColor(t);
+    if (tokens.length > 4 || tokens.any((t) => !valid(t))) return null;
+    final values = _four(tokens), suffix = name.substring(7);
+    return {
+      name: value,
+      for (var i = 0; i < 4; i++) 'border-${_sides[i]}-$suffix': values[i],
+    };
+  }
+  if (name == 'border' || _sides.any((side) => name == 'border-$side')) {
+    String? width, style, color;
+    for (final token in tokens) {
+      if (_borderWidth(token) && width == null) {
+        width = token;
+      } else if (_borderStyles.contains(token) && style == null) {
+        style = token;
+      } else if (_borderColor(token) && color == null) {
+        color = token;
+      } else {
+        return null;
+      }
+    }
+    final sides = name == 'border' ? _sides : [name.substring(7)];
+    return {
+      name: value,
+      for (final side in sides) ...{
+        'border-$side-width': width ?? 'medium',
+        'border-$side-style': style ?? 'none',
+        'border-$side-color': color ?? 'currentcolor',
+      },
+    };
+  }
+  if (name.startsWith('border-') &&
+      name != 'border-collapse' &&
+      name != 'border-radius') {
+    if (name.endsWith('-width') && !_borderWidth(value) ||
+        name.endsWith('-style') && !_borderStyles.contains(value) ||
+        name.endsWith('-color') && !_borderColor(value)) {
+      return null;
+    }
+  }
+  return {name: value};
 }

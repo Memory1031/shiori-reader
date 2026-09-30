@@ -725,6 +725,7 @@ class EpubParser {
     final pendingTableLayouts = <int, TableRowLayout>{};
     var activeStyle = const EpubRichStyle();
     BlockBox? activeBox;
+    dom.Element? activeBoxOwner;
     var boxGroup = 0;
     final styleSpans = <(EpubRichStyle, int, int)>[];
     dom.Element? activeFloat;
@@ -901,6 +902,21 @@ class EpubParser {
           )
           .toList();
       final textStyles = <InlineTextStyle>[];
+      final wholeLink =
+          spans.length == 1 &&
+          spans.single.$2 <= trimStart &&
+          spans.single.$3 >= trimStart + value.length;
+      final decoration =
+          heading == null &&
+              wholeLink &&
+              value.runes.length <= 256 &&
+              images.isEmpty &&
+              ruby.isEmpty &&
+              tableLayout == null &&
+              flow.hanging == null &&
+              flow.label == null
+          ? epubLinkDecoration(paragraphOwner, styles, richStyles)
+          : null;
       for (final span in styleSpans) {
         final start = (span.$2 - trimStart).clamp(0, value.length);
         final end = (span.$3 - trimStart).clamp(0, value.length);
@@ -909,7 +925,8 @@ class EpubParser {
             span.$1.range(
               value.substring(0, start).runes.length,
               value.substring(start, end).runes.length,
-              preserveNeutral: activeBox?.backgroundColor != null,
+              preserveNeutral:
+                  activeBox?.backgroundColor != null || decoration != null,
             ),
           );
         }
@@ -934,15 +951,30 @@ class EpubParser {
         return;
       }
       if (tableLayout != null) pendingTableLayouts[blocks.length] = tableLayout;
+      final localLayout =
+          (heading != null || decoration != null) &&
+              paragraphOwner != activeBoxOwner
+          ? epubBlockBox(
+              styles[paragraphOwner] ?? const {},
+              0,
+              richStyles[paragraphOwner] ?? const EpubRichStyle(),
+              allowEdges: true,
+              edgesOnly: true,
+            )
+          : null;
       blocks.add(
         heading == null
             ? ParagraphBlock(
+                linkDecoration: decoration,
+                hasAuthoredFontSize:
+                    richStyles[paragraphOwner]?.hasFontSize ?? false,
                 hangingIndentEm: flow.hanging,
                 trailingLabelStart: labelStart,
                 inlineImages: images,
                 inlineRuby: ruby,
                 inlineStyles: textStyles,
                 box: activeBox,
+                layout: localLayout,
                 text: value,
                 alignment: switch (property('text-align')) {
                   'center' => ParagraphAlignment.center,
@@ -961,10 +993,13 @@ class EpubParser {
                 })(),
               )
             : HeadingBlock(
+                hasAuthoredFontSize:
+                    richStyles[paragraphOwner]?.hasFontSize ?? false,
                 inlineImages: images,
                 inlineRuby: ruby,
                 inlineStyles: textStyles,
                 box: activeBox,
+                layout: localLayout,
                 text: value,
                 level: heading,
                 alignment: switch (property('text-align')) {
@@ -990,6 +1025,7 @@ class EpubParser {
       'ul',
       'ol',
       'figure',
+      'dl',
     };
     const paragraphs = {'p', 'li', 'dt', 'dd', 'pre', 'figcaption', 'tr'};
     String? rubyAnnotation(dom.Element rt, bool inheritedVisible) {
@@ -1233,6 +1269,14 @@ class EpubParser {
           final size = imageSizes[img];
           blocks.add(
             ImageBlock(
+              box: activeBox,
+              layout: epubBlockBox(
+                styles[node] ?? const {},
+                0,
+                richStyles[node] ?? const EpubRichStyle(),
+                allowEdges: true,
+                edgesOnly: true,
+              ),
               media: img,
               alt: node.attributes['alt'],
               width: size?.width,
@@ -1253,7 +1297,26 @@ class EpubParser {
         whitespace = previousWhitespace;
         visible = previousVisible;
         flush();
-        blocks.add(DividerBlock(box: activeBox));
+        blocks.add(
+          DividerBlock(
+            box: activeBox,
+            layout: epubBlockBox(
+              {
+                'margin-left': styles[node]?['text-align'] == 'left'
+                    ? '0'
+                    : 'auto',
+                'margin-right': styles[node]?['text-align'] == 'right'
+                    ? '0'
+                    : 'auto',
+                ...?styles[node],
+              },
+              0,
+              richStyles[node] ?? const EpubRichStyle(),
+              allowEdges: true,
+              edgesOnly: true,
+            ),
+          ),
+        );
         return;
       }
       if (tag == 'br') {
@@ -1311,6 +1374,7 @@ class EpubParser {
 
     walk = (node) {
       final previousBox = activeBox;
+      final previousBoxOwner = activeBoxOwner;
       // A single decorated container is shared across its flattened blocks.
       // Nested decorated boxes remain outside this first native subset.
       if (node is dom.Element &&
@@ -1323,10 +1387,17 @@ class EpubParser {
           styles[node] ?? const {},
           boxGroup,
           richStyles[node] ?? const EpubRichStyle(),
+          allowEdges:
+              proseHeadingLevel(node.localName) != null ||
+              node.querySelectorAll('img,picture').length -
+                          node.querySelectorAll('picture img').length ==
+                      1 &&
+                  node.text.trim().isEmpty,
         );
         if (box != null) {
           flush();
           activeBox = box;
+          activeBoxOwner = node;
           boxGroup++;
         }
       }
@@ -1341,6 +1412,7 @@ class EpubParser {
       activeCell = previousCell;
       activeFloat = previousFloat;
       activeBox = previousBox;
+      activeBoxOwner = previousBoxOwner;
     };
     walk(doc.body!);
     flush();
@@ -1362,6 +1434,7 @@ class EpubParser {
         for (final entry in entries) {
           final b = blocks[entry.key] as ParagraphBlock;
           converted[entry.key] = ParagraphBlock(
+            hasAuthoredFontSize: b.hasAuthoredFontSize,
             text: b.text,
             alignment: b.alignment,
             leadingIndent: b.leadingIndent,
@@ -1372,7 +1445,9 @@ class EpubParser {
             hangingIndentEm: b.hangingIndentEm,
             trailingLabelStart: b.trailingLabelStart,
             box: b.box,
+            layout: b.layout,
             tableRow: entry.value,
+            linkDecoration: b.linkDecoration,
           );
         }
       } on ArgumentError {
@@ -1388,12 +1463,14 @@ class EpubParser {
       for (var i = 0; i < blocks.length; i++) {
         if (blocks[i] case HeadingBlock(:final text, :final alignment)) {
           blocks[i] = ParagraphBlock(
+            hasAuthoredFontSize: blocks[i].hasAuthoredFontSize,
             text: text,
             alignment: alignment,
             inlineImages: blocks[i].inlineImages,
             inlineRuby: blocks[i].inlineRuby,
             inlineStyles: blocks[i].inlineStyles,
             box: blocks[i].box,
+            layout: blocks[i].layout,
           );
         }
       }
@@ -1426,6 +1503,7 @@ class EpubParser {
       if (level > 2 &&
           !blocks.whereType<HeadingBlock>().any((h) => h.level < level)) {
         blocks[openingIndex] = HeadingBlock(
+          hasAuthoredFontSize: opening.hasAuthoredFontSize,
           text: text,
           level: 2,
           alignment: alignment,
@@ -1433,6 +1511,7 @@ class EpubParser {
           inlineRuby: opening.inlineRuby,
           inlineStyles: opening.inlineStyles,
           box: opening.box,
+          layout: opening.layout,
         );
       }
     }

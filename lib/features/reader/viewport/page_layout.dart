@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'paragraph_flow.dart';
 import 'package:flutter/material.dart';
 
@@ -23,6 +24,7 @@ final class PageFragment {
     this.height,
     this.text, {
     this.flow,
+    this.linkLayout,
     this.boxTop = 0,
     this.boxBottom = 0,
   });
@@ -33,6 +35,7 @@ final class PageFragment {
   final String? text;
   final double boxTop, boxBottom;
   final ParagraphFlow? flow;
+  final ReaderLinkLayout? linkLayout;
 }
 
 final class ReaderPage {
@@ -160,6 +163,7 @@ final class PageLayout {
     double boxTop,
     double boxBottom,
     ParagraphFlow? flow,
+    ReaderLinkLayout? linkLayout,
   })?
   _fit(
     String text,
@@ -178,6 +182,7 @@ final class PageLayout {
         boxTop: 0,
         boxBottom: 0,
         flow: null,
+        linkLayout: null,
       );
     }
     measuredChunks++;
@@ -190,6 +195,50 @@ final class PageLayout {
       chapter: index.content.key,
       locale: locale,
     );
+    if (block is ParagraphBlock &&
+        block.linkDecoration != null &&
+        blockOffset == 0 &&
+        text.runes.length == block.text.runes.length) {
+      final link = readerLinkLayout(
+        block,
+        textWidth,
+        style,
+        scaler,
+        direction,
+        locale: locale,
+        heightBehavior: textHeightBehavior,
+        chapter: index.content.key,
+      )!;
+      final edges = readerBoxEdges(
+        index.content,
+        blockIndex,
+        width: width,
+        style: style,
+        scaler: scaler,
+        pageHeight: height,
+      );
+      final spacing = readerBlockSpacing(
+        block,
+        paragraphSpacing,
+        chapter: index.content.key,
+        pageHeight: height,
+      );
+      final total = link.height + edges.top + edges.bottom + spacing;
+      // Move an intact label to the next page; too-tall labels lose decoration
+      // and use the ordinary source-preserving text pagination below.
+      if (total <= height + .01) {
+        if (total > available + .01) return null;
+        return (
+          text: text,
+          count: text.runes.length,
+          height: total,
+          boxTop: edges.top,
+          boxBottom: edges.bottom,
+          flow: null,
+          linkLayout: link,
+        );
+      }
+    }
     final table = block is ParagraphBlock ? block.tableRow : null;
     final em = scaler.scale(style.fontSize ?? 20);
     final tableFits =
@@ -202,11 +251,19 @@ final class PageLayout {
             textWidth - em;
     if (readerUsesParagraphFlow(block, direction) && tableFits) {
       final paragraph = block as ParagraphBlock;
-      final edges = readerBoxEdges(index.content, blockIndex);
+      final edges = readerBoxEdges(
+        index.content,
+        blockIndex,
+        width: width,
+        style: style,
+        scaler: scaler,
+        pageHeight: height,
+      );
       final top = startsBlock ? edges.top : 0.0;
       final spacing = readerBlockSpacing(
         block,
         paragraphSpacing,
+        pageHeight: height,
         chapter: index.content.key,
       );
       final flow = readerParagraphFlow(
@@ -222,6 +279,7 @@ final class PageLayout {
         pageHeight: (height - top - edges.bottom - spacing).clamp(0.0, height),
         width: textWidth,
         style: readerBlockStyle(block, style, chapter: index.content.key),
+        readerFontSize: style.fontSize,
         scaler: scaler,
         locale: locale,
         textHeightBehavior: textHeightBehavior,
@@ -249,6 +307,7 @@ final class PageLayout {
         boxTop: top,
         boxBottom: bottom,
         flow: selected,
+        linkLayout: null,
       );
     }
     final prefix = readerIndentPrefix(
@@ -280,6 +339,7 @@ final class PageLayout {
                   maxWidth: textWidth,
                   styles: block.inlineStyles,
                   style: blockStyle,
+                  readerFontSize: style.fontSize,
                 ),
               ],
               style: blockStyle,
@@ -301,6 +361,7 @@ final class PageLayout {
               locale: locale,
               styles: block.inlineStyles,
               style: blockStyle,
+              readerFontSize: style.fontSize,
               scaler: scaler,
               maxWidth: textWidth,
             ),
@@ -308,7 +369,14 @@ final class PageLayout {
           ..layout(maxWidth: textWidth);
     try {
       final lines = painter.computeLineMetrics();
-      final edges = readerBoxEdges(index.content, blockIndex);
+      final edges = readerBoxEdges(
+        index.content,
+        blockIndex,
+        width: width,
+        style: style,
+        scaler: scaler,
+        pageHeight: height,
+      );
       final blockLength = switch (block) {
         ParagraphBlock(:final text) ||
         HeadingBlock(:final text) => text.runes.length,
@@ -321,6 +389,7 @@ final class PageLayout {
       final spacing = readerBlockSpacing(
         block,
         paragraphSpacing,
+        pageHeight: height,
         chapter: index.content.key,
       );
       // Placeholder-only lines can report shorter line metrics than their
@@ -334,6 +403,7 @@ final class PageLayout {
           boxTop: top,
           boxBottom: bottom,
           flow: null,
+          linkLayout: null,
         );
       }
       // A split box keeps only its outermost top/bottom edges, like CSS slice.
@@ -405,6 +475,7 @@ final class PageLayout {
         boxTop: keptTop,
         boxBottom: keptBottom,
         flow: null,
+        linkLayout: null,
       );
     } finally {
       painter.dispose();
@@ -412,23 +483,33 @@ final class PageLayout {
   }
 
   double _objectHeight(int unit) {
-    final block = index.content.blocks[index.chunks[unit].blockIndex];
-    if (block is ImageBlock) {
-      final known =
-          imageExtent?.call(block) ??
-          imageHeights[block.media] ??
-          (block.width != null && block.height != null
-              ? width * block.height! / block.width!
-              : 180.0);
-      return known.clamp(1.0, height);
-    }
-    final edges = readerBoxEdges(index.content, index.chunks[unit].blockIndex);
-    return ((block is ParagraphBlock
-                ? readerBlankHeight(block, style, scaler)
-                : 24.0) +
-            edges.top +
-            edges.bottom)
-        .clamp(1.0, height);
+    final at = index.chunks[unit].blockIndex, block = index.content.blocks[at];
+    final edges = readerBoxEdges(
+      index.content,
+      at,
+      width: width,
+      style: style,
+      scaler: scaler,
+      pageHeight: height,
+    );
+    final inner = readerBoxInnerWidth(
+      block,
+      width,
+      style: style,
+      scaler: scaler,
+    );
+    final body = block is ImageBlock
+        ? imageExtent?.call(block) ??
+              imageHeights[block.media] ??
+              (block.width != null && block.height != null
+                  ? inner * block.height! / block.width!
+                  : 180.0)
+        : block is ParagraphBlock
+        ? readerBlankHeight(block, style, scaler)
+        : 24.0;
+    return body.clamp(1, math.max(1.0, height - edges.top - edges.bottom)) +
+        edges.top +
+        edges.bottom;
   }
 
   /// A large illustration owns one column, not necessarily the whole spread.
@@ -436,6 +517,16 @@ final class PageLayout {
       fragments.length == 1 &&
       index.content.blocks[index.chunks[fragments.single.unit].blockIndex]
           is ImageBlock &&
+      index
+              .content
+              .blocks[index.chunks[fragments.single.unit].blockIndex]
+              .box ==
+          null &&
+      index
+              .content
+              .blocks[index.chunks[fragments.single.unit].blockIndex]
+              .layout ==
+          null &&
       (fragments.single.height >= height * .6 ||
           index.content.blocks.length == 1);
 
@@ -447,7 +538,9 @@ final class PageLayout {
     final first = _forwardColumn(from);
     if (first == null || columns == 1) return first;
     if (index.content.blocks.length == 1 &&
-        index.content.blocks.single is ImageBlock) {
+        index.content.blocks.single is ImageBlock &&
+        index.content.blocks.single.box == null &&
+        index.content.blocks.single.layout == null) {
       return ReaderPage(
         first.start,
         first.end,
@@ -467,7 +560,11 @@ final class PageLayout {
   ReaderPage? backward(PageCursor until) {
     if (columns == 1 &&
         !index.content.blocks.any(
-          (b) => readerUsesParagraphFlow(b, direction),
+          (b) =>
+              b.box != null ||
+              b.layout != null ||
+              b is ParagraphBlock && b.linkDecoration != null ||
+              readerUsesParagraphFlow(b, direction),
         )) {
       return _backwardColumn(until);
     }
@@ -504,7 +601,14 @@ final class PageLayout {
         if (extent > remaining + .01 || fullPageImage && fragments.isNotEmpty) {
           break;
         }
-        final edges = readerBoxEdges(index.content, chunk.blockIndex);
+        final edges = readerBoxEdges(
+          index.content,
+          chunk.blockIndex,
+          width: width,
+          style: style,
+          scaler: scaler,
+          pageHeight: height,
+        );
         fragments.add(
           PageFragment(
             cursor.unit,
@@ -572,6 +676,7 @@ final class PageLayout {
             fitted.height,
             fitted.text,
             flow: fitted.flow,
+            linkLayout: fitted.linkLayout,
             boxTop: fitted.boxTop,
             boxBottom: fitted.boxBottom,
           ),
@@ -609,7 +714,14 @@ final class PageLayout {
         if (extent > remaining + .01 || fullPageImage && fragments.isNotEmpty) {
           break;
         }
-        final edges = readerBoxEdges(index.content, chunk.blockIndex);
+        final edges = readerBoxEdges(
+          index.content,
+          chunk.blockIndex,
+          width: width,
+          style: style,
+          scaler: scaler,
+          pageHeight: height,
+        );
         fragments.add(
           PageFragment(
             cursor.unit,
@@ -645,6 +757,7 @@ final class PageLayout {
             fitted.height,
             fitted.text,
             flow: fitted.flow,
+            linkLayout: fitted.linkLayout,
             boxTop: fitted.boxTop,
             boxBottom: fitted.boxBottom,
           ),

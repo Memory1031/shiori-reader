@@ -88,11 +88,11 @@ void main() {
       final chapter = content.chapters.first;
       final block = chapter.blocks.single as ParagraphBlock;
       expect(block.text, '😀甲乙丙丁');
-      expect(block.inlineStyles.map((s) => s.start), [1, 2, 3]);
-      expect(block.inlineStyles.map((s) => s.fontScale), [.8, 1, 1]);
-      expect(block.inlineStyles.last.italic, isTrue);
-      expect(block.inlineStyles.last.bold, isTrue);
-      expect(block.inlineStyles.last.color, 0xff9161a4);
+      expect(block.inlineStyles.map((s) => s.start), [0, 1, 2, 3, 4]);
+      expect(block.inlineStyles.map((s) => s.fontScale), [1, .8, 1, 1, 1]);
+      expect(block.inlineStyles[3].italic, isTrue);
+      expect(block.inlineStyles[3].bold, isTrue);
+      expect(block.inlineStyles[3].color, 0xff9161a4);
       expect(content.links.single.sourceOffset, 2);
       expect(content.links.single.sourceLength, 2);
       expect(block.blockKey, ParagraphBlock(text: block.text).blockKey);
@@ -127,7 +127,8 @@ void main() {
     final chapter = content.chapters.first;
     final box = chapter.blocks.first.box!;
     expect(box.centered, isTrue);
-    expect(box.width, 304);
+    expect(box.width, isNull);
+    expect(box.widthLength, LayoutLength(19, LayoutUnit.em));
     expect(box.maxWidthFraction, 1);
     expect(chapter.blocks[1].box, box);
     expect(

@@ -13,10 +13,21 @@ export 'inline_ruby.dart';
 enum ParagraphAlignment { start, center, end }
 
 sealed class ContentBlock extends ValueModel {
-  ContentBlock(int occurrence, {this.box})
-    : occurrence = nonNegative(occurrence, 'occurrence');
+  ContentBlock(
+    int occurrence, {
+    this.box,
+    this.layout,
+    this.hasAuthoredFontSize = false,
+  }) : occurrence = nonNegative(occurrence, 'occurrence');
   final int occurrence;
   final BlockBox? box;
+
+  /// Element-local geometry inside the one supported outer container.
+  final BlockBox? layout;
+
+  /// Effective size on the block itself, including inheritance; unrelated
+  /// inline color or a child-only size never suppresses default heading size.
+  final bool hasAuthoredFontSize;
   List<InlineTextStyle> get inlineStyles => const [];
   List<InlineImage> get inlineImages => const [];
   List<InlineRuby> get inlineRuby => const [];
@@ -45,6 +56,8 @@ sealed class ContentBlock extends ValueModel {
     'type': kind,
     ...fieldsJson,
     if (box != null) 'box': box!.toJson(),
+    if (layout != null) 'layout': layout!.toJson(),
+    if (hasAuthoredFontSize) 'hasAuthoredFontSize': true,
     'occurrence': occurrence,
     'blockKey': blockKey,
   };
@@ -54,11 +67,20 @@ sealed class ContentBlock extends ValueModel {
     final box = json['box'] == null
         ? null
         : BlockBox.fromJson(json['box'] as Map<String, dynamic>);
+    final layout = json['layout'] == null
+        ? null
+        : BlockBox.fromJson(json['layout'] as Map<String, dynamic>);
     final styles = (json['inlineStyles'] as List? ?? const []).map(
       (v) => InlineTextStyle.fromJson(v as Map<String, dynamic>),
     );
     final ContentBlock block = switch (json['type']) {
       'paragraph' => ParagraphBlock(
+        linkDecoration: json['linkDecoration'] == null
+            ? null
+            : LinkDecoration.fromJson(
+                json['linkDecoration'] as Map<String, dynamic>,
+              ),
+        hasAuthoredFontSize: json['hasAuthoredFontSize'] as bool? ?? false,
         authoredGapEm: (json['authoredGapEm'] as num?)?.toDouble(),
         hangingIndentEm: (json['hangingIndentEm'] as num?)?.toDouble(),
         trailingLabelStart: json['trailingLabelStart'] as int?,
@@ -72,6 +94,7 @@ sealed class ContentBlock extends ValueModel {
           (v) => InlineRuby.fromJson(v as Map<String, dynamic>),
         ),
         box: box,
+        layout: layout,
         inlineImages: (json['inlineImages'] as List? ?? const []).map(
           (v) => InlineImage.fromJson(v as Map<String, dynamic>),
         ),
@@ -84,6 +107,7 @@ sealed class ContentBlock extends ValueModel {
       ),
       'image' => ImageBlock(
         box: box,
+        layout: layout,
         media: MediaRef.fromJson(json['media'] as Map<String, dynamic>),
         width: json['width'] as int?,
         height: json['height'] as int?,
@@ -92,11 +116,13 @@ sealed class ContentBlock extends ValueModel {
         occurrence: occurrence,
       ),
       'heading' => HeadingBlock(
+        hasAuthoredFontSize: json['hasAuthoredFontSize'] as bool? ?? false,
         inlineStyles: styles,
         inlineRuby: (json['inlineRuby'] as List? ?? const []).map(
           (v) => InlineRuby.fromJson(v as Map<String, dynamic>),
         ),
         box: box,
+        layout: layout,
         inlineImages: (json['inlineImages'] as List? ?? const []).map(
           (v) => InlineImage.fromJson(v as Map<String, dynamic>),
         ),
@@ -107,7 +133,11 @@ sealed class ContentBlock extends ValueModel {
             : ParagraphAlignment.values.byName(json['alignment'] as String),
         occurrence: occurrence,
       ),
-      'divider' => DividerBlock(occurrence: occurrence, box: box),
+      'divider' => DividerBlock(
+        occurrence: occurrence,
+        box: box,
+        layout: layout,
+      ),
       _ => throw const FormatException('Unknown content block type'),
     };
     if (json['blockKey'] != block.blockKey) {
@@ -179,18 +209,35 @@ final class ParagraphBlock extends ContentBlock {
     Iterable<InlineRuby> inlineRuby = const [],
     Iterable<InlineTextStyle> inlineStyles = const [],
     BlockBox? box,
+    BlockBox? layout,
+    bool hasAuthoredFontSize = false,
     this.alignment = ParagraphAlignment.start,
     this.leadingIndent = 0,
     this.authoredGapEm,
     this.hangingIndentEm,
     this.trailingLabelStart,
     this.tableRow,
+    this.linkDecoration,
     int occurrence = 0,
   }) : inlineRuby = List.unmodifiable(inlineRuby),
        inlineStyles = List.unmodifiable(inlineStyles),
        inlineImages = List.unmodifiable(inlineImages),
        text = ContentIdentity.normalizeText(text),
-       super(occurrence, box: box) {
+       super(
+         occurrence,
+         layout: layout,
+         box: box,
+         hasAuthoredFontSize: hasAuthoredFontSize,
+       ) {
+    if (linkDecoration != null &&
+        (this.text.isEmpty ||
+            this.inlineImages.isNotEmpty ||
+            this.inlineRuby.isNotEmpty ||
+            tableRow != null ||
+            hangingIndentEm != null ||
+            trailingLabelStart != null)) {
+      throw ArgumentError('Invalid decorated link paragraph');
+    }
     if (authoredGapEm != null &&
         (!authoredGapEm!.isFinite ||
             authoredGapEm! <= 0 ||
@@ -267,6 +314,7 @@ final class ParagraphBlock extends ContentBlock {
   /// Code point start of a short, right-aligned suffix ending at text.runes.length.
   final int? trailingLabelStart;
   final TableRowLayout? tableRow;
+  final LinkDecoration? linkDecoration;
   @override
   final List<InlineImage> inlineImages;
   @override
@@ -300,6 +348,7 @@ final class ParagraphBlock extends ContentBlock {
     if (hangingIndentEm != null) 'hangingIndentEm': hangingIndentEm,
     if (trailingLabelStart != null) 'trailingLabelStart': trailingLabelStart,
     if (tableRow != null) 'tableRow': tableRow!.toJson(),
+    if (linkDecoration != null) 'linkDecoration': linkDecoration!.toJson(),
     if (inlineStyles.isNotEmpty)
       'inlineStyles': inlineStyles.map((s) => s.toJson()).toList(),
     if (inlineImages.isNotEmpty)
@@ -309,15 +358,18 @@ final class ParagraphBlock extends ContentBlock {
   };
   @override
   ParagraphBlock withOccurrence(int occurrence) => ParagraphBlock(
+    hasAuthoredFontSize: hasAuthoredFontSize,
     text: text,
     authoredGapEm: authoredGapEm,
     hangingIndentEm: hangingIndentEm,
     trailingLabelStart: trailingLabelStart,
     tableRow: tableRow,
+    linkDecoration: linkDecoration,
     inlineImages: inlineImages,
     inlineRuby: inlineRuby,
     inlineStyles: inlineStyles,
     box: box,
+    layout: layout,
     alignment: alignment,
     leadingIndent: leadingIndent,
     occurrence: occurrence,
@@ -331,7 +383,10 @@ final class ParagraphBlock extends ContentBlock {
     hangingIndentEm,
     trailingLabelStart,
     tableRow,
+    linkDecoration,
+    hasAuthoredFontSize,
     box,
+    layout,
     occurrence,
   ];
 }
@@ -340,6 +395,7 @@ final class ImageBlock extends ContentBlock {
   ImageBlock({
     required this.media,
     BlockBox? box,
+    BlockBox? layout,
     this.width,
     this.height,
     String? alt,
@@ -349,7 +405,7 @@ final class ImageBlock extends ContentBlock {
        caption = caption == null
            ? null
            : ContentIdentity.normalizeText(caption),
-       super(occurrence, box: box) {
+       super(occurrence, layout: layout, box: box) {
     if ((width != null && width! <= 0) || (height != null && height! <= 0)) {
       throw ArgumentError('Known image dimensions must be positive');
     }
@@ -376,6 +432,7 @@ final class ImageBlock extends ContentBlock {
   ImageBlock withOccurrence(int occurrence) => ImageBlock(
     media: media,
     box: box,
+    layout: layout,
     width: width,
     height: height,
     alt: alt,
@@ -390,6 +447,7 @@ final class ImageBlock extends ContentBlock {
     alt,
     caption,
     box,
+    layout,
     occurrence,
   ];
 }
@@ -401,6 +459,8 @@ final class HeadingBlock extends ContentBlock {
     Iterable<InlineRuby> inlineRuby = const [],
     Iterable<InlineTextStyle> inlineStyles = const [],
     BlockBox? box,
+    BlockBox? layout,
+    bool hasAuthoredFontSize = false,
     this.level = 1,
     this.alignment = ParagraphAlignment.start,
     int occurrence = 0,
@@ -408,7 +468,12 @@ final class HeadingBlock extends ContentBlock {
        inlineStyles = List.unmodifiable(inlineStyles),
        inlineImages = List.unmodifiable(inlineImages),
        text = nonBlank(ContentIdentity.normalizeText(text), 'heading'),
-       super(occurrence, box: box) {
+       super(
+         occurrence,
+         layout: layout,
+         box: box,
+         hasAuthoredFontSize: hasAuthoredFontSize,
+       ) {
     validateInlineRuby(this.text, this.inlineRuby);
     validateInlineStyles(this.text, this.inlineStyles);
     validateInlineImages(this.text, this.inlineImages);
@@ -453,11 +518,13 @@ final class HeadingBlock extends ContentBlock {
   };
   @override
   HeadingBlock withOccurrence(int occurrence) => HeadingBlock(
+    hasAuthoredFontSize: hasAuthoredFontSize,
     text: text,
     inlineImages: inlineImages,
     inlineRuby: inlineRuby,
     inlineStyles: inlineStyles,
     box: box,
+    layout: layout,
     level: level,
     alignment: alignment,
     occurrence: occurrence,
@@ -468,13 +535,15 @@ final class HeadingBlock extends ContentBlock {
     inlineImages,
     inlineStyles,
     box,
+    layout,
+    hasAuthoredFontSize,
     occurrence,
   ];
 }
 
 final class DividerBlock extends ContentBlock {
-  DividerBlock({int occurrence = 0, BlockBox? box})
-    : super(occurrence, box: box);
+  DividerBlock({int occurrence = 0, BlockBox? box, BlockBox? layout})
+    : super(occurrence, layout: layout, box: box);
   @override
   String get kind => 'divider';
   @override
@@ -483,9 +552,9 @@ final class DividerBlock extends ContentBlock {
   Map<String, Object?> get fieldsJson => const {};
   @override
   DividerBlock withOccurrence(int occurrence) =>
-      DividerBlock(occurrence: occurrence, box: box);
+      DividerBlock(occurrence: occurrence, box: box, layout: layout);
   @override
-  List<Object?> get values => [box, occurrence];
+  List<Object?> get values => [box, layout, occurrence];
 }
 
 final class ChapterContent extends ValueModel {

@@ -49,12 +49,25 @@ double? _length(String? value, double em) {
 }
 
 class EpubRichStyle {
-  const EpubRichStyle({this.color, this.scale = 1, this.bold, this.italic});
+  const EpubRichStyle({
+    this.color,
+    this.scale = 1,
+    this.bold,
+    this.italic,
+    this.hasFontSize = false,
+    this.fontSizeFromReader = false,
+    this.defaultHeading = false,
+  });
   final int? color;
   final double scale;
   final bool? bold, italic;
+  final bool hasFontSize, fontSizeFromReader, defaultHeading;
   bool get isDefault =>
-      color == null && scale == 1 && bold == null && italic == null;
+      color == null &&
+      scale == 1 &&
+      !fontSizeFromReader &&
+      bold == null &&
+      italic == null;
   InlineTextStyle range(
     int start,
     int length, {
@@ -66,9 +79,29 @@ class EpubRichStyle {
         ? null
         : color,
     fontScale: scale,
+    fontSizeFromReader: fontSizeFromReader,
     bold: bold,
     italic: italic,
   );
+}
+
+/// Absolute keywords resolve against the reader's medium. Only em and %
+/// multiply the computed parent. Publisher root sizes are deliberately ignored.
+double? epubFontScale(String? value, double parent) {
+  const keywords = {
+    'xx-small': 3 / 5,
+    'x-small': 3 / 4,
+    'small': 8 / 9,
+    'medium': 1.0,
+    'large': 6 / 5,
+    'x-large': 3 / 2,
+    'xx-large': 2.0,
+    'xxx-large': 3.0,
+  };
+  return keywords[value] ??
+      (_length(value, parent * 16) == null
+          ? null
+          : (_length(value, parent * 16)! / 16).clamp(.25, 4));
 }
 
 /// Computed inherited typography for the bounded native subset. Root sizing
@@ -82,14 +115,28 @@ Map<dom.Element, EpubRichStyle> epubRichStyles(
     final parent = result[e.parent] ?? const EpubRichStyle();
     final css = styles[e] ?? const {};
     final root = e.localName == 'body' || e.localName == 'html';
-    final size = root ? null : _length(css['font-size'], parent.scale * 16);
+    final size = root ? null : epubFontScale(css['font-size'], parent.scale);
+    final heading = RegExp(r'^h[1-6]$').hasMatch(e.localName ?? '');
+    final relative =
+        css['font-size']?.endsWith('em') == true ||
+        css['font-size']?.endsWith('%') == true;
     final weight = css['font-weight'];
     final fontStyle = css['font-style'];
     result[e] = EpubRichStyle(
       color: css['color'] == 'initial'
           ? null
           : epubColor(css['color']) ?? parent.color,
-      scale: size == null ? parent.scale : (size / 16).clamp(.25, 4),
+      scale: size ?? parent.scale,
+      hasFontSize: size != null || parent.hasFontSize,
+      fontSizeFromReader: size == null
+          ? parent.fontSizeFromReader
+          : !relative ||
+                heading ||
+                !parent.defaultHeading ||
+                parent.fontSizeFromReader,
+      defaultHeading: heading
+          ? size == null && !parent.hasFontSize
+          : parent.defaultHeading,
       bold: weight == 'normal' || weight == '400'
           ? false
           : weight == 'bold' ||
@@ -110,64 +157,179 @@ Map<dom.Element, EpubRichStyle> epubRichStyles(
   return result;
 }
 
+LayoutLength? epubLayoutLength(String? value, {bool percentage = true}) {
+  final match = RegExp(r'^(\d*\.?\d+)(px|em|%)?$').firstMatch(value ?? '');
+  if (match == null) return null;
+  final n = double.tryParse(match[1]!);
+  if (n == null || !n.isFinite || n < 0) return null;
+  final unit = switch (match[2]) {
+    'em' => LayoutUnit.em,
+    '%' => LayoutUnit.fraction,
+    _ => LayoutUnit.px,
+  };
+  if (unit == LayoutUnit.fraction && !percentage) return null;
+  final v = unit == LayoutUnit.fraction ? n / 100 : n;
+  return v <= 4096 ? LayoutLength(v, unit) : null;
+}
+
+LinkDecoration? epubLinkDecoration(
+  dom.Element? owner,
+  Map<dom.Element, Map<String, String>> styles,
+  Map<dom.Element, EpubRichStyle> rich,
+) {
+  if (owner == null || owner.localName != 'p') return null;
+  final links = owner.querySelectorAll('a[href]');
+  if (links.length != 1) return null;
+  final link = links.single;
+  final nodes = owner.querySelectorAll('*');
+  if (nodes.any(
+    (e) =>
+        !{'a', 'span', 'b', 'strong', 'i', 'em'}.contains(e.localName) ||
+        e.attributes.containsKey('hidden') ||
+        styles[e]?['display'] == 'none' ||
+        {'absolute', 'fixed'}.contains(styles[e]?['position']) ||
+        !{null, 'none'}.contains(styles[e]?['float']) ||
+        {'flex', 'grid', 'block'}.contains(styles[e]?['display']),
+  )) {
+    return null;
+  }
+  final candidates = nodes
+      .where((e) => epubColor(styles[e]?['background-color']) != null)
+      .toList();
+  if (candidates.length != 1) return null;
+  final node = candidates.single;
+  if (node != link && !link.querySelectorAll('*').contains(node) ||
+      node.text != link.text) {
+    return null;
+  }
+  if (nodes.any(
+    (e) => (styles[e] ?? const <String, String>{}).keys.any(
+      (key) =>
+          key.startsWith('border-') && key != 'border-radius' ||
+          e != node && (key.startsWith('padding-') || key == 'border-radius'),
+    ),
+  )) {
+    return null;
+  }
+  final css = styles[node]!;
+  final radius = epubLayoutLength(css['border-radius'], percentage: false);
+  if (css['border-radius'] != null && radius == null) return null;
+  return LinkDecoration(
+    backgroundColor: epubColor(css['background-color'])!,
+    radius: radius,
+    padding: BoxInsets(
+      top: epubLayoutLength(css['padding-top']),
+      right: epubLayoutLength(css['padding-right']),
+      bottom: epubLayoutLength(css['padding-bottom']),
+      left: epubLayoutLength(css['padding-left']),
+    ),
+    fontScale: rich[node]?.scale ?? 1,
+  );
+}
+
 BlockBox? epubBlockBox(
   Map<String, String> css,
   int group,
-  EpubRichStyle style,
-) {
-  // Only simple decorated containers, never generic body width/margins.
-  final background = epubColor(css['background-color']);
-  final border = css['border'] ?? '';
-  if (background == null &&
-      border.isEmpty &&
-      css['border-width'] == null &&
-      css['width'] == null &&
-      css['max-width'] == null) {
-    return null;
-  }
+  EpubRichStyle style, {
+  bool allowEdges = false,
+  bool edgesOnly = false,
+}) {
   if ({'absolute', 'fixed'}.contains(css['position']) ||
-      {'flex', 'grid'}.contains(css['display']) ||
+      {'flex', 'grid', 'inline-flex', 'inline-grid'}.contains(css['display']) ||
       css['float'] != null && css['float'] != 'none') {
     return null;
   }
-  final tokens = border.split(RegExp(r'\s+'));
-  final borderWidth =
-      _length(
-        css['border-width'] ??
-            tokens.where((t) => RegExp(r'^\d').hasMatch(t)).firstOrNull,
-        style.scale * 16,
-      ) ??
-      0;
-  final borderColor =
-      epubColor(css['border-color']) ??
-      tokens.map(epubColor).whereType<int>().firstOrNull ??
-      style.color;
-  double? size(String key) {
-    if (css[key]?.endsWith('%') == true) return null;
-    final v = _length(css[key], style.scale * 16);
-    return v != null && v > 0 && v <= 4096 ? v : null;
+  final background = edgesOnly ? null : epubColor(css['background-color']);
+  BoxBorderSide side(String key) {
+    final raw = css['border-$key-style'] ?? 'none';
+    final type = switch (raw) {
+      'none' || 'hidden' => BoxBorderStyle.none,
+      'dashed' => BoxBorderStyle.dashed,
+      'dotted' => BoxBorderStyle.dotted,
+      _ => BoxBorderStyle.solid,
+    };
+    final width = switch (css['border-$key-width']) {
+      'thin' => LayoutLength(1),
+      'medium' || null => LayoutLength(3),
+      'thick' => LayoutLength(5),
+      _ =>
+        epubLayoutLength(css['border-$key-width'], percentage: false) ??
+            LayoutLength(0),
+    };
+    return BoxBorderSide(
+      width: type == BoxBorderStyle.none || edgesOnly ? LayoutLength(0) : width,
+      style: edgesOnly ? BoxBorderStyle.none : type,
+      color: epubColor(css['border-$key-color']) ?? style.color,
+    );
   }
 
-  double? fraction(String key) {
-    final value = css[key];
-    if (value == null || !value.endsWith('%')) return null;
-    final n = double.tryParse(value.substring(0, value.length - 1));
-    return n != null && n.isFinite && n > 0 ? (n / 100).clamp(.01, 1) : null;
+  final borders = BoxBorders(
+    top: side('top'),
+    right: side('right'),
+    bottom: side('bottom'),
+    left: side('left'),
+  );
+  final decorated =
+      background != null ||
+      [
+        borders.top,
+        borders.right,
+        borders.bottom,
+        borders.left,
+      ].any((s) => s!.style != BoxBorderStyle.none && s.width.value > 0);
+  BoxInsets insets(String prefix) => BoxInsets(
+    top: epubLayoutLength(css['$prefix-top']),
+    right: epubLayoutLength(css['$prefix-right']),
+    bottom: epubLayoutLength(css['$prefix-bottom']),
+    left: epubLayoutLength(css['$prefix-left']),
+  );
+  final margin = insets('margin'), padding = insets('padding');
+  final width = epubLayoutLength(css['width']),
+      maxWidth = epubLayoutLength(css['max-width']);
+  final hasEdges = [...margin.values, ...padding.values].any((v) => v != null);
+  if (!decorated &&
+      width == null &&
+      maxWidth == null &&
+      !(allowEdges && hasEdges)) {
+    return null;
   }
-
-  // v1 accepts uniform padding; unsupported shorthand does not invent geometry.
-  final padding = _length(css['padding'], style.scale * 16) ?? 0;
+  double? pixels(LayoutLength? v) =>
+      v?.unit == LayoutUnit.px && v!.value > 0 ? v.value : null;
+  double? fraction(LayoutLength? v) =>
+      v?.unit == LayoutUnit.fraction && v!.value > 0
+      ? v.value.clamp(.01, 1)
+      : null;
   return BlockBox(
     group: group,
-    width: size('width'),
-    maxWidth: size('max-width'),
-    widthFraction: fraction('width'),
-    maxWidthFraction: fraction('max-width'),
-    padding: padding.clamp(0, 64),
-    borderWidth: borderWidth.clamp(0, 8),
-    borderColor: borderColor,
+    width: pixels(width),
+    maxWidth: pixels(maxWidth),
+    widthFraction: fraction(width),
+    maxWidthFraction: fraction(maxWidth),
+    widthLength: width,
+    maxWidthLength: maxWidth,
+    margins: margin,
+    paddingEdges: padding,
+    borders: borders,
     backgroundColor: background,
-    dashed: (css['border-style'] ?? border).contains('dashed'),
+    fontScale: style.scale,
+    headingRelative: style.defaultHeading && !style.fontSizeFromReader,
+    // Legacy accessors are retained; new measurement uses the explicit sides.
+    padding:
+        (epubLayoutLength(css['padding'])?.unit == LayoutUnit.px
+                ? epubLayoutLength(css['padding'])!.value
+                : 0)
+            .clamp(0, 64)
+            .toDouble(),
+    borderWidth:
+        (borders.top!.width.unit == LayoutUnit.px
+                ? borders.top!.width.value
+                : 0)
+            .clamp(0, 8)
+            .toDouble(),
+    borderColor: borders.top!.color,
+    dashed: borders.top!.style == BoxBorderStyle.dashed,
     centered: css['margin-left'] == 'auto' && css['margin-right'] == 'auto',
+    autoLeft: css['margin-left'] == 'auto',
+    autoRight: css['margin-right'] == 'auto',
   );
 }

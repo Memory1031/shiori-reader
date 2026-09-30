@@ -30,7 +30,9 @@ TextStyle readerBlockStyle(
     return base.copyWith(
       fontSize:
           (base.fontSize ?? 18) *
-          (title
+          (block.hasAuthoredFontSize
+              ? 1
+              : title
               ? 1.4
               : block is HeadingBlock
               ? 1.15
@@ -100,13 +102,20 @@ double readerBlockSpacing(
   ContentBlock block,
   double paragraphSpacing, {
   ChapterKey? chapter,
+  double pageHeight = double.infinity,
 }) {
-  if (block.box != null || block is ParagraphBlock && block.tableRow != null) {
+  if (block.box != null ||
+      block.layout != null ||
+      block is ParagraphBlock && block.tableRow != null) {
     return 0;
   }
-  if (_isChapterHeading(block, chapter)) return paragraphSpacing + 64;
-  if (block is HeadingBlock) return paragraphSpacing + 28;
-  return paragraphSpacing;
+  if (_isChapterHeading(block, chapter)) {
+    return (paragraphSpacing + 64).clamp(0, pageHeight * .2);
+  }
+  if (block is HeadingBlock) {
+    return (paragraphSpacing + 28).clamp(0, pageHeight * .2);
+  }
+  return paragraphSpacing.clamp(0, pageHeight * .2);
 }
 
 /// Keep natural glyph spacing while sharing the unused CJK cell across margins.
@@ -121,7 +130,12 @@ double readerBlockWidth(
   ChapterKey? chapter,
   Locale? locale,
 }) {
-  available = readerBoxInnerWidth(block, available);
+  available = readerBoxInnerWidth(
+    block,
+    available,
+    style: style,
+    scaler: scaler,
+  );
   if (block.inlineStyles.isNotEmpty ||
       block is ParagraphBlock &&
           (block.hangingIndentEm != null ||

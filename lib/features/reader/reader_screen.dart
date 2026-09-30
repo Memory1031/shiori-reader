@@ -35,6 +35,7 @@ import 'reader_linked_text.dart';
 import 'epub_layout_page.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'viewport/page_turn.dart';
+import 'viewport/reader_box.dart';
 
 /// The body never observes per-frame progress or Chrome visibility changes.
 /// Preferences are injected and scoped to this reading session.
@@ -1200,15 +1201,41 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }) {
     final columnWidth =
         (bounds.maxWidth - (columns - 1) * readerColumnGap) / columns;
-    ({double height, double caption}) extent(ImageBlock block) =>
-        readerImageExtent(
-          block,
-          width: columnWidth,
-          maxHeight: bounds.maxHeight,
-          scaler: MediaQuery.textScalerOf(context),
-          direction: Directionality.of(context),
-          knownSize: _sizes[block.media],
-        );
+    final imageIndexes = Map<ImageBlock, int>.identity();
+    for (final (index, block) in widget.content.blocks.indexed) {
+      if (block is ImageBlock) {
+        imageIndexes[block] = index;
+      }
+    }
+    ({double height, double caption}) extent(ImageBlock block) {
+      final boxes = readerBlockBoxes(
+        block,
+        columnWidth,
+        style,
+        MediaQuery.textScalerOf(context),
+        pageHeight: bounds.maxHeight,
+      );
+      final edges = readerBoxEdges(
+        widget.content,
+        imageIndexes[block] ?? widget.content.blocks.indexOf(block),
+        width: columnWidth,
+        style: style,
+        scaler: MediaQuery.textScalerOf(context),
+        pageHeight: bounds.maxHeight,
+      );
+      return readerImageExtent(
+        block,
+        width: boxes.innerWidth,
+        maxHeight: (bounds.maxHeight - edges.top - edges.bottom).clamp(
+          1,
+          bounds.maxHeight,
+        ),
+        scaler: MediaQuery.textScalerOf(context),
+        direction: Directionality.of(context),
+        knownSize: _sizes[block.media],
+      );
+    }
+
     Widget image(BuildContext context, ImageBlock block) {
       final geometry = extent(block);
       return SizedBox(
