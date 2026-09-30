@@ -17,7 +17,7 @@ class _CapturedStdout implements Stdout {
 void main() {
   final projectTemplate = File(
     'ios/Runner.xcodeproj/project.pbxproj',
-  ).readAsStringSync();
+  ).readAsStringSync().replaceAll('\r\n', '\n');
   final configTemplate = File(
     'ios/ShareExtension/ShareExtension.xcconfig',
   ).readAsStringSync();
@@ -253,12 +253,14 @@ void main() {
   }
 
   test('rejects an incomplete extension target configuration list', () {
-    File('$repo/ios/Runner.xcodeproj/project.pbxproj').writeAsStringSync(
-      projectTemplate.replaceFirst(
-        '\t\t\t\t006068B0FCA81F3AA7B4D9E7 /* Profile */,\n',
-        '',
-      ),
+    final incompleteProject = projectTemplate.replaceFirst(
+      '\t\t\t\t006068B0FCA81F3AA7B4D9E7 /* Profile */,\n',
+      '',
     );
+    expect(incompleteProject, isNot(projectTemplate));
+    File(
+      '$repo/ios/Runner.xcodeproj/project.pbxproj',
+    ).writeAsStringSync(incompleteProject);
     commit('missing-profile');
     git(['push', 'origin', 'develop']);
     expect(() => publishRelease(repo, 'v1.0.0'), throwsStateError);
