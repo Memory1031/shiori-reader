@@ -11,6 +11,7 @@ import '../../shared/widgets/state_views.dart';
 import '../novel_detail/catalog_controller.dart';
 import 'reader_controller.dart';
 import 'reader_preferences.dart';
+import 'reader_theme.dart';
 import 'position/position_resolver.dart';
 import 'reader_screen.dart';
 import 'viewport/page_turn.dart';
@@ -1668,6 +1669,53 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         : [entering, shade, leaving];
   }
 
+  Widget _chapterWaitBar() => ListenableBuilder(
+    listenable: _preferences,
+    builder: (context, _) {
+      final theme = readerTheme(
+        _preferences.value,
+        MediaQuery.platformBrightnessOf(context),
+        accent: appAccentOf(context),
+      );
+      return Theme(
+        data: theme,
+        child: Material(
+          color: theme.scaffoldBackgroundColor,
+          surfaceTintColor: Colors.transparent,
+          elevation: 4,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: Icon(
+                    Icons.hourglass_top,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Text(AppLocalizations.of(context).loading)),
+                TextButton(
+                  key: const ValueKey('cancel-chapter-turn'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.onSurface,
+                  ),
+                  onPressed: () => _cancelChapter(),
+                  child: Text(
+                    MaterialLocalizations.of(context).cancelButtonLabel,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+
   @override
   Widget build(BuildContext context) =>
       WindowCaptionScope.appDefault(child: _buildPage(context));
@@ -1743,38 +1791,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                       left: 24,
                       right: 24,
                       bottom: 32,
-                      child: SafeArea(
-                        child: Material(
-                          elevation: 4,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              children: [
-                                const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: Icon(Icons.hourglass_top, size: 20),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    AppLocalizations.of(context).loading,
-                                  ),
-                                ),
-                                TextButton(
-                                  key: const ValueKey('cancel-chapter-turn'),
-                                  onPressed: () => _cancelChapter(),
-                                  child: Text(
-                                    MaterialLocalizations.of(
-                                      context,
-                                    ).cancelButtonLabel,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                      child: SafeArea(child: _chapterWaitBar()),
                     ),
                 ],
               )
