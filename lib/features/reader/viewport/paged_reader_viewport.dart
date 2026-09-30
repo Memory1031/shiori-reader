@@ -644,6 +644,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           textStyle,
           scaler,
           pageHeight: constraints.maxHeight,
+          minimumContentHeight: f.boxContentHeight,
         );
         final edges = readerBoxEdges(
           widget.content,
@@ -652,6 +653,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           style: textStyle,
           scaler: scaler,
           pageHeight: constraints.maxHeight,
+          minimumContentHeight: f.boxContentHeight,
         );
         final starts = chunk.start + f.start == 0;
         final ends =

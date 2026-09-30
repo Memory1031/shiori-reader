@@ -55,6 +55,7 @@ ReaderLinkLayout? readerLinkLayout(
       ),
     ),
     textDirection: direction,
+    textAlign: readerBlockAlign(block, chapter: chapter),
     textScaler: scaler,
     locale: locale,
     textHeightBehavior: heightBehavior,
@@ -231,6 +232,7 @@ readerBlockBoxes(
   TextStyle style,
   TextScaler scaler, {
   double pageHeight = double.infinity,
+  double? minimumContentHeight,
 }) {
   final textStyle = block is HeadingBlock
       ? readerBlockStyle(block, style)
@@ -242,12 +244,14 @@ readerBlockBoxes(
         : textStyle.fontSize ?? 20;
     font = math.max(font, base * span.fontScale);
   }
-  final minimumContentHeight = scaler.scale(font) * (textStyle.height ?? 1.6);
+  final contentHeight = math.max(
+    scaler.scale(font) * (textStyle.height ?? 1.6),
+    minimumContentHeight ?? 0,
+  );
   final levels = block.box != null && block.layout != null ? 2 : 1;
   // Reserve one real text row across the bounded pair of boxes, including
   // authored heading size. Each level shares only the optional edge budget.
-  final edgeHeight =
-      (pageHeight - minimumContentHeight) / levels + minimumContentHeight;
+  final edgeHeight = (pageHeight - contentHeight) / levels + contentHeight;
   final outer = readerBoxGeometry(
     block.box,
     block,
@@ -255,7 +259,7 @@ readerBlockBoxes(
     style,
     scaler,
     pageHeight: edgeHeight,
-    minimumContentHeight: minimumContentHeight,
+    minimumContentHeight: contentHeight,
   );
   final local = readerBoxGeometry(
     block.layout,
@@ -264,7 +268,7 @@ readerBlockBoxes(
     style,
     scaler,
     pageHeight: edgeHeight,
-    minimumContentHeight: minimumContentHeight,
+    minimumContentHeight: contentHeight,
   );
   return (
     outer: outer,
@@ -305,6 +309,7 @@ readerBoxEdges(
   TextStyle style = const TextStyle(fontSize: 16),
   TextScaler scaler = TextScaler.noScaling,
   double pageHeight = double.infinity,
+  double? minimumContentHeight,
 }) {
   final block = content.blocks[index], box = block.box;
   final boxes = readerBlockBoxes(
@@ -313,6 +318,7 @@ readerBoxEdges(
     style,
     scaler,
     pageHeight: pageHeight,
+    minimumContentHeight: minimumContentHeight,
   );
   final outerTop =
       box != null &&

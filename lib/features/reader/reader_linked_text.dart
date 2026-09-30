@@ -245,7 +245,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
                       links: const [],
                       style: widget.style,
                       readerFontSize: widget.readerFontSize,
-                      align: TextAlign.start,
+                      align: widget.align,
                       scaler: widget.scaler,
                       inlineStyles: widget.inlineStyles,
                       authoredBackground: decoration.backgroundColor,

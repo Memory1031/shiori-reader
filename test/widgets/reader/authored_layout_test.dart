@@ -12,6 +12,226 @@ import 'package:shiori/features/reader/reader_authored_colors.dart';
 import '../../data/local/epub_authored_layout_test.dart' show authoredContent;
 
 void main() {
+  for (final alignment in ['center', 'right']) {
+    testWidgets(
+      'two-line decorated link preserves $alignment character alignment',
+      (tester) async {
+        const label = 'ABCDEFGHIJKLM';
+        final book = authoredContent(
+          '<p style="text-align:$alignment"><a href="#target" '
+          'style="background-color:#544f65;color:white;'
+          'border-radius:30px;padding:.3em">$label</a></p>'
+          '<p id="target">After</p>',
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData.dark(),
+            home: Center(
+              child: SizedBox(
+                width: 200,
+                height: 260,
+                child: PagedReaderViewport(
+                  content: book.chapters.first,
+                  controller: PagedReaderController(),
+                  contentLinks: book.links,
+                  textStyle: const TextStyle(fontSize: 20, height: 1.6),
+                  turnStyle: PageTurnStyle.none,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final pill = find.byWidgetPredicate(
+          (w) =>
+              w is DecoratedBox &&
+              w.decoration is BoxDecoration &&
+              (w.decoration as BoxDecoration).color == const Color(0xff544f65),
+        );
+        expect(pill, findsOneWidget);
+        final paragraph = tester
+            .renderObjectList<RenderParagraph>(find.byType(RichText))
+            .singleWhere((p) => p.text.toPlainText() == label);
+        final lines = paragraph.getBoxesForSelection(
+          const TextSelection(baseOffset: 0, extentOffset: label.length),
+        );
+        expect(lines, hasLength(2));
+        expect(
+          lines.last.right - lines.last.left,
+          lessThan(lines.first.right - lines.first.left),
+        );
+        if (alignment == 'center') {
+          expect(
+            lines.last.left + lines.last.right,
+            closeTo(lines.first.left + lines.first.right, .01),
+          );
+        } else {
+          expect(lines.last.right, closeTo(lines.first.right, .01));
+        }
+        final layout = readerLinkLayout(
+          book.chapters.first.blocks.first as ParagraphBlock,
+          200,
+          const TextStyle(fontSize: 20, height: 1.6),
+          TextScaler.noScaling,
+          TextDirection.ltr,
+          chapter: book.chapters.first.key,
+        )!;
+        expect(
+          tester.getSize(pill).height,
+          closeTo(paragraph.size.height + layout.padding.vertical, .01),
+        );
+        final pillBounds = tester.getRect(pill);
+        final viewport = tester.getRect(find.byType(PagedReaderViewport));
+        if (alignment == 'center') {
+          expect(pillBounds.center.dx, closeTo(viewport.center.dx, .01));
+        } else {
+          expect(pillBounds.right, closeTo(viewport.right, .01));
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  test(
+    'boxed placeholders paginate from mid-chapter with scaled nested edges',
+    () {
+      const picture =
+          '<img src="../images/%E6%98%9F%20%E7%A9%BA.png" '
+          'style="width:4em;height:4em"/>';
+      for (final body in [
+        '<p>$picture</p>',
+        '<p style="margin-left:1em;text-indent:-1em">$picture</p>',
+        '<p><ruby>Native<rt>Reading</rt></ruby></p>',
+      ]) {
+        final content = authoredContent(
+          '<p>${'Before ' * 30}</p>'
+          '<div style="margin:36% 0;padding:999em;border:3px solid blue">'
+          '$body</div><p>After</p>',
+        ).chapters.first;
+        final boxed = content.blocks[1] as ParagraphBlock;
+        if (body.contains('text-indent')) {
+          expect(boxed.hangingIndentEm, 1);
+        }
+        if (body.contains('ruby')) {
+          expect(boxed.inlineRuby, hasLength(1));
+        }
+        for (final scaler in [TextScaler.noScaling, TextScaler.linear(1.5)]) {
+          final layout = PageLayout(
+            index: ChunkIndex(content),
+            width: 300,
+            height: 250,
+            style: const TextStyle(fontSize: 20, height: 1.6),
+            scaler: scaler,
+            direction: TextDirection.ltr,
+          );
+          var cursor = const PageCursor(0, 0);
+          final text = StringBuffer();
+          final pages = <ReaderPage>[];
+          for (var i = 0; i < 30; i++) {
+            final page = layout.forward(cursor);
+            if (page == null) break;
+            expect(PageBoundaries.compare(page.end, cursor), greaterThan(0));
+            expect(
+              page.fragments.fold<double>(0, (h, f) => h + f.height),
+              lessThanOrEqualTo(250.01),
+            );
+            pages.add(page);
+            text.write(page.fragments.map((f) => f.text ?? '').join());
+            cursor = page.end;
+          }
+          expect(cursor.unit, layout.index.chunks.length);
+          expect(
+            text.toString(),
+            content.blocks
+                .whereType<ParagraphBlock>()
+                .map((b) => b.text)
+                .join(),
+          );
+          final back = layout.backward(cursor)!;
+          expect(PageBoundaries.compare(back.start, pages.last.start), 0);
+        }
+      }
+    },
+  );
+
+  testWidgets(
+    'inline image shrinks optional box edges and reaches the real chapter end',
+    (tester) async {
+      final content = authoredContent(
+        '<div style="background-color:#eeeeee;margin:36% 0">'
+        '<p><img src="../images/%E6%98%9F%20%E7%A9%BA.png" '
+        'style="width:4em;height:4em"/></p></div><p>After</p>',
+      ).chapters.first;
+      final image = content.blocks.first as ParagraphBlock;
+      expect(image.inlineImages, hasLength(1));
+      expect(image.inlineImages.single.heightEm, 4);
+      const style = TextStyle(fontSize: 20, height: 1.6);
+      final layout = PageLayout(
+        index: ChunkIndex(content),
+        width: 300,
+        height: 250,
+        style: style,
+        scaler: TextScaler.noScaling,
+        direction: TextDirection.ltr,
+      );
+      var cursor = const PageCursor(0, 0);
+      final source = StringBuffer();
+      final first = layout.forward(cursor);
+      expect(first, isNotNull);
+      for (var i = 0; i < 10; i++) {
+        final page = layout.forward(cursor);
+        if (page == null) break;
+        expect(PageBoundaries.compare(page.end, cursor), greaterThan(0));
+        expect(
+          page.fragments.fold<double>(0, (sum, f) => sum + f.height),
+          lessThanOrEqualTo(250.01),
+        );
+        source.write(page.fragments.map((f) => f.text ?? '').join());
+        cursor = page.end;
+      }
+      expect(cursor.unit, layout.index.chunks.length);
+      expect(source.toString(), '\uFFfcAfter');
+      final fragment = first!.fragments.first;
+      expect(fragment.boxTop + fragment.boxBottom, lessThan(216));
+      final controller = PagedReaderController();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 300,
+              height: 250,
+              child: PagedReaderViewport(
+                content: content,
+                controller: controller,
+                textStyle: style,
+                turnStyle: PageTurnStyle.none,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final paragraph = tester
+          .renderObjectList<RenderParagraph>(find.byType(RichText))
+          .singleWhere((p) => p.text.toPlainText() == '\uFFfc');
+      expect(paragraph.size.height, greaterThanOrEqualTo(80));
+      final frame = tester
+          .widgetList<ReaderBoxFrame>(find.byType(ReaderBoxFrame))
+          .singleWhere((f) => f.box == image.box);
+      expect(frame.geometry!.top, closeTo(fragment.boxTop, .01));
+      expect(frame.geometry!.bottom, closeTo(fragment.boxBottom, .01));
+      final bounds = tester.getRect(find.byType(PagedReaderViewport));
+      final paragraphBottom = paragraph
+          .localToGlobal(Offset(0, paragraph.size.height))
+          .dy;
+      expect(paragraphBottom, lessThanOrEqualTo(bounds.bottom + .01));
+      await controller.next();
+      await tester.pumpAndSettle();
+      expect(find.text('After', findRichText: true), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test(
     'large headings and huge nested edges still progress on short pages',
     () {

@@ -27,6 +27,7 @@ final class PageFragment {
     this.linkLayout,
     this.boxTop = 0,
     this.boxBottom = 0,
+    this.boxContentHeight,
   });
   final int unit;
   final int start;
@@ -34,6 +35,9 @@ final class PageFragment {
   final double height;
   final String? text;
   final double boxTop, boxBottom;
+
+  /// Actual placeholder row reservation, shared with the painted box geometry.
+  final double? boxContentHeight;
   final ParagraphFlow? flow;
   final ReaderLinkLayout? linkLayout;
 }
@@ -162,6 +166,7 @@ final class PageLayout {
     double height,
     double boxTop,
     double boxBottom,
+    double? boxContentHeight,
     ParagraphFlow? flow,
     ReaderLinkLayout? linkLayout,
   })?
@@ -181,6 +186,7 @@ final class PageLayout {
         height: 16,
         boxTop: 0,
         boxBottom: 0,
+        boxContentHeight: null,
         flow: null,
         linkLayout: null,
       );
@@ -234,6 +240,7 @@ final class PageLayout {
           height: total,
           boxTop: edges.top,
           boxBottom: edges.bottom,
+          boxContentHeight: null,
           flow: null,
           linkLayout: link,
         );
@@ -251,7 +258,7 @@ final class PageLayout {
             textWidth - em;
     if (readerUsesParagraphFlow(block, direction) && tableFits) {
       final paragraph = block as ParagraphBlock;
-      final edges = readerBoxEdges(
+      var edges = readerBoxEdges(
         index.content,
         blockIndex,
         width: width,
@@ -259,14 +266,14 @@ final class PageLayout {
         scaler: scaler,
         pageHeight: height,
       );
-      final top = startsBlock ? edges.top : 0.0;
+      var top = startsBlock ? edges.top : 0.0;
       final spacing = readerBlockSpacing(
         block,
         paragraphSpacing,
         pageHeight: height,
         chapter: index.content.key,
       );
-      final flow = readerParagraphFlow(
+      ParagraphFlow measureFlow(double contentHeight) => readerParagraphFlow(
         block: paragraph,
         tableLeftWidth: paragraph.tableRow == null
             ? null
@@ -275,8 +282,7 @@ final class PageLayout {
         text: text,
         offset: blockOffset,
         maxHeight: available,
-        // Gaps may shrink; the containing box's required edges may not.
-        pageHeight: (height - top - edges.bottom - spacing).clamp(0.0, height),
+        pageHeight: contentHeight,
         width: textWidth,
         style: readerBlockStyle(block, style, chapter: index.content.key),
         readerFontSize: style.fontSize,
@@ -284,6 +290,30 @@ final class PageLayout {
         locale: locale,
         textHeightBehavior: textHeightBehavior,
       );
+      var flow = measureFlow(
+        (height - top - edges.bottom - spacing).clamp(0.0, height),
+      );
+      double? boxContentHeight;
+      if ((block.box != null || block.layout != null) &&
+          (block.inlineImages.isNotEmpty || block.inlineRuby.isNotEmpty)) {
+        boxContentHeight = flow.lines.fold<double>(
+          flow.minimumHeight,
+          (h, line) => math.max(h, line.height),
+        );
+        edges = readerBoxEdges(
+          index.content,
+          blockIndex,
+          width: width,
+          style: style,
+          scaler: scaler,
+          pageHeight: height,
+          minimumContentHeight: boxContentHeight,
+        );
+        top = startsBlock ? edges.top : 0.0;
+        flow = measureFlow(
+          (height - top - edges.bottom - spacing).clamp(0.0, height),
+        );
+      }
       var count = 0;
       for (final line in flow.lines) {
         final bottom = blockOffset + line.end == paragraph.text.runes.length
@@ -306,6 +336,7 @@ final class PageLayout {
         height: selected.height + spacing + top + bottom,
         boxTop: top,
         boxBottom: bottom,
+        boxContentHeight: boxContentHeight,
         flow: selected,
         linkLayout: null,
       );
@@ -369,6 +400,19 @@ final class PageLayout {
           ..layout(maxWidth: textWidth);
     try {
       final lines = painter.computeLineMetrics();
+      double? boxContentHeight;
+      if ((block.box != null || block.layout != null) &&
+          (block.inlineImages.isNotEmpty || block.inlineRuby.isNotEmpty)) {
+        // Placeholder-only rows can have paragraph leading beyond line metrics.
+        // Reserve the measured tallest row and that leading, not just font size.
+        final rowHeight = lines.fold<double>(
+          0,
+          (h, line) => math.max(h, line.height),
+        );
+        final lineHeight = lines.fold<double>(0, (h, line) => h + line.height);
+        boxContentHeight =
+            rowHeight + math.max(0.0, painter.height - lineHeight);
+      }
       final edges = readerBoxEdges(
         index.content,
         blockIndex,
@@ -376,6 +420,7 @@ final class PageLayout {
         style: style,
         scaler: scaler,
         pageHeight: height,
+        minimumContentHeight: boxContentHeight,
       );
       final blockLength = switch (block) {
         ParagraphBlock(:final text) ||
@@ -402,6 +447,7 @@ final class PageLayout {
           height: fullHeight,
           boxTop: top,
           boxBottom: bottom,
+          boxContentHeight: boxContentHeight,
           flow: null,
           linkLayout: null,
         );
@@ -474,6 +520,7 @@ final class PageLayout {
         height: used,
         boxTop: keptTop,
         boxBottom: keptBottom,
+        boxContentHeight: boxContentHeight,
         flow: null,
         linkLayout: null,
       );
@@ -679,6 +726,7 @@ final class PageLayout {
             linkLayout: fitted.linkLayout,
             boxTop: fitted.boxTop,
             boxBottom: fitted.boxBottom,
+            boxContentHeight: fitted.boxContentHeight,
           ),
         );
         remaining -= fitted.height;
@@ -760,6 +808,7 @@ final class PageLayout {
             linkLayout: fitted.linkLayout,
             boxTop: fitted.boxTop,
             boxBottom: fitted.boxBottom,
+            boxContentHeight: fitted.boxContentHeight,
           ),
         );
         remaining -= fitted.height;
