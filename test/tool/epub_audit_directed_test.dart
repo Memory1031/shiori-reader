@@ -33,6 +33,217 @@ Json book(String hash, List<Json> observations, {bool complete = true}) => {
 };
 
 void main() {
+  group('visible authored breaks', () {
+    for (final sample in [
+      ('hidden break', '<p style="visibility:hidden"><br/></p>', false),
+      ('visible break', '<p><br/></p>', true),
+      (
+        'restored break',
+        '<p style="visibility:hidden"><br style="visibility:visible"/></p>',
+        true,
+      ),
+      (
+        'restored descendant break',
+        '<p style="visibility:hidden"><span style="visibility:visible"><br/></span></p>',
+        true,
+      ),
+      (
+        'display none ancestor',
+        '<p style="display:none"><br style="visibility:visible"/></p>',
+        false,
+      ),
+      ('HTML hidden ancestor', '<p hidden><br/></p>', false),
+    ]) {
+      test(sample.$1, () {
+        final parser = traced(auditFixture(body: '${sample.$2}<p>Tail</p>'));
+        final original = parser.parse();
+        final chapter = original.content.chapters.first;
+        final blanks = chapter.blocks.whereType<ParagraphBlock>().where(
+          (b) => b.text.isEmpty && b.authoredGapEm != null,
+        );
+        expect(blanks.length, sample.$3 ? 1 : 0);
+        expect(
+          chapter.blocks.whereType<ParagraphBlock>().map((b) => b.text),
+          sample.$3 ? ['', 'Tail'] : ['Tail'],
+        );
+        final report = auditParsed(parser, original);
+        expect(findings(report, 'whitespace.authored_blank_missing'), isEmpty);
+        expect(report['checks']['whitespace']['checked'], sample.$3 ? 1 : 0);
+        expect(report['checks']['whitespace']['failed'], 0);
+        expect(report['checks']['whitespace']['unknown'], 0);
+        expect(report['checks']['text']['status'], 'pass');
+        if (sample.$3) {
+          final altered = changed(
+            original,
+            chapters: [
+              ChapterContent(
+                key: chapter.key,
+                title: chapter.title,
+                blocks: chapter.blocks.where((b) => !blanks.contains(b)),
+              ),
+              ...original.content.chapters.skip(1),
+            ],
+          );
+          final failure = auditParsed(parser, altered);
+          expect(
+            findings(
+              failure,
+              'whitespace.authored_blank_missing',
+            ).single['counts'],
+            {'source': 1, 'parsed': 0},
+          );
+          expect(failure['checks']['whitespace']['status'], 'fail');
+        }
+      });
+    }
+  });
+
+  group('noteref image consumption conditions', () {
+    for (final sample in [
+      (
+        'hidden noteref with visible image',
+        '<p><a role="doc-noteref" href="#n" style="visibility:hidden"><img src="../images/a.gif" style="visibility:visible"/></a></p><aside role="doc-footnote" id="n">Synthetic note.</aside><p>Tail</p>',
+      ),
+      (
+        'noteref without href',
+        '<p><a role="doc-noteref"><img src="../images/a.gif"/></a></p><p>Tail</p>',
+      ),
+    ]) {
+      for (final fault in ['intact', 'missing', 'duplicate']) {
+        test('${sample.$1}: $fault image', () {
+          final parser = traced(imageFixture(sample.$2));
+          final original = parser.parse();
+          final chapter = original.content.chapters.first;
+          final image = chapter.blocks.whereType<ImageBlock>().single;
+          expect(original.content.links, isEmpty);
+          expect(
+            chapter.blocks.whereType<ParagraphBlock>().map((b) => b.text),
+            ['Tail'],
+          );
+          final altered = changed(
+            original,
+            chapters: [
+              ChapterContent(
+                key: chapter.key,
+                title: chapter.title,
+                blocks: fault == 'missing'
+                    ? chapter.blocks.where((b) => b != image)
+                    : [if (fault == 'duplicate') image, ...chapter.blocks],
+              ),
+              ...original.content.chapters.skip(1),
+            ],
+          );
+          expect(identical(altered.media, original.media), true);
+          final report = auditParsed(parser, altered);
+          expect(findings(report, 'image.noteref_marker'), isEmpty);
+          expect(report['checks']['images']['unknown'], 0);
+          if (fault == 'intact') {
+            expect(report['checks']['images']['status'], 'pass');
+            expect(findings(report, 'image.unexpected_instance'), isEmpty);
+            expect(
+              findings(report, 'image.selected_instance_missing'),
+              isEmpty,
+            );
+          } else {
+            final rule = fault == 'missing'
+                ? 'image.selected_instance_missing'
+                : 'image.unexpected_instance';
+            final failure = findings(report, rule).single;
+            expect(failure['occurrences'], 1);
+            expect(failure['counts']['sourceInstances'], 1);
+            expect(
+              failure['counts']['parsedInstances'],
+              fault == 'missing' ? 0 : 2,
+            );
+            expect(report['checks']['images']['status'], 'fail');
+            expect(report['checks']['images']['failed'], 1);
+          }
+        });
+      }
+    }
+    for (final href in [
+      '#n',
+      '#missing',
+      '',
+      'https://example.invalid/n',
+      '%ZZ',
+    ]) {
+      test(
+        'visible noteref with href consumes the icon even for unavailable target: $href',
+        () {
+          final parser = traced(
+            imageFixture(
+              '<p><a role="doc-noteref" href="$href"><img src="../images/a.gif"/></a></p><aside role="doc-footnote" id="n">Synthetic note.</aside><p>Tail</p>',
+            ),
+          );
+          final original = parser.parse();
+          expect(
+            original.content.chapters.first.blocks.whereType<ImageBlock>(),
+            isEmpty,
+          );
+          expect(original.content.links, hasLength(1));
+          final report = auditParsed(parser, original);
+          expect(findings(report, 'image.noteref_marker'), hasLength(1));
+          expect(report['checks']['images']['status'], 'pass');
+          expect(report['checks']['images']['unknown'], 0);
+          expect(findings(report, 'image.selected_instance_missing'), isEmpty);
+          expect(findings(report, 'image.unexpected_instance'), isEmpty);
+          if (href == '#n') {
+            expect(
+              original.content.links.single.footnoteText,
+              'Synthetic note.',
+            );
+            expect(report['checks']['footnotes']['status'], 'pass');
+          }
+        },
+      );
+    }
+    test('SVG presentation anchor does not consume a noteref image', () {
+      final parser = traced(
+        imageFixture(
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><a role="doc-noteref" href="#n"><image href="../images/a.gif" width="1" height="1"/></a><text x="0" y="1">Label</text></svg>',
+        ),
+      );
+      final original = parser.parse();
+      expect(parser.presentations, isNotEmpty);
+      expect(
+        original.content.chapters.first.blocks.whereType<ImageBlock>(),
+        hasLength(1),
+      );
+      final report = auditParsed(parser, original);
+      expect(findings(report, 'image.noteref_marker'), isEmpty);
+      expect(report['checks']['images']['status'], 'pass');
+      expect(report['checks']['images']['unknown'], 0);
+    });
+    test('fixed image path does not consume a noteref icon', () {
+      final files = epubFiles(toc: false);
+      files['OPS/book.opf'] = utf8.encode(
+        utf8
+            .decode(files['OPS/book.opf']!)
+            .replaceFirst(
+              '<itemref idref="a"/>',
+              '<itemref idref="a" properties="rendition:layout-pre-paginated"/>',
+            ),
+      );
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '<html><body><p><a role="doc-noteref" href="#n"><img src="../images/星 空.png"/></a></p></body></html>',
+      );
+      final parser = traced(zipFiles(files));
+      final original = parser.parse();
+      expect(original.content.chapters.first.blocks.single, isA<ImageBlock>());
+      final report = auditParsed(parser, original);
+      expect(
+        (report['documents'] as List).firstWhere(
+          (d) => d['path'] == 'OPS/text/a.xhtml',
+        )['processingPath'],
+        'fixed_image',
+      );
+      expect(findings(report, 'image.noteref_marker'), isEmpty);
+      expect(report['checks']['images']['status'], 'pass');
+      expect(report['checks']['images']['unknown'], 0);
+    });
+  });
+
   group('visibility correspondence', () {
     for (final body in [
       '<p style="visibility:hidden">Hidden<span style="visibility:visible">Visible</span></p><p>Tail</p>',

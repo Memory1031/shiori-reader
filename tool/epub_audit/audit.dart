@@ -97,10 +97,11 @@ Json auditParsed(
 }
 
 final class _SimpleText {
-  _SimpleText(this.text, this.ruby, this.links);
+  _SimpleText(this.text, this.ruby, this.links, this.hasVisibleBreak);
   final String text;
   final List<(int, int, String)> ruby;
   final Map<dom.Element, List<(int, int)>> links;
+  final bool hasVisibleBreak;
 }
 
 final class _Audit {
@@ -505,7 +506,7 @@ final class _Audit {
     final output = StringBuffer();
     final ruby = <(int, int, String)>[];
     final links = <dom.Element, List<(int, int)>>{};
-    var pre = false;
+    var pre = false, hasVisibleBreak = false;
     void write(String text, dom.Element? owner) {
       if (text.isEmpty) return;
       final from = output.length;
@@ -560,7 +561,10 @@ final class _Audit {
         owner = node;
       }
       if (node.localName == 'br') {
-        if (visible) write('\n', owner);
+        if (visible) {
+          hasVisibleBreak = true;
+          write('\n', owner);
+        }
         return;
       }
       if (node.localName == 'ruby' &&
@@ -628,6 +632,7 @@ final class _Audit {
         for (final entry in links.entries)
           entry.key: [for (final r in entry.value) ?range(r.$1, r.$2)],
       },
+      hasVisibleBreak,
     );
   }
 
@@ -862,7 +867,7 @@ final class _Audit {
       final normalized = normalizeSimple(node, styles, markers);
       final expected = normalized.text;
       if (expected.isEmpty) {
-        if (node.querySelector('br') != null) authoredBlanks++;
+        if (normalized.hasVisibleBreak) authoredBlanks++;
         continue;
       }
       if (expected.trim().isEmpty) {
@@ -920,7 +925,7 @@ final class _Audit {
             sourceRanges[entry.key] = (output[found], range.$1, range.$2);
           }
         }
-        if (node.querySelector('br') != null ||
+        if (normalized.hasVisibleBreak ||
             node.localName == 'pre' ||
             expected.contains('\u00a0')) {
           checks['whitespace']!.checked++;
@@ -1028,7 +1033,15 @@ final class _Audit {
         ancestor != null;
         ancestor = ancestor.parent
       ) {
-        if (epubNoteref(ancestor)) {
+        // Prose consumes the icon at a visible a[href], even if its target is
+        // unavailable. Fixed images and SVG presentation anchors bypass this
+        // branch. Establish consumption from source/path, not emitted markers.
+        if (pathFor(path) != 'fixed_image' &&
+            epubNoteref(ancestor) &&
+            !hidden(ancestor, styles) &&
+            ancestor.attributes.containsKey('href') &&
+            !(presentation != null &&
+                ancestor.namespaceUri == 'http://www.w3.org/2000/svg')) {
           convertedNoteref = true;
           break;
         }
