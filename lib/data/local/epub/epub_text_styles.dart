@@ -1,4 +1,5 @@
 import 'epub_rich_styles.dart';
+import 'epub_trace.dart';
 import 'package:html/dom.dart' as dom;
 
 /// Shared screen-sheet media policy for native prose and inert authored
@@ -30,13 +31,32 @@ Iterable<(String, String)> epubDocumentStylesheets(
   dom.Document document,
   String path,
   String? Function(String, String) resolve,
-  String Function(String) readText,
-) sync* {
-  final context = _ImportContext(resolve, readText);
+  String Function(String) readText, {
+  EpubTraceCollector? trace,
+}) sync* {
+  final context = _ImportContext(resolve, readText, trace, path);
   var inlineIndex = 0;
   for (final node in document.querySelectorAll('style, link')) {
-    if (!_screenMediaApplies(node.attributes['media'] ?? '')) continue;
-    if (node.attributes.containsKey('disabled')) continue;
+    if (!_screenMediaApplies(node.attributes['media'] ?? '')) {
+      trace?.record(
+        'css.sheet',
+        path,
+        location: epubTraceLocation(node),
+        reason: (node.attributes['media'] ?? '').trim() == 'print'
+            ? 'print_not_applied'
+            : 'media_unknown',
+      );
+      continue;
+    }
+    if (node.attributes.containsKey('disabled')) {
+      trace?.record(
+        'css.sheet',
+        path,
+        location: epubTraceLocation(node),
+        reason: 'disabled',
+      );
+      continue;
+    }
     if (node.localName == 'style') {
       // Inline sheets share the document path; identity carries a per-node
       // suffix so cycle bookkeeping can never swallow the second sheet.
@@ -51,11 +71,29 @@ Iterable<(String, String)> epubDocumentStylesheets(
       final rel = (node.attributes['rel'] ?? '').toLowerCase().split(
         RegExp(r'\s+'),
       );
-      if (!rel.contains('stylesheet') || rel.contains('alternate')) continue;
+      if (!rel.contains('stylesheet') || rel.contains('alternate')) {
+        if (rel.contains('alternate')) {
+          trace?.record(
+            'css.sheet',
+            path,
+            location: epubTraceLocation(node),
+            reason: 'alternate',
+          );
+        }
+        continue;
+      }
       final href = node.attributes['href'];
       if (href == null || href.trim().isEmpty) continue;
       final resolved = resolve(path, href);
-      if (resolved == null) continue;
+      if (resolved == null) {
+        trace?.record(
+          'css.sheet',
+          path,
+          location: epubTraceLocation(node),
+          reason: 'unusable_reference',
+        );
+        continue;
+      }
       yield* context.expand(resolved, resolved, context.read(resolved), {}, 0);
     }
   }
@@ -65,7 +103,9 @@ final _cssCommentPattern = RegExp(r'/\*[\s\S]*?\*/');
 
 /// Budgeted `@import` expansion for one document.
 class _ImportContext {
-  _ImportContext(this._resolve, this._readText);
+  _ImportContext(this._resolve, this._readText, this.trace, this.path);
+  final EpubTraceCollector? trace;
+  final String path;
 
   static const _maxDepth = 8;
   static const _maxImports = 64;
@@ -94,8 +134,24 @@ class _ImportContext {
     Set<String> active,
     int depth,
   ) sync* {
-    if (depth > _maxDepth || active.contains(identity)) return;
-    if (_totalChars + text.length > _maxTotalChars) return;
+    if (depth > _maxDepth || active.contains(identity)) {
+      trace?.record(
+        'css.sheet',
+        path,
+        stylesheet: identity,
+        reason: depth > _maxDepth ? 'import_depth_limit' : 'import_cycle',
+      );
+      return;
+    }
+    if (_totalChars + text.length > _maxTotalChars) {
+      trace?.record(
+        'css.sheet',
+        path,
+        stylesheet: identity,
+        reason: 'sheet_budget',
+      );
+      return;
+    }
     _totalChars += text.length;
     final css = text.replaceAll(_cssCommentPattern, '');
     var index = 0;
@@ -120,15 +176,49 @@ class _ImportContext {
       final statement = _parseImportStatement(css, index);
       if (statement == null) break;
       index = statement.end;
-      if (!_screenMediaApplies(statement.media)) continue;
+      if (!_screenMediaApplies(statement.media)) {
+        trace?.record(
+          'css.sheet',
+          path,
+          stylesheet: identity,
+          reason: statement.media.trim() == 'print'
+              ? 'import_print'
+              : 'import_media_unknown',
+        );
+        continue;
+      }
       final resolved = _resolve(base, statement.href);
-      if (resolved == null) continue;
+      if (resolved == null) {
+        trace?.record(
+          'css.sheet',
+          path,
+          stylesheet: identity,
+          reason: 'import_unusable_reference',
+        );
+        continue;
+      }
       _imports++;
       yield* expand(resolved, resolved, read(resolved), {
         ...active,
         identity,
       }, depth + 1);
     }
+    if (_imports >= _maxImports) {
+      trace?.record(
+        'css.sheet',
+        path,
+        stylesheet: identity,
+        reason: 'import_count_limit',
+      );
+    }
+    trace?.record(
+      'css.sheet',
+      path,
+      stylesheet: identity,
+      reason: 'loaded',
+      data: {'characters': css.length},
+    );
+    trace?.currentStylesheet = identity;
     yield (base, css.substring(index));
   }
 }
@@ -222,8 +312,18 @@ int _skipCssWhitespace(String css, int index) {
 Iterable<(String, String)> epubScreenRules(
   String input, [
   int depth = 0,
+  EpubTraceCollector? trace,
+  String path = '',
 ]) sync* {
-  if (depth > 8) return;
+  if (depth > 8) {
+    trace?.record(
+      'css.syntax',
+      path,
+      stylesheet: trace.currentStylesheet,
+      reason: 'rule_depth_limit',
+    );
+    return;
+  }
   final css = input.replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '');
   var start = 0, nesting = 0, open = -1;
   String? quote;
@@ -253,13 +353,37 @@ Iterable<(String, String)> epubScreenRules(
       final declarations = css.substring(open + 1, i);
       if (selector.toLowerCase().startsWith('@media')) {
         if (_screenMediaApplies(selector.substring('@media'.length))) {
-          yield* epubScreenRules(declarations, depth + 1);
+          yield* epubScreenRules(declarations, depth + 1, trace, path);
+        } else {
+          trace?.record(
+            'css.syntax',
+            path,
+            stylesheet: trace.currentStylesheet,
+            reason: selector.substring('@media'.length).trim() == 'print'
+                ? 'print_not_applied'
+                : 'media_unknown',
+          );
         }
       } else if (!selector.startsWith('@') && selector.isNotEmpty) {
         yield (selector, declarations);
+      } else if (selector.startsWith('@')) {
+        trace?.record(
+          'css.syntax',
+          path,
+          stylesheet: trace.currentStylesheet,
+          reason: 'conditional_or_at_rule_unknown',
+        );
       }
       start = i + 1;
     }
+  }
+  if (nesting != 0 || quote != null) {
+    trace?.record(
+      'css.syntax',
+      path,
+      stylesheet: trace.currentStylesheet,
+      reason: 'incomplete_rule',
+    );
   }
 }
 
@@ -267,21 +391,64 @@ Iterable<(String, String)> epubScreenRules(
 /// Reader preferences own body size, line height and paragraph spacing.
 Map<dom.Element, Map<String, String>> epubTextStyles(
   dom.Document doc,
-  Iterable<String> sheets,
-) {
+  Iterable<String> sheets, {
+  EpubTraceCollector? trace,
+  String path = '',
+}) {
   final values = <dom.Element, Map<String, String>>{};
   final important = <dom.Element, Set<String>>{};
   final rules = <(String, String, int)>[];
+  final sources = trace == null ? null : <(String?, int)>[];
+  var trackedOrigins = 0;
+  final origins = trace == null
+      ? null
+      : <dom.Element, Map<String, Map<String, Object?>>>{};
   for (final sheet in sheets) {
-    for (final (selectors, declarations) in epubScreenRules(sheet)) {
+    var sourceRule = 0;
+    for (final (selectors, declarations) in epubScreenRules(
+      sheet,
+      0,
+      trace,
+      path,
+    )) {
+      if (trace != null) {
+        var d = 0;
+        for (final declaration in declarations.split(';')) {
+          final colon = declaration.indexOf(':');
+          if (colon > 0) {
+            trace.record(
+              'css.source',
+              path,
+              stylesheet: trace.currentStylesheet,
+              ruleIndex: sourceRule,
+              declarationIndex: d,
+              property: declaration.substring(0, colon).trim().toLowerCase(),
+              value: declaration.substring(colon + 1).trim(),
+              reason: 'loaded_declaration_inventory',
+            );
+          }
+          d++;
+          if (!trace.collecting) break;
+        }
+      }
       for (final selector in selectors.split(',')) {
-        if (selector.contains('@') || rules.length >= 1000) continue;
+        if (selector.contains('@') || rules.length >= 1000) {
+          trace?.record(
+            'css.syntax',
+            path,
+            stylesheet: trace.currentStylesheet,
+            reason: 'rule_count_limit',
+          );
+          continue;
+        }
         final score =
             '#'.allMatches(selector).length * 100 +
             RegExp(r'[.:\[]').allMatches(selector).length * 10 +
             RegExp(r'(?:^|\s)[a-zA-Z]').allMatches(selector).length;
         rules.add((selector.trim(), declarations, score));
+        sources?.add((trace?.currentStylesheet, sourceRule));
       }
+      sourceRule++;
     }
   }
   // Stable specificity order; retain source order for ties.
@@ -290,10 +457,29 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
       final c = rules[a].$3.compareTo(rules[b].$3);
       return c == 0 ? a.compareTo(b) : c;
     });
-  void apply(dom.Element element, String declarations) {
+  void apply(
+    dom.Element element,
+    String declarations,
+    int ruleIndex,
+    String? sheet,
+  ) {
+    var declarationIndex = -1;
     for (final declaration in declarations.split(';')) {
+      declarationIndex++;
       final parts = declaration.split(':');
-      if (parts.length != 2) continue;
+      if (parts.length != 2) {
+        if (parts.length > 2) {
+          trace?.record(
+            'css.syntax',
+            path,
+            stylesheet: sheet,
+            ruleIndex: ruleIndex,
+            declarationIndex: declarationIndex,
+            reason: 'declaration_syntax_unknown',
+          );
+        }
+        continue;
+      }
       final name = parts[0].trim().toLowerCase();
       if ({
         'color',
@@ -365,6 +551,17 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
               'initial',
               'unset',
             }.contains(value)) {
+          trace?.record(
+            'css.decision',
+            path,
+            location: epubTraceLocation(element),
+            stylesheet: sheet,
+            ruleIndex: ruleIndex,
+            declarationIndex: declarationIndex,
+            property: name,
+            value: value,
+            reason: 'rejected_value',
+          );
           continue;
         }
         if (name == 'visibility' &&
@@ -376,17 +573,92 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
               'initial',
               'unset',
             }.contains(value)) {
+          trace?.record(
+            'css.decision',
+            path,
+            location: epubTraceLocation(element),
+            stylesheet: sheet,
+            ruleIndex: ruleIndex,
+            declarationIndex: declarationIndex,
+            property: name,
+            value: value,
+            reason: 'rejected_value',
+          );
           continue;
         }
 
         final properties = _expandNativeDeclaration(name, value);
-        if (properties == null) continue;
+        if (properties == null) {
+          trace?.record(
+            'css.decision',
+            path,
+            location: epubTraceLocation(element),
+            stylesheet: sheet,
+            ruleIndex: ruleIndex,
+            declarationIndex: declarationIndex,
+            property: name,
+            value: value,
+            reason: 'rejected_value',
+          );
+          continue;
+        }
         final priorities = important[element] ??= {};
         for (final property in properties.entries) {
-          if (!priority && priorities.contains(property.key)) continue;
+          if (!priority && priorities.contains(property.key)) {
+            trace?.record(
+              'css.decision',
+              path,
+              location: epubTraceLocation(element),
+              stylesheet: sheet,
+              ruleIndex: ruleIndex,
+              declarationIndex: declarationIndex,
+              property: name,
+              value: value,
+              reason: 'overridden_important',
+            );
+            continue;
+          }
+          if (origins != null && trace!.collecting) {
+            if (++trackedOrigins > trace.capacity) {
+              trace.truncated = true;
+            } else {
+              final previous = origins[element]?[property.key];
+              if (previous != null) {
+                trace.record(
+                  'css.decision',
+                  path,
+                  location: epubTraceLocation(element),
+                  stylesheet: previous['sheet'] as String?,
+                  ruleIndex: previous['rule'] as int,
+                  declarationIndex: previous['declaration'] as int,
+                  property: property.key,
+                  value: previous['value'] as String,
+                  reason: 'overridden',
+                );
+              }
+              (origins[element] ??= {})[property.key] = {
+                'sheet': sheet,
+                'rule': ruleIndex,
+                'declaration': declarationIndex,
+                'value': property.value,
+              };
+            }
+          }
           if (priority) priorities.add(property.key);
           (values[element] ??= {})[property.key] = property.value;
         }
+      } else {
+        trace?.record(
+          'css.decision',
+          path,
+          location: epubTraceLocation(element),
+          stylesheet: sheet,
+          ruleIndex: ruleIndex,
+          declarationIndex: declarationIndex,
+          property: name,
+          value: parts[1].trim(),
+          reason: 'property_not_in_native_subset',
+        );
       }
     }
   }
@@ -400,22 +672,64 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
       final selected = doc.querySelectorAll(
         nth == null ? selector : selector.substring(0, nth.start),
       );
+      if (selected.isEmpty) {
+        trace?.record(
+          'css.selector',
+          path,
+          stylesheet: sources?[i].$1,
+          ruleIndex: sources?[i].$2 ?? i,
+          reason: 'unmatched',
+        );
+      }
       for (final element in selected) {
         if (nth != null &&
             element.parent?.children.indexOf(element) !=
                 int.parse(nth[1]!) - 1) {
           continue;
         }
-        apply(element, rules[i].$2);
+        apply(element, rules[i].$2, sources?[i].$2 ?? i, sources?[i].$1);
       }
     } on FormatException {
+      trace?.record(
+        'css.selector',
+        path,
+        stylesheet: sources?[i].$1,
+        ruleIndex: sources?[i].$2 ?? i,
+        reason: 'unknown',
+      );
       /* Unsupported selectors remain native defaults. */
     } on UnimplementedError {
+      trace?.record(
+        'css.selector',
+        path,
+        stylesheet: sources?[i].$1,
+        ruleIndex: sources?[i].$2 ?? i,
+        reason: 'unknown',
+      );
       /* html's selector engine does not implement every CSS pseudo-class. */
     }
   }
   for (final e in doc.querySelectorAll('[style]')) {
-    apply(e, e.attributes['style']!);
+    apply(e, e.attributes['style']!, -1, path);
+  }
+  if (origins != null) {
+    for (final e in origins.entries) {
+      for (final p in e.value.entries) {
+        trace!.record(
+          'css.cascade',
+          path,
+          location: epubTraceLocation(e.key),
+          stylesheet: p.value['sheet'] as String?,
+          ruleIndex: p.value['rule'] as int,
+          declarationIndex: p.value['declaration'] as int,
+          property: p.key,
+          value: p.value['value'] as String,
+          reason: 'winner',
+        );
+        if (!trace.collecting) break;
+      }
+      if (!trace!.collecting) break;
+    }
   }
   return values;
 }

@@ -24,6 +24,7 @@ import 'epub_image_candidates.dart';
 import 'epub_diagnostics.dart';
 import 'epub_footnotes.dart';
 import 'epub_fixed_image.dart';
+import 'epub_trace.dart';
 
 final class ParsedEpub {
   ParsedEpub(this.content, this.media, this.diagnostics);
@@ -127,7 +128,9 @@ class EpubParser {
     this.book,
     this.filename, {
     this.includePresentations = false,
+    this.trace,
   });
+  final EpubTraceCollector? trace;
   final bool includePresentations;
   final Uint8List bytes;
   final NovelKey book;
@@ -196,6 +199,7 @@ class EpubParser {
     if (mediaByPath.containsKey(path)) return mediaByPath[path];
     if (!zip.entries.containsKey(path)) {
       _diagnostics.add(EpubDiagnosticCode.missingImage);
+      trace?.record('image.resource', path, reason: 'missing_package_resource');
       return null;
     }
     final b = zip.read(path);
@@ -203,6 +207,7 @@ class EpubParser {
     // passed to a browser, and a missing/unsupported image stays a local gap.
     if (epubRasterMime(b) == null) {
       _diagnostics.add(EpubDiagnosticCode.unsupportedImage);
+      trace?.record('image.resource', path, reason: 'unsupported_signature');
       return null;
     }
     final hash = sha256.convert(b).toString();
@@ -344,6 +349,16 @@ class EpubParser {
       if (++spineCount > 10000) zipLimit();
       if (occurrence > 0 && !epub3) invalidZip();
       if (chain.isNotEmpty) _diagnostics.add(EpubDiagnosticCode.spineFallback);
+      trace?.record(
+        'document.spine',
+        path,
+        reason: fixed ? 'fixed_image' : 'native',
+        data: {
+          'linear': attr(ref, 'linear') != 'no',
+          'occurrence': occurrence,
+          'fallback': chain.isNotEmpty,
+        },
+      );
       if (fixed) {
         _fixedImageChapter(path, occurrence);
       } else if (occurrence == 0) {
@@ -659,6 +674,7 @@ class EpubParser {
         path,
         optionalEpubStyleReference,
         (p) => zip.entries.containsKey(p) ? text(p) : '',
+        trace: trace,
       ).map((sheet) => sheet.$2),
     );
     MediaRef? media;
@@ -685,6 +701,7 @@ class EpubParser {
       ],
     );
     _fixedChapters.add(chapter.key);
+    trace?.record('document.output', path, reason: 'fixed_image');
     chapters.add(chapter);
     chapterPaths[chapter.key] = path;
     if (!byPath.containsKey(path)) {
@@ -716,7 +733,10 @@ class EpubParser {
         path,
         optionalEpubStyleReference,
         (p) => zip.entries.containsKey(p) ? text(p) : '',
+        trace: trace,
       ).map((sheet) => sheet.$2),
+      trace: trace,
+      path: path,
     );
     final richStyles = epubRichStyles(doc, styles);
     final tableRows = epubTableRows(doc, styles, richStyles);
@@ -755,6 +775,15 @@ class EpubParser {
     if (presentation != null) {
       presentations[LocalBookIdentity.chapter(book, 'epub:$path').chapterId] =
           presentation;
+      trace?.record(
+        'document.presentation',
+        path,
+        reason: 'generated',
+        data: {
+          'sha256': sha256.convert(utf8.encode(presentation)).toString(),
+          'bytes': utf8.encode(presentation).length,
+        },
+      );
     }
 
     final blocks = <ContentBlock>[];
@@ -1009,6 +1038,26 @@ class EpubParser {
                 },
               ),
       );
+      trace?.record(
+        'block.output',
+        path,
+        location: epubTraceLocation(paragraphOwner),
+        reason: 'emitted',
+        data: {
+          'blockKey': blocks.last.blockKey,
+          'fontSize': blocks.last.hasAuthoredFontSize,
+          'styles': textStyles.length,
+          'styleScales': textStyles.map((s) => s.fontScale).take(8).toList(),
+          'box': activeBox != null,
+          'layout': localLayout != null,
+          'linkDecoration': decoration != null,
+          'table': tableLayout != null,
+          'hanging': flow.hanging != null,
+          'label': labelStart != null,
+          'ruby': ruby.length,
+          'inlineImages': images.length,
+        },
+      );
       if (blocks.length > 100000) zipLimit();
     }
 
@@ -1259,6 +1308,13 @@ class EpubParser {
                   alt: node.attributes['alt'],
                 ),
               );
+              trace?.record(
+                'image.output',
+                path,
+                location: epubTraceLocation(node),
+                reason: 'inline',
+                data: {'hash': img.mediaId.split('/').last},
+              );
               return;
             }
           }
@@ -1283,7 +1339,20 @@ class EpubParser {
               height: size?.height,
             ),
           );
+          trace?.record(
+            'image.output',
+            path,
+            location: epubTraceLocation(node),
+            reason: 'block',
+            data: {'hash': img.mediaId.split('/').last},
+          );
         } else {
+          trace?.record(
+            'image.output',
+            path,
+            location: epubTraceLocation(node),
+            reason: 'no_usable_candidate',
+          );
           _diagnostics.add(EpubDiagnosticCode.noUsableImage);
           // Visible per-image gap; remaining text and images still import.
           final alt = node.attributes['alt']?.trim();
@@ -1399,6 +1468,32 @@ class EpubParser {
           activeBox = box;
           activeBoxOwner = node;
           boxGroup++;
+          trace?.record(
+            'box.output',
+            path,
+            location: epubTraceLocation(node),
+            reason: 'emitted',
+          );
+        }
+      }
+      if (trace != null &&
+          node is dom.Element &&
+          activeBox != null &&
+          node != activeBoxOwner &&
+          (containers.contains(node.localName) ||
+              paragraphs.contains(node.localName))) {
+        if (epubBlockBox(
+              styles[node] ?? const {},
+              0,
+              richStyles[node] ?? const EpubRichStyle(),
+            ) !=
+            null) {
+          trace?.record(
+            'box.output',
+            path,
+            location: epubTraceLocation(node),
+            reason: 'nested_not_emitted',
+          );
         }
       }
       final previousFloat = activeFloat;
@@ -1479,6 +1574,7 @@ class EpubParser {
       (b) => b is ImageBlock || b is ParagraphBlock && b.text.trim().isNotEmpty,
     )) {
       skippedEmptyPaths.add(path);
+      trace?.record('document.output', path, reason: 'empty_skipped');
       presentations.remove(
         LocalBookIdentity.chapter(book, 'epub:$path').chapterId,
       );
@@ -1565,6 +1661,13 @@ class EpubParser {
     chapters.add(chapter);
     chapterPaths[chapter.key] = path;
     byPath[path] = chapter;
+    trace?.record(
+      'document.output',
+      path,
+      reason: presentation == null
+          ? 'native'
+          : 'presentation_with_native_fallback',
+    );
     fragments[path] = {
       for (final e in anchors.entries)
         if (e.value.$1 < chapter.blocks.length)

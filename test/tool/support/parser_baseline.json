@@ -1,0 +1,2909 @@
+{
+  "gitSha": "8f28402a3641a4a37e68455877d0ed609f7a3766",
+  "parserVersion": 19,
+  "fixtures": {
+    "semantics": {
+      "content": {
+        "detail": "{\"version\":1,\"kind\":\"detail\",\"payload\":{\"summary\":{\"key\":{\"sourceId\":\"local\",\"novelId\":\"8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46\"},\"title\":\"离线星空\",\"authors\":[\"测试作者\"],\"cover\":{\"sourceId\":\"local\",\"mediaId\":\"8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46/02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b\"}},\"synopsis\":\"\",\"tags\":[],\"status\":\"unknown\",\"sourceUpdatedAt\":null}}",
+        "catalog": "{\"version\":1,\"kind\":\"catalog\",\"payload\":{\"key\":{\"sourceId\":\"local\",\"novelId\":\"8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46\"},\"revision\":\"b2f14cd31c4bced8c3ac0d8213670e447a1e3d019fc5277f0761ae6f51bde23b\",\"volumes\":[{\"id\":\"epub\",\"title\":null,\"synthetic\":true,\"chapters\":[{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46\"},\"chapterId\":\"33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99\"},\"title\":\"Synthetic heading\",\"ordinal\":0},{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46\"},\"chapterId\":\"5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3\"},\"title\":\"第二章\",\"ordinal\":1}]}]}}",
+        "chapters": [
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+              },
+              "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+            },
+            "title": "Synthetic heading",
+            "blocks": [
+              {
+                "type": "heading",
+                "text": "Synthetic heading",
+                "level": 2,
+                "occurrence": 0,
+                "blockKey": "5991c84239e78f5f299a9e217195ceaa5f0a74dedeb25061b49cebb1b1ad10c7"
+              },
+              {
+                "type": "paragraph",
+                "text": "Alpha base omega.",
+                "inlineRuby": [
+                  {
+                    "start": 6,
+                    "length": 4,
+                    "annotation": "reading"
+                  }
+                ],
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "ab19b577bd8ee92e79534ca8474d3ed141b3b552e4198f83c2869c0c177cca5e"
+              },
+              {
+                "type": "paragraph",
+                "text": "Note⁽¹⁾.",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "c7c9a47df9f7f666ada87ca8566b6586d8f1dec66cfc8eee76d6408f3a6524d0"
+              },
+              {
+                "type": "paragraph",
+                "text": "Before ￼ after.",
+                "inlineImages": [
+                  {
+                    "offset": 7,
+                    "media": {
+                      "sourceId": "local",
+                      "mediaId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46/02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b"
+                    },
+                    "widthEm": 1.0,
+                    "heightEm": 1.0,
+                    "alt": null
+                  }
+                ],
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "5faf270fa082cf99b178bf4663943e2a1ce6f9d83cc934072aab78687df065b8"
+              },
+              {
+                "type": "paragraph",
+                "text": "",
+                "authoredGapEm": 1.0,
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "515a9f80c907ee5ada434dca5ce9fe9012efc8984a59a0e3ab9c65714fa8b839"
+              },
+              {
+                "type": "paragraph",
+                "text": "  preserved\n space",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "2f458bf91cf191d78d1999c1d785c77d0612c0fda4f3c7ab619889952dd27831"
+              },
+              {
+                "type": "paragraph",
+                "text": "Wide space\nnew line.",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "238757e37db40808a50eb0a63bb1d21fd711d0fd8e28bec01128bfefc8e1f943"
+              },
+              {
+                "type": "paragraph",
+                "text": "Destination",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "232945391f33f1a2f5f2e3516226b6d204e27f3567c53f74656f117704f99fa6"
+              }
+            ],
+            "contentRevision": "61ad0d280845eb375ddb69c690ef517833d6be58c1080e712e4406a4fe1d2e6b"
+          },
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "title": "第二章",
+            "blocks": [
+              {
+                "type": "heading",
+                "text": "第二章",
+                "level": 1,
+                "occurrence": 0,
+                "blockKey": "d34ed3455e35dff668b76c70b8e1af3825cf7cd2160ccb0c9e33d5cbdf6912c9"
+              },
+              {
+                "type": "paragraph",
+                "text": "独立的第二章正文。",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "96161631f0c92d47258cd7452f33bffe8953daf954ef380f10694b0d09ab98e3"
+              }
+            ],
+            "contentRevision": "e164b2d8e576d93361fdd900c6a8b9071e0a776e6686d03d840522a1a614ed15"
+          }
+        ],
+        "auxiliary": [],
+        "navigation": [
+          {
+            "title": "第二卷",
+            "chapter": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "block": "d34ed3455e35dff668b76c70b8e1af3825cf7cd2160ccb0c9e33d5cbdf6912c9",
+            "children": [
+              {
+                "title": "先列第二章",
+                "chapter": {
+                  "novelKey": {
+                    "sourceId": "local",
+                    "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+                  },
+                  "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+                },
+                "block": "d34ed3455e35dff668b76c70b8e1af3825cf7cd2160ccb0c9e33d5cbdf6912c9",
+                "children": []
+              }
+            ]
+          },
+          {
+            "title": "第一段",
+            "chapter": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+              },
+              "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+            },
+            "block": "5991c84239e78f5f299a9e217195ceaa5f0a74dedeb25061b49cebb1b1ad10c7",
+            "children": [
+              {
+                "title": "第二段",
+                "chapter": {
+                  "novelKey": {
+                    "sourceId": "local",
+                    "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+                  },
+                  "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+                },
+                "block": null,
+                "children": []
+              },
+              {
+                "title": "缺锚点",
+                "chapter": {
+                  "novelKey": {
+                    "sourceId": "local",
+                    "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+                  },
+                  "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+                },
+                "block": null,
+                "children": []
+              }
+            ]
+          }
+        ],
+        "links": [
+          {
+            "source": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+              },
+              "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+            },
+            "block": "c7c9a47df9f7f666ada87ca8566b6586d8f1dec66cfc8eee76d6408f3a6524d0",
+            "label": "⁽¹⁾",
+            "target": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+              },
+              "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+            },
+            "targetBlock": null,
+            "unavailable": null,
+            "sourceOffset": 4,
+            "footnoteText": "Self authored note."
+          },
+          {
+            "source": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+              },
+              "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+            },
+            "block": "232945391f33f1a2f5f2e3516226b6d204e27f3567c53f74656f117704f99fa6",
+            "label": "Destination",
+            "target": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "targetBlock": "d34ed3455e35dff668b76c70b8e1af3825cf7cd2160ccb0c9e33d5cbdf6912c9",
+            "targetOffset": 0,
+            "unavailable": null,
+            "sourceOffset": 0,
+            "sourceLength": 11
+          }
+        ],
+        "readingOrder": [
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+            },
+            "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+          },
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46"
+            },
+            "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+          }
+        ],
+        "txtEncoding": null
+      },
+      "media": {
+        "02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b": "02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b"
+      },
+      "mediaByPath": {
+        "OPS/images/星 空.png": {
+          "sourceId": "local",
+          "mediaId": "8772109aa5b264841d6d7311eeb0b822105fcc6eb0c7070956b3d3ad4185ee46/02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b"
+        }
+      },
+      "presentations": {},
+      "diagnostics": [
+        "missingFragment",
+        "missingFragment"
+      ],
+      "diagnosticsTruncated": false
+    },
+    "authored": {
+      "content": {
+        "detail": "{\"version\":1,\"kind\":\"detail\",\"payload\":{\"summary\":{\"key\":{\"sourceId\":\"local\",\"novelId\":\"30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb\"},\"title\":\"Native Layout\",\"authors\":[],\"cover\":null},\"synopsis\":\"\",\"tags\":[],\"status\":\"unknown\",\"sourceUpdatedAt\":null}}",
+        "catalog": "{\"version\":1,\"kind\":\"catalog\",\"payload\":{\"key\":{\"sourceId\":\"local\",\"novelId\":\"30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb\"},\"revision\":\"5f346fd71b40a2140f89e871a2a80fe4d88e6e502fda2cfc9ecbb8fba25b1f77\",\"volumes\":[{\"id\":\"epub\",\"title\":null,\"synthetic\":true,\"chapters\":[{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb\"},\"chapterId\":\"33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99\"},\"title\":\"Native Authored Layout\",\"ordinal\":0},{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb\"},\"chapterId\":\"1aed86267c7346b822ec4f02833b5589c545317bff4f571eef4bfb564d0b6aa7\"},\"title\":\"Contents\",\"ordinal\":1},{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb\"},\"chapterId\":\"89fbe32c6ebefdea0de116c4fe12ea338a59ce931321687d256fbc83d17add73\"},\"title\":\"logo\",\"ordinal\":2},{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb\"},\"chapterId\":\"5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3\"},\"title\":\"b\",\"ordinal\":3}]}]}}",
+        "chapters": [
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+            },
+            "title": "Native Authored Layout",
+            "blocks": [
+              {
+                "type": "heading",
+                "text": "Native Authored Layout",
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 7,
+                    "color": null,
+                    "fontScale": 3.0,
+                    "fontSizeFromReader": true,
+                    "bold": null,
+                    "italic": null
+                  },
+                  {
+                    "start": 7,
+                    "length": 8,
+                    "color": 4282811060,
+                    "fontScale": 3.0,
+                    "fontSizeFromReader": true,
+                    "bold": null,
+                    "italic": null
+                  },
+                  {
+                    "start": 15,
+                    "length": 7,
+                    "color": null,
+                    "fontScale": 3.0,
+                    "fontSizeFromReader": true,
+                    "bold": null,
+                    "italic": null
+                  }
+                ],
+                "level": 1,
+                "box": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 8.0,
+                  "borderWidth": 6.0,
+                  "borderColor": 4282811060,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 12.0,
+                      "unit": "px"
+                    },
+                    "right": {
+                      "value": 12.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 12.0,
+                      "unit": "px"
+                    },
+                    "left": {
+                      "value": 12.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {
+                    "top": {
+                      "value": 8.0,
+                      "unit": "px"
+                    },
+                    "right": {
+                      "value": 8.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 8.0,
+                      "unit": "px"
+                    },
+                    "left": {
+                      "value": 8.0,
+                      "unit": "px"
+                    }
+                  },
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 6.0,
+                        "unit": "px"
+                      },
+                      "style": "solid",
+                      "color": 4282811060
+                    },
+                    "right": {
+                      "width": {
+                        "value": 6.0,
+                        "unit": "px"
+                      },
+                      "style": "solid",
+                      "color": 4282811060
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": 4282811060
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": 4282811060
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "layout": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.2,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 3.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "hasAuthoredFontSize": true,
+                "occurrence": 0,
+                "blockKey": "e5e0c5ea68307f7c3babfea422f13e3b2964856bdf88d1336bddac3c255e8072"
+              },
+              {
+                "type": "heading",
+                "text": "Synthetic edition",
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 17,
+                    "color": null,
+                    "fontScale": 1.5,
+                    "fontSizeFromReader": true,
+                    "bold": null,
+                    "italic": null
+                  }
+                ],
+                "level": 2,
+                "box": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 8.0,
+                  "borderWidth": 6.0,
+                  "borderColor": 4282811060,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 12.0,
+                      "unit": "px"
+                    },
+                    "right": {
+                      "value": 12.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 12.0,
+                      "unit": "px"
+                    },
+                    "left": {
+                      "value": 12.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {
+                    "top": {
+                      "value": 8.0,
+                      "unit": "px"
+                    },
+                    "right": {
+                      "value": 8.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 8.0,
+                      "unit": "px"
+                    },
+                    "left": {
+                      "value": 8.0,
+                      "unit": "px"
+                    }
+                  },
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 6.0,
+                        "unit": "px"
+                      },
+                      "style": "solid",
+                      "color": 4282811060
+                    },
+                    "right": {
+                      "width": {
+                        "value": 6.0,
+                        "unit": "px"
+                      },
+                      "style": "solid",
+                      "color": 4282811060
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": 4282811060
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": 4282811060
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "layout": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.2,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 0.2,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.5,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "hasAuthoredFontSize": true,
+                "occurrence": 0,
+                "blockKey": "2a4e6f63b0ed16ccd1f06582b89e9d86d04ce65b6a42f92f76ef6e02c211d490"
+              },
+              {
+                "type": "paragraph",
+                "text": "Independent sample",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "box": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 8.0,
+                  "borderWidth": 6.0,
+                  "borderColor": 4282811060,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 12.0,
+                      "unit": "px"
+                    },
+                    "right": {
+                      "value": 12.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 12.0,
+                      "unit": "px"
+                    },
+                    "left": {
+                      "value": 12.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {
+                    "top": {
+                      "value": 8.0,
+                      "unit": "px"
+                    },
+                    "right": {
+                      "value": 8.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 8.0,
+                      "unit": "px"
+                    },
+                    "left": {
+                      "value": 8.0,
+                      "unit": "px"
+                    }
+                  },
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 6.0,
+                        "unit": "px"
+                      },
+                      "style": "solid",
+                      "color": 4282811060
+                    },
+                    "right": {
+                      "width": {
+                        "value": 6.0,
+                        "unit": "px"
+                      },
+                      "style": "solid",
+                      "color": 4282811060
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": 4282811060
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": 4282811060
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "occurrence": 0,
+                "blockKey": "e52c8f9169976d88f3bdddc1e470a2f4e3ee6ad80bc8bd5721b93b3ce257f2f0"
+              }
+            ],
+            "contentRevision": "cb7a52e7b6aa4ea8a40448ec3119b66bba5ebc33d6c298879039296079ae011e"
+          },
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "1aed86267c7346b822ec4f02833b5589c545317bff4f571eef4bfb564d0b6aa7"
+            },
+            "title": "Contents",
+            "blocks": [
+              {
+                "type": "heading",
+                "text": "Contents",
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 8,
+                    "color": null,
+                    "fontScale": 1.5,
+                    "fontSizeFromReader": true,
+                    "bold": null,
+                    "italic": null
+                  }
+                ],
+                "level": 2,
+                "box": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.2,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 0.2,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.5,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "hasAuthoredFontSize": true,
+                "occurrence": 0,
+                "blockKey": "675fc4ccc38aaa9999dbde15c2c6a94cc9461a332a4ab13c8614e86a09ef95ec"
+              },
+              {
+                "type": "divider",
+                "layout": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": 0.5,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": true,
+                  "widthLength": {
+                    "value": 0.5,
+                    "unit": "fraction"
+                  },
+                  "margins": {},
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": true,
+                  "autoRight": true
+                },
+                "occurrence": 0,
+                "blockKey": "a4e05f3fcf3f65a0a5b8193881cda5cedd899c53fa2dd4460acddbb313089da3"
+              },
+              {
+                "type": "paragraph",
+                "text": "Entry 1",
+                "linkDecoration": {
+                  "backgroundColor": 4283715429,
+                  "padding": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.3,
+                      "unit": "em"
+                    }
+                  },
+                  "radius": {
+                    "value": 30.0,
+                    "unit": "px"
+                  },
+                  "fontScale": 1.0
+                },
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 7,
+                    "color": 4294967295,
+                    "fontScale": 1.0,
+                    "bold": true,
+                    "italic": null
+                  }
+                ],
+                "alignment": "center",
+                "leadingIndent": 0,
+                "layout": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "occurrence": 0,
+                "blockKey": "59e9b0e7cd76a5efbdf4959a63ea7e75c79e748735ffc744b2d949a6f11d9dfe"
+              },
+              {
+                "type": "paragraph",
+                "text": "",
+                "authoredGapEm": 1.0,
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "515a9f80c907ee5ada434dca5ce9fe9012efc8984a59a0e3ab9c65714fa8b839"
+              },
+              {
+                "type": "paragraph",
+                "text": "Entry 2",
+                "linkDecoration": {
+                  "backgroundColor": 4283715429,
+                  "padding": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.3,
+                      "unit": "em"
+                    }
+                  },
+                  "radius": {
+                    "value": 30.0,
+                    "unit": "px"
+                  },
+                  "fontScale": 1.0
+                },
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 7,
+                    "color": 4294967295,
+                    "fontScale": 1.0,
+                    "bold": true,
+                    "italic": null
+                  }
+                ],
+                "alignment": "center",
+                "leadingIndent": 0,
+                "layout": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "occurrence": 0,
+                "blockKey": "cbedaf6dc69e8f617219f1a1f8882ca6495e8420d7c40d559d67c9e2dd1829e0"
+              },
+              {
+                "type": "paragraph",
+                "text": "",
+                "authoredGapEm": 1.0,
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 1,
+                "blockKey": "d8fa6febf367ffffd51c8e3aecb66c1f26e182b8ad76ac9a9631cd217a16d327"
+              },
+              {
+                "type": "paragraph",
+                "text": "Entry 3",
+                "linkDecoration": {
+                  "backgroundColor": 4283715429,
+                  "padding": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.3,
+                      "unit": "em"
+                    }
+                  },
+                  "radius": {
+                    "value": 30.0,
+                    "unit": "px"
+                  },
+                  "fontScale": 1.0
+                },
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 7,
+                    "color": 4294967295,
+                    "fontScale": 1.0,
+                    "bold": true,
+                    "italic": null
+                  }
+                ],
+                "alignment": "center",
+                "leadingIndent": 0,
+                "layout": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "occurrence": 0,
+                "blockKey": "a77a204537bd3e7346b796301b3f0df99752d38e3e702fc25eef95be7dd6e581"
+              },
+              {
+                "type": "paragraph",
+                "text": "",
+                "authoredGapEm": 1.0,
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 2,
+                "blockKey": "e558ac5ee735de7c3b5c36b4117067bb29b67af3012bf1c1884d7d4488d5df6e"
+              },
+              {
+                "type": "paragraph",
+                "text": "Entry 4",
+                "linkDecoration": {
+                  "backgroundColor": 4283715429,
+                  "padding": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.3,
+                      "unit": "em"
+                    }
+                  },
+                  "radius": {
+                    "value": 30.0,
+                    "unit": "px"
+                  },
+                  "fontScale": 1.0
+                },
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 7,
+                    "color": 4294967295,
+                    "fontScale": 1.0,
+                    "bold": true,
+                    "italic": null
+                  }
+                ],
+                "alignment": "center",
+                "leadingIndent": 0,
+                "layout": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "occurrence": 0,
+                "blockKey": "ed558ef24553bc7c994bc8cb133acba774f66f359a497497e906355d37732471"
+              },
+              {
+                "type": "paragraph",
+                "text": "",
+                "authoredGapEm": 1.0,
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 3,
+                "blockKey": "1119feb9b2ae816390aa2f821f6414131a6572cf78f40d1866426eefaeaa44ce"
+              },
+              {
+                "type": "paragraph",
+                "text": "Entry 5",
+                "linkDecoration": {
+                  "backgroundColor": 4283715429,
+                  "padding": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.3,
+                      "unit": "em"
+                    }
+                  },
+                  "radius": {
+                    "value": 30.0,
+                    "unit": "px"
+                  },
+                  "fontScale": 1.0
+                },
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 7,
+                    "color": 4294967295,
+                    "fontScale": 1.0,
+                    "bold": true,
+                    "italic": null
+                  }
+                ],
+                "alignment": "center",
+                "leadingIndent": 0,
+                "layout": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "occurrence": 0,
+                "blockKey": "14c6a6bf65d217d18ffe1d448dfe0879eeedf26b524d30a63498eda20f356dcd"
+              },
+              {
+                "type": "paragraph",
+                "text": "",
+                "authoredGapEm": 1.0,
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 4,
+                "blockKey": "66081351c4dc514529acde12798aea64afadbefed9736edaad3166863651cb78"
+              },
+              {
+                "type": "paragraph",
+                "text": "Entry 6",
+                "linkDecoration": {
+                  "backgroundColor": 4283715429,
+                  "padding": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.3,
+                      "unit": "em"
+                    }
+                  },
+                  "radius": {
+                    "value": 30.0,
+                    "unit": "px"
+                  },
+                  "fontScale": 1.0
+                },
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 7,
+                    "color": 4294967295,
+                    "fontScale": 1.0,
+                    "bold": true,
+                    "italic": null
+                  }
+                ],
+                "alignment": "center",
+                "leadingIndent": 0,
+                "layout": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "occurrence": 0,
+                "blockKey": "c64832962edf89c2b4395a7f9ab8ebe29b82e0f957e0fbf5aab25128f983ef5b"
+              },
+              {
+                "type": "paragraph",
+                "text": "",
+                "authoredGapEm": 1.0,
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 5,
+                "blockKey": "f8793b6695bcae9a09aa787d1c4558794f1c84edf1e5473e07f9314d2703031c"
+              },
+              {
+                "type": "paragraph",
+                "text": "Entry 7",
+                "linkDecoration": {
+                  "backgroundColor": 4283715429,
+                  "padding": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.3,
+                      "unit": "em"
+                    }
+                  },
+                  "radius": {
+                    "value": 30.0,
+                    "unit": "px"
+                  },
+                  "fontScale": 1.0
+                },
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 7,
+                    "color": 4294967295,
+                    "fontScale": 1.0,
+                    "bold": true,
+                    "italic": null
+                  }
+                ],
+                "alignment": "center",
+                "leadingIndent": 0,
+                "layout": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "right": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "bottom": {
+                      "value": 0.3,
+                      "unit": "em"
+                    },
+                    "left": {
+                      "value": 0.0,
+                      "unit": "px"
+                    }
+                  },
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "occurrence": 0,
+                "blockKey": "0f5d50905caa33ed10f93aa2f5dde837e63b0f0dadc8eb63ca9e84daa2e2382d"
+              },
+              {
+                "type": "paragraph",
+                "text": "",
+                "authoredGapEm": 1.0,
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 6,
+                "blockKey": "fe4514774f5b9bab14a51d4fd0b40f6386b8fd5c0becf2a3e4245f59649d70d8"
+              }
+            ],
+            "contentRevision": "2446cab76f90de8dcbcc97277570aa3d1d69dfeadbc61db5560a1f329910ea86"
+          },
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "89fbe32c6ebefdea0de116c4fe12ea338a59ce931321687d256fbc83d17add73"
+            },
+            "title": "logo",
+            "blocks": [
+              {
+                "type": "image",
+                "media": {
+                  "sourceId": "local",
+                  "mediaId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb/99726c4f1147ebd93c5d8adeca5cc8b540c8de7aa7218f1a21930d7f16605a7c"
+                },
+                "width": 160,
+                "height": 40,
+                "alt": "Geometric sample",
+                "caption": null,
+                "box": {
+                  "group": 0,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.36,
+                      "unit": "fraction"
+                    }
+                  },
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "occurrence": 0,
+                "blockKey": "2e2f4b2f06939e06af70d2cbcd13fc01995d8968c0c729955c3427d5f6739b58"
+              },
+              {
+                "type": "paragraph",
+                "text": "Production",
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 10,
+                    "color": null,
+                    "fontScale": 1.1,
+                    "fontSizeFromReader": true,
+                    "bold": null,
+                    "italic": null
+                  }
+                ],
+                "alignment": "start",
+                "leadingIndent": 0,
+                "box": {
+                  "group": 1,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "right": {
+                      "value": 0.02,
+                      "unit": "fraction"
+                    },
+                    "bottom": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "left": {
+                      "value": 0.32,
+                      "unit": "fraction"
+                    }
+                  },
+                  "paddingEdges": {
+                    "right": {
+                      "value": 0.06,
+                      "unit": "fraction"
+                    }
+                  },
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.2,
+                        "unit": "em"
+                      },
+                      "style": "solid",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.1,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "hasAuthoredFontSize": true,
+                "occurrence": 0,
+                "blockKey": "93ca3e9a4f5ad25e8b9b5702d9e2050c494985fd88a4106539016180bd71d978"
+              },
+              {
+                "type": "paragraph",
+                "text": "Synthetic studio",
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 16,
+                    "color": null,
+                    "fontScale": 1.1,
+                    "fontSizeFromReader": true,
+                    "bold": null,
+                    "italic": null
+                  }
+                ],
+                "alignment": "start",
+                "leadingIndent": 0,
+                "box": {
+                  "group": 1,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "right": {
+                      "value": 0.02,
+                      "unit": "fraction"
+                    },
+                    "bottom": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "left": {
+                      "value": 0.32,
+                      "unit": "fraction"
+                    }
+                  },
+                  "paddingEdges": {
+                    "right": {
+                      "value": 0.06,
+                      "unit": "fraction"
+                    }
+                  },
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.2,
+                        "unit": "em"
+                      },
+                      "style": "solid",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.1,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "hasAuthoredFontSize": true,
+                "occurrence": 0,
+                "blockKey": "7f8ada9baa0de0a28c094ff0826ba0fb5ff6d9c65425836dbabc3130425b9f4e"
+              },
+              {
+                "type": "paragraph",
+                "text": "Open native flow",
+                "inlineStyles": [
+                  {
+                    "start": 0,
+                    "length": 16,
+                    "color": null,
+                    "fontScale": 1.1,
+                    "fontSizeFromReader": true,
+                    "bold": null,
+                    "italic": null
+                  }
+                ],
+                "alignment": "start",
+                "leadingIndent": 0,
+                "box": {
+                  "group": 1,
+                  "width": null,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "margins": {
+                    "top": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "right": {
+                      "value": 0.02,
+                      "unit": "fraction"
+                    },
+                    "bottom": {
+                      "value": 0.0,
+                      "unit": "px"
+                    },
+                    "left": {
+                      "value": 0.32,
+                      "unit": "fraction"
+                    }
+                  },
+                  "paddingEdges": {
+                    "right": {
+                      "value": 0.06,
+                      "unit": "fraction"
+                    }
+                  },
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.2,
+                        "unit": "em"
+                      },
+                      "style": "solid",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.1,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                },
+                "hasAuthoredFontSize": true,
+                "occurrence": 0,
+                "blockKey": "648119e2e60061abfef1e4eda059174ce919dfd35460af799b2db5c962b2d010"
+              }
+            ],
+            "contentRevision": "c0fd7982ffbbf1fd78d167ff75ef0a18d6519f801d669c1aa4bb1a5e25188b2d"
+          },
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "title": "b",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "SOURCE_START Record 000 native text. Record 001 native text. Record 002 native text. Record 003 native text. Record 004 native text. Record 005 native text. Record 006 native text. Record 007 native text. Record 008 native text. Record 009 native text. Record 010 native text. Record 011 native text. Record 012 native text. Record 013 native text. Record 014 native text. Record 015 native text. Record 016 native text. Record 017 native text. Record 018 native text. Record 019 native text. Record 020 native text. Record 021 native text. Record 022 native text. Record 023 native text. Record 024 native text. Record 025 native text. Record 026 native text. Record 027 native text. Record 028 native text. Record 029 native text. Record 030 native text. Record 031 native text. Record 032 native text. Record 033 native text. Record 034 native text. Record 035 native text. Record 036 native text. Record 037 native text. Record 038 native text. Record 039 native text. Record 040 native text. Record 041 native text. Record 042 native text. Record 043 native text. Record 044 native text. Record 045 native text. Record 046 native text. Record 047 native text. Record 048 native text. Record 049 native text. Record 050 native text. Record 051 native text. Record 052 native text. Record 053 native text. Record 054 native text. Record 055 native text. Record 056 native text. Record 057 native text. Record 058 native text. Record 059 native text. Record 060 native text. Record 061 native text. Record 062 native text. Record 063 native text. Record 064 native text. Record 065 native text. Record 066 native text. Record 067 native text. Record 068 native text. Record 069 native text. Record 070 native text. Record 071 native text. Record 072 native text. Record 073 native text. Record 074 native text. Record 075 native text. Record 076 native text. Record 077 native text. Record 078 native text. Record 079 native text. Record 080 native text. Record 081 native text. Record 082 native text. Record 083 native text. Record 084 native text. Record 085 native text. Record 086 native text. Record 087 native text. Record 088 native text. Record 089 native text. Record 090 native text. Record 091 native text. Record 092 native text. Record 093 native text. Record 094 native text. Record 095 native text. Record 096 native text. Record 097 native text. Record 098 native text. Record 099 native text. SOURCE_END",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "aa0dbbc3bfd3a2c192f9a10508cb440aa2f997521a44f41b5e8514f41a215be3"
+              },
+              {
+                "type": "paragraph",
+                "text": "Before table",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "d53dd7cdd7606f774768235451d497de7a0d12a83b36aacbe45ca468c75ec839"
+              },
+              {
+                "type": "paragraph",
+                "text": "AShort row",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "4e635f76bf7da5a3dd90721aa8bb49c3f0d889b8ce431e53cdf53b157be56bed"
+              },
+              {
+                "type": "paragraph",
+                "text": "After table",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "7df99810c5369bd2f86a6c51967f9503c1315612391277562aae8bde6199cfe1"
+              }
+            ],
+            "contentRevision": "971b798857cf444fdf03f11e0f3d2bda86480e7fc3a38fc13285d61320da37b4"
+          }
+        ],
+        "auxiliary": [
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "ae7456182edc262e89f0075165af177a5e425fdaccc2631f66894eefcd7fd414"
+            },
+            "title": "notes",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Auxiliary destination",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "6d5a56e9a9d656072676ecf9470152f59a631718c5b84425a48ab6bdca0f4b7b"
+              }
+            ],
+            "contentRevision": "ec653d83f27f0226c973518c2c260740e06fb17821ddf26bb6e7e6499bad5484"
+          }
+        ],
+        "navigation": [
+          {
+            "title": "Native Authored Layout",
+            "chapter": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+            },
+            "block": null,
+            "children": []
+          },
+          {
+            "title": "Contents",
+            "chapter": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "1aed86267c7346b822ec4f02833b5589c545317bff4f571eef4bfb564d0b6aa7"
+            },
+            "block": null,
+            "children": []
+          },
+          {
+            "title": "logo",
+            "chapter": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "89fbe32c6ebefdea0de116c4fe12ea338a59ce931321687d256fbc83d17add73"
+            },
+            "block": null,
+            "children": []
+          },
+          {
+            "title": "b",
+            "chapter": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "block": null,
+            "children": []
+          }
+        ],
+        "links": [
+          {
+            "source": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "1aed86267c7346b822ec4f02833b5589c545317bff4f571eef4bfb564d0b6aa7"
+            },
+            "block": "59e9b0e7cd76a5efbdf4959a63ea7e75c79e748735ffc744b2d949a6f11d9dfe",
+            "label": "Entry 1",
+            "target": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "ae7456182edc262e89f0075165af177a5e425fdaccc2631f66894eefcd7fd414"
+            },
+            "targetBlock": "6d5a56e9a9d656072676ecf9470152f59a631718c5b84425a48ab6bdca0f4b7b",
+            "targetOffset": 0,
+            "unavailable": null,
+            "sourceOffset": 0,
+            "sourceLength": 7
+          },
+          {
+            "source": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "1aed86267c7346b822ec4f02833b5589c545317bff4f571eef4bfb564d0b6aa7"
+            },
+            "block": "cbedaf6dc69e8f617219f1a1f8882ca6495e8420d7c40d559d67c9e2dd1829e0",
+            "label": "Entry 2",
+            "target": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "targetBlock": "aa0dbbc3bfd3a2c192f9a10508cb440aa2f997521a44f41b5e8514f41a215be3",
+            "targetOffset": 0,
+            "unavailable": null,
+            "sourceOffset": 0,
+            "sourceLength": 7
+          },
+          {
+            "source": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "1aed86267c7346b822ec4f02833b5589c545317bff4f571eef4bfb564d0b6aa7"
+            },
+            "block": "a77a204537bd3e7346b796301b3f0df99752d38e3e702fc25eef95be7dd6e581",
+            "label": "Entry 3",
+            "target": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "targetBlock": "aa0dbbc3bfd3a2c192f9a10508cb440aa2f997521a44f41b5e8514f41a215be3",
+            "targetOffset": 0,
+            "unavailable": null,
+            "sourceOffset": 0,
+            "sourceLength": 7
+          },
+          {
+            "source": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "1aed86267c7346b822ec4f02833b5589c545317bff4f571eef4bfb564d0b6aa7"
+            },
+            "block": "ed558ef24553bc7c994bc8cb133acba774f66f359a497497e906355d37732471",
+            "label": "Entry 4",
+            "target": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "targetBlock": "aa0dbbc3bfd3a2c192f9a10508cb440aa2f997521a44f41b5e8514f41a215be3",
+            "targetOffset": 0,
+            "unavailable": null,
+            "sourceOffset": 0,
+            "sourceLength": 7
+          },
+          {
+            "source": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "1aed86267c7346b822ec4f02833b5589c545317bff4f571eef4bfb564d0b6aa7"
+            },
+            "block": "14c6a6bf65d217d18ffe1d448dfe0879eeedf26b524d30a63498eda20f356dcd",
+            "label": "Entry 5",
+            "target": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "targetBlock": "aa0dbbc3bfd3a2c192f9a10508cb440aa2f997521a44f41b5e8514f41a215be3",
+            "targetOffset": 0,
+            "unavailable": null,
+            "sourceOffset": 0,
+            "sourceLength": 7
+          },
+          {
+            "source": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "1aed86267c7346b822ec4f02833b5589c545317bff4f571eef4bfb564d0b6aa7"
+            },
+            "block": "c64832962edf89c2b4395a7f9ab8ebe29b82e0f957e0fbf5aab25128f983ef5b",
+            "label": "Entry 6",
+            "target": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "targetBlock": "aa0dbbc3bfd3a2c192f9a10508cb440aa2f997521a44f41b5e8514f41a215be3",
+            "targetOffset": 0,
+            "unavailable": null,
+            "sourceOffset": 0,
+            "sourceLength": 7
+          },
+          {
+            "source": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "1aed86267c7346b822ec4f02833b5589c545317bff4f571eef4bfb564d0b6aa7"
+            },
+            "block": "0f5d50905caa33ed10f93aa2f5dde837e63b0f0dadc8eb63ca9e84daa2e2382d",
+            "label": "Entry 7",
+            "target": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "targetBlock": "aa0dbbc3bfd3a2c192f9a10508cb440aa2f997521a44f41b5e8514f41a215be3",
+            "targetOffset": 0,
+            "unavailable": null,
+            "sourceOffset": 0,
+            "sourceLength": 7
+          }
+        ],
+        "readingOrder": [
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+            },
+            "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+          },
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+            },
+            "chapterId": "1aed86267c7346b822ec4f02833b5589c545317bff4f571eef4bfb564d0b6aa7"
+          },
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+            },
+            "chapterId": "89fbe32c6ebefdea0de116c4fe12ea338a59ce931321687d256fbc83d17add73"
+          },
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb"
+            },
+            "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+          }
+        ],
+        "txtEncoding": null
+      },
+      "media": {
+        "99726c4f1147ebd93c5d8adeca5cc8b540c8de7aa7218f1a21930d7f16605a7c": "99726c4f1147ebd93c5d8adeca5cc8b540c8de7aa7218f1a21930d7f16605a7c"
+      },
+      "mediaByPath": {
+        "OPS/images/logo.png": {
+          "sourceId": "local",
+          "mediaId": "30d84060b92832a3d679f5779fadc2e08ea1fa761019506dcef5de461c13f1fb/99726c4f1147ebd93c5d8adeca5cc8b540c8de7aa7218f1a21930d7f16605a7c"
+        }
+      },
+      "presentations": {},
+      "diagnostics": [
+        "syntheticNavigation"
+      ],
+      "diagnosticsTruncated": false
+    },
+    "mixed": {
+      "content": {
+        "detail": "{\"version\":1,\"kind\":\"detail\",\"payload\":{\"summary\":{\"key\":{\"sourceId\":\"local\",\"novelId\":\"c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9\"},\"title\":\"synthetic\",\"authors\":[],\"cover\":null},\"synopsis\":\"\",\"tags\":[],\"status\":\"unknown\",\"sourceUpdatedAt\":null}}",
+        "catalog": "{\"version\":1,\"kind\":\"catalog\",\"payload\":{\"key\":{\"sourceId\":\"local\",\"novelId\":\"c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9\"},\"revision\":\"9e7f9e16be1b0f3d19dd76bc91307dce0ac0bce3e6f7258fab6e7a83052cf81c\",\"volumes\":[{\"id\":\"epub\",\"title\":null,\"synthetic\":true,\"chapters\":[{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9\"},\"chapterId\":\"33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99\"},\"title\":\"a\",\"ordinal\":0},{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9\"},\"chapterId\":\"5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3\"},\"title\":\"第二章\",\"ordinal\":1},{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9\"},\"chapterId\":\"5818bd2017844bda777e5ab4d3193bd51f58850d809fdb3d8fd20c63b15c6045\"},\"title\":\"c\",\"ordinal\":2},{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9\"},\"chapterId\":\"33f4214b1c27609e310c527e4c40d65499e2e9174e85418d61d58ab2af19a59c\"},\"title\":\"a\",\"ordinal\":3}]}]}}",
+        "chapters": [
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+              },
+              "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+            },
+            "title": "a",
+            "blocks": [
+              {
+                "type": "image",
+                "media": {
+                  "sourceId": "local",
+                  "mediaId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9/02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b"
+                },
+                "width": 1,
+                "height": 1,
+                "alt": null,
+                "caption": null,
+                "occurrence": 0,
+                "blockKey": "2f156e8fd8523bd47f747be0221ebafad0318644d7d2e56c7325eb539c50c6d4"
+              }
+            ],
+            "contentRevision": "4a4704675d4a5312cd57650fcfd0e85c440085dabd282dd3fde1d931ac620e13"
+          },
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "title": "第二章",
+            "blocks": [
+              {
+                "type": "heading",
+                "text": "第二章",
+                "level": 1,
+                "occurrence": 0,
+                "blockKey": "d34ed3455e35dff668b76c70b8e1af3825cf7cd2160ccb0c9e33d5cbdf6912c9"
+              },
+              {
+                "type": "paragraph",
+                "text": "独立的第二章正文。",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "96161631f0c92d47258cd7452f33bffe8953daf954ef380f10694b0d09ab98e3"
+              }
+            ],
+            "contentRevision": "e164b2d8e576d93361fdd900c6a8b9071e0a776e6686d03d840522a1a614ed15"
+          },
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+              },
+              "chapterId": "5818bd2017844bda777e5ab4d3193bd51f58850d809fdb3d8fd20c63b15c6045"
+            },
+            "title": "c",
+            "blocks": [
+              {
+                "type": "image",
+                "media": {
+                  "sourceId": "local",
+                  "mediaId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9/c0dfc0a1d7d5d37eeb3835704dc8f8ff9fc89bba16eae119253f5dd47531f065"
+                },
+                "width": 1000,
+                "height": 100,
+                "alt": null,
+                "caption": null,
+                "occurrence": 0,
+                "blockKey": "9bae01666c436f01512244054cdc1d3a8454fe30ed4adec448aa4ab9122a7799"
+              }
+            ],
+            "contentRevision": "e3286155ea64ac1ee24c8eb788f51b9818038648a7668bf2498ce87564fe6a5e"
+          },
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+              },
+              "chapterId": "33f4214b1c27609e310c527e4c40d65499e2e9174e85418d61d58ab2af19a59c"
+            },
+            "title": "a",
+            "blocks": [
+              {
+                "type": "image",
+                "media": {
+                  "sourceId": "local",
+                  "mediaId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9/02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b"
+                },
+                "width": 1,
+                "height": 1,
+                "alt": null,
+                "caption": null,
+                "occurrence": 0,
+                "blockKey": "2f156e8fd8523bd47f747be0221ebafad0318644d7d2e56c7325eb539c50c6d4"
+              }
+            ],
+            "contentRevision": "4a4704675d4a5312cd57650fcfd0e85c440085dabd282dd3fde1d931ac620e13"
+          }
+        ],
+        "auxiliary": [],
+        "navigation": [
+          {
+            "title": "第二卷",
+            "chapter": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "block": "d34ed3455e35dff668b76c70b8e1af3825cf7cd2160ccb0c9e33d5cbdf6912c9",
+            "children": [
+              {
+                "title": "先列第二章",
+                "chapter": {
+                  "novelKey": {
+                    "sourceId": "local",
+                    "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+                  },
+                  "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+                },
+                "block": "d34ed3455e35dff668b76c70b8e1af3825cf7cd2160ccb0c9e33d5cbdf6912c9",
+                "children": []
+              }
+            ]
+          },
+          {
+            "title": "第一段",
+            "chapter": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+              },
+              "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+            },
+            "block": "2f156e8fd8523bd47f747be0221ebafad0318644d7d2e56c7325eb539c50c6d4",
+            "children": [
+              {
+                "title": "第二段",
+                "chapter": {
+                  "novelKey": {
+                    "sourceId": "local",
+                    "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+                  },
+                  "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+                },
+                "block": null,
+                "children": []
+              },
+              {
+                "title": "缺锚点",
+                "chapter": {
+                  "novelKey": {
+                    "sourceId": "local",
+                    "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+                  },
+                  "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+                },
+                "block": null,
+                "children": []
+              }
+            ]
+          }
+        ],
+        "links": [],
+        "readingOrder": [
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+            },
+            "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+          },
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+            },
+            "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+          },
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+            },
+            "chapterId": "5818bd2017844bda777e5ab4d3193bd51f58850d809fdb3d8fd20c63b15c6045"
+          },
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9"
+            },
+            "chapterId": "33f4214b1c27609e310c527e4c40d65499e2e9174e85418d61d58ab2af19a59c"
+          }
+        ],
+        "txtEncoding": null
+      },
+      "media": {
+        "02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b": "02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b",
+        "c0dfc0a1d7d5d37eeb3835704dc8f8ff9fc89bba16eae119253f5dd47531f065": "c0dfc0a1d7d5d37eeb3835704dc8f8ff9fc89bba16eae119253f5dd47531f065"
+      },
+      "mediaByPath": {
+        "OPS/images/星 空.png": {
+          "sourceId": "local",
+          "mediaId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9/02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b"
+        },
+        "OPS/images/wide.png": {
+          "sourceId": "local",
+          "mediaId": "c182eb661dda7723dfef6cd79cecdabf9a29ecf714d8b6e18f8e2e264ac2c2f9/c0dfc0a1d7d5d37eeb3835704dc8f8ff9fc89bba16eae119253f5dd47531f065"
+        }
+      },
+      "presentations": {},
+      "diagnostics": [
+        "missingFragment",
+        "missingFragment"
+      ],
+      "diagnosticsTruncated": false
+    },
+    "presentation": {
+      "content": {
+        "detail": "{\"version\":1,\"kind\":\"detail\",\"payload\":{\"summary\":{\"key\":{\"sourceId\":\"local\",\"novelId\":\"81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a\"},\"title\":\"离线星空\",\"authors\":[\"测试作者\"],\"cover\":{\"sourceId\":\"local\",\"mediaId\":\"81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a/02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b\"}},\"synopsis\":\"\",\"tags\":[],\"status\":\"unknown\",\"sourceUpdatedAt\":null}}",
+        "catalog": "{\"version\":1,\"kind\":\"catalog\",\"payload\":{\"key\":{\"sourceId\":\"local\",\"novelId\":\"81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a\"},\"revision\":\"f60dcff2007c6078d72ee6a66f0b4280db12b7e782d0a519a187aa754976a1a2\",\"volumes\":[{\"id\":\"epub\",\"title\":null,\"synthetic\":true,\"chapters\":[{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a\"},\"chapterId\":\"33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99\"},\"title\":\"a\",\"ordinal\":0},{\"key\":{\"novelKey\":{\"sourceId\":\"local\",\"novelId\":\"81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a\"},\"chapterId\":\"5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3\"},\"title\":\"第二章\",\"ordinal\":1}]}]}}",
+        "chapters": [
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a"
+              },
+              "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+            },
+            "title": "a",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "Short authored page",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "7b2405fda826cf0b97be820a5a77a3e33e139be7cf9484d0c41522315351ef3a"
+              },
+              {
+                "type": "image",
+                "media": {
+                  "sourceId": "local",
+                  "mediaId": "81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a/02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b"
+                },
+                "width": 1,
+                "height": 1,
+                "alt": null,
+                "caption": null,
+                "occurrence": 0,
+                "blockKey": "eb68d7540b594d14eda7add2c7025ea13423aa24aa11f3247a3eefabaec46c2f"
+              }
+            ],
+            "contentRevision": "73fab5df2e9f7600f48e61b44ea415cb3ab1b5be90852564015ca231090a91c0"
+          },
+          {
+            "normalizationVersion": 1,
+            "key": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "title": "第二章",
+            "blocks": [
+              {
+                "type": "heading",
+                "text": "第二章",
+                "level": 1,
+                "occurrence": 0,
+                "blockKey": "d34ed3455e35dff668b76c70b8e1af3825cf7cd2160ccb0c9e33d5cbdf6912c9"
+              },
+              {
+                "type": "paragraph",
+                "text": "独立的第二章正文。",
+                "alignment": "start",
+                "leadingIndent": 0,
+                "occurrence": 0,
+                "blockKey": "96161631f0c92d47258cd7452f33bffe8953daf954ef380f10694b0d09ab98e3"
+              }
+            ],
+            "contentRevision": "e164b2d8e576d93361fdd900c6a8b9071e0a776e6686d03d840522a1a614ed15"
+          }
+        ],
+        "auxiliary": [],
+        "navigation": [
+          {
+            "title": "第二卷",
+            "chapter": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a"
+              },
+              "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+            },
+            "block": "d34ed3455e35dff668b76c70b8e1af3825cf7cd2160ccb0c9e33d5cbdf6912c9",
+            "children": [
+              {
+                "title": "先列第二章",
+                "chapter": {
+                  "novelKey": {
+                    "sourceId": "local",
+                    "novelId": "81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a"
+                  },
+                  "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+                },
+                "block": "d34ed3455e35dff668b76c70b8e1af3825cf7cd2160ccb0c9e33d5cbdf6912c9",
+                "children": []
+              }
+            ]
+          },
+          {
+            "title": "第一段",
+            "chapter": {
+              "novelKey": {
+                "sourceId": "local",
+                "novelId": "81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a"
+              },
+              "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+            },
+            "block": null,
+            "children": [
+              {
+                "title": "第二段",
+                "chapter": {
+                  "novelKey": {
+                    "sourceId": "local",
+                    "novelId": "81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a"
+                  },
+                  "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+                },
+                "block": null,
+                "children": []
+              },
+              {
+                "title": "缺锚点",
+                "chapter": {
+                  "novelKey": {
+                    "sourceId": "local",
+                    "novelId": "81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a"
+                  },
+                  "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+                },
+                "block": null,
+                "children": []
+              }
+            ]
+          }
+        ],
+        "links": [],
+        "readingOrder": [
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a"
+            },
+            "chapterId": "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99"
+          },
+          {
+            "novelKey": {
+              "sourceId": "local",
+              "novelId": "81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a"
+            },
+            "chapterId": "5d1ab9519f296ebf08bb0851bbee50761dbc2af5195a07adde984c6126d844d3"
+          }
+        ],
+        "txtEncoding": null
+      },
+      "media": {
+        "02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b": "02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b"
+      },
+      "mediaByPath": {
+        "OPS/images/星 空.png": {
+          "sourceId": "local",
+          "mediaId": "81c9985ac3c564ce1c4c717ab84651b72a96dff22593ad0d3711552aa1f03d4a/02c3dde7051f2bb5b4ee3c6cef81ffa67656caf3881388d065ec3f3e3f039b1b"
+        }
+      },
+      "presentations": {
+        "33f6887d20fd9fa97e118c012cfa5c7d77e42d05571bef277308e842307f7e99": "088c506296e83ea0f3569658ac99f8b3918cccd898137b7f3dc612ecff03ada6"
+      },
+      "diagnostics": [
+        "missingFragment",
+        "missingFragment",
+        "missingFragment"
+      ],
+      "diagnosticsTruncated": false
+    },
+    "invalid": {
+      "rejected": "invalid"
+    },
+    "fixedRejected": {
+      "rejected": "fixedLayout"
+    }
+  }
+}
