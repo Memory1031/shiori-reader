@@ -4,7 +4,7 @@ import 'package:shiori/data/local/epub/epub_trace.dart';
 
 typedef Json = Map<String, dynamic>;
 const schemaVersion = 1;
-const auditRulesVersion = '1.1.0';
+const auditRulesVersion = '1.2.0';
 
 final class AuditOptions {
   const AuditOptions({
@@ -156,6 +156,14 @@ final class FindingCollector {
 }
 
 int priorityTier(Json f) {
+  if ({
+        'policy_override',
+        'security_filtered',
+        'not_applicable',
+      }.contains(f['disposition']) ||
+      f['confidence'] == 'confirmed' && f['disposition'] == 'emitted_native') {
+    return 4;
+  }
   if (f['confidence'] == 'confirmed' &&
       {'content_integrity', 'navigation'}.contains(f['impact']) &&
       {'unsupported', 'invalid_input', 'degraded'}.contains(f['disposition'])) {
@@ -288,7 +296,7 @@ String reportMarkdown(Json report) {
     '运行完整：${run['complete']}；文件：${run['totalFiles']}；唯一 EPUB：${run['uniqueEpubs']}；重复：${run['duplicates']}；聚合完整：${run['aggregateComplete'] ?? true}。',
     '状态：`${jsonEncode(run['statuses'])}`；审计完整书数：${run['auditCompleteBooks']}。',
     '',
-    '层级按确认的内容/导航问题、确认的布局降级、需复核候选、装饰、策略/覆盖信息排序。同层按唯一 EPUB 数、文档数排序。数量是本次观察范围，未知/失败不计作兼容通过。',
+    '层级按确认的内容/导航问题、确认的布局降级、需复核候选、装饰、支持/策略/覆盖信息排序。同层按唯一 EPUB 数、文档数排序。确认保留的元数据属于支持信息；输出对象的疑似或未知属性关联仍保留为候选，emitted_native 不等于设备呈现通过。数量是本次观察范围，未知/失败不计作兼容通过。',
     '',
     '| 层级 | 规则/原因 | 属性 | 唯一 EPUB | 文档 | 实例 | 置信度 | 处理 |',
     '| --- | --- | --- | ---: | ---: | ---: | --- | --- |',

@@ -435,13 +435,11 @@ final class _Audit {
     }
   }
 
-  bool hidden(dom.Element node, Map<dom.Element, Map<String, String>> styles) {
-    var visibility = true;
-    final lineage = <dom.Element>[];
+  bool subtreeExcluded(
+    dom.Element node,
+    Map<dom.Element, Map<String, String>> styles,
+  ) {
     for (dom.Element? e = node; e != null; e = e.parent) {
-      lineage.add(e);
-    }
-    for (final e in lineage.reversed) {
       if (e.attributes.containsKey('hidden') ||
           styles[e]?['display'] == 'none' ||
           epubFootnote(e) ||
@@ -459,6 +457,18 @@ final class _Audit {
           }.contains(e.localName)) {
         return true;
       }
+    }
+    return false;
+  }
+
+  bool hidden(dom.Element node, Map<dom.Element, Map<String, String>> styles) {
+    if (subtreeExcluded(node, styles)) return true;
+    var visibility = true;
+    final lineage = <dom.Element>[];
+    for (dom.Element? e = node; e != null; e = e.parent) {
+      lineage.add(e);
+    }
+    for (final e in lineage.reversed) {
       switch (styles[e]?['visibility']) {
         case 'visible':
         case 'initial':
@@ -512,6 +522,10 @@ final class _Audit {
 
     void walk(dom.Node node, String mode, dom.Element? owner) {
       if (node is dom.Text) {
+        if (node.parent case final parent?) {
+          if (hidden(parent, styles)) return;
+        }
+        if ({'pre', 'pre-wrap'}.contains(mode)) pre = true;
         var text = node.data.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
         if (!{'pre', 'pre-wrap'}.contains(mode)) {
           text = text.replaceAll(
@@ -523,7 +537,7 @@ final class _Audit {
         return;
       }
       if (node is! dom.Element ||
-          hidden(node, styles) ||
+          subtreeExcluded(node, styles) ||
           node.localName == 'rp' ||
           node.localName == 'rt') {
         return;
@@ -534,20 +548,24 @@ final class _Audit {
           : own == 'initial'
           ? 'normal'
           : own;
-      if ({'pre', 'pre-wrap'}.contains(next)) pre = true;
-      if (markers[node] case final marker?) {
+      final visible = !hidden(node, styles);
+      if (visible && markers.containsKey(node)) {
+        final marker = markers[node]!;
         write(marker, node);
         return;
       }
-      if (node.localName == 'a' && node.attributes.containsKey('href')) {
+      if (visible &&
+          node.localName == 'a' &&
+          node.attributes.containsKey('href')) {
         owner = node;
       }
       if (node.localName == 'br') {
-        write('\n', owner);
+        if (visible) write('\n', owner);
         return;
       }
       if (node.localName == 'ruby' &&
           simpleRuby(node) &&
+          !node.querySelectorAll('rt').any((rt) => hidden(rt, styles)) &&
           !{'pre', 'pre-wrap', 'pre-line'}.contains(next)) {
         var base = <dom.Node>[];
         for (final child in node.nodes) {
@@ -721,13 +739,14 @@ final class _Audit {
     final uncoveredStructures = <dom.Element>{};
     void coverage(dom.Node node, dom.Element owner) {
       if (node is dom.Text) {
+        if (hidden(owner, styles)) return;
         if (node.data.replaceAll(RegExp(r'[ \t\r\n\f]'), '').isNotEmpty) {
           uncovered.add(owner);
         }
         return;
       }
       if (node is! dom.Element ||
-          hidden(node, styles) ||
+          subtreeExcluded(node, styles) ||
           rootSet.contains(node) ||
           {'rt', 'rp'}.contains(node.localName)) {
         return;
@@ -779,7 +798,7 @@ final class _Audit {
       }
     }
     for (final node in roots) {
-      if (hidden(node, styles)) continue;
+      if (subtreeExcluded(node, styles)) continue;
       final complex =
           node.querySelectorAll('*').any((n) {
             if (hidden(n, styles)) return false;
@@ -812,7 +831,7 @@ final class _Audit {
           }) ||
           node
               .querySelectorAll('ruby')
-              .where((r) => !hidden(r, styles))
+              .where((r) => !subtreeExcluded(r, styles))
               .any(
                 (r) =>
                     !simpleRuby(r) ||
@@ -1107,6 +1126,27 @@ final class _Audit {
               : e.value,
         );
       }
+    }
+    // Compare the native representation independently of any presentation.
+    // Resource presence alone cannot establish the number of image instances.
+    for (final e in nativeCounts.entries) {
+      final sourceCount = sourceCounts[e.key] ?? 0;
+      final extra = e.value - sourceCount;
+      if (extra <= 0) continue;
+      checks['images']!.checked += extra;
+      checks['images']!.failed += extra;
+      add(
+        'image.unexpected_instance',
+        path,
+        'native_raster_instances_without_selected_source',
+        category: 'media',
+        count: extra,
+        counts: {
+          'sourceInstances': sourceCount,
+          'parsedInstances': e.value,
+          'resourceSha256': e.key,
+        },
+      );
     }
     if (sourceCounts.length == nativeCounts.length &&
         sourceCounts.entries.every((e) => nativeCounts[e.key] == e.value) &&
