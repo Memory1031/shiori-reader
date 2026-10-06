@@ -128,6 +128,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   late final ReaderPreferences _preferences;
   ReaderSettings _settings = ReaderSettings();
   final _paperTurn = ValueNotifier<PageTurnFrame>(PageTurnFrame.rest);
+  final _dragSurface = GlobalKey<PagedReaderDragSurfaceState>();
   bool _completionTurning = false;
   final _completionTransition = GlobalKey<ReaderCompletionTransitionState>();
   void _cancelCompletion({bool immediate = false}) {
@@ -276,6 +277,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
+      _dragSurface.currentState?.cancel();
       _cancelCompletion(immediate: true);
       unawaited(_preferences.flush());
       unawaited(widget.session?.flushProgress());
@@ -863,7 +865,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
     return Builder(
       builder: (context) {
         _route = ModalRoute.of(context);
-        if (!_routeCurrent) _cancelCompletion(immediate: true);
+        if (!_routeCurrent) {
+          _dragSurface.currentState?.cancel();
+          _cancelCompletion(immediate: true);
+        }
         return page;
       },
     );
@@ -1122,7 +1127,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
         _isProse(widget.content) &&
         pageBounds.maxWidth - _pageInsets.horizontal - 2 * _margin >=
             2 * readerMinColumnWidth + readerColumnGap;
-    return Listener(
+    final page = Listener(
       onPointerSignal: _scrollPage,
       onPointerDown: _pointerDown,
       onPointerUp: (event) => _pointerUp(context, event),
@@ -1156,6 +1161,20 @@ class _ReaderContentViewState extends State<ReaderContentView>
           ),
         ),
       ),
+    );
+    if (_usesPresentation) return page;
+    return PagedReaderDragSurface(
+      key: _dragSurface,
+      controller: _paged,
+      enabled: _interactive && widget.completion == null,
+      isCurrent: () =>
+          mounted &&
+          _routeCurrent &&
+          _panel?.isValid != true &&
+          widget.session?.isClosed != true,
+      pageSize: pageBounds.biggest,
+      pageOrigin: Offset(_pageInsets.left, _pageInsets.top),
+      child: page,
     );
   }
 
@@ -1267,6 +1286,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     return ExcludeSemantics(
       excluding: widget.completion != null,
       child: PagedReaderViewport(
+        hostedDrag: true,
         inputEnabled:
             widget.active && widget.completion == null && !_completionTurning,
         onBoundaryDrag: _boundaryDrag,
@@ -1276,7 +1296,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
         content: widget.content,
         pageSize: pageBounds.biggest,
         contentOrigin: Offset(
-          (pageBounds.maxWidth - bounds.maxWidth) / 2,
+          _pageInsets.left +
+              (pageBounds.maxWidth - _pageInsets.horizontal - bounds.maxWidth) /
+                  2,
           contentTop,
         ),
         onTurnVisual: (frame) => _paperTurn.value = frame,

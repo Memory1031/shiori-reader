@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show ValueListenable, listEquals;
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../../domain/models/models.dart';
@@ -36,6 +37,170 @@ class PagedReaderController {
   bool get isRestoring => _state?._restoring ?? false;
 }
 
+/// Hosts the viewport's existing horizontal gesture on the reader surface,
+/// independently of the text's layout bounds. Taps remain in the viewport.
+class PagedReaderDragSurface extends StatefulWidget {
+  const PagedReaderDragSurface({
+    super.key,
+    required this.controller,
+    required this.enabled,
+    required this.isCurrent,
+    required this.pageSize,
+    required this.pageOrigin,
+    required this.child,
+  });
+  final PagedReaderController controller;
+  final bool enabled;
+  final bool Function() isCurrent;
+  final Size pageSize;
+  // The surface is inside SafeArea; folds use the full Reader page coordinates.
+  final Offset pageOrigin;
+  final Widget child;
+
+  @override
+  State<PagedReaderDragSurface> createState() => PagedReaderDragSurfaceState();
+}
+
+class PagedReaderDragSurfaceState extends State<PagedReaderDragSurface> {
+  _PagedReaderViewportState? _owner;
+  int? _epoch, _pointer;
+  bool get _owns =>
+      _owner != null &&
+      identical(widget.controller._state, _owner) &&
+      _owner!.mounted &&
+      _owner!._epoch == _epoch &&
+      _owner!._gestureAccepted;
+
+  void cancel() {
+    final owner = _owner;
+    _owner = null;
+    _epoch = null;
+    _pointer = null;
+    if (owner == null) return;
+    if (owner.mounted) owner._dragCancel();
+    if (!mounted) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  @override
+  void didUpdateWidget(PagedReaderDragSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Disabling new input while a chapter/completion target prepares must not
+    // remove an accepted recognizer. Geometry/ownership changes do retire it.
+    if (oldWidget.controller != widget.controller ||
+        oldWidget.pageSize != widget.pageSize ||
+        oldWidget.pageOrigin != widget.pageOrigin ||
+        !widget.isCurrent()) {
+      cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_owns) _owner!._dragCancel();
+    _owner = null;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final listening = widget.enabled || _owner != null;
+    return Listener(
+      onPointerDown: (event) {
+        if (_pointer == null &&
+            widget.enabled &&
+            event.buttons == kPrimaryButton) {
+          _pointer = event.pointer;
+        }
+      },
+      onPointerUp: (event) {
+        if (_pointer == event.pointer) _pointer = null;
+      },
+      // An accepted Flutter drag can report PointerCancel as end. Retire the
+      // owning pointer before that callback, without cancelling another finger.
+      onPointerCancel: (event) {
+        // After the first finger lifts, Flutter can keep the drag owned by a
+        // remaining finger. Its final cancellation must not become a commit.
+        if (_pointer == event.pointer || _pointer == null && _owner != null) {
+          cancel();
+        }
+      },
+      child: IgnorePointer(
+        // Hit paths of accepted pointers stay alive. New pointers must not
+        // enter the recognizer while the host is preparing another surface.
+        ignoring: !widget.enabled,
+        child: RawGestureDetector(
+          behavior: HitTestBehavior.opaque,
+          excludeFromSemantics: true,
+          gestures: {
+            if (listening)
+              HorizontalDragGestureRecognizer:
+                  GestureRecognizerFactoryWithHandlers<
+                    HorizontalDragGestureRecognizer
+                  >(
+                    () => HorizontalDragGestureRecognizer(debugOwner: this),
+                    (recognizer) => recognizer
+                      ..gestureSettings = MediaQuery.maybeGestureSettingsOf(
+                        context,
+                      )
+                      ..multitouchDragStrategy = ScrollConfiguration.of(
+                        context,
+                      ).getMultitouchDragStrategy(context)
+                      // Blank has no tap competitor to delay arena acceptance.
+                      // Use Flutter's ordinary drag slop for both blank and text.
+                      ..onlyAcceptDragOnThreshold = true
+                      ..onStart = (details) {
+                        if (!widget.enabled || !widget.isCurrent()) return;
+                        final state = widget.controller._state;
+                        if (state == null ||
+                            !state.widget.hostedDrag ||
+                            !state._dragStart(
+                              details.localPosition.dy + widget.pageOrigin.dy,
+                            )) {
+                          return;
+                        }
+                        setState(() {
+                          _owner = state;
+                          _epoch = state._epoch;
+                        });
+                      }
+                      ..onUpdate = (details) {
+                        if (!_owns || !widget.isCurrent()) {
+                          cancel();
+                          return;
+                        }
+                        _owner!._dragUpdate(details);
+                      }
+                      ..onEnd = (details) {
+                        if (!_owns || !widget.isCurrent()) {
+                          cancel();
+                          return;
+                        }
+                        final owner = _owner!;
+                        setState(() {
+                          _owner = null;
+                          _epoch = null;
+                          _pointer = null;
+                        });
+                        owner._dragEnd(details);
+                      }
+                      ..onCancel = cancel,
+                  ),
+          },
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
 /// Native pages with a shared blank-back paper fold. Pages before/after the
 /// semantic pivot are computed only when requested; no fictitious global page
 /// number. Explicit seeks scan unknown forward boundaries in batches; ordinary turns stay lazy.
@@ -59,6 +224,7 @@ class PagedReaderViewport extends StatefulWidget {
     this.onBoundaryDrag,
     this.onEdges,
     this.inputEnabled = true,
+    this.hostedDrag = false,
     this.onTurning,
     this.onTurnVisual,
     this.pageSize,
@@ -95,6 +261,10 @@ class PagedReaderViewport extends StatefulWidget {
   final BoundaryPageDrag? Function(int direction, double grip)? onBoundaryDrag;
   final void Function(bool first, bool last)? onEdges;
   final bool inputEnabled;
+
+  /// The Reader hosts horizontal input outside its content padding. Standalone
+  /// viewports retain their own recognizer; the two modes are mutually exclusive.
+  final bool hostedDrag;
   final ValueChanged<bool>? onTurning;
 
   /// Reports each frame of a turn so the host can paint the curl over the
@@ -432,6 +602,24 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     }
   }
 
+  bool _dragStart(double pageY) {
+    if (!widget.inputEnabled ||
+        _turnAnimation.isAnimating ||
+        _target != null ||
+        _gestureAccepted ||
+        _restoring ||
+        _layout == null) {
+      return false;
+    }
+    _gestureAccepted = true;
+    _queuedDirection = null;
+    _dragDirection = null;
+    _boundaryDrag = null;
+    _dragDistance = 0;
+    _grip = pageTurnGrip(pageY, widget.pageSize?.height ?? _layout!.height);
+    return true;
+  }
+
   void _dragEnd(DragEndDetails details) {
     if (!_gestureAccepted || _turnAnimation.isAnimating) return;
     _gestureAccepted = false;
@@ -462,7 +650,13 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   }
 
   void _dragCancel() {
-    _retireGesture()?.cancel();
+    final drag = _retireGesture();
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => drag?.cancel());
+    } else {
+      drag?.cancel();
+    }
     if (_target != null && !_turnAnimation.isAnimating) _finish(false);
   }
 
@@ -921,26 +1115,25 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         child: Listener(
           // Flutter's accepted drag recognizer reports PointerCancel as end.
           // This local listener only cancels our already owned gesture.
-          onPointerCancel: (_) => _dragCancel(),
+          onPointerCancel: widget.hostedDrag ? null : (_) => _dragCancel(),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onHorizontalDragStart: !_acceptsDrag
+            onHorizontalDragStart: widget.hostedDrag || !_acceptsDrag
                 ? null
                 : (details) {
-                    _gestureAccepted =
-                        widget.inputEnabled && !_turnAnimation.isAnimating;
-                    _queuedDirection = null;
-                    _dragDirection = null;
-                    _boundaryDrag = null;
-                    _dragDistance = 0;
-                    _grip = pageTurnGrip(
+                    _dragStart(
                       details.localPosition.dy + widget.contentOrigin.dy,
-                      widget.pageSize?.height ?? constraints.maxHeight,
                     );
                   },
-            onHorizontalDragUpdate: _acceptsDrag ? _dragUpdate : null,
-            onHorizontalDragEnd: _acceptsDrag ? _dragEnd : null,
-            onHorizontalDragCancel: _acceptsDrag ? _dragCancel : null,
+            onHorizontalDragUpdate: !widget.hostedDrag && _acceptsDrag
+                ? _dragUpdate
+                : null,
+            onHorizontalDragEnd: !widget.hostedDrag && _acceptsDrag
+                ? _dragEnd
+                : null,
+            onHorizontalDragCancel: !widget.hostedDrag && _acceptsDrag
+                ? _dragCancel
+                : null,
             onTapUp: (details) {
               if (!widget.inputEnabled) return;
               switch (readerTapZone(
