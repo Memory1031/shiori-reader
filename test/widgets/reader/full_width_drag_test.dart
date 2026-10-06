@@ -445,6 +445,45 @@ void main() {
   }
 
   testWidgets(
+    'moving second finger PointerCancel retires turn while first stays down',
+    (tester) async {
+      final h = DragReader();
+      await h.open(tester);
+      final before = h.pages.capture();
+      final first = await heldDrag(tester, const Offset(389, 400), delta: -60);
+      final firstProgress = nativeFrame(tester).progress;
+      expect(firstProgress, lessThan(.28));
+      final second = await tester.startGesture(const Offset(250, 450));
+      for (var i = 0; i < 2; i++) {
+        await second.moveBy(
+          const Offset(-40, 0),
+          timeStamp: Duration(milliseconds: 120 + i * 30),
+        );
+        await tester.pump(const Duration(milliseconds: 30));
+      }
+      expect(nativeFrame(tester).progress, greaterThan(firstProgress));
+      expect(nativeFrame(tester).progress, greaterThan(.28));
+      expect(h.pages.capture(), before);
+      await second.cancel();
+      await tester.pumpAndSettle();
+      await first.up(timeStamp: const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      expect(h.pages.capture(), before);
+      expect(nativeFrame(tester).progress, 0);
+      final next = await heldDrag(tester, const Offset(389, 400), delta: -160);
+      await tester.pump(const Duration(milliseconds: 140));
+      await next.up();
+      await tester.pumpAndSettle();
+      expect(h.pages.capture(), isNot(before));
+      await h.close(tester);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
+
+  testWidgets(
     'remaining finger PointerCancel never commits after first finger lifts',
     (tester) async {
       final h = DragReader();

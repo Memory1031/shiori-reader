@@ -64,6 +64,8 @@ class PagedReaderDragSurface extends StatefulWidget {
 class PagedReaderDragSurfaceState extends State<PagedReaderDragSurface> {
   _PagedReaderViewportState? _owner;
   int? _epoch, _pointer;
+  int? _movingPointer;
+  final _contributingPointers = <int>{};
   bool get _owns =>
       _owner != null &&
       identical(widget.controller._state, _owner) &&
@@ -76,6 +78,8 @@ class PagedReaderDragSurfaceState extends State<PagedReaderDragSurface> {
     _owner = null;
     _epoch = null;
     _pointer = null;
+    _movingPointer = null;
+    _contributingPointers.clear();
     if (owner == null) return;
     if (owner.mounted) owner._dragCancel();
     if (!mounted) return;
@@ -123,12 +127,18 @@ class PagedReaderDragSurfaceState extends State<PagedReaderDragSurface> {
       onPointerUp: (event) {
         if (_pointer == event.pointer) _pointer = null;
       },
+      // Hit-test listeners run before recognizer routes. Only an actual drag
+      // update below records this pointer as contributing to the turn.
+      onPointerMove: (event) => _movingPointer = event.pointer,
+      onPointerPanZoomUpdate: (event) => _movingPointer = event.pointer,
       // An accepted Flutter drag can report PointerCancel as end. Retire the
-      // owning pointer before that callback, without cancelling another finger.
+      // turn before that callback if a starting or contributing pointer cancels.
       onPointerCancel: (event) {
         // After the first finger lifts, Flutter can keep the drag owned by a
         // remaining finger. Its final cancellation must not become a commit.
-        if (_pointer == event.pointer || _pointer == null && _owner != null) {
+        if (_pointer == event.pointer ||
+            _contributingPointers.contains(event.pointer) ||
+            _pointer == null && _owner != null) {
           cancel();
         }
       },
@@ -169,12 +179,16 @@ class PagedReaderDragSurfaceState extends State<PagedReaderDragSurface> {
                         setState(() {
                           _owner = state;
                           _epoch = state._epoch;
+                          _contributingPointers.clear();
                         });
                       }
                       ..onUpdate = (details) {
                         if (!_owns || !widget.isCurrent()) {
                           cancel();
                           return;
+                        }
+                        if (details.delta.dx != 0 && _movingPointer != null) {
+                          _contributingPointers.add(_movingPointer!);
                         }
                         _owner!._dragUpdate(details);
                       }
@@ -188,6 +202,8 @@ class PagedReaderDragSurfaceState extends State<PagedReaderDragSurface> {
                           _owner = null;
                           _epoch = null;
                           _pointer = null;
+                          _movingPointer = null;
+                          _contributingPointers.clear();
                         });
                         owner._dragEnd(details);
                       }
