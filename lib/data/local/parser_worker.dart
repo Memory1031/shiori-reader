@@ -6,7 +6,14 @@ import 'local_guard.dart';
 
 /// CPU work owns no session or file handles. Cancellation kills only this
 /// worker; the caller awaits its exit before rolling back the import session.
-Future<T> runParserWorker<T>(T Function() work, CancellationToken token) async {
+Future<T> runParserWorker<T>(
+  T Function() work,
+  CancellationToken token, {
+  Duration timeLimit = const Duration(seconds: 45),
+}) async {
+  if (timeLimit <= Duration.zero) {
+    throw ArgumentError.value(timeLimit, 'timeLimit');
+  }
   checkLocalCancellation(token);
   final replies = ReceivePort();
   final exits = ReceivePort();
@@ -58,8 +65,8 @@ Future<T> runParserWorker<T>(T Function() work, CancellationToken token) async {
     subscriptions.add(cancelled);
     if (token.isCancelled) stop(const LocalCancelled());
     timeout = Timer(
-      const Duration(seconds: 45),
-      () => stop(const LocalParseException(LocalParseProblem.tooLarge)),
+      timeLimit,
+      () => stop(const LocalParseException(LocalParseProblem.timeout)),
     );
     return await result.future;
   } finally {

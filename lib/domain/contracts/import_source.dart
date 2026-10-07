@@ -29,6 +29,8 @@ enum ImportProblem {
   drm,
   fixedLayout,
   parseLimit,
+  parseStructureLimit,
+  parseTimeout,
   storage,
   cancelled,
 }

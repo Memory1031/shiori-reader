@@ -762,7 +762,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get importParseLimit =>
-      '文件超过解析限制：TXT 16 MiB、EPUB 64 MiB；过大的章节、图片或解压内容也无法导入。';
+      '文件或解析后的内容超出处理预算。TXT 原文件上限为 16 MiB，EPUB 为 64 MiB；较小文件也可能因解析后的数据过大而无法导入。';
+
+  @override
+  String get importParseStructureLimit => 'TXT 的段落或章节过多，超出当前可处理的结构规模，请分卷后导入。';
+
+  @override
+  String get importParseTimeout => '处理这本书耗时过长，已停止导入。可以重试，或分卷后导入。';
 
   @override
   String get importEpubSupport => '支持 EPUB 图文阅读。';

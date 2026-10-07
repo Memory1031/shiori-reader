@@ -1541,8 +1541,20 @@ abstract class AppLocalizations {
   /// No description provided for @importParseLimit.
   ///
   /// In en, this message translates to:
-  /// **'Parsing limits exceeded: TXT 16 MiB, EPUB 64 MiB. Oversized chapters, images, or expanded content are also unsupported.'**
+  /// **'The file or parsed content exceeds the processing budget. TXT input is limited to 16 MiB and EPUB to 64 MiB; even smaller files may produce too much parsed data.'**
   String get importParseLimit;
+
+  /// No description provided for @importParseStructureLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'This TXT has too many paragraphs or chapters to process. Split it into volumes and import them separately.'**
+  String get importParseStructureLimit;
+
+  /// No description provided for @importParseTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing this book took too long and was stopped. Try again, or split it into volumes before importing.'**
+  String get importParseTimeout;
 
   /// No description provided for @importEpubSupport.
   ///

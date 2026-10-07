@@ -1856,7 +1856,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), null);
       expect(find.text(longName), findsOneWidget);
-      expect(find.textContaining('解析限制'), findsOneWidget);
+      final strings = AppLocalizations.of(
+        tester.element(find.byType(ImportOverlay)),
+      );
+      expect(find.text(strings.importParseLimit), findsOneWidget);
       expect(find.text('Reader position unchanged'), findsOneWidget);
     });
   });

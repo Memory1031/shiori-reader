@@ -1,3 +1,8 @@
+import 'dart:collection';
+import 'dart:typed_data';
+
+const maxTxtLines = 250000;
+
 /// Bounded, line-oriented structural analysis. Offsets here are UTF-16 indices
 /// only for slicing; persistent identity is counted separately in code points.
 final class TxtLine {
@@ -5,20 +10,49 @@ final class TxtLine {
   final int start, end;
 }
 
-List<TxtLine> txtLines(String text, void Function() tooMany) {
-  final result = <TxtLine>[];
+// Keep one packed end offset per line, rather than retaining a Dart object and
+// list slot for every line. Ranges are created only while inspecting a line.
+final class _TxtLines extends ListBase<TxtLine> {
+  _TxtLines(this.ends);
+  final Uint32List ends;
+  @override
+  int get length => ends.length;
+  @override
+  set length(int value) => throw UnsupportedError('Immutable line index');
+  @override
+  TxtLine operator [](int index) {
+    RangeError.checkValidIndex(index, this);
+    return TxtLine(index == 0 ? 0 : ends[index - 1], ends[index]);
+  }
+
+  @override
+  void operator []=(int index, TxtLine value) =>
+      throw UnsupportedError('Immutable line index');
+}
+
+List<TxtLine> txtLines(String text, Never Function() tooMany) {
+  var ends = Uint32List(1024);
+  var count = 0;
+  void add(int end) {
+    if (count == maxTxtLines) tooMany();
+    if (count == ends.length) {
+      final grown = Uint32List((ends.length * 2).clamp(0, maxTxtLines));
+      grown.setRange(0, count, ends);
+      ends = grown;
+    }
+    ends[count++] = end;
+  }
+
   var start = 0;
   for (var i = 0; i < text.length; i++) {
     final c = text.codeUnitAt(i);
     if (c != 10 && c != 13) continue;
     if (c == 13 && i + 1 < text.length && text.codeUnitAt(i + 1) == 10) i++;
-    result.add(TxtLine(start, i + 1));
+    add(i + 1);
     start = i + 1;
-    if (result.length > 100000) tooMany();
   }
-  if (start < text.length) result.add(TxtLine(start, text.length));
-  if (result.length > 100000) tooMany();
-  return result;
+  if (start < text.length) add(text.length);
+  return _TxtLines(Uint32List.sublistView(ends, 0, count));
 }
 
 final _numbered = RegExp(

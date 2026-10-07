@@ -4,6 +4,8 @@ import '../../../domain/models/models.dart';
 import 'txt_decoder.dart';
 import 'txt_headings.dart';
 
+const maxTxtChapters = 10000;
+
 String filenameTitle(String filename) {
   final name = filename.replaceAll('\\', '/').split('/').last;
   final dot = name.lastIndexOf('.');
@@ -27,7 +29,7 @@ LocalBookContent parseTxt(
   var chapterTitle = title, chapterStart = 0, offset = 0;
   final lines = txtLines(
     text,
-    () => throw const LocalParseException(LocalParseProblem.tooLarge),
+    () => throw const LocalParseException(LocalParseProblem.structureLimit),
   );
   final headings = txtHeadingLines(text, lines);
   void flush() {
@@ -42,6 +44,9 @@ LocalBookContent parseTxt(
     if (!blocks.any((b) => b is ParagraphBlock && b.text.trim().isNotEmpty)) {
       return;
     }
+    if (chapters.length == maxTxtChapters) {
+      throw const LocalParseException(LocalParseProblem.structureLimit);
+    }
     chapters.add(
       ChapterContent(
         key: LocalBookIdentity.chapter(book, 'txt:$chapterStart'),
@@ -49,9 +54,6 @@ LocalBookContent parseTxt(
         blocks: blocks,
       ),
     );
-    if (chapters.length > 10000) {
-      throw const LocalParseException(LocalParseProblem.tooLarge);
-    }
     blocks = [];
   }
 
@@ -77,7 +79,8 @@ LocalBookContent parseTxt(
   }
 
   for (var i = 0; i < lines.length; i++) {
-    line(text.substring(lines[i].start, lines[i].end), headings.contains(i));
+    final range = lines[i];
+    line(text.substring(range.start, range.end), headings.contains(i));
   }
   flush();
   return LocalBookContent(

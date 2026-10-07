@@ -306,6 +306,23 @@ void main() {
     },
   );
 
+  test(
+    'worker timeout is distinct from size and releases the isolate',
+    () async {
+      await expectLater(
+        runParserWorker(
+          () {
+            while (true) {}
+          },
+          CancellationSource().token,
+          timeLimit: const Duration(milliseconds: 20),
+        ),
+        throwsA(problem(LocalParseProblem.timeout)),
+      ).timeout(const Duration(seconds: 3));
+      expect(await runParserWorker(() => 42, CancellationSource().token), 42);
+    },
+  );
+
   group('EPUB package, content and navigation', () {
     for (final ncx in [false, true]) {
       test(

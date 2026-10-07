@@ -25,7 +25,15 @@ abstract interface class LocalBookDecoder {
   });
 }
 
-enum LocalParseProblem { invalid, tooLarge, encoding, drm, fixedLayout }
+enum LocalParseProblem {
+  invalid,
+  tooLarge,
+  structureLimit,
+  timeout,
+  encoding,
+  drm,
+  fixedLayout,
+}
 
 final class LocalParseException extends FormatException {
   const LocalParseException(this.problem) : super('Local book parsing failed');

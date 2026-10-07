@@ -2,12 +2,63 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/local/txt/txt_decoder.dart';
 import 'package:shiori/data/local/txt/txt_parser.dart';
+import 'package:shiori/data/local/txt/txt_headings.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/contracts/local_books.dart';
 import 'parsers_test.dart' show utf16, original;
 
 final key = LocalBookIdentity.book('b' * 64);
 void main() {
+  test('packed line ranges preserve mixed newlines and UTF16 offsets', () {
+    const text = '甲\r\n\r\n😀\r乙\n尾';
+    final lines = txtLines(text, () => throw StateError('Unexpected limit'));
+    expect(lines.map((line) => (line.start, line.end)), [
+      (0, 3),
+      (3, 5),
+      (5, 8),
+      (8, 10),
+      (10, 11),
+    ]);
+    expect(
+      lines.map((line) => text.substring(line.start, line.end)).join(),
+      text,
+    );
+    expect(() => lines[0] = const TxtLine(0, 0), throwsUnsupportedError);
+  });
+  test('line budget accepts its boundary and rejects a final extra line', () {
+    final text = 'a\n' * maxTxtLines;
+    Never tooMany() =>
+        throw const LocalParseException(LocalParseProblem.structureLimit);
+    final lines = txtLines(text, tooMany);
+    expect(lines, hasLength(maxTxtLines));
+    expect(lines.last.end, text.length);
+    expect(
+      () => txtLines('$text尾', tooMany),
+      throwsA(
+        isA<LocalParseException>().having(
+          (e) => e.problem,
+          'problem',
+          LocalParseProblem.structureLimit,
+        ),
+      ),
+    );
+  });
+  test('too many explicit chapters reports a structure limit', () {
+    final text = List.generate(
+      maxTxtChapters + 1,
+      (i) => 'Chapter ${i + 1}\n正文\n',
+    ).join();
+    expect(
+      () => parseTxt(utf8.encode(text), key, 'x.txt', TxtEncoding.utf8),
+      throwsA(
+        isA<LocalParseException>().having(
+          (e) => e.problem,
+          'problem',
+          LocalParseProblem.structureLimit,
+        ),
+      ),
+    );
+  });
   test('long previews expose head middle tail without cutting Unicode', () {
     final text = '${'甲' * 300}😀中间𠮷${'乙' * 300}尾部';
     final sample = txtPreviewSample(text);

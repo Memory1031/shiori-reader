@@ -157,7 +157,10 @@ class ManagedLocalBooks
   static const maxMediaBytes = 32 * 1024 * 1024;
   static const maxBundleBytes = 512 * 1024 * 1024;
   static const maxManifestBytes = 32 * 1024 * 1024;
+  static const maxTxtManifestBytes = 64 * 1024 * 1024;
   static const maxPresentationBytes = 32 * 1024 * 1024;
+  static int _manifestLimit(LocalBookFormat format) =>
+      format == LocalBookFormat.txt ? maxTxtManifestBytes : maxManifestBytes;
   static final _digest = RegExp(r'^[a-f0-9]{64}$');
 
   static Future<Result<ManagedLocalBooks>> open(
@@ -215,9 +218,12 @@ class ManagedLocalBooks
         return Success<T>(await action());
       } catch (e) {
         return Failure<T>(
-          e is _LimitExceeded ||
-                  e is LocalParseException &&
-                      e.problem == LocalParseProblem.tooLarge
+          e is LocalParseException && e.problem == LocalParseProblem.timeout
+              ? AppFailure(kind: FailureKind.timeout, operation: op)
+              : e is _LimitExceeded ||
+                    e is LocalParseException &&
+                        (e.problem == LocalParseProblem.tooLarge ||
+                            e.problem == LocalParseProblem.structureLimit)
               ? AppFailure(kind: FailureKind.tooLarge, operation: op)
               : e is FormatException
               ? AppFailure(
@@ -464,16 +470,20 @@ class ManagedLocalBooks
     final file = await _file(key.novelId, 'manifest.json', bundle: bundle);
     final stat = await file.stat();
     final hash = row.read<String>('manifest_hash');
+    final format = LocalBookFormat.values.byName(row.read<String>('format'));
     final cached = _readCache;
     if (cached != null &&
         cached.$1 == key &&
         cached.$2 == hash &&
         cached.$3 == stat.modified &&
-        cached.$4 == stat.size) {
+        cached.$4 == stat.size &&
+        cached.$5.record.format == format) {
       return cached.$5;
     }
 
-    if (await file.length() > maxManifestBytes) throw const _LimitExceeded();
+    if (await file.length() > _manifestLimit(format)) {
+      throw const _LimitExceeded();
+    }
     final bytes = await file.readAsBytes();
     final decoded = await _decodeManifest(
       bytes,
@@ -481,6 +491,9 @@ class ManagedLocalBooks
       row.read<String>('manifest_hash'),
       token,
     );
+    if (decoded.record.format != format) {
+      throw const FormatException('Local format mismatch');
+    }
     final book = (
       record: decoded.record,
       presentationHash: decoded.presentationHash,
@@ -703,11 +716,14 @@ class ManagedLocalBooks
         final manifest = await _file(digest, 'manifest.json', bundle: active);
         final row = await db
             .customSelect(
-              'SELECT manifest_hash FROM local_books WHERE digest=?',
+              'SELECT manifest_hash,format FROM local_books WHERE digest=?',
               variables: [Variable(digest)],
             )
             .getSingle();
-        if (await manifest.length() > maxManifestBytes ||
+        final format = LocalBookFormat.values.byName(
+          row.read<String>('format'),
+        );
+        if (await manifest.length() > _manifestLimit(format) ||
             sha256.convert(await manifest.readAsBytes()).toString() !=
                 row.read<String>('manifest_hash')) {
           return false;
@@ -943,7 +959,7 @@ Future<({LocalBookContent content, List<int> manifest})> _writeParsedArtifacts({
     html == null ? null : sha256.convert(html).toString(),
     html != null,
   );
-  if (manifest.length > ManagedLocalBooks.maxManifestBytes ||
+  if (manifest.length > ManagedLocalBooks._manifestLimit(format) ||
       session.used + manifest.length + (html?.length ?? 0) >
           ManagedLocalBooks.maxBundleBytes) {
     throw const _LimitExceeded();

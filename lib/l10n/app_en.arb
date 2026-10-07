@@ -369,7 +369,9 @@
   "importEncodingInvalid": "The entire file could not be decoded with this encoding. Choose another encoding or check the original.",
   "importDrm": "This EPUB contains protected or encrypted content and cannot be imported.",
   "importFixedLayout": "Fixed-layout EPUB is not supported. Use a reflowable edition.",
-  "importParseLimit": "Parsing limits exceeded: TXT 16 MiB, EPUB 64 MiB. Oversized chapters, images, or expanded content are also unsupported.",
+  "importParseLimit": "The file or parsed content exceeds the processing budget. TXT input is limited to 16 MiB and EPUB to 64 MiB; even smaller files may produce too much parsed data.",
+  "importParseStructureLimit": "This TXT has too many paragraphs or chapters to process. Split it into volumes and import them separately.",
+  "importParseTimeout": "Processing this book took too long and was stopped. Try again, or split it into volumes before importing.",
   "importEpubSupport": "Supports EPUB text and images.",
   "localBooksCount": "{count, plural, =1{1 book} other{{count} books}}",
   "@localBooksCount": {

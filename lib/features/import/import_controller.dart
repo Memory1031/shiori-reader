@@ -486,6 +486,8 @@ class ImportController extends ChangeNotifier {
         // getter read here would silently change fatal classification.
         final issue = item.problem ??= failure.kind == FailureKind.tooLarge
             ? ImportProblem.parseLimit
+            : failure.kind == FailureKind.timeout
+            ? ImportProblem.parseTimeout
             : failure.kind == FailureKind.parse
             ? ImportProblem.invalidContent
             : ImportProblem.storage;
@@ -530,6 +532,8 @@ class ImportController extends ChangeNotifier {
       item.problem = switch (error.problem) {
         LocalParseProblem.invalid => ImportProblem.invalidContent,
         LocalParseProblem.tooLarge => ImportProblem.parseLimit,
+        LocalParseProblem.structureLimit => ImportProblem.parseStructureLimit,
+        LocalParseProblem.timeout => ImportProblem.parseTimeout,
         LocalParseProblem.encoding => ImportProblem.encoding,
         LocalParseProblem.drm => ImportProblem.drm,
         LocalParseProblem.fixedLayout => ImportProblem.fixedLayout,

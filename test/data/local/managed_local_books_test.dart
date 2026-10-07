@@ -75,6 +75,38 @@ void main() {
     store = ok(await ManagedLocalBooks.open(paths, db));
   });
   test(
+    'EPUB manifest limit remains separate from the larger TXT budget',
+    () async {
+      final imported = ok(
+        await store.importBook(
+          bytes: Stream.value(zipFiles(epubFiles())),
+          format: LocalBookFormat.epub,
+          parse: (session) => const BookDecoder().decode(
+            session,
+            format: LocalBookFormat.epub,
+            filename: 'fixture.epub',
+            cancellation: token(),
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+          ),
+          cancellation: token(),
+        ),
+      );
+      final key = imported.content.detail.summary.key;
+      final file = File(
+        '${paths.localBooks.path}/${key.novelId}/manifest.json',
+      );
+      final writer = await file.open(mode: FileMode.append);
+      try {
+        await writer.truncate(ManagedLocalBooks.maxManifestBytes + 1);
+      } finally {
+        await writer.close();
+      }
+      final result = await store.read(key, cancellation: token());
+      expect((result as Failure).failure.kind, FailureKind.tooLarge);
+    },
+  );
+
+  test(
     'unchanged manifest reuses decoded record and changed file is revalidated',
     () async {
       final imported = ok(

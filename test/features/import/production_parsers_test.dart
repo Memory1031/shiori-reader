@@ -18,6 +18,30 @@ import 'package:shiori/l10n/generated/app_localizations.dart';
 import '../../data/local/support/epub_fixtures.dart';
 import 'import_flow_test.dart' show MemorySource;
 
+class RejectingDecoder implements LocalBookDecoder {
+  const RejectingDecoder(this.problem);
+  final LocalParseProblem problem;
+  @override
+  Future<LocalBookContent> decode(
+    LocalImportSession session, {
+    required LocalBookFormat format,
+    required String filename,
+    required CancellationToken cancellation,
+    required ChooseTxtEncoding chooseEncoding,
+    TxtEncoding? encoding,
+  }) {
+    if (filename == 'reject.txt') throw LocalParseException(problem);
+    return const BookDecoder().decode(
+      session,
+      format: format,
+      filename: filename,
+      cancellation: cancellation,
+      chooseEncoding: chooseEncoding,
+      encoding: encoding,
+    );
+  }
+}
+
 void main() {
   testWidgets('self-authored PNG decodes with the actual Flutter codec', (
     tester,
@@ -67,6 +91,121 @@ void main() {
     }
     expect(condition(), true);
   }
+
+  test(
+    'six megabyte TXT with many blank lines imports and reopens intact',
+    () async {
+      final text = '第一章\r\n${'${'测试' * 12}\r\n\r\n' * 85000}第二章\r\n最终正文😀\r\n';
+      source.bytes = [239, 187, 191, ...utf8.encode(text)];
+      expect(source.bytes.length, inInclusiveRange(6000000, 7000000));
+      source.receive(name: 'large-synthetic.txt');
+      await controller.start();
+      await controller.submit();
+      expect(controller.phase, ImportPhase.succeeded);
+      expect(controller.choosingEncoding, isFalse);
+      final record = controller.result!;
+      final key = record.content.detail.summary.key;
+      expect(record.content.chapters, hasLength(2));
+      expect(record.content.chapters.first.blocks, hasLength(170001));
+      final nextOffset = text.substring(0, text.indexOf('第二章')).runes.length;
+      expect(
+        record.content.chapters.last.key,
+        LocalBookIdentity.chapter(key, 'txt:$nextOffset'),
+      );
+      expect(source.acked, hasLength(1));
+      final manifest = File(
+        '${paths.localBooks.path}/${key.novelId}/manifest.json',
+      );
+      expect(
+        await manifest.length(),
+        greaterThan(ManagedLocalBooks.maxManifestBytes),
+      );
+      await store.close();
+      store =
+          (await ManagedLocalBooks.open(paths, db)
+                  as Success<ManagedLocalBooks>)
+              .value;
+      final reopened =
+          (await store.read(key, cancellation: CancellationSource().token)
+                  as Success<LocalBookRecord?>)
+              .value!;
+      expect(
+        reopened.content.chapters.map((c) => c.contentRevision),
+        record.content.chapters.map((c) => c.contentRevision),
+      );
+      final restored = reopened.content.chapters
+          .expand((c) => c.blocks)
+          .map((b) => b is HeadingBlock ? b.text : (b as ParagraphBlock).text)
+          .join();
+      expect(restored, text.replaceAll('\r\n', '\n'));
+    },
+  );
+
+  for (final error in [
+    (parse: LocalParseProblem.tooLarge, import: ImportProblem.parseLimit),
+    (
+      parse: LocalParseProblem.structureLimit,
+      import: ImportProblem.parseStructureLimit,
+    ),
+    (parse: LocalParseProblem.timeout, import: ImportProblem.parseTimeout),
+  ]) {
+    test('${error.parse} remains a distinct nonfatal import problem', () async {
+      await controller.shutdown();
+      controller.dispose();
+      controller = ImportController(
+        source: source,
+        store: store,
+        decoder: RejectingDecoder(error.parse),
+      );
+      source.receive(id: 'bad', name: 'reject.txt');
+      source.receive(id: 'good', name: 'good.txt');
+      await controller.start();
+      await controller.submit();
+      expect(controller.items[0].problem, error.import);
+      expect(controller.items[0].phase, ImportItemPhase.failed);
+      expect(controller.items[1].phase, ImportItemPhase.succeeded);
+      expect(source.acked, ['good']);
+      expect(
+        await db.customSelect('SELECT * FROM local_books').get(),
+        hasLength(1),
+      );
+      expect(await paths.localImportStaging.list().toList(), isEmpty);
+    });
+  }
+
+  test(
+    'storage worker timeout does not become a fatal storage failure',
+    () async {
+      await controller.shutdown();
+      controller.dispose();
+      var parses = 0;
+      controller = ImportController(
+        source: source,
+        store: store,
+        parsers: {
+          LocalBookFormat.txt: (session) async {
+            if (++parses == 1) {
+              throw const LocalParseException(LocalParseProblem.timeout);
+            }
+            return const BookDecoder().decode(
+              session,
+              format: LocalBookFormat.txt,
+              filename: 'good.txt',
+              cancellation: CancellationSource().token,
+              chooseEncoding: (_) async => TxtEncoding.utf8,
+            );
+          },
+        },
+      );
+      source.receive(id: 'bad', name: 'reject.txt');
+      source.receive(id: 'good', name: 'good.txt');
+      await controller.start();
+      await controller.submit();
+      expect(controller.items[0].problem, ImportProblem.parseTimeout);
+      expect(controller.items[1].phase, ImportItemPhase.succeeded);
+      expect(source.acked, ['good']);
+    },
+  );
 
   test(
     'strict encoding failure preserves receipt, manual retry commits and deduplicates',
@@ -295,6 +434,45 @@ void main() {
     },
   );
   for (final locale in ['zh', 'en']) {
+    for (final problem in [
+      ImportProblem.parseStructureLimit,
+      ImportProblem.parseTimeout,
+    ]) {
+      testWidgets('$locale $problem shows its own localized error', (
+        tester,
+      ) async {
+        await tester.runAsync(() async {
+          source.receive(error: problem);
+          await controller.start();
+          await controller.submit();
+          controller.open();
+        });
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: Locale(locale),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            builder: (_, child) =>
+                ImportOverlay(controller: controller, child: child!),
+            home: const Scaffold(body: Text('Existing reader')),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final strings = AppLocalizations.of(
+          tester.element(find.byType(ImportOverlay)),
+        );
+        expect(
+          find.text(
+            problem == ImportProblem.parseTimeout
+                ? strings.importParseTimeout
+                : strings.importParseStructureLimit,
+          ),
+          findsOneWidget,
+        );
+        expect(find.text(strings.importParseLimit), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
     testWidgets(
       '$locale encoding preview is usable with large text and preserves reader',
       (tester) async {

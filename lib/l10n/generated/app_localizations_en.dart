@@ -835,7 +835,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importParseLimit =>
-      'Parsing limits exceeded: TXT 16 MiB, EPUB 64 MiB. Oversized chapters, images, or expanded content are also unsupported.';
+      'The file or parsed content exceeds the processing budget. TXT input is limited to 16 MiB and EPUB to 64 MiB; even smaller files may produce too much parsed data.';
+
+  @override
+  String get importParseStructureLimit =>
+      'This TXT has too many paragraphs or chapters to process. Split it into volumes and import them separately.';
+
+  @override
+  String get importParseTimeout =>
+      'Processing this book took too long and was stopped. Try again, or split it into volumes before importing.';
 
   @override
   String get importEpubSupport => 'Supports EPUB text and images.';
