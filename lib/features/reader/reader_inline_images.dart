@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/models/models.dart';
 import 'reader_ruby.dart';
+import 'reader_inline_stack.dart';
 
 /// Shared replacement geometry for pagination and painted rich text. Offsets
 /// count Unicode code points; each image occupies one U+FFFC in the source.
@@ -14,6 +15,7 @@ List<InlineSpan> readerInlineSpans({
   double? readerFontSize,
   Widget Function(InlineImage)? imageBuilder,
   List<InlineRuby> ruby = const [],
+  List<InlineStack> stacks = const [],
   TextScaler scaler = TextScaler.noScaling,
   TextDirection direction = TextDirection.ltr,
   Locale? locale,
@@ -25,6 +27,10 @@ List<InlineSpan> readerInlineSpans({
   final end = offset + runes.length;
   final cuts = <int>{offset, end};
   final pictures = {for (final i in images) i.offset: i};
+  final stacked = {
+    for (final s in stacks)
+      if (s.start >= offset && s.end <= end) s.start: s,
+  };
   final pairs = {
     for (final r in ruby)
       if (r.start >= offset && r.end <= end) r.start: r,
@@ -44,10 +50,35 @@ List<InlineSpan> readerInlineSpans({
     cuts.removeWhere((c) => c > r.start && c < r.end);
     cuts.addAll([r.start, r.end]);
   }
+  for (final s in stacked.values) {
+    cuts.removeWhere((c) => c > s.start && c < s.end);
+    cuts.addAll([s.start, s.end]);
+  }
   final ordered = cuts.toList()..sort();
   return [
     for (var i = 0; i + 1 < ordered.length; i++)
-      if (pairs[ordered[i]] case final pair?)
+      if (stacked[ordered[i]] case final stack?)
+        WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          style: style,
+          child: ReaderInlineStack(
+            layout: readerStackLayout(
+              text: String.fromCharCodes(
+                runes.sublist(stack.start - offset, stack.end - offset),
+              ),
+              stack: stack,
+              styles: styles,
+              style: style,
+              scaler: scaler,
+              direction: direction,
+              locale: locale,
+              readerFontSize: readerFontSize,
+              resolveColor: resolveColor,
+            ),
+          ),
+        )
+      else if (pairs[ordered[i]] case final pair?)
         WidgetSpan(
           alignment: PlaceholderAlignment.baseline,
           baseline: TextBaseline.alphabetic,
@@ -226,6 +257,7 @@ List<PlaceholderDimensions> readerInlineDimensions({
   required List<InlineImage> images,
   List<InlineTextStyle> styles = const [],
   List<InlineRuby> ruby = const [],
+  List<InlineStack> stacks = const [],
   String text = '',
   TextDirection direction = TextDirection.ltr,
   Locale? locale,
@@ -280,6 +312,31 @@ List<PlaceholderDimensions> readerInlineDimensions({
             );
           })(),
         ),
+    for (final stack in stacks)
+      if (stack.start >= offset && stack.end <= offset + length)
+        (
+          stack.start,
+          (() {
+            final l = readerStackLayout(
+              text: String.fromCharCodes(
+                text.runes.skip(stack.start - offset).take(stack.length),
+              ),
+              stack: stack,
+              styles: styles,
+              style: style,
+              scaler: scaler,
+              direction: direction,
+              locale: locale,
+              readerFontSize: readerFontSize,
+            );
+            return PlaceholderDimensions(
+              size: l.geometry.size,
+              baseline: TextBaseline.alphabetic,
+              baselineOffset: l.geometry.baseline,
+              alignment: PlaceholderAlignment.baseline,
+            );
+          })(),
+        ),
   ]..sort((a, b) => a.$1.compareTo(b.$1));
   return dimensions.map((d) => d.$2).toList();
 }
@@ -290,19 +347,28 @@ int readerInlineSourceBoundary(
   String text,
   int offset,
   List<InlineRuby> ruby,
-  int display,
-) {
+  int display, {
+  List<InlineStack> stacks = const [],
+}) {
   final runes = text.runes.toList();
   final pairs = {
     for (final r in ruby)
       if (r.start >= offset && r.end <= offset + runes.length)
         r.start - offset: r,
   };
+  final stacked = {
+    for (final s in stacks)
+      if (s.start >= offset && s.end <= offset + runes.length)
+        s.start - offset: s,
+  };
   var source = 0, rendered = 0, utf16 = 0;
   while (source < runes.length && rendered < display) {
     final pair = pairs[source];
-    final count = pair?.length ?? 1;
-    final units = pair != null ? 1 : (runes[source] > 0xffff ? 2 : 1);
+    final stack = stacked[source];
+    final count = stack?.length ?? pair?.length ?? 1;
+    final units = pair != null || stack != null
+        ? 1
+        : (runes[source] > 0xffff ? 2 : 1);
     if (rendered + units > display) break;
     utf16 += String.fromCharCodes(runes.skip(source).take(count)).length;
     source += count;
@@ -320,4 +386,79 @@ Size readerInlineSize(
 }) {
   final em = scaler.scale(style.fontSize ?? 20);
   return Size((image.widthEm * em).clamp(0, maxWidth), image.heightEm * em);
+}
+
+ReaderInlineStackLayout readerStackLayout({
+  required String text,
+  required InlineStack stack,
+  required List<InlineTextStyle> styles,
+  required TextStyle style,
+  required TextScaler scaler,
+  required TextDirection direction,
+  Locale? locale,
+  double? readerFontSize,
+  Color Function(Color)? resolveColor,
+}) {
+  final runes = text.runes.toList();
+  final split = stack.separator - stack.start;
+  final upper = String.fromCharCodes(runes.take(split)),
+      lower = String.fromCharCodes(runes.skip(split + 1));
+  InlineSpan row(
+    String text,
+    int offset,
+    double? lineHeightEm,
+    double basisEm,
+  ) {
+    final spans = readerInlineSpans(
+      text: text,
+      offset: offset,
+      images: const [],
+      styles: styles,
+      style: style,
+      readerFontSize: readerFontSize,
+      resolveColor: resolveColor,
+    );
+    return TextSpan(
+      style: style,
+      children: [
+        for (final span in spans)
+          if (span is TextSpan)
+            TextSpan(
+              text: span.text,
+              style: span.style!.copyWith(
+                fontSize: scaler.scale(span.style!.fontSize ?? 20),
+                height: lineHeightEm == null
+                    ? 1
+                    : lineHeightEm /
+                          basisEm *
+                          scaler.scale(
+                            basisEm * (readerFontSize ?? style.fontSize ?? 20),
+                          ) /
+                          scaler.scale(span.style!.fontSize ?? 20),
+              ),
+            ),
+      ],
+    );
+  }
+
+  return ReaderInlineStackLayout(
+    upper: row(
+      upper,
+      stack.start,
+      stack.upperLineHeightEm,
+      stack.upperLineHeightBasisEm,
+    ),
+    lower: row(
+      lower,
+      stack.separator + 1,
+      stack.lowerLineHeightEm,
+      stack.lowerLineHeightBasisEm,
+    ),
+    upperText: upper,
+    lowerText: lower,
+    style: style,
+    scaler: scaler,
+    direction: direction,
+    locale: locale,
+  );
 }

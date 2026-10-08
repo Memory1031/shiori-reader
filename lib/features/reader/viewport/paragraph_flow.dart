@@ -71,6 +71,7 @@ final class ParagraphFlow {
 /// offset zero, independent of page/column/chunk boundaries. No text is added.
 ParagraphFlow readerParagraphFlow({
   required ParagraphBlock block,
+  List<InlineStack> stacks = const [],
   required String text,
   required int offset,
   required double width,
@@ -131,6 +132,7 @@ ParagraphFlow readerParagraphFlow({
             offset: offset + start,
             images: block.inlineImages,
             ruby: block.inlineRuby,
+            stacks: stacks,
             styles: block.inlineStyles,
             readerFontSize: readerFontSize,
             style: style,
@@ -150,6 +152,7 @@ ParagraphFlow readerParagraphFlow({
           length: source.runes.length,
           images: block.inlineImages,
           ruby: block.inlineRuby,
+          stacks: stacks,
           text: source,
           styles: block.inlineStyles,
           readerFontSize: readerFontSize,
@@ -181,6 +184,7 @@ ParagraphFlow readerParagraphFlow({
           offset + start,
           block.inlineRuby,
           p.getLineBoundary(point).start,
+          stacks: stacks,
         );
         var safe = 0;
         for (final cluster in slice(start, end).characters) {
@@ -193,12 +197,15 @@ ParagraphFlow readerParagraphFlow({
       p.dispose();
     }
     if (stop <= start) {
+      final stack = stacks.where((s) => s.start == offset + start).firstOrNull;
       final ruby = block.inlineRuby
           .where((r) => r.start == offset + start)
           .firstOrNull;
       stop =
           start +
-          (ruby?.length ?? slice(start, end).characters.first.runes.length);
+          (stack?.length ??
+              ruby?.length ??
+              slice(start, end).characters.first.runes.length);
     }
     final line = painter(start, stop, available);
     try {

@@ -9,6 +9,8 @@ import 'content_style.dart';
 export 'content_style.dart';
 import 'inline_ruby.dart';
 export 'inline_ruby.dart';
+import 'inline_stack.dart';
+export 'inline_stack.dart';
 
 enum ParagraphAlignment { start, center, end }
 
@@ -31,6 +33,7 @@ sealed class ContentBlock extends ValueModel {
   List<InlineTextStyle> get inlineStyles => const [];
   List<InlineImage> get inlineImages => const [];
   List<InlineRuby> get inlineRuby => const [];
+  List<InlineStack> get inlineStacks => const [];
   Iterable<MediaRef> get mediaRefs sync* {
     if (this case ImageBlock(:final media)) yield media;
     for (final image in inlineImages) {
@@ -90,6 +93,9 @@ sealed class ContentBlock extends ValueModel {
                 Map<String, Object?>.from(json['tableRow'] as Map),
               ),
         inlineStyles: styles,
+        inlineStacks: (json['inlineStacks'] as List? ?? const []).map(
+          (v) => InlineStack.fromJson(v as Map<String, dynamic>),
+        ),
         inlineRuby: (json['inlineRuby'] as List? ?? const []).map(
           (v) => InlineRuby.fromJson(v as Map<String, dynamic>),
         ),
@@ -118,6 +124,9 @@ sealed class ContentBlock extends ValueModel {
       'heading' => HeadingBlock(
         hasAuthoredFontSize: json['hasAuthoredFontSize'] as bool? ?? false,
         inlineStyles: styles,
+        inlineStacks: (json['inlineStacks'] as List? ?? const []).map(
+          (v) => InlineStack.fromJson(v as Map<String, dynamic>),
+        ),
         inlineRuby: (json['inlineRuby'] as List? ?? const []).map(
           (v) => InlineRuby.fromJson(v as Map<String, dynamic>),
         ),
@@ -207,6 +216,7 @@ final class ParagraphBlock extends ContentBlock {
     required String text,
     Iterable<InlineImage> inlineImages = const [],
     Iterable<InlineRuby> inlineRuby = const [],
+    Iterable<InlineStack> inlineStacks = const [],
     Iterable<InlineTextStyle> inlineStyles = const [],
     BlockBox? box,
     BlockBox? layout,
@@ -219,7 +229,8 @@ final class ParagraphBlock extends ContentBlock {
     this.tableRow,
     this.linkDecoration,
     int occurrence = 0,
-  }) : inlineRuby = List.unmodifiable(inlineRuby),
+  }) : inlineStacks = List.unmodifiable(inlineStacks),
+       inlineRuby = List.unmodifiable(inlineRuby),
        inlineStyles = List.unmodifiable(inlineStyles),
        inlineImages = List.unmodifiable(inlineImages),
        text = ContentIdentity.normalizeText(text),
@@ -233,6 +244,7 @@ final class ParagraphBlock extends ContentBlock {
         (this.text.isEmpty ||
             this.inlineImages.isNotEmpty ||
             this.inlineRuby.isNotEmpty ||
+            this.inlineStacks.isNotEmpty ||
             tableRow != null ||
             hangingIndentEm != null ||
             trailingLabelStart != null)) {
@@ -266,7 +278,8 @@ final class ParagraphBlock extends ContentBlock {
           !boundaries.contains(start) ||
           String.fromCharCodes(runes.skip(start)).trim().isEmpty ||
           runes.skip(start).any((r) => r == 10 || r == 0xfffc) ||
-          this.inlineRuby.any((r) => r.end > start)) {
+          this.inlineRuby.any((r) => r.end > start) ||
+          this.inlineStacks.any((s) => s.end > start)) {
         throw ArgumentError('Invalid trailing label range');
       }
     }
@@ -291,10 +304,16 @@ final class ParagraphBlock extends ContentBlock {
           trailingLabelStart != null ||
           authoredGapEm != null ||
           this.inlineImages.isNotEmpty ||
-          this.inlineRuby.isNotEmpty) {
+          this.inlineRuby.isNotEmpty ||
+          this.inlineStacks.isNotEmpty) {
         throw ArgumentError('Invalid table row');
       }
     }
+    validateInlineStacks(
+      this.text,
+      this.inlineStacks,
+      this.inlineRuby.map((r) => (r.start, r.end)),
+    );
     validateInlineRuby(this.text, this.inlineRuby);
     validateInlineStyles(this.text, this.inlineStyles);
     validateInlineImages(this.text, this.inlineImages);
@@ -320,6 +339,8 @@ final class ParagraphBlock extends ContentBlock {
   @override
   final List<InlineRuby> inlineRuby;
   @override
+  final List<InlineStack> inlineStacks;
+  @override
   final List<InlineTextStyle> inlineStyles;
   final ParagraphAlignment alignment;
 
@@ -342,6 +363,8 @@ final class ParagraphBlock extends ContentBlock {
   @override
   Map<String, Object?> get fieldsJson => {
     'text': text,
+    if (inlineStacks.isNotEmpty)
+      'inlineStacks': inlineStacks.map((s) => s.toJson()).toList(),
     if (inlineRuby.isNotEmpty)
       'inlineRuby': inlineRuby.map((r) => r.toJson()).toList(),
     if (authoredGapEm != null) 'authoredGapEm': authoredGapEm,
@@ -367,6 +390,7 @@ final class ParagraphBlock extends ContentBlock {
     linkDecoration: linkDecoration,
     inlineImages: inlineImages,
     inlineRuby: inlineRuby,
+    inlineStacks: inlineStacks,
     inlineStyles: inlineStyles,
     box: box,
     layout: layout,
@@ -377,6 +401,7 @@ final class ParagraphBlock extends ContentBlock {
   @override
   List<Object?> get values => [
     ...semanticFields,
+    inlineStacks,
     inlineImages,
     inlineStyles,
     authoredGapEm,
@@ -457,6 +482,7 @@ final class HeadingBlock extends ContentBlock {
     required String text,
     Iterable<InlineImage> inlineImages = const [],
     Iterable<InlineRuby> inlineRuby = const [],
+    Iterable<InlineStack> inlineStacks = const [],
     Iterable<InlineTextStyle> inlineStyles = const [],
     BlockBox? box,
     BlockBox? layout,
@@ -464,7 +490,8 @@ final class HeadingBlock extends ContentBlock {
     this.level = 1,
     this.alignment = ParagraphAlignment.start,
     int occurrence = 0,
-  }) : inlineRuby = List.unmodifiable(inlineRuby),
+  }) : inlineStacks = List.unmodifiable(inlineStacks),
+       inlineRuby = List.unmodifiable(inlineRuby),
        inlineStyles = List.unmodifiable(inlineStyles),
        inlineImages = List.unmodifiable(inlineImages),
        text = nonBlank(ContentIdentity.normalizeText(text), 'heading'),
@@ -474,6 +501,11 @@ final class HeadingBlock extends ContentBlock {
          box: box,
          hasAuthoredFontSize: hasAuthoredFontSize,
        ) {
+    validateInlineStacks(
+      this.text,
+      this.inlineStacks,
+      this.inlineRuby.map((r) => (r.start, r.end)),
+    );
     validateInlineRuby(this.text, this.inlineRuby);
     validateInlineStyles(this.text, this.inlineStyles);
     validateInlineImages(this.text, this.inlineImages);
@@ -486,6 +518,8 @@ final class HeadingBlock extends ContentBlock {
   final List<InlineImage> inlineImages;
   @override
   final List<InlineRuby> inlineRuby;
+  @override
+  final List<InlineStack> inlineStacks;
   @override
   final List<InlineTextStyle> inlineStyles;
   final int level;
@@ -507,6 +541,8 @@ final class HeadingBlock extends ContentBlock {
   @override
   Map<String, Object?> get fieldsJson => {
     'text': text,
+    if (inlineStacks.isNotEmpty)
+      'inlineStacks': inlineStacks.map((s) => s.toJson()).toList(),
     if (inlineRuby.isNotEmpty)
       'inlineRuby': inlineRuby.map((r) => r.toJson()).toList(),
     if (inlineStyles.isNotEmpty)
@@ -522,6 +558,7 @@ final class HeadingBlock extends ContentBlock {
     text: text,
     inlineImages: inlineImages,
     inlineRuby: inlineRuby,
+    inlineStacks: inlineStacks,
     inlineStyles: inlineStyles,
     box: box,
     layout: layout,
@@ -532,6 +569,7 @@ final class HeadingBlock extends ContentBlock {
   @override
   List<Object?> get values => [
     ...semanticFields,
+    inlineStacks,
     inlineImages,
     inlineStyles,
     box,

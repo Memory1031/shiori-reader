@@ -487,6 +487,15 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
         'font-weight',
         'font-style',
         'max-width',
+        'min-width',
+        'min-height',
+        'max-height',
+        'line-height',
+        'overflow',
+        'overflow-x',
+        'overflow-y',
+        'transform',
+        'box-shadow',
         'padding',
         'padding-left',
         'padding-right',
@@ -767,6 +776,15 @@ Map<String, String>? _expandNativeDeclaration(String name, String value) {
     r'rgb\([^)]*\)|[^\s]+',
   ).allMatches(value).map((m) => m[0]!).toList();
   if (tokens.isEmpty) return null;
+  if (name == 'line-height' &&
+      !{'normal', 'inherit', 'unset', 'initial'}.contains(value) &&
+      !RegExp(r'^(?:calc|var|min|max|clamp)\(').hasMatch(value) &&
+      (!RegExp(r'^(?:\d*\.)?\d+(?:em|px|%)?$').hasMatch(value) ||
+          (double.tryParse(value.replaceFirst(RegExp(r'(em|px|%)$'), '')) ??
+                  -1) <
+              0)) {
+    return null;
+  }
   if (name == 'font-size' &&
       !{'inherit', 'unset', 'initial'}.contains(value) &&
       epubFontScale(value, 1) == null) {

@@ -113,6 +113,111 @@ final class PageLayout {
   }();
   int _length(int unit) =>
       (index.chunks[unit].text?.runes.length ?? 1).clamp(1, 1000000000);
+  // Stable for the whole layout, never dependent on remaining page space.
+  late final Map<ContentBlock, List<InlineStack>> _stacks = {};
+  List<InlineStack> inlineStacks(ContentBlock block) =>
+      _stacks.putIfAbsent(block, () {
+        if (direction != TextDirection.ltr || block.inlineStacks.isEmpty) {
+          return const [];
+        }
+        final text = switch (block) {
+          ParagraphBlock(:final text) || HeadingBlock(:final text) => text,
+          _ => '',
+        };
+        final bs = readerBlockStyle(block, style, chapter: index.content.key);
+        var w = readerBlockWidth(
+          block,
+          width,
+          style,
+          scaler,
+          direction,
+          chapter: index.content.key,
+          locale: locale,
+        );
+        if (block is ParagraphBlock && block.hangingIndentEm != null) {
+          w -= math.min(
+            block.hangingIndentEm! * scaler.scale(style.fontSize ?? 20),
+            math.max(0, w - 4 * scaler.scale(style.fontSize ?? 20)),
+          );
+        }
+        return List.unmodifiable(
+          block.inlineStacks.where((stack) {
+            final l = readerStackLayout(
+              text: String.fromCharCodes(
+                text.runes.skip(stack.start).take(stack.length),
+              ),
+              stack: stack,
+              styles: block.inlineStyles,
+              style: bs,
+              readerFontSize: style.fontSize,
+              scaler: scaler,
+              direction: direction,
+              locale: locale,
+            );
+            if (l.geometry.size.width > w + .01) return false;
+            final row =
+                TextPainter(
+                    text: TextSpan(
+                      style: bs,
+                      children: [
+                        const TextSpan(text: '口'),
+                        ...readerInlineSpans(
+                          text: String.fromCharCodes(
+                            text.runes.skip(stack.start).take(stack.length),
+                          ),
+                          offset: stack.start,
+                          images: const [],
+                          stacks: [stack],
+                          styles: block.inlineStyles,
+                          style: bs,
+                          readerFontSize: style.fontSize,
+                          scaler: scaler,
+                          direction: direction,
+                          locale: locale,
+                        ),
+                      ],
+                    ),
+                    textDirection: direction,
+                    textScaler: scaler,
+                    locale: locale,
+                    textHeightBehavior: textHeightBehavior,
+                  )
+                  ..setPlaceholderDimensions([
+                    PlaceholderDimensions(
+                      size: l.geometry.size,
+                      baseline: TextBaseline.alphabetic,
+                      baselineOffset: l.geometry.baseline,
+                      alignment: PlaceholderAlignment.baseline,
+                    ),
+                  ])
+                  ..layout();
+            try {
+              final edges = readerBoxEdges(
+                index.content,
+                index.content.blocks.indexOf(block),
+                width: width,
+                style: style,
+                scaler: scaler,
+                pageHeight: height,
+                minimumContentHeight: row.height,
+              );
+              return row.height +
+                      edges.top +
+                      edges.bottom +
+                      readerBlockSpacing(
+                        block,
+                        paragraphSpacing,
+                        pageHeight: height,
+                        chapter: index.content.key,
+                      ) <=
+                  height + .01;
+            } finally {
+              row.dispose();
+            }
+          }),
+        );
+      });
+
   PageCursor normalize(PageCursor cursor) {
     var unit = cursor.unit;
     var offset = cursor.offset;
@@ -137,6 +242,12 @@ final class PageLayout {
       offset = next;
     }
     final block = index.content.blocks[chunk.blockIndex];
+    for (final stack in inlineStacks(block)) {
+      if (stack.start < chunk.start + offset &&
+          chunk.start + offset < stack.end) {
+        offset = stack.start - chunk.start;
+      }
+    }
     for (final ruby in block.inlineRuby) {
       if (ruby.start < chunk.start + offset &&
           chunk.start + offset < ruby.end) {
@@ -275,6 +386,7 @@ final class PageLayout {
       );
       ParagraphFlow measureFlow(double contentHeight) => readerParagraphFlow(
         block: paragraph,
+        stacks: inlineStacks(paragraph),
         tableLeftWidth: paragraph.tableRow == null
             ? null
             : _tableWidths[paragraph.tableRow!.group],
@@ -295,7 +407,9 @@ final class PageLayout {
       );
       double? boxContentHeight;
       if ((block.box != null || block.layout != null) &&
-          (block.inlineImages.isNotEmpty || block.inlineRuby.isNotEmpty)) {
+          (block.inlineImages.isNotEmpty ||
+              block.inlineRuby.isNotEmpty ||
+              inlineStacks(block).isNotEmpty)) {
         boxContentHeight = flow.lines.fold<double>(
           flow.minimumHeight,
           (h, line) => math.max(h, line.height),
@@ -364,6 +478,7 @@ final class PageLayout {
                   offset: blockOffset,
                   images: block.inlineImages,
                   ruby: block.inlineRuby,
+                  stacks: inlineStacks(block),
                   scaler: scaler,
                   direction: direction,
                   locale: locale,
@@ -387,6 +502,7 @@ final class PageLayout {
               length: text.runes.length,
               images: block.inlineImages,
               ruby: block.inlineRuby,
+              stacks: inlineStacks(block),
               text: text,
               direction: direction,
               locale: locale,
@@ -402,7 +518,9 @@ final class PageLayout {
       final lines = painter.computeLineMetrics();
       double? boxContentHeight;
       if ((block.box != null || block.layout != null) &&
-          (block.inlineImages.isNotEmpty || block.inlineRuby.isNotEmpty)) {
+          (block.inlineImages.isNotEmpty ||
+              block.inlineRuby.isNotEmpty ||
+              inlineStacks(block).isNotEmpty)) {
         // Placeholder-only rows can have paragraph leading beyond line metrics.
         // Reserve the measured tallest row and that leading, not just font size.
         final rowHeight = lines.fold<double>(
@@ -486,6 +604,7 @@ final class PageLayout {
           0,
           text.length,
         ),
+        stacks: inlineStacks(block),
       );
       // A Flutter line break is normally grapheme-safe; snap defensively.
       var safe = 0;
@@ -498,7 +617,9 @@ final class PageLayout {
           ? text.substring(boundary)
           : text.substring(0, boundary);
       if (selected.isEmpty) return null;
-      if (block.inlineImages.isNotEmpty || block.inlineRuby.isNotEmpty) {
+      if (block.inlineImages.isNotEmpty ||
+          block.inlineRuby.isNotEmpty ||
+          inlineStacks(block).isNotEmpty) {
         // A new fragment has its own leading and placeholder baselines.
         // Measure the strictly shorter slice instead of summing line heights.
         if (selected.length >= text.length) return null;

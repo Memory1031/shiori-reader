@@ -1,3 +1,4 @@
+import 'epub_inline_stack.dart';
 import 'epub_paragraph_layout.dart';
 import 'epub_table_layout.dart';
 import '../../html/prose_semantics.dart';
@@ -793,6 +794,7 @@ class EpubParser {
     final spans = <(int, int, int)>[];
     final inlineImages = <InlineImage>[];
     final rubyRanges = ProseRubyRanges();
+    final stackSpans = <(int, int, double?, double?, double, double)>[];
     var explicitGapEm = 0.0;
     final buffer = ProseTextBuffer(
       onWrite: (start, end) {
@@ -833,6 +835,43 @@ class EpubParser {
       final value = buffer.take();
       final trimStart = rawText.indexOf(value);
       final ruby = rubyRanges.take(rawText, value);
+      final stacks = <InlineStack>[];
+      for (final span in stackSpans) {
+        final start = (span.$1 - trimStart).clamp(0, value.length),
+            end = (span.$2 - trimStart).clamp(0, value.length);
+        final source = value.substring(start, end);
+        final cpStart = value.substring(0, start).runes.length;
+        final separator = source.indexOf('\n');
+        if (stacks.length >= 64 ||
+            source.runes.length > 512 ||
+            separator <= 0 ||
+            separator >= source.length - 1 ||
+            source.substring(0, separator).runes.length > 256 ||
+            source.substring(separator + 1).runes.length > 256 ||
+            source.substring(0, separator).trim().isEmpty ||
+            source.substring(separator + 1).trim().isEmpty) {
+          continue;
+        }
+        try {
+          final item = InlineStack(
+            start: cpStart,
+            length: source.runes.length,
+            separator: cpStart + source.substring(0, separator).runes.length,
+            upperLineHeightEm: span.$3,
+            lowerLineHeightEm: span.$4,
+            upperLineHeightBasisEm: span.$5,
+            lowerLineHeightBasisEm: span.$6,
+          );
+          validateInlineStacks(value, [
+            ...stacks,
+            item,
+          ], ruby.map((r) => (r.start, r.end)));
+          stacks.add(item);
+        } on ArgumentError {
+          /* Keep the ordinary source-text fallback. */
+        }
+      }
+      stackSpans.clear();
       final flow = value.isEmpty || heading != null
           ? (hanging: null, label: null)
           : epubParagraphLayout(
@@ -941,6 +980,7 @@ class EpubParser {
               value.runes.length <= 256 &&
               images.isEmpty &&
               ruby.isEmpty &&
+              stacks.isEmpty &&
               tableLayout == null &&
               flow.hanging == null &&
               flow.label == null
@@ -1001,6 +1041,7 @@ class EpubParser {
                 trailingLabelStart: labelStart,
                 inlineImages: images,
                 inlineRuby: ruby,
+                inlineStacks: stacks,
                 inlineStyles: textStyles,
                 box: activeBox,
                 layout: localLayout,
@@ -1026,6 +1067,7 @@ class EpubParser {
                     richStyles[paragraphOwner]?.hasFontSize ?? false,
                 inlineImages: images,
                 inlineRuby: ruby,
+                inlineStacks: stacks,
                 inlineStyles: textStyles,
                 box: activeBox,
                 layout: localLayout,
@@ -1431,8 +1473,23 @@ class EpubParser {
         }
         return;
       }
+      final stackStyle =
+          !boundary && activeLink == null && stackSpans.length < 64
+          ? epubInlineStack(node, styles, richStyles, previousVisible)
+          : null;
+      final stackStart = buffer.length;
       for (final child in node.nodes) {
         walk(child);
+      }
+      if (stackStyle != null) {
+        stackSpans.add((
+          stackStart,
+          buffer.length,
+          stackStyle.upper,
+          stackStyle.lower,
+          stackStyle.upperBasis,
+          stackStyle.lowerBasis,
+        ));
       }
       if (boundary) flush(heading: heading);
       activeLink = previousLink;
@@ -1536,6 +1593,7 @@ class EpubParser {
             inlineStyles: b.inlineStyles,
             inlineImages: b.inlineImages,
             inlineRuby: b.inlineRuby,
+            inlineStacks: b.inlineStacks,
             authoredGapEm: b.authoredGapEm,
             hangingIndentEm: b.hangingIndentEm,
             trailingLabelStart: b.trailingLabelStart,
@@ -1563,6 +1621,7 @@ class EpubParser {
             alignment: alignment,
             inlineImages: blocks[i].inlineImages,
             inlineRuby: blocks[i].inlineRuby,
+            inlineStacks: blocks[i].inlineStacks,
             inlineStyles: blocks[i].inlineStyles,
             box: blocks[i].box,
             layout: blocks[i].layout,
@@ -1605,6 +1664,7 @@ class EpubParser {
           alignment: alignment,
           inlineImages: opening.inlineImages,
           inlineRuby: opening.inlineRuby,
+          inlineStacks: opening.inlineStacks,
           inlineStyles: opening.inlineStyles,
           box: opening.box,
           layout: opening.layout,

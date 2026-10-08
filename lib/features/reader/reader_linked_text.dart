@@ -119,6 +119,7 @@ class ReaderLinkedText extends StatefulWidget {
     this.onFootnote,
     this.inlineImages = const [],
     this.inlineRuby = const [],
+    this.inlineStacks = const [],
     this.inlineStyles = const [],
     this.authoredBackground,
     this.images,
@@ -129,6 +130,7 @@ class ReaderLinkedText extends StatefulWidget {
   final String text, prefix;
   final List<InlineImage> inlineImages;
   final List<InlineRuby> inlineRuby;
+  final List<InlineStack> inlineStacks;
   final List<InlineTextStyle> inlineStyles;
   final int? authoredBackground;
   final ImageRepository? images;
@@ -303,6 +305,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
                     onFootnote: widget.onFootnote,
                     inlineImages: widget.inlineImages,
                     inlineRuby: widget.inlineRuby,
+                    inlineStacks: widget.inlineStacks,
                     inlineStyles: widget.inlineStyles,
                     authoredBackground: widget.authoredBackground,
                     images: widget.images,
@@ -338,6 +341,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
           images: widget.inlineImages,
           styles: widget.inlineStyles,
           ruby: widget.inlineRuby,
+          stacks: widget.inlineStacks,
           scaler: widget.scaler,
           direction: Directionality.of(context),
           locale: widget.locale,

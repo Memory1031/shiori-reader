@@ -982,6 +982,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                 fragment,
                               ).box?.backgroundColor,
                               inlineRuby: fragmentBlock(fragment).inlineRuby,
+                              inlineStacks: _layout!.inlineStacks(
+                                fragmentBlock(fragment),
+                              ),
                               inlineStyles: widget
                                   .content
                                   .blocks[_layout!
