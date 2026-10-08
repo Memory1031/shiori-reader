@@ -5,6 +5,7 @@ import 'package:shiori/features/reader/reader_inline_stack.dart';
 import 'package:shiori/features/reader/reader_preferences.dart';
 import 'package:shiori/features/reader/reader_inline_images.dart';
 import 'package:shiori/features/reader/viewport/page_layout.dart';
+import 'package:shiori/features/reader/viewport/block_style.dart';
 import 'package:shiori/features/reader/viewport/paragraph_flow.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/features/reader/viewport/page_boundaries.dart';
@@ -522,6 +523,279 @@ void main() {
       expect(find.byType(ReaderInlineStack), findsOneWidget);
     },
   );
+  testWidgets(
+    'mixed stack baselines downgrade before pagination and keep the complete source',
+    (tester) async {
+      const a =
+          '<span style="$stackStyle"><span style="line-height:6em">A</span><br/>a</span>';
+      const b =
+          '<span style="$stackStyle">B<br/><span style="line-height:6em">b</span></span>';
+      const base = TextStyle(fontSize: 20, height: 1.2);
+      for (final prefix in ['', '${'Before ' * 30}<br/>']) {
+        for (final group in [
+          (html: '$a$b', source: 'A\naB\nb', units: [a, b]),
+          (
+            html: '$a<span style="font-size:4em">Big</span>',
+            source: 'A\naBig',
+            units: [a],
+          ),
+        ]) {
+          final c = stackedChapter(
+            '<p>$prefix${group.html} After ${'tail ' * 80}</p>',
+          );
+          final block = c.blocks.single as ParagraphBlock;
+          double probe(List<InlineStack> stacks, String text, int offset) {
+            final p =
+                TextPainter(
+                    text: TextSpan(
+                      style: base,
+                      children: readerInlineSpans(
+                        text: text,
+                        offset: offset,
+                        images: const [],
+                        stacks: stacks,
+                        styles: block.inlineStyles,
+                        style: base,
+                      ),
+                    ),
+                    textDirection: TextDirection.ltr,
+                  )
+                  ..setPlaceholderDimensions(
+                    readerInlineDimensions(
+                      offset: offset,
+                      length: text.runes.length,
+                      images: const [],
+                      stacks: stacks,
+                      text: text,
+                      styles: block.inlineStyles,
+                      style: base,
+                      scaler: TextScaler.noScaling,
+                      maxWidth: 700,
+                    ),
+                  )
+                  ..layout(maxWidth: 700);
+            try {
+              return p.height;
+            } finally {
+              p.dispose();
+            }
+          }
+
+          final stacks = block.inlineStacks;
+          expect(stacks, hasLength(group.units.length));
+          final separate = stacks
+              .map(
+                (s) => probe(
+                  [s],
+                  String.fromCharCodes(
+                    block.text.runes.skip(s.start).take(s.length),
+                  ),
+                  s.start,
+                ),
+              )
+              .reduce((a, b) => a > b ? a : b);
+          final mixed = probe(stacks, group.source, stacks.first.start);
+          expect(mixed, greaterThan(separate + 10));
+          final pageHeight = (separate + mixed) / 2;
+          PageLayout layout(ChapterContent content) => PageLayout(
+            index: ChunkIndex(content),
+            width: 700,
+            height: pageHeight,
+            style: base,
+            scaler: TextScaler.noScaling,
+            direction: TextDirection.ltr,
+            paragraphSpacing: 0,
+          );
+          for (final unit in group.units) {
+            final single = stackedChapter('<p>$unit After</p>');
+            expect(
+              layout(single).inlineStacks(single.blocks.single),
+              hasLength(1),
+              reason:
+                  'each unit must fit alone; only their mixed baseline overflows',
+            );
+          }
+          final hardBreaks = stackedChapter('<p>$a<br/>$b After</p>');
+          expect(
+            layout(hardBreaks).inlineStacks(hardBreaks.blocks.single),
+            hasLength(2),
+            reason: 'authored hard breaks cannot combine the two baselines',
+          );
+          final l = layout(c);
+          final active = l.inlineStacks(block);
+          final bounds = PageBoundaries(l);
+          var cursor = const PageCursor(0, 0);
+          final pages = <ReaderPage>[];
+          while (true) {
+            final page = bounds.forward(cursor);
+            if (page == null) break;
+            expect(PageBoundaries.compare(page.end, cursor), greaterThan(0));
+            expect(pages.length, lessThan(30));
+            pages.add(page);
+            cursor = page.end;
+          }
+          expect(cursor.unit, l.index.chunks.length);
+          expect(
+            pages.expand((p) => p.fragments).map((f) => f.text ?? '').join(),
+            block.text,
+          );
+          expect(
+            active.length,
+            lessThan(group.units.length),
+            reason: 'the fresh-page mixed row must downgrade',
+          );
+          for (final original in pages.reversed) {
+            final rebuilt = bounds.backward(cursor)!;
+            expect(PageBoundaries.compare(rebuilt.start, original.start), 0);
+            expect(PageBoundaries.compare(rebuilt.end, original.end), 0);
+            expect(
+              rebuilt.fragments.map((f) => f.text),
+              original.fragments.map((f) => f.text),
+            );
+            cursor = rebuilt.start;
+          }
+          expect(l.inlineStacks(block), same(active));
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Center(
+                child: SizedBox(
+                  width: 700,
+                  height: pageHeight,
+                  child: PagedReaderViewport(
+                    content: c,
+                    controller: PagedReaderController(),
+                    textStyle: base,
+                    paragraphSpacing: 0,
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(find.byType(ReaderInlineStack), findsNothing);
+          expect(tester.takeException(), isNull);
+        }
+      }
+    },
+  );
+  testWidgets('heading stack line heights follow the declaration font context', (
+    tester,
+  ) async {
+    for (final sample in [
+      (heading: '', upper: '', height: '1em', font: 28.0, basis: 28.0),
+      (heading: '', upper: '', height: '1', font: 28.0, basis: 28.0),
+      (
+        heading: '',
+        upper: 'font-size:.68em',
+        height: '1em',
+        font: 19.04,
+        basis: 28.0,
+      ),
+      (
+        heading: '',
+        upper: 'font-size:.68em',
+        height: '1',
+        font: 19.04,
+        basis: 19.04,
+      ),
+      (
+        heading: 'font-size:2em',
+        upper: '',
+        height: '1em',
+        font: 40.0,
+        basis: 40.0,
+      ),
+      (
+        heading: '',
+        upper: 'font-size:20px',
+        height: '1em',
+        font: 25.0,
+        basis: 28.0,
+      ),
+      (
+        heading: '',
+        upper: 'font-size:20px',
+        height: '1',
+        font: 25.0,
+        basis: 25.0,
+      ),
+      (heading: '', upper: '', height: '16px', font: 28.0, basis: 20.0),
+    ]) {
+      final c = stackedChapter(
+        '<h1 style="${sample.heading}"><span style="$stackStyle;line-height:${sample.height}"><span style="${sample.upper}">上层</span><br/>下层</span></h1><p>后续正文。</p>',
+      );
+      final block = c.blocks.first;
+      expect(block, isA<HeadingBlock>());
+      expect(ContentBlock.fromJson(block.toJson()), block);
+      for (final scaler in [TextScaler.noScaling, const StackScaler()]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(textScaler: scaler),
+              child: PagedReaderViewport(
+                content: c,
+                controller: PagedReaderController(),
+                textStyle: const TextStyle(fontSize: 20, height: 1.6),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final rendered = tester.widget<ReaderInlineStack>(
+          find.byType(ReaderInlineStack),
+        );
+        final l = rendered.layout;
+        final upper = (l.upper as TextSpan).children!.first as TextSpan;
+        expect(upper.style!.fontSize, closeTo(scaler.scale(sample.font), .001));
+        expect(
+          upper.style!.height,
+          closeTo(scaler.scale(sample.basis) / scaler.scale(sample.font), .001),
+          reason: '${sample.heading} / ${sample.upper} / ${sample.height}',
+        );
+        final reference = TextPainter(
+          text: TextSpan(
+            text: '上层',
+            style:
+                readerBlockStyle(
+                  block,
+                  const TextStyle(fontSize: 20, height: 1.6),
+                  chapter: c.key,
+                ).copyWith(
+                  fontSize: scaler.scale(sample.font),
+                  height:
+                      scaler.scale(sample.basis) / scaler.scale(sample.font),
+                ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        final lower = TextPainter(
+          text: l.lower,
+          textDirection: TextDirection.ltr,
+        )..layout();
+        try {
+          expect(l.geometry.upper.height, closeTo(reference.height, .01));
+          expect(
+            l.geometry.size.height,
+            closeTo(reference.height + lower.height, .01),
+          );
+          expect(
+            l.geometry.baseline,
+            closeTo(
+              reference.height +
+                  lower.computeDistanceToActualBaseline(
+                    TextBaseline.alphabetic,
+                  ),
+              .01,
+            ),
+          );
+        } finally {
+          reference.dispose();
+          lower.dispose();
+        }
+        expect(tester.takeException(), isNull);
+      }
+    }
+  });
   testWidgets(
     'oversized units expand into readable source and reach the real chapter end',
     (tester) async {

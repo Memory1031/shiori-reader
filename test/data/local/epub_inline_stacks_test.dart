@@ -104,6 +104,48 @@ void main() {
       isEmpty,
     );
   });
+  test(
+    'line height font origins survive JSON without changing semantic identity',
+    () {
+      final fixed = stackedChapter(
+        '<h1><span style="$stackStyle"><span style="font-size:medium">上</span><br/>下</span></h1><p>正文。</p>',
+      );
+      final unitless = stackedChapter(
+        '<h1><span style="$stackStyle;line-height:1"><span style="font-size:medium">上</span><br/>下</span></h1><p>正文。</p>',
+      );
+      final block = fixed.blocks.first;
+      final fixedStack = block.inlineStacks.single;
+      expect(fixedStack.upperLineHeightFromReader, isFalse);
+      expect(fixedStack.lowerLineHeightFromReader, isFalse);
+      expect(
+        unitless.blocks.first.inlineStacks.single.upperLineHeightFromReader,
+        isTrue,
+      );
+      expect(
+        unitless.blocks.first.inlineStacks.single.lowerLineHeightFromReader,
+        isFalse,
+      );
+      expect(ContentBlock.fromJson(block.toJson()), block);
+      expect(block.withOccurrence(3).inlineStacks, block.inlineStacks);
+      final legacy = block.toJson()
+        ..['inlineStacks'] = [
+          fixedStack.toJson()
+            ..remove('upperLineHeightFromReader')
+            ..remove('lowerLineHeightFromReader'),
+        ];
+      final restored = ContentBlock.fromJson(legacy);
+      expect(restored.inlineStacks.single.upperLineHeightFromReader, isTrue);
+      expect(restored.inlineStacks.single.lowerLineHeightFromReader, isTrue);
+      expect(restored.blockKey, block.blockKey);
+      expect(restored, isNot(block));
+      expect(
+        stackedChapter(
+          '<h1><span style="$stackStyle;line-height:1"><span style="font-size:medium">上</span>一<br/>下</span></h1><p>正文。</p>',
+        ).blocks.first.inlineStacks,
+        isEmpty,
+      );
+    },
+  );
   test('layout admission preserves later link and footnote source ranges', () {
     final files = epubFiles();
     const body =

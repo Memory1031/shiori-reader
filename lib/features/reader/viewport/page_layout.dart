@@ -140,83 +140,153 @@ final class PageLayout {
             math.max(0, w - 4 * scaler.scale(style.fontSize ?? 20)),
           );
         }
-        return List.unmodifiable(
-          block.inlineStacks.where((stack) {
-            final l = readerStackLayout(
-              text: String.fromCharCodes(
-                text.runes.skip(stack.start).take(stack.length),
-              ),
-              stack: stack,
-              styles: block.inlineStyles,
-              style: bs,
-              readerFontSize: style.fontSize,
-              scaler: scaler,
-              direction: direction,
-              locale: locale,
-            );
-            if (l.geometry.size.width > w + .01) return false;
-            final row =
-                TextPainter(
-                    text: TextSpan(
-                      style: bs,
-                      children: [
-                        const TextSpan(text: '口'),
-                        ...readerInlineSpans(
-                          text: String.fromCharCodes(
-                            text.runes.skip(stack.start).take(stack.length),
-                          ),
-                          offset: stack.start,
-                          images: const [],
-                          stacks: [stack],
-                          styles: block.inlineStyles,
-                          style: bs,
-                          readerFontSize: style.fontSize,
-                          scaler: scaler,
-                          direction: direction,
-                          locale: locale,
-                        ),
-                      ],
-                    ),
-                    textDirection: direction,
-                    textScaler: scaler,
-                    locale: locale,
-                    textHeightBehavior: textHeightBehavior,
-                  )
-                  ..setPlaceholderDimensions([
-                    PlaceholderDimensions(
-                      size: l.geometry.size,
-                      baseline: TextBaseline.alphabetic,
-                      baselineOffset: l.geometry.baseline,
-                      alignment: PlaceholderAlignment.baseline,
-                    ),
-                  ])
-                  ..layout();
-            try {
-              final edges = readerBoxEdges(
-                index.content,
-                index.content.blocks.indexOf(block),
-                width: width,
-                style: style,
-                scaler: scaler,
-                pageHeight: height,
-                minimumContentHeight: row.height,
-              );
-              return row.height +
-                      edges.top +
-                      edges.bottom +
-                      readerBlockSpacing(
-                        block,
-                        paragraphSpacing,
-                        pageHeight: height,
-                        chapter: index.content.key,
-                      ) <=
-                  height + .01;
-            } finally {
-              row.dispose();
-            }
-          }),
-        );
+        final accepted = block.inlineStacks.where((stack) {
+          final l = readerStackLayout(
+            text: String.fromCharCodes(
+              text.runes.skip(stack.start).take(stack.length),
+            ),
+            stack: stack,
+            styles: block.inlineStyles,
+            style: bs,
+            readerFontSize: style.fontSize,
+            scaler: scaler,
+            direction: direction,
+            locale: locale,
+          );
+          return l.geometry.size.width <= w + .01;
+        }).toList();
+        return _mixedStacks(block, accepted, bs, w);
       });
+
+  List<InlineStack> _mixedStacks(
+    ContentBlock block,
+    List<InlineStack> accepted,
+    TextStyle blockStyle,
+    double textWidth,
+  ) {
+    final blockIndex = index.content.blocks.indexOf(block);
+    final chunks = index.chunks.where((c) => c.blockIndex == blockIndex);
+    final spacing = readerBlockSpacing(
+      block,
+      paragraphSpacing,
+      pageHeight: height,
+      chapter: index.content.key,
+    );
+    // Resolve before publishing any page/cursor. An unwrapped authored row is
+    // a conservative baseline envelope for every soft-wrapped subset, including
+    // page fragments starting at a different source offset. Hard source breaks
+    // remain intact. Only bounded chunks containing active units are measured.
+    while (accepted.isNotEmpty) {
+      final rejected = <InlineStack>{};
+      for (final chunk in chunks) {
+        final text = chunk.text;
+        if (text == null ||
+            !accepted.any(
+              (s) => s.start >= chunk.start && s.end <= chunk.end,
+            )) {
+          continue;
+        }
+        final p =
+            TextPainter(
+                text: TextSpan(
+                  style: blockStyle,
+                  children: [
+                    const TextSpan(text: '口'),
+                    ...readerInlineSpans(
+                      text: text,
+                      offset: chunk.start,
+                      images: block.inlineImages,
+                      ruby: block.inlineRuby,
+                      stacks: accepted,
+                      styles: block.inlineStyles,
+                      style: blockStyle,
+                      readerFontSize: style.fontSize,
+                      scaler: scaler,
+                      direction: direction,
+                      locale: locale,
+                      maxWidth: textWidth,
+                    ),
+                  ],
+                ),
+                textDirection: direction,
+                textScaler: scaler,
+                locale: locale,
+                textHeightBehavior: textHeightBehavior,
+              )
+              ..setPlaceholderDimensions(
+                readerInlineDimensions(
+                  offset: chunk.start,
+                  length: text.runes.length,
+                  text: text,
+                  images: block.inlineImages,
+                  ruby: block.inlineRuby,
+                  stacks: accepted,
+                  styles: block.inlineStyles,
+                  style: blockStyle,
+                  readerFontSize: style.fontSize,
+                  scaler: scaler,
+                  direction: direction,
+                  locale: locale,
+                  maxWidth: textWidth,
+                ),
+              )
+              ..layout();
+        try {
+          final lines = p.computeLineMetrics();
+          final leading = math.max(
+            0.0,
+            p.height - lines.fold<double>(0, (h, line) => h + line.height),
+          );
+          for (final line in lines) {
+            final rowHeight = line.height + leading;
+            final edges = readerBoxEdges(
+              index.content,
+              blockIndex,
+              width: width,
+              style: style,
+              scaler: scaler,
+              pageHeight: height,
+              minimumContentHeight: rowHeight,
+            );
+            if (rowHeight + edges.top + edges.bottom + spacing <=
+                height + .01) {
+              continue;
+            }
+            final boundary = p.getLineBoundary(
+              p.getPositionForOffset(
+                Offset(0, line.baseline - line.ascent * .5),
+              ),
+            );
+            int source(int display) =>
+                chunk.start +
+                text
+                    .substring(
+                      0,
+                      readerInlineSourceBoundary(
+                        text,
+                        chunk.start,
+                        block.inlineRuby,
+                        (display - 1).clamp(0, text.length),
+                        stacks: accepted,
+                      ),
+                    )
+                    .runes
+                    .length;
+            final start = source(boundary.start), end = source(boundary.end);
+            rejected.addAll(
+              accepted.where((s) => s.start < end && start < s.end),
+            );
+          }
+        } finally {
+          p.dispose();
+        }
+      }
+      if (rejected.isEmpty) break;
+      // Strictly shrinking (at most 64 units), never retrying an unchanged cursor.
+      accepted.removeWhere(rejected.contains);
+    }
+    return List.unmodifiable(accepted);
+  }
 
   PageCursor normalize(PageCursor cursor) {
     var unit = cursor.unit;

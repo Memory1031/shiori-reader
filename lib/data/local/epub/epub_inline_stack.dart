@@ -4,7 +4,14 @@ import 'epub_paragraph_layout.dart';
 
 /// Structural admission only; the existing prose walker owns normalized text.
 /// No class names or text/language heuristics participate in recognition.
-({double? upper, double? lower, double upperBasis, double lowerBasis})?
+({
+  double? upper,
+  double? lower,
+  double upperBasis,
+  double lowerBasis,
+  bool upperFromReader,
+  bool lowerFromReader,
+})?
 epubInlineStack(
   dom.Element owner,
   Map<dom.Element, Map<String, String>> styles,
@@ -119,7 +126,7 @@ epubInlineStack(
 
   // CSS unitless values inherit as multipliers; lengths inherit their computed
   // absolute value. Wrapper 1em therefore stays 1em for a .68em child.
-  (double, double)? lineHeight(dom.Element node) {
+  (double, double, bool)? lineHeight(dom.Element node) {
     for (
       var e = node as dom.Element?;
       e != null;
@@ -129,7 +136,7 @@ epubInlineStack(
       if (v == null || v == 'inherit' || v == 'unset') continue;
       if (v == 'normal' || v == 'initial') return null;
       final m = RegExp(r'^(\d*\.?\d+)(em|px|%)?$').firstMatch(v);
-      if (m == null) return (double.nan, 1);
+      if (m == null) return (double.nan, 1, true);
       final n = double.parse(m[1]!);
       final scale = rich[e]?.scale ?? 1;
       final value = switch (m[2]) {
@@ -143,13 +150,18 @@ epubInlineStack(
         'em' || '%' => scale,
         _ => 1.0,
       };
-      return (value > 0 && value <= 8 ? value : double.nan, basis);
+      final font = rich[m[2] == null ? node : e];
+      final fromReader =
+          m[2] == 'px' ||
+          font?.defaultHeading != true ||
+          font?.fontSizeFromReader == true;
+      return (value > 0 && value <= 8 ? value : double.nan, basis, fromReader);
     }
     return null;
   }
 
   var breaks = 0, count = 0, valid = true;
-  final heights = <List<(double, double)>>[[], []];
+  final heights = <List<(double, double, bool)>>[[], []];
   void visit(dom.Node node, bool visible) {
     if (!valid || ++count > 128) {
       valid = false;
@@ -162,7 +174,8 @@ epubInlineStack(
           final row = heights[breaks.clamp(0, 1)];
           // A row with competing font bases needs richer line-box metadata.
           // Keep this bounded subset source-readable instead of approximating it.
-          if (!h.$1.isFinite || row.any((other) => other.$2 != h.$2)) {
+          if (!h.$1.isFinite ||
+              row.any((other) => other.$2 != h.$2 || other.$3 != h.$3)) {
             valid = false;
           } else {
             row.add(h);
@@ -215,5 +228,7 @@ epubInlineStack(
         : heights[1].reduce((a, b) => a.$1 > b.$1 ? a : b).$1,
     upperBasis: heights[0].isEmpty ? 1 : heights[0].first.$2,
     lowerBasis: heights[1].isEmpty ? 1 : heights[1].first.$2,
+    upperFromReader: heights[0].isEmpty ? true : heights[0].first.$3,
+    lowerFromReader: heights[1].isEmpty ? true : heights[1].first.$3,
   );
 }

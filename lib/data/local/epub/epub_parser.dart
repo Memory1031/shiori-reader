@@ -794,7 +794,8 @@ class EpubParser {
     final spans = <(int, int, int)>[];
     final inlineImages = <InlineImage>[];
     final rubyRanges = ProseRubyRanges();
-    final stackSpans = <(int, int, double?, double?, double, double)>[];
+    final stackSpans =
+        <(int, int, double?, double?, double, double, bool, bool)>[];
     var explicitGapEm = 0.0;
     final buffer = ProseTextBuffer(
       onWrite: (start, end) {
@@ -861,6 +862,8 @@ class EpubParser {
             lowerLineHeightEm: span.$4,
             upperLineHeightBasisEm: span.$5,
             lowerLineHeightBasisEm: span.$6,
+            upperLineHeightFromReader: span.$7,
+            lowerLineHeightFromReader: span.$8,
           );
           validateInlineStacks(value, [
             ...stacks,
@@ -1489,6 +1492,8 @@ class EpubParser {
           stackStyle.lower,
           stackStyle.upperBasis,
           stackStyle.lowerBasis,
+          stackStyle.upperFromReader,
+          stackStyle.lowerFromReader,
         ));
       }
       if (boundary) flush(heading: heading);

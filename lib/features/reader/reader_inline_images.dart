@@ -408,6 +408,7 @@ ReaderInlineStackLayout readerStackLayout({
     int offset,
     double? lineHeightEm,
     double basisEm,
+    bool fromReader,
   ) {
     final spans = readerInlineSpans(
       text: text,
@@ -432,7 +433,10 @@ ReaderInlineStackLayout readerStackLayout({
                     : lineHeightEm /
                           basisEm *
                           scaler.scale(
-                            basisEm * (readerFontSize ?? style.fontSize ?? 20),
+                            basisEm *
+                                (fromReader
+                                    ? readerFontSize ?? style.fontSize ?? 20
+                                    : style.fontSize ?? 20),
                           ) /
                           scaler.scale(span.style!.fontSize ?? 20),
               ),
@@ -447,12 +451,14 @@ ReaderInlineStackLayout readerStackLayout({
       stack.start,
       stack.upperLineHeightEm,
       stack.upperLineHeightBasisEm,
+      stack.upperLineHeightFromReader,
     ),
     lower: row(
       lower,
       stack.separator + 1,
       stack.lowerLineHeightEm,
       stack.lowerLineHeightBasisEm,
+      stack.lowerLineHeightFromReader,
     ),
     upperText: upper,
     lowerText: lower,

@@ -12,6 +12,8 @@ final class InlineStack extends ValueModel {
     this.lowerLineHeightEm,
     this.upperLineHeightBasisEm = 1,
     this.lowerLineHeightBasisEm = 1,
+    this.upperLineHeightFromReader = true,
+    this.lowerLineHeightFromReader = true,
   }) {
     if (start < 0 ||
         length < 3 ||
@@ -35,6 +37,8 @@ final class InlineStack extends ValueModel {
   final double? upperLineHeightEm, lowerLineHeightEm;
   // Scale the computed length through its font basis, not as a font size.
   final double upperLineHeightBasisEm, lowerLineHeightBasisEm;
+  // False when the line-height font basis inherits the default heading.
+  final bool upperLineHeightFromReader, lowerLineHeightFromReader;
   int get end => start + length;
   Map<String, Object?> toJson() => {
     'start': start,
@@ -46,6 +50,8 @@ final class InlineStack extends ValueModel {
       'upperLineHeightBasisEm': upperLineHeightBasisEm,
     if (lowerLineHeightBasisEm != 1)
       'lowerLineHeightBasisEm': lowerLineHeightBasisEm,
+    if (!upperLineHeightFromReader) 'upperLineHeightFromReader': false,
+    if (!lowerLineHeightFromReader) 'lowerLineHeightFromReader': false,
   };
   factory InlineStack.fromJson(Map<String, dynamic> json) => InlineStack(
     start: json['start'] as int,
@@ -57,6 +63,10 @@ final class InlineStack extends ValueModel {
         (json['upperLineHeightBasisEm'] as num?)?.toDouble() ?? 1,
     lowerLineHeightBasisEm:
         (json['lowerLineHeightBasisEm'] as num?)?.toDouble() ?? 1,
+    upperLineHeightFromReader:
+        json['upperLineHeightFromReader'] as bool? ?? true,
+    lowerLineHeightFromReader:
+        json['lowerLineHeightFromReader'] as bool? ?? true,
   );
   @override
   List<Object?> get values => [
@@ -67,6 +77,8 @@ final class InlineStack extends ValueModel {
     lowerLineHeightEm,
     upperLineHeightBasisEm,
     lowerLineHeightBasisEm,
+    upperLineHeightFromReader,
+    lowerLineHeightFromReader,
   ];
 }
 
