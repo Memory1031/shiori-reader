@@ -11,6 +11,36 @@ import 'svg_paper_art.dart';
 import '../../shared/capabilities.dart';
 import '../../domain/contracts/local_content_links.dart';
 
+/// The exact themed document loaded by the static native host.
+String epubLayoutDocument(
+  String html,
+  Color paper,
+  Color foreground,
+  Brightness brightness,
+  bool pointerFirst,
+) {
+  final background = paper.toARGB32().toRadixString(16).substring(2);
+  final ink = foreground.toARGB32().toRadixString(16).substring(2);
+  // Mouse drags turn pages; keep them from selecting or dragging content.
+  final interactionStyle = pointerFirst
+      ? 'html,body,body *{-webkit-user-select:none!important;user-select:none!important;-webkit-user-drag:none!important;}'
+      : '';
+  final svgTextStyle =
+      brightness == Brightness.dark && html.contains('class="shiori-svg-page"')
+      ? 'body.shiori-svg-page>svg text:not([fill]){fill:#$ink;}'
+      : '';
+  return html.replaceFirst('</head>', '''<style>
+html,body{background:#$background!important;color:#$ink;margin:0!important;}
+html,body{scrollbar-width:none;}
+::-webkit-scrollbar{display:none;}
+body{font-size:clamp(12px,5.7vw,20px);padding:8px!important;box-sizing:border-box;display:flow-root;overflow-wrap:break-word;}
+img{max-width:100%;height:auto;}
+body:not(.shiori-svg-page) p{max-width:100%;}
+$svgTextStyle
+$interactionStyle
+</style></head>''');
+}
+
 /// A short authored page, not the renderer for normal long-form reading.
 class EpubLayoutPage extends StatefulWidget {
   const EpubLayoutPage({
@@ -145,26 +175,13 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
         _pointerFirst == pointerFirst) {
       return cached;
     }
-    final background = paper.toARGB32().toRadixString(16).substring(2);
-    final ink = foreground.toARGB32().toRadixString(16).substring(2);
-    // Mouse drags turn pages; keep them from selecting or dragging content.
-    final interactionStyle = pointerFirst
-        ? 'html,body,body *{-webkit-user-select:none!important;user-select:none!important;-webkit-user-drag:none!important;}'
-        : '';
-    final svgTextStyle =
-        brightness == Brightness.dark &&
-            html.contains('class="shiori-svg-page"')
-        ? 'body.shiori-svg-page>svg text:not([fill]){fill:#$ink;}'
-        : '';
-    final document = html.replaceFirst('</head>', '''<style>
-html,body{background:#$background!important;color:#$ink;margin:0!important;}
-html,body{scrollbar-width:none;}
-::-webkit-scrollbar{display:none;}
-body{font-size:clamp(12px,5.7vw,20px);padding:8px!important;box-sizing:border-box;display:flow-root;overflow-wrap:break-word;}
-img{max-width:100%;height:auto;}
-$svgTextStyle
-$interactionStyle
-</style></head>''');
+    final document = epubLayoutDocument(
+      html,
+      paper,
+      foreground,
+      brightness,
+      pointerFirst,
+    );
     _sourceHtml = html;
     _paper = paper;
     _foreground = foreground;

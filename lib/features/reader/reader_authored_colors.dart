@@ -19,6 +19,19 @@ class ReaderAuthoredColors {
 
   bool get _warm => paper.r - paper.b > .035;
 
+  /// Background is already resolved; authored foreground is still raw ARGB.
+  Color linkForeground(Color primary, Color background, {Color? authored}) {
+    if (authored != null) {
+      final candidate = resolve(
+        authored,
+        ReaderColorRole.foreground,
+        background: background,
+      );
+      if (readerColorContrast(candidate, background) >= 4.5) return candidate;
+    }
+    return _contrast(primary, background, 4.5);
+  }
+
   Color resolve(Color authored, ReaderColorRole role, {Color? background}) {
     final surface = background ?? paper;
     switch (role) {

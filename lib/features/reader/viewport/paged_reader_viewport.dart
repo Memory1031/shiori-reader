@@ -886,6 +886,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         );
         return ReaderBoxFrame(
           box: block.box,
+          linkOwnsDecoration:
+              f.linkLayout != null &&
+              block is ParagraphBlock &&
+              block.linkDecoration?.onBlock == true,
           width: boxes.outer?.width ?? width,
           geometry: boxes.outer,
           top: outerTop,

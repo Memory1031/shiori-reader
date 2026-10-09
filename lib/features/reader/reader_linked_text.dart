@@ -125,6 +125,7 @@ class ReaderLinkedText extends StatefulWidget {
     this.images,
     this.locale,
     this.textHeightBehavior,
+    this.linkLabel = false,
   });
   final ParagraphFlow? flow;
   final String text, prefix;
@@ -136,6 +137,9 @@ class ReaderLinkedText extends StatefulWidget {
   final ImageRepository? images;
   final Locale? locale;
   final TextHeightBehavior? textHeightBehavior;
+
+  /// A decorated label inherits link color policy without a second recognizer.
+  final bool linkLabel;
   final int blockOffset;
   final List<LocalContentLink> links;
   final TextStyle style;
@@ -251,6 +255,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
                       scaler: widget.scaler,
                       inlineStyles: widget.inlineStyles,
                       authoredBackground: decoration.backgroundColor,
+                      linkLabel: true,
                       locale: widget.locale,
                       textHeightBehavior: widget.textHeightBehavior,
                     ),
@@ -329,8 +334,14 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
       ReaderColorRole.foreground,
       background: background,
     );
+    final primary = Theme.of(context).colorScheme.primary;
+    final linkColor = widget.authoredBackground == null
+        ? foreground(primary)
+        : colors.linkForeground(primary, background);
     final displayStyle = widget.style.copyWith(
-      color: foreground(widget.style.color ?? colors.ink),
+      color: widget.linkLabel
+          ? linkColor
+          : foreground(widget.style.color ?? colors.ink),
     );
     final runes = widget.text.runes.toList();
     final spans = <InlineSpan>[TextSpan(text: widget.prefix)];
@@ -347,8 +358,15 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
           locale: widget.locale,
           maxWidth: maxWidth,
           onRubyTap: onTap,
-          resolveColor: foreground,
-          style: displayStyle,
+          resolveColor: onTap == null && !widget.linkLabel
+              ? foreground
+              : widget.authoredBackground == null
+              ? (_) => linkColor
+              : (raw) =>
+                    colors.linkForeground(primary, background, authored: raw),
+          style: onTap == null && !widget.linkLabel
+              ? displayStyle
+              : displayStyle.copyWith(color: linkColor),
           readerFontSize: widget.readerFontSize,
           imageBuilder: (image) => GestureDetector(
             onTap: onTap,
@@ -397,9 +415,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
           span is TextSpan
               ? TextSpan(
                   text: span.text,
-                  style: (span.style ?? displayStyle).copyWith(
-                    color: foreground(Theme.of(context).colorScheme.primary),
-                  ),
+                  style: span.style,
                   semanticsLabel: note.isFootnote
                       ? AppLocalizations.of(context).readerFootnote(note.label)
                       : null,

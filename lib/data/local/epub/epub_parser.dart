@@ -977,7 +977,7 @@ class EpubParser {
           spans.length == 1 &&
           spans.single.$2 <= trimStart &&
           spans.single.$3 >= trimStart + value.length;
-      final decoration =
+      var decoration =
           heading == null &&
               wholeLink &&
               value.runes.length <= 256 &&
@@ -989,6 +989,10 @@ class EpubParser {
               flow.label == null
           ? epubLinkDecoration(paragraphOwner, styles, richStyles)
           : null;
+      // A paragraph decoration cannot take ownership of an ancestor's box.
+      if (decoration?.onBlock == true && paragraphOwner != activeBoxOwner) {
+        decoration = null;
+      }
       for (final span in styleSpans) {
         final start = (span.$2 - trimStart).clamp(0, value.length);
         final end = (span.$3 - trimStart).clamp(0, value.length);

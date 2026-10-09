@@ -9,9 +9,267 @@ import 'package:shiori/features/reader/viewport/page_layout.dart';
 import 'package:shiori/features/reader/viewport/page_boundaries.dart';
 import 'package:shiori/features/reader/viewport/render_chunk.dart';
 import 'package:shiori/features/reader/reader_authored_colors.dart';
+import 'package:shiori/features/reader/reader_linked_text.dart';
 import '../../data/local/epub_authored_layout_test.dart' show authoredContent;
 
 void main() {
+  testWidgets(
+    'missing authored ink uses readable link accent; paper links and geometry remain unchanged',
+    (tester) async {
+      final book = authoredContent(
+        '<p><a href="#target">合成链接</a></p><p id="target">After</p>',
+      );
+      const ink = Color(0xff52756b), dark = Color(0xff272435);
+      final theme = ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: ink,
+        ).copyWith(primary: ink),
+      );
+      var activations = 0;
+      Size? size;
+      for (final background in [null, dark.toARGB32()]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Center(
+              child: SizedBox(
+                width: 240,
+                child: ReaderLinkedText(
+                  text: '合成链接',
+                  prefix: '',
+                  blockOffset: 0,
+                  links: book.links,
+                  style: const TextStyle(fontSize: 20),
+                  align: TextAlign.left,
+                  scaler: TextScaler.noScaling,
+                  authoredBackground: background,
+                  onLink: (_) => activations++,
+                ),
+              ),
+            ),
+          ),
+        );
+        final paragraph = tester
+            .renderObjectList<RenderParagraph>(find.byType(RichText))
+            .singleWhere((p) => p.text.toPlainText() == '合成链接');
+        Color? color;
+        paragraph.text.visitChildren((s) {
+          if (s is TextSpan && s.recognizer != null) color = s.style!.color;
+          return true;
+        });
+        if (background == null) {
+          expect(color, ink);
+          size = paragraph.size;
+        } else {
+          expect(readerColorContrast(color!, dark), greaterThanOrEqualTo(4.5));
+          expect(paragraph.size, size);
+        }
+        final box = paragraph
+            .getBoxesForSelection(
+              const TextSelection(baseOffset: 0, extentOffset: 4),
+            )
+            .first;
+        final point = paragraph.localToGlobal(
+          Offset((box.left + box.right) / 2, (box.top + box.bottom) / 2),
+        );
+        await tester.tapAt(point);
+        await tester.dragFrom(point, const Offset(-100, 0));
+      }
+      expect(activations, 2);
+    },
+  );
+  testWidgets(
+    'seven paragraph buttons share authored width, paint and hit geometry',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final labels = ['第一章', '第二章', '第三章', '第四章', '第五章', '较长章节标签', '后记'];
+      final book = authoredContent(
+        '${labels.map((l) => '<p class="entry"><a href="#target" style="color:white">$l</a><br/></p>').join()}<p id="target">${'After ' * 40}</p>',
+        '.entry{width:4em;background-color:#272435;border-radius:15px;padding:1px;text-align:center;text-indent:0;margin:.7em}',
+      );
+      final controller = PagedReaderController();
+      var activated = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 300,
+              height: 900,
+              child: PagedReaderViewport(
+                content: book.chapters.first,
+                controller: controller,
+                contentLinks: book.links,
+                textStyle: const TextStyle(fontSize: 20, height: 1.6),
+                turnStyle: PageTurnStyle.none,
+                onLink: (_) => activated++,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final buttons = find.byWidgetPredicate(
+        (w) =>
+            w is DecoratedBox &&
+            w.decoration is BoxDecoration &&
+            (w.decoration as BoxDecoration).color == const Color(0xff272435),
+      );
+      expect(buttons, findsNWidgets(7));
+      final paragraphs = tester.renderObjectList<RenderParagraph>(
+        find.byType(RichText),
+      );
+      for (var i = 0; i < labels.length; i++) {
+        final button = buttons.at(i), rect = tester.getRect(button);
+        expect(rect.width, closeTo(82, .01));
+        final decoration =
+            tester.widget<DecoratedBox>(button).decoration as BoxDecoration;
+        expect(decoration.borderRadius, BorderRadius.circular(15));
+        final paragraph = paragraphs.singleWhere(
+          (p) => p.text.toPlainText() == labels[i],
+        );
+        final boxes = paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: 0, extentOffset: labels[i].length),
+        );
+        for (final box in boxes) {
+          expect(
+            paragraph.localToGlobal(Offset((box.left + box.right) / 2, 0)).dx,
+            closeTo(rect.center.dx, .01),
+          );
+        }
+        expect(rect.height, closeTo(paragraph.size.height + 2, .01));
+        Color? color;
+        paragraph.text.visitChildren((s) {
+          if (s is TextSpan && s.text?.isNotEmpty == true) {
+            color = s.style?.color;
+          }
+          return true;
+        });
+        expect(
+          readerColorContrast(color!, decoration.color!),
+          greaterThanOrEqualTo(4.5),
+        );
+        await tester.tapAt(rect.center);
+        expect(activated, i * 2 + 1);
+        await tester.tapAt(rect.topLeft + const Offset(.5, .5));
+        expect(activated, i * 2 + 2);
+      }
+      final frames = tester
+          .widgetList<ReaderBoxFrame>(find.byType(ReaderBoxFrame))
+          .where((f) => f.box?.backgroundColor == 0xff272435);
+      expect(frames, hasLength(7));
+      expect(frames.every((f) => f.linkOwnsDecoration), isTrue);
+      await tester.tapAt(
+        tester.getRect(buttons.first).topCenter - const Offset(0, 4),
+      );
+      expect(activated, 14);
+      tester
+          .widget<FocusableActionDetector>(
+            find.byType(FocusableActionDetector).first,
+          )
+          .focusNode!
+          .requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyEvent(LogicalKeyboardKey.space);
+      expect(activated, 16);
+      final before = controller.capture();
+      await tester.drag(buttons.first, const Offset(-180, 0));
+      await tester.pumpAndSettle();
+      expect(activated, 16);
+      expect(controller.capture(), isNot(before));
+      expect(tester.takeException(), isNull);
+    },
+  );
+  test(
+    'paragraph button fallback retains text, source link and background on short pages',
+    () {
+      final book = authoredContent(
+        '<p style="background-color:#272435;width:4em;padding:2em;border-radius:99em"><a href="#target" style="color:white">${'长标签😀' * 30}</a></p><p id="target">After</p>',
+      );
+      final content = book.chapters.first,
+          block = content.blocks.first as ParagraphBlock;
+      expect(block.linkDecoration!.onBlock, isTrue);
+      for (final scaler in [TextScaler.noScaling, TextScaler.linear(2)]) {
+        final layout = PageLayout(
+          index: ChunkIndex(content),
+          width: 130,
+          height: 150,
+          style: const TextStyle(fontSize: 28, height: 1.6),
+          scaler: scaler,
+          direction: TextDirection.ltr,
+        );
+        var cursor = const PageCursor(0, 0);
+        final text = StringBuffer();
+        for (var i = 0; i < 100; i++) {
+          final page = layout.forward(cursor);
+          if (page == null) break;
+          expect(PageBoundaries.compare(page.end, cursor), greaterThan(0));
+          for (final f in page.fragments) {
+            expect(f.linkLayout, isNull);
+            text.write(f.text ?? '');
+          }
+          cursor = page.end;
+        }
+        expect(cursor.unit, layout.index.chunks.length);
+        expect(text.toString(), '${block.text}After');
+        expect(content.blocks.first.box!.backgroundColor, 0xff272435);
+        expect(book.links.single.sourceLength, block.text.runes.length);
+      }
+    },
+  );
+  testWidgets(
+    'background links retain readable authored foreground in every paper theme',
+    (tester) async {
+      final book = authoredContent(
+        '<p style="background-color:#272435"><a href="#target" style="color:white">合成链接</a> extra</p>'
+        '<p id="target">After</p>',
+      );
+      final block = book.chapters.first.blocks.first as ParagraphBlock;
+      expect(block.linkDecoration, isNull);
+      for (final theme in [
+        ThemeData(),
+        ThemeData(scaffoldBackgroundColor: const Color(0xfff4e9d5)),
+        ThemeData.dark(),
+      ]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: ReaderLinkedText(
+              text: block.text,
+              prefix: '',
+              blockOffset: 0,
+              links: book.links,
+              style: const TextStyle(fontSize: 20),
+              align: TextAlign.left,
+              scaler: TextScaler.noScaling,
+              inlineStyles: block.inlineStyles,
+              authoredBackground: block.box!.backgroundColor,
+            ),
+          ),
+        );
+        final paragraph = tester
+            .renderObjectList<RenderParagraph>(find.byType(RichText))
+            .singleWhere((p) => p.text.toPlainText() == block.text);
+        final foreground = <Color>[];
+        paragraph.text.visitChildren((span) {
+          if (span is TextSpan && span.recognizer != null) {
+            foreground.add(span.style!.color!);
+          }
+          return true;
+        });
+        expect(foreground, isNotEmpty);
+        for (final color in foreground) {
+          expect(
+            readerColorContrast(color, const Color(0xff272435)),
+            greaterThanOrEqualTo(4.5),
+          );
+        }
+      }
+    },
+  );
   for (final alignment in ['center', 'right']) {
     testWidgets(
       'two-line decorated link preserves $alignment character alignment',

@@ -138,6 +138,7 @@ final class LinkDecoration extends ValueModel {
     required this.padding,
     this.radius,
     this.fontScale = 1,
+    this.onBlock = false,
   }) {
     if (backgroundColor < 0 ||
         backgroundColor > 0xffffffff ||
@@ -152,11 +153,15 @@ final class LinkDecoration extends ValueModel {
   final BoxInsets padding;
   final LayoutLength? radius;
   final double fontScale;
+
+  /// The paragraph box supplies width and padding; the link paints it once.
+  final bool onBlock;
   Map<String, Object?> toJson() => {
     'backgroundColor': backgroundColor,
     'padding': padding.toJson(),
     if (radius != null) 'radius': radius!.toJson(),
     'fontScale': fontScale,
+    if (onBlock) 'onBlock': true,
   };
   factory LinkDecoration.fromJson(Map<String, dynamic> j) => LinkDecoration(
     backgroundColor: j['backgroundColor'] as int,
@@ -165,9 +170,16 @@ final class LinkDecoration extends ValueModel {
         ? null
         : LayoutLength.fromJson(j['radius'] as Map<String, dynamic>),
     fontScale: (j['fontScale'] as num?)?.toDouble() ?? 1,
+    onBlock: j['onBlock'] as bool? ?? false,
   );
   @override
-  List<Object?> get values => [backgroundColor, padding, radius, fontScale];
+  List<Object?> get values => [
+    backgroundColor,
+    padding,
+    radius,
+    fontScale,
+    onBlock,
+  ];
 }
 
 final class BoxBorderSide extends ValueModel {

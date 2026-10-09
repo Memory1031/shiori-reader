@@ -181,15 +181,56 @@ LinkDecoration? epubLinkDecoration(
   final links = owner.querySelectorAll('a[href]');
   if (links.length != 1) return null;
   final link = links.single;
-  final nodes = owner.querySelectorAll('*');
+  bool visible(dom.Element e) {
+    for (dom.Element? n = e; n != null; n = n.parent) {
+      if (n.attributes.containsKey('hidden') ||
+          styles[n]?['display'] == 'none' ||
+          {'hidden', 'collapse'}.contains(styles[n]?['visibility'])) {
+        return false;
+      }
+      if (n == owner) break;
+    }
+    return true;
+  }
+
+  final nodes = [owner, ...owner.querySelectorAll('*')].where(visible).toList();
+  var breaks = 0;
+  var textAfterBreak = false;
+  void checkBreaks(dom.Node n) {
+    if (n is dom.Element && !visible(n)) return;
+    if (n is dom.Element && n.localName == 'br') breaks++;
+    if (n is dom.Text && n.text.trim().isNotEmpty && breaks > 0) {
+      textAfterBreak = true;
+    }
+    for (final child in n.nodes) {
+      checkBreaks(child);
+    }
+  }
+
+  checkBreaks(owner);
+  if (breaks > 1 || textAfterBreak) return null;
   if (nodes.any(
     (e) =>
-        !{'a', 'span', 'b', 'strong', 'i', 'em'}.contains(e.localName) ||
-        e.attributes.containsKey('hidden') ||
-        styles[e]?['display'] == 'none' ||
-        {'absolute', 'fixed'}.contains(styles[e]?['position']) ||
+        e != owner &&
+            !{
+              'a',
+              'span',
+              'b',
+              'strong',
+              'i',
+              'em',
+              'br',
+            }.contains(e.localName) ||
+        !{null, 'static'}.contains(styles[e]?['position']) ||
         !{null, 'none'}.contains(styles[e]?['float']) ||
-        {'flex', 'grid', 'block'}.contains(styles[e]?['display']),
+        !{null, 'none'}.contains(styles[e]?['transform']) ||
+        {
+          'flex',
+          'grid',
+          'inline-flex',
+          'inline-grid',
+        }.contains(styles[e]?['display']) ||
+        e != owner && styles[e]?['display'] == 'block',
   )) {
     return null;
   }
@@ -198,15 +239,29 @@ LinkDecoration? epubLinkDecoration(
       .toList();
   if (candidates.length != 1) return null;
   final node = candidates.single;
-  if (node != link && !link.querySelectorAll('*').contains(node) ||
-      node.text != link.text) {
+  if (node != owner &&
+      (node != link && !link.querySelectorAll('*').contains(node) ||
+          node.text != link.text)) {
     return null;
   }
   if (nodes.any(
     (e) => (styles[e] ?? const <String, String>{}).keys.any(
       (key) =>
           key.startsWith('border-') && key != 'border-radius' ||
-          e != node && (key.startsWith('padding-') || key == 'border-radius'),
+          e != node && (key.startsWith('padding-') || key == 'border-radius') ||
+          {
+            'height',
+            'min-height',
+            'max-height',
+            'min-width',
+            'box-sizing',
+            'left',
+            'right',
+            'top',
+            'bottom',
+          }.contains(key) ||
+          {'width', 'max-width'}.contains(key) &&
+              (e != owner || epubLayoutLength(styles[e]![key]) == null),
     ),
   )) {
     return null;
@@ -224,6 +279,7 @@ LinkDecoration? epubLinkDecoration(
       left: epubLayoutLength(css['padding-left']),
     ),
     fontScale: rich[node]?.scale ?? 1,
+    onBlock: node == owner,
   );
 }
 

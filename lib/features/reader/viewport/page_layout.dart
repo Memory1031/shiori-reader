@@ -386,6 +386,15 @@ final class PageLayout {
         block.linkDecoration != null &&
         blockOffset == 0 &&
         text.runes.length == block.text.runes.length) {
+      final box = block.linkDecoration!.onBlock
+          ? readerBlockBoxes(
+              block,
+              width,
+              style,
+              scaler,
+              pageHeight: height,
+            ).outer
+          : null;
       final link = readerLinkLayout(
         block,
         textWidth,
@@ -395,6 +404,7 @@ final class PageLayout {
         locale: locale,
         heightBehavior: textHeightBehavior,
         chapter: index.content.key,
+        box: box,
       )!;
       final edges = readerBoxEdges(
         index.content,
@@ -410,7 +420,9 @@ final class PageLayout {
         chapter: index.content.key,
         pageHeight: height,
       );
-      final total = link.height + edges.top + edges.bottom + spacing;
+      final top = edges.top - (box?.paddingTop ?? 0);
+      final bottom = edges.bottom - (box?.paddingBottom ?? 0);
+      final total = link.height + top + bottom + spacing;
       // Move an intact label to the next page; too-tall labels lose decoration
       // and use the ordinary source-preserving text pagination below.
       if (total <= height + .01) {
@@ -419,8 +431,8 @@ final class PageLayout {
           text: text,
           count: text.runes.length,
           height: total,
-          boxTop: edges.top,
-          boxBottom: edges.bottom,
+          boxTop: top,
+          boxBottom: bottom,
           boxContentHeight: null,
           flow: null,
           linkLayout: link,

@@ -21,6 +21,7 @@ ReaderLinkLayout? readerLinkLayout(
   Locale? locale,
   TextHeightBehavior? heightBehavior,
   ChapterKey? chapter,
+  ReaderBoxGeometry? box,
 }) {
   final decoration = block.linkDecoration;
   if (decoration == null) return null;
@@ -35,33 +36,48 @@ ReaderLinkLayout? readerLinkLayout(
     left *= factor;
     right *= factor;
   }
-  final padding = EdgeInsets.fromLTRB(
-    left,
-    length(decoration.padding.top),
-    right,
-    length(decoration.padding.bottom),
-  );
+  final padding = decoration.onBlock && box != null
+      ? EdgeInsets.fromLTRB(
+          box.paddingLeft,
+          box.paddingTop,
+          box.paddingRight,
+          box.paddingBottom,
+        )
+      : EdgeInsets.fromLTRB(
+          left,
+          length(decoration.padding.top),
+          right,
+          length(decoration.padding.bottom),
+        );
   final style = readerBlockStyle(block, base, chapter: chapter);
-  final painter = TextPainter(
-    text: TextSpan(
-      style: style,
-      children: readerInlineSpans(
-        text: block.text,
-        offset: 0,
-        images: const [],
-        styles: block.inlineStyles,
-        style: style,
-        readerFontSize: base.fontSize,
-      ),
-    ),
-    textDirection: direction,
-    textAlign: readerBlockAlign(block, chapter: chapter),
-    textScaler: scaler,
-    locale: locale,
-    textHeightBehavior: heightBehavior,
-  )..layout(maxWidth: math.max(1.0, width - padding.horizontal));
+  final painter =
+      TextPainter(
+        text: TextSpan(
+          style: style,
+          children: readerInlineSpans(
+            text: block.text,
+            offset: 0,
+            images: const [],
+            styles: block.inlineStyles,
+            style: style,
+            readerFontSize: base.fontSize,
+          ),
+        ),
+        textDirection: direction,
+        textAlign: readerBlockAlign(block, chapter: chapter),
+        textScaler: scaler,
+        locale: locale,
+        textHeightBehavior: heightBehavior,
+      )..layout(
+        maxWidth: math.max(
+          1.0,
+          decoration.onBlock ? width : width - padding.horizontal,
+        ),
+      );
   try {
-    final w = math.min(width, painter.width + padding.horizontal),
+    final w = decoration.onBlock
+            ? width + padding.horizontal
+            : math.min(width, painter.width + padding.horizontal),
         h = painter.height + padding.vertical;
     return ReaderLinkLayout(
       w,
@@ -354,12 +370,14 @@ class ReaderBoxFrame extends StatelessWidget {
     this.geometry,
     this.starts,
     this.ends,
+    this.linkOwnsDecoration = false,
   });
   final BlockBox? box;
   final double width, top, bottom;
   final Widget child;
   final ReaderBoxGeometry? geometry;
   final bool? starts, ends;
+  final bool linkOwnsDecoration;
   @override
   Widget build(BuildContext context) {
     final b = box;
@@ -380,18 +398,20 @@ class ReaderBoxFrame extends StatelessWidget {
         child: SizedBox(
           width: width,
           child: CustomPaint(
-            painter: ReaderBoxPainter(
-              b,
-              g,
-              start,
-              end,
-              ReaderAuthoredColors(Theme.of(context)),
-            ),
+            painter: linkOwnsDecoration
+                ? null
+                : ReaderBoxPainter(
+                    b,
+                    g,
+                    start,
+                    end,
+                    ReaderAuthoredColors(Theme.of(context)),
+                  ),
             child: Padding(
               padding: EdgeInsets.fromLTRB(
-                g.paddingLeft + g.borderLeft,
+                linkOwnsDecoration ? 0 : g.paddingLeft + g.borderLeft,
                 math.max(0, top - mt),
-                g.paddingRight + g.borderRight,
+                linkOwnsDecoration ? 0 : g.paddingRight + g.borderRight,
                 math.max(0, bottom - mb),
               ),
               child: child,

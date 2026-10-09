@@ -240,6 +240,27 @@ class _SvgBooks extends MemoryBooks implements LocalPagePresentationRepository {
 }
 
 void main() {
+  test(
+    'host bounds paragraph boxes without clipping visible overflow or SVG',
+    () {
+      final source =
+          '<html><head><meta http-equiv="Content-Security-Policy" content="script-src none"></head><body><p style="width:600px;white-space:nowrap">Synthetic wide text</p></body></html>';
+      final html = epubLayoutDocument(
+        source,
+        Colors.white,
+        Colors.black,
+        Brightness.light,
+        false,
+      );
+      expect(html, contains('body:not(.shiori-svg-page) p{max-width:100%;}'));
+      expect(html, contains('width:600px;white-space:nowrap'));
+      expect(html, contains('Synthetic wide text'));
+      expect(html, isNot(contains('overflow-x:')));
+      expect(html, isNot(contains('overflow:hidden')));
+      expect(html, contains('script-src none'));
+    },
+  );
+
   late _Platform platform;
   late Directory temp;
   var ready = 0, failed = 0, previous = 0, next = 0, center = 0;
