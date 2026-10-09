@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/data/local/epub/epub_parser.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_completion_page.dart';
@@ -28,6 +29,7 @@ import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 
 import '../../support/contract_fakes.dart';
 import '../../data/local/epub_svg_links_test.dart' show svgLinksParser;
+import '../../data/local/support/epub_fixtures.dart';
 import '../../data/local/local_reading_test.dart' show ForbiddenOnline;
 import 'local_reading_test.dart' show MemoryBooks;
 import 'package:shiori/data/repositories/local_reading_repository.dart';
@@ -252,7 +254,10 @@ void main() {
         Brightness.light,
         false,
       );
-      expect(html, contains('body:not(.shiori-svg-page) p{max-width:100%;}'));
+      expect(
+        html,
+        contains(':where(body:not(.shiori-svg-page) p){max-width:100%;}'),
+      );
       expect(html, contains('width:600px;white-space:nowrap'));
       expect(html, contains('Synthetic wide text'));
       expect(html, isNot(contains('overflow-x:')));
@@ -260,6 +265,47 @@ void main() {
       expect(html, contains('script-src none'));
     },
   );
+
+  test('host width default precedes every authored paragraph limit', () {
+    for (final selector in ['.left', 'p.left', 'p', '*', ':where(p)']) {
+      final files = epubFiles();
+      final limit = '$selector{max-width:120px;}';
+      files['OPS/text/a.xhtml'] = utf8.encode(
+        '<html><head><style>'
+        '.stage{position:relative;height:260px;}'
+        'p{margin:0;font:20px/1.4 monospace;}'
+        '.left{position:absolute;top:0;left:0;width:100%;}'
+        '.right{position:absolute;top:0;left:150px;width:120px;}'
+        '$limit</style></head><body><div class="stage">'
+        '<p class="left">Left synthetic text wraps inside its narrow region.</p>'
+        '<p class="right">Right synthetic text stays in its own region.</p>'
+        '</div></body></html>',
+      );
+      final parser = EpubParser(
+        zipFiles(files),
+        NovelKey(sourceId: SourceId('local'), novelId: 'width-test'),
+        'width-test.epub',
+        includePresentations: true,
+      );
+      parser.parse();
+      final source = parser.presentations.values.single;
+      final html = epubLayoutDocument(
+        source,
+        Colors.white,
+        Colors.black,
+        Brightness.light,
+        false,
+      );
+      const fallback =
+          '<style>:where(body:not(.shiori-svg-page) p){max-width:100%;}</style>';
+      expect(html.indexOf(fallback), greaterThanOrEqualTo(0));
+      expect(html.indexOf(fallback), lessThan(html.indexOf(limit)));
+      expect(html, isNot(contains('body:not(.shiori-svg-page) p{')));
+      expect(html, contains('class="left"'));
+      expect(html, contains('class="right"'));
+      expect(html, contains("script-src 'none'"));
+    }
+  });
 
   late _Platform platform;
   late Directory temp;

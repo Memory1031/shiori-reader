@@ -29,13 +29,18 @@ String epubLayoutDocument(
       brightness == Brightness.dark && html.contains('class="shiori-svg-page"')
       ? 'body.shiori-svg-page>svg text:not([fill]){fill:#$ink;}'
       : '';
-  return html.replaceFirst('</head>', '''<style>
+  // Zero specificity and earlier order let every authored limit win,
+  // including universal selectors. This is only a default for unbounded p.
+  final document = html.replaceFirst(
+    '<head>',
+    '<head><style>:where(body:not(.shiori-svg-page) p){max-width:100%;}</style>',
+  );
+  return document.replaceFirst('</head>', '''<style>
 html,body{background:#$background!important;color:#$ink;margin:0!important;}
 html,body{scrollbar-width:none;}
 ::-webkit-scrollbar{display:none;}
 body{font-size:clamp(12px,5.7vw,20px);padding:8px!important;box-sizing:border-box;display:flow-root;overflow-wrap:break-word;}
 img{max-width:100%;height:auto;}
-body:not(.shiori-svg-page) p{max-width:100%;}
 $svgTextStyle
 $interactionStyle
 </style></head>''');
