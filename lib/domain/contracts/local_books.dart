@@ -5,6 +5,7 @@ import 'cancellation.dart';
 import 'result.dart';
 import 'local_book_decoder.dart';
 import 'local_content_links.dart';
+import '../local_chapter_progress.dart';
 
 enum LocalBookFormat { txt, epub }
 
@@ -190,6 +191,15 @@ abstract interface class LocalBookReparse implements LocalBookInvalidation {
 /// Reader-only metadata; shelf/home never request complete local content.
 abstract interface class LocalBookProgressRepository {
   Future<Result<BookProgressMetrics>> loadProgressMetrics(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  });
+}
+
+/// Optional Reader-only snapshot, derived from the already imported manifest.
+/// Null means TXT; an EPUB index may have no reliable logical sections.
+abstract interface class LocalLogicalChapterRepository {
+  Future<Result<LocalChapterProgressIndex?>> loadLogicalChapters(
     NovelKey key, {
     required CancellationToken cancellation,
   });

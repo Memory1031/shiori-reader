@@ -87,6 +87,8 @@ LocalBookDecoder 接收导入 session、格式、文件名、token 和编码确�
 
 LocalNavigationRepository 返回嵌套目录与 ChapterKey / 可选 blockKey。LocalPagePresentationRepository 为特殊短页提供可选惰性静态 HTML，普通正文返回空；领域正文仍保存原生语义块，不持有 WebView 对象。发布与兼容见[本地导入](local-import.md)。
 
+可选的 LocalLogicalChapterRepository 从同一已导入快照返回 Reader 专用的只读目录区段索引，包含主阅读顺序、完整块权重、内容版本与块身份；TXT 返回空。索引不改变 ChapterContent、ReaderPosition 或存储格式；逻辑显示与导航合同见[阅读器](reader.md#全书进度与阅读完成)。
+
 CacheManagement 提供 inspect、按书 / 全部 clear 和可释放 pin；ReadingPrefetch 提供目标选择、开关、暂停 / 恢复与生命周期通知。预取不创建阅读进度。ImageRepository 持久化失败可返回 memoryOnly + persistenceFailure，清理不破坏活动 lease，但阻止旧响应回填。
 
 应用根先关闭预取，再关闭媒体 / 小说仓库与调度器，最后关闭数据库。ReaderPreferences 读取或更新时将旧 scroll 归一化为 paged，保留排版；读取不为了模式迁移主动覆盖存储。详见[阅读器](reader.md)、[缓存](architecture.md)与[数据库](architecture.md)。

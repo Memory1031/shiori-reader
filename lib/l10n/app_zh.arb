@@ -641,5 +641,9 @@
   },
   "importInboxFull": "收件箱已满（64 个文件 / 512 MiB）。请先在 Shiori 导入或放弃部分待处理文件，再重新分享。",
   "importPublicationUncertain": "文件可能已收下。请先在 Shiori 检查待导入文件，再决定是否重新分享。",
-  "importLater": "稍后"
+  "importLater": "稍后",
+  "readerChapterProgressLoading": "章节进度加载中",
+  "readerCurrentDocument": "当前文档",
+  "readerDocumentPercent": "当前文档 {percent}%",
+  "@readerDocumentPercent": {"placeholders": {"percent": {"type": "String"}}}
 }

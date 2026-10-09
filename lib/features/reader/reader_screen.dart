@@ -33,6 +33,8 @@ import 'reader_image.dart';
 import 'reader_image_preview.dart';
 import 'reader_linked_text.dart';
 import 'epub_layout_page.dart';
+import '../../domain/local_chapter_progress.dart';
+import 'reader_logical_progress.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'viewport/page_turn.dart';
 import 'viewport/reader_box.dart';
@@ -45,6 +47,7 @@ class ReaderContentView extends StatefulWidget {
     required this.content,
     this.runningTitle,
     this.chapterTitle,
+    this.logicalProgress,
     this.onReady,
     this.onLayoutInvalidated,
     this.onPanelChanged,
@@ -77,6 +80,7 @@ class ReaderContentView extends StatefulWidget {
   final ChapterContent content;
   final String? runningTitle;
   final String? chapterTitle;
+  final ReaderLogicalProgress? logicalProgress;
   final VoidCallback? onReady,
       onLoadFailure,
       onLayoutInvalidated,
@@ -277,6 +281,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
+      _progressRequest++;
       _dragSurface.currentState?.cancel();
       _cancelCompletion(immediate: true);
       unawaited(_preferences.flush());
@@ -433,6 +438,22 @@ class _ReaderContentViewState extends State<ReaderContentView>
   // Show the extent of the visible page; keep its start as the resume anchor.
   double get _visibleChapterFraction =>
       _lastPageVisible ? 1 : _displayChapterFraction;
+  ReaderPosition? get _anchor =>
+      _latestReadingPosition ??
+      _readingPosition.value ??
+      _position ??
+      widget.initialPosition;
+  LocalChapterSection? get _logicalSection =>
+      widget.logicalProgress?.index?.sectionAt(widget.content.key, _anchor);
+  double get _visibleScopeFraction {
+    final section = _logicalSection, index = widget.logicalProgress?.index;
+    return section == null || index == null
+        ? _visibleChapterFraction
+        : section.fraction(
+            index.coordinate(widget.content.key, _visibleChapterFraction)!,
+          );
+  }
+
   Timer? _positionLabelTimer;
   bool _announcedReady = false;
   int _layoutEpoch = 0;
@@ -1345,7 +1366,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   String get _effectiveChapterTitle =>
-      widget.chapterTitle ?? widget.content.title;
+      _logicalSection?.title ??
+      (widget.logicalProgress != null && !widget.logicalProgress!.loading
+          ? widget.content.title
+          : widget.chapterTitle ?? widget.content.title);
 
   void _seekChapter(double fraction) {
     final count = widget.content.blocks.length;
@@ -1374,40 +1398,112 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   Future<void> _progressPanel(BuildContext context) async {
-    Widget progress(ReaderPanelDone onDone, {ValueChanged<double>? onSeek}) =>
+    final request = _progressRequest;
+    final logical = widget.logicalProgress;
+    final index = logical?.index;
+    final section = _logicalSection;
+    final session = widget.session, content = widget.content;
+    final anchor = section == null
+        ? _displayChapterFraction
+        : section.fraction(
+            index!.coordinate(content.key, _displayChapterFraction)!,
+          );
+    final visible = _visibleScopeFraction;
+    final title = _effectiveChapterTitle;
+    final l = AppLocalizations.of(context);
+    bool valid() =>
+        mounted &&
+        request == _progressRequest &&
+        identical(widget.session, session) &&
+        widget.content == content &&
+        (logical == null || identical(widget.logicalProgress?.index, index)) &&
+        session?.isClosed != true;
+    bool live() => valid() && _interactive;
+    VoidCallback? step(int direction) {
+      if (logical == null) {
+        return direction < 0 ? _actions.previousChapter : _actions.nextChapter;
+      }
+      if (index == null || section == null) return null;
+      final adjacent = index.adjacent(section, direction);
+      return adjacent == null
+          ? null
+          : () {
+              if (live()) {
+                unawaited(logical.navigate(section, index.target(adjacent, 0)));
+              }
+            };
+    }
+
+    Widget progress(ReaderPanelDone onDone, bool Function() accepts) =>
         ReaderProgressPanel(
-          chapterTitle: _effectiveChapterTitle,
-          chapterFraction: _visibleChapterFraction,
-          anchorFraction: _displayChapterFraction,
-          bookFractionAt: (fraction) =>
-              widget.session?.bookProgressAt(fraction)?.fraction,
-          onSeek: onSeek ?? _seekChapter,
+          chapterTitle: title,
+          chapterFraction: visible,
+          anchorFraction: anchor,
+          enabled: logical?.loading != true,
+          scopeLabel: logical?.loading == true
+              ? l.readerChapterProgressLoading
+              : logical != null && section == null
+              ? l.readerCurrentDocument
+              : null,
+          bookFractionAt: (fraction) => section == null
+              ? session?.bookProgressAt(fraction)?.fraction
+              : index!.bookFractionAt(section, fraction),
+          onSeek: (fraction) {
+            if (!valid() || !accepts()) return;
+            if (index == null || section == null) {
+              _seekChapter(fraction);
+              return;
+            }
+            final target = index.target(section, fraction);
+            if (target.chapter == content.key) {
+              _navigateTo(target.position);
+            } else {
+              onDone(() {
+                if (live()) unawaited(logical!.navigate(section, target));
+              });
+            }
+          },
           onDone: onDone,
-          showChapterStepper: _actions.hasChapterStepper,
-          onPreviousChapter: _actions.previousChapter,
-          onNextChapter: _actions.nextChapter,
+          showChapterStepper: logical == null
+              ? _actions.hasChapterStepper
+              : section != null,
+          onPreviousChapter: step(-1),
+          onNextChapter: step(1),
         );
     if (!_desktopPanels) {
-      return showReaderSheet<void>(
+      Future<dynamic>? completed;
+      final intent = await showReaderSheet<VoidCallback>(
         context,
-        builder: (sheet) => progress(readerSheetDone(sheet)),
+        builder: (sheet) {
+          final route = ModalRoute.of(sheet)!;
+          completed = route.completed;
+          return progress(
+            ([then]) {
+              if (route.isCurrent) Navigator.of(sheet).pop(then);
+            },
+            () =>
+                route.isCurrent &&
+                mounted &&
+                identical(widget.session, session),
+          );
+        },
       );
+      await completed;
+      if (intent != null && live()) intent();
+      return;
     }
-    // A chapter step comes back as the result; a seek acts while the
-    // popover stays open.
-    await _deliver(
-      _openPanel<VoidCallback>(
-        ReaderPanelPlacement.anchored,
-        semanticLabel: _effectiveChapterTitle,
-        anchor: _progressAnchor,
-        builder: (context, panel) => progress(
-          ([then]) => panel.close(then),
-          onSeek: (fraction) {
-            if (_owns(panel)) _seekChapter(fraction);
-          },
-        ),
-      ),
+    // Same-document seeks retain the panel; other choices leave as its result.
+    final panel = _openPanel<VoidCallback>(
+      ReaderPanelPlacement.anchored,
+      semanticLabel: title,
+      anchor: _progressAnchor,
+      builder: (context, panel) =>
+          progress(([then]) => panel.close(then), () => _owns(panel)),
     );
+    if (panel == null) return;
+    final intent = await panel.closed;
+    await panel.completed;
+    if (intent != null && live()) intent();
   }
 
   /// Chapter progress text, rebuilt at most at the sampling rate.
@@ -1418,7 +1514,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }) => ValueListenableBuilder<ReaderPosition?>(
     valueListenable: _readingPosition,
     builder: (context, position, _) => Text(
-      label(formatReadingPercent(_visibleChapterFraction)),
+      widget.logicalProgress?.loading == true
+          ? AppLocalizations.of(context).readerChapterProgressLoading
+          : widget.logicalProgress != null && _logicalSection == null
+          ? AppLocalizations.of(context).readerDocumentPercent(
+              formatReadingPercent(_visibleChapterFraction),
+            )
+          : label(formatReadingPercent(_visibleScopeFraction)),
       textAlign: TextAlign.center,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -1471,27 +1573,30 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   Widget _toolbars(BuildContext context, {bool completion = false}) {
     final l = AppLocalizations.of(context);
-    return ReaderToolbars(
-      metrics: ReaderChromeMetrics.of(context),
-      insets: _pageInsets,
-      top: ReaderTopBar(
-        title: completion ? _bookTitle : _effectiveChapterTitle,
-        returnToOrigin: widget.returnToOrigin,
-        onLeave: () => _leave(context),
-        menu: _menu(l),
-        onMenu: (command) => _run(context, command),
-      ),
-      bottom: ReaderBottomBar(
-        contentsTooltip:
-            _contentsLayers(context).firstOrNull?.label ?? l.catalogTitle,
-        onContents: _command(context, ReaderCommand.contents),
-        showProgress: !completion,
-        progress: completion
-            ? const SizedBox.shrink()
-            : _progressLabel(l.readerChapterPercent),
-        onProgress: _command(context, ReaderCommand.progress),
-        onSettings: _command(context, ReaderCommand.settings),
-        progressKey: completion ? null : _progressAnchor,
+    return AnimatedBuilder(
+      animation: _readingPosition,
+      builder: (context, _) => ReaderToolbars(
+        metrics: ReaderChromeMetrics.of(context),
+        insets: _pageInsets,
+        top: ReaderTopBar(
+          title: completion ? _bookTitle : _effectiveChapterTitle,
+          returnToOrigin: widget.returnToOrigin,
+          onLeave: () => _leave(context),
+          menu: _menu(l),
+          onMenu: (command) => _run(context, command),
+        ),
+        bottom: ReaderBottomBar(
+          contentsTooltip:
+              _contentsLayers(context).firstOrNull?.label ?? l.catalogTitle,
+          onContents: _command(context, ReaderCommand.contents),
+          showProgress: !completion,
+          progress: completion
+              ? const SizedBox.shrink()
+              : _progressLabel(l.readerChapterPercent),
+          onProgress: _command(context, ReaderCommand.progress),
+          onSettings: _command(context, ReaderCommand.settings),
+          progressKey: completion ? null : _progressAnchor,
+        ),
       ),
     );
   }

@@ -23,6 +23,7 @@ class ReaderController extends ScopedController {
     this.onPosition,
     this.initialBlockKey,
     this.initialBlockOffset,
+    this.navigationPosition,
     this.startAtBeginning = false,
     this.startAtEnd = false,
     bool deferProgress = false,
@@ -42,6 +43,7 @@ class ReaderController extends ScopedController {
   ReadMode readMode;
   final String? initialBlockKey;
   final int? initialBlockOffset;
+  final ReaderPosition? navigationPosition;
   final bool startAtBeginning;
   final bool startAtEnd;
   final void Function(int)? onPosition;
@@ -402,6 +404,11 @@ class ReaderController extends ScopedController {
                 chapterFraction: 1,
               );
               usedFallback = false;
+            }
+            if (navigationPosition case final requested?) {
+              final resolved = resolveReaderPosition(content!, requested);
+              initialPosition = resolved.position;
+              usedFallback = resolved.usedFallback;
             }
             restoreStatus = ReaderRestoreStatus.positioning;
           }

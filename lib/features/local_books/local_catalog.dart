@@ -84,11 +84,13 @@ class LocalNavigationView extends StatefulWidget {
     required this.onSelect,
     this.current,
     this.readingOrder = const [],
+    this.selectedEntry,
   });
   final List<LocalNavigationEntry> entries;
   final ValueChanged<LocalNavigationEntry> onSelect;
   final ChapterKey? current;
   final List<ChapterKey> readingOrder;
+  final LocalNavigationEntry? selectedEntry;
   @override
   State<LocalNavigationView> createState() => _LocalNavigationViewState();
 }
@@ -135,7 +137,9 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
       }
     }
     final match = rows.indexWhere(
-      (row) => row.$1.chapterKey == selectedChapter,
+      (row) => widget.selectedEntry != null
+          ? identical(row.$1, widget.selectedEntry)
+          : row.$1.chapterKey == selectedChapter,
     );
     Widget buildRow(BuildContext context, int index) {
       final (entry, depth) = rows[index];
@@ -145,9 +149,13 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
           start: 16 + depth.clamp(0, 4) * 16,
           end: 16,
         ),
-        selected: entry.chapterKey == selectedChapter,
+        selected: widget.selectedEntry != null
+            ? index == match
+            : entry.chapterKey == selectedChapter,
         leading: Icon(
-          entry.chapterKey == selectedChapter
+          (widget.selectedEntry != null
+                  ? index == match
+                  : entry.chapterKey == selectedChapter)
               ? Icons.bookmark
               : entry.children.isEmpty
               ? Icons.article_outlined

@@ -2347,6 +2347,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Later'**
   String get importLater;
+
+  /// No description provided for @readerChapterProgressLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter progress loading'**
+  String get readerChapterProgressLoading;
+
+  /// No description provided for @readerCurrentDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Current document'**
+  String get readerCurrentDocument;
+
+  /// No description provided for @readerDocumentPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Document {percent}%'**
+  String readerDocumentPercent(String percent);
 }
 
 class _AppLocalizationsDelegate

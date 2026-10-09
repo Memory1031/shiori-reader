@@ -641,5 +641,9 @@
   },
   "importInboxFull": "The inbox is full (64 files / 512 MiB). Import or discard pending files in Shiori, then share again.",
   "importPublicationUncertain": "Files may have been received. Check pending files in Shiori before sharing again.",
-  "importLater": "Later"
+  "importLater": "Later",
+  "readerChapterProgressLoading": "Chapter progress loading",
+  "readerCurrentDocument": "Current document",
+  "readerDocumentPercent": "Document {percent}%",
+  "@readerDocumentPercent": {"placeholders": {"percent": {"type": "String"}}}
 }

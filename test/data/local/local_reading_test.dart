@@ -175,6 +175,19 @@ void main() {
           ok(await novels.loadNavigation(key, cancellation: token())),
           isNotEmpty,
         );
+        final logical = ok(
+          await novels.loadLogicalChapters(key, cancellation: token()),
+        );
+        if (format == LocalBookFormat.txt) {
+          expect(logical, isNull);
+        } else {
+          expect(logical!.metrics.revision, record.content.catalog.revision);
+          expect(logical.metrics.total, record.content.progressMetrics.total);
+          expect(logical.sections, isNotEmpty);
+          for (final chapter in record.content.chapters) {
+            expect(logical.documents[chapter.key]!.matches(chapter), isTrue);
+          }
+        }
       },
     );
   }

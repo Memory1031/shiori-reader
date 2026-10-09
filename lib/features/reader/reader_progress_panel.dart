@@ -20,6 +20,8 @@ class ReaderProgressPanel extends StatefulWidget {
     this.onPreviousChapter,
     this.onNextChapter,
     this.showChapterStepper = true,
+    this.enabled = true,
+    this.scopeLabel,
   });
   final String chapterTitle;
 
@@ -35,6 +37,8 @@ class ReaderProgressPanel extends StatefulWidget {
   final ReaderPanelDone onDone;
   final VoidCallback? onPreviousChapter, onNextChapter;
   final bool showChapterStepper;
+  final bool enabled;
+  final String? scopeLabel;
 
   @override
   State<ReaderProgressPanel> createState() => _ReaderProgressPanelState();
@@ -79,6 +83,11 @@ class _ReaderProgressPanelState extends State<ReaderProgressPanel> {
             ],
           ),
           const SizedBox(height: ShioriSpace.page),
+          if (widget.enabled && widget.scopeLabel != null)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(widget.scopeLabel!),
+            ),
           Row(
             children: [
               Expanded(
@@ -92,16 +101,22 @@ class _ReaderProgressPanelState extends State<ReaderProgressPanel> {
                 ),
               ),
               const SizedBox(width: ShioriSpace.item),
-              Text('${formatReadingPercent(_fraction)}%'),
+              Text(
+                widget.enabled
+                    ? '${formatReadingPercent(_fraction)}%'
+                    : widget.scopeLabel ?? '',
+              ),
             ],
           ),
           Slider(
             value: _fraction,
-            onChanged: (v) => setState(() {
-              _fraction = v;
-              _bookBasis = v;
-            }),
-            onChangeEnd: widget.onSeek,
+            onChanged: !widget.enabled
+                ? null
+                : (v) => setState(() {
+                    _fraction = v;
+                    _bookBasis = v;
+                  }),
+            onChangeEnd: widget.enabled ? widget.onSeek : null,
           ),
           if (widget.showChapterStepper)
             Row(

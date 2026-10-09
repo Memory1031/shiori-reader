@@ -22,6 +22,8 @@ import 'viewport/paged_reader_viewport.dart';
 import 'reader_chrome.dart';
 import 'reader_contents.dart';
 import 'reader_panel.dart';
+import '../../domain/local_chapter_progress.dart';
+import 'reader_logical_progress.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
 class BookReaderScreen extends StatefulWidget {
@@ -248,6 +250,57 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     null,
   );
   Future<void> _loadNavigation() async {
+    if (_local && widget.repository is LocalLogicalChapterRepository) {
+      return _loadLogicalMetadata();
+    }
+    return _loadPhysicalNavigation();
+  }
+
+  LocalChapterProgressIndex? _logicalIndex;
+  bool _logicalLoading = true, _logicalApplicable = true;
+  Future<void>? _logicalRequest;
+  Future<void> _loadLogicalMetadata() => _logicalRequest ??=
+      _fetchLogicalMetadata().whenComplete(() => _logicalRequest = null);
+  Future<void> _fetchLogicalMetadata() async {
+    final result = await (widget.repository as LocalLogicalChapterRepository)
+        .loadLogicalChapters(
+          widget.chapter.novelKey,
+          cancellation: _titleRequest.token,
+        );
+    if (!mounted || _invalidated || _titleRequest.token.isCancelled) return;
+    setState(() {
+      _logicalLoading = false;
+      _logicalIndex = result is Success<LocalChapterProgressIndex?>
+          ? result.value
+          : null;
+      _logicalApplicable =
+          result is! Success<LocalChapterProgressIndex?> ||
+          result.value != null;
+      if (_logicalIndex case final index?) {
+        _readingOrder = index.metrics.order;
+        _navigationTree.value = Success(index.navigation);
+        _navigation.clear();
+        void collect(List<LocalNavigationEntry> entries, int depth) {
+          for (final entry in entries) {
+            _navigation.putIfAbsent(entry.chapterKey, () => []).add((
+              entry,
+              depth,
+            ));
+            collect(entry.children, depth + 1);
+          }
+        }
+
+        collect(index.navigation, 0);
+        _navigationRevision = Object();
+      }
+    });
+    _readingOrderChanges.value++;
+    if (_logicalIndex == null) {
+      await Future.wait([_loadPhysicalNavigation(), _loadPhysicalOrder()]);
+    }
+  }
+
+  Future<void> _loadPhysicalNavigation() async {
     final repository = widget.repository;
     if (!_local || repository is! LocalNavigationRepository) return;
     final result = await (repository as LocalNavigationRepository)
@@ -380,6 +433,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   bool get _needsOrder =>
       _local && widget.repository is LocalContentLinkRepository;
   Future<void> _loadOrder() async {
+    if (_local && widget.repository is LocalLogicalChapterRepository) {
+      return _loadLogicalMetadata();
+    }
+    return _loadPhysicalOrder();
+  }
+
+  Future<void> _loadPhysicalOrder() async {
     if (!_needsOrder) return;
     final result = await (widget.repository as LocalContentLinkRepository)
         .loadReadingOrder(
@@ -486,6 +546,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     ChapterKey key, {
     String? blockKey,
     int? blockOffset,
+    ReaderPosition? navigationPosition,
     bool fromStart = false,
     bool fromEnd = false,
     bool deferProgress = false,
@@ -496,6 +557,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           chapter: key,
           initialBlockKey: blockKey,
           initialBlockOffset: blockOffset,
+          navigationPosition: navigationPosition,
           startAtBeginning: fromStart,
           startAtEnd: fromEnd,
           deferProgress: deferProgress,
@@ -637,6 +699,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     bool passive = false,
     String? blockKey,
     int? blockOffset,
+    ReaderPosition? navigationPosition,
     bool fromStart = false,
     bool fromEnd = false,
   }) {
@@ -647,6 +710,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         existing.target.chapter == chapter &&
         existing.target.initialBlockKey == blockKey &&
         existing.target.initialBlockOffset == blockOffset &&
+        existing.target.navigationPosition == navigationPosition &&
         existing.target.startAtBeginning == fromStart &&
         existing.target.startAtEnd == fromEnd) {
       if (!passive && existing.passive) {
@@ -674,6 +738,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       passive: passive,
       blockKey: blockKey,
       blockOffset: blockOffset,
+      navigationPosition: navigationPosition,
       fromStart: fromStart,
       fromEnd: fromEnd,
     );
@@ -775,6 +840,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     ChapterKey chapter, {
     String? blockKey,
     int? blockOffset,
+    ReaderPosition? navigationPosition,
     bool fromStart = false,
     bool fromEnd = false,
   }) async {
@@ -818,6 +884,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       direction: direction,
       blockKey: blockKey,
       blockOffset: blockOffset,
+      navigationPosition: navigationPosition,
       fromStart: fromStart,
       fromEnd: fromEnd,
     );
@@ -856,6 +923,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   void _targetReady(ReaderController reader) {
     final operation = _operation;
     if (operation == null || !_valid(operation) || operation.target != reader) {
+      return;
+    }
+    if (reader.navigationPosition case final position?
+        when position.contentRevision != reader.content?.contentRevision) {
+      _rejectPending(reader);
       return;
     }
     setState(() {
@@ -1290,6 +1362,40 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
+  Future<void> _navigateLogical(
+    ReaderController source,
+    LocalChapterProgressIndex? basis,
+    LocalChapterSection section,
+    LocalChapterTarget target,
+  ) async {
+    if (!mounted ||
+        _invalidated ||
+        _changing ||
+        source != _reader ||
+        source.isClosed ||
+        _route?.isCurrent == false ||
+        basis == null ||
+        !identical(basis, _logicalIndex) ||
+        !basis.sections.contains(section) ||
+        !section.reliable ||
+        basis.documents[source.chapter]?.matches(source.content!) != true ||
+        basis.documents[target.chapter]?.revision !=
+            target.position.contentRevision) {
+      return;
+    }
+    if (target.chapter == source.chapter) {
+      source.beginPositionNavigation();
+      setState(() => _completion = null);
+      _viewports[source]?.restore(target.position);
+    } else {
+      await _switch(
+        target.chapter,
+        navigationPosition: target.position,
+        fromStart: true,
+      );
+    }
+  }
+
   /// Set while a link is being validated for an auxiliary reader, so a
   /// repeated activation opens it once.
   bool _openingLink = false;
@@ -1374,6 +1480,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           _catalogChanges,
         ]),
         current: _reader.chapter,
+        selectedEntry: _logicalIndex
+            ?.sectionAt(_reader.chapter, _viewports[_reader]?.capture())
+            ?.entry,
         onRetry: _loadNavigation,
         onSelect: (target) {
           if (mounted) _followContentTarget(target.chapterKey, target.blockKey);
@@ -1487,6 +1596,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   Widget _view(ReaderController reader, {required bool active}) {
+    final logicalBasis = _logicalIndex;
     final (order, positions) = _readingSequence();
     final index = positions[reader.chapter] ?? -1;
     final previous = index > 0 && widget.linkDepth == 0
@@ -1560,6 +1670,26 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     return ReaderContentView(
       key: ValueKey(reader),
       content: reader.content!,
+      logicalProgress:
+          _local &&
+              widget.repository is LocalLogicalChapterRepository &&
+              _logicalApplicable
+          ? ReaderLogicalProgress(
+              loading: _logicalLoading,
+              index:
+                  _logicalIndex?.documents[reader.chapter]?.matches(
+                            reader.content!,
+                          ) ==
+                          true &&
+                      (_catalog.loaded == null ||
+                          _catalog.loaded!.value.revision ==
+                              _logicalIndex!.metrics.revision)
+                  ? _logicalIndex
+                  : null,
+              navigate: (section, target) =>
+                  _navigateLogical(reader, logicalBasis, section, target),
+            )
+          : null,
       completion: reader == _reader ? _completion : null,
       completionTarget: terminal,
       completionBasis: (reader, order, terminal),

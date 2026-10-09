@@ -1332,4 +1332,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importLater => 'Later';
+
+  @override
+  String get readerChapterProgressLoading => 'Chapter progress loading';
+
+  @override
+  String get readerCurrentDocument => 'Current document';
+
+  @override
+  String readerDocumentPercent(String percent) {
+    return 'Document $percent%';
+  }
 }

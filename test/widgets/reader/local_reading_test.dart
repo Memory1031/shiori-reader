@@ -586,10 +586,20 @@ void main() {
         expect(find.text('In-volume contents'), findsNothing);
         expect(
           tester
-              .widget<ListTile>(find.byKey(const ValueKey(('local-toc', 2))))
+              .widget<ListTile>(find.byKey(const ValueKey(('local-toc', 4))))
               .selected,
           isTrue,
         );
+        // The parser's null block target is the file start. Only its deepest
+        // row owns this anchor; later targets in the same file are not selected.
+        for (final row in [2, 3]) {
+          expect(
+            tester
+                .widget<ListTile>(find.byKey(ValueKey(('local-toc', row))))
+                .selected,
+            isFalse,
+          );
+        }
         await tester.tap(find.text('第二段'));
         await tester.pumpAndSettle();
         final target = content.navigation.last.children.first;

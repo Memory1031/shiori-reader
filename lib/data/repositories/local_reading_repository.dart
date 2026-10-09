@@ -1,6 +1,7 @@
 import '../../domain/contracts/contracts.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
+import '../../domain/local_chapter_progress.dart';
 
 /// Local identity dispatch happens before all online cache/source decorators.
 /// Borrowed dependencies retain their original lifetime owners.
@@ -9,6 +10,7 @@ class LocalReadingRepository
         NovelRepository,
         LocalNavigationRepository,
         LocalBookProgressRepository,
+        LocalLogicalChapterRepository,
         LocalPagePresentationRepository,
         LocalBookInvalidation,
         LocalContentLinkRepository {
@@ -65,6 +67,41 @@ class LocalReadingRepository
       ? (local as LocalBookInvalidation).changes
       : const Stream.empty();
   final NovelRepository online;
+  @override
+  Future<Result<LocalChapterProgressIndex?>> loadLogicalChapters(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  }) async {
+    final result = await local.read(key, cancellation: cancellation);
+    if (cancellation.isCancelled) {
+      return Failure(AppFailure.cancelled(Operation.catalog));
+    }
+    if (result case Failure(:final failure)) return Failure(failure);
+    final record = (result as Success<LocalBookRecord?>).value;
+    if (record == null) {
+      return Failure(
+        AppFailure(kind: FailureKind.notFound, operation: Operation.catalog),
+      );
+    }
+    if (record.format == LocalBookFormat.txt) return const Success(null);
+    LocalChapterProgressIndex? index;
+    try {
+      index = LocalChapterProgressIndex.build(
+        metrics: record.content.progressMetrics,
+        chapters: record.content.chapters,
+        navigation: record.content.navigation,
+      );
+    } on ArgumentError {
+      // Incomplete weights are unavailable, never a partial denominator.
+      index = null;
+    }
+    return index == null
+        ? Failure(
+            AppFailure(kind: FailureKind.parse, operation: Operation.catalog),
+          )
+        : Success(index);
+  }
+
   @override
   Future<Result<String?>> loadPagePresentation(
     ChapterKey chapter, {

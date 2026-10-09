@@ -79,6 +79,13 @@ final class BookProgressMetrics {
   final _entries = <ChapterKey, (int, int, int)>{};
   late final int total;
   int? ordinal(ChapterKey chapter) => _entries[chapter]?.$3;
+  int? weight(ChapterKey chapter) => _entries[chapter]?.$2;
+  double? coordinate(ChapterKey chapter, double fraction) {
+    finiteRange(fraction, 0, 1, 'chapterFraction');
+    final entry = _entries[chapter];
+    return entry == null ? null : entry.$1 + entry.$2 * fraction;
+  }
+
   bool isLast(ChapterKey chapter) => order.isNotEmpty && order.last == chapter;
   BookProgressSnapshot? at(
     ChapterKey chapter,

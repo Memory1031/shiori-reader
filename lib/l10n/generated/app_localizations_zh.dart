@@ -1207,4 +1207,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get importLater => '稍后';
+
+  @override
+  String get readerChapterProgressLoading => '章节进度加载中';
+
+  @override
+  String get readerCurrentDocument => '当前文档';
+
+  @override
+  String readerDocumentPercent(String percent) {
+    return '当前文档 $percent%';
+  }
 }

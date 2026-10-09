@@ -284,6 +284,7 @@ ReaderContentsLayer localContentsLayer(
   required List<ChapterKey> Function() readingOrder,
   required Listenable readingOrderChanges,
   required ChapterKey current,
+  LocalNavigationEntry? selectedEntry,
   required VoidCallback onRetry,
   required ValueChanged<LocalNavigationEntry> onSelect,
 }) => ReaderContentsLayer(
@@ -299,6 +300,7 @@ ReaderContentsLayer localContentsLayer(
       Success(:final value) => LocalNavigationView(
         entries: value,
         current: current,
+        selectedEntry: selectedEntry,
         readingOrder: readingOrder(),
         onSelect: (entry) => done(() => onSelect(entry)),
       ),
