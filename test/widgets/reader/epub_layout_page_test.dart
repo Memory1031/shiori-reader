@@ -256,7 +256,9 @@ void main() {
       );
       expect(
         html,
-        contains(':where(body:not(.shiori-svg-page) p){max-width:100%;}'),
+        contains(
+          '@layer{:where(body:not(.shiori-svg-page) p){max-width:100%;}}',
+        ),
       );
       expect(html, contains('width:600px;white-space:nowrap'));
       expect(html, contains('Synthetic wide text'));
@@ -266,10 +268,14 @@ void main() {
     },
   );
 
-  test('host width default precedes every authored paragraph limit', () {
-    for (final selector in ['.left', 'p.left', 'p', '*', ':where(p)']) {
+  test('host width default precedes authored rules and cascade layers', () {
+    for (final limit in [
+      for (final selector in ['.left', 'p.left', 'p', '*', ':where(p)'])
+        '$selector{max-width:120px;}',
+      '@layer publisher{.left{max-width:120px;}}',
+      '@layer publisher{#left{max-width:120px;}}',
+    ]) {
       final files = epubFiles();
-      final limit = '$selector{max-width:120px;}';
       files['OPS/text/a.xhtml'] = utf8.encode(
         '<html><head><style>'
         '.stage{position:relative;height:260px;}'
@@ -277,7 +283,7 @@ void main() {
         '.left{position:absolute;top:0;left:0;width:100%;}'
         '.right{position:absolute;top:0;left:150px;width:120px;}'
         '$limit</style></head><body><div class="stage">'
-        '<p class="left">Left synthetic text wraps inside its narrow region.</p>'
+        '<p id="left" class="left">Left synthetic text wraps inside its narrow region.</p>'
         '<p class="right">Right synthetic text stays in its own region.</p>'
         '</div></body></html>',
       );
@@ -297,10 +303,18 @@ void main() {
         false,
       );
       const fallback =
-          '<style>:where(body:not(.shiori-svg-page) p){max-width:100%;}</style>';
+          '<style>@layer{:where(body:not(.shiori-svg-page) p){max-width:100%;}}</style>';
       expect(html.indexOf(fallback), greaterThanOrEqualTo(0));
       expect(html.indexOf(fallback), lessThan(html.indexOf(limit)));
       expect(html, isNot(contains('body:not(.shiori-svg-page) p{')));
+      expect(
+        html,
+        isNot(
+          contains(
+            '<style>:where(body:not(.shiori-svg-page) p){max-width:100%;}</style>',
+          ),
+        ),
+      );
       expect(html, contains('class="left"'));
       expect(html, contains('class="right"'));
       expect(html, contains("script-src 'none'"));

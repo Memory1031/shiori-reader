@@ -29,11 +29,11 @@ String epubLayoutDocument(
       brightness == Brightness.dark && html.contains('class="shiori-svg-page"')
       ? 'body.shiori-svg-page>svg text:not([fill]){fill:#$ink;}'
       : '';
-  // Zero specificity and earlier order let every authored limit win,
-  // including universal selectors. This is only a default for unbounded p.
+  // The first anonymous layer stays below authored layers and unlayered rules.
+  // Engines without cascade layers ignore this optional width protection.
   final document = html.replaceFirst(
     '<head>',
-    '<head><style>:where(body:not(.shiori-svg-page) p){max-width:100%;}</style>',
+    '<head><style>@layer{:where(body:not(.shiori-svg-page) p){max-width:100%;}}</style>',
   );
   return document.replaceFirst('</head>', '''<style>
 html,body{background:#$background!important;color:#$ink;margin:0!important;}
