@@ -210,6 +210,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void didUpdateWidget(ReaderContentView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.logicalProgress?.loading == true &&
+        widget.logicalProgress?.loading != true) {
+      // The modal lives in another overlay branch; update it after this build.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _progressMetadataChanges.value++;
+      });
+    }
     if (!widget.active || widget.session?.isClosed == true) {
       _cancelCompletion(immediate: true);
     }
@@ -224,6 +231,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       // and retires its panel; a choice still coming back from it is not
       // applied, since the page no longer takes commands.
       _progressRequest++;
+      _dismissProgressPanel();
       _panel?.dismiss();
       _panel = null;
     }
@@ -282,6 +290,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
       _progressRequest++;
+      _dismissProgressPanel();
       _dragSurface.currentState?.cancel();
       _cancelCompletion(immediate: true);
       unawaited(_preferences.flush());
@@ -630,6 +639,22 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   /// Bumped to drop a progress request still waiting for the toolbars.
   int _progressRequest = 0;
+  final _progressMetadataChanges = ValueNotifier(0);
+  ModalRoute<VoidCallback>? _progressRoute;
+
+  /// Retire only the progress host. A result already in its closing animation
+  /// still finishes normally, but its request generation prevents navigation.
+  void _dismissProgressPanel() {
+    final route = _progressRoute;
+    _progressRoute = null;
+    if (route == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigator = route.navigator;
+      if (navigator != null && navigator.mounted && route.isActive) {
+        navigator.removeRoute(route);
+      }
+    });
+  }
 
   bool get _progressAnchored {
     final anchor = _progressAnchor.currentContext?.findRenderObject();
@@ -816,6 +841,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _panel?.dismiss();
     _panel = null;
     _progressRequest++;
+    _dismissProgressPanel();
+    _progressMetadataChanges.dispose();
     _pageFocus.dispose();
     _wheelCooldown?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -1399,27 +1426,42 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   Future<void> _progressPanel(BuildContext context) async {
     final request = _progressRequest;
-    final logical = widget.logicalProgress;
-    final index = logical?.index;
-    final section = _logicalSection;
     final session = widget.session, content = widget.content;
-    final anchor = section == null
-        ? _displayChapterFraction
-        : section.fraction(
-            index!.coordinate(content.key, _displayChapterFraction)!,
-          );
-    final visible = _visibleScopeFraction;
-    final title = _effectiveChapterTitle;
+    capture() {
+      final logical = widget.logicalProgress;
+      final index = logical?.index;
+      final section = _logicalSection;
+      return (
+        logical: logical,
+        index: index,
+        section: section,
+        anchor: section == null
+            ? _displayChapterFraction
+            : section.fraction(
+                index!.coordinate(content.key, _displayChapterFraction)!,
+              ),
+        visible: _visibleScopeFraction,
+        title: _effectiveChapterTitle,
+      );
+    }
+
+    var basis = capture();
     final l = AppLocalizations.of(context);
-    bool valid() =>
+    bool sameReader() =>
         mounted &&
         request == _progressRequest &&
         identical(widget.session, session) &&
         widget.content == content &&
-        (logical == null || identical(widget.logicalProgress?.index, index)) &&
         session?.isClosed != true;
+    bool valid() =>
+        sameReader() &&
+        (basis.logical == null ||
+            identical(widget.logicalProgress?.index, basis.index));
     bool live() => valid() && _interactive;
     VoidCallback? step(int direction) {
+      final logical = basis.logical,
+          index = basis.index,
+          section = basis.section;
       if (logical == null) {
         return direction < 0 ? _actions.previousChapter : _actions.nextChapter;
       }
@@ -1435,74 +1477,99 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
 
     Widget progress(ReaderPanelDone onDone, bool Function() accepts) =>
-        ReaderProgressPanel(
-          chapterTitle: title,
-          chapterFraction: visible,
-          anchorFraction: anchor,
-          enabled: logical?.loading != true,
-          scopeLabel: logical?.loading == true
-              ? l.readerChapterProgressLoading
-              : logical != null && section == null
-              ? l.readerCurrentDocument
-              : null,
-          bookFractionAt: (fraction) => section == null
-              ? session?.bookProgressAt(fraction)?.fraction
-              : index!.bookFractionAt(section, fraction),
-          onSeek: (fraction) {
-            if (!valid() || !accepts()) return;
-            if (index == null || section == null) {
-              _seekChapter(fraction);
-              return;
+        ListenableBuilder(
+          listenable: _progressMetadataChanges,
+          builder: (context, _) {
+            // Only a disabled loading placeholder adopts new metadata. Once
+            // usable, the section and conversion callbacks stay frozen.
+            if (sameReader() &&
+                basis.logical?.loading == true &&
+                widget.logicalProgress?.loading != true) {
+              basis = capture();
             }
-            final target = index.target(section, fraction);
-            if (target.chapter == content.key) {
-              _navigateTo(target.position);
-            } else {
-              onDone(() {
-                if (live()) unawaited(logical!.navigate(section, target));
-              });
-            }
+            final logical = basis.logical,
+                index = basis.index,
+                section = basis.section;
+            return ReaderProgressPanel(
+              key: ObjectKey(logical),
+              chapterTitle: basis.title,
+              chapterFraction: basis.visible,
+              anchorFraction: basis.anchor,
+              enabled: logical?.loading != true,
+              scopeLabel: logical?.loading == true
+                  ? l.readerChapterProgressLoading
+                  : logical != null && section == null
+                  ? l.readerCurrentDocument
+                  : null,
+              bookFractionAt: (fraction) => section == null
+                  ? session?.bookProgressAt(fraction)?.fraction
+                  : index!.bookFractionAt(section, fraction),
+              onSeek: (fraction) {
+                if (!valid() || !accepts()) return;
+                if (index == null || section == null) {
+                  _seekChapter(fraction);
+                  return;
+                }
+                final target = index.target(section, fraction);
+                if (target.chapter == content.key) {
+                  _navigateTo(target.position);
+                } else {
+                  onDone(() {
+                    if (live()) unawaited(logical!.navigate(section, target));
+                  });
+                }
+              },
+              onDone: onDone,
+              showChapterStepper: logical == null
+                  ? _actions.hasChapterStepper
+                  : section != null,
+              onPreviousChapter: step(-1),
+              onNextChapter: step(1),
+            );
           },
-          onDone: onDone,
-          showChapterStepper: logical == null
-              ? _actions.hasChapterStepper
-              : section != null,
-          onPreviousChapter: step(-1),
-          onNextChapter: step(1),
         );
     if (!_desktopPanels) {
       Future<dynamic>? completed;
+      ModalRoute<VoidCallback>? route;
       final intent = await showReaderSheet<VoidCallback>(
         context,
         builder: (sheet) {
-          final route = ModalRoute.of(sheet)!;
-          completed = route.completed;
+          if (route == null) {
+            route = ModalRoute.of<VoidCallback>(sheet)!;
+            _progressRoute = route;
+            completed = route!.completed;
+            if (!sameReader()) _dismissProgressPanel();
+          }
+          final sheetRoute = route!;
           return progress(
             ([then]) {
-              if (route.isCurrent) Navigator.of(sheet).pop(then);
+              if (sheetRoute.isCurrent) Navigator.of(sheet).pop(then);
             },
             () =>
-                route.isCurrent &&
+                sheetRoute.isCurrent &&
                 mounted &&
                 identical(widget.session, session),
           );
         },
       );
       await completed;
+      if (identical(_progressRoute, route)) _progressRoute = null;
       if (intent != null && live()) intent();
       return;
     }
     // Same-document seeks retain the panel; other choices leave as its result.
     final panel = _openPanel<VoidCallback>(
       ReaderPanelPlacement.anchored,
-      semanticLabel: title,
+      semanticLabel: basis.title,
       anchor: _progressAnchor,
       builder: (context, panel) =>
           progress(([then]) => panel.close(then), () => _owns(panel)),
     );
     if (panel == null) return;
+    _progressRoute = panel.route;
     final intent = await panel.closed;
     await panel.completed;
+    if (identical(_progressRoute, panel.route)) _progressRoute = null;
     if (intent != null && live()) intent();
   }
 

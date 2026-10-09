@@ -489,12 +489,15 @@ void main() {
   }
 
   testWidgets(
-    'metadata loading disables physical slider; one snapshot becomes ready',
+    'open loading panel adopts one complete logical snapshot before scrubbing',
     (tester) async {
       final reader = await mount(tester, delayedMetadata: true);
       expect(find.text('Chapter progress loading'), findsOneWidget);
       expect(find.text('Chapter 100%'), findsNothing);
       await openProgress(tester);
+      final host = ModalRoute.of(
+        tester.element(find.byType(ReaderProgressPanel)),
+      );
       expect(tester.widget<Slider>(find.byType(Slider)).onChangeEnd, isNull);
       expect(
         tester
@@ -502,17 +505,89 @@ void main() {
             .enabled,
         isFalse,
       );
-      await closeOverlay(tester);
       reader.repo.metadata!.complete();
       await decodeImages(tester);
       await tester.pumpAndSettle();
       expect(reader.repo.metadataReads, 1);
       expect(find.text('Chapter 30%'), findsOneWidget);
-      await openProgress(tester);
+      expect(find.byType(ReaderProgressPanel), findsOneWidget);
+      expect(find.text('Chapter progress loading'), findsNothing);
+      expect(
+        ModalRoute.of(tester.element(find.byType(ReaderProgressPanel))),
+        same(host),
+      );
+      final panel = tester.widget<ReaderProgressPanel>(
+        find.byType(ReaderProgressPanel),
+      );
+      expect(panel.enabled, isTrue);
+      expect(panel.chapterTitle, 'First logical');
+      expect(panel.scopeLabel, isNull);
+      expect(panel.chapterFraction, closeTo(4 / 13, 1e-12));
+      expect(panel.anchorFraction, closeTo(3 / 13, 1e-12));
+      expect(panel.bookFractionAt!(.8), closeTo(.8 * 13 / 15, 1e-12));
+      expect(
+        tester.widget<Slider>(find.byType(Slider)).value,
+        closeTo(4 / 13, 1e-12),
+      );
       expect(tester.widget<Slider>(find.byType(Slider)).onChangeEnd, isNotNull);
-      await closeOverlay(tester);
+      await dragTo(tester, .8, preview: true, reader: reader);
+      expect(find.byType(ReaderProgressPanel), findsNothing);
+      final view = reader.view(tester);
+      expect(view.content.key, reader.book.chapters[2].key);
+      final index = view.logicalProgress!.index!;
+      final target = index.target(index.sections.first, .8).position;
+      final block = view.content.blocks[target.blockIndex] as ParagraphBlock;
+      visibleSource(
+        tester,
+        block,
+        (block.text.runes.length * target.blockFraction).floor(),
+      );
+      expect(tester.takeException(), isNull);
     },
   );
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
+    testWidgets(
+      'backgrounding retires an open progress host on $platform',
+      (tester) async {
+        await tester.binding.setSurfaceSize(
+          platform == TargetPlatform.windows
+              ? const Size(1500, 900)
+              : const Size(800, 600),
+        );
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        addTearDown(
+          () => tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          ),
+        );
+        final reader = await mount(tester);
+        final source = reader.view(tester);
+        final position = source.viewportController!.capture();
+        await openProgress(tester);
+        final stale = tester.widget<Slider>(find.byType(Slider)).onChangeEnd!;
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pumpAndSettle();
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(ReaderProgressPanel), findsNothing);
+        stale(.8);
+        await tester.pumpAndSettle();
+        expect(reader.view(tester).session, same(source.session));
+        expect(reader.view(tester).viewportController!.capture(), position);
+        await openProgress(tester);
+        await dragTo(tester, .8);
+        expect(reader.view(tester).content.key, reader.book.chapters[2].key);
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(platform),
+    );
+  }
 
   testWidgets(
     'failed logical target and cancelled late success preserve source and save',
