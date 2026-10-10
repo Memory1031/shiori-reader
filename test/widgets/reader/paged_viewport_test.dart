@@ -7,10 +7,68 @@ import 'package:shiori/features/reader/viewport/page_layout.dart';
 import 'package:shiori/features/reader/viewport/page_turn.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/features/reader/viewport/render_chunk.dart';
+import 'package:shiori/features/reader/reader_linked_text.dart';
 
 import 'viewport_test.dart' show at;
 
 void main() {
+  testWidgets('in-page restore retains text through every frame', (
+    tester,
+  ) async {
+    final controller = PagedReaderController();
+    final content = ChapterContent(
+      key: fixtureChapterKey(FixtureScenario.shortChapter),
+      title: 'In-page link',
+      blocks: [ParagraphBlock(text: 'Synthetic paragraph content. ' * 100)],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(
+          child: SizedBox(
+            width: 300,
+            height: 300,
+            child: PagedReaderViewport(
+              content: content,
+              controller: controller,
+              turnStyle: PageTurnStyle.none,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final next = controller.next();
+    await tester.pumpAndSettle();
+    await next;
+    final anchor = controller.capture()!;
+    expect(anchor.blockFraction, greaterThan(0));
+    final text = find.byType(ReaderLinkedText).first;
+    final element = text.evaluate().single;
+    final target = at(content, 0, anchor.blockFraction + .002);
+    controller.restore(target);
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(text.evaluate().single, same(element));
+    expect(controller.capture()!.blockFraction, target.blockFraction);
+    await tester.pumpAndSettle();
+    expect(text.evaluate().single, same(element));
+    final previous = controller.previous();
+    await tester.pumpAndSettle();
+    await previous;
+    expect(controller.capture()!.blockFraction, 0);
+    final returnNext = controller.next();
+    await tester.pumpAndSettle();
+    await returnNext;
+    expect(controller.capture()!.blockFraction, target.blockFraction);
+    // This target lies inside a previously measured page, but not the one
+    // currently shown. It should also avoid an intermediate seek frame.
+    controller.restore(at(content, 0, .002));
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(controller.capture()!.blockFraction, .002);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('reflow cancels a boundary handle once outside layout', (
     tester,
   ) async {
@@ -126,6 +184,14 @@ void main() {
     expect(controller.capture()!.blockIndex, 1);
     expect(mounts, 1);
     expect(disposals, 0);
+    final imageState = tester.state(find.byType(_ImageMountProbe));
+    controller.restore(at(content, 1));
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(tester.state(find.byType(_ImageMountProbe)), same(imageState));
+    expect(mounts, 1);
+    expect(disposals, 0);
+    await tester.pumpAndSettle();
     final previous = controller.previous();
     await tester.pumpAndSettle();
     await previous;

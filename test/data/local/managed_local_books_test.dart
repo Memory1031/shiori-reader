@@ -16,6 +16,7 @@ import 'package:shiori/data/repositories/local_reading_repository.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'local_reading_test.dart' show ForbiddenOnline;
+import 'epub_html_links_test.dart' show htmlLinkFiles;
 
 T ok<T>(Result<T> result) => (result as Success<T>).value;
 CancellationToken token() => CancellationSource().token;
@@ -878,6 +879,48 @@ void main() {
 
     Future<Map<String, dynamic>> manifestAt(File file) async =>
         jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+
+    test(
+      'HTML anchor identities survive import, cold open and reparse',
+      () async {
+        final imported = await importEpub(htmlLinkFiles());
+        final key = imported.content.detail.summary.key;
+        final source = imported.content.chapters.first.key;
+        final first = imported.content.links.first;
+        expect(first.presentationId, 0);
+        expect(first.targetOffset, greaterThan(0));
+        await store.close();
+        await db.close();
+        db = UserDatabase(NativeDatabase(paths.userDatabase));
+        store = ok(await ManagedLocalBooks.open(paths, db));
+        final reopened = ok(
+          await store.loadContentLinks(source, cancellation: token()),
+        );
+        expect(reopened.first.toJson(), first.toJson());
+        final page = ok(
+          await store.loadPagePresentation(source, cancellation: token()),
+        )!;
+        expect(page, contains('href="https://shiori.invalid/link/0"'));
+        expect(page, isNot(contains('b.xhtml#b')));
+        ok(
+          await store.reparseBook(
+            key,
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+            cancellation: token(),
+          ),
+        );
+        expect(
+          ok(
+            await store.loadContentLinks(source, cancellation: token()),
+          ).first.toJson(),
+          first.toJson(),
+        );
+        expect(
+          ok(await store.loadPagePresentation(source, cancellation: token())),
+          page,
+        );
+      },
+    );
 
     test(
       'import writes the same pinned artifacts a reparse of it publishes',

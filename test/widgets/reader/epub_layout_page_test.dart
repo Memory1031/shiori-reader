@@ -29,6 +29,8 @@ import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 
 import '../../support/contract_fakes.dart';
 import '../../data/local/epub_svg_links_test.dart' show svgLinksParser;
+import '../../data/local/epub_html_links_test.dart' show htmlLinksParser;
+import 'package:shiori/shared/epub_link_address.dart';
 import '../../data/local/support/epub_fixtures.dart';
 import '../../data/local/local_reading_test.dart' show ForbiddenOnline;
 import 'local_reading_test.dart' show MemoryBooks;
@@ -94,6 +96,8 @@ class _Controller extends PlatformInAppWebViewController {
   final scripts = <String>[];
   Object? scrollPosition = <num>[0, 0];
   Completer<dynamic>? readScroll, restoreScroll;
+  Object? hitAddress;
+  Completer<dynamic>? readHit;
 
   @override
   Future<dynamic> evaluateJavascript({
@@ -101,6 +105,9 @@ class _Controller extends PlatformInAppWebViewController {
     ContentWorld? contentWorld,
   }) async {
     scripts.add(source);
+    if (source.startsWith('(function(){\nconst v=')) {
+      return readHit == null ? hitAddress : readHit!.future;
+    }
     if (source.startsWith('[')) {
       return readScroll == null ? scrollPosition : readScroll!.future;
     }
@@ -376,6 +383,151 @@ void main() {
     expect(platform.heads.length, greaterThanOrEqualTo(minHeads));
   }
 
+  for (final os in ['android', 'ios', 'windows']) {
+    testWidgets('HTML links consume taps and cancel native navigation on $os', (
+      tester,
+    ) async {
+      final parser = htmlLinksParser();
+      final content = parser.parse().content;
+      final source = content.chapters.first;
+      final links = content.links
+          .where((link) => link.source == source.key)
+          .toList();
+      final followed = <LocalContentLink>[];
+      await tester.pumpWidget(
+        page(
+          os: os,
+          html: parser.presentations[source.key.chapterId]!,
+          links: links,
+          onLink: followed.add,
+        ),
+      );
+      await tester.pumpAndSettle();
+      if (os == 'windows') {
+        // The shared profile directory is created outside the fake clock.
+        for (var i = 0; i < 100 && platform.views.isEmpty; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pumpAndSettle();
+        }
+        expect(platform.views, hasLength(1), reason: 'Native host not created');
+      }
+      dynamic native = os == 'windows'
+          ? platform.views.single
+          : platform.heads.single;
+      Future<NavigationActionPolicy> navigate(
+        String address, {
+        bool main = true,
+        bool gesture = true,
+      }) async => await native.params.shouldOverrideUrlLoading!(
+        native.wrapped,
+        NavigationAction(
+          request: URLRequest(url: WebUri(address)),
+          isForMainFrame: main,
+          hasGesture: gesture,
+        ),
+      );
+      expect(await navigate(epubLinkAddress(0)), NavigationActionPolicy.CANCEL);
+      expect(followed, isEmpty); // The document is not ready yet.
+      native.finish();
+      await tester.pumpAndSettle();
+      final controller = platform.views.single.controller;
+      expect(native.params.initialSettings!.javaScriptEnabled, isTrue);
+      expect(native.params.initialData!.data, contains("script-src 'none'"));
+      controller.hitAddress = epubLinkAddress(0);
+      await tester.tapAt(const Offset(30, 200));
+      expect(await navigate(epubLinkAddress(0)), NavigationActionPolicy.CANCEL);
+      await tester.pumpAndSettle();
+      expect(followed.single, same(links.first));
+      expect([previous, center, next], [0, 0, 0]);
+      native.params.onReceivedError!(
+        native.wrapped,
+        WebResourceRequest(
+          url: WebUri(epubLinkAddress(0)),
+          isForMainFrame: true,
+        ),
+        WebResourceError(
+          type: WebResourceErrorType.CANCELLED,
+          description: 'Canceled by navigation policy',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(failed, 0);
+      expect(platform.views, hasLength(1));
+
+      // Native keyboard/accessibility activation resolves by ID, not label.
+      expect(await navigate(epubLinkAddress(1)), NavigationActionPolicy.CANCEL);
+      expect(followed.last.target, content.auxiliaryChapters.single.key);
+      expect(followed, hasLength(2));
+      for (final address in [
+        epubLinkAddress(9876),
+        '${epubLinkAddress(0)}#other',
+        'https://example.invalid',
+        'file:///private/book',
+        'javascript:alert(1)',
+      ]) {
+        expect(await navigate(address), NavigationActionPolicy.CANCEL);
+      }
+      await navigate(epubLinkAddress(0), main: false);
+      await navigate(epubLinkAddress(0), gesture: false);
+      expect(followed, hasLength(2));
+
+      await tester.dragFrom(const Offset(30, 200), const Offset(100, 0));
+      expect(previous, 1);
+      expect(followed, hasLength(2));
+      controller.hitAddress = null;
+      await tester.tapAt(const Offset(400, 200));
+      await tester.pumpAndSettle();
+      expect(center, 1);
+
+      // Native activation wins even if its hit query is still pending.
+      controller.readHit = Completer<dynamic>();
+      await tester.tapAt(const Offset(770, 200));
+      await navigate(epubLinkAddress(0));
+      controller.readHit!.complete(null);
+      await tester.pumpAndSettle();
+      expect(followed, hasLength(3));
+      expect(next, 0);
+      await tester.pumpWidget(page(os: os));
+      await tester.pumpAndSettle();
+      await navigate(epubLinkAddress(0));
+      expect(followed, hasLength(3));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('late or failed HTML hit queries cannot tap another document', (
+    tester,
+  ) async {
+    final parser = htmlLinksParser();
+    final content = parser.parse().content;
+    final source = content.chapters.first;
+    await tester.pumpWidget(
+      page(
+        html: parser.presentations[source.key.chapterId]!,
+        links: content.links,
+      ),
+    );
+    await tester.pumpAndSettle();
+    platform.heads.single.finish();
+    await tester.pumpAndSettle();
+    final controller = platform.views.single.controller;
+    controller.readHit = Completer<dynamic>();
+    await tester.tapAt(const Offset(400, 200));
+    controller.readHit!.completeError(StateError('native hit test failed'));
+    await tester.pumpAndSettle();
+    expect(previous + center + next, 0);
+    controller.readHit = Completer<dynamic>();
+    await tester.tapAt(const Offset(400, 200));
+    await tester.pumpWidget(page());
+    await tester.pumpAndSettle();
+    controller.readHit!.complete(null);
+    await tester.pumpAndSettle();
+    expect(previous + center + next, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Windows A-B-A artwork restores loaded hotspots without navigation',
     (tester) async {
@@ -633,6 +785,141 @@ void main() {
       expect(next, 0);
     }
   });
+
+  for (final auxiliary in [false, true]) {
+    testWidgets(
+      'HTML TOC reaches a real ${auxiliary ? 'auxiliary' : 'main'} Reader target',
+      (tester) async {
+        final parser = htmlLinksParser();
+        final content = parser.parse().content;
+        final local = _SvgBooks(
+          LocalBookRecord(
+            content: content,
+            format: LocalBookFormat.epub,
+            importedAt: DateTime.utc(2025),
+          ),
+          parser.presentations,
+        );
+        final repo = LocalReadingRepository(
+          online: ForbiddenOnline(),
+          local: local,
+        );
+        final library = FixtureLibraryRepository();
+        final settings = FixtureSettingsStore();
+        await settings.save(
+          ReaderSettings(controlsHintSeen: true),
+          cancellation: CancellationSource().token,
+        );
+        await tester.pumpWidget(
+          EpubWebViewHost(
+            userDataDirectory: temp,
+            operatingSystem: 'android',
+            child: ShioriApp(
+              locale: const Locale('en'),
+              routes: AppRoutes(
+                home: (_) => BookReaderScreen(
+                  chapter: content.chapters.first.key,
+                  repository: repo,
+                  library: library,
+                  settings: settings,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final native = platform.heads.single;
+        native.finish();
+        await tester.pumpAndSettle();
+        final before = tester.widget<ReaderContentView>(
+          find.byType(ReaderContentView),
+        );
+        expect(before.session!.contentLinks.first.presentationId, 0);
+        expect(
+          await native.params.shouldOverrideUrlLoading!(
+            native.wrapped,
+            NavigationAction(
+              request: URLRequest(
+                url: WebUri(epubLinkAddress(auxiliary ? 1 : 0)),
+              ),
+              isForMainFrame: true,
+              hasGesture: true,
+            ),
+          ),
+          NavigationActionPolicy.CANCEL,
+        );
+        await tester.pumpAndSettle();
+        final reader = tester.widget<ReaderContentView>(
+          find.byType(ReaderContentView),
+        );
+        expect(
+          reader.content.key,
+          auxiliary
+              ? content.auxiliaryChapters.single.key
+              : content.chapters.last.key,
+        );
+        final displayed = tester
+            .widgetList<RichText>(find.byType(RichText))
+            .map((w) => w.text.toPlainText())
+            .join();
+        expect(
+          displayed,
+          contains(auxiliary ? 'AUXILIARY_DESTINATION' : 'DESTINATION'),
+        );
+        if (auxiliary) {
+          expect(reader.session!.library, isNull);
+          // A late native event from the covered TOC must not change it.
+          await native.params.shouldOverrideUrlLoading!(
+            native.wrapped,
+            NavigationAction(
+              request: URLRequest(url: WebUri(epubLinkAddress(0))),
+              isForMainFrame: true,
+              hasGesture: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<ReaderContentView>(find.byType(ReaderContentView))
+                .content
+                .key,
+            before.content.key,
+          );
+          expect(
+            tester
+                .widget<ReaderContentView>(find.byType(ReaderContentView))
+                .session,
+            same(before.session),
+          );
+        } else {
+          expect(reader.session!.library, same(library));
+          expect(displayed, isNot(contains('BEFORE')));
+          final viewport = tester.widget<PagedReaderViewport>(
+            find.byType(PagedReaderViewport),
+          );
+          expect(viewport.controller.capture()!.blockFraction, greaterThan(0));
+          expect(find.byType(BookReaderScreen), findsOneWidget);
+          expect(find.byType(ReaderCompletionPage), findsNothing);
+          await reader.session!.flushProgress();
+          final saved =
+              (await library.getProgress(
+                        content.detail.summary.key,
+                        cancellation: CancellationSource().token,
+                      )
+                      as Success<ReadingProgress?>)
+                  .value!;
+          expect(saved.chapterKey, reader.content.key);
+          expect(saved.position.blockFraction, greaterThan(0));
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+        await library.close();
+      },
+    );
+  }
 
   testWidgets('SVG TOC tap reaches the real Reader chapter navigation', (
     tester,

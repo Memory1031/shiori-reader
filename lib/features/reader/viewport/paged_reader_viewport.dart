@@ -338,6 +338,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   Object? _signature;
   ReaderPosition? _position;
   ReaderPosition? _restoreAnchor;
+  int _restorePage = 0;
   int _epoch = 0;
   int? _first;
   int? _last;
@@ -681,7 +682,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     final number = _current;
     final page = _page(number);
     if (page == null) return;
-    _position = _current == 0 && _restoreAnchor != null
+    _position = _current == _restorePage && _restoreAnchor != null
         ? _restoreAnchor
         : _layout!.position(page.start);
     widget.onPosition?.call(
@@ -784,27 +785,44 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         if (wasTurning) widget.onTurning?.call(false);
         _deferredLayout = false;
         _positionReset = false;
-        _current = 0;
-        _pages.clear();
-        _first = null;
-        _last = null;
         final epoch = ++_epoch;
         _restoreAnchor = _anchorAtEnd || _usedFallback ? null : _position;
         final target = _anchorAtEnd ? null : _layout!.cursor(_position);
         final start = _boundaries!.seekStart(
           target ?? PageCursor(_layout!.index.chunks.length, 0),
         );
-        if (target != null && PageBoundaries.compare(start, target) == 0) {
+        final visible = _pages[_current];
+        if (!changed &&
+            target != null &&
+            visible != null &&
+            PageBoundaries.compare(start, visible.start) == 0 &&
+            (PageBoundaries.compare(target, visible.end) < 0 ||
+                visible.end.unit >= _layout!.index.chunks.length)) {
+          // A link within the visible page only moves its semantic anchor.
+          // Keep the page slot and its decoded inline images mounted.
+          _restorePage = _current;
           _seeking = false;
-          final first = _boundaries!.forward(start);
-          if (first != null) {
+          _readyAfterFrame(epoch);
+        } else {
+          _current = 0;
+          _restorePage = 0;
+          _pages.clear();
+          _first = null;
+          _last = null;
+          // A known forward boundary may already contain the target. Resolve
+          // that one page now instead of flashing the seek UI for one frame.
+          final first = target == null ? null : _boundaries!.forward(start);
+          if (first != null &&
+              (PageBoundaries.compare(target!, first.end) < 0 ||
+                  first.end.unit >= _layout!.index.chunks.length)) {
+            _seeking = false;
             _pages[0] = first;
             _position = _layout!.position(first.start);
             _readyAfterFrame(epoch);
+          } else {
+            _seeking = true;
+            _seekPage(epoch, first?.end ?? start, first, target: target);
           }
-        } else {
-          _seeking = true;
-          _seekPage(epoch, start, null, target: target);
         }
       }
       // Pending chapter-end seeks must not expose a provisional page or progress.

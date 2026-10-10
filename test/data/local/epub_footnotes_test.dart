@@ -7,6 +7,81 @@ import 'support/epub_fixtures.dart';
 
 void main() {
   final key = NovelKey(sourceId: SourceId('local'), novelId: 'notes');
+  for (final classes in [
+    ('duokan-footnote', 'duokan-footnote-content', 'duokan-footnote-item'),
+    ('custom-reference', 'custom-notes', 'custom-note'),
+  ]) {
+    test(
+      'class-only content renders ordinary images, text and links: ${classes.$1}',
+      () {
+        final files = epubFiles();
+        files['OPS/text/a.xhtml'] = utf8.encode(
+          '''<html><head><style>.symbol {width:1em}</style></head><body>
+        <p>😀Before<a class="${classes.$1}" href="#n"><img class="symbol" src="../images/%E6%98%9F%20%E7%A9%BA.png"/></a>after.</p>
+        <ol class="${classes.$2}"><li class="${classes.$3}" id="n"><p>Annotation remains in the body.</p></li></ol>
+        <p>Next paragraph.</p><p hidden>Hidden content.</p><script>bad()</script>
+        </body></html>''',
+        );
+        final content = EpubParser(
+          zipFiles(files),
+          key,
+          'synthetic.epub',
+        ).parse().content;
+        final chapter = content.chapters.first;
+        expect(chapter.blocks.whereType<ParagraphBlock>().map((b) => b.text), [
+          '😀Before\uFFFCafter.',
+          'Annotation remains in the body.',
+          'Next paragraph.',
+        ]);
+        final paragraph = chapter.blocks.first as ParagraphBlock;
+        expect(paragraph.inlineImages, hasLength(1));
+        expect(paragraph.inlineImages.single.offset, 7);
+        expect(paragraph.inlineImages.single.widthEm, 1);
+        expect(ContentBlock.fromJson(paragraph.toJson()), paragraph);
+        final link = content.links.single;
+        expect(link.isFootnote, isFalse);
+        expect(link.footnoteText, isNull);
+        expect(link.unavailable, isNull);
+        expect(link.sourceOffset, 7);
+        expect(link.sourceLength, 1);
+        expect(link.targetBlockKey, chapter.blocks[1].blockKey);
+      },
+    );
+  }
+
+  test(
+    'class-only text references retain their text and normal link validation',
+    () {
+      final files = epubFiles();
+      files['OPS/text/a.xhtml'] = utf8.encode('''<html><body>
+      <p>Before<a class="duokan-footnote" href="#fn1">1</a><a class="duokan-footnote" href="#missing">2</a><a class="duokan-footnote" href="https://example.test/#fn1">3</a>after.</p>
+      <ol><li id="fn1" class="duokan-footnote-item"><p>Ordinary note text.</p></li></ol>
+      </body></html>''');
+      final content = EpubParser(
+        zipFiles(files),
+        key,
+        'synthetic.epub',
+      ).parse().content;
+      expect(
+        (content.chapters.first.blocks.first as ParagraphBlock).text,
+        'Before123after.',
+      );
+      expect(
+        (content.chapters.first.blocks.last as ParagraphBlock).text,
+        'Ordinary note text.',
+      );
+      expect(
+        content.links.every((l) => !l.isFootnote && l.footnoteText == null),
+        isTrue,
+      );
+      expect(content.links.map((l) => l.unavailable), [
+        null,
+        LocalLinkUnavailable.missingAnchor,
+        LocalLinkUnavailable.external,
+      ]);
+    },
+  );
+
   test('image noteref stays inline; hidden note is inert and round trips', () {
     final files = epubFiles();
     files['OPS/text/a.xhtml'] = utf8.encode('''

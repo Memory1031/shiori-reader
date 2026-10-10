@@ -4,6 +4,7 @@ import 'package:html/dom.dart' as dom;
 import 'epub_text_styles.dart';
 import 'epub_image_candidates.dart';
 import 'epub_svg_presentation.dart';
+import '../../../shared/epub_link_address.dart';
 
 /// Builds a self-contained, inert document for short, authored layout pages.
 /// The caller resolves archive paths; no filesystem or network URLs survive.
@@ -15,6 +16,7 @@ String? epubPresentation(
   String? Function(String, String) resolve, {
   String? Function(String, String)? resolveStyle,
   void Function(EpubSvgHotspot)? onSvgHotspot,
+  int? Function(dom.Element)? linkId,
 }) {
   final body = document.body;
   if (body == null || body.text.length > 2000) return null;
@@ -106,6 +108,12 @@ String? epubPresentation(
       )
       .replaceAll('</', r'<\/');
   final copy = body.clone(true);
+  final anchors = body.querySelectorAll('a[href]');
+  final copiedAnchors = copy.querySelectorAll('a[href]');
+  final anchorIds = {
+    for (var i = 0; i < anchors.length; i++)
+      copiedAnchors[i]: ?linkId?.call(anchors[i]),
+  };
   // Resolve before sanitizing picture/source attributes or removing nodes.
   final selectedImages = <dom.Element, String>{};
   for (final img in copy.querySelectorAll('img')) {
@@ -185,6 +193,9 @@ String? epubPresentation(
     if (e.localName == 'img') {
       e.attributes['src'] = selectedImages[e] ?? '';
       e.attributes['alt'] = original['alt'] ?? '';
+    }
+    if (anchorIds[e] case final id?) {
+      e.attributes['href'] = epubLinkAddress(id);
     }
   }
   final bodyAttributes = Map<Object, String>.from(copy.attributes);

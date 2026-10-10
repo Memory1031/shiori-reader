@@ -24,8 +24,7 @@ bool _semantic(dom.Element node, String value) {
 }
 
 bool epubNoteref(dom.Element node) =>
-    node.localName == 'a' &&
-    (_semantic(node, 'noteref') || node.classes.contains('duokan-footnote'));
+    node.localName == 'a' && _semantic(node, 'noteref');
 
 bool epubFootnote(dom.Element node) =>
     _semantic(node, 'footnote') || _semantic(node, 'endnote');

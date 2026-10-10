@@ -76,6 +76,30 @@ fvm flutter run --target lib/main_dev.dart --dart-define=SHIORI_SCENARIO=longCha
 
 调用方拥有环境、订阅和媒体 lease：退出先取消请求与订阅，关闭 lease，最后关闭环境。Fixture 的内存缓存不代替生产持久化 / 重启验收。Parser 的脱敏样本及 SHA-256 / LF 约定见[样本说明](../test/fixtures/lightnovel/README.md)。
 
+### 阅读器离屏渲染与截图
+
+`flutter test` 会运行 Flutter 测试引擎，可以直接挂载生产阅读器、完成布局和绘制，再导出 PNG，无需启动模拟器或安装应用。它适合检查原生分页中的封面、行内图片、注音、脚注和书内链接；截图来自实际组件绘制，不是根据解析结果另画一张示意图。
+
+现有入口是 [authored_epub_test.dart](../test/widgets/reader/authored_epub_test.dart)，使用[自制 EPUB](../test/data/local/support/authored_epub.dart)，经过真实导入、仓库和 `BookReaderScreen`。macOS / Linux 可这样导出预览：
+
+```sh
+SHIORI_AUTHORED_SCREENSHOTS="$PWD/.tooling/evidence/reader-preview" \
+SHIORI_AUTHORED_FONT="<中文字体文件的绝对路径>" \
+fvm flutter test --no-pub test/widgets/reader/authored_epub_test.dart
+```
+
+Windows PowerShell 先设置 `$env:SHIORI_AUTHORED_SCREENSHOTS` 和 `$env:SHIORI_AUTHORED_FONT`，再运行同一测试命令。输出包含扉页、目录、图片页和窄屏大字预览；未设置截图目录时只运行测试。字体参数可省略，但默认测试字体 Ahem 不适合目视检查中文。此入口使用 Windows 平台变体，把提供的字体通过 `FontLoader` 注册到阅读器使用的 `Microsoft YaHei UI` 字体族；截图不代表其他平台的系统字体效果。
+
+检查真实 EPUB 时，在本地临时测试中复用上述挂载、等待和截图方式，并替换数据来源：
+
+1. 在 `tester.runAsync` 中读取 EPUB 字节，交给 [EpubParser](../lib/data/local/epub/epub_parser.dart)，取得 `content` 和 `media`。使用本地书籍身份，保留解析出的媒体字节，避免只看到图片占位布局。
+2. 原生分页可用 [MemoryBooks](../test/widgets/reader/local_reading_test.dart) 装配 `LocalBookRecord` 和 `media`，再注入 `LocalReadingRepository`、`LocalImageRepository`、`FixtureSettingsStore`。在线依赖使用 [ForbiddenOnline](../test/data/local/local_reading_test.dart)。涉及托管文件、数据库或 EPUB HTML 页描述时，沿用截图入口中的 `ManagedLocalBooks` 导入流程。
+3. 从解析出的章节与正文块找到目标位置，通过 `BookReaderScreen` 的 `chapter`、`initialBlockKey` 和 `initialBlockOffset` 定位；这是定位到包含该位置的页面，不保证目标段落出现在页首。用 `ShioriApp` 提供主题和本地化，并在阅读器外包一层带 `GlobalKey` 的 `RepaintBoundary`。
+4. 设置 `tester.view.physicalSize` 和 `devicePixelRatio`；逻辑尺寸等于两者相除。大字预览通过 `MediaQuery.textScaler` 设置。先加载匹配阅读器字体族的中文字体，再挂载组件；文件读取、字体加载和图片解码需要真实异步执行时间，沿用入口中有上限的等待与 `pump`，确认分页和图片加载完成后再截图。
+5. 从 `GlobalKey` 取得 `RenderRepaintBoundary`，调用 `toImage`、`toByteData(format: ImageByteFormat.png)` 并写入输出目录，最后释放 `ui.Image`。检查图片大小时用 `RenderBox.getTransformTo(null)` 转换后的矩形，计入行内图片的缩放；点击该矩形中心后断言链接目标、阅读位置或弹层，再导出点击后的截图。
+
+真实书籍、机器路径和截图仅保留在本地忽略目录；默认测试继续使用确定性的自制样本。测试结束时恢复视口、平台覆盖并释放仓库等资源。这种方式无需修改应用入口或原生构建参数，但不能验证平台 WebView 的页面绘制、系统插件和设备表现；这些仍需模拟器或实机验证。
+
 ## 升级与排障
 
 已发布版本的 schema 快照必须保留；迁移用旧快照和自制数据测试，检查事务失败回滚与未知版本拒绝。不要删除用户数据库来处理升级失败。先退出应用，保全数据库及 WAL / SHM、preferences、托管原件和 manifest，在副本上检查。

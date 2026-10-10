@@ -10,6 +10,7 @@ import 'reader_tap_zones.dart';
 import 'svg_paper_art.dart';
 import '../../shared/capabilities.dart';
 import '../../domain/contracts/local_content_links.dart';
+import '../../shared/epub_link_address.dart';
 
 /// The exact themed document loaded by the static native host.
 String epubLayoutDocument(
@@ -33,7 +34,7 @@ String epubLayoutDocument(
   // Engines without cascade layers ignore this optional width protection.
   final document = html.replaceFirst(
     '<head>',
-    '<head><style>@layer{:where(body:not(.shiori-svg-page) p){max-width:100%;}}</style>',
+    '<head><meta http-equiv="Content-Security-Policy" content="script-src \'none\'; connect-src \'none\'; base-uri \'none\'; form-action \'none\'"><style>@layer{:where(body:not(.shiori-svg-page) p){max-width:100%;}}</style>',
   );
   return document.replaceFirst('</head>', '''<style>
 html,body{background:#$background!important;color:#$ink;margin:0!important;}
@@ -89,6 +90,8 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
   bool _artworkPending = false;
   int _viewGeneration = 0;
   int _artworkGeneration = 0;
+  int _tapRequest = 0;
+  InAppWebViewController? _webController;
 
   void _prepareArtwork(String html, Color ink, {required bool keepView}) {
     if (identical(_preparingSource, html) && _preparingInk == ink) return;
@@ -149,6 +152,61 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
       }
     }
     return null;
+  }
+
+  void _pageTap(Offset point, Size size) {
+    switch (readerTapZone(
+      point.dx,
+      size.width,
+      chromeVisible: widget.chromeVisible?.value ?? false,
+    )) {
+      case ReaderTap.previous:
+        widget.onPrevious?.call();
+      case ReaderTap.next:
+        widget.onNext?.call();
+      case ReaderTap.center:
+        widget.onCenterTap();
+    }
+  }
+
+  Future<void> _textPageTap(Offset point, Size size) async {
+    final controller = _webController;
+    final document = _document;
+    final request = _tapRequest;
+    if (!_ready ||
+        controller == null ||
+        ModalRoute.of(context)?.isCurrent == false) {
+      return;
+    }
+    try {
+      // The browser owns transformed glyphs, wrapping, scrolling and zoom.
+      // This fixed host query only decides whether the reader may also tap;
+      // the canceled native link callback is the sole navigation dispatcher.
+      final address = await controller
+          .evaluateJavascript(
+            source:
+                '''(function(){
+const v=window.visualViewport;
+const x=${point.dx / size.width}*(v?v.width:window.innerWidth)+(v?v.offsetLeft:0);
+const y=${point.dy / size.height}*(v?v.height:window.innerHeight)+(v?v.offsetTop:0);
+const e=document.elementFromPoint(x,y);
+const a=e&&e.closest('a[href^="$epubLinkPrefix"]');
+return a?a.getAttribute('href'):null;
+})()''',
+          )
+          .timeout(const Duration(seconds: 2));
+      if (!mounted ||
+          request != _tapRequest ||
+          !_ready ||
+          !identical(document, _document) ||
+          !identical(controller, _webController) ||
+          ModalRoute.of(context)?.isCurrent == false) {
+        return;
+      }
+      if (address == null) _pageTap(point, size);
+    } catch (_) {
+      // A failed or late hit test must not turn a link into a page turn.
+    }
   }
 
   // Inlined documents can reach ~10 MiB. The source string is held by
@@ -233,6 +291,7 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
       builder: (context, bounds) => Listener(
         behavior: HitTestBehavior.opaque,
         onPointerDown: (e) {
+          _tapRequest++;
           // Only a primary press may navigate or turn the page. Pointer-up
           // no longer carries the released mouse button, so decide here.
           _down = e.buttons == kPrimaryButton ? e.localPosition : null;
@@ -257,17 +316,10 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
               widget.onLink?.call(link);
               return;
             }
-            switch (readerTapZone(
-              down.dx,
-              bounds.maxWidth,
-              chromeVisible: widget.chromeVisible?.value ?? false,
-            )) {
-              case ReaderTap.previous:
-                widget.onPrevious?.call();
-              case ReaderTap.next:
-                widget.onNext?.call();
-              case ReaderTap.center:
-                widget.onCenterTap();
+            if (widget.html.contains('href="$epubLinkPrefix')) {
+              unawaited(_textPageTap(down, bounds.biggest));
+            } else {
+              _pageTap(down, bounds.biggest);
             }
           }
         },
@@ -277,6 +329,22 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
             _StaticWebView(
               key: ValueKey(inlineView ? _viewGeneration : _generation),
               document: document,
+              onController: (controller) {
+                if (identical(document, _document)) _webController = controller;
+              },
+              onTextLink: (id) {
+                if (!mounted ||
+                    !_ready ||
+                    !identical(document, _document) ||
+                    ModalRoute.of(context)?.isCurrent == false) {
+                  return;
+                }
+                _tapRequest++;
+                final link = widget.links
+                    .where((link) => link.presentationId == id)
+                    .firstOrNull;
+                if (link != null) widget.onLink?.call(link);
+              },
               onReady: () {
                 if (!identical(document, _document)) return;
                 setState(() => _loadedDocument = document);
@@ -317,10 +385,14 @@ class _StaticWebView extends StatefulWidget {
     required this.document,
     required this.onReady,
     this.onFailed,
+    required this.onController,
+    required this.onTextLink,
   });
   final String document;
   final VoidCallback onReady;
   final VoidCallback? onFailed;
+  final ValueChanged<InAppWebViewController> onController;
+  final ValueChanged<int> onTextLink;
   @override
   State<_StaticWebView> createState() => _StaticWebViewState();
 }
@@ -388,7 +460,9 @@ class _StaticWebViewState extends State<_StaticWebView> {
   }
 
   InAppWebViewSettings get _settings => InAppWebViewSettings(
-    javaScriptEnabled: false,
+    // Android requires this for the fixed DOM hit query. Authored scripts
+    // remain stripped and forbidden by both parser and host CSPs.
+    javaScriptEnabled: widget.document.contains('href="$epubLinkPrefix'),
     javaScriptCanOpenWindowsAutomatically: false,
     supportMultipleWindows: true,
     blockNetworkLoads: true,
@@ -442,9 +516,7 @@ class _StaticWebViewState extends State<_StaticWebView> {
           action: PermissionResponseAction.DENY,
         ),
         onLoadStop: (_, _) => _loadFinished(),
-        onReceivedError: (_, request, _) {
-          if (request.isForMainFrame == true) _fail();
-        },
+        onReceivedError: (_, request, _) => _receivedError(request),
         onRenderProcessGone: (_, _) => _fail(),
         onWebContentProcessDidTerminate: (_) => _fail(),
       );
@@ -464,10 +536,28 @@ class _StaticWebViewState extends State<_StaticWebView> {
     InAppWebViewController _,
     NavigationAction action,
   ) async {
+    final id = epubLinkId(action.request.url?.toString());
+    if (mounted &&
+        _ready &&
+        !_failed &&
+        action.isForMainFrame &&
+        action.hasGesture != false &&
+        id != null) {
+      widget.onTextLink(id);
+    }
     final url = action.request.url?.toString();
     return url == 'about:blank'
         ? NavigationActionPolicy.ALLOW
         : NavigationActionPolicy.CANCEL;
+  }
+
+  void _receivedError(WebResourceRequest request) {
+    // WebView2 reports the intentionally canceled host-link request as an
+    // error. It must not retire the readable static document or its owner.
+    if (request.isForMainFrame == true &&
+        epubLinkId(request.url.toString()) == null) {
+      _fail();
+    }
   }
 
   Future<void> _loadFinished() async {
@@ -557,6 +647,7 @@ class _StaticWebViewState extends State<_StaticWebView> {
           : null,
       onWebViewCreated: (controller) {
         _controller = controller;
+        widget.onController(controller);
         _attached = true;
         if (_loaded &&
             !identical(_loadingDocument, widget.document) &&
@@ -573,9 +664,7 @@ class _StaticWebViewState extends State<_StaticWebView> {
         action: PermissionResponseAction.DENY,
       ),
       onLoadStop: (_, _) => _loadFinished(),
-      onReceivedError: (_, request, _) {
-        if (request.isForMainFrame == true) _fail();
-      },
+      onReceivedError: (_, request, _) => _receivedError(request),
       onRenderProcessGone: (_, _) => _fail(),
       onWebContentProcessDidTerminate: (_) => _fail(),
       gestureRecognizers: {

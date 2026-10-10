@@ -155,6 +155,7 @@ class EpubParser {
       >{};
   var linkCount = 0;
   final _linkRegions = <String, Map<int, LocalLinkRegion>>{};
+  final _presentationLinkIds = <String, Map<int, int>>{};
   final _footnotes =
       <String, List<(int, String, String?, LocalLinkUnavailable?)>>{};
   final _noteDocuments = <String, Map<String, dom.Element>?>{};
@@ -489,6 +490,7 @@ class EpubParser {
             sourceBlockKey: source.blocks[raw.$1].blockKey,
             label: raw.$2,
             region: _linkRegions[path]?[rawIndex],
+            presentationId: _presentationLinkIds[path]?[rawIndex],
             sourceOffset: raw.$6,
             sourceLength: raw.$7,
             target: unavailable == null ? destination?.key : null,
@@ -760,6 +762,12 @@ class EpubParser {
     }
 
     final svgHotspots = <EpubSvgHotspot>[];
+    final anchorNodes =
+        doc.body?.querySelectorAll('a[href]') ?? <dom.Element>[];
+    if (anchorNodes.length > 10000) zipLimit();
+    final anchorIds = {
+      for (var i = 0; i < anchorNodes.length; i++) anchorNodes[i]: i,
+    };
     final presentation = includePresentations
         ? epubPresentation(
             doc,
@@ -771,6 +779,7 @@ class EpubParser {
             (base, href) => epubReference(base, href)?.$1,
             resolveStyle: optionalEpubStyleReference,
             onSvgHotspot: svgHotspots.add,
+            linkId: (node) => epubNoteref(node) ? null : anchorIds[node],
           )
         : null;
     if (presentation != null) {
@@ -952,6 +961,9 @@ class EpubParser {
         if (original.$6 == null) {
           records[span.$1] = range;
         } else {
+          if (_presentationLinkIds[path]?[span.$1] case final id?) {
+            _presentationLinkIds[path]![records.length] = id;
+          }
           records.add(range);
           if (++linkCount > 10000) zipLimit();
         }
@@ -1302,6 +1314,9 @@ class EpubParser {
         }
         final label = node.text.trim();
         activeLink = (rawLinks[path] ??= []).length;
+        if (anchorIds[node] case final id?) {
+          (_presentationLinkIds[path] ??= {})[activeLink!] = id;
+        }
         (rawLinks[path] ??= []).add((
           blocks.length,
           label.isEmpty ? '↗' : String.fromCharCodes(label.runes.take(200)),

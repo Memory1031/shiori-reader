@@ -44,8 +44,36 @@ void main() {
         } on LocalParseException catch (e) {
           snapshot = {'rejected': e.problem.name};
         }
-        expect(snapshot, baseline[fixture.key]);
+        // The historical snapshot predates static HTML anchor identities.
+        // Keep its semantic/link targets frozen; compare the complete current
+        // output separately so tracing cannot alter the new layout metadata.
+        final original = {
+          ...snapshot,
+          if (snapshot['content'] case final Map content)
+            'content': {
+              ...content,
+              'links': [
+                for (final link in content['links'] as List)
+                  Map<String, Object?>.from(link as Map)
+                    ..remove('presentationId'),
+              ],
+            },
+        };
+        expect(original, baseline[fixture.key]);
         if (trace != null) {
+          final unobserved = EpubParser(
+            fixture.value,
+            LocalBookIdentity.book(digest),
+            'synthetic.epub',
+            includePresentations: true,
+          );
+          Map<String, Object?> current;
+          try {
+            current = parserSnapshot(unobserved);
+          } on LocalParseException catch (e) {
+            current = {'rejected': e.problem.name};
+          }
+          expect(snapshot, current);
           expect(trace.events.length, lessThanOrEqualTo(limit!));
         }
       });

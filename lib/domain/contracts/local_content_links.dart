@@ -61,8 +61,11 @@ final class LocalContentLink {
     this.sourceLength,
     this.footnoteText,
     this.region,
+    this.presentationId,
   }) {
-    if (sourceBlockKey.isEmpty ||
+    if (presentationId != null &&
+            (presentationId! < 0 || presentationId! >= 10000) ||
+        sourceBlockKey.isEmpty ||
         label.trim().isEmpty ||
         (target == null) != (unavailable != null) ||
         target == null && targetBlockKey != null ||
@@ -95,8 +98,12 @@ final class LocalContentLink {
   final int? sourceLength;
   final String? footnoteText;
   final LocalLinkRegion? region;
+
+  /// Opaque anchor identity within one static HTML document; absent in old books.
+  final int? presentationId;
   bool get isFootnote => sourceOffset != null && sourceLength == null;
   Map<String, Object?> toJson() => {
+    if (presentationId != null) 'presentationId': presentationId,
     if (region != null) 'region': region!.toJson(),
     'source': source.toJson(),
     'block': sourceBlockKey,
@@ -111,6 +118,7 @@ final class LocalContentLink {
   };
   factory LocalContentLink.fromJson(Map<String, dynamic> json) =>
       LocalContentLink(
+        presentationId: json['presentationId'] as int?,
         region: json['region'] == null
             ? null
             : LocalLinkRegion.fromJson(json['region'] as Map<String, dynamic>),
