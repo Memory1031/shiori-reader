@@ -44,7 +44,9 @@ class _Shelf {
       await env.library.putBookshelf(
         BookshelfEntry(
           snapshot: NovelSummary(
-            key: i.isEven
+            key: progress && i == 1
+                ? fixtureNovelKey(FixtureScenario.multiVolume)
+                : i.isEven
                 ? LocalBookIdentity.book(i.toRadixString(16).padLeft(64, '0'))
                 : NovelKey(sourceId: SourceId('fixture'), novelId: '$i'),
             title: '$i ${'很长的中文书名 Long English book title ' * 3}',

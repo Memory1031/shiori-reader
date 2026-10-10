@@ -5,6 +5,9 @@ import 'package:shiori/app/routes.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/features/bookshelf/bookshelf_view.dart';
+import 'package:shiori/features/home/continue_reading_card.dart';
+import 'package:shiori/features/home/continue_reading_row.dart';
 import 'package:shiori/features/home/reading_home.dart';
 import 'package:shiori/features/novel_detail/detail_screen.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
@@ -12,6 +15,115 @@ import 'reader/continue_test.dart' show seed;
 import 'bookshelf_test.dart' show RemovalCache;
 
 void main() {
+  for (final platform in [
+    TargetPlatform.android,
+    TargetPlatform.iOS,
+    TargetPlatform.windows,
+  ]) {
+    testWidgets(
+      'resume follows shelf removals on $platform',
+      (tester) async {
+        await tester.binding.setSurfaceSize(
+          platform == TargetPlatform.windows
+              ? const Size(1280, 720)
+              : const Size(390, 844),
+        );
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final env = FixtureEnvironment();
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox());
+          await tester.runAsync(env.close);
+        });
+        final token = CancellationSource().token;
+        final scenarios = [
+          FixtureScenario.shortChapter,
+          FixtureScenario.multiVolume,
+        ];
+        for (var i = 0; i < scenarios.length; i++) {
+          final book = env.source.data.summary(scenarios[i]);
+          await env.library.putBookshelf(
+            BookshelfEntry(snapshot: book, addedAt: DateTime.utc(2026)),
+            cancellation: token,
+          );
+          final generation =
+              (await env.library.beginProgressSession(
+                        book.key,
+                        cancellation: token,
+                      )
+                      as Success<int>)
+                  .value;
+          await env.library.saveProgress(
+            ReadingProgress(
+              snapshot: book,
+              chapterKey: fixtureChapterKey(scenarios[i]),
+              chapterOrdinalSnapshot: 0,
+              catalogRevision: 'fixture',
+              position: ReaderPosition(
+                contentRevision: 'fixture',
+                blockKey: 'fixture',
+                blockIndex: 0,
+                blockFraction: 0,
+                chapterFraction: 0,
+              ),
+              completed: false,
+              lastReadAt: DateTime.utc(2026, 1, i + 1),
+            ),
+            stamp: ProgressWriteStamp(generation: generation, sequence: 0),
+            cancellation: token,
+          );
+        }
+        await tester.pumpWidget(
+          ShioriApp(
+            locale: const Locale('en'),
+            homeBuilder: (_, _) => ReadingHome(
+              repository: env.novels,
+              library: env.library,
+              sources: [env.source.descriptor],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final controller = tester
+            .widget<BookshelfView>(find.byType(BookshelfView))
+            .controller;
+        final older = env.source.data.summary(scenarios.first);
+        final latest = env.source.data.summary(scenarios.last);
+        final resume = platform == TargetPlatform.windows
+            ? find.byType(ContinueReadingRow)
+            : find.byType(ContinueReadingCard);
+        void shows(NovelSummary book) {
+          expect(resume, findsOneWidget);
+          expect(
+            find.descendant(of: resume, matching: find.text(book.title)),
+            findsOneWidget,
+          );
+        }
+
+        shows(latest);
+        expect(await controller.remove(latest.key), isTrue);
+        await tester.pumpAndSettle();
+        shows(older);
+        expect(controller.progressFor(latest.key), isNotNull);
+
+        expect(await controller.remove(older.key), isTrue);
+        await tester.pumpAndSettle();
+        expect(find.text('Your bookshelf is empty.'), findsOneWidget);
+        expect(find.text('Continue reading'), findsNothing);
+        expect(find.byType(ContinueReadingCard), findsNothing);
+        expect(find.byType(ContinueReadingRow), findsNothing);
+        expect(controller.recent, hasLength(2));
+
+        // Removing an online book keeps its position available when re-added.
+        expect(await controller.add(older), isTrue);
+        await tester.pumpAndSettle();
+        shows(older);
+        expect(controller.progressFor(latest.key), isNotNull);
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(platform),
+    );
+  }
+
   testWidgets('continue reading can open details without stacking readers', (
     tester,
   ) async {
@@ -20,6 +132,11 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final env = FixtureEnvironment(scenario: FixtureScenario.multiVolume);
+    final summary = env.source.data.summary(FixtureScenario.multiVolume);
+    await env.library.putBookshelf(
+      BookshelfEntry(snapshot: summary, addedAt: DateTime.now()),
+      cancellation: CancellationSource().token,
+    );
     await seed(env, fixtureChapterKey(FixtureScenario.multiVolume));
     await tester.pumpWidget(
       ShioriApp(
@@ -35,7 +152,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    final library = tester
+        .widget<BookshelfView>(find.byType(BookshelfView))
+        .controller;
     await tester.tap(find.text('Resume'));
+    await tester.pumpAndSettle();
+    // An open reader can still use the saved position after shelf removal.
+    expect(await library.remove(summary.key), isTrue);
     await tester.pumpAndSettle();
     for (var cycle = 0; cycle < 2; cycle++) {
       expect(find.byType(ReaderContentView), findsOneWidget);
@@ -133,6 +256,8 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('Your bookshelf is empty.'), findsOneWidget);
+      expect(find.text('Continue reading'), findsNothing);
+      expect(find.byType(ContinueReadingCard), findsNothing);
       expect(find.text('Undo removal'), findsNothing);
       await tester.tap(find.byTooltip('More'));
       await tester.pumpAndSettle();

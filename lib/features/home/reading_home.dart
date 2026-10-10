@@ -334,31 +334,33 @@ class _ReadingHomeState extends State<ReadingHome> {
 
   // The continue card scrolls with the shelf so short or landscape windows
   // keep room for books.
-  Widget? _continueHeader(BuildContext context) => _library.recent.isEmpty
-      ? null
-      : Padding(
-          padding: const EdgeInsets.fromLTRB(
-            ShioriSpace.page,
-            ShioriSpace.item,
-            ShioriSpace.page,
-            ShioriSpace.small,
+  Widget? _continueHeader(BuildContext context) {
+    final progress = _library.continueReadingProgress;
+    if (progress == null) return null;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        ShioriSpace.page,
+        ShioriSpace.item,
+        ShioriSpace.page,
+        ShioriSpace.small,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            AppLocalizations.of(context).detailContinue,
+            style: Theme.of(context).textTheme.titleSmall,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                AppLocalizations.of(context).detailContinue,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: ShioriSpace.small),
-              ContinueReadingCard(
-                progress: _library.recent.first,
-                images: widget.images,
-                onContinue: () => _continue(_library.recent.first.novelKey),
-              ),
-            ],
+          const SizedBox(height: ShioriSpace.small),
+          ContinueReadingCard(
+            progress: progress,
+            images: widget.images,
+            onContinue: () => _continue(progress.novelKey),
           ),
-        );
+        ],
+      ),
+    );
+  }
 
   Widget? _environment(BuildContext context) => widget.environmentLabel == null
       ? null
@@ -476,7 +478,7 @@ class _ReadingHomeState extends State<ReadingHome> {
   /// The shelf titles itself with a fixed toolbar on its left-aligned
   /// frame, so the page has no app bar.
   Widget _desktopShelf(BuildContext context) {
-    final recent = _library.recent.firstOrNull;
+    final recent = _library.continueReadingProgress;
     return Scaffold(
       body: SafeArea(
         child: Column(
