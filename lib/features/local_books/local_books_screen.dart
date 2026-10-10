@@ -221,29 +221,43 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     setState(() => _deleting = false);
   }
 
-  Future<void> _reparse(LocalBookInfo info) async {
-    if (_busy) return;
-    setState(() {
-      _deleteFailure = null;
-      _showDeleteResult = false;
-    });
-    await _reparseFlow?.start(context, [
-      LocalReparseTarget.fromInfo(info),
-    ], desktop: DesktopLayoutScope.useDesktopPage(context));
-  }
+  Future<void> _reparse(LocalBookInfo info) =>
+      _startReparse([LocalReparseTarget.fromInfo(info)]);
 
-  Future<void> _reparseAll(List<LocalBookInfo> books) async {
-    if (_busy) return;
-    setState(() {
-      _deleteFailure = null;
-      _showDeleteResult = false;
-    });
-    await _reparseFlow?.start(
-      context,
-      books.map(LocalReparseTarget.fromInfo),
-      batch: true,
-      desktop: DesktopLayoutScope.useDesktopPage(context),
+  Future<void> _reparseAll(List<LocalBookInfo> books) =>
+      _startReparse(books.map(LocalReparseTarget.fromInfo), batch: true);
+
+  Future<void> _startReparse(
+    Iterable<LocalReparseTarget> books, {
+    bool batch = false,
+  }) async {
+    final flow = _reparseFlow;
+    if (_busy || flow == null) return;
+    final request = CancellationSource();
+    final lease = _library.acquireBatch(request);
+    if (lease == null) return;
+    var settled = false;
+    unawaited(
+      request.token.whenCancelled.then((_) {
+        if (!settled) flow.cancelSession();
+      }),
     );
+    try {
+      setState(() {
+        _deleteFailure = null;
+        _showDeleteResult = false;
+      });
+      await flow.start(
+        context,
+        books,
+        batch: batch,
+        desktop: DesktopLayoutScope.useDesktopPage(context),
+      );
+    } finally {
+      settled = true;
+      request.cancel();
+      lease.release();
+    }
   }
 
   @override
