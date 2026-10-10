@@ -528,6 +528,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('backgrounding retires HTML hit queries after resume', (
+    tester,
+  ) async {
+    addTearDown(
+      () => tester.binding.handleAppLifecycleStateChanged(
+        AppLifecycleState.resumed,
+      ),
+    );
+    final parser = htmlLinksParser();
+    final content = parser.parse().content;
+    final source = content.chapters.first;
+    await tester.pumpWidget(
+      page(
+        html: parser.presentations[source.key.chapterId]!,
+        links: content.links,
+      ),
+    );
+    await tester.pumpAndSettle();
+    platform.heads.single.finish();
+    await tester.pumpAndSettle();
+    final controller = platform.views.single.controller;
+    controller.readHit = Completer<dynamic>();
+    await tester.tapAt(const Offset(770, 200));
+    expect(controller.scripts, hasLength(1));
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    controller.readHit!.complete(null);
+    await tester.pumpAndSettle();
+    expect([previous, center, next], [0, 0, 0]);
+
+    // The same loaded document still accepts a new foreground tap.
+    expect(platform.views.single.controller, same(controller));
+    controller.readHit = null;
+    await tester.tapAt(const Offset(770, 200));
+    await tester.pumpAndSettle();
+    expect(controller.scripts, hasLength(2));
+    expect([previous, center, next], [0, 0, 1]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Windows A-B-A artwork restores loaded hotspots without navigation',
     (tester) async {

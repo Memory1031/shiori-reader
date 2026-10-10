@@ -75,7 +75,8 @@ class EpubLayoutPage extends StatefulWidget {
   State<EpubLayoutPage> createState() => _EpubLayoutPageState();
 }
 
-class _EpubLayoutPageState extends State<EpubLayoutPage> {
+class _EpubLayoutPageState extends State<EpubLayoutPage>
+    with WidgetsBindingObserver {
   Offset? _down;
   Duration? _downTime;
   String? _loadedDocument;
@@ -92,6 +93,28 @@ class _EpubLayoutPageState extends State<EpubLayoutPage> {
   int _artworkGeneration = 0;
   int _tapRequest = 0;
   InAppWebViewController? _webController;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      // A foreground return cannot revive a hit query from an interrupted tap.
+      _tapRequest++;
+      _down = null;
+      _downTime = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   void _prepareArtwork(String html, Color ink, {required bool keepView}) {
     if (identical(_preparingSource, html) && _preparingInk == ink) return;
