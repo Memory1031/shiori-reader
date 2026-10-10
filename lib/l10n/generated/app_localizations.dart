@@ -2365,6 +2365,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Document {percent}%'**
   String readerDocumentPercent(String percent);
+
+  /// No description provided for @bookMultiSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-select'**
+  String get bookMultiSelect;
+
+  /// No description provided for @bookSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String bookSelectedCount(int count);
+
+  /// No description provided for @bookSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get bookSelectAll;
+
+  /// No description provided for @bookDeselectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect all'**
+  String get bookDeselectAll;
+
+  /// No description provided for @bookRemoveSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get bookRemoveSelected;
+
+  /// No description provided for @bookDeleteSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get bookDeleteSelected;
+
+  /// No description provided for @bookReparseSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Reparse selected ({count})'**
+  String bookReparseSelected(int count);
+
+  /// No description provided for @bookNoReparse.
+  ///
+  /// In en, this message translates to:
+  /// **'Only available local EPUB and TXT books can be reparsed.'**
+  String get bookNoReparse;
+
+  /// No description provided for @bookReparseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reparse ({count})'**
+  String bookReparseAction(int count);
+
+  /// No description provided for @bookReparseAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected books can be reparsed.'**
+  String bookReparseAvailable(int count);
+
+  /// No description provided for @bookNoSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Select books first.'**
+  String get bookNoSelection;
+
+  /// No description provided for @bookReparseSelectedConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerate parsing data for {count} selected local books. The original data is kept if parsing fails.{excluded, plural, =0{} other{\n{excluded} other selected books will be excluded.}}'**
+  String bookReparseSelectedConfirm(int count, int excluded);
+
+  /// No description provided for @bookBatchRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove selected books'**
+  String get bookBatchRemoveTitle;
+
+  /// No description provided for @bookBatchLocalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete local books'**
+  String get bookBatchLocalTitle;
+
+  /// No description provided for @bookBatchOnlineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from bookshelf'**
+  String get bookBatchOnlineTitle;
+
+  /// No description provided for @bookBatchRemoveConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Process these {count} selected books?'**
+  String bookBatchRemoveConfirm(int count);
+
+  /// No description provided for @bookBatchOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} online books: clear their cache and remove them from the shelf. Reading history is kept.'**
+  String bookBatchOnline(int count);
+
+  /// No description provided for @bookBatchLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} local books: permanently delete app-owned book data and reading progress. External original files are kept. This cannot be undone.'**
+  String bookBatchLocal(int count);
+
+  /// No description provided for @bookBatchProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{index} / {total} · {title}'**
+  String bookBatchProgress(int index, int total, String title);
+
+  /// No description provided for @bookBatchSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{success} books completed{failed, plural, =0{} other{\nFailed: {failed}}}{unprocessed, plural, =0{} other{\nNot processed: {unprocessed}}}{missing, plural, =0{} other{\nNo longer present: {missing}}}{excluded, plural, =0{} other{\nExcluded: {excluded}}}'**
+  String bookBatchSummary(
+    int success,
+    int failed,
+    int unprocessed,
+    int missing,
+    int excluded,
+  );
+
+  /// No description provided for @bookBatchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch results'**
+  String get bookBatchResults;
+
+  /// No description provided for @bookBatchSuccessDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View completed books ({count})'**
+  String bookBatchSuccessDetails(int count);
+
+  /// No description provided for @bookBatchRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed, unprocessed and excluded books remain selected for your next action.'**
+  String get bookBatchRemaining;
+
+  /// No description provided for @bookBatchSucceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get bookBatchSucceeded;
+
+  /// No description provided for @bookBatchMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped: book no longer exists'**
+  String get bookBatchMissing;
+
+  /// No description provided for @bookBatchUnprocessed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not processed after stopping'**
+  String get bookBatchUnprocessed;
+
+  /// No description provided for @bookBatchInapplicable.
+  ///
+  /// In en, this message translates to:
+  /// **'Excluded from reparse'**
+  String get bookBatchInapplicable;
+
+  /// No description provided for @bookToggleSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Select or deselect {title}'**
+  String bookToggleSelection(String title);
+
+  /// No description provided for @bookReparseCleanupPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated book saved. Remaining old files will be cleaned up at the next launch.'**
+  String get bookReparseCleanupPending;
 }
 
 class _AppLocalizationsDelegate

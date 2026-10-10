@@ -61,6 +61,19 @@ class ImportController extends ChangeNotifier {
   bool _externalCopy = false;
   bool _discarding = false;
   bool _running = false, _needsRefresh = false;
+  bool _maintenanceBlocked = false;
+  bool get maintenanceBlocked => _maintenanceBlocked;
+
+  /// A page-owned maintenance batch owns the foreground interaction. OS
+  /// receipts may still stage, but remain pending until its result is closed.
+  void setMaintenanceBlocked(bool blocked) {
+    if (_closed || _maintenanceBlocked == blocked) return;
+    _maintenanceBlocked = blocked;
+    _refreshEpoch++;
+    _emit();
+    if (!blocked) unawaited(refresh());
+  }
+
   int _refreshEpoch = 0;
   bool get discarding => _discarding;
   Completer<TxtEncoding>? _encodingChoice;
@@ -108,6 +121,12 @@ class ImportController extends ChangeNotifier {
   }
 
   ImportProblem? get batchProblem => _problem;
+  bool get interactionOpen =>
+      panelOpen ||
+      !snoozed &&
+          (busy ||
+              batchProblem != null ||
+              items.any((item) => item.phase != ImportItemPhase.succeeded));
 
   TxtEncoding? get encoding => focus?.encoding;
   bool get choosingEncoding => encodingPreview != null;
@@ -117,6 +136,7 @@ class ImportController extends ChangeNotifier {
   }
 
   void open() {
+    if (_closed || _maintenanceBlocked) return;
     panelOpen = true;
     snoozed = false;
     _emit();
@@ -133,7 +153,7 @@ class ImportController extends ChangeNotifier {
 
   /// Explicitly releases this batch's remaining inbox copies, never stored books.
   Future<void> discard() async {
-    if (_closed || busy) return;
+    if (_closed || busy || _maintenanceBlocked) return;
     _discarding = true;
     _refreshEpoch++;
     _problem = null;
@@ -202,7 +222,7 @@ class ImportController extends ChangeNotifier {
   Future<void> start() async {
     _subscription = source.changes.listen(
       (event) {
-        if (_running || _discarding) {
+        if (_running || _discarding || _maintenanceBlocked) {
           // Intake events are independent of the confirmed parsing snapshot.
           _needsRefresh = true;
           _deferredSourceProblem = event.problem ?? _deferredSourceProblem;
@@ -231,7 +251,10 @@ class ImportController extends ChangeNotifier {
         }
       },
       onError: (Object _) {
-        if (!busy) {
+        if (_maintenanceBlocked) {
+          _needsRefresh = true;
+          _deferredSourceProblem = ImportProblem.unreadable;
+        } else if (!busy) {
           _problem = ImportProblem.unreadable;
           _emit();
         }
@@ -243,13 +266,13 @@ class ImportController extends ChangeNotifier {
   Future<void> refresh() async {
     if (_closed) return;
     _needsRefresh = true;
-    if (busy || _refreshing) return;
+    if (busy || _refreshing || _maintenanceBlocked) return;
     _needsRefresh = false;
     _refreshing = true;
     final epoch = _refreshEpoch;
     try {
       final pending = await source.pending();
-      if (_closed || busy || epoch != _refreshEpoch) {
+      if (_closed || busy || _maintenanceBlocked || epoch != _refreshEpoch) {
         _needsRefresh = true;
         return;
       }
@@ -291,13 +314,18 @@ class ImportController extends ChangeNotifier {
       }
     } finally {
       _refreshing = false;
-      if (!busy && !_closed && _deferredSourceProblem != null) {
+      if (!busy &&
+          !_closed &&
+          !_maintenanceBlocked &&
+          _deferredSourceProblem != null) {
         _problem ??= _deferredSourceProblem;
         _deferredSourceProblem = null;
         snoozed = false;
         _emit();
       }
-      if (_needsRefresh && !busy && !_closed) unawaited(refresh());
+      if (_needsRefresh && !busy && !_closed && !_maintenanceBlocked) {
+        unawaited(refresh());
+      }
     }
   }
 
@@ -313,7 +341,7 @@ class ImportController extends ChangeNotifier {
   }
 
   Future<void> pick() async {
-    if (busy || _awaiting() || _closed) return;
+    if (busy || _awaiting() || _closed || _maintenanceBlocked) return;
     open();
     phase = ImportPhase.receiving;
     _problem = null;
@@ -342,7 +370,7 @@ class ImportController extends ChangeNotifier {
 
   Future<void> submit() async {
     final view = focus;
-    if (busy || _closed || view == null) return;
+    if (busy || _closed || view == null || _maintenanceBlocked) return;
     if (view.phase == ImportItemPhase.succeeded) return;
     _problem = null;
     final confirmed = List<ImportItemState>.unmodifiable(items);

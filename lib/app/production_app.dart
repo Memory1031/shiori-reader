@@ -345,6 +345,7 @@ class _ProductionAppState extends State<ProductionApp>
                     openPage: openUpdatePage,
                   ),
             onImport: _imports!.open,
+            importController: _imports,
             localBooks: _databases!.localBooks,
             localManagement: _databases!.localBooks,
           ),

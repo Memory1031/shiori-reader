@@ -3,7 +3,15 @@ import '../../domain/models/models.dart';
 import '../../shared/controllers/scoped_controller.dart';
 
 class LibraryController extends ScopedController {
-  LibraryController(this.repository, {this.cache, this.localBooks});
+  LibraryController(
+    this.repository, {
+    this.cache,
+    this.localBooks,
+    this.canStartBatch,
+    this.onBatchLockChanged,
+  });
+  final bool Function()? canStartBatch;
+  final void Function(bool)? onBatchLockChanged;
   final LocalBookManagement? localBooks;
   bool localCleanupPending = false;
   Map<NovelKey, LocalBookFormat> localFormats = const {};
@@ -13,7 +21,37 @@ class LibraryController extends ScopedController {
   List<ReadingProgress> recent = const [];
   Map<NovelKey, ReadingProgress> _progressByBook = const {};
   AppFailure? shelfFailure, historyFailure, writeFailure;
-  bool shelfReady = false, historyReady = false, writing = false;
+  bool shelfReady = false, historyReady = false;
+  bool _writing = false;
+  LibraryWriteLease? _batch;
+  bool get writing => _writing || _batch != null;
+  bool get batchAvailable =>
+      !isClosed && !writing && canStartBatch?.call() != false;
+
+  /// Holds the shared write lane through confirmation, execution and results.
+  /// Batch items use the same removal operation without re-entering _write.
+  LibraryWriteLease? acquireBatch(CancellationSource request) {
+    if (!batchAvailable) return null;
+    final lease = _batch = LibraryWriteLease._(this);
+    cancellation.whenCancelled.then((_) => request.cancel());
+    onBatchLockChanged?.call(true);
+    update();
+    return lease;
+  }
+
+  Future<Result<LocalBookDeletion>> removeInBatch(
+    NovelKey key,
+    LibraryWriteLease lease, {
+    required CancellationToken cancellation,
+  }) {
+    if (isClosed || _batch != lease || cancellation.isCancelled) {
+      return Future.value(
+        Failure(AppFailure.cancelled(Operation.libraryWrite)),
+      );
+    }
+    return _remove(key, cancellation);
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -77,7 +115,7 @@ class LibraryController extends ScopedController {
     void Function(T) accept,
   ) async {
     if (isClosed || writing) return false;
-    writing = true;
+    _writing = true;
     writeFailure = null;
     update();
     Result<T> result;
@@ -93,7 +131,7 @@ class LibraryController extends ScopedController {
       );
     }
     if (isClosed) return false;
-    writing = false;
+    _writing = false;
     if (result case Success(:final value)) {
       accept(value);
       update();
@@ -112,37 +150,62 @@ class LibraryController extends ScopedController {
     ),
     (_) {},
   );
-  Future<bool> remove(NovelKey key) {
+  Future<bool> remove(NovelKey key) => _write<LocalBookDeletion>(
+    () => _remove(key, cancellation),
+    (result) => localCleanupPending = result.cleanupPending,
+  );
+
+  Future<Result<LocalBookDeletion>> _remove(
+    NovelKey key,
+    CancellationToken token,
+  ) async {
     if (key.sourceId == LocalBookIdentity.sourceId) {
-      return _write<LocalBookDeletion>(() async {
-        final management = localBooks;
-        if (management == null) {
-          return Failure(
-            AppFailure(
-              kind: FailureKind.unsupported,
-              operation: Operation.libraryWrite,
-            ),
-          );
-        }
-        return management.deleteBook(key, cancellation: cancellation);
-      }, (result) => localCleanupPending = result.cleanupPending);
-    }
-    return _write(() async {
-      // Keep the entry available for retry if cache cleanup fails. These stores
-      // cannot share a transaction; a later library failure may leave no cache.
-      final management = cache;
-      if (management != null) {
-        final cleared = await management.clear(novel: key);
-        if (cleared case Failure(:final failure)) {
-          return Failure<BookshelfEntry?>(failure);
-        }
+      final management = localBooks;
+      if (management == null) {
+        return Failure(
+          AppFailure(
+            kind: FailureKind.unsupported,
+            operation: Operation.libraryWrite,
+          ),
+        );
       }
-      return repository.removeFromBookshelf(key, cancellation: cancellation);
-    }, (_) {});
+      return management.deleteBook(key, cancellation: token);
+    }
+    // Keep the entry available for retry if cache cleanup fails. These stores
+    // cannot share a transaction; a later library failure may leave no cache.
+    final management = cache;
+    if (management != null) {
+      final cleared = await management.clear(novel: key);
+      if (cleared case Failure(:final failure)) {
+        return Failure<LocalBookDeletion>(failure);
+      }
+    }
+    if (token.isCancelled) {
+      return Failure(AppFailure.cancelled(Operation.libraryWrite));
+    }
+    final removed = await repository.removeFromBookshelf(
+      key,
+      cancellation: token,
+    );
+    return switch (removed) {
+      Success() => const Success(LocalBookDeletion()),
+      Failure(:final failure) => Failure(failure),
+    };
   }
 
   Future<bool> clearHistory(NovelKey key) => _write(
     () => repository.clearHistory(key, cancellation: cancellation),
     (_) {},
   );
+}
+
+class LibraryWriteLease {
+  LibraryWriteLease._(this._owner);
+  final LibraryController _owner;
+  void release() {
+    if (_owner._batch != this) return;
+    _owner._batch = null;
+    _owner.onBatchLockChanged?.call(false);
+    if (!_owner.isClosed) _owner.update();
+  }
 }

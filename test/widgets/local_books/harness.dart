@@ -128,12 +128,18 @@ class LocalStore
 }
 
 class LocalHarness {
-  LocalHarness(this.tester, {LocalStore? store, this.cache, this.updates})
-    : store = store ?? LocalStore();
+  LocalHarness(
+    this.tester, {
+    LocalStore? store,
+    this.cache,
+    this.updates,
+    this.preview,
+  }) : store = store ?? LocalStore();
   final WidgetTester tester;
   final LocalStore store;
   final CacheManagement? cache;
   final WidgetBuilder? updates;
+  final Widget Function(BuildContext, Widget)? preview;
   final library = FixtureLibraryRepository();
   final env = FixtureEnvironment();
   final navigation = HomeNavigation(HomeSection.localBooks);
@@ -150,12 +156,15 @@ class LocalHarness {
   String lang = 'en';
   late final Widget app = ShioriApp(
     locale: Locale(lang),
-    overlayBuilder: (context, child) => MediaQuery(
-      data: MediaQuery.of(
-        context,
-      ).copyWith(textScaler: TextScaler.linear(scale)),
-      child: ImportOverlay(controller: importer, child: child),
-    ),
+    overlayBuilder: (context, child) {
+      final overlay = MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(scale)),
+        child: ImportOverlay(controller: importer, child: child),
+      );
+      return preview?.call(context, overlay) ?? overlay;
+    },
     routes: shell
         ? const AppRoutes()
         : AppRoutes(
@@ -193,6 +202,7 @@ class LocalHarness {
               sources: [env.source.descriptor],
               settings: Store()..value = ReaderSettings(controlsHintSeen: true),
               navigation: navigation,
+              importController: importer,
               onImport: () {
                 imports++;
                 importer.open();

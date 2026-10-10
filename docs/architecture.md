@@ -87,7 +87,7 @@ CachedChapter / CacheOverview / PrefetchState 是不可变投影，预取目标�
 
 pointer-first 使用 DesktopShell，按宽度在底部导航、rail 与 sidebar 之间切换；840 / 1200 断点变化不替换 Workspace Navigator 或清空路由栈。Windows 原生窗口最小 client 宽度为 840。移动端保持 touch-first 呈现，宽窗口本身不启用桌面管理页。
 
-书架、搜索、本地文件、离线内容和关于与更新位于 Workspace。详情使用调用方路由上下文，Reader 通过 root 路由全窗口打开，返回后恢复原页面栈。切换 section 或重选当前 section 清除根页上方路由；重选不额外清空根页业务状态，不建立跨 section 的永久搜索会话。
+书架、搜索、本地文件、离线内容和关于与更新位于 Workspace。详情使用调用方路由上下文，Reader 通过 root 路由全窗口打开，返回后恢复原页面栈。切换 section 或重选当前 section 清除根页上方路由并退出多选，保留列表布局与滚动状态，不建立跨 section 的永久搜索会话。
 
 桌面 Chrome 相对 Workspace 使用固定 gutter，独立于正文最大宽度；正文在实际可用区域内居中。断点与 gutter 使用 Shell 布局宽度，内容 geometry 使用页面约束，不能将扣除侧栏后的宽度用作窗口断点。管理页滚动视口铺满 Workspace，自动滚动条位于最右侧。书架菜单支持右键、Menu 键与 Shift+F10；本地文件与书架共用重新解析流程。桌面与移动端共享视觉 token 和业务状态，页面框架不拥有业务 controller、Navigator 或额外滚动容器。
 

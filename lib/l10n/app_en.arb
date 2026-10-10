@@ -645,5 +645,121 @@
   "readerChapterProgressLoading": "Chapter progress loading",
   "readerCurrentDocument": "Current document",
   "readerDocumentPercent": "Document {percent}%",
-  "@readerDocumentPercent": {"placeholders": {"percent": {"type": "String"}}}
+  "@readerDocumentPercent": {"placeholders": {"percent": {"type": "String"}}},
+  "bookMultiSelect": "Multi-select",
+  "bookSelectedCount": "{count} selected",
+  "@bookSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSelectAll": "Select all",
+  "bookDeselectAll": "Deselect all",
+  "bookRemoveSelected": "Remove",
+  "bookDeleteSelected": "Delete",
+  "bookReparseSelected": "Reparse selected ({count})",
+  "@bookReparseSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookNoReparse": "Only available local EPUB and TXT books can be reparsed.",
+  "bookReparseAction": "Reparse ({count})",
+  "@bookReparseAction": {"placeholders": {"count": {"type": "int"}}},
+  "bookReparseAvailable": "{count} selected books can be reparsed.",
+  "@bookReparseAvailable": {"placeholders": {"count": {"type": "int"}}},
+  "bookNoSelection": "Select books first.",
+  "bookReparseSelectedConfirm": "Regenerate parsing data for {count} selected local books. The original data is kept if parsing fails.{excluded, plural, =0{} other{\n{excluded} other selected books will be excluded.}}",
+  "@bookReparseSelectedConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "excluded": {
+        "type": "int"
+      }
+    }
+  },
+  "bookBatchRemoveTitle": "Remove selected books",
+  "bookBatchLocalTitle": "Delete local books",
+  "bookBatchOnlineTitle": "Remove from bookshelf",
+  "bookBatchRemoveConfirm": "Process these {count} selected books?",
+  "@bookBatchRemoveConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookBatchOnline": "{count} online books: clear their cache and remove them from the shelf. Reading history is kept.",
+  "@bookBatchOnline": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookBatchLocal": "{count} local books: permanently delete app-owned book data and reading progress. External original files are kept. This cannot be undone.",
+  "@bookBatchLocal": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookBatchProgress": "{index} / {total} · {title}",
+  "@bookBatchProgress": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "bookBatchSummary": "{success} books completed{failed, plural, =0{} other{\nFailed: {failed}}}{unprocessed, plural, =0{} other{\nNot processed: {unprocessed}}}{missing, plural, =0{} other{\nNo longer present: {missing}}}{excluded, plural, =0{} other{\nExcluded: {excluded}}}",
+  "@bookBatchSummary": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      },
+      "unprocessed": {
+        "type": "int"
+      },
+      "missing": {
+        "type": "int"
+      },
+      "excluded": {
+        "type": "int"
+      }
+    }
+  },
+  "bookBatchResults": "Batch results",
+  "bookBatchSuccessDetails": "View completed books ({count})",
+  "@bookBatchSuccessDetails": {"placeholders": {"count": {"type": "int"}}},
+  "bookBatchRemaining": "Failed, unprocessed and excluded books remain selected for your next action.",
+  "bookBatchSucceeded": "Completed",
+  "bookBatchMissing": "Skipped: book no longer exists",
+  "bookBatchUnprocessed": "Not processed after stopping",
+  "bookBatchInapplicable": "Excluded from reparse",
+  "bookToggleSelection": "Select or deselect {title}",
+  "@bookToggleSelection": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "bookReparseCleanupPending": "Updated book saved. Remaining old files will be cleaned up at the next launch."
 }

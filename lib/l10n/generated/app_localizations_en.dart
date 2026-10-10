@@ -1343,4 +1343,154 @@ class AppLocalizationsEn extends AppLocalizations {
   String readerDocumentPercent(String percent) {
     return 'Document $percent%';
   }
+
+  @override
+  String get bookMultiSelect => 'Multi-select';
+
+  @override
+  String bookSelectedCount(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get bookSelectAll => 'Select all';
+
+  @override
+  String get bookDeselectAll => 'Deselect all';
+
+  @override
+  String get bookRemoveSelected => 'Remove';
+
+  @override
+  String get bookDeleteSelected => 'Delete';
+
+  @override
+  String bookReparseSelected(int count) {
+    return 'Reparse selected ($count)';
+  }
+
+  @override
+  String get bookNoReparse =>
+      'Only available local EPUB and TXT books can be reparsed.';
+
+  @override
+  String bookReparseAction(int count) {
+    return 'Reparse ($count)';
+  }
+
+  @override
+  String bookReparseAvailable(int count) {
+    return '$count selected books can be reparsed.';
+  }
+
+  @override
+  String get bookNoSelection => 'Select books first.';
+
+  @override
+  String bookReparseSelectedConfirm(int count, int excluded) {
+    String _temp0 = intl.Intl.pluralLogic(
+      excluded,
+      locale: localeName,
+      other: '\n$excluded other selected books will be excluded.',
+      zero: '',
+    );
+    return 'Regenerate parsing data for $count selected local books. The original data is kept if parsing fails.$_temp0';
+  }
+
+  @override
+  String get bookBatchRemoveTitle => 'Remove selected books';
+
+  @override
+  String get bookBatchLocalTitle => 'Delete local books';
+
+  @override
+  String get bookBatchOnlineTitle => 'Remove from bookshelf';
+
+  @override
+  String bookBatchRemoveConfirm(int count) {
+    return 'Process these $count selected books?';
+  }
+
+  @override
+  String bookBatchOnline(int count) {
+    return '$count online books: clear their cache and remove them from the shelf. Reading history is kept.';
+  }
+
+  @override
+  String bookBatchLocal(int count) {
+    return '$count local books: permanently delete app-owned book data and reading progress. External original files are kept. This cannot be undone.';
+  }
+
+  @override
+  String bookBatchProgress(int index, int total, String title) {
+    return '$index / $total · $title';
+  }
+
+  @override
+  String bookBatchSummary(
+    int success,
+    int failed,
+    int unprocessed,
+    int missing,
+    int excluded,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      failed,
+      locale: localeName,
+      other: '\nFailed: $failed',
+      zero: '',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      unprocessed,
+      locale: localeName,
+      other: '\nNot processed: $unprocessed',
+      zero: '',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      missing,
+      locale: localeName,
+      other: '\nNo longer present: $missing',
+      zero: '',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      excluded,
+      locale: localeName,
+      other: '\nExcluded: $excluded',
+      zero: '',
+    );
+    return '$success books completed$_temp0$_temp1$_temp2$_temp3';
+  }
+
+  @override
+  String get bookBatchResults => 'Batch results';
+
+  @override
+  String bookBatchSuccessDetails(int count) {
+    return 'View completed books ($count)';
+  }
+
+  @override
+  String get bookBatchRemaining =>
+      'Failed, unprocessed and excluded books remain selected for your next action.';
+
+  @override
+  String get bookBatchSucceeded => 'Completed';
+
+  @override
+  String get bookBatchMissing => 'Skipped: book no longer exists';
+
+  @override
+  String get bookBatchUnprocessed => 'Not processed after stopping';
+
+  @override
+  String get bookBatchInapplicable => 'Excluded from reparse';
+
+  @override
+  String bookToggleSelection(String title) {
+    return 'Select or deselect $title';
+  }
+
+  @override
+  String get bookReparseCleanupPending =>
+      'Updated book saved. Remaining old files will be cleaned up at the next launch.';
 }

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../../app/theme/shiori_theme.dart';
@@ -102,6 +104,8 @@ class BookListItem extends StatefulWidget {
     this.onSecondaryTapUp,
     this.focusNode,
     this.minHeight = 120,
+    this.selected,
+    this.selectionLabel,
   });
   final Widget child;
   final VoidCallback? onTap, onLongPress;
@@ -110,8 +114,13 @@ class BookListItem extends StatefulWidget {
   final GestureTapUpCallback? onSecondaryTapUp;
   final FocusNode? focusNode;
   final double minHeight;
+  final bool? selected;
+  final String? selectionLabel;
 
   static const inset = ShioriSpace.medium;
+
+  /// Vertical room between the tint's edge and the row's edge.
+  static const gap = ShioriSpace.tight / 2;
 
   /// Whether the row around [context] is hovered, focused or pressed, for
   /// content that tints itself like [BookListTile]'s title.
@@ -129,55 +138,79 @@ class _BookListItemState extends State<BookListItem> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final active = _hovered || _focused || _pressed;
+    final selected = widget.selected == true;
     final radius = BorderRadius.circular(ShioriShape.control);
     final duration = ShioriMotion.of(context, ShioriMotion.feedback);
+    // A selected row keeps a quiet wash; the trailing marker carries the
+    // state, so the title stays ink and focus keeps its own ring.
     final tint = colors.primary.withValues(
-      alpha: _pressed ? .12 : (active ? .06 : 0),
+      alpha: _pressed
+          ? .12
+          : selected
+          ? (_hovered ? .11 : .08)
+          : (active ? .06 : 0),
     );
     // Opaque paper keeps swipe actions hidden behind the row at rest.
-    return Material(
-      color: theme.scaffoldBackgroundColor,
-      child: InkWell(
-        onTap: widget.onTap,
-        onLongPress: widget.onLongPress,
-        onSecondaryTapUp: widget.onSecondaryTapUp,
-        focusNode: widget.focusNode,
-        onHover: (value) => setState(() => _hovered = value),
-        onHighlightChanged: (value) => setState(() => _pressed = value),
-        onFocusChange: (value) => setState(() => _focused = value),
-        borderRadius: radius,
-        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-        splashFactory: NoSplash.splashFactory,
-        child: AnimatedContainer(
-          duration: duration,
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: BookListItem.inset),
-          decoration: BoxDecoration(color: tint, borderRadius: radius),
-          // The focus ring paints over the row so it never shifts layout.
-          foregroundDecoration: BoxDecoration(
-            borderRadius: radius,
-            border: Border.all(
-              color: _focused
-                  ? colors.primary.withValues(alpha: .6)
-                  : Colors.transparent,
-              width: 1.5,
-            ),
-          ),
-          child: Container(
-            constraints: BoxConstraints(minHeight: widget.minHeight),
-            padding: const EdgeInsets.symmetric(vertical: ShioriSpace.medium),
-            decoration: BoxDecoration(
-              border: Border(
-                // The hairline yields to the tint so a highlighted row reads
-                // as one surface.
-                bottom: BorderSide(
-                  color: active
-                      ? Colors.transparent
-                      : colors.outlineVariant.withValues(alpha: .45),
+    return Semantics(
+      checked: widget.selected,
+      selected: widget.selected,
+      label: widget.selectionLabel,
+      child: Material(
+        color: theme.scaffoldBackgroundColor,
+        child: InkWell(
+          onTap: widget.onTap,
+          onLongPress: widget.onLongPress,
+          onSecondaryTapUp: widget.onSecondaryTapUp,
+          focusNode: widget.focusNode,
+          onHover: (value) => setState(() => _hovered = value),
+          onHighlightChanged: (value) => setState(() => _pressed = value),
+          onFocusChange: (value) => setState(() => _focused = value),
+          borderRadius: radius,
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          splashFactory: NoSplash.splashFactory,
+          // Each row insets its tint vertically so adjacent selected or
+          // hovered rows read as separate surfaces; the inner padding gives
+          // the room back, keeping the row height unchanged.
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: BookListItem.gap),
+            child: AnimatedContainer(
+              duration: duration,
+              curve: Curves.easeOut,
+              padding: const EdgeInsets.symmetric(
+                horizontal: BookListItem.inset,
+              ),
+              decoration: BoxDecoration(color: tint, borderRadius: radius),
+              // The focus ring paints over the row so it never shifts layout.
+              foregroundDecoration: BoxDecoration(
+                borderRadius: radius,
+                border: Border.all(
+                  color: _focused
+                      ? colors.primary.withValues(alpha: selected ? .9 : .6)
+                      : Colors.transparent,
+                  width: 1.5,
                 ),
               ),
+              child: Container(
+                constraints: BoxConstraints(
+                  minHeight: max(0, widget.minHeight - 2 * BookListItem.gap),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: ShioriSpace.medium - BookListItem.gap,
+                ),
+                decoration: BoxDecoration(
+                  border: Border(
+                    // The hairline yields to the tint so a highlighted row reads
+                    // as one surface.
+                    bottom: BorderSide(
+                      color: active || selected
+                          ? Colors.transparent
+                          : colors.outlineVariant.withValues(alpha: .45),
+                    ),
+                  ),
+                ),
+                child: _TitleTint(active: active, child: widget.child),
+              ),
             ),
-            child: _TitleTint(active: active, child: widget.child),
           ),
         ),
       ),

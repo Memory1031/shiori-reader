@@ -16,6 +16,8 @@ import '../local_books/local_reparse_controller.dart';
 import 'library_controller.dart';
 import '../reader/book_progress_label.dart';
 import 'remove_shelf_book.dart';
+import 'book_batch_actions.dart';
+import 'book_selection_widgets.dart';
 
 class BookshelfView extends StatefulWidget {
   const BookshelfView({
@@ -31,9 +33,11 @@ class BookshelfView extends StatefulWidget {
     this.layout,
     this.showTitle = true,
     this.desktop = false,
+    this.batchActions,
   });
   final LibraryController controller;
   final LocalBookReparse? localReparse;
+  final BookBatchActions? batchActions;
 
   /// The pointer-first shelf: a fixed toolbar over centered content,
   /// a density-driven grid, column rows without swipe actions, and book
@@ -61,6 +65,32 @@ class BookshelfView extends StatefulWidget {
 }
 
 class _BookshelfViewState extends State<BookshelfView> {
+  late final _ownedActions = widget.batchActions == null
+      ? BookBatchActions(
+          widget.controller,
+          reparse: widget.localReparse,
+          bindShelf: true,
+        )
+      : null;
+  BookBatchActions get _batch => widget.batchActions ?? _ownedActions!;
+  bool get _selecting => _batch.selection.active;
+  void _selectionChanged() {
+    if (mounted) {
+      setState(() {
+        if (_selecting) _revealed = null;
+      });
+    }
+  }
+
+  void _openBook(NovelKey key) {
+    if (_batch.busy || widget.controller.writing) return;
+    if (_selecting) {
+      _batch.selection.toggle(key);
+    } else {
+      widget.onOpen(key);
+    }
+  }
+
   ValueNotifier<bool>? _ownLayout;
   ValueNotifier<bool> get _layout =>
       widget.layout ?? (_ownLayout ??= ValueNotifier(true));
@@ -75,6 +105,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   void initState() {
     super.initState();
     _layout.addListener(_layoutChanged);
+    _batch.addListener(_selectionChanged);
   }
 
   @override
@@ -89,6 +120,8 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   @override
   void dispose() {
+    _batch.removeListener(_selectionChanged);
+    _ownedActions?.dispose();
     _layout.removeListener(_layoutChanged);
     _ownLayout?.dispose();
 
@@ -136,6 +169,12 @@ class _BookshelfViewState extends State<BookshelfView> {
         enabled: widget.onDetails != null,
       ),
       null,
+      _BookEntry(
+        _BookAction.select,
+        Icons.checklist,
+        strings.bookMultiSelect,
+        enabled: _batch.canEnter,
+      ),
       if (book.key.sourceId == LocalBookIdentity.sourceId &&
           reparse != null &&
           controller.localFormats.containsKey(book.key))
@@ -155,6 +194,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   void _perform(NovelSummary book, _BookAction action) {
+    if (_batch.busy || widget.controller.writing || _selecting) return;
     final controller = widget.controller;
     switch (action) {
       case _BookAction.open:
@@ -172,10 +212,13 @@ class _BookshelfViewState extends State<BookshelfView> {
         }
       case _BookAction.remove:
         removeShelfBook(context, controller, book);
+      case _BookAction.select:
+        _batch.enter(book.key);
     }
   }
 
   Future<void> _actions(NovelSummary book) async {
+    if (_selecting || _batch.busy || widget.controller.writing) return;
     final strings = AppLocalizations.of(context);
     final controller = widget.controller;
     final theme = Theme.of(context);
@@ -191,7 +234,7 @@ class _BookshelfViewState extends State<BookshelfView> {
       ),
     ].join(' · ');
     final entries = _entries(book);
-    await showShioriSheet<void>(
+    final action = await showShioriSheet<_BookAction>(
       context,
       builder: (sheet) => Padding(
         padding: const EdgeInsets.fromLTRB(
@@ -268,19 +311,20 @@ class _BookshelfViewState extends State<BookshelfView> {
                     borderRadius: BorderRadius.circular(ShioriShape.control),
                   ),
                   onTap: () {
-                    Navigator.pop(sheet);
-                    _perform(book, entry.action);
+                    Navigator.pop(sheet, entry.action);
                   },
                 ),
           ],
         ),
       ),
     );
+    if (mounted && action != null) _perform(book, action);
   }
 
   /// A book menu anchored at [anchor] in global coordinates. Resolves true
   /// when it closed without a choice, so the caller can take focus back.
   Future<bool> _menu(NovelSummary book, Rect anchor) async {
+    if (_selecting || _batch.busy || widget.controller.writing) return false;
     final overlay =
         Overlay.of(context, rootOverlay: true).context.findRenderObject()!
             as RenderBox;
@@ -318,6 +362,21 @@ class _BookshelfViewState extends State<BookshelfView> {
 
   @override
   Widget build(BuildContext context) {
+    return BookSelectionScope(
+      actions: _batch,
+      child: Column(
+        children: [
+          if (_selecting && !widget.desktop && _ownedActions != null)
+            BookSelectionToolbar(actions: _batch),
+          Expanded(child: _content(context)),
+          if (_selecting && !widget.desktop)
+            BookSelectionBottomBar(actions: _batch),
+        ],
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context) {
     if (widget.desktop) return _desktop(context);
     final controller = widget.controller;
     final strings = AppLocalizations.of(context);
@@ -343,7 +402,7 @@ class _BookshelfViewState extends State<BookshelfView> {
           );
           final cover = BookCover(book: book, images: widget.images);
           if (!_grid) {
-            final open = _revealed == book.key;
+            final open = !_selecting && _revealed == book.key;
             final sourceLabel = _sourceBadgeLabel(book.key, format);
             final metadata = [?sourceLabel, ?progressLabel].join(' · ');
             // The row's own inset keeps content on the page gutter.
@@ -419,9 +478,15 @@ class _BookshelfViewState extends State<BookshelfView> {
                         ),
                       ),
                     GestureDetector(
-                      onHorizontalDragStart: (_) => _drag = 0,
-                      onHorizontalDragUpdate: (d) => _drag += d.delta.dx,
-                      onHorizontalDragEnd: (d) => _dragEnd(book.key, d),
+                      onHorizontalDragStart: _selecting
+                          ? null
+                          : (_) => _drag = 0,
+                      onHorizontalDragUpdate: _selecting
+                          ? null
+                          : (d) => _drag += d.delta.dx,
+                      onHorizontalDragEnd: _selecting
+                          ? null
+                          : (d) => _dragEnd(book.key, d),
                       child: AnimatedContainer(
                         duration: ShioriMotion.of(
                           context,
@@ -437,12 +502,18 @@ class _BookshelfViewState extends State<BookshelfView> {
                           0,
                         ),
                         child: BookListItem(
-                          onLongPress: () => _actions(book),
+                          selected: _selecting
+                              ? _batch.selection.selected.contains(book.key)
+                              : null,
+                          selectionLabel: _selecting
+                              ? strings.bookToggleSelection(book.title)
+                              : null,
+                          onLongPress: _selecting ? null : () => _actions(book),
                           onTap: () {
                             if (open) {
                               setState(() => _revealed = null);
                             } else {
-                              widget.onOpen(book.key);
+                              _openBook(book.key);
                             }
                           },
                           minHeight: open ? 120 * scale.clamp(1, 2) : 120,
@@ -453,12 +524,20 @@ class _BookshelfViewState extends State<BookshelfView> {
                                 ? null
                                 : book.authors.join(', '),
                             metadata: metadata,
-                            trailing: IconButton(
-                              key: ValueKey(('shelf-more', book.key)),
-                              tooltip: strings.moreActions,
-                              onPressed: () => _actions(book),
-                              icon: const Icon(Icons.more_horiz, size: 20),
-                            ),
+                            trailing: _selecting
+                                ? BookSelectionCheck(
+                                    selected: _batch.selection.selected
+                                        .contains(book.key),
+                                  )
+                                : IconButton(
+                                    key: ValueKey(('shelf-more', book.key)),
+                                    tooltip: strings.moreActions,
+                                    onPressed: () => _actions(book),
+                                    icon: const Icon(
+                                      Icons.more_horiz,
+                                      size: 20,
+                                    ),
+                                  ),
                           ),
                         ),
                       ),
@@ -470,8 +549,11 @@ class _BookshelfViewState extends State<BookshelfView> {
           }
           return _ShelfGridCard(
             key: ValueKey(book.key),
-            onTap: () => widget.onOpen(book.key),
-            onLongPress: () => _actions(book),
+            onTap: () => _openBook(book.key),
+            selected: _selecting
+                ? _batch.selection.selected.contains(book.key)
+                : null,
+            onLongPress: _selecting ? null : () => _actions(book),
             cover: cover,
             title: book.title,
             sourceLabel: _sourceBadgeLabel(book.key, format),
@@ -482,7 +564,15 @@ class _BookshelfViewState extends State<BookshelfView> {
           key: PageStorageKey(_grid ? 'shelf-grid' : 'shelf-list'),
           slivers: [
             if (widget.header case final header?)
-              SliverToBoxAdapter(child: header),
+              SliverToBoxAdapter(
+                child: IgnorePointer(
+                  ignoring: _selecting || _batch.busy,
+                  child: ExcludeFocus(
+                    excluding: _selecting || _batch.busy,
+                    child: header,
+                  ),
+                ),
+              ),
             if (widget.showTitle)
               SliverToBoxAdapter(
                 child: Padding(
@@ -625,8 +715,11 @@ class _BookshelfViewState extends State<BookshelfView> {
           if (_grid) {
             return _ShelfGridCard(
               key: ValueKey(book.key),
-              onTap: () => widget.onOpen(book.key),
-              onMenu: (anchor) => _menu(book, anchor),
+              onTap: () => _openBook(book.key),
+              selected: _selecting
+                  ? _batch.selection.selected.contains(book.key)
+                  : null,
+              onMenu: _selecting ? null : (anchor) => _menu(book, anchor),
               cover: cover,
               title: book.title,
               sourceLabel: sourceLabel,
@@ -646,7 +739,10 @@ class _BookshelfViewState extends State<BookshelfView> {
               descriptive: true,
             ),
             progress: progress?.fraction,
-            onTap: () => widget.onOpen(book.key),
+            onTap: () => _openBook(book.key),
+            selected: _selecting
+                ? _batch.selection.selected.contains(book.key)
+                : null,
             onMenu: (anchor) => _menu(book, anchor),
           );
         }
@@ -654,13 +750,22 @@ class _BookshelfViewState extends State<BookshelfView> {
         return Column(
           children: [
             DesktopPageChrome(
-              child: DesktopShelfToolbar(
-                layout: _layout,
-                count: controller.shelfReady && books.isNotEmpty
-                    ? books.length
-                    : null,
-                onImport: widget.onImport,
-              ),
+              child: _selecting
+                  ? BookSelectionToolbar(
+                      actions: _batch,
+                      operations: true,
+                      layout: ShelfLayoutToggle(layout: _layout),
+                    )
+                  : DesktopShelfToolbar(
+                      layout: _layout,
+                      count: controller.shelfReady && books.isNotEmpty
+                          ? books.length
+                          : null,
+                      onImport: widget.controller.writing || _batch.busy
+                          ? null
+                          : widget.onImport,
+                      selectionEntry: BookSelectionEntry(actions: _batch),
+                    ),
             ),
             Expanded(
               child: CustomScrollView(
@@ -670,7 +775,15 @@ class _BookshelfViewState extends State<BookshelfView> {
                     framed(
                       SliverPadding(
                         padding: const EdgeInsets.only(bottom: rowGap),
-                        sliver: SliverToBoxAdapter(child: header),
+                        sliver: SliverToBoxAdapter(
+                          child: IgnorePointer(
+                            ignoring: _selecting || _batch.busy,
+                            child: ExcludeFocus(
+                              excluding: _selecting || _batch.busy,
+                              child: header,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   if (controller.shelfFailure != null)
@@ -749,7 +862,7 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 }
 
-enum _BookAction { open, details, reparse, remove }
+enum _BookAction { open, details, reparse, remove, select }
 
 class _BookEntry {
   const _BookEntry(this.action, this.icon, this.label, {this.enabled = true});
@@ -795,10 +908,12 @@ class _ShelfGridCard extends StatefulWidget {
     this.onLongPress,
     this.onMenu,
     this.sourceLabel,
+    this.selected,
   });
 
   final Widget cover;
   final String title;
+  final bool? selected;
   final String? sourceLabel;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
@@ -854,6 +969,7 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final active = _hovered || _pressed || _focused;
+    final selected = widget.selected == true;
     final duration = ShioriMotion.of(context, ShioriMotion.feedback);
     final radius = BorderRadius.circular(ShioriShape.cover);
     final menu = widget.onMenu != null;
@@ -893,14 +1009,47 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
                 borderRadius: radius,
                 border: Border.all(
                   color: colors.primary.withValues(
-                    alpha: _focused || _pressed ? .9 : (_hovered ? .55 : 0),
+                    alpha: _focused || _pressed || selected
+                        ? .9
+                        : (_hovered ? .55 : 0),
                   ),
-                  width: 2,
+                  width: _focused && widget.selected != null ? 3.5 : 2,
                 ),
               ),
-              child: _ShelfCover(
-                cover: widget.cover,
-                sourceLabel: widget.sourceLabel,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: _ShelfCover(
+                      cover: widget.cover,
+                      sourceLabel: widget.sourceLabel,
+                    ),
+                  ),
+                  if (widget.selected != null) ...[
+                    // A light wash keeps the choice legible on busy artwork.
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: AnimatedOpacity(
+                          duration: duration,
+                          opacity: selected ? 1 : 0,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: radius,
+                              color: colors.primary.withValues(alpha: .14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    PositionedDirectional(
+                      top: 2,
+                      end: 2,
+                      child: BookSelectionCheck(
+                        selected: selected,
+                        overArtwork: true,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -919,6 +1068,14 @@ class _ShelfGridCardState extends State<_ShelfGridCard> {
         ],
       ),
     );
+    if (widget.selected != null) {
+      card = Semantics(
+        checked: widget.selected,
+        selected: widget.selected,
+        label: AppLocalizations.of(context).bookToggleSelection(widget.title),
+        child: card,
+      );
+    }
     if (!menu) return card;
 
     // Shown on hover or focus without its own Tab stop; the Menu key and

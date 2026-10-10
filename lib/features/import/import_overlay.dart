@@ -104,11 +104,7 @@ class _ImportOverlayState extends State<ImportOverlay>
     builder: (context, _) {
       final c = widget.controller;
       final l = AppLocalizations.of(context);
-      final hasOpenWork =
-          c.busy ||
-          c.batchProblem != null ||
-          c.items.any((item) => item.phase != ImportItemPhase.succeeded);
-      final show = c.panelOpen || !c.snoozed && hasOpenWork;
+      final show = !c.maintenanceBlocked && c.interactionOpen;
       _updateFocus(show);
       return Stack(
         children: [

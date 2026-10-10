@@ -645,5 +645,121 @@
   "readerChapterProgressLoading": "章节进度加载中",
   "readerCurrentDocument": "当前文档",
   "readerDocumentPercent": "当前文档 {percent}%",
-  "@readerDocumentPercent": {"placeholders": {"percent": {"type": "String"}}}
+  "@readerDocumentPercent": {"placeholders": {"percent": {"type": "String"}}},
+  "bookMultiSelect": "多选",
+  "bookSelectedCount": "已选 {count} 本",
+  "@bookSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookSelectAll": "全选",
+  "bookDeselectAll": "取消全选",
+  "bookRemoveSelected": "移除",
+  "bookDeleteSelected": "删除",
+  "bookReparseSelected": "重新解析所选（{count} 本）",
+  "@bookReparseSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookNoReparse": "仅支持重新解析仍存在的本地 EPUB／TXT 书籍。",
+  "bookReparseAction": "重新解析（{count}）",
+  "@bookReparseAction": {"placeholders": {"count": {"type": "int"}}},
+  "bookReparseAvailable": "其中 {count} 本可重新解析",
+  "@bookReparseAvailable": {"placeholders": {"count": {"type": "int"}}},
+  "bookNoSelection": "请先选择书籍。",
+  "bookReparseSelectedConfirm": "重新生成所选 {count} 本本地书籍的解析数据。解析失败时保留原有数据。{excluded, plural, =0{} other{\n另有 {excluded} 本所选书籍不参与。}}",
+  "@bookReparseSelectedConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "excluded": {
+        "type": "int"
+      }
+    }
+  },
+  "bookBatchRemoveTitle": "移除所选书籍",
+  "bookBatchLocalTitle": "删除本地书籍",
+  "bookBatchOnlineTitle": "移出书架",
+  "bookBatchRemoveConfirm": "处理所选的 {count} 本书籍？",
+  "@bookBatchRemoveConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookBatchOnline": "{count} 本在线书籍：清理缓存并移出书架，保留阅读历史。",
+  "@bookBatchOnline": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookBatchLocal": "{count} 本本地书籍：永久删除应用内书籍数据与阅读进度，保留外部原文件。此操作不可撤销。",
+  "@bookBatchLocal": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bookBatchProgress": "{index} / {total} · {title}",
+  "@bookBatchProgress": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "bookBatchSummary": "已完成 {success} 本{failed, plural, =0{} other{\n失败 {failed} 本}}{unprocessed, plural, =0{} other{\n未处理 {unprocessed} 本}}{missing, plural, =0{} other{\n已不存在 {missing} 本}}{excluded, plural, =0{} other{\n未参与 {excluded} 本}}",
+  "@bookBatchSummary": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      },
+      "unprocessed": {
+        "type": "int"
+      },
+      "missing": {
+        "type": "int"
+      },
+      "excluded": {
+        "type": "int"
+      }
+    }
+  },
+  "bookBatchResults": "批量操作结果",
+  "bookBatchSuccessDetails": "查看已完成书籍（{count} 本）",
+  "@bookBatchSuccessDetails": {"placeholders": {"count": {"type": "int"}}},
+  "bookBatchRemaining": "失败、未处理及未参与的书籍仍保留选中，可在关闭后继续操作。",
+  "bookBatchSucceeded": "已完成",
+  "bookBatchMissing": "已跳过：书籍已不存在",
+  "bookBatchUnprocessed": "停止后未处理",
+  "bookBatchInapplicable": "不适用，未重新解析",
+  "bookToggleSelection": "选择或取消选择《{title}》",
+  "@bookToggleSelection": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "bookReparseCleanupPending": "新内容已保存，残留旧资源将于下次启动时清理。"
 }

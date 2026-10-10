@@ -1218,4 +1218,151 @@ class AppLocalizationsZh extends AppLocalizations {
   String readerDocumentPercent(String percent) {
     return '当前文档 $percent%';
   }
+
+  @override
+  String get bookMultiSelect => '多选';
+
+  @override
+  String bookSelectedCount(int count) {
+    return '已选 $count 本';
+  }
+
+  @override
+  String get bookSelectAll => '全选';
+
+  @override
+  String get bookDeselectAll => '取消全选';
+
+  @override
+  String get bookRemoveSelected => '移除';
+
+  @override
+  String get bookDeleteSelected => '删除';
+
+  @override
+  String bookReparseSelected(int count) {
+    return '重新解析所选（$count 本）';
+  }
+
+  @override
+  String get bookNoReparse => '仅支持重新解析仍存在的本地 EPUB／TXT 书籍。';
+
+  @override
+  String bookReparseAction(int count) {
+    return '重新解析（$count）';
+  }
+
+  @override
+  String bookReparseAvailable(int count) {
+    return '其中 $count 本可重新解析';
+  }
+
+  @override
+  String get bookNoSelection => '请先选择书籍。';
+
+  @override
+  String bookReparseSelectedConfirm(int count, int excluded) {
+    String _temp0 = intl.Intl.pluralLogic(
+      excluded,
+      locale: localeName,
+      other: '\n另有 $excluded 本所选书籍不参与。',
+      zero: '',
+    );
+    return '重新生成所选 $count 本本地书籍的解析数据。解析失败时保留原有数据。$_temp0';
+  }
+
+  @override
+  String get bookBatchRemoveTitle => '移除所选书籍';
+
+  @override
+  String get bookBatchLocalTitle => '删除本地书籍';
+
+  @override
+  String get bookBatchOnlineTitle => '移出书架';
+
+  @override
+  String bookBatchRemoveConfirm(int count) {
+    return '处理所选的 $count 本书籍？';
+  }
+
+  @override
+  String bookBatchOnline(int count) {
+    return '$count 本在线书籍：清理缓存并移出书架，保留阅读历史。';
+  }
+
+  @override
+  String bookBatchLocal(int count) {
+    return '$count 本本地书籍：永久删除应用内书籍数据与阅读进度，保留外部原文件。此操作不可撤销。';
+  }
+
+  @override
+  String bookBatchProgress(int index, int total, String title) {
+    return '$index / $total · $title';
+  }
+
+  @override
+  String bookBatchSummary(
+    int success,
+    int failed,
+    int unprocessed,
+    int missing,
+    int excluded,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      failed,
+      locale: localeName,
+      other: '\n失败 $failed 本',
+      zero: '',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      unprocessed,
+      locale: localeName,
+      other: '\n未处理 $unprocessed 本',
+      zero: '',
+    );
+    String _temp2 = intl.Intl.pluralLogic(
+      missing,
+      locale: localeName,
+      other: '\n已不存在 $missing 本',
+      zero: '',
+    );
+    String _temp3 = intl.Intl.pluralLogic(
+      excluded,
+      locale: localeName,
+      other: '\n未参与 $excluded 本',
+      zero: '',
+    );
+    return '已完成 $success 本$_temp0$_temp1$_temp2$_temp3';
+  }
+
+  @override
+  String get bookBatchResults => '批量操作结果';
+
+  @override
+  String bookBatchSuccessDetails(int count) {
+    return '查看已完成书籍（$count 本）';
+  }
+
+  @override
+  String get bookBatchRemaining => '失败、未处理及未参与的书籍仍保留选中，可在关闭后继续操作。';
+
+  @override
+  String get bookBatchSucceeded => '已完成';
+
+  @override
+  String get bookBatchMissing => '已跳过：书籍已不存在';
+
+  @override
+  String get bookBatchUnprocessed => '停止后未处理';
+
+  @override
+  String get bookBatchInapplicable => '不适用，未重新解析';
+
+  @override
+  String bookToggleSelection(String title) {
+    return '选择或取消选择《$title》';
+  }
+
+  @override
+  String get bookReparseCleanupPending => '新内容已保存，残留旧资源将于下次启动时清理。';
 }

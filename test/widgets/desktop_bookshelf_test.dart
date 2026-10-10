@@ -187,7 +187,7 @@ void main() {
         final import = tester.getRect(
           find.descendant(
             of: find.byType(DesktopShelfToolbar),
-            matching: find.byType(OutlinedButton),
+            matching: find.byKey(const ValueKey('shelf-import')),
           ),
         );
         _near(toggle.center.dy, import.center.dy, 'toolbar action centers');

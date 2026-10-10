@@ -25,6 +25,9 @@ import '../cache/cache_screen.dart';
 import '../search/search_screen.dart';
 import '../local_books/local_books_screen.dart';
 import '../local_books/local_cover_index.dart';
+import '../bookshelf/book_batch_actions.dart';
+import '../bookshelf/book_selection_widgets.dart';
+import '../import/import_controller.dart';
 
 class ReadingHome extends StatefulWidget {
   const ReadingHome({
@@ -43,6 +46,7 @@ class ReadingHome extends StatefulWidget {
     this.environmentLabel,
     this.navigation,
     this.updates,
+    this.importController,
   });
   final NovelRepository repository;
   final LibraryRepository library;
@@ -64,12 +68,14 @@ class ReadingHome extends StatefulWidget {
   /// Root of the desktop shell's updates section; without it the entry
   /// runs [onUpdates] instead.
   final WidgetBuilder? updates;
+  final ImportController? importController;
   @override
   State<ReadingHome> createState() => _ReadingHomeState();
 }
 
 class _ReadingHomeState extends State<ReadingHome> {
   late final LibraryController _library;
+  late final BookBatchActions _shelfActions;
 
   HomeNavigation? _ownNavigation;
   HomeNavigation get _navigation =>
@@ -99,9 +105,22 @@ class _ReadingHomeState extends State<ReadingHome> {
             widget.library,
             cache: widget.cache,
             localBooks: widget.localManagement,
+            canStartBatch: () =>
+                widget.importController?.busy != true &&
+                widget.importController?.interactionOpen != true,
+            onBatchLockChanged: (blocked) =>
+                widget.importController?.setMaintenanceBlocked(blocked),
           )
           ..onStart()
           ..addListener(_changed);
+    _shelfActions = BookBatchActions(
+      _library,
+      bindShelf: true,
+      reparse: widget.localBooks is LocalBookReparse
+          ? widget.localBooks as LocalBookReparse
+          : null,
+    )..addListener(_changed);
+    widget.importController?.addListener(_importChanged);
     _navigation.addListener(_navigate);
   }
 
@@ -113,6 +132,14 @@ class _ReadingHomeState extends State<ReadingHome> {
       old?.removeListener(_navigate);
       _navigation.addListener(_navigate);
     }
+    if (oldWidget.importController != widget.importController) {
+      oldWidget.importController?.removeListener(_importChanged);
+      widget.importController?.addListener(_importChanged);
+    }
+  }
+
+  void _importChanged() {
+    if (!_library.isClosed) _library.update();
   }
 
   void _changed() {
@@ -123,6 +150,7 @@ class _ReadingHomeState extends State<ReadingHome> {
   /// section's root: pages opened above it close at once, without an exit
   /// transition, and a new root replaces the old one the same way.
   void _navigate() {
+    _shelfActions.leave();
     _history.clear();
     if (mounted) setState(() {});
   }
@@ -136,9 +164,12 @@ class _ReadingHomeState extends State<ReadingHome> {
 
   @override
   void dispose() {
+    widget.importController?.removeListener(_importChanged);
     _navigation.removeListener(_navigate);
     _ownNavigation?.dispose();
     _shelfGrid.dispose();
+    _shelfActions.removeListener(_changed);
+    _shelfActions.dispose();
     _library.removeListener(_changed);
     _library.onDelete();
     _library.dispose();
@@ -205,6 +236,8 @@ class _ReadingHomeState extends State<ReadingHome> {
               store: widget.localBooks!,
               management: widget.localManagement!,
               library: widget.library,
+              libraryController: _library,
+              selectionResetSignal: _navigation,
               onRead: _continue,
               onImport: widget.onImport!,
               covers: _localCovers,
@@ -488,6 +521,7 @@ class _ReadingHomeState extends State<ReadingHome> {
               child: PageStorage(
                 bucket: _shelfStorage,
                 child: BookshelfView(
+                  batchActions: _shelfActions,
                   desktop: true,
                   localReparse: widget.localBooks is LocalBookReparse
                       ? widget.localBooks as LocalBookReparse
@@ -521,58 +555,72 @@ class _ReadingHomeState extends State<ReadingHome> {
   Widget _mobile(BuildContext context) {
     final strings = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const ShioriLogo(),
-        actions: [
-          IconButton(
-            onPressed: () => _search(context),
-            tooltip: strings.searchTitle,
-            icon: const Icon(Icons.search),
-          ),
-          PopupMenuButton<String>(
-            tooltip: strings.moreActions,
-            onSelected: (value) {
-              if (value == 'import') widget.onImport?.call();
-              if (value == 'cache') {
-                _routes.open(context, const CacheDestination());
-              }
-              if (value == 'local') {
-                _routes.open(context, const LocalBooksDestination());
-              }
-              if (value == 'appearance') widget.onAppearance?.call();
-              if (value == 'updates') widget.onUpdates?.call();
-            },
-            itemBuilder: (_) => [
-              if (widget.onUpdates != null)
-                _menuItem('updates', Icons.info_outline, strings.updateTitle),
-              if (widget.onImport != null)
-                _menuItem(
-                  'import',
-                  Icons.file_upload_outlined,
-                  strings.importTitle,
+      appBar: _shelfActions.selection.active
+          ? BookSelectionAppBar(actions: _shelfActions)
+          : AppBar(
+              title: const ShioriLogo(),
+              actions: [
+                IconButton(
+                  onPressed: _library.writing ? null : () => _search(context),
+                  tooltip: strings.searchTitle,
+                  icon: const Icon(Icons.search),
                 ),
-              if (widget.localManagement != null)
-                _menuItem(
-                  'local',
-                  Icons.folder_outlined,
-                  strings.localBooksTitle,
+                PopupMenuButton<String>(
+                  enabled: !_library.writing,
+                  tooltip: strings.moreActions,
+                  onSelected: (value) {
+                    if (value == 'select') _shelfActions.enter();
+                    if (value == 'import') widget.onImport?.call();
+                    if (value == 'cache') {
+                      _routes.open(context, const CacheDestination());
+                    }
+                    if (value == 'local') {
+                      _routes.open(context, const LocalBooksDestination());
+                    }
+                    if (value == 'appearance') widget.onAppearance?.call();
+                    if (value == 'updates') widget.onUpdates?.call();
+                  },
+                  itemBuilder: (_) => [
+                    ShioriMenuItem(
+                      value: 'select',
+                      icon: Icons.checklist,
+                      label: strings.bookMultiSelect,
+                      enabled: _shelfActions.canEnter,
+                    ),
+                    if (widget.onUpdates != null)
+                      _menuItem(
+                        'updates',
+                        Icons.info_outline,
+                        strings.updateTitle,
+                      ),
+                    if (widget.onImport != null)
+                      _menuItem(
+                        'import',
+                        Icons.file_upload_outlined,
+                        strings.importTitle,
+                      ),
+                    if (widget.localManagement != null)
+                      _menuItem(
+                        'local',
+                        Icons.folder_outlined,
+                        strings.localBooksTitle,
+                      ),
+                    if (widget.cache != null)
+                      _menuItem(
+                        'cache',
+                        Icons.offline_pin_outlined,
+                        strings.cacheTitle,
+                      ),
+                    if (widget.onAppearance != null)
+                      _menuItem(
+                        'appearance',
+                        Icons.palette_outlined,
+                        strings.appAppearance,
+                      ),
+                  ],
                 ),
-              if (widget.cache != null)
-                _menuItem(
-                  'cache',
-                  Icons.offline_pin_outlined,
-                  strings.cacheTitle,
-                ),
-              if (widget.onAppearance != null)
-                _menuItem(
-                  'appearance',
-                  Icons.palette_outlined,
-                  strings.appAppearance,
-                ),
-            ],
-          ),
-        ],
-      ),
+              ],
+            ),
       body: SafeArea(
         child: Column(
           children: [
@@ -585,6 +633,8 @@ class _ReadingHomeState extends State<ReadingHome> {
                     maxWidth: ShioriLayout.page,
                   ),
                   child: BookshelfView(
+                    batchActions: _shelfActions,
+                    layout: _shelfGrid,
                     localReparse: widget.localBooks is LocalBookReparse
                         ? widget.localBooks as LocalBookReparse
                         : null,

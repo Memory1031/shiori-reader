@@ -1,4 +1,5 @@
 import 'app/image_export.dart';
+import 'app/flutter_binding.dart';
 import 'shared/image_export_scope.dart';
 import 'package:flutter/material.dart';
 import 'features/reader/epub_webview_host.dart';
@@ -17,7 +18,7 @@ import 'data/local/preferences_app_settings_store.dart';
 import 'shared/app_logger.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  ShioriWidgetsFlutterBinding();
   const scenario = String.fromEnvironment('SHIORI_SCENARIO');
   if (scenario == 'themeLab') {
     runApp(createDevApp(scenarioId: scenario));

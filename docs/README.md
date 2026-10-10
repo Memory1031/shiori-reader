@@ -6,6 +6,7 @@
 | --- | --- |
 | [开发说明](development.md) | 工具链、运行、测试和排障 |
 | [架构与数据规则](architecture.md) | 领域身份、桌面工作区、应用装配、数据库、缓存和网络预算 |
+| [UI 设计规范](design.md) | 视觉 token、组件、交互状态与弹窗模式 |
 | [接口合同](contracts.md) | Repository、会话、取消和所有权 |
 | [阅读器](reader.md) | 排版、分页、动画和阅读位置 |
 | [本地导入](local-import.md) | EPUB/TXT、资源、诊断与重解析 |

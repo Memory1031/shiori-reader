@@ -9,6 +9,7 @@ Keep this file focused on durable project principles. Do not create or update pr
 - Follow the user's current task and constraints. Consult [docs/README.md](docs/README.md) for relevant module documentation before implementation and [docs/release/README.md](docs/release/README.md) for release operations. Do not automatically start subsequent tasks.
 - Inspect the working tree and preserve user / other agent changes, including staged and untracked files. Coordinate shared files when parallel work is authorized.
 - Prefer small, reviewable changes and the simplest design that meets the task. Avoid speculative abstractions, premature optimization, and unrelated refactoring.
+- For Shiori UI additions, adjustments, or visual polish, first read [shiori-ui](.agents/skills/shiori-ui/SKILL.md) and its referenced frontend-design skill, preserve the existing design system, and inspect actual rendered results. Pure parser, storage, and algorithm work does not require these design skills.
 - Use Chinese for project explanations and task documentation when documentation is actually required, unless requested otherwise; preserve established code naming and the English commit convention below.
 - Do not broaden the scope to cleanup, documentation, refactoring, or follow-up work unless it is required for correctness or explicitly requested.
 

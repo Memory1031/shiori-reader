@@ -17,6 +17,10 @@ import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/book_list_tile.dart';
 import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
+import '../bookshelf/library_controller.dart';
+import '../bookshelf/book_batch_actions.dart';
+import '../bookshelf/book_selection_controller.dart';
+import '../bookshelf/book_selection_widgets.dart';
 
 class LocalBooksScreen extends StatefulWidget {
   const LocalBooksScreen({
@@ -30,6 +34,8 @@ class LocalBooksScreen extends StatefulWidget {
     this.covers,
     this.progressOf,
     this.onDetails,
+    this.libraryController,
+    this.selectionResetSignal,
   });
   final ImageRepository? images;
 
@@ -42,6 +48,8 @@ class LocalBooksScreen extends StatefulWidget {
   final LocalBookStore store;
   final LocalBookManagement management;
   final LibraryRepository library;
+  final LibraryController? libraryController;
+  final Listenable? selectionResetSignal;
   final ValueChanged<NovelKey> onRead;
   final ValueChanged<NovelKey>? onDetails;
   final VoidCallback onImport;
@@ -59,7 +67,64 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
   final _viewport = GlobalKey();
   LocalBookFormat? _filter;
 
-  late final _books = widget.management.watchBooks();
+  late final LibraryController? _ownedLibrary = widget.libraryController == null
+      ? (LibraryController(widget.library, localBooks: widget.management)
+          ..onStart())
+      : null;
+  LibraryController get _library => widget.libraryController ?? _ownedLibrary!;
+  late final _batch = BookBatchActions(
+    _library,
+    reparse: widget.store is LocalBookReparse
+        ? widget.store as LocalBookReparse
+        : null,
+  );
+  late final StreamSubscription<Result<List<LocalBookInfo>>> _booksSubscription;
+  AsyncSnapshot<Result<List<LocalBookInfo>>> _snapshot =
+      const AsyncSnapshot.waiting();
+  List<LocalBookInfo> _lastBooks = const [];
+  bool get _selecting => _batch.selection.active;
+  List<LocalBookInfo> get _shown => _filter == null
+      ? _lastBooks
+      : _lastBooks.where((book) => book.format == _filter).toList();
+  void _visibleChanged() => _batch.selection.updateVisible(
+    _snapshot.data is Success
+        ? _shown.map((b) => BookSelectionItem(b.key, b.title, format: b.format))
+        : null,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _batch.addListener(_operationChanged);
+    widget.selectionResetSignal?.addListener(_batch.leave);
+    _library.addListener(_operationChanged);
+    _booksSubscription = widget.management.watchBooks().listen(
+      (result) {
+        if (!mounted) return;
+        _snapshot = AsyncSnapshot.withData(ConnectionState.active, result);
+        if (result case Success(:final value)) {
+          _lastBooks = List.unmodifiable(value);
+        }
+        _visibleChanged();
+        setState(() {});
+      },
+      onError: (Object error) {
+        if (!mounted) return;
+        _snapshot = AsyncSnapshot.withData(
+          ConnectionState.active,
+          Failure(
+            AppFailure(
+              kind: FailureKind.database,
+              operation: Operation.libraryRead,
+            ),
+          ),
+        );
+        _visibleChanged();
+        setState(() {});
+      },
+    );
+  }
+
   late final LocalReparseFlow? _reparseFlow = widget.store is LocalBookReparse
       ? (LocalReparseFlow(widget.store as LocalBookReparse)
           ..addListener(_operationChanged))
@@ -67,7 +132,11 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
   bool _deleting = false;
   bool _showDeleteResult = false;
   AppFailure? _deleteFailure;
-  bool get _busy => _deleting || (_reparseFlow?.busy ?? false);
+  bool get _busy =>
+      _deleting ||
+      (_reparseFlow?.busy ?? false) ||
+      _batch.busy ||
+      _library.writing;
   LocalReparseController? get _operation => _reparseFlow?.controller;
   NovelKey? get _activeKey => _operation?.active?.key;
   AppFailure? get _failure =>
@@ -90,6 +159,15 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
 
   @override
   void dispose() {
+    widget.selectionResetSignal?.removeListener(_batch.leave);
+    unawaited(_booksSubscription.cancel());
+    _batch.removeListener(_operationChanged);
+    _batch.dispose();
+    if (!_library.isClosed) _library.removeListener(_operationChanged);
+    if (_ownedLibrary != null) {
+      _ownedLibrary.onDelete();
+      _ownedLibrary.dispose();
+    }
     _request.cancel();
     _scroll.dispose();
     _reparseFlow?.dispose();
@@ -170,10 +248,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
 
   @override
   Widget build(BuildContext context) =>
-      StreamBuilder<Result<List<LocalBookInfo>>>(
-        stream: _books,
-        builder: (context, snapshot) => _build(context, snapshot),
-      );
+      BookSelectionScope(actions: _batch, child: _build(context, _snapshot));
 
   bool get _canReparse => widget.store is LocalBookReparse;
 
@@ -182,13 +257,10 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     AsyncSnapshot<Result<List<LocalBookInfo>>> snapshot,
   ) {
     final l = AppLocalizations.of(context);
-    final books = switch (snapshot.data) {
-      Success(:final value) => value,
-      _ => <LocalBookInfo>[],
-    };
+    final books = _lastBooks;
     final hasEpub = books.any((b) => b.format == LocalBookFormat.epub);
     final hasTxt = books.any((b) => b.format == LocalBookFormat.txt);
-    final filter = hasEpub && hasTxt ? _filter : null;
+    final filter = _filter;
     final shown = filter == null
         ? books
         : books.where((b) => b.format == filter).toList();
@@ -217,11 +289,15 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
               slivers: [
                 if (!snapshot.hasData)
                   fill(const LoadingView())
-                else if (snapshot.data case Failure(:final failure))
+                else if (snapshot.data case Failure(
+                  :final failure,
+                ) when books.isEmpty)
                   fill(FailureView(failure: failure))
                 else if (books.isEmpty)
                   fill(_emptyLibrary(context))
                 else ...[
+                  if (snapshot.data case Failure(:final failure))
+                    SliverToBoxAdapter(child: FailureView(failure: failure)),
                   SliverPadding(
                     padding: EdgeInsets.fromLTRB(
                       inset,
@@ -233,7 +309,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                       child: _libraryCard(context, books),
                     ),
                   ),
-                  if (hasEpub && hasTxt)
+                  if (hasEpub && hasTxt || _filter != null)
                     SliverPadding(
                       padding: EdgeInsets.fromLTRB(
                         inset,
@@ -266,11 +342,17 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       ],
     );
     return Scaffold(
-      appBar: desktop
+      appBar: !desktop && _selecting
+          ? BookSelectionAppBar(actions: _batch)
+          : desktop
           ? null
           : AppBar(
               title: Text(l.localBooksTitle),
               actions: [
+                BookSelectionEntry(
+                  actions: _batch,
+                  compact: MediaQuery.sizeOf(context).width < 440,
+                ),
                 IconButton(
                   key: const ValueKey('local-books-import'),
                   tooltip: l.importTitle,
@@ -285,21 +367,32 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
           children: [
             if (desktop)
               DesktopPageChrome(
-                child: DesktopPageToolbar(
-                  title: l.localBooksTitle,
-                  leading:
-                      ModalRoute.of(context)?.impliesAppBarDismissal == true
-                      ? const BackButton()
-                      : null,
-                  actions: [
-                    OutlinedButton.icon(
-                      key: const ValueKey('local-books-import'),
-                      onPressed: _busy ? null : widget.onImport,
-                      icon: const Icon(Icons.file_upload_outlined, size: 20),
-                      label: Text(l.importTitle),
-                    ),
-                  ],
-                ),
+                child: _selecting
+                    ? BookSelectionToolbar(
+                        actions: _batch,
+                        operations: true,
+                        localOnly: true,
+                      )
+                    : DesktopPageToolbar(
+                        title: l.localBooksTitle,
+                        leading:
+                            ModalRoute.of(context)?.impliesAppBarDismissal ==
+                                true
+                            ? const BackButton()
+                            : null,
+                        actions: [
+                          BookSelectionEntry(actions: _batch),
+                          OutlinedButton.icon(
+                            key: const ValueKey('local-books-import'),
+                            onPressed: _busy ? null : widget.onImport,
+                            icon: const Icon(
+                              Icons.file_upload_outlined,
+                              size: 20,
+                            ),
+                            label: Text(l.importTitle),
+                          ),
+                        ],
+                      ),
               ),
             Expanded(
               child: Center(
@@ -311,6 +404,8 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                 ),
               ),
             ),
+            if (_selecting && !desktop)
+              BookSelectionBottomBar(actions: _batch, localOnly: true),
           ],
         ),
       ),
@@ -339,22 +434,16 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
+            Wrap(
+              spacing: ShioriSpace.medium,
+              runSpacing: ShioriSpace.tight,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(
                   l.localBooksCount(books.length),
                   style: theme.textTheme.titleLarge,
                 ),
-                const SizedBox(width: ShioriSpace.medium),
-                Expanded(
-                  child: Text(
-                    'EPUB $epub · TXT ${books.length - epub}',
-                    style: muted,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+                Text('EPUB $epub · TXT ${books.length - epub}', style: muted),
               ],
             ),
             const SizedBox(height: ShioriSpace.tight),
@@ -369,7 +458,9 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                   alignment: AlignmentDirectional.centerStart,
                   child: FilledButton.tonalIcon(
                     key: const ValueKey('local-books-reparse-all'),
-                    onPressed: _busy ? null : () => _reparseAll(books),
+                    onPressed: _busy || _selecting
+                        ? null
+                        : () => _reparseAll(books),
                     icon: const Icon(Icons.autorenew, size: 20),
                     label: Text(l.localReparseAll),
                   ),
@@ -449,7 +540,12 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
             showCheckmark: false,
             label: Text('${label(format)} ${count(format)}'),
             selected: _filter == format,
-            onSelected: (_) => setState(() => _filter = format),
+            onSelected: _busy
+                ? null
+                : (_) {
+                    setState(() => _filter = format);
+                    _visibleChanged();
+                  },
           ),
       ],
     );
@@ -488,6 +584,10 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       metadata: imported,
       trailing: desktop
           ? null
+          : _selecting
+          ? BookSelectionCheck(
+              selected: _batch.selection.selected.contains(book.key),
+            )
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -516,14 +616,30 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     if (desktop) {
       return DesktopLocalBookRow(
         key: ValueKey(book.key),
-        onRead: _busy ? null : () => widget.onRead(book.key),
+        onRead: _busy
+            ? null
+            : () => _selecting
+                  ? _batch.selection.toggle(book.key)
+                  : widget.onRead(book.key),
+        selected: _selecting
+            ? _batch.selection.selected.contains(book.key)
+            : null,
+        selectionLabel: _selecting ? l.bookToggleSelection(book.title) : null,
         onMenu: (anchor) => _desktopMenu(context, book, anchor),
         content: tile,
       );
     }
     return BookListItem(
       key: ValueKey(book.key),
-      onTap: _busy ? null : () => widget.onRead(book.key),
+      onTap: _busy
+          ? null
+          : () => _selecting
+                ? _batch.selection.toggle(book.key)
+                : widget.onRead(book.key),
+      selected: _selecting
+          ? _batch.selection.selected.contains(book.key)
+          : null,
+      selectionLabel: _selecting ? l.bookToggleSelection(book.title) : null,
       child: tile,
     );
   }
@@ -533,7 +649,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     LocalBookInfo book,
     Rect anchor,
   ) async {
-    if (_busy) return false;
+    if (_busy || _selecting) return false;
     final l = AppLocalizations.of(context);
     final overlay =
         Overlay.of(context, rootOverlay: true).context.findRenderObject()!
@@ -565,6 +681,12 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
           enabled: widget.onDetails != null,
         ),
         const PopupMenuDivider(),
+        ShioriMenuItem(
+          value: 'select',
+          label: l.bookMultiSelect,
+          icon: Icons.checklist,
+          enabled: _batch.canEnter,
+        ),
         if (_canReparse)
           ShioriMenuItem(
             value: 'reparse',
@@ -590,6 +712,8 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
         _reparse(book);
       case 'delete':
         _delete(book);
+      case 'select':
+        _batch.enter(book.key);
     }
     return false;
   }
@@ -600,13 +724,19 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       key: ValueKey(('local-book-actions', book.key)),
       padding: EdgeInsets.zero,
       icon: const Icon(Icons.more_horiz, size: 20),
-      enabled: !_busy,
+      enabled: !_busy && !_selecting,
       tooltip: l.moreActions,
       onSelected: (action) {
         if (action == 'reparse') _reparse(book);
         if (action == 'delete') _delete(book);
+        if (action == 'select') _batch.enter(book.key);
       },
       itemBuilder: (_) => [
+        ShioriMenuItem(
+          value: 'select',
+          label: l.bookMultiSelect,
+          enabled: _batch.canEnter,
+        ),
         if (_canReparse)
           ShioriMenuItem(value: 'reparse', label: l.localReparse),
         ShioriMenuItem(value: 'delete', label: l.localDeleteConfirm),

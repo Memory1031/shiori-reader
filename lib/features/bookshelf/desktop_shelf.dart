@@ -7,6 +7,7 @@ import '../../app/theme/shiori_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_list_tile.dart';
 import '../../shared/widgets/desktop_content_frame.dart';
+import 'book_selection_widgets.dart';
 
 /// Columns and card width for the desktop shelf grid in [width].
 ///
@@ -83,12 +84,14 @@ class DesktopShelfToolbar extends StatelessWidget {
     required this.layout,
     this.count,
     this.onImport,
+    this.selectionEntry,
   });
   final ValueNotifier<bool> layout;
 
   /// Omitted until the shelf has books to count.
   final int? count;
   final VoidCallback? onImport;
+  final Widget? selectionEntry;
 
   /// Below this frame width the import action drops its label.
   static const labelledImport = 520.0;
@@ -110,6 +113,7 @@ class DesktopShelfToolbar extends StatelessWidget {
                 ),
               ),
         actions: [
+          ?selectionEntry,
           ShelfLayoutToggle(layout: layout),
           if (onImport case final onImport?) ...[
             if (bounds.maxWidth < labelledImport)
@@ -120,6 +124,7 @@ class DesktopShelfToolbar extends StatelessWidget {
               )
             else
               OutlinedButton.icon(
+                key: const ValueKey('shelf-import'),
                 onPressed: onImport,
                 icon: const Icon(Icons.file_upload_outlined, size: 20),
                 label: Text(strings.importTitle),
@@ -146,6 +151,7 @@ class DesktopBookRow extends StatefulWidget {
     this.progressLabel,
     this.progress,
     this.moreKey,
+    this.selected,
   });
 
   final Widget cover;
@@ -161,6 +167,7 @@ class DesktopBookRow extends StatefulWidget {
   /// closed it.
   final Future<bool> Function(Rect anchor) onMenu;
   final Key? moreKey;
+  final bool? selected;
 
   static const minHeight = 88.0;
   static const coverWidth = 40.0;
@@ -187,6 +194,7 @@ class _DesktopBookRowState extends State<DesktopBookRow> {
   }
 
   Future<void> _open(Rect anchor, {bool keyboard = false}) async {
+    if (widget.selected != null) return;
     final restore = await menuClosedFromKeyboard(
       widget.onMenu(anchor),
       keyboard: keyboard,
@@ -227,15 +235,17 @@ class _DesktopBookRowState extends State<DesktopBookRow> {
     );
     final largeText =
         MediaQuery.textScalerOf(context).scale(14) > 14 * maxDensityScale;
-    final more = SizedBox(
-      width: 40,
-      child: IconButton(
-        key: widget.moreKey,
-        tooltip: AppLocalizations.of(context).moreActions,
-        onPressed: _openAtMore,
-        icon: Icon(Icons.more_horiz, size: 20, key: _more),
-      ),
-    );
+    final more = widget.selected != null
+        ? BookSelectionCheck(selected: widget.selected!)
+        : SizedBox(
+            width: 40,
+            child: IconButton(
+              key: widget.moreKey,
+              tooltip: AppLocalizations.of(context).moreActions,
+              onPressed: _openAtMore,
+              icon: Icon(Icons.more_horiz, size: 20, key: _more),
+            ),
+          );
     final tag = widget.sourceLabel == null
         ? null
         : ShelfFormatTag(label: widget.sourceLabel!);
@@ -254,12 +264,17 @@ class _DesktopBookRowState extends State<DesktopBookRow> {
     return DesktopMenuShortcuts(
       onMenu: () => _openAtMore(keyboard: true),
       child: BookListItem(
+        selected: widget.selected,
+        selectionLabel: widget.selected == null
+            ? null
+            : AppLocalizations.of(context).bookToggleSelection(widget.title),
         focusNode: _focus,
         minHeight: DesktopBookRow.minHeight,
         onTap: widget.onTap,
-        onLongPress: _openAtMore,
-        onSecondaryTapUp: (details) =>
-            _open(details.globalPosition & Size.zero),
+        onLongPress: widget.selected == null ? _openAtMore : null,
+        onSecondaryTapUp: widget.selected != null
+            ? null
+            : (details) => _open(details.globalPosition & Size.zero),
         child: LayoutBuilder(
           builder: (context, bounds) {
             final progressWidth = bounds.maxWidth < DesktopBookRow.wideContent

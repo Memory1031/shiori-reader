@@ -4,6 +4,7 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/local_books/local_reparse_controller.dart';
+import 'package:shiori/features/bookshelf/book_selection_controller.dart';
 
 class GatedReparse implements LocalBookReparse {
   final calls =
@@ -59,6 +60,35 @@ Future<TxtEncoding?> choose(
   TxtEncodingPreview preview,
 ) async => TxtEncoding.utf8;
 void main() {
+  test(
+    'keyed outcomes distinguish same titles, missing and stopped work',
+    () async {
+      final service = GatedReparse();
+      final controller = LocalReparseController(service);
+      final same = targets
+          .map((b) => LocalReparseTarget(b.key, 'Same', b.format))
+          .toList();
+      final done = controller.run(
+        same,
+        batch: true,
+        chooseEncoding: choose,
+        exists: (key) => key == same.first.key ? false : true,
+      );
+      expect(service.calls.single.key, same[1].key);
+      controller.cancel();
+      service.calls.single.result.complete(success);
+      await done;
+      expect(controller.outcomes.map((r) => (r.key, r.status)), [
+        (same[0].key, BookBatchStatus.missing),
+        (same[1].key, BookBatchStatus.succeeded),
+        (same[2].key, BookBatchStatus.unprocessed),
+      ]);
+      expect(controller.succeeded, 1);
+      expect(controller.skipped, 1);
+      expect(controller.unprocessed, 1);
+      controller.dispose();
+    },
+  );
   test(
     'single success and override, double start rejected, empty no-op',
     () async {

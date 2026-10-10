@@ -197,7 +197,7 @@ void main() {
       final import = tester.getRect(
         find.descendant(
           of: find.byType(DesktopShelfToolbar),
-          matching: find.byType(OutlinedButton),
+          matching: find.byKey(const ValueKey('shelf-import')),
         ),
       );
       ScrollPosition position() => tester
@@ -218,7 +218,7 @@ void main() {
           tester.getRect(
             find.descendant(
               of: find.byType(DesktopShelfToolbar),
-              matching: find.byType(OutlinedButton),
+              matching: find.byKey(const ValueKey('shelf-import')),
             ),
           ),
           import,
