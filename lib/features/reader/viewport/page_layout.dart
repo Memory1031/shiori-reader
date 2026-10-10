@@ -8,6 +8,7 @@ import '../position/position_resolver.dart';
 import 'block_style.dart';
 import 'reader_box.dart';
 import '../reader_inline_images.dart';
+import '../reader_audio.dart' show readerAudioExtent;
 
 /// A cursor in transient chunks; exposed/persisted positions always use Domain.
 final class PageCursor {
@@ -754,6 +755,8 @@ final class PageLayout {
               (block.width != null && block.height != null
                   ? inner * block.height! / block.width!
                   : 180.0)
+        : block is AudioBlock
+        ? readerAudioExtent
         : block is ParagraphBlock
         ? readerBlankHeight(block, style, scaler)
         : 24.0;

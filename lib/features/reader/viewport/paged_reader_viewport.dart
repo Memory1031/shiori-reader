@@ -232,6 +232,7 @@ class PagedReaderViewport extends StatefulWidget {
     this.imageHeights = const {},
     this.imageExtent,
     this.imageBuilder,
+    this.audioBuilder,
     this.onPosition,
     this.onRestoreStart,
     this.onCenterTap,
@@ -269,6 +270,7 @@ class PagedReaderViewport extends StatefulWidget {
   final Map<MediaRef, double> imageHeights;
   final double Function(ImageBlock)? imageExtent;
   final Widget Function(BuildContext, ImageBlock)? imageBuilder;
+  final Widget Function(BuildContext, AudioBlock)? audioBuilder;
   final VoidCallback? onCenterTap;
 
   /// While true, taps dismiss the reader chrome instead of turning pages.
@@ -893,6 +895,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
             ? edges.outerBottom.clamp(0.0, f.boxBottom)
             : 0.0;
         final local = ReaderBoxFrame(
+          images: widget.images,
           box: block.layout,
           width: boxes.local?.width ?? boxes.innerWidth,
           geometry: boxes.local,
@@ -903,7 +906,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           child: child,
         );
         return ReaderBoxFrame(
-          box: block.box,
+          images: widget.images,
+          box: boxes.outer?.box,
           linkOwnsDecoration:
               f.linkLayout != null &&
               block is ParagraphBlock &&
@@ -1000,6 +1004,25 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                               locale: locale,
                               textHeightBehavior: heightBehavior,
                               images: widget.images,
+                              hasBackgroundImage:
+                                  widget.images != null &&
+                                  (fragmentBlock(
+                                            fragment,
+                                          ).box?.backgroundImage !=
+                                          null ||
+                                      fragmentBlock(
+                                            fragment,
+                                          ).layout?.backgroundImage !=
+                                          null) &&
+                                  _layout!.index.chunks[fragment.unit].start +
+                                          fragment.start ==
+                                      0 &&
+                                  _layout!.index.chunks[fragment.unit].start +
+                                          fragment.end ==
+                                      _layout!
+                                          .index
+                                          .chunks[fragment.unit]
+                                          .total,
                               authoredBackground: fragmentBlock(
                                 fragment,
                               ).box?.backgroundColor,
@@ -1244,6 +1267,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   Widget _object(BuildContext context, PageFragment fragment) {
     final block =
         widget.content.blocks[_layout!.index.chunks[fragment.unit].blockIndex];
+    if (block is AudioBlock) {
+      return widget.audioBuilder?.call(context, block) ??
+          const SizedBox.shrink();
+    }
     if (block is ImageBlock) {
       return KeyedSubtree(
         key: _imageKeys.putIfAbsent(block.blockKey, GlobalKey.new),

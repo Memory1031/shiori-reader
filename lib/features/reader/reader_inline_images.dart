@@ -192,6 +192,16 @@ TextStyle readerAuthoredStyle(
       .firstOrNull;
   if (range == null) return base;
   return base.copyWith(
+    fontFamily: range.fonts.isEmpty
+        ? base.fontFamily
+        : range.fonts.first.familyName,
+    fontFamilyFallback: range.fonts.isEmpty
+        ? base.fontFamilyFallback
+        : [
+            ...range.fonts.skip(1).map((f) => f.familyName),
+            if (base.fontFamily != null) base.fontFamily!,
+            ...?base.fontFamilyFallback,
+          ],
     color: range.color == null
         ? base.color
         : (resolveColor?.call(Color(range.color!)) ?? Color(range.color!)),

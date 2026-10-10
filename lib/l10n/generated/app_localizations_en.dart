@@ -194,6 +194,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerImagePlaceholder => 'Illustration';
 
   @override
+  String get readerAudioPlay => 'Play audio';
+
+  @override
+  String get readerAudioPause => 'Pause audio';
+
+  @override
+  String get readerAudioUnavailable => 'Audio unavailable';
+
+  @override
+  String get readerAudioFailed => 'Audio playback failed. Tap to retry.';
+
+  @override
   String get hideReaderControls => 'Hide reading controls';
 
   @override

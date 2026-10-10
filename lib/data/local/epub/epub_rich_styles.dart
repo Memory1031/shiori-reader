@@ -57,17 +57,20 @@ class EpubRichStyle {
     this.hasFontSize = false,
     this.fontSizeFromReader = false,
     this.defaultHeading = false,
+    this.fonts = const [],
   });
   final int? color;
   final double scale;
   final bool? bold, italic;
   final bool hasFontSize, fontSizeFromReader, defaultHeading;
+  final List<EmbeddedFontFamily> fonts;
   bool get isDefault =>
       color == null &&
       scale == 1 &&
       !fontSizeFromReader &&
       bold == null &&
-      italic == null;
+      italic == null &&
+      fonts.isEmpty;
   InlineTextStyle range(
     int start,
     int length, {
@@ -82,6 +85,7 @@ class EpubRichStyle {
     fontSizeFromReader: fontSizeFromReader,
     bold: bold,
     italic: italic,
+    fonts: fonts,
   );
 }
 
@@ -105,11 +109,12 @@ double? epubFontScale(String? value, double parent) {
 }
 
 /// Computed inherited typography for the bounded native subset. Root sizing
-/// and publisher rhythm never replace the reader's base font/line/paragraph settings.
+/// and publisher rhythm never replace the reader's base size/line/paragraph settings.
 Map<dom.Element, EpubRichStyle> epubRichStyles(
   dom.Document doc,
-  Map<dom.Element, Map<String, String>> styles,
-) {
+  Map<dom.Element, Map<String, String>> styles, {
+  List<EmbeddedFontFamily> Function(String)? resolveFonts,
+}) {
   final result = <dom.Element, EpubRichStyle>{};
   for (final e in doc.querySelectorAll('*')) {
     final parent = result[e.parent] ?? const EpubRichStyle();
@@ -152,6 +157,11 @@ Map<dom.Element, EpubRichStyle> epubRichStyles(
                 {'i', 'em'}.contains(e.localName)
           ? true
           : parent.italic,
+      fonts: switch (css['font-family']) {
+        null || 'inherit' || 'unset' => parent.fonts,
+        'initial' || 'revert' => const [],
+        final family => resolveFonts?.call(family) ?? const [],
+      },
     );
   }
   return result;
@@ -289,6 +299,8 @@ BlockBox? epubBlockBox(
   EpubRichStyle style, {
   bool allowEdges = false,
   bool edgesOnly = false,
+  BlockBackgroundImage? backgroundImage,
+  DecorationColumns? decorationColumns,
 }) {
   if ({'absolute', 'fixed'}.contains(css['position']) ||
       {'flex', 'grid', 'inline-flex', 'inline-grid'}.contains(css['display']) ||
@@ -302,6 +314,9 @@ BlockBox? epubBlockBox(
       'none' || 'hidden' => BoxBorderStyle.none,
       'dashed' => BoxBorderStyle.dashed,
       'dotted' => BoxBorderStyle.dotted,
+      'double' => BoxBorderStyle.doubleLine,
+      'ridge' => BoxBorderStyle.ridge,
+      'groove' => BoxBorderStyle.groove,
       _ => BoxBorderStyle.solid,
     };
     final width = switch (css['border-$key-width']) {
@@ -326,6 +341,7 @@ BlockBox? epubBlockBox(
     left: side('left'),
   );
   final decorated =
+      backgroundImage != null ||
       background != null ||
       [
         borders.top,
@@ -366,7 +382,12 @@ BlockBox? epubBlockBox(
     margins: margin,
     paddingEdges: padding,
     borders: borders,
+    decorationColumns: decorationColumns,
+    radius: edgesOnly
+        ? null
+        : epubLayoutLength(css['border-radius'], percentage: false),
     backgroundColor: background,
+    backgroundImage: backgroundImage,
     fontScale: style.scale,
     headingRelative: style.defaultHeading && !style.fontSizeFromReader,
     // Legacy accessors are retained; new measurement uses the explicit sides.

@@ -30,8 +30,10 @@ import 'reader_toolbars.dart';
 import 'settings_panel.dart';
 import 'reader_margin.dart';
 import 'reader_image.dart';
+import 'reader_audio.dart';
 import 'reader_image_preview.dart';
 import 'reader_linked_text.dart';
+import 'reader_embedded_fonts.dart';
 import 'epub_layout_page.dart';
 import '../../domain/local_chapter_progress.dart';
 import 'reader_logical_progress.dart';
@@ -60,6 +62,7 @@ class ReaderContentView extends StatefulWidget {
     this.onLoadFailure,
     this.onPageAppearance,
     this.images,
+    this.audioFactory,
     this.settings,
     this.session,
     this.initialPosition,
@@ -77,6 +80,7 @@ class ReaderContentView extends StatefulWidget {
     this.appearanceActive,
   });
   final ImageRepository? images;
+  final AudioPlaybackFactory? audioFactory;
   final ChapterContent content;
   final String? runningTitle;
   final String? chapterTitle;
@@ -141,6 +145,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   void _completionTurnChanged(bool value) {
     if (!mounted || _completionTurning == value) return;
+    if (value) _audio.stop();
     setState(() => _completionTurning = value);
     widget.onCompletionTurn?.call(
       value
@@ -200,6 +205,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _audio = ReaderAudioController(_audioFactory);
     _preferences = widget.preferences ?? ReaderPreferences(widget.settings);
     _settings = _preferences.value;
     _preferences.addListener(_changed);
@@ -210,6 +216,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void didUpdateWidget(ReaderContentView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.images != widget.images ||
+        oldWidget.audioFactory != widget.audioFactory) {
+      _audio.dispose();
+      _audio = ReaderAudioController(_audioFactory);
+    }
     if (oldWidget.logicalProgress?.loading == true &&
         widget.logicalProgress?.loading != true) {
       // The modal lives in another overlay branch; update it after this build.
@@ -217,7 +228,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
         if (mounted) _progressMetadataChanges.value++;
       });
     }
-    if (!widget.active || widget.session?.isClosed == true) {
+    if (!widget.active ||
+        widget.session?.isClosed == true ||
+        oldWidget.content.key != widget.content.key) {
+      _audio.stop();
       _cancelCompletion(immediate: true);
     }
     if (oldWidget.crossChapterTurning && !widget.crossChapterTurning) {
@@ -240,6 +254,12 @@ class _ReaderContentViewState extends State<ReaderContentView>
   /// The page's keyboard focus: shortcuts act while it or a control on the
   /// page holds focus.
   final _pageFocus = FocusNode(debugLabel: 'reader-page');
+  late ReaderAudioController _audio;
+  AudioPlaybackFactory? get _audioFactory =>
+      widget.audioFactory ??
+      (widget.images is AudioPlaybackFactory
+          ? widget.images as AudioPlaybackFactory
+          : null);
 
   /// Gives the page focus once it becomes the active chapter. The chapter it
   /// replaces takes its focus away with it, which leaves focus on the route
@@ -289,6 +309,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
+      _audio.stop();
       _progressRequest++;
       _dismissProgressPanel();
       _dragSurface.currentState?.cancel();
@@ -467,6 +488,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   bool _announcedReady = false;
   int _layoutEpoch = 0;
   void _layoutInvalidated() {
+    _audio.stop();
     _layoutEpoch++;
     _announcedReady = false;
     _cancelCompletion(immediate: true);
@@ -838,6 +860,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   @override
   void dispose() {
+    _audio.dispose();
     _panel?.dismiss();
     _panel = null;
     _progressRequest++;
@@ -914,10 +937,17 @@ class _ReaderContentViewState extends State<ReaderContentView>
       builder: (context) {
         _route = ModalRoute.of(context);
         if (!_routeCurrent) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_routeCurrent) _audio.stop();
+          });
           _dragSurface.currentState?.cancel();
           _cancelCompletion(immediate: true);
         }
-        return page;
+        return ReaderFontGate(
+          content: widget.content,
+          repository: widget.images,
+          child: page,
+        );
       },
     );
   }
@@ -1356,6 +1386,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
             _position?.chapterFraction == 1 &&
             _position?.blockFraction == 1,
         onTurning: (turning) {
+          if (turning) _audio.stop();
           _dragging = turning;
           if (!turning) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1387,6 +1418,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
           }
         },
         imageBuilder: image,
+        audioBuilder: (context, block) => ReaderAudioControl(
+          block: block,
+          controller: _audio,
+          enabled: _interactive && !_dragging,
+        ),
         imageExtent: (block) => extent(block).height,
       ),
     );

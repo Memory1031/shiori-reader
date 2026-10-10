@@ -1744,16 +1744,25 @@ final class _Audit {
           evidence = 'parser_and_output';
           rule = 'typography.native_metadata';
         } else if (property == 'border-radius') {
+          final rounded = boxEvents.any(
+            (b) =>
+                b['document'] == path &&
+                b['location'] == location &&
+                b['reason'] == 'emitted' &&
+                (b['data'] as Map?)?['radius'] == true,
+          );
           impact = 'decoration';
-          disposition = decorated ? 'emitted_native' : 'unsupported';
+          disposition = decorated || rounded ? 'emitted_native' : 'unsupported';
           evidence = 'parser_and_output';
-          rule = decorated
+          rule = rounded
+              ? 'box.uniform_radius_metadata'
+              : decorated
               ? 'link.decoration_conditional'
               : 'link.decoration_structure_unsupported';
         } else if (property?.startsWith('border-') == true &&
             property!.endsWith('-style') &&
             boxes &&
-            {'ridge', 'groove', 'double', 'inset', 'outset'}.contains(value)) {
+            {'inset', 'outset'}.contains(value)) {
           disposition = 'degraded';
           rule = 'box.border_style_approximation';
           evidence = 'parser_and_output';

@@ -171,8 +171,8 @@ void main() {
       final two = box(
         'border-width:6px;border-style:ridge groove none hidden;border-color:#4682b4',
       );
-      expect(two.borders!.top!.style, BoxBorderStyle.solid);
-      expect(two.borders!.right!.style, BoxBorderStyle.solid);
+      expect(two.borders!.top!.style, BoxBorderStyle.ridge);
+      expect(two.borders!.right!.style, BoxBorderStyle.groove);
       expect(two.borders!.bottom!.width.value, 0);
       expect(two.borders!.left!.width.value, 0);
       final bottom = box('border-width:4px;border-bottom-style:solid');

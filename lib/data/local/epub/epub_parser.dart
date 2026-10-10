@@ -1,6 +1,7 @@
 import 'epub_inline_stack.dart';
 import 'epub_paragraph_layout.dart';
 import 'epub_table_layout.dart';
+import 'epub_decoration_table.dart';
 import '../../html/prose_semantics.dart';
 import '../../html/prose_ruby.dart';
 import 'dart:convert';
@@ -17,6 +18,7 @@ import '../txt/txt_decoder.dart';
 import '../txt/txt_parser.dart' show filenameTitle;
 import 'epub_zip.dart';
 import 'epub_image_dimensions.dart';
+import 'epub_audio.dart';
 import 'epub_presentation.dart';
 import 'epub_svg_presentation.dart';
 import 'epub_text_styles.dart';
@@ -26,6 +28,7 @@ import 'epub_diagnostics.dart';
 import 'epub_footnotes.dart';
 import 'epub_fixed_image.dart';
 import 'epub_trace.dart';
+import 'epub_native_assets.dart';
 
 final class ParsedEpub {
   ParsedEpub(this.content, this.media, this.diagnostics);
@@ -165,6 +168,31 @@ class EpubParser {
   final skippedEmptyPaths = <String>{};
   final fragments = <String, Map<String, (String, int)>>{};
   int mediaSize = 0, textSize = 0;
+  int _fontBytes = 0;
+  final _fontRefs = <String, MediaRef?>{};
+  final _obfuscatedFonts = <String>{};
+
+  MediaRef? font(String path) => _fontRefs.putIfAbsent(path, () {
+    final entry = zip.entries[path];
+    if (entry == null ||
+        entry.size > 8 * 1024 * 1024 ||
+        _fontRefs.length >= 64 ||
+        _obfuscatedFonts.contains(path)) {
+      return null;
+    }
+    final b = zip.read(path, limit: 8 * 1024 * 1024);
+    if (!epubNativeFontBytes(b) || _fontBytes + b.length > 32 * 1024 * 1024) {
+      return null;
+    }
+    _fontBytes += b.length;
+    final hash = sha256.convert(b).toString();
+    if (!media.containsKey(hash)) {
+      mediaSize += b.length;
+      if (mediaSize > 128 * 1024 * 1024) zipLimit();
+      media[hash] = b;
+    }
+    return MediaRef(sourceId: book.sourceId, mediaId: '${book.novelId}/$hash');
+  });
 
   String text(String path, {int limit = 4 * 1024 * 1024}) {
     final b = zip.read(path, limit: limit);
@@ -226,6 +254,76 @@ class EpubParser {
     return ref;
   }
 
+  (MediaRef?, AudioFormat?, AudioUnavailable?) audio(
+    String base,
+    dom.Element node,
+  ) {
+    var reason = AudioUnavailable.missing;
+    final candidates = node.attributes['src']?.trim().isNotEmpty == true
+        ? [node.attributes['src']!]
+        : node.children
+              .where((e) => e.localName == 'source')
+              .map((e) => e.attributes['src'] ?? '')
+              .where((s) => s.trim().isNotEmpty);
+    for (final candidate in candidates.take(128)) {
+      (String, String?)? ref;
+      try {
+        ref = epubReference(base, candidate);
+      } on LocalParseException catch (error) {
+        if (error.problem != LocalParseProblem.invalid) rethrow;
+        reason = AudioUnavailable.unsupported;
+        continue;
+      } on FormatException {
+        reason = AudioUnavailable.unsupported;
+        continue;
+      }
+      if (ref == null) {
+        reason = AudioUnavailable.external;
+        continue;
+      }
+      if (ref.$2 != null) {
+        reason = AudioUnavailable.unsupported;
+        continue;
+      }
+      if (!zip.entries.containsKey(ref.$1)) {
+        reason = AudioUnavailable.missing;
+        continue;
+      }
+      final declared = items.values
+          .where((i) => i.path == ref!.$1)
+          .firstOrNull
+          ?.type;
+      if (!{
+        'audio/mpeg',
+        'audio/wav',
+        'audio/x-wav',
+        'audio/wave',
+      }.contains(declared)) {
+        reason = AudioUnavailable.unsupported;
+        continue;
+      }
+      final bytes = zip.read(ref.$1);
+      final format = epubAudioFormat(bytes);
+      if (format == null ||
+          (format == AudioFormat.mp3) != (declared == 'audio/mpeg')) {
+        reason = AudioUnavailable.unsupported;
+        continue;
+      }
+      final hash = sha256.convert(bytes).toString();
+      if (!media.containsKey(hash)) {
+        mediaSize += bytes.length;
+        if (mediaSize > 128 * 1024 * 1024) zipLimit();
+        media[hash] = bytes;
+      }
+      return (
+        MediaRef(sourceId: book.sourceId, mediaId: '${book.novelId}/$hash'),
+        format,
+        null,
+      );
+    }
+    return (null, null, reason);
+  }
+
   ParsedEpub parse() {
     if (utf8.decode(zip.read('mimetype', limit: 100)).trim() !=
         'application/epub+zip') {
@@ -234,7 +332,7 @@ class EpubParser {
     // Some otherwise readable packages compress mimetype or add a newline.
     // EpubZip still verifies compression, declared length and CRC.
     if (zip.entries.containsKey('META-INF/encryption.xml')) {
-      // Font obfuscation is safe to ignore because publisher fonts are unused.
+      // Accepted font obfuscation remains readable through system fallback.
       final encryption = xml('META-INF/encryption.xml');
       for (final encrypted in elements(encryption, 'EncryptedData')) {
         final methods = elements(encrypted, 'EncryptionMethod');
@@ -251,6 +349,11 @@ class EpubParser {
             ).hasMatch(attr(refs.single, 'URI') ?? '')) {
           throw const LocalParseException(LocalParseProblem.drm);
         }
+        final path = optionalEpubStyleReference(
+          'encryption.xml',
+          attr(refs.single, 'URI')!,
+        );
+        if (path != null) _obfuscatedFonts.add(path);
       }
     }
     final container = xml('META-INF/container.xml');
@@ -729,20 +832,51 @@ class EpubParser {
         .allMatches(doc.documentElement?.text ?? '')
         .map((match) => match.group(0)!)
         .toSet();
+    final sheets = epubDocumentStylesheets(
+      doc,
+      path,
+      optionalEpubStyleReference,
+      (p) => zip.entries.containsKey(p) ? text(p) : '',
+      trace: trace,
+    ).toList();
+    final fonts = EpubNativeFonts(sheets, optionalEpubStyleReference, font);
     final styles = epubTextStyles(
       doc,
-      epubDocumentStylesheets(
-        doc,
-        path,
-        optionalEpubStyleReference,
-        (p) => zip.entries.containsKey(p) ? text(p) : '',
-        trace: trace,
-      ).map((sheet) => sheet.$2),
+      sheets.map((sheet) => sheet.$2),
       trace: trace,
       path: path,
+      stylesheetPaths: sheets.map((sheet) => sheet.$1),
+      resolveAsset: optionalEpubStyleReference,
     );
-    final richStyles = epubRichStyles(doc, styles);
+    final richStyles = epubRichStyles(doc, styles, resolveFonts: fonts.resolve);
+    final backgrounds = <dom.Element, BlockBackgroundImage?>{};
+    BlockBackgroundImage? background(dom.Element? node) {
+      if (node == null ||
+          (styles[node]?['background-image'] ?? 'none') == 'none' ||
+          !(node.localName == 'p' ||
+              proseHeadingLevel(node.localName) != null) ||
+          node.text.runes.length > 256 ||
+          node.querySelector('img,picture,svg,table,ruby,p,div') != null) {
+        return null;
+      }
+      return backgrounds.putIfAbsent(
+        node,
+        // The existing decorated-link surface owns its opaque background.
+        // Keep its supported paint and hit geometry; omit the raster layer.
+        () =>
+            node.localName == 'p' &&
+                epubLinkDecoration(node, styles, richStyles) != null
+            ? null
+            : epubBackgroundImage(
+                styles[node] ?? const {},
+                image,
+                (ref) => imageSizes[ref],
+              ),
+      );
+    }
+
     final tableRows = epubTableRows(doc, styles, richStyles);
+    final decorationTables = epubDecorationTables(doc, styles, richStyles);
     dom.Element? activeCell;
     final cellSpans = <dom.Element, (int, int)>{};
     final pendingTableLayouts = <int, TableRowLayout>{};
@@ -755,7 +889,16 @@ class EpubParser {
     final floatSpans = <dom.Element, (int, int)>{};
     dom.Element? paragraphOwner;
     String? property(String name) {
-      for (var node = paragraphOwner; node != null; node = node.parent) {
+      // A flattened single-cell row has one unambiguous text alignment.
+      // Multi-cell rows still use the existing readable text fallback.
+      var owner = paragraphOwner;
+      if ((name == 'text-align' || name == 'text-indent') &&
+          owner?.localName == 'tr' &&
+          owner!.children.length == 1 &&
+          {'td', 'th'}.contains(owner.children.single.localName)) {
+        owner = owner.children.single;
+      }
+      for (var node = owner; node != null; node = node.parent) {
         if (styles[node]?[name] case final value?) return value;
       }
       return null;
@@ -1014,7 +1157,10 @@ class EpubParser {
               value.substring(0, start).runes.length,
               value.substring(start, end).runes.length,
               preserveNeutral:
-                  activeBox?.backgroundColor != null || decoration != null,
+                  activeBox?.backgroundColor != null ||
+                  activeBox?.backgroundImage != null ||
+                  background(paragraphOwner) != null ||
+                  decoration != null,
             ),
           );
         }
@@ -1039,15 +1185,24 @@ class EpubParser {
         return;
       }
       if (tableLayout != null) pendingTableLayouts[blocks.length] = tableLayout;
+      final decorationTable = decorationTables[activeBoxOwner];
+      final inDecorationCell = decorationTable?.content == paragraphOwner;
       final localLayout =
-          (heading != null || decoration != null) &&
+          (heading != null ||
+                  decoration != null ||
+                  inDecorationCell ||
+                  background(paragraphOwner) != null) &&
               paragraphOwner != activeBoxOwner
           ? epubBlockBox(
-              styles[paragraphOwner] ?? const {},
+              {
+                if (inDecorationCell) 'margin-left': '0',
+                ...?styles[paragraphOwner],
+              },
               0,
               richStyles[paragraphOwner] ?? const EpubRichStyle(),
               allowEdges: true,
               edgesOnly: true,
+              backgroundImage: background(paragraphOwner),
             )
           : null;
       blocks.add(
@@ -1194,7 +1349,6 @@ class EpubParser {
             'object',
             'embed',
             'head',
-            'audio',
             'video',
             'canvas',
           }.contains(tag) ||
@@ -1220,13 +1374,73 @@ class EpubParser {
         'hidden' || 'collapse' => false,
         _ => visible,
       };
-      if (!visible && {'img', 'image', 'hr', 'br', 'rp'}.contains(tag)) {
+      if (!visible &&
+          {'img', 'image', 'hr', 'br', 'rp', 'audio'}.contains(tag)) {
         whitespace = previousWhitespace;
         visible = previousVisible;
         return;
       }
       final previousOwner = paragraphOwner;
       final previousLink = activeLink;
+      if (tag == 'audio') {
+        if (node.attributes.containsKey('controls')) {
+          flush();
+          final (media, format, unavailable) = audio(path, node);
+          if (node.id.isNotEmpty) {
+            anchors.putIfAbsent(node.id, () => (blocks.length, 0));
+          }
+          final label =
+              node.attributes['aria-label'] ?? node.attributes['title'];
+          String? audioAlignment;
+          for (
+            dom.Element? owner = node;
+            owner != null && audioAlignment == null;
+            owner = owner.parent
+          ) {
+            audioAlignment = styles[owner]?['text-align'];
+          }
+          blocks.add(
+            AudioBlock(
+              media: media,
+              format: format,
+              unavailable: unavailable,
+              alignment: switch (audioAlignment) {
+                'right' || 'end' => ParagraphAlignment.end,
+                'center' => ParagraphAlignment.center,
+                _ => ParagraphAlignment.start,
+              },
+              label: label == null
+                  ? null
+                  : String.fromCharCodes(label.runes.take(200)),
+              box: activeBox,
+              layout: epubBlockBox(
+                // Native controls occupy a reader line. An author's small
+                // inline audio width must not shrink its alignment/tap target.
+                {
+                  for (final e
+                      in (styles[node] ?? const <String, String>{}).entries)
+                    if (e.key != 'width' && e.key != 'max-width')
+                      e.key: e.value,
+                },
+                0,
+                richStyles[node] ?? const EpubRichStyle(),
+                allowEdges: true,
+                edgesOnly: true,
+              ),
+            ),
+          );
+          trace?.record(
+            'audio.output',
+            path,
+            location: epubTraceLocation(node),
+            reason: unavailable?.name ?? 'native',
+            data: {if (media != null) 'hash': media.mediaId.split('/').last},
+          );
+        }
+        whitespace = previousWhitespace;
+        visible = previousVisible;
+        return;
+      }
       if (paragraphs.contains(tag) ||
           containers.contains(tag) ||
           heading != null) {
@@ -1531,12 +1745,15 @@ class EpubParser {
           activeBox == null &&
           (containers.contains(node.localName) ||
               paragraphs.contains(node.localName) ||
-              proseHeadingLevel(node.localName) != null) &&
+              proseHeadingLevel(node.localName) != null ||
+              decorationTables.containsKey(node)) &&
           node.localName != 'body') {
         final box = epubBlockBox(
-          styles[node] ?? const {},
+          decorationTables[node]?.css ?? styles[node] ?? const {},
           boxGroup,
           richStyles[node] ?? const EpubRichStyle(),
+          backgroundImage: background(node),
+          decorationColumns: decorationTables[node]?.columns,
           allowEdges:
               proseHeadingLevel(node.localName) != null ||
               node.querySelectorAll('img,picture').length -
@@ -1554,6 +1771,7 @@ class EpubParser {
             path,
             location: epubTraceLocation(node),
             reason: 'emitted',
+            data: {'radius': box.radius != null},
           );
         }
       }
@@ -1635,7 +1853,10 @@ class EpubParser {
       }
     }
     if (!blocks.any(
-      (b) => b is ImageBlock || b is ParagraphBlock && b.text.trim().isNotEmpty,
+      (b) =>
+          b is ImageBlock ||
+          b is AudioBlock ||
+          b is ParagraphBlock && b.text.trim().isNotEmpty,
     )) {
       for (var i = 0; i < blocks.length; i++) {
         if (blocks[i] case HeadingBlock(:final text, :final alignment)) {
@@ -1654,7 +1875,10 @@ class EpubParser {
       }
     }
     if (!blocks.any(
-      (b) => b is ImageBlock || b is ParagraphBlock && b.text.trim().isNotEmpty,
+      (b) =>
+          b is ImageBlock ||
+          b is AudioBlock ||
+          b is ParagraphBlock && b.text.trim().isNotEmpty,
     )) {
       skippedEmptyPaths.add(path);
       trace?.record('document.output', path, reason: 'empty_skipped');

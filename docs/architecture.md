@@ -20,6 +20,7 @@
 - Paragraph / Heading 可携带 `inlineStacks`，描述原文中由一个换行分隔的双层行内文字范围及局部行高。两层与换行仍属于正文，范围使用 Unicode 码点，不切断 grapheme、不与 Ruby 或行内图片重叠；它只参与布局值与缓存失效，不进入语义身份，旧 JSON 缺字段时为空。
 - Paragraph 可带 `hangingIndentEm`（0–32 范围内的正数，表示 LTR 续行缩进）与 `trailingLabelStart`（至段末的短文本码点范围）。两者是排版元数据，参与完整内容值与缓存失效，不改变原文、leadingIndent 或内容身份；旧 JSON 缺字段时保持普通排版。
 - Paragraph 可带 `TableRowLayout`，保存受限双列表格组、两个单元格的源码点范围、列宽与内边距、单条分隔线及行尾空白。元数据参与完整值与缓存失效，不进入语义摘要；空白表格行折合前一记录的间距，不增加块索引。旧 JSON 缺字段保持原有平铺段落。
+- `BlockBox.decorationColumns` 可描述单行三列装饰中的两个空侧格比例；中格沿用一个语义文字块与局部盒，底边在中格留空。它仅参与布局值与缓存失效，旧 JSON 缺字段时保持原有盒语义。
 - 图片尺寸各自可未知；已知值须正数。封面和正文图片必须属于相同 Source。ImageBlock 尺寸为后续可发现的布局元数据，更新尺寸不改变 blockKey / contentRevision；mediaId、alt、caption 的改变会改变语义身份。
 - ReadingProgress 的全书进度快照与计算所依据的目录及章节身份绑定；全书终点状态独立于章节级 completed。全书算法与终点交互见[阅读器](reader.md)。
 - ReadingProgress 持有 NovelSummary 快照以保留离线标题 / 封面，并检查 ChapterKey 与快照属于同一本书；是否收藏由独立 BookshelfEntry 表示。lastReadAt 统一为 UTC 毫秒，写入先后由持久化 sequence 控制。

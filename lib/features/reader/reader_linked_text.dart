@@ -122,6 +122,7 @@ class ReaderLinkedText extends StatefulWidget {
     this.inlineStacks = const [],
     this.inlineStyles = const [],
     this.authoredBackground,
+    this.hasBackgroundImage = false,
     this.images,
     this.locale,
     this.textHeightBehavior,
@@ -133,6 +134,7 @@ class ReaderLinkedText extends StatefulWidget {
   final List<InlineRuby> inlineRuby;
   final List<InlineStack> inlineStacks;
   final List<InlineTextStyle> inlineStyles;
+  final bool hasBackgroundImage;
   final int? authoredBackground;
   final ImageRepository? images;
   final Locale? locale;
@@ -329,11 +331,14 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
             Color(widget.authoredBackground!),
             ReaderColorRole.background,
           );
-    Color foreground(Color color) => colors.resolve(
-      color,
-      ReaderColorRole.foreground,
-      background: background,
-    );
+    Color foreground(Color color) =>
+        widget.hasBackgroundImage && ReaderBackgroundPresence.of(context)
+        ? color
+        : colors.resolve(
+            color,
+            ReaderColorRole.foreground,
+            background: background,
+          );
     final primary = Theme.of(context).colorScheme.primary;
     final linkColor = widget.authoredBackground == null
         ? foreground(primary)

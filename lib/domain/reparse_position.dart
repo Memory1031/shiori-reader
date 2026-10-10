@@ -17,6 +17,7 @@ String _semantic(ContentBlock b) => switch (b) {
   ParagraphBlock(:final text) => 'text:$text',
   HeadingBlock(:final text) => 'text:$text',
   ImageBlock(:final media) => 'image:${media.mediaId}',
+  AudioBlock(:final media, :final label) => 'audio:${media?.mediaId}:$label',
   _ => 'divider',
 };
 

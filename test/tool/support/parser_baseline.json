@@ -383,7 +383,7 @@
                         "value": 6.0,
                         "unit": "px"
                       },
-                      "style": "solid",
+                      "style": "ridge",
                       "color": 4282811060
                     },
                     "right": {
@@ -391,7 +391,7 @@
                         "value": 6.0,
                         "unit": "px"
                       },
-                      "style": "solid",
+                      "style": "groove",
                       "color": 4282811060
                     },
                     "bottom": {
@@ -559,7 +559,7 @@
                         "value": 6.0,
                         "unit": "px"
                       },
-                      "style": "solid",
+                      "style": "ridge",
                       "color": 4282811060
                     },
                     "right": {
@@ -567,7 +567,7 @@
                         "value": 6.0,
                         "unit": "px"
                       },
-                      "style": "solid",
+                      "style": "groove",
                       "color": 4282811060
                     },
                     "bottom": {
@@ -725,7 +725,7 @@
                         "value": 6.0,
                         "unit": "px"
                       },
-                      "style": "solid",
+                      "style": "ridge",
                       "color": 4282811060
                     },
                     "right": {
@@ -733,7 +733,7 @@
                         "value": 6.0,
                         "unit": "px"
                       },
-                      "style": "solid",
+                      "style": "groove",
                       "color": 4282811060
                     },
                     "bottom": {

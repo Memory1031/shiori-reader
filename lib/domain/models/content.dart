@@ -36,8 +36,17 @@ sealed class ContentBlock extends ValueModel {
   List<InlineStack> get inlineStacks => const [];
   Iterable<MediaRef> get mediaRefs sync* {
     if (this case ImageBlock(:final media)) yield media;
+    if (this case AudioBlock(media: final media?)) yield media;
     for (final image in inlineImages) {
       yield image.media;
+    }
+    for (final background in [box?.backgroundImage, layout?.backgroundImage]) {
+      if (background != null) yield background.media;
+    }
+    for (final style in inlineStyles) {
+      for (final family in style.fonts) {
+        yield* family.sources;
+      }
     }
   }
 
@@ -77,6 +86,24 @@ sealed class ContentBlock extends ValueModel {
       (v) => InlineTextStyle.fromJson(v as Map<String, dynamic>),
     );
     final ContentBlock block = switch (json['type']) {
+      'audio' => AudioBlock(
+        media: json['media'] == null
+            ? null
+            : MediaRef.fromJson(json['media'] as Map<String, dynamic>),
+        format: json['format'] == null
+            ? null
+            : AudioFormat.values.byName(json['format'] as String),
+        unavailable: json['unavailable'] == null
+            ? null
+            : AudioUnavailable.values.byName(json['unavailable'] as String),
+        label: json['label'] as String?,
+        alignment: ParagraphAlignment.values.byName(
+          json['alignment'] as String? ?? 'start',
+        ),
+        box: box,
+        layout: layout,
+        occurrence: occurrence,
+      ),
       'paragraph' => ParagraphBlock(
         linkDecoration: json['linkDecoration'] == null
             ? null
@@ -416,6 +443,74 @@ final class ParagraphBlock extends ContentBlock {
   ];
 }
 
+enum AudioFormat { mp3, wav }
+
+enum AudioUnavailable { missing, unsupported, external }
+
+/// A user-triggered package-local audio control; never a remote URL or autoplay.
+final class AudioBlock extends ContentBlock {
+  AudioBlock({
+    this.media,
+    this.format,
+    this.unavailable,
+    this.alignment = ParagraphAlignment.start,
+    String? label,
+    BlockBox? box,
+    BlockBox? layout,
+    int occurrence = 0,
+  }) : label = label == null ? null : ContentIdentity.normalizeText(label),
+       super(occurrence, box: box, layout: layout) {
+    if ((media != null && format != null && unavailable == null) ||
+        (media == null && format == null && unavailable != null)) {
+      return;
+    }
+    throw ArgumentError(
+      'Audio must have a local resource or an unavailable reason',
+    );
+  }
+  final MediaRef? media;
+  final AudioFormat? format;
+  final AudioUnavailable? unavailable;
+  final ParagraphAlignment alignment;
+  final String? label;
+  @override
+  String get kind => 'audio';
+  @override
+  List<Object?> get semanticFields => [
+    media?.identityFields,
+    format?.name,
+    unavailable?.name,
+    label,
+  ];
+  @override
+  Map<String, Object?> get fieldsJson => {
+    'media': media?.toJson(),
+    'format': format?.name,
+    'unavailable': unavailable?.name,
+    'alignment': alignment.name,
+    'label': label,
+  };
+  @override
+  AudioBlock withOccurrence(int occurrence) => AudioBlock(
+    media: media,
+    format: format,
+    unavailable: unavailable,
+    alignment: alignment,
+    label: label,
+    box: box,
+    layout: layout,
+    occurrence: occurrence,
+  );
+  @override
+  List<Object?> get values => [
+    ...semanticFields,
+    alignment,
+    box,
+    layout,
+    occurrence,
+  ];
+}
+
 final class ImageBlock extends ContentBlock {
   ImageBlock({
     required this.media,
@@ -610,7 +705,7 @@ final class ChapterContent extends ValueModel {
           throw ArgumentError('Body image belongs to another Source');
         }
       }
-      if (block is ImageBlock) {
+      if (block is ImageBlock || block is AudioBlock) {
         readable = true;
       } else if (block is ParagraphBlock && block.text.trim().isNotEmpty) {
         readable = true;
@@ -620,7 +715,7 @@ final class ChapterContent extends ValueModel {
       occurrences[digest] = occurrence + 1;
       indexed.add(block.withOccurrence(occurrence));
     }
-    if (!readable) throw ArgumentError('Chapter has no readable text or image');
+    if (!readable) throw ArgumentError('Chapter has no readable text or media');
     return ChapterContent._(
       key,
       nonBlank(ContentIdentity.normalizeText(title), 'title'),

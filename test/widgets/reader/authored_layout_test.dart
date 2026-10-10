@@ -11,6 +11,7 @@ import 'package:shiori/features/reader/viewport/render_chunk.dart';
 import 'package:shiori/features/reader/reader_authored_colors.dart';
 import 'package:shiori/features/reader/reader_linked_text.dart';
 import '../../data/local/epub_authored_layout_test.dart' show authoredContent;
+import 'media_decorations_test.dart' show pixels;
 
 void main() {
   testWidgets(
@@ -670,35 +671,26 @@ void main() {
       54,
     );
   });
-  test('painter has only top/right strokes, including continuation slices', () {
-    final box = authoredContent(
-      '<div style="border-width:6px;border-style:ridge groove none none;border-color:#4682b4">Text</div>',
-    ).chapters.first.blocks.single.box!;
-    final g = ReaderBoxGeometry(box, 300, 20, 600);
-    final colors = ReaderAuthoredColors(ThemeData());
-    void paint(Canvas c) => ReaderBoxPainter(
-      box,
-      g,
-      true,
-      true,
-      colors,
-    ).paint(c, const Size(300, 100));
-    expect(
-      paint,
-      paints
-        ..line(p1: const Offset(297, 0), p2: const Offset(297, 100))
-        ..line(p1: const Offset(0, 3), p2: const Offset(300, 3)),
-    );
-    expect(paint, paintsExactlyCountTimes(#drawLine, 2));
-    void continuation(Canvas c) => ReaderBoxPainter(
-      box,
-      g,
-      false,
-      false,
-      colors,
-    ).paint(c, const Size(300, 100));
-    expect(continuation, paintsExactlyCountTimes(#drawLine, 1));
-  });
+  testWidgets(
+    'painter has only top/right borders, including continuation slices',
+    (tester) async {
+      final box = authoredContent(
+        '<div style="border-width:6px;border-style:ridge groove none none;border-color:#4682b4">Text</div>',
+      ).chapters.first.blocks.single.box!;
+      final full = (await tester.runAsync(() => pixels(box)))!,
+          continuation = (await tester.runAsync(
+            () => pixels(box, top: false, bottom: false),
+          ))!;
+      expect(full(50, 0).last, 255);
+      expect(full(99, 40).last, 255);
+      expect(full(0, 40).last, 0);
+      expect(full(50, 79).last, 0);
+      expect(continuation(50, 0).last, 0);
+      expect(continuation(99, 40).last, 255);
+      expect(continuation(0, 40).last, 0);
+      expect(continuation(50, 79).last, 0);
+    },
+  );
   test(
     'container edges slice across chunks/pages; huge whitespace cannot stop text',
     () {

@@ -1725,6 +1725,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       images: reader == _pending && _operation?.passive == true
           ? _candidateImages
           : _displayImages,
+      audioFactory: widget.images is AudioPlaybackFactory
+          ? widget.images as AudioPlaybackFactory
+          : null,
       settings: widget.settings,
       session: reader,
       viewportController: _viewports.putIfAbsent(

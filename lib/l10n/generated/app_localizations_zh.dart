@@ -184,6 +184,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerImagePlaceholder => '插图';
 
   @override
+  String get readerAudioPlay => '播放音频';
+
+  @override
+  String get readerAudioPause => '暂停音频';
+
+  @override
+  String get readerAudioUnavailable => '此音频不可用';
+
+  @override
+  String get readerAudioFailed => '音频播放失败，点按重试';
+
+  @override
   String get hideReaderControls => '隐藏阅读操作栏';
 
   @override

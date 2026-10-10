@@ -11,6 +11,7 @@ import 'theme.dart';
 import 'appearance_panel.dart';
 import 'launch_view.dart';
 import 'window_caption.dart';
+import '../features/reader/reader_embedded_fonts.dart';
 
 AppController _defaultController() => AppController();
 
@@ -45,6 +46,7 @@ class ShioriApp extends StatefulWidget {
 }
 
 class _ShioriAppState extends State<ShioriApp> {
+  final _readerFonts = ReaderFontRegistry();
   late final WindowCaptionController? _caption =
       Platform.isWindows || widget.captionSender != null
       ? WindowCaptionController(sender: widget.captionSender)
@@ -52,6 +54,7 @@ class _ShioriAppState extends State<ShioriApp> {
 
   @override
   void dispose() {
+    _readerFonts.dispose();
     _caption?.dispose();
     super.dispose();
   }
@@ -66,9 +69,10 @@ class _ShioriAppState extends State<ShioriApp> {
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
         final app = widget.overlayBuilder?.call(context, child!) ?? child!;
-        return _caption == null
+        final page = _caption == null
             ? app
             : WindowCaptionSync(controller: _caption, child: app);
+        return ReaderFontScope(registry: _readerFonts, child: page);
       },
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       locale: widget.locale,

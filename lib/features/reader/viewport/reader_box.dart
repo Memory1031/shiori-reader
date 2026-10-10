@@ -4,6 +4,8 @@ import '../../../domain/models/models.dart';
 import '../reader_authored_colors.dart';
 import 'block_style.dart';
 import '../reader_inline_images.dart';
+import '../../../domain/contracts/contracts.dart';
+import '../../../shared/source_image.dart';
 
 class ReaderLinkLayout {
   const ReaderLinkLayout(this.width, this.height, this.padding, this.radius);
@@ -96,9 +98,11 @@ class ReaderBoxGeometry {
   ReaderBoxGeometry(
     this.box,
     double available,
-    double em,
+    this.em,
     double pageHeight, {
     double? minimumContentHeight,
+    double leadingOffset = 0,
+    double trailingOffset = 0,
   }) {
     final cap = pageHeight.isFinite
         ? math.max(0.0, (pageHeight - (minimumContentHeight ?? em * 1.6)) / 2)
@@ -164,6 +168,7 @@ class ReaderBoxGeometry {
         )
         .clamp(1, contentRoom);
     width = contentWidth + inset;
+    radius = length(box.radius);
     final free = math.max(0.0, available - width - ml - mr);
     if (box.centered || box.autoLeft && box.autoRight) {
       ml += free / 2;
@@ -171,8 +176,8 @@ class ReaderBoxGeometry {
     } else if (box.autoLeft) {
       ml += free;
     }
-    marginLeft = ml;
-    marginRight = mr;
+    marginLeft = ml + leadingOffset;
+    marginRight = mr + trailingOffset;
     // Optional whitespace shrinks on a fresh short page; reserve content room.
     void vertical(double margin, double padding, double border, bool top) {
       final requested = margin + padding;
@@ -203,6 +208,7 @@ class ReaderBoxGeometry {
     );
   }
   final BlockBox box;
+  final double em;
   late final double requestedMarginTop,
       marginTop,
       marginRight,
@@ -214,7 +220,8 @@ class ReaderBoxGeometry {
       borderBottom,
       borderLeft,
       width,
-      contentWidth;
+      contentWidth,
+      radius;
   double get top => marginTop + paddingTop + borderTop;
   double get bottom => marginBottom + paddingBottom + borderBottom;
 }
@@ -227,6 +234,8 @@ ReaderBoxGeometry? readerBoxGeometry(
   TextScaler scaler, {
   double pageHeight = double.infinity,
   double? minimumContentHeight,
+  double leadingOffset = 0,
+  double trailingOffset = 0,
 }) {
   if (box == null) return null;
   final headingScale = box.headingRelative
@@ -238,6 +247,8 @@ ReaderBoxGeometry? readerBoxGeometry(
     scaler.scale((style.fontSize ?? 20) * box.fontScale * headingScale),
     pageHeight,
     minimumContentHeight: minimumContentHeight,
+    leadingOffset: leadingOffset,
+    trailingOffset: trailingOffset,
   );
 }
 
@@ -268,7 +279,7 @@ readerBlockBoxes(
   // Reserve one real text row across the bounded pair of boxes, including
   // authored heading size. Each level shares only the optional edge budget.
   final edgeHeight = (pageHeight - contentHeight) / levels + contentHeight;
-  final outer = readerBoxGeometry(
+  var outer = readerBoxGeometry(
     block.box,
     block,
     available,
@@ -277,14 +288,31 @@ readerBlockBoxes(
     pageHeight: edgeHeight,
     minimumContentHeight: contentHeight,
   );
+  final columns = block.box?.decorationColumns;
+  var localAvailable = outer?.contentWidth ?? available;
+  var columnOffset = 0.0, trailingOffset = 0.0;
+  if (columns != null && outer != null) {
+    final cellWidth = localAvailable * columns.contentFraction;
+    // Keep ordinary text readable at narrow widths / large user font sizes.
+    if (cellWidth < scaler.scale(font) * 4) {
+      outer = null;
+      localAvailable = available;
+    } else {
+      columnOffset = localAvailable * columns.leadingFraction;
+      trailingOffset = localAvailable * columns.trailingFraction;
+      localAvailable = cellWidth;
+    }
+  }
   final local = readerBoxGeometry(
     block.layout,
     block,
-    outer?.contentWidth ?? available,
+    localAvailable,
     style,
     scaler,
     pageHeight: edgeHeight,
     minimumContentHeight: contentHeight,
+    leadingOffset: columnOffset,
+    trailingOffset: trailingOffset,
   );
   return (
     outer: outer,
@@ -337,14 +365,14 @@ readerBoxEdges(
     minimumContentHeight: minimumContentHeight,
   );
   final outerTop =
-      box != null &&
-          (index == 0 || content.blocks[index - 1].box?.group != box.group)
+      boxes.outer != null &&
+          (index == 0 || content.blocks[index - 1].box?.group != box?.group)
       ? boxes.outer!.top
       : 0.0;
   final outerBottom =
-      box != null &&
+      boxes.outer != null &&
           (index + 1 == content.blocks.length ||
-              content.blocks[index + 1].box?.group != box.group)
+              content.blocks[index + 1].box?.group != box?.group)
       ? boxes.outer!.bottom
       : 0.0;
   final localTop = boxes.local?.top ?? 0.0,
@@ -356,6 +384,60 @@ readerBoxEdges(
     outerBottom: outerBottom,
     localTop: localTop,
     localBottom: localBottom,
+  );
+}
+
+/// Only decoded decorations may keep light author ink. Failed or omitted
+/// backgrounds retain the reader's normal contrast policy.
+class ReaderBackgroundPresence extends InheritedWidget {
+  const ReaderBackgroundPresence({
+    super.key,
+    required this.visible,
+    required super.child,
+  });
+  final bool visible;
+  static bool of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<ReaderBackgroundPresence>()
+          ?.visible ??
+      false;
+  @override
+  bool updateShouldNotify(ReaderBackgroundPresence oldWidget) =>
+      visible != oldWidget.visible;
+}
+
+class _ReaderBackgroundReady extends StatefulWidget {
+  const _ReaderBackgroundReady({
+    required this.media,
+    required this.repository,
+    required this.builder,
+  });
+  final MediaRef? media;
+  final ImageRepository? repository;
+  final Widget Function(BuildContext, ValueChanged<Size>) builder;
+  @override
+  State<_ReaderBackgroundReady> createState() => _ReaderBackgroundReadyState();
+}
+
+class _ReaderBackgroundReadyState extends State<_ReaderBackgroundReady> {
+  bool _ready = false;
+  @override
+  void didUpdateWidget(_ReaderBackgroundReady oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.media != oldWidget.media ||
+        widget.repository != oldWidget.repository) {
+      _ready = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ReaderBackgroundPresence(
+    visible: _ready || ReaderBackgroundPresence.of(context),
+    child: Builder(
+      builder: (context) => widget.builder(context, (_) {
+        if (mounted && !_ready) setState(() => _ready = true);
+      }),
+    ),
   );
 }
 
@@ -371,6 +453,7 @@ class ReaderBoxFrame extends StatelessWidget {
     this.starts,
     this.ends,
     this.linkOwnsDecoration = false,
+    this.images,
   });
   final BlockBox? box;
   final double width, top, bottom;
@@ -378,6 +461,7 @@ class ReaderBoxFrame extends StatelessWidget {
   final ReaderBoxGeometry? geometry;
   final bool? starts, ends;
   final bool linkOwnsDecoration;
+  final ImageRepository? images;
   @override
   Widget build(BuildContext context) {
     final b = box;
@@ -407,14 +491,112 @@ class ReaderBoxFrame extends StatelessWidget {
                     end,
                     ReaderAuthoredColors(Theme.of(context)),
                   ),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                linkOwnsDecoration ? 0 : g.paddingLeft + g.borderLeft,
-                math.max(0, top - mt),
-                linkOwnsDecoration ? 0 : g.paddingRight + g.borderRight,
-                math.max(0, bottom - mb),
+            child: _ReaderBackgroundReady(
+              repository: images,
+              media: images != null && start && end
+                  ? b.backgroundImage?.media
+                  : null,
+              builder: (context, onReady) => Stack(
+                fit: StackFit.passthrough,
+                children: [
+                  if (b.backgroundImage != null &&
+                      images != null &&
+                      start &&
+                      end)
+                    Positioned.fill(
+                      left: g.borderLeft,
+                      right: g.borderRight,
+                      top: g.borderTop,
+                      bottom: g.borderBottom,
+                      child: IgnorePointer(
+                        child: ExcludeSemantics(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.elliptical(
+                                math.max(0, g.radius - g.borderLeft),
+                                math.max(0, g.radius - g.borderTop),
+                              ),
+                              topRight: Radius.elliptical(
+                                math.max(0, g.radius - g.borderRight),
+                                math.max(0, g.radius - g.borderTop),
+                              ),
+                              bottomLeft: Radius.elliptical(
+                                math.max(0, g.radius - g.borderLeft),
+                                math.max(0, g.radius - g.borderBottom),
+                              ),
+                              bottomRight: Radius.elliptical(
+                                math.max(0, g.radius - g.borderRight),
+                                math.max(0, g.radius - g.borderBottom),
+                              ),
+                            ),
+                            child: LayoutBuilder(
+                              builder: (context, bounds) {
+                                final image = b.backgroundImage!;
+                                final em = g.em;
+                                var w = image.width?.resolve(
+                                      bounds.maxWidth,
+                                      em,
+                                    ),
+                                    h = image.height?.resolve(
+                                      bounds.maxHeight,
+                                      em,
+                                    );
+                                if (w == null && h == null) {
+                                  w = image.intrinsicWidth.toDouble();
+                                  h = image.intrinsicHeight.toDouble();
+                                }
+                                w ??=
+                                    h! *
+                                    image.intrinsicWidth /
+                                    image.intrinsicHeight;
+                                h ??=
+                                    w *
+                                    image.intrinsicHeight /
+                                    image.intrinsicWidth;
+                                return Align(
+                                  alignment: Alignment(
+                                    image.x * 2 - 1,
+                                    image.y * 2 - 1,
+                                  ),
+                                  child: OverflowBox(
+                                    minWidth: w,
+                                    maxWidth: w,
+                                    minHeight: h,
+                                    maxHeight: h,
+                                    alignment: Alignment(
+                                      image.x * 2 - 1,
+                                      image.y * 2 - 1,
+                                    ),
+                                    child: SizedBox(
+                                      width: w,
+                                      height: h,
+                                      child: SourceImage(
+                                        media: image.media,
+                                        repository: images!,
+                                        placeholder: const SizedBox.shrink(),
+                                        onIntrinsicSize: onReady,
+                                        backgroundColor: Colors.transparent,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      linkOwnsDecoration ? 0 : g.paddingLeft + g.borderLeft,
+                      math.max(0, top - mt),
+                      linkOwnsDecoration ? 0 : g.paddingRight + g.borderRight,
+                      math.max(0, bottom - mb),
+                    ),
+                    child: child,
+                  ),
+                ],
               ),
-              child: child,
             ),
           ),
         ),
@@ -438,66 +620,161 @@ class ReaderBoxPainter extends CustomPainter {
             Color(box.backgroundColor!),
             ReaderColorRole.background,
           );
-    if (background != null) {
-      canvas.drawRect(Offset.zero & size, Paint()..color = background);
-    }
-    void edge(Offset a, Offset b, double width, BoxBorderSide? side) {
-      if (width <= 0) return;
-      final type =
-          side?.style ??
-          (box.dashed ? BoxBorderStyle.dashed : BoxBorderStyle.solid);
-      final paint = Paint()
-        ..color = colors.resolve(
-          Color(side?.color ?? box.borderColor ?? 0xff808080),
-          ReaderColorRole.border,
-          background: background,
-        )
-        ..strokeWidth = width;
-      if (type == BoxBorderStyle.solid) {
-        canvas.drawLine(a, b, paint);
-        return;
-      }
-      final distance = (b - a).distance;
-      if (distance <= 0) return;
-      final step = width * (type == BoxBorderStyle.dotted ? 1 : 4);
-      if (type == BoxBorderStyle.dotted) paint.strokeCap = StrokeCap.round;
-      for (var d = 0.0; d < distance; d += step * 2) {
-        canvas.drawLine(
-          a + (b - a) * (d / distance),
-          a + (b - a) * ((d + step).clamp(0, distance) / distance),
-          paint,
-        );
-      }
+    final g = geometry;
+    if (size.isEmpty) return;
+    final widths = [
+      top ? g.borderTop : 0.0,
+      g.borderRight,
+      bottom ? g.borderBottom : 0.0,
+      g.borderLeft,
+    ];
+    final radius = g.radius.clamp(0.0, math.min(size.width, size.height) / 2);
+    RRect shape(double inset) {
+      final t = widths[0] * inset,
+          r = widths[1] * inset,
+          b = widths[2] * inset,
+          l = widths[3] * inset;
+      Radius corner(bool enabled, double x, double y) => enabled
+          ? Radius.elliptical(math.max(0, radius - x), math.max(0, radius - y))
+          : Radius.zero;
+      return RRect.fromRectAndCorners(
+        Rect.fromLTRB(
+          l,
+          t,
+          math.max(l, size.width - r),
+          math.max(t, size.height - b),
+        ),
+        topLeft: corner(top, l, t),
+        topRight: corner(top, r, t),
+        bottomLeft: corner(bottom, l, b),
+        bottomRight: corner(bottom, r, b),
+      );
     }
 
-    final g = geometry;
-    edge(
-      Offset(g.borderLeft / 2, 0),
-      Offset(g.borderLeft / 2, size.height),
-      g.borderLeft,
-      box.borders?.left,
-    );
-    edge(
-      Offset(size.width - g.borderRight / 2, 0),
-      Offset(size.width - g.borderRight / 2, size.height),
-      g.borderRight,
-      box.borders?.right,
-    );
-    if (top) {
-      edge(
-        Offset(0, g.borderTop / 2),
-        Offset(size.width, g.borderTop / 2),
-        g.borderTop,
-        box.borders?.top,
-      );
+    final outer = shape(0);
+    if (background != null) {
+      canvas.drawRRect(outer, Paint()..color = background);
     }
-    if (bottom) {
-      edge(
-        Offset(0, size.height - g.borderBottom / 2),
-        Offset(size.width, size.height - g.borderBottom / 2),
-        g.borderBottom,
-        box.borders?.bottom,
+    final inner = shape(1).outerRect;
+    final corners = [
+      Offset.zero,
+      Offset(size.width, 0),
+      Offset(size.width, size.height),
+      Offset(0, size.height),
+    ];
+    final inside = [
+      inner.topLeft,
+      inner.topRight,
+      inner.bottomRight,
+      inner.bottomLeft,
+    ];
+    final sides = [
+      box.borders?.top,
+      box.borders?.right,
+      box.borders?.bottom,
+      box.borders?.left,
+    ];
+    for (var i = 0; i < 4; i++) {
+      final width = widths[i];
+      if (width <= 0) continue;
+      final type =
+          sides[i]?.style ??
+          (box.dashed ? BoxBorderStyle.dashed : BoxBorderStyle.solid);
+      if (type == BoxBorderStyle.none) continue;
+      final color = colors.resolve(
+        Color(sides[i]?.color ?? box.borderColor ?? 0xff808080),
+        ReaderColorRole.border,
+        background: background,
       );
+      final next = (i + 1) % 4;
+      canvas.save();
+      canvas.clipRRect(outer);
+      canvas.clipPath(
+        Path()..addPolygon([
+          corners[i],
+          corners[next],
+          inside[next],
+          inside[i],
+        ], true),
+      );
+      final columns = box.decorationColumns;
+      if (i == 2 && columns != null) {
+        final start = g.borderLeft + g.paddingLeft;
+        canvas.clipPath(
+          Path()
+            ..addRect(
+              Rect.fromLTRB(
+                0,
+                0,
+                start + g.contentWidth * columns.leadingFraction,
+                size.height,
+              ),
+            )
+            ..addRect(
+              Rect.fromLTRB(
+                start + g.contentWidth * (1 - columns.trailingFraction),
+                0,
+                size.width,
+                size.height,
+              ),
+            ),
+        );
+      }
+      void band(double from, double to, Color ink) {
+        canvas.drawPath(
+          Path()
+            ..fillType = PathFillType.evenOdd
+            ..addRRect(shape(from))
+            ..addRRect(shape(to)),
+          Paint()..color = ink,
+        );
+      }
+
+      switch (type) {
+        case BoxBorderStyle.doubleLine:
+          band(0, 1 / 3, color);
+          band(2 / 3, 1, color);
+        case BoxBorderStyle.ridge:
+        case BoxBorderStyle.groove:
+          final light = Color.lerp(
+            color,
+            Colors.white.withValues(alpha: color.a),
+            .35,
+          )!;
+          final dark = Color.lerp(
+            color,
+            Colors.black.withValues(alpha: color.a),
+            .35,
+          )!;
+          final raised = type == BoxBorderStyle.ridge;
+          final lightOuter = raised == (i == 0 || i == 3);
+          band(0, .5, lightOuter ? light : dark);
+          band(.5, 1, lightOuter ? dark : light);
+        case BoxBorderStyle.dashed:
+        case BoxBorderStyle.dotted:
+          // Follow the rounded perimeter, clipped to this side's corner joins.
+          final paint = Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = width;
+          if (type == BoxBorderStyle.dotted) {
+            paint.strokeCap = StrokeCap.round;
+          }
+          final step = width * (type == BoxBorderStyle.dotted ? 1 : 4);
+          for (final metric in (Path()..addRRect(shape(.5))).computeMetrics()) {
+            for (var d = 0.0; d < metric.length; d += step * 2) {
+              canvas.drawPath(
+                metric.extractPath(d, math.min(d + step, metric.length)),
+                paint,
+              );
+            }
+          }
+        case BoxBorderStyle.solid:
+          band(0, 1, color);
+        case BoxBorderStyle.none:
+          break;
+      }
+      canvas.restore();
     }
   }
 

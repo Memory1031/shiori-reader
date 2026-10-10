@@ -440,6 +440,30 @@ abstract class AppLocalizations {
   /// **'Illustration'**
   String get readerImagePlaceholder;
 
+  /// No description provided for @readerAudioPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play audio'**
+  String get readerAudioPlay;
+
+  /// No description provided for @readerAudioPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause audio'**
+  String get readerAudioPause;
+
+  /// No description provided for @readerAudioUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio unavailable'**
+  String get readerAudioUnavailable;
+
+  /// No description provided for @readerAudioFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio playback failed. Tap to retry.'**
+  String get readerAudioFailed;
+
   /// No description provided for @hideReaderControls.
   ///
   /// In en, this message translates to:

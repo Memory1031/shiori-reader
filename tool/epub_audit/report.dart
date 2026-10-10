@@ -4,7 +4,7 @@ import 'package:shiori/data/local/epub/epub_trace.dart';
 
 typedef Json = Map<String, dynamic>;
 const schemaVersion = 1;
-const auditRulesVersion = '1.2.1';
+const auditRulesVersion = '1.2.2';
 
 final class AuditOptions {
   const AuditOptions({

@@ -2,9 +2,11 @@
 
 按当前 pubspec.lock 对应包的 LICENSE / NOTICE 文本列出；含开发及传递依赖，不表示全部进入产物。类别为文本识别，不替代原始完整声明。
 
-锁文件 SHA-256：`f8876177232e134b96ef57112320a76718c8a90f5d89fe5bcc486b6a3e48aede`（按仓库中 LF 换行的文件内容计算）。
+锁文件 SHA-256：`c2b1fc3f670fe9b11292445f40b6218a05a3f3303155194f82ee19a7eb3d98d4`（按仓库中 LF 换行的文件内容计算）。
 
 Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Memory1031/flutter_inappwebview/tree/3e48253e4c03beb49fe020fb1168ab1fb2be4818/flutter_inappwebview_windows)，按完整提交 SHA 锁定，保留上游 LICENSE 与源码许可声明。仅 Windows 子包使用 Git override，其余平台包仍取自锁定的 hosted 版本。
+
+Windows 音频使用仓库内的 [audioplayers_windows 4.3.1 补丁](../../third_party/audioplayers_windows/README.md)，通过 path override 固定源码，保留其 [MIT 许可](../../third_party/audioplayers_windows/LICENSE)。其他音频平台包仍使用锁定的 hosted 版本。
 
 | 包 | 锁定版本 | 依赖关系 | 许可文本类别 | 文件 |
 | --- | --- | --- | --- | --- |
@@ -13,6 +15,13 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 | archive | 4.2.0 | direct main | MIT 类（含附带声明） | LICENSE, LICENSE-other.md |
 | args | 2.7.0 | transitive | BSD 类 | LICENSE |
 | async | 2.13.1 | transitive | BSD 类 | LICENSE |
+| audioplayers | 6.5.1 | direct main | MIT 类 | LICENSE |
+| audioplayers_android | 5.2.1 | transitive | MIT 类 | LICENSE |
+| audioplayers_darwin | 6.4.0 | transitive | MIT 类 | LICENSE |
+| audioplayers_linux | 4.2.1 | transitive | MIT 类 | LICENSE |
+| audioplayers_platform_interface | 7.1.1 | transitive | MIT 类 | LICENSE |
+| audioplayers_web | 5.2.1 | transitive | MIT 类 | LICENSE |
+| audioplayers_windows | 4.3.1（本地补丁） | direct overridden | MIT 类 | LICENSE |
 | battery_plus | 7.1.1 | direct main | BSD 类 | LICENSE |
 | battery_plus_platform_interface | 2.0.1 | transitive | BSD 类 | LICENSE |
 | boolean_selector | 2.1.2 | transitive | BSD 类 | LICENSE |
@@ -42,6 +51,7 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 | file_selector_platform_interface | 2.7.0 | transitive | BSD 类 | LICENSE |
 | file_selector_web | 0.9.5 | transitive | BSD 类 | LICENSE |
 | file_selector_windows | 0.9.3+6 | transitive | BSD 类 | LICENSE |
+| fixnum | 1.1.1 | transitive | BSD 类 | LICENSE |
 | flutter | 0.0.0 | direct main | BSD 类 | LICENSE |
 | flutter_inappwebview | 6.1.5 | direct main | Apache 类 | LICENSE |
 | flutter_inappwebview_android | 1.1.3 | transitive | Apache 类 | LICENSE |
@@ -120,6 +130,7 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 | stack_trace | 1.12.1 | transitive | BSD 类 | LICENSE |
 | stream_channel | 2.1.4 | transitive | BSD 类 | LICENSE |
 | string_scanner | 1.4.1 | transitive | BSD 类 | LICENSE |
+| synchronized | 3.4.0 | transitive | MIT 类 | LICENSE |
 | term_glyph | 1.2.2 | transitive | BSD 类 | LICENSE |
 | test | 1.26.3 | direct dev | BSD 类 | LICENSE |
 | test_api | 0.7.7 | transitive | BSD 类 | LICENSE |
@@ -127,6 +138,7 @@ Windows WebView 使用 [Memory1031 fork 的 0.6.0 补丁](https://github.com/Mem
 | typed_data | 1.4.0 | transitive | BSD 类 | LICENSE |
 | upower | 0.7.0 | transitive | MPL-2.0 类 | LICENSE |
 | vector_math | 2.2.0 | transitive | BSD 类 | LICENSE |
+| uuid | 4.6.0 | transitive | MIT 类 | LICENSE |
 | vm_service | 15.3.0 | transitive | BSD 类 | LICENSE |
 | wakelock_plus | 1.6.1 | direct main | BSD 类 | LICENSE |
 | wakelock_plus_platform_interface | 1.5.1 | transitive | BSD 类 | LICENSE |

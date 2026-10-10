@@ -314,6 +314,7 @@ Iterable<(String, String)> epubScreenRules(
   int depth = 0,
   EpubTraceCollector? trace,
   String path = '',
+  bool fontFaces = false,
 ]) sync* {
   if (depth > 8) {
     trace?.record(
@@ -353,7 +354,13 @@ Iterable<(String, String)> epubScreenRules(
       final declarations = css.substring(open + 1, i);
       if (selector.toLowerCase().startsWith('@media')) {
         if (_screenMediaApplies(selector.substring('@media'.length))) {
-          yield* epubScreenRules(declarations, depth + 1, trace, path);
+          yield* epubScreenRules(
+            declarations,
+            depth + 1,
+            trace,
+            path,
+            fontFaces,
+          );
         } else {
           trace?.record(
             'css.syntax',
@@ -364,6 +371,8 @@ Iterable<(String, String)> epubScreenRules(
                 : 'media_unknown',
           );
         }
+      } else if (fontFaces && selector.toLowerCase() == '@font-face') {
+        yield ('@font-face', declarations);
       } else if (!selector.startsWith('@') && selector.isNotEmpty) {
         yield (selector, declarations);
       } else if (selector.startsWith('@')) {
@@ -394,16 +403,25 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
   Iterable<String> sheets, {
   EpubTraceCollector? trace,
   String path = '',
+  Iterable<String>? stylesheetPaths,
+  String? Function(String base, String href)? resolveAsset,
 }) {
   final values = <dom.Element, Map<String, String>>{};
   final important = <dom.Element, Set<String>>{};
   final rules = <(String, String, int)>[];
-  final sources = trace == null ? null : <(String?, int)>[];
+  final sources = trace == null && resolveAsset == null
+      ? null
+      : <(String?, int)>[];
+  final sheetPaths = stylesheetPaths?.iterator;
   var trackedOrigins = 0;
   final origins = trace == null
       ? null
       : <dom.Element, Map<String, Map<String, Object?>>>{};
   for (final sheet in sheets) {
+    final sheetPath = sheetPaths?.moveNext() == true
+        ? sheetPaths!.current
+        : trace?.currentStylesheet;
+    if (trace != null) trace.currentStylesheet = sheetPath;
     var sourceRule = 0;
     for (final (selectors, declarations) in epubScreenRules(
       sheet,
@@ -446,7 +464,7 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
             RegExp(r'[.:\[]').allMatches(selector).length * 10 +
             RegExp(r'(?:^|\s)[a-zA-Z]').allMatches(selector).length;
         rules.add((selector.trim(), declarations, score));
-        sources?.add((trace?.currentStylesheet, sourceRule));
+        sources?.add((sheetPath, sourceRule));
       }
       sourceRule++;
     }
@@ -486,6 +504,15 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
         'font-size',
         'font-weight',
         'font-style',
+        'font-family',
+        'background',
+        'background-image',
+        'background-repeat',
+        'background-position',
+        'background-size',
+        'background-attachment',
+        'background-origin',
+        'background-clip',
         'max-width',
         'min-width',
         'min-height',
@@ -544,11 +571,20 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
         'white-space',
         'visibility',
       }.contains(name)) {
-        final raw = parts[1].trim().toLowerCase();
-        final priority = RegExp(r'!\s*important\s*$').hasMatch(raw);
-        final value = raw
-            .replaceFirst(RegExp(r'\s*!\s*important\s*$'), '')
+        final raw = parts[1].trim();
+        final priority = RegExp(
+          r'!\s*important\s*$',
+          caseSensitive: false,
+        ).hasMatch(raw);
+        final originalValue = raw
+            .replaceFirst(
+              RegExp(r'\s*!\s*important\s*$', caseSensitive: false),
+              '',
+            )
             .trim();
+        final value = name == 'background' || name == 'background-image'
+            ? originalValue
+            : originalValue.toLowerCase();
         if (name == 'white-space' &&
             !{
               'normal',
@@ -610,6 +646,15 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
             reason: 'rejected_value',
           );
           continue;
+        }
+        if (resolveAsset != null &&
+            properties['background-image'] != null &&
+            properties['background-image'] != 'none') {
+          final href = epubCssUrl(properties['background-image']!);
+          final resolved = href == null
+              ? null
+              : resolveAsset((sheet ?? path).split('#').first, href);
+          properties['background-image'] = resolved ?? 'none';
         }
         final priorities = important[element] ??= {};
         for (final property in properties.entries) {
@@ -772,6 +817,44 @@ bool _borderWidth(String t) =>
 bool _borderColor(String t) => t == 'currentcolor' || epubColor(t) != null;
 
 Map<String, String>? _expandNativeDeclaration(String name, String value) {
+  if (name == 'background') {
+    if (value.toLowerCase() == 'none') {
+      return {
+        'background-image': 'none',
+        'background-repeat': 'repeat',
+        'background-position': '0% 0%',
+        'background-size': 'auto',
+        'background-color': 'transparent',
+        'background-attachment': 'scroll',
+        'background-origin': 'padding-box',
+        'background-clip': 'border-box',
+      };
+    }
+    final url = RegExp(
+      r'''url\(\s*(?:"[^"]*"|'[^']*'|[^\s)]+)\s*\)''',
+      caseSensitive: false,
+    ).firstMatch(value);
+    if (url == null) return null;
+    final remainder = value.replaceRange(url.start, url.end, '');
+    if (remainder.contains(',') || remainder.contains('/')) return null;
+    final rest = remainder.trim().toLowerCase().split(RegExp(r'\s+'));
+    if (!rest.contains('no-repeat')) return null;
+    final position = rest.where((t) => t != 'no-repeat').join(' ');
+    return {
+      'background-image': url[0]!,
+      'background-repeat': 'no-repeat',
+      'background-position': position.isEmpty ? '0% 0%' : position,
+      'background-size': 'auto',
+      'background-color': 'transparent',
+      'background-attachment': 'scroll',
+      'background-origin': 'padding-box',
+      'background-clip': 'border-box',
+    };
+  }
+  if (name == 'background-image') {
+    if (value.toLowerCase() == 'none') return {name: 'none'};
+    return epubCssUrl(value) != null ? {name: value} : null;
+  }
   final tokens = RegExp(
     r'rgb\([^)]*\)|[^\s]+',
   ).allMatches(value).map((m) => m[0]!).toList();
@@ -855,4 +938,12 @@ Map<String, String>? _expandNativeDeclaration(String name, String value) {
     }
   }
   return {name: value};
+}
+
+String? epubCssUrl(String value) {
+  final match = RegExp(
+    r'''^url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s)]+))\s*\)$''',
+    caseSensitive: false,
+  ).firstMatch(value.trim());
+  return match == null ? null : match[1] ?? match[2] ?? match[3];
 }

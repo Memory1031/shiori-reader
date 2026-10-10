@@ -1,13 +1,16 @@
 import 'dart:typed_data';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
+import 'local_audio_playback.dart';
 
 /// Each load owns verified bytes. Deleting the book cannot invalidate an active
 /// lease; new loads after deletion fail. No URL, online cache or network access.
-class LocalImageRepository implements ImageRepository {
+class LocalImageRepository implements ImageRepository, AudioPlaybackFactory {
   LocalImageRepository({required this.local, required this.online});
   final LocalBookStore local;
   final ImageRepository online;
+  @override
+  AudioPlayback createAudioPlayback() => LocalAudioPlayback(local);
   @override
   Future<Result<LoadResult<MediaLease>>> load(
     MediaRef ref, {

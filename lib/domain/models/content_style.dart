@@ -1,4 +1,7 @@
 import 'value_model.dart';
+import 'identity.dart';
+import 'embedded_font.dart';
+export 'embedded_font.dart';
 
 /// Authored relative typography; layout metadata never changes text identity.
 final class InlineTextStyle extends ValueModel {
@@ -10,9 +13,11 @@ final class InlineTextStyle extends ValueModel {
     this.fontSizeFromReader = false,
     this.bold,
     this.italic,
-  }) {
+    Iterable<EmbeddedFontFamily> fonts = const [],
+  }) : fonts = List.unmodifiable(fonts) {
     if (start < 0 ||
         length <= 0 ||
+        this.fonts.length > 8 ||
         !fontScale.isFinite ||
         fontScale < .25 ||
         fontScale > 4 ||
@@ -29,12 +34,14 @@ final class InlineTextStyle extends ValueModel {
 
   /// Null inherits the reader base; false is an explicit authored reset.
   final bool? bold, italic;
+  final List<EmbeddedFontFamily> fonts;
   bool get isNoOp =>
       color == null &&
       fontScale == 1 &&
       !fontSizeFromReader &&
       bold == null &&
-      italic == null;
+      italic == null &&
+      fonts.isEmpty;
   Map<String, Object?> toJson() => {
     'start': start,
     'length': length,
@@ -43,6 +50,7 @@ final class InlineTextStyle extends ValueModel {
     if (fontSizeFromReader) 'fontSizeFromReader': true,
     'bold': bold,
     'italic': italic,
+    if (fonts.isNotEmpty) 'fonts': fonts.map((f) => f.toJson()).toList(),
   };
   factory InlineTextStyle.fromJson(Map<String, dynamic> j) => InlineTextStyle(
     start: j['start'] as int,
@@ -52,6 +60,9 @@ final class InlineTextStyle extends ValueModel {
     fontSizeFromReader: j['fontSizeFromReader'] as bool? ?? false,
     bold: j['bold'] as bool?,
     italic: j['italic'] as bool?,
+    fonts: (j['fonts'] as List? ?? const []).map(
+      (f) => EmbeddedFontFamily.fromJson(f as Map<String, dynamic>),
+    ),
   );
   @override
   List<Object?> get values => [
@@ -62,6 +73,7 @@ final class InlineTextStyle extends ValueModel {
     fontSizeFromReader,
     bold,
     italic,
+    fonts,
   ];
 }
 
@@ -129,7 +141,7 @@ final class BoxInsets extends ValueModel {
   List<Object?> get values => [top, right, bottom, left];
 }
 
-enum BoxBorderStyle { none, solid, dashed, dotted }
+enum BoxBorderStyle { none, solid, dashed, dotted, doubleLine, ridge, groove }
 
 /// A single whole-paragraph native link label; text and link ranges are intact.
 final class LinkDecoration extends ValueModel {
@@ -236,6 +248,35 @@ final class BoxBorders extends ValueModel {
   List<Object?> get values => [top, right, bottom, left];
 }
 
+/// Two empty side cells around one content cell in a bounded decoration row.
+final class DecorationColumns extends ValueModel {
+  DecorationColumns({
+    required this.leadingFraction,
+    required this.trailingFraction,
+  }) {
+    if (!leadingFraction.isFinite ||
+        !trailingFraction.isFinite ||
+        leadingFraction <= 0 ||
+        trailingFraction <= 0 ||
+        leadingFraction + trailingFraction >= 1) {
+      throw ArgumentError('Invalid decoration columns');
+    }
+  }
+  final double leadingFraction, trailingFraction;
+  double get contentFraction => 1 - leadingFraction - trailingFraction;
+  Map<String, Object?> toJson() => {
+    'leadingFraction': leadingFraction,
+    'trailingFraction': trailingFraction,
+  };
+  factory DecorationColumns.fromJson(Map<String, dynamic> j) =>
+      DecorationColumns(
+        leadingFraction: (j['leadingFraction'] as num).toDouble(),
+        trailingFraction: (j['trailingFraction'] as num).toDouble(),
+      );
+  @override
+  List<Object?> get values => [leadingFraction, trailingFraction];
+}
+
 /// One simple authored container shared by consecutive semantic blocks.
 /// CSS pixels remain layout units; widths are capped to the reading viewport.
 final class BlockBox extends ValueModel {
@@ -249,6 +290,7 @@ final class BlockBox extends ValueModel {
     this.borderWidth = 0,
     this.borderColor,
     this.backgroundColor,
+    this.backgroundImage,
     this.dashed = false,
     this.centered = false,
     this.widthLength,
@@ -256,12 +298,15 @@ final class BlockBox extends ValueModel {
     this.margins,
     this.paddingEdges,
     this.borders,
+    this.decorationColumns,
+    this.radius,
     this.fontScale = 1,
     this.headingRelative = false,
     this.autoLeft = false,
     this.autoRight = false,
   }) {
-    if (!fontScale.isFinite ||
+    if (radius?.unit == LayoutUnit.fraction ||
+        !fontScale.isFinite ||
         fontScale < .25 ||
         fontScale > 4 ||
         [
@@ -290,6 +335,7 @@ final class BlockBox extends ValueModel {
   final double? width, maxWidth, widthFraction, maxWidthFraction;
   final double padding, borderWidth;
   final int? borderColor, backgroundColor;
+  final BlockBackgroundImage? backgroundImage;
   final bool dashed;
 
   /// Both horizontal CSS margins are auto; independent of text alignment.
@@ -299,6 +345,12 @@ final class BlockBox extends ValueModel {
 
   /// Null preserves legacy uniform borders. CSS boxes always store all sides.
   final BoxBorders? borders;
+
+  /// Absent in older manifests. The bottom edge has an opening at the content cell.
+  final DecorationColumns? decorationColumns;
+
+  /// Uniform circular corners; absent in older manifests. Paint-only geometry.
+  final LayoutLength? radius;
   final double fontScale;
   final bool headingRelative, autoLeft, autoRight;
   Map<String, Object?> toJson() => {
@@ -311,6 +363,7 @@ final class BlockBox extends ValueModel {
     'borderWidth': borderWidth,
     'borderColor': borderColor,
     'backgroundColor': backgroundColor,
+    if (backgroundImage != null) 'backgroundImage': backgroundImage!.toJson(),
     'dashed': dashed,
     'centered': centered,
     if (widthLength != null) 'widthLength': widthLength!.toJson(),
@@ -318,6 +371,9 @@ final class BlockBox extends ValueModel {
     if (margins != null) 'margins': margins!.toJson(),
     if (paddingEdges != null) 'paddingEdges': paddingEdges!.toJson(),
     if (borders != null) 'borders': borders!.toJson(),
+    if (decorationColumns != null)
+      'decorationColumns': decorationColumns!.toJson(),
+    if (radius != null) 'radius': radius!.toJson(),
     'fontScale': fontScale,
     'headingRelative': headingRelative,
     'autoLeft': autoLeft,
@@ -333,6 +389,11 @@ final class BlockBox extends ValueModel {
     borderWidth: (j['borderWidth'] as num).toDouble(),
     borderColor: j['borderColor'] as int?,
     backgroundColor: j['backgroundColor'] as int?,
+    backgroundImage: j['backgroundImage'] == null
+        ? null
+        : BlockBackgroundImage.fromJson(
+            j['backgroundImage'] as Map<String, dynamic>,
+          ),
     dashed: j['dashed'] as bool,
     centered: j['centered'] as bool? ?? false,
     widthLength: j['widthLength'] == null
@@ -350,6 +411,14 @@ final class BlockBox extends ValueModel {
     borders: j['borders'] == null
         ? null
         : BoxBorders.fromJson(j['borders'] as Map<String, dynamic>),
+    decorationColumns: j['decorationColumns'] == null
+        ? null
+        : DecorationColumns.fromJson(
+            j['decorationColumns'] as Map<String, dynamic>,
+          ),
+    radius: j['radius'] == null
+        ? null
+        : LayoutLength.fromJson(j['radius'] as Map<String, dynamic>),
     fontScale: (j['fontScale'] as num?)?.toDouble() ?? 1,
     headingRelative: j['headingRelative'] as bool? ?? false,
     autoLeft: j['autoLeft'] as bool? ?? false,
@@ -366,6 +435,7 @@ final class BlockBox extends ValueModel {
     borderWidth,
     borderColor,
     backgroundColor,
+    backgroundImage,
     dashed,
     centered,
     widthLength,
@@ -373,9 +443,76 @@ final class BlockBox extends ValueModel {
     margins,
     paddingEdges,
     borders,
+    decorationColumns,
+    radius,
     fontScale,
     headingRelative,
     autoLeft,
     autoRight,
+  ];
+}
+
+/// One nonrepeating raster decoration, positioned inside a block's padding box.
+final class BlockBackgroundImage extends ValueModel {
+  BlockBackgroundImage({
+    required this.media,
+    required this.intrinsicWidth,
+    required this.intrinsicHeight,
+    this.width,
+    this.height,
+    this.x = 0,
+    this.y = 0,
+  }) {
+    if (intrinsicWidth <= 0 ||
+        intrinsicHeight <= 0 ||
+        intrinsicWidth > 32768 ||
+        intrinsicHeight > 32768 ||
+        !x.isFinite ||
+        !y.isFinite ||
+        x < 0 ||
+        x > 1 ||
+        y < 0 ||
+        y > 1 ||
+        width?.value == 0 ||
+        height?.value == 0) {
+      throw ArgumentError('Invalid background image');
+    }
+  }
+  final MediaRef media;
+  final int intrinsicWidth, intrinsicHeight;
+  final LayoutLength? width, height;
+  final double x, y;
+  Map<String, Object?> toJson() => {
+    'media': media.toJson(),
+    'intrinsicWidth': intrinsicWidth,
+    'intrinsicHeight': intrinsicHeight,
+    if (width != null) 'width': width!.toJson(),
+    if (height != null) 'height': height!.toJson(),
+    'x': x,
+    'y': y,
+  };
+  factory BlockBackgroundImage.fromJson(Map<String, dynamic> j) =>
+      BlockBackgroundImage(
+        media: MediaRef.fromJson(j['media'] as Map<String, dynamic>),
+        intrinsicWidth: j['intrinsicWidth'] as int,
+        intrinsicHeight: j['intrinsicHeight'] as int,
+        width: j['width'] == null
+            ? null
+            : LayoutLength.fromJson(j['width'] as Map<String, dynamic>),
+        height: j['height'] == null
+            ? null
+            : LayoutLength.fromJson(j['height'] as Map<String, dynamic>),
+        x: (j['x'] as num).toDouble(),
+        y: (j['y'] as num).toDouble(),
+      );
+  @override
+  List<Object?> get values => [
+    media,
+    intrinsicWidth,
+    intrinsicHeight,
+    width,
+    height,
+    x,
+    y,
   ];
 }
