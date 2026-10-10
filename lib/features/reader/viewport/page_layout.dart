@@ -765,20 +765,51 @@ final class PageLayout {
   /// A large illustration owns one column, not necessarily the whole spread.
   bool isIllustrationColumn(List<PageFragment> fragments) =>
       fragments.length == 1 &&
-      index.content.blocks[index.chunks[fragments.single.unit].blockIndex]
-          is ImageBlock &&
-      index
-              .content
-              .blocks[index.chunks[fragments.single.unit].blockIndex]
-              .box ==
-          null &&
-      index
-              .content
-              .blocks[index.chunks[fragments.single.unit].blockIndex]
-              .layout ==
-          null &&
+      _centerableImage(
+        index.content.blocks[index.chunks[fragments.single.unit].blockIndex],
+      ) &&
       (fragments.single.height >= height * .6 ||
           index.content.blocks.length == 1);
+
+  bool _centerableImage(ContentBlock block) =>
+      block is ImageBlock &&
+      _neutralImageBox(block.box) &&
+      _neutralImageBox(block.layout);
+
+  // Explicit zero margins/padding still produce boxes in imported books.
+  // Accept them without changing stored content or authored layout geometry.
+  bool _neutralImageBox(BlockBox? box) {
+    if (box == null) return true;
+    bool zeroInsets(BoxInsets? insets) => [
+      insets?.top,
+      insets?.right,
+      insets?.bottom,
+      insets?.left,
+    ].every((side) => side == null || side.value == 0);
+    final borders = box.borders;
+    return box.width == null &&
+        box.maxWidth == null &&
+        box.widthFraction == null &&
+        box.maxWidthFraction == null &&
+        box.widthLength == null &&
+        box.maxWidthLength == null &&
+        box.padding == 0 &&
+        box.borderWidth == 0 &&
+        box.backgroundColor == null &&
+        !box.centered &&
+        !box.autoLeft &&
+        !box.autoRight &&
+        box.fontScale == 1 &&
+        !box.headingRelative &&
+        zeroInsets(box.margins) &&
+        zeroInsets(box.paddingEdges) &&
+        [borders?.top, borders?.right, borders?.bottom, borders?.left].every(
+          (side) =>
+              side == null ||
+              side.style == BoxBorderStyle.none ||
+              side.width.value == 0,
+        );
+  }
 
   bool _fullPageImage(int blockIndex, double extent) =>
       index.content.blocks[blockIndex] is ImageBlock &&
@@ -788,9 +819,7 @@ final class PageLayout {
     final first = _forwardColumn(from);
     if (first == null || columns == 1) return first;
     if (index.content.blocks.length == 1 &&
-        index.content.blocks.single is ImageBlock &&
-        index.content.blocks.single.box == null &&
-        index.content.blocks.single.layout == null) {
+        _centerableImage(index.content.blocks.single)) {
       return ReaderPage(
         first.start,
         first.end,
