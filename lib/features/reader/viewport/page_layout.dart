@@ -779,8 +779,8 @@ final class PageLayout {
       _neutralImageBox(block.box) &&
       _neutralImageBox(block.layout);
 
-  // Explicit zero margins/padding still produce boxes in imported books.
-  // Accept them without changing stored content or authored layout geometry.
+  // Zero edges and a responsive max-width of 100% do not change image geometry.
+  // Accept stored forms of both without overriding authored sizing/decoration.
   bool _neutralImageBox(BlockBox? box) {
     if (box == null) return true;
     bool zeroInsets(BoxInsets? insets) => [
@@ -793,12 +793,17 @@ final class PageLayout {
     return box.width == null &&
         box.maxWidth == null &&
         box.widthFraction == null &&
-        box.maxWidthFraction == null &&
+        (box.maxWidthFraction == null || box.maxWidthFraction == 1) &&
         box.widthLength == null &&
-        box.maxWidthLength == null &&
+        (box.maxWidthLength == null ||
+            box.maxWidthLength!.unit == LayoutUnit.fraction &&
+                box.maxWidthLength!.value == 1) &&
         box.padding == 0 &&
         box.borderWidth == 0 &&
         box.backgroundColor == null &&
+        box.backgroundImage == null &&
+        (box.radius == null || box.radius!.value == 0) &&
+        box.decorationColumns == null &&
         !box.centered &&
         !box.autoLeft &&
         !box.autoRight &&

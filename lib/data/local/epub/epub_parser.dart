@@ -964,6 +964,7 @@ class EpubParser {
     var activeStyle = const EpubRichStyle();
     BlockBox? activeBox;
     dom.Element? activeBoxOwner;
+    final emittedBlankBorders = <dom.Element>{};
     var boxGroup = 0;
     final styleSpans = <(EpubRichStyle, int, int)>[];
     dom.Element? activeFloat;
@@ -983,6 +984,60 @@ class EpubParser {
         if (styles[node]?[name] case final value?) return value;
       }
       return null;
+    }
+
+    BlockBox? blankBorder(bool visible) {
+      final owner = paragraphOwner;
+      if (activeBox == null ||
+          !visible ||
+          owner?.localName != 'p' ||
+          owner!.parent != activeBoxOwner ||
+          owner.children.any((e) => e.localName != 'br')) {
+        return null;
+      }
+      final css = styles[owner] ?? const <String, String>{};
+      // Only an existing blank block directly inside the outer box gains a
+      // local border. Other decorations and complex geometry keep fallback.
+      if (!{null, 'block', 'initial'}.contains(css['display']) ||
+          !{null, 'static', 'initial'}.contains(css['position']) ||
+          !{null, 'none'}.contains(css['transform']) ||
+          !{null, 'horizontal-tb'}.contains(css['writing-mode']) ||
+          css.keys.any(
+            (key) => {
+              'height',
+              'min-height',
+              'max-height',
+              'min-width',
+              'overflow',
+              'overflow-x',
+              'overflow-y',
+              'background-color',
+              'background-image',
+              'border-radius',
+            }.contains(key),
+          )) {
+        return null;
+      }
+      final box = epubBlockBox(
+        css,
+        0,
+        richStyles[owner] ?? const EpubRichStyle(),
+        allowEdges: true,
+      );
+      return box != null &&
+              [
+                box.borders!.top,
+                box.borders!.right,
+                box.borders!.bottom,
+                box.borders!.left,
+              ].any(
+                (side) =>
+                    side != null &&
+                    side.style != BoxBorderStyle.none &&
+                    side.width.value > 0,
+              )
+          ? box
+          : null;
     }
 
     final svgHotspots = <EpubSvgHotspot>[];
@@ -1291,13 +1346,16 @@ class EpubParser {
       explicitGapEm = 0;
       if (value.trim().isEmpty) {
         if (gap > 0) {
+          final border = blankBorder(visible);
           blocks.add(
             ParagraphBlock(
               text: '',
               box: activeBox,
+              layout: border,
               authoredGapEm: gap.clamp(0, 16),
             ),
           );
+          if (border != null) emittedBlankBorders.add(paragraphOwner!);
           if (blocks.length > 100000) invalidZip();
         }
         return;
@@ -1839,7 +1897,7 @@ class EpubParser {
       final previousBox = activeBox;
       final previousBoxOwner = activeBoxOwner;
       // A single decorated container is shared across its flattened blocks.
-      // Nested decorated boxes remain outside this first native subset.
+      // Element-local blank borders do not introduce another container group.
       if (node is dom.Element &&
           activeBox == null &&
           (containers.contains(node.localName) ||
@@ -1874,6 +1932,14 @@ class EpubParser {
           );
         }
       }
+      final previousFloat = activeFloat;
+      if (node is dom.Element &&
+          !{null, 'none', 'initial'}.contains(styles[node]?['float'])) {
+        activeFloat = node;
+      }
+      final previousCell = activeCell;
+      if (node is dom.Element && node.localName == 'td') activeCell = node;
+      visit(node);
       if (trace != null &&
           node is dom.Element &&
           activeBox != null &&
@@ -1890,18 +1956,13 @@ class EpubParser {
             'box.output',
             path,
             location: epubTraceLocation(node),
-            reason: 'nested_not_emitted',
+            reason: emittedBlankBorders.contains(node)
+                ? 'emitted'
+                : 'nested_not_emitted',
+            data: {'radius': false},
           );
         }
       }
-      final previousFloat = activeFloat;
-      if (node is dom.Element &&
-          !{null, 'none', 'initial'}.contains(styles[node]?['float'])) {
-        activeFloat = node;
-      }
-      final previousCell = activeCell;
-      if (node is dom.Element && node.localName == 'td') activeCell = node;
-      visit(node);
       activeCell = previousCell;
       activeFloat = previousFloat;
       activeBox = previousBox;
