@@ -17,6 +17,7 @@ import 'reader_controller.dart';
 import 'reader_completion_page.dart';
 import 'reader_completion_transition.dart';
 import 'reader_preferences.dart';
+import 'native_reader_settings_adapter.dart';
 import 'reader_theme.dart';
 import 'reading_progress_format.dart';
 export 'reader_actions.dart' show ReaderActions;
@@ -957,20 +958,6 @@ class _ReaderContentViewState extends State<ReaderContentView>
     );
   }
 
-  TextStyle _bodyStyle(BuildContext context) {
-    final theme = Theme.of(context);
-    final typography = ShioriCapabilities.of(context).explicitUiTypeface
-        ? theme.textTheme.bodyLarge
-        : null;
-    return TextStyle(
-      fontFamily: typography?.fontFamily,
-      fontFamilyFallback: typography?.fontFamilyFallback,
-      fontSize: _settings.fontSize,
-      height: _settings.lineHeight,
-      color: theme.colorScheme.onSurface,
-    );
-  }
-
   Widget _body(BuildContext context) {
     if (!_settingsReady) {
       return const Scaffold(body: SafeArea(child: LoadingView()));
@@ -984,12 +971,15 @@ class _ReaderContentViewState extends State<ReaderContentView>
       widget.onPageAppearance?.call(look.$1, look.$2);
     }
     _pageInsets = MediaQuery.paddingOf(context);
-    _margin = readerHorizontalMargin(
+    final layout = NativeReaderSettingsAdapter.resolve(
       _settings,
-      MediaQuery.textScalerOf(context),
-      Directionality.of(context),
+      theme: Theme.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: Directionality.of(context),
+      explicitUiTypeface: ShioriCapabilities.of(context).explicitUiTypeface,
     );
-    final style = _bodyStyle(context);
+    _margin = layout.horizontalMargin;
+    final style = layout.bodyStyle;
     return WindowCaptionScope(
       enabled:
           (widget.appearanceActive ?? widget.active) &&
@@ -1048,7 +1038,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                           clipBehavior: Clip.none,
                           children: [
                             Positioned.fill(
-                              child: _page(context, pageBounds, style),
+                              child: _page(context, pageBounds, layout),
                             ),
                             ValueListenableBuilder<bool>(
                               valueListenable: _chrome,
@@ -1202,7 +1192,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   Widget _page(
     BuildContext context,
     BoxConstraints pageBounds,
-    TextStyle style,
+    NativeReaderLayoutSettings layout,
   ) {
     final chrome = ReaderChromeMetrics.of(context);
     final spread =
@@ -1237,7 +1227,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                       pageBounds: pageBounds,
                       bounds: bounds,
                       columns: spread ? 2 : 1,
-                      style: style,
+                      layout: layout,
                       contentTop: _pageInsets.top + chrome.header,
                     ),
             ),
@@ -1298,9 +1288,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
     required BoxConstraints pageBounds,
     required BoxConstraints bounds,
     required int columns,
-    required TextStyle style,
+    required NativeReaderLayoutSettings layout,
     required double contentTop,
   }) {
+    final style = layout.bodyStyle;
     final columnWidth =
         (bounds.maxWidth - (columns - 1) * readerColumnGap) / columns;
     final imageIndexes = Map<ImageBlock, int>.identity();
@@ -1413,7 +1404,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
         contentLinks: widget.session?.contentLinks.toList() ?? const [],
         initialPosition: _position,
         textStyle: style,
-        paragraphSpacing: _settings.paragraphSpacing,
+        paragraphSpacing: layout.paragraphSpacing,
         onCenterTap: _toggle,
         chromeVisible: _chrome,
         onBoundary: (direction) {
