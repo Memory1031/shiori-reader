@@ -25,7 +25,7 @@ fvm dart run tool/epub_compatibility_audit.dart evaluate --bundle ".tooling/epub
 
 `report.json` 是版本化汇总事实来源，`report.md` 只从相同 JSON 生成；每本的完整检查、文档清单和有界观察保存在 `book-*.json`。`inventory.json` 保存输入身份，`books.jsonl` 逐本提交索引；已完成的单本 JSON 不再改写，重复别名仅追加到索引，读取时合并。中断后可从索引读取已完成结果并忽略未写完的尾行，汇总的 `complete=false` 表示范围尚未完成。
 
-schema2 / rules2.0.2 保留旧检查与观察，并增加独立的源事实、表示事实、对应关系、候选和验证证据。源实例身份包含 EPUB hash、包内路径、spine occurrence 与 DOM 位置；资源 hash 不代替实例身份。偏移明确标记 Unicode 码点、UTF-16 或字节；没有可靠 HTML source span 时保持 null。简单文本预期独立于 trace；有效 CSS 依赖共享的生产原生 cascade，明确记录该依赖。
+schema2 / rules2.0.3 保留旧检查与观察，并增加独立的源事实、表示事实、对应关系、候选和验证证据。源实例身份包含 EPUB hash、包内路径、spine occurrence 与 DOM 位置；资源 hash 不代替实例身份。偏移明确标记 Unicode 码点、UTF-16 或字节；没有可靠 HTML source span 时保持 null。简单文本预期独立于 trace；有效 CSS 依赖共享的生产原生 cascade，明确记录该依赖。
 
 各证据层分别使用 `pass/fail/unknown/not_run`。原生模型已输出、真实 Reader 选择、widget 几何／点击、浏览器、原生 WebView、音频解码和字体字形归属互不升格。候选按内容、结构、视觉、交互及可解释的证据分档组织；支持观察、Reader 策略、安全边界和源问题保留事实，但不按警告数量生成开发任务。
 

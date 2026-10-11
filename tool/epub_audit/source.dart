@@ -4,6 +4,7 @@ import 'package:html/parser.dart' as html;
 import 'package:xml/xml.dart';
 import 'package:shiori/data/local/epub/epub_zip.dart';
 import 'package:shiori/data/local/epub/epub_parser.dart' show epubReference;
+import 'package:shiori/data/local/epub/epub_stylesheet_decoder.dart';
 import 'package:shiori/data/local/txt/txt_decoder.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'report.dart';
@@ -25,7 +26,9 @@ final class SourceInventory {
   String text(String path, {bool css = false}) {
     if (css && _cssCache.containsKey(path)) return _cssCache[path]!;
     final bytes = zip.read(path, limit: 4 * 1024 * 1024);
-    final value = decodeTxt(bytes, txtBom(bytes) ?? TxtEncoding.utf8);
+    final value = css
+        ? decodeEpubStylesheet(bytes)
+        : decodeTxt(bytes, txtBom(bytes) ?? TxtEncoding.utf8);
     if (css) {
       cssCharacters += value.length;
       if (cssCharacters > 8 * 1024 * 1024) throw SourceBudgetExceeded();
