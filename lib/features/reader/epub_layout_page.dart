@@ -122,13 +122,13 @@ class _EpubLayoutPageState extends State<EpubLayoutPage>
     super.dispose();
   }
 
-  void _prepareArtwork(String html, Color ink, {required bool keepView}) {
+  void _prepareArtwork(String html, Color ink) {
     if (identical(_preparingSource, html) && _preparingInk == ink) return;
     final sameSource = identical(_preparingSource, html);
     _preparingSource = html;
     _preparingInk = ink;
     final generation = ++_artworkGeneration;
-    if (!keepView || !sameSource) _preparedHtml = null;
+    if (!sameSource) _preparedHtml = null;
     _artworkPending = false;
     if (!html.contains('class="shiori-svg-page"')) {
       _preparedHtml = html;
@@ -248,7 +248,6 @@ return a?a.getAttribute('href'):null;
   Color? _foreground;
   Brightness? _brightness;
   bool? _pointerFirst;
-  int _generation = 0;
   String? _document;
 
   String _documentOf(
@@ -279,7 +278,6 @@ return a?a.getAttribute('href'):null;
     _foreground = foreground;
     _brightness = brightness;
     _pointerFirst = pointerFirst;
-    _generation++;
     _down = null;
     return _document = document;
   }
@@ -324,12 +322,7 @@ return a?a.getAttribute('href'):null;
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final inlineView = EpubWebViewHost.usesInlineView(context);
-    _prepareArtwork(
-      widget.html,
-      theme.colorScheme.onSurface,
-      keepView: inlineView,
-    );
+    _prepareArtwork(widget.html, theme.colorScheme.onSurface);
     if (_preparedHtml == null) {
       return ColoredBox(color: theme.scaffoldBackgroundColor);
     }
@@ -387,7 +380,7 @@ return a?a.getAttribute('href'):null;
           fit: StackFit.expand,
           children: [
             _StaticWebView(
-              key: ValueKey(inlineView ? _viewGeneration : _generation),
+              key: ValueKey(_viewGeneration),
               document: document,
               onController: (controller) {
                 if (identical(document, _document)) _webController = controller;
@@ -437,8 +430,8 @@ return a?a.getAttribute('href'):null;
   }
 }
 
-/// Windows reloads static theme data on its inline owner, one document at a
-/// time. Mobile keeps its existing headless owner per document/theme.
+/// Theme data reloads serially on the source document's owner. Windows uses an
+/// inline view; mobile adopts its prepared headless view once.
 class _StaticWebView extends StatefulWidget {
   const _StaticWebView({
     super.key,
@@ -472,8 +465,7 @@ class _StaticWebViewState extends State<_StaticWebView> {
   @override
   void didUpdateWidget(_StaticWebView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.document, widget.document) &&
-        _environment != null) {
+    if (!identical(oldWidget.document, widget.document)) {
       _ready = false;
       // An in-flight navigation finishes before loading the newest theme.
       // WebView2's about:blank load callbacks carry no document identity.
@@ -493,16 +485,24 @@ class _StaticWebViewState extends State<_StaticWebView> {
       // runs these fixed host commands while authored JavaScript stays disabled.
       if (_themeScrollOffset == null) {
         try {
-          final position = await _controller!.evaluateJavascript(
-            source: '[window.scrollX, window.scrollY]',
-          );
-          if (position is List &&
-              position.length == 2 &&
-              position.every((value) => value is num && value.isFinite)) {
-            _themeScrollOffset = Offset(
-              (position[0] as num).toDouble(),
-              (position[1] as num).toDouble(),
+          if (_environment != null) {
+            final position = await _controller!.evaluateJavascript(
+              source: '[window.scrollX, window.scrollY]',
             );
+            if (position is List &&
+                position.length == 2 &&
+                position.every((value) => value is num && value.isFinite)) {
+              _themeScrollOffset = Offset(
+                (position[0] as num).toDouble(),
+                (position[1] as num).toDouble(),
+              );
+            }
+          } else {
+            final x = await _controller!.getScrollX();
+            final y = await _controller!.getScrollY();
+            if (x != null && y != null) {
+              _themeScrollOffset = Offset(x.toDouble(), y.toDouble());
+            }
           }
         } catch (_) {
           // An unavailable position must not prevent the theme from loading.
@@ -555,10 +555,10 @@ class _StaticWebViewState extends State<_StaticWebView> {
     try {
       _environment = await EpubWebViewHost.prepare(context);
       if (!mounted || _failed) return;
+      _loadingDocument = widget.document;
       // A Windows environment creates a new inline native view; the plugin
       // does not adopt the headless document. Wait for the visible view's load.
       if (_environment != null) {
-        _loadingDocument = widget.document;
         setState(() => _prepared = true);
         return;
       }
@@ -566,10 +566,13 @@ class _StaticWebViewState extends State<_StaticWebView> {
         webViewEnvironment: _environment,
         initialSettings: _settings,
         initialData: InAppWebViewInitialData(
-          data: widget.document,
+          data: _loadingDocument!,
           baseUrl: WebUri('about:blank'),
         ),
         shouldOverrideUrlLoading: _navigation,
+        onWebViewCreated: (controller) {
+          if (mounted && !_failed) _controller = controller;
+        },
         onCreateWindow: (_, _) async => false,
         onPermissionRequest: (_, request) async => PermissionResponse(
           resources: request.resources,
@@ -622,7 +625,7 @@ class _StaticWebViewState extends State<_StaticWebView> {
 
   Future<void> _loadFinished() async {
     if (!mounted || _failed || _restoringScroll) return;
-    if (_environment != null && !identical(_loadingDocument, widget.document)) {
+    if (!identical(_loadingDocument, widget.document)) {
       unawaited(_reload());
       return;
     }
@@ -630,9 +633,16 @@ class _StaticWebViewState extends State<_StaticWebView> {
     if (offset != null) {
       _restoringScroll = true;
       try {
-        await _controller!.evaluateJavascript(
-          source: 'window.scrollTo(${offset.dx}, ${offset.dy})',
-        );
+        if (_environment != null) {
+          await _controller!.evaluateJavascript(
+            source: 'window.scrollTo(${offset.dx}, ${offset.dy})',
+          );
+        } else {
+          await _controller!.scrollTo(
+            x: offset.dx.round(),
+            y: offset.dy.round(),
+          );
+        }
       } catch (_) {
         // Keep the readable document if the native view rejects restoration.
       } finally {
@@ -709,9 +719,7 @@ class _StaticWebViewState extends State<_StaticWebView> {
         _controller = controller;
         widget.onController(controller);
         _attached = true;
-        if (_loaded &&
-            !identical(_loadingDocument, widget.document) &&
-            _environment != null) {
+        if (_loaded && !identical(_loadingDocument, widget.document)) {
           unawaited(_reload());
           return;
         }

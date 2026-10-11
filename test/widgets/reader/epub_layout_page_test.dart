@@ -24,7 +24,9 @@ import 'package:shiori/features/reader/epub_page_inspection.dart';
 import 'package:shiori/features/reader/epub_webview_host.dart';
 import 'package:shiori/features/reader/svg_paper_art.dart';
 import 'package:shiori/features/reader/reader_controller.dart';
+import 'package:shiori/features/reader/reader_preferences.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/features/reader/reader_theme.dart';
 import 'package:shiori/features/reader/settings_panel.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 
@@ -99,6 +101,36 @@ class _Controller extends PlatformInAppWebViewController {
   Completer<dynamic>? readScroll, restoreScroll;
   Object? hitAddress;
   Completer<dynamic>? readHit;
+  Offset nativeScroll = Offset.zero;
+  final nativeScrollReads = <String>[];
+  final nativeScrollRestores = <Offset>[];
+  Completer<int?>? readNativeY;
+  Completer<void>? restoreNativeScroll;
+  bool failLoad = false;
+
+  @override
+  Future<int?> getScrollX() async {
+    nativeScrollReads.add('x');
+    return nativeScroll.dx.round();
+  }
+
+  @override
+  Future<int?> getScrollY() async {
+    nativeScrollReads.add('y');
+    return readNativeY == null ? nativeScroll.dy.round() : readNativeY!.future;
+  }
+
+  @override
+  Future<void> scrollTo({
+    required int x,
+    required int y,
+    bool animated = false,
+  }) async {
+    expect(animated, isFalse);
+    await restoreNativeScroll?.future;
+    nativeScroll = Offset(x.toDouble(), y.toDouble());
+    nativeScrollRestores.add(nativeScroll);
+  }
 
   @override
   Future<dynamic> evaluateJavascript({
@@ -130,7 +162,9 @@ class _Controller extends PlatformInAppWebViewController {
     Uri? iosAllowingReadAccessTo,
     WebUri? allowingReadAccessTo,
   }) async {
+    if (failLoad) throw StateError('native theme navigation failed');
     documents.add(data);
+    nativeScroll = Offset.zero;
   }
 }
 
@@ -144,6 +178,7 @@ class _Headless extends PlatformHeadlessInAppWebView {
   Future<void> run() async {
     if (owner.failCreation) throw StateError('native creation failed');
     await owner.gate?.future;
+    params.onWebViewCreated?.call(wrapped);
   }
 
   @override
@@ -157,7 +192,10 @@ class _Headless extends PlatformHeadlessInAppWebView {
 class _View extends PlatformInAppWebViewWidget {
   _View(super.params) : super.implementation();
   bool attached = false;
-  final controller = _Controller();
+  final _inlineController = _Controller();
+  _Controller get controller => params.headlessWebView is _Headless
+      ? (params.headlessWebView as _Headless).controller
+      : _inlineController;
   dynamic get wrapped => params.controllerFromPlatform!(controller);
   void finish() => params.onLoadStop!(wrapped, WebUri('about:blank'));
   @override
@@ -615,76 +653,82 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'Windows A-B-A artwork restores loaded hotspots without navigation',
-    (tester) async {
-      final html = (await tester.runAsync(() async {
-        final html = await svgArtworkPage(paper: Colors.red);
-        expect(await themedSvgPaperArtwork(html, Colors.black), same(html));
-        return html;
-      }))!;
-      final gates = <Completer<String>>[];
-      Future<String> prepare(String source, Color ink) {
-        expect(source, same(html));
-        final gate = Completer<String>();
-        gates.add(gate);
-        return gate.future;
-      }
+  for (final os in ['android', 'ios', 'windows']) {
+    testWidgets(
+      '$os A-B-A artwork restores loaded hotspots without navigation',
+      (tester) async {
+        final html = (await tester.runAsync(() async {
+          final html = await svgArtworkPage(paper: Colors.red);
+          expect(await themedSvgPaperArtwork(html, Colors.black), same(html));
+          return html;
+        }))!;
+        final gates = <Completer<String>>[];
+        Future<String> prepare(String source, Color ink) {
+          expect(source, same(html));
+          final gate = Completer<String>();
+          gates.add(gate);
+          return gate.future;
+        }
 
-      final link = svgLinksParser().parse().content.links.singleWhere(
-        (link) => link.region != null,
-      );
-      var taps = 0;
-      Widget themed(Brightness brightness) => page(
-        os: 'windows',
-        html: html,
-        brightness: brightness,
-        prepareArtwork: prepare,
-        links: [link],
-        onLink: (_) => taps++,
-      );
-      await tester.pumpWidget(themed(Brightness.light));
-      gates[0].complete(html);
-      await tester.pumpAndSettle();
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 50)),
-      );
-      await tester.pumpAndSettle();
-      final view = platform.views.single;
-      view.finish();
-      await tester.pumpAndSettle();
-      expect(ready, 1);
-      await tester.pumpWidget(themed(Brightness.dark));
-      expect(gates.length, 2);
-      await tester.pumpWidget(themed(Brightness.light));
-      expect(gates.length, 3);
-      gates[2].complete(html);
-      await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel(link.label), findsOneWidget);
-      final size = tester.getSize(find.byType(EpubLayoutPage));
-      final region = link.region!;
-      final width = size.width < size.height * region.aspectRatio
-          ? size.width
-          : size.height * region.aspectRatio;
-      await tester.tapAt(
-        tester.getTopLeft(find.byType(EpubLayoutPage)) +
-            Offset(
-              (size.width - width) / 2 +
-                  width * (region.left + region.right) / 2,
-              width / region.aspectRatio * (region.top + region.bottom) / 2,
-            ),
-      );
-      expect(taps, 1);
-      // Obsolete B must not replace A, even if its output would be different.
-      gates[1].complete(html.replaceFirst('</body>', 'obsolete B</body>'));
-      await tester.pumpAndSettle();
-      expect(view.controller.documents, isEmpty);
-      expect(platform.views.single, same(view));
-      expect(ready, 1);
-      expect(find.bySemanticsLabel(link.label), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-    },
-  );
+        final link = svgLinksParser().parse().content.links.singleWhere(
+          (link) => link.region != null,
+        );
+        var taps = 0;
+        Widget themed(Brightness brightness) => page(
+          os: os,
+          html: html,
+          brightness: brightness,
+          prepareArtwork: prepare,
+          links: [link],
+          onLink: (_) => taps++,
+        );
+        await tester.pumpWidget(themed(Brightness.light));
+        gates[0].complete(html);
+        await tester.pumpAndSettle();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pumpAndSettle();
+        final view = platform.views.single;
+        if (os == 'windows') {
+          view.finish();
+        } else {
+          platform.heads.single.finish();
+        }
+        await tester.pumpAndSettle();
+        expect(ready, 1);
+        await tester.pumpWidget(themed(Brightness.dark));
+        expect(gates.length, 2);
+        await tester.pumpWidget(themed(Brightness.light));
+        expect(gates.length, 3);
+        gates[2].complete(html);
+        await tester.pumpAndSettle();
+        expect(find.bySemanticsLabel(link.label), findsOneWidget);
+        final size = tester.getSize(find.byType(EpubLayoutPage));
+        final region = link.region!;
+        final width = size.width < size.height * region.aspectRatio
+            ? size.width
+            : size.height * region.aspectRatio;
+        await tester.tapAt(
+          tester.getTopLeft(find.byType(EpubLayoutPage)) +
+              Offset(
+                (size.width - width) / 2 +
+                    width * (region.left + region.right) / 2,
+                width / region.aspectRatio * (region.top + region.bottom) / 2,
+              ),
+        );
+        expect(taps, 1);
+        // Obsolete B must not replace A, even if its output would be different.
+        gates[1].complete(html.replaceFirst('</body>', 'obsolete B</body>'));
+        await tester.pumpAndSettle();
+        expect(view.controller.documents, isEmpty);
+        expect(platform.views.single, same(view));
+        expect(ready, 1);
+        expect(find.bySemanticsLabel(link.label), findsOneWidget);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
 
   testWidgets('only neutral white SVG artwork blends with reader paper', (
     tester,
@@ -725,13 +769,27 @@ void main() {
     expect(warm, contains('background:#f2e8d5!important'));
     expect(warm, contains('data:image/png;base64,'));
     expect(warm, isNot(contains('mix-blend-mode:')));
+    platform.heads.single.finish();
+    await tester.pumpAndSettle();
+    final controller = platform.views.single.controller;
     await tester.pumpWidget(page(html: neutral, brightness: Brightness.dark));
-    await settleSvgArtwork(tester, minHeads: 2);
-    final dark = platform.heads.last.params.initialData!.data;
+    for (var i = 0; i < 100 && controller.documents.isEmpty; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(controller.documents, hasLength(1));
+    expect(
+      platform.heads,
+      hasLength(1),
+      reason: 'theme retains the source owner',
+    );
+    final dark = controller.documents.single;
     expect(dark, contains('svg text:not([fill])'));
 
     await tester.pumpWidget(page(html: colorful));
-    await settleSvgArtwork(tester, minHeads: 3);
+    await settleSvgArtwork(tester, minHeads: 2);
     expect(
       platform.heads.last.params.initialData!.data,
       isNot(contains('mix-blend-mode:')),
@@ -1407,27 +1465,363 @@ void main() {
     },
   );
 
-  testWidgets('theme change retires document and ignores its late completion', (
-    tester,
-  ) async {
-    await tester.pumpWidget(page());
-    await tester.pump();
-    final old = platform.heads.single;
-    await tester.pumpWidget(page(brightness: Brightness.dark));
-    await tester.pumpAndSettle();
-    expect(platform.heads.length, greaterThan(1));
-    expect(
-      platform.heads.last.params.initialData!.data,
-      isNot(old.params.initialData!.data),
+  for (final os in ['android', 'ios']) {
+    testWidgets('$os theme change preserves a scrolled authored page', (
+      tester,
+    ) async {
+      const tall =
+          '<html><head></head><body><div style="height:1600px;position:relative">Static authored page</div></body></html>';
+      await tester.pumpWidget(page(os: os, html: tall));
+      await tester.pumpAndSettle();
+      platform.heads.single.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 1);
+      final controller = platform.views.single.controller;
+      controller.nativeScroll = const Offset(12, 650);
+      await tester.pumpWidget(
+        page(os: os, html: tall, brightness: Brightness.dark),
+      );
+      await tester.pumpAndSettle();
+      platform.views.last.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 2);
+      expect(
+        platform.views.last.controller.nativeScroll,
+        const Offset(12, 650),
+      );
+      expect(failed, 0);
+      expect(
+        platform.heads.last.params.initialSettings!.javaScriptEnabled,
+        isFalse,
+      );
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
+      '$os initial theme loads acknowledge only the latest document',
+      (tester) async {
+        await tester.pumpWidget(page(os: os));
+        await tester.pumpAndSettle();
+        final head = platform.heads.single;
+        final view = platform.views.single;
+        await tester.pumpWidget(page(os: os, brightness: Brightness.dark));
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(page(os: os, paper: const Color(0xffffeedd)));
+        await tester.pumpAndSettle();
+        expect(head.controller.documents, isEmpty);
+        head.finish();
+        await tester.pumpAndSettle();
+        expect(ready, 0);
+        expect(head.controller.documents.single, contains('#ffeedd'));
+        await tester.pumpWidget(page(os: os, brightness: Brightness.dark));
+        await tester.pumpAndSettle();
+        view.finish();
+        await tester.pumpAndSettle();
+        expect(ready, 0);
+        expect(head.controller.documents, hasLength(2));
+        view.finish();
+        await tester.pumpAndSettle();
+        expect(ready, 1);
+        expect(platform.heads.single, same(head));
+        expect(platform.views.single, same(view));
+        await tester.pumpWidget(const SizedBox());
+        head.finish();
+        view.finish();
+        await tester.pumpAndSettle();
+        expect(ready, 1);
+        expect(head.disposed, isTrue);
+        expect(tester.takeException(), isNull);
+      },
     );
-    old.finish();
-    await tester.pump();
-    expect(ready, 0);
-    platform.heads.last.finish();
-    await tester.pump();
-    expect(ready, 1);
-    await tester.pumpWidget(const SizedBox());
-  });
+
+    testWidgets(
+      '$os keeps scroll across rapid themes and retires source reads',
+      (tester) async {
+        await tester.pumpWidget(page(os: os));
+        await tester.pumpAndSettle();
+        final head = platform.heads.single;
+        final view = platform.views.single;
+        head.finish();
+        await tester.pumpAndSettle();
+        final controller = view.controller;
+        controller.nativeScroll = const Offset(12, 650);
+        controller.readNativeY = Completer<int?>();
+        await tester.pumpWidget(page(os: os, brightness: Brightness.dark));
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(page(os: os, paper: const Color(0xffffeedd)));
+        await tester.pumpAndSettle();
+        expect(controller.documents, isEmpty);
+        controller.readNativeY!.complete(650);
+        await tester.pumpAndSettle();
+        expect(controller.documents.single, contains('#ffeedd'));
+        await tester.pumpWidget(page(os: os, brightness: Brightness.dark));
+        await tester.pumpAndSettle();
+        view.finish();
+        await tester.pumpAndSettle();
+        expect(controller.documents, hasLength(2));
+        expect(controller.nativeScrollReads, ['x', 'y']);
+        controller.restoreNativeScroll = Completer<void>();
+        view.finish();
+        await tester.pumpAndSettle();
+        expect(ready, 1);
+        await tester.pumpWidget(page(os: os));
+        await tester.pumpAndSettle();
+        expect(controller.documents, hasLength(2));
+        controller.restoreNativeScroll!.complete();
+        await tester.pumpAndSettle();
+        expect(controller.documents, hasLength(3));
+        expect(ready, 1);
+        view.finish();
+        await tester.pumpAndSettle();
+        expect(ready, 2);
+        expect(controller.nativeScroll, const Offset(12, 650));
+        expect(controller.nativeScrollRestores, [
+          const Offset(12, 650),
+          const Offset(12, 650),
+        ]);
+        expect(controller.scripts, isEmpty);
+        controller.readNativeY = Completer<int?>();
+        await tester.pumpWidget(page(os: os, brightness: Brightness.dark));
+        await tester.pumpAndSettle();
+        // A different chapter owns a different controller and must never inherit
+        // the old page's pending scroll read or its completion callback.
+        await tester.pumpWidget(
+          page(os: os, html: document.replaceFirst('Static', 'New source')),
+        );
+        await tester.pumpAndSettle();
+        controller.readNativeY!.complete(900);
+        view.finish();
+        await tester.pumpAndSettle();
+        expect(controller.documents, hasLength(3));
+        expect(head.disposed, isTrue);
+        expect(ready, 2);
+        platform.heads.last.finish();
+        await tester.pumpAndSettle();
+        expect(ready, 3);
+        expect(platform.views.last.controller.nativeScroll, Offset.zero);
+        expect(platform.views.last.controller.nativeScrollRestores, isEmpty);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('$os theme update failure falls back to semantic pagination', (
+      tester,
+    ) async {
+      final repository = ContractNovelRepository(ContractSource());
+      final session = ReaderController(
+        repository: repository,
+        chapter: contractChapter,
+      )..pagePresentation = document;
+      final preferences = ReaderPreferences(null);
+      await tester.pumpWidget(
+        EpubWebViewHost(
+          userDataDirectory: temp,
+          operatingSystem: os,
+          child: ShioriApp(
+            routes: AppRoutes(
+              home: (_) => ReaderContentView(
+                content: contractContent('主题更新失败后的原生正文'),
+                session: session,
+                preferences: preferences,
+                onReady: () => ready++,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      platform.heads.single.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 1);
+      final head = platform.heads.single;
+      head.controller.failLoad = true;
+      preferences.update(
+        preferences.value.copyWith(themeMode: ReaderThemeMode.dark),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(EpubLayoutPage), findsNothing);
+      expect(find.byType(PagedReaderViewport), findsOneWidget);
+      expect(session.restoreStatus, ReaderRestoreStatus.ready);
+      expect(head.disposed, isTrue);
+      head.finish();
+      await tester.pumpAndSettle();
+      expect(find.byType(EpubLayoutPage), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      preferences.dispose();
+      session.dispose();
+      await repository.close();
+    });
+  }
+
+  testWidgets(
+    'source change retires document and ignores its late completion',
+    (tester) async {
+      await tester.pumpWidget(page());
+      await tester.pump();
+      final old = platform.heads.single;
+      await tester.pumpWidget(
+        page(
+          html: document.replaceFirst('Static', 'Other'),
+          brightness: Brightness.dark,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(platform.heads.length, greaterThan(1));
+      expect(
+        platform.heads.last.params.initialData!.data,
+        isNot(old.params.initialData!.data),
+      );
+      old.finish();
+      await tester.pump();
+      expect(ready, 0);
+      platform.heads.last.finish();
+      await tester.pump();
+      expect(ready, 1);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  for (final os in ['android', 'ios', 'windows']) {
+    testWidgets(
+      '$os reader settings preserve authored HTML and sync system theme',
+      (tester) async {
+        tester.view.physicalSize = const Size(400, 700);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.platformBrightnessTestValue =
+            Brightness.light;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        final repository = ContractNovelRepository(ContractSource());
+        final session = ReaderController(
+          repository: repository,
+          chapter: contractChapter,
+        )..pagePresentation = document;
+        final preferences = ReaderPreferences(null)
+          ..value = ReaderSettings(controlsHintSeen: true);
+        final chrome = ValueNotifier(false);
+        await tester.pumpWidget(
+          EpubWebViewHost(
+            userDataDirectory: temp,
+            operatingSystem: os,
+            child: ShioriApp(
+              routes: AppRoutes(
+                home: (_) => ReaderContentView(
+                  content: contractContent('特殊页的原生语义正文'),
+                  session: session,
+                  preferences: preferences,
+                  chrome: chrome,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (os == 'windows') {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 50)),
+          );
+          await tester.pumpAndSettle();
+          platform.views.single.finish();
+        } else {
+          platform.heads.single.finish();
+        }
+        await tester.pumpAndSettle();
+        final view = platform.views.single;
+        final width = tester.getSize(find.byType(EpubLayoutPage)).width;
+        preferences.update(
+          preferences.value.copyWith(
+            fontSize: 32,
+            lineHeight: 2.4,
+            paragraphSpacing: 32,
+            horizontalPadding: 48,
+            pageTurn: PageTurnStyle.none,
+            controlsHintSeen: false,
+            mode: ReaderMode.scroll,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(preferences.value.mode, ReaderMode.paged);
+        expect(view.controller.documents, isEmpty);
+        expect(
+          tester.getSize(find.byType(EpubLayoutPage)).width,
+          lessThan(width),
+        );
+        chrome.value = true;
+        await tester.pumpAndSettle();
+        chrome.value = false;
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        expect(view.controller.documents, isEmpty);
+        expect(platform.views.single, same(view));
+
+        void expectTheme(Brightness system) {
+          final theme = readerTheme(preferences.value, system);
+          String cssColor(Color color) =>
+              '#${color.toARGB32().toRadixString(16).substring(2)}';
+          final html = view.controller.documents.last;
+          expect(
+            html,
+            contains(
+              'background:${cssColor(theme.scaffoldBackgroundColor)}!important',
+            ),
+          );
+          expect(
+            html,
+            contains('color:${cssColor(theme.colorScheme.onSurface)};'),
+          );
+          expect(html, contains('padding:8px!important'));
+          expect(html, contains('font-size:clamp(12px,5.7vw,20px)'));
+        }
+
+        preferences.update(preferences.value.copyWith(paper: ReaderPaper.warm));
+        await tester.pumpAndSettle();
+        expect(view.controller.documents, hasLength(1));
+        expectTheme(Brightness.light);
+        view.finish();
+        await tester.pumpAndSettle();
+        tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+        await tester.pumpAndSettle();
+        expect(view.controller.documents, hasLength(2));
+        expectTheme(Brightness.dark);
+        view.finish();
+        await tester.pumpAndSettle();
+        preferences.update(
+          preferences.value.copyWith(paper: ReaderPaper.paper),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          view.controller.documents,
+          hasLength(2),
+          reason: 'night paper is independent of light paper choice',
+        );
+        tester.platformDispatcher.platformBrightnessTestValue =
+            Brightness.light;
+        await tester.pumpAndSettle();
+        expect(view.controller.documents, hasLength(3));
+        expectTheme(Brightness.light);
+        view.finish();
+        await tester.pumpAndSettle();
+        expect(platform.views.single, same(view));
+        expect(platform.heads, hasLength(os == 'windows' ? 0 : 1));
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+        chrome.dispose();
+        preferences.dispose();
+        session.dispose();
+        await repository.close();
+      },
+    );
+  }
 
   testWidgets(
     'Windows theme loads serialize on one owner and acknowledge only the latest document',
