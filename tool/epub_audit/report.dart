@@ -4,7 +4,7 @@ import 'package:shiori/data/local/epub/epub_trace.dart';
 
 typedef Json = Map<String, dynamic>;
 const schemaVersion = 1;
-const auditRulesVersion = '1.2.2';
+const auditRulesVersion = '1.2.3';
 
 final class AuditOptions {
   const AuditOptions({
@@ -334,7 +334,7 @@ String reportMarkdown(Json report) {
     '',
     '## 覆盖边界',
     '',
-    '文本仅对可建立独立对应的简单段落逐块检查；Ruby、标准脚注、图片、空白和关系分别核对。复杂转换明确为 unknown。CSS 以实际 native cascade/决定和输出为证据；未知属性仅为匹配候选，不还原完整 cascade。特殊呈现只验证生成与资源，不验证浏览器 used style。未覆盖变量、伪元素生成内容、完整 SVG/CSS、字体、布局像素与分页。',
+    '文本仅对可建立独立对应的简单段落逐块检查；Ruby、标准脚注、图片、音频控件状态与所选显示路径、空白和关系分别核对。音频只验证声明、签名、资源与模型对应，不验证平台解码或播放。复杂转换明确为 unknown。CSS 以实际 native cascade/决定和输出为证据；未知属性仅为匹配候选，不还原完整 cascade。特殊呈现只验证生成与资源，不验证浏览器 used style。未覆盖变量、伪元素生成内容、完整 SVG/CSS、字体、布局像素与分页。',
     '',
     '旧 differences / policyDifferences / presentationImageDifferences 已弃用，旧数量不与新报告比较。新报告独立 schema，JSON 是事实来源。',
   ]);

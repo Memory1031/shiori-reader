@@ -10,6 +10,7 @@ import 'package:shiori/data/local/epub/epub_trace.dart';
 import 'package:shiori/data/local/epub/epub_text_styles.dart';
 import 'package:shiori/data/local/epub/epub_footnotes.dart';
 import 'package:shiori/data/local/epub/epub_image_candidates.dart';
+import 'package:shiori/data/local/epub/epub_audio.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/contracts/local_books.dart';
 import 'package:shiori/domain/contracts/local_content_links.dart';
@@ -325,13 +326,17 @@ final class _Audit {
                 if (doc.body != null) doc.body!,
                 ...doc.body?.querySelectorAll('*') ?? <dom.Element>[],
               ]
-              .where((n) => !hidden(n, styles))
+              .where(
+                (n) => n.localName == 'audio'
+                    ? audioNotSelected(path, n, styles) == null
+                    : !hidden(n, styles),
+              )
               .any(
                 (n) =>
                     n.nodes.whereType<dom.Text>().any(
                       (t) => t.data.trim().isNotEmpty,
                     ) ||
-                    {'img', 'image'}.contains(n.localName),
+                    {'img', 'image', 'audio'}.contains(n.localName),
               );
       String coverage = 'pass';
       for (final s in spine) {
@@ -387,7 +392,10 @@ final class _Audit {
           }
         }
       }
-      if (chapter == null) continue;
+      if (chapter == null) {
+        if (spine.isNotEmpty) audioAudit(path, doc, styles, null);
+        continue;
+      }
       textAudit(path, doc, styles, chapter, presentation != null || fixed);
       imageAudit(path, doc, styles, chapter, presentation);
       structureAudit(path, doc, styles, chapter);
@@ -1211,18 +1219,215 @@ final class _Audit {
     return map;
   }
 
+  (String?, AudioFormat?, AudioUnavailable?) audioSource(
+    String path,
+    dom.Element node,
+  ) {
+    var unavailable = AudioUnavailable.missing;
+    final candidates = node.attributes['src']?.trim().isNotEmpty == true
+        ? [node.attributes['src']!]
+        : node.children
+              .where((e) => e.localName == 'source')
+              .map((e) => e.attributes['src'] ?? '')
+              .where((s) => s.trim().isNotEmpty);
+    for (final candidate in candidates.take(128)) {
+      (String, String?)? ref;
+      try {
+        ref = epubReference(path, candidate);
+      } on LocalParseException catch (error) {
+        if (error.problem != LocalParseProblem.invalid) rethrow;
+        unavailable = AudioUnavailable.unsupported;
+        continue;
+      } on FormatException {
+        unavailable = AudioUnavailable.unsupported;
+        continue;
+      }
+      if (ref == null) {
+        unavailable = AudioUnavailable.external;
+        continue;
+      }
+      if (ref.$2 != null) {
+        unavailable = AudioUnavailable.unsupported;
+        continue;
+      }
+      if (!source.zip.entries.containsKey(ref.$1)) {
+        unavailable = AudioUnavailable.missing;
+        continue;
+      }
+      final type = source.items.values
+          .where((i) => i['path'] == ref!.$1)
+          .firstOrNull?['type'];
+      if (!{
+        'audio/mpeg',
+        'audio/wav',
+        'audio/x-wav',
+        'audio/wave',
+      }.contains(type)) {
+        unavailable = AudioUnavailable.unsupported;
+        continue;
+      }
+      final bytes = source.zip.read(ref.$1), format = epubAudioFormat(bytes);
+      if (format == null ||
+          (format == AudioFormat.mp3) != (type == 'audio/mpeg')) {
+        unavailable = AudioUnavailable.unsupported;
+        continue;
+      }
+      return (sha256.convert(bytes).toString(), format, null);
+    }
+    return (null, null, unavailable);
+  }
+
+  String? audioNotSelected(
+    String path,
+    dom.Element node,
+    Map<dom.Element, Map<String, String>> styles,
+  ) {
+    if (!node.attributes.containsKey('controls')) {
+      return 'controls_not_requested';
+    }
+    if (node.attributes.containsKey('hidden') ||
+        styles[node]?['display'] == 'none' ||
+        node.parent != null && subtreeExcluded(node.parent!, styles)) {
+      return 'excluded_subtree';
+    }
+    final visible = switch (styles[node]?['visibility']) {
+      'visible' || 'initial' => true,
+      'hidden' || 'collapse' => false,
+      _ => node.parent == null || !hidden(node.parent!, styles),
+    };
+    if (!visible) return 'invisible_control';
+    for (var parent = node.parent; parent != null; parent = parent.parent) {
+      if ({'rt', 'rp', 'img', 'image', 'br', 'hr'}.contains(parent.localName)) {
+        return 'consumed_non_audio_subtree';
+      }
+      if (parent.localName == 'a' &&
+          epubNoteref(parent) &&
+          parent.attributes.containsKey('href') &&
+          !hidden(parent, styles) &&
+          !(pathFor(path) == 'presentation' &&
+              parent.namespaceUri == 'http://www.w3.org/2000/svg')) {
+        return 'standard_note_marker';
+      }
+    }
+    return null;
+  }
+
+  void audioAudit(
+    String path,
+    dom.Document doc,
+    Map<dom.Element, Map<String, String>> styles,
+    ChapterContent? chapter,
+  ) {
+    final expected = <dom.Element>[];
+    for (final node in doc.body!.querySelectorAll('audio')) {
+      checks['structures']!.checked++;
+      final reason = audioNotSelected(path, node, styles);
+      if (reason == null) {
+        expected.add(node);
+      } else {
+        add(
+          'audio.not_selected',
+          path,
+          reason,
+          category: 'media',
+          impact: 'information',
+          disposition: 'not_applicable',
+          evidence: 'source_only',
+          location: epubTraceLocation(node),
+        );
+      }
+    }
+    final output =
+        chapter?.blocks.whereType<AudioBlock>().toList() ?? <AudioBlock>[];
+    for (var i = 0; i < expected.length; i++) {
+      final node = expected[i], location = epubTraceLocation(node);
+      final (hash, format, unavailable) = audioSource(path, node);
+      final control = i < output.length ? output[i] : null;
+      final counts = <String, dynamic>{
+        'source': 1,
+        'native': control == null ? 0 : 1,
+        'hash': ?hash,
+      };
+      String? failure;
+      if (control == null) {
+        failure = 'audio.control_missing';
+      } else if (pathFor(path) != 'native') {
+        failure = 'audio.display_path_mismatch';
+      } else {
+        final resource = hash == null ? null : parsed.media[hash];
+        final media = hash == null
+            ? null
+            : MediaRef(
+                sourceId: parser.book.sourceId,
+                mediaId: '${parser.book.novelId}/$hash',
+              );
+        if (control.media != media ||
+            control.format != format ||
+            control.unavailable != unavailable ||
+            hash != null &&
+                (resource == null ||
+                    sha256.convert(resource).toString() != hash)) {
+          failure = 'audio.control_metadata_mismatch';
+        }
+      }
+      if (failure != null) {
+        checks['structures']!.failed++;
+        add(
+          failure,
+          path,
+          switch (failure) {
+            'audio.control_missing' => 'visible_source_control_not_emitted',
+            'audio.display_path_mismatch' =>
+              'native_audio_control_not_on_selected_display_path',
+            _ => 'source_resource_and_control_state_disagree',
+          },
+          category: 'media',
+          counts: counts,
+          location: location,
+          evidence: 'source_and_output_relationship',
+        );
+      } else {
+        add(
+          'audio.native_control',
+          path,
+          unavailable == null
+              ? '${format!.name}_native_control_emitted'
+              : '${unavailable.name}_unavailable_control_emitted',
+          category: 'media',
+          impact: 'information',
+          disposition: 'emitted_native',
+          evidence: 'source_and_output_relationship',
+          counts: counts,
+          location: location,
+        );
+      }
+    }
+    if (output.length > expected.length) {
+      checks['structures']!.checked++;
+      checks['structures']!.failed++;
+      add(
+        'audio.unexpected_control',
+        path,
+        'native_control_has_no_selected_source_instance',
+        category: 'media',
+        counts: {'source': expected.length, 'native': output.length},
+      );
+    }
+  }
+
   void structureAudit(
     String path,
     dom.Document doc,
     Map<dom.Element, Map<String, String>> styles,
     ChapterContent chapter,
   ) {
+    audioAudit(path, doc, styles, chapter);
     for (final node in doc.body!.querySelectorAll(
-      'script,iframe,form,audio,video,svg,table',
+      'script,iframe,form,video,svg,table',
     )) {
       final tag = node.localName!;
       checks['structures']!.checked++;
-      if ({'script', 'iframe', 'audio', 'video'}.contains(tag)) {
+      if ({'script', 'iframe', 'video'}.contains(tag)) {
         add(
           'dom.security_boundary',
           path,
