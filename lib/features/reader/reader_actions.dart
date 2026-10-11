@@ -13,6 +13,7 @@ class ReaderActions {
   const ReaderActions({
     this.previousChapter,
     this.nextChapter,
+    this.navigateChapter,
     this.bookEnd,
     this.completionPrevious,
     this.exitToShelf,
@@ -25,8 +26,12 @@ class ReaderActions {
     this.bookContents,
   });
 
-  /// Step to the neighbouring chapter in reading order.
+  /// Turn to the neighbouring chapter at a page boundary.
   final VoidCallback? previousChapter, nextChapter;
+
+  /// Progress-panel chapter navigation; preserves reading controls. When
+  /// absent, the surface uses the corresponding chapter step above.
+  final ValueChanged<int>? navigateChapter;
 
   /// Commit completion after revalidating the book's final chapter. False
   /// means the host rejected a stale request; the text must stay visible.

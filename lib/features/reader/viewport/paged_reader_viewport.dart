@@ -272,6 +272,7 @@ class PagedReaderViewport extends StatefulWidget {
     this.inputEnabled = true,
     this.hostedDrag = false,
     this.onTurning,
+    this.onTurnCommitted,
     this.onTurnVisual,
     this.pageSize,
     this.contentOrigin = Offset.zero,
@@ -313,6 +314,9 @@ class PagedReaderViewport extends StatefulWidget {
   /// viewports retain their own recognizer; the two modes are mutually exclusive.
   final bool hostedDrag;
   final ValueChanged<bool>? onTurning;
+
+  /// A successful user page turn, excluding restores and cancelled drags.
+  final VoidCallback? onTurnCommitted;
 
   /// Reports each frame of a turn so the host can paint the curl over the
   /// full reader page; when null the viewport paints it itself.
@@ -565,7 +569,10 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       }
     });
     widget.onTurning?.call(false);
-    if (commit) _sample();
+    if (commit) {
+      _sample();
+      widget.onTurnCommitted?.call();
+    }
     if (!commit) _queuedDirection = null;
     if (_queuedDirection != null) {
       // Let pending layout/route changes settle before consuming the one-slot

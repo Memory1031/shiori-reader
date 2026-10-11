@@ -6,9 +6,11 @@ import '../../app/theme/shiori_theme.dart';
 import 'package:flutter/services.dart';
 
 import '../../domain/contracts/contracts.dart';
+import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
+import '../../shared/local_navigation_title.dart';
 import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
 import 'reader_controller.dart';
@@ -49,6 +51,7 @@ class ReaderContentView extends StatefulWidget {
     required this.content,
     this.runningTitle,
     this.chapterTitle,
+    this.navigationEntry,
     this.logicalProgress,
     this.onReady,
     this.onLayoutInvalidated,
@@ -84,6 +87,7 @@ class ReaderContentView extends StatefulWidget {
   final ChapterContent content;
   final String? runningTitle;
   final String? chapterTitle;
+  final LocalNavigationEntry? navigationEntry;
   final ReaderLogicalProgress? logicalProgress;
   final VoidCallback? onReady,
       onLoadFailure,
@@ -182,6 +186,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     } else {
       _actions.completionPrevious!.call();
     }
+    _chrome.value = false;
     return true;
   }
 
@@ -1395,6 +1400,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
           }
         },
         onPosition: _sample,
+        onTurnCommitted: () => _chrome.value = false,
         onRestoreStart: _layoutInvalidated,
         controller: _paged,
         onLink: _actions.contentLink,
@@ -1428,11 +1434,29 @@ class _ReaderContentViewState extends State<ReaderContentView>
     );
   }
 
-  String get _effectiveChapterTitle =>
-      _logicalSection?.title ??
-      (widget.logicalProgress != null && !widget.logicalProgress!.loading
-          ? widget.content.title
-          : widget.chapterTitle ?? widget.content.title);
+  LocalNavigationEntry? get _titleNavigationEntry {
+    if (_logicalSection case final section?) return section.entry;
+    final logical = widget.logicalProgress;
+    // An auxiliary document is outside logical reading-order sections, but
+    // its direct navigation label still names the displayed content.
+    if (logical != null &&
+        !logical.loading &&
+        (logical.index == null ||
+            logical.index!.metrics.ordinal(widget.content.key) != null)) {
+      return null;
+    }
+    return widget.navigationEntry;
+  }
+
+  String get _effectiveChapterTitle {
+    final entry = _titleNavigationEntry;
+    if (entry != null) {
+      return localNavigationTitle(entry, AppLocalizations.of(context));
+    }
+    return widget.logicalProgress != null && !widget.logicalProgress!.loading
+        ? widget.content.title
+        : widget.chapterTitle ?? widget.content.title;
+  }
 
   void _seekChapter(double fraction) {
     final count = widget.content.blocks.length;
@@ -1477,12 +1501,12 @@ class _ReaderContentViewState extends State<ReaderContentView>
                 index!.coordinate(content.key, _displayChapterFraction)!,
               ),
         visible: _visibleScopeFraction,
+        entry: _titleNavigationEntry,
         title: _effectiveChapterTitle,
       );
     }
 
     var basis = capture();
-    final l = AppLocalizations.of(context);
     bool sameReader() =>
         mounted &&
         request == _progressRequest &&
@@ -1499,7 +1523,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
           index = basis.index,
           section = basis.section;
       if (logical == null) {
-        return direction < 0 ? _actions.previousChapter : _actions.nextChapter;
+        final turn = direction < 0
+            ? _actions.previousChapter
+            : _actions.nextChapter;
+        final navigate = _actions.navigateChapter;
+        return turn == null || navigate == null
+            ? turn
+            : () => navigate(direction);
       }
       if (index == null || section == null) return null;
       final adjacent = index.adjacent(section, direction);
@@ -1516,6 +1546,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
         ListenableBuilder(
           listenable: _progressMetadataChanges,
           builder: (context, _) {
+            final l = AppLocalizations.of(context);
             // Only a disabled loading placeholder adopts new metadata. Once
             // usable, the section and conversion callbacks stay frozen.
             if (sameReader() &&
@@ -1528,7 +1559,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
                 section = basis.section;
             return ReaderProgressPanel(
               key: ObjectKey(logical),
-              chapterTitle: basis.title,
+              chapterTitle: basis.entry == null
+                  ? basis.title
+                  : localNavigationTitle(basis.entry!, l),
               chapterFraction: basis.visible,
               anchorFraction: basis.anchor,
               enabled: logical?.loading != true,

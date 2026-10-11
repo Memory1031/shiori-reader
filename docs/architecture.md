@@ -102,7 +102,7 @@ Presentation 依赖领域契约，通过显式注入获得服务。应用根拥�
 
 应用外观和阅读器纸张 / 排版分开存储。应用支持跟随系统、浅色、深色，强调色包括青绿、蓝灰、暖棕、淡粉；阅读器设置独立见[阅读器](reader.md)。
 
-用户文案统一维护在 `lib/l10n/app_zh.arb`、`app_en.arb`，使用 `AppLocalizations`；修改后运行 `fvm flutter gen-l10n` 并提交生成文件。内容标题不作为 UI 翻译，错误展示使用本地化 Failure 映射，不直接打印站点响应。
+用户文案统一维护在 `lib/l10n/app_zh.arb`、`app_en.arb`，使用 `AppLocalizations`；修改后运行 `fvm flutter gen-l10n` 并提交生成文件。原书内容标题保留原文；阅读器生成的导航名称保存语言无关类型，由界面映射，目录、阅读标题和进度面板随界面语言同步切换。错误展示使用本地化 Failure 映射，不直接打印站点响应。
 
 页面保留 SafeArea、可读语义标签与足够触控区域，关注小屏、横屏、大字和英文长度。iOS 路由遵循平台返回方式；自动化语义测试不能替代 TalkBack / VoiceOver 设备验证。
 

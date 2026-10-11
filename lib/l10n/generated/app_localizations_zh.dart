@@ -20,6 +20,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get localBookContents => '全书目录';
 
   @override
+  String get localNavigationCover => '封面';
+
+  @override
+  String get localNavigationTitlePage => '扉页';
+
+  @override
+  String get localNavigationCredits => '制作信息';
+
+  @override
+  String get localNavigationSynopsis => '简介';
+
+  @override
+  String get localNavigationAuthor => '作者介绍';
+
+  @override
+  String get localNavigationIllustrator => '画师介绍';
+
+  @override
+  String get localNavigationIllustrations => '彩插';
+
+  @override
+  String get localNavigationContents => '目录';
+
+  @override
+  String get localNavigationPreface => '前言';
+
+  @override
+  String get localNavigationDedication => '献辞';
+
+  @override
   String get articleContents => '卷内目录';
 
   @override

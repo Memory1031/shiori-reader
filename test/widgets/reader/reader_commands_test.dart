@@ -355,19 +355,24 @@ void main() {
     testWidgets('on a focused button Space presses it and the arrows still '
         'turn', (tester) async {
       final reader = await pumpReader(tester, chrome: true);
-      final button = Focus.of(tester.element(find.text('Aa')));
-      button.requestFocus();
-      await tester.pump();
-
       var last = reader.fraction;
       for (final turn in [
         LogicalKeyboardKey.arrowRight,
         LogicalKeyboardKey.pageDown,
       ]) {
+        Focus.of(tester.element(find.text('Aa'))).requestFocus();
+        await tester.pump();
         await key(tester, turn);
         expect(reader.fraction, greaterThan(last), reason: '$turn');
+        expect(chromeVisible(), isFalse);
+        expect(FocusManager.instance.primaryFocus?.debugLabel, 'reader-page');
         last = reader.fraction;
+        await key(tester, LogicalKeyboardKey.f2);
+        expect(reader.fraction, last);
       }
+      final button = Focus.of(tester.element(find.text('Aa')));
+      button.requestFocus();
+      await tester.pump();
       expect(FocusManager.instance.primaryFocus, button);
 
       // Shift+Space neither turns nor presses the button.

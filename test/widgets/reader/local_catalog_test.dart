@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
@@ -330,6 +331,113 @@ void main() {
     }
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'mouse thumb drag scrolls anchored contents in both directions',
+    (tester) async {
+      tester.view
+        ..physicalSize = const Size(1000, 800)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final rows = List.generate(
+        80,
+        (i) => LocalNavigationEntry(title: 'Entry $i', chapterKey: chapter(i)),
+      );
+      for (final (current, scale, size) in [
+        (0, 1.0, const Size(360, 500)),
+        (60, 1.0, const Size(360, 500)),
+        (75, 1.0, const Size(360, 500)),
+        (79, 1.0, const Size(360, 500)),
+        (75, 1.5, const Size(320, 500)),
+      ]) {
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpWidget(
+          app(
+            Scaffold(
+              body: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox.fromSize(
+                  size: size,
+                  child: MediaQuery(
+                    data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+                    child: LocalNavigationView(
+                      entries: rows,
+                      current: chapter(current),
+                      onSelect: (_) {},
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Entry $current').hitTestable(), findsOneWidget);
+        expect(find.byType(ListTile).evaluate().length, lessThan(35));
+        final position = tester
+            .state<ScrollableState>(find.byType(Scrollable))
+            .position;
+        final bar = find.byType(Scrollbar);
+        final rect = tester.getRect(bar);
+        // Scroll away from the end, as in a reader reopened near the book's end.
+        await tester.sendEventToBinding(
+          PointerScrollEvent(
+            kind: PointerDeviceKind.mouse,
+            position: rect.center,
+            scrollDelta: Offset(0, current == 0 ? 100 : -500),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.pump(const Duration(milliseconds: 100));
+        final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+        await mouse.addPointer(location: rect.center);
+        for (final delta in [-80.0, 80.0]) {
+          final painter =
+              tester
+                      .widget<CustomPaint>(
+                        find.descendant(
+                          of: bar,
+                          matching: find.byWidgetPredicate(
+                            (widget) =>
+                                widget is CustomPaint &&
+                                widget.foregroundPainter is ScrollbarPainter,
+                          ),
+                        ),
+                      )
+                      .foregroundPainter!
+                  as ScrollbarPainter;
+          final x =
+              rect.width - painter.crossAxisMargin - painter.thickness / 2;
+          final hits = [
+            for (double y = 0; y < rect.height; y++)
+              if (painter.hitTestOnlyThumbInteractive(
+                Offset(x, y),
+                PointerDeviceKind.mouse,
+              ))
+                y,
+          ];
+          expect(hits, isNotEmpty);
+          final thumb = rect.topLeft + Offset(x, (hits.first + hits.last) / 2);
+          await mouse.moveTo(thumb);
+          await tester.pump(const Duration(milliseconds: 100));
+          final before = position.pixels;
+          await mouse.down(thumb);
+          await mouse.moveBy(Offset(0, delta));
+          await tester.pump(const Duration(milliseconds: 100));
+          await mouse.up();
+          await tester.pumpAndSettle();
+          expect(
+            position.pixels,
+            delta < 0 ? lessThan(before) : greaterThan(before),
+            reason: 'thumb must drag from current entry $current',
+          );
+        }
+        await mouse.removePointer();
+        expect(tester.takeException(), isNull);
+      }
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
 
   testWidgets(
     'async nested catalog opens at deep current chapter and scrolls both ways',

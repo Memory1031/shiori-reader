@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/routes.dart';
@@ -354,6 +355,9 @@ void main() {
       expect(library.writes, isEmpty);
       expect(library.sessions, 0);
       library.failRead = false;
+      expect(find.byTooltip('More'), findsNothing);
+      await tester.sendKeyEvent(LogicalKeyboardKey.f2);
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('More'));
       await tester.pumpAndSettle();
       await tester.tap(find.textContaining('Could not read saved progress'));

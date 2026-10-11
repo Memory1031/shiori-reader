@@ -20,6 +20,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get localBookContents => 'Book contents';
 
   @override
+  String get localNavigationCover => 'Cover';
+
+  @override
+  String get localNavigationTitlePage => 'Title page';
+
+  @override
+  String get localNavigationCredits => 'Credits';
+
+  @override
+  String get localNavigationSynopsis => 'Synopsis';
+
+  @override
+  String get localNavigationAuthor => 'About the author';
+
+  @override
+  String get localNavigationIllustrator => 'About the illustrator';
+
+  @override
+  String get localNavigationIllustrations => 'Illustrations';
+
+  @override
+  String get localNavigationContents => 'Contents';
+
+  @override
+  String get localNavigationPreface => 'Preface';
+
+  @override
+  String get localNavigationDedication => 'Dedication';
+
+  @override
   String get articleContents => 'In-volume contents';
 
   @override

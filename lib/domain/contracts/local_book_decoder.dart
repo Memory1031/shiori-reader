@@ -40,6 +40,20 @@ final class LocalParseException extends FormatException {
   final LocalParseProblem problem;
 }
 
+/// Language-neutral labels for reader-generated navigation titles only.
+enum LocalNavigationLabel {
+  cover,
+  titlePage,
+  credits,
+  synopsis,
+  author,
+  illustrator,
+  illustrations,
+  contents,
+  preface,
+  dedication,
+}
+
 /// EPUB TOC is independent of the unique, spine-ordered chapter catalog.
 /// A null blockKey explicitly falls back to the chapter start.
 final class LocalNavigationEntry {
@@ -47,17 +61,23 @@ final class LocalNavigationEntry {
     required this.title,
     required this.chapterKey,
     this.blockKey,
+    this.generatedLabel,
     Iterable<LocalNavigationEntry> children = const [],
   }) : children = List.unmodifiable(children);
   final String title;
   final ChapterKey chapterKey;
   final String? blockKey;
+
+  /// Authored titles remain verbatim; generated labels are localized by UI.
+  /// [title] remains the fallback for readers that do not know the label.
+  final LocalNavigationLabel? generatedLabel;
   final List<LocalNavigationEntry> children;
 
   Map<String, Object?> toJson() => {
     'title': title,
     'chapter': chapterKey.toJson(),
     'block': blockKey,
+    if (generatedLabel != null) 'generatedLabel': generatedLabel!.name,
     'children': children.map((e) => e.toJson()).toList(),
   };
 
@@ -68,6 +88,9 @@ final class LocalNavigationEntry {
           json['chapter'] as Map<String, dynamic>,
         ),
         blockKey: json['block'] as String?,
+        generatedLabel: LocalNavigationLabel.values
+            .where((label) => label.name == json['generatedLabel'])
+            .firstOrNull,
         children: (json['children'] as List).map(
           (e) => LocalNavigationEntry.fromJson(e as Map<String, dynamic>),
         ),

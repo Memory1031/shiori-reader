@@ -116,6 +116,66 @@ abstract class AppLocalizations {
   /// **'Book contents'**
   String get localBookContents;
 
+  /// No description provided for @localNavigationCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover'**
+  String get localNavigationCover;
+
+  /// No description provided for @localNavigationTitlePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Title page'**
+  String get localNavigationTitlePage;
+
+  /// No description provided for @localNavigationCredits.
+  ///
+  /// In en, this message translates to:
+  /// **'Credits'**
+  String get localNavigationCredits;
+
+  /// No description provided for @localNavigationSynopsis.
+  ///
+  /// In en, this message translates to:
+  /// **'Synopsis'**
+  String get localNavigationSynopsis;
+
+  /// No description provided for @localNavigationAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'About the author'**
+  String get localNavigationAuthor;
+
+  /// No description provided for @localNavigationIllustrator.
+  ///
+  /// In en, this message translates to:
+  /// **'About the illustrator'**
+  String get localNavigationIllustrator;
+
+  /// No description provided for @localNavigationIllustrations.
+  ///
+  /// In en, this message translates to:
+  /// **'Illustrations'**
+  String get localNavigationIllustrations;
+
+  /// No description provided for @localNavigationContents.
+  ///
+  /// In en, this message translates to:
+  /// **'Contents'**
+  String get localNavigationContents;
+
+  /// No description provided for @localNavigationPreface.
+  ///
+  /// In en, this message translates to:
+  /// **'Preface'**
+  String get localNavigationPreface;
+
+  /// No description provided for @localNavigationDedication.
+  ///
+  /// In en, this message translates to:
+  /// **'Dedication'**
+  String get localNavigationDedication;
+
   /// No description provided for @articleContents.
   ///
   /// In en, this message translates to:

@@ -7,6 +7,7 @@ import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
+import '../../shared/local_navigation_title.dart';
 import '../../shared/widgets/state_views.dart';
 import '../novel_detail/catalog_controller.dart';
 import 'reader_controller.dart';
@@ -345,23 +346,30 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           Object? order,
           String? book,
           Object? content,
+          String locale,
+          LocalNavigationEntry? entry,
           String? chapter,
           String? running,
         })
       >();
-  (String?, String?) _titlesFor(ReaderController reader) {
+  (String?, String?, LocalNavigationEntry?) _titlesFor(
+    ReaderController reader,
+  ) {
     final catalog = _catalog.loaded?.value;
     final content = reader.content;
+    final locale = AppLocalizations.of(context).localeName;
     final cached = _titles[reader];
     if (cached != null &&
         identical(cached.catalog, catalog) &&
         identical(cached.navigation, _navigationRevision) &&
         identical(cached.order, _readingOrder) &&
         cached.book == _bookTitle &&
+        cached.locale == locale &&
         identical(cached.content, content)) {
-      return (cached.chapter, cached.running);
+      return (cached.chapter, cached.running, cached.entry);
     }
-    final chapter = _scanChapterTitle(reader);
+    final entry = _scanChapterNavigation(reader);
+    final chapter = _scanChapterTitle(reader, entry);
     final running = _scanRunningTitle(reader);
     _titles[reader] = (
       catalog: catalog,
@@ -369,17 +377,19 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       order: _readingOrder,
       book: _bookTitle,
       content: content,
+      locale: locale,
+      entry: entry,
       chapter: chapter,
       running: running,
     );
-    return (chapter, running);
+    return (chapter, running, entry);
   }
 
   String? _chapterTitle(ReaderController reader) => _titlesFor(reader).$1;
   String? _runningTitle(ReaderController reader) => _titlesFor(reader).$2;
 
-  String? _scanChapterTitle(ReaderController reader) {
-    String? title;
+  LocalNavigationEntry? _scanChapterNavigation(ReaderController reader) {
+    LocalNavigationEntry? selected;
     int? earliest;
     var deepest = -1;
     final blocks = reader.content!.blocks;
@@ -397,12 +407,21 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       if (earliest == null ||
           index < earliest ||
           index == earliest && depth > deepest) {
-        title = entry.title;
+        selected = entry;
         earliest = index;
         deepest = depth;
       }
     }
-    return title ??
+    return selected;
+  }
+
+  String? _scanChapterTitle(
+    ReaderController reader,
+    LocalNavigationEntry? entry,
+  ) {
+    return (entry == null
+            ? null
+            : localNavigationTitle(entry, AppLocalizations.of(context))) ??
         _inheritedNavigationTitle(reader.chapter) ??
         _catalog.loaded?.value.flatChapters
             .where(
@@ -429,7 +448,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       final entries = _navigation[order[i]];
       if (entries == null) continue;
       for (final (entry, _) in entries.reversed) {
-        if (entry.title.trim().isNotEmpty) return entry.title;
+        if (entry.title.trim().isNotEmpty) {
+          return localNavigationTitle(entry, AppLocalizations.of(context));
+        }
       }
     }
     return null;
@@ -811,6 +832,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       _turnGrip = grip;
       operation.engaged = true;
       operation.intent = _ChapterIntent.dragging;
+      operation.pageTurn = true;
       operation.visible = operation.ready && _nativePair(operation);
     });
     return BoundaryPageDrag(
@@ -848,6 +870,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     ReaderPosition? navigationPosition,
     bool fromStart = false,
     bool fromEnd = false,
+    bool pageTurn = false,
   }) async {
     _completionTurn?.invalidate();
     if (_closingPanelForSwitch) return;
@@ -893,6 +916,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       fromStart: fromStart,
       fromEnd: fromEnd,
     );
+    operation.pageTurn = pageTurn;
     _animateChapter = fromStart || fromEnd;
     _turnDirection = direction;
     _turnGrip = pageTurnCentreGrip;
@@ -1024,6 +1048,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       _chapterTurn.value = 0;
       _changing = false;
     });
+    if (operation.pageTurn) _chrome.value = false;
     _close(previous);
     if (_allowRemote && reader.content != null) {
       unawaited(
@@ -1108,6 +1133,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     final blockKey = reader.initialBlockKey,
         blockOffset = reader.initialBlockOffset;
     final fromStart = reader.startAtBeginning, fromEnd = reader.startAtEnd;
+    final pageTurn = operation.pageTurn;
     final failure = reader.failure;
     unawaited(_cancelChapter());
     final l = AppLocalizations.of(context);
@@ -1130,6 +1156,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                     blockOffset: blockOffset,
                     fromStart: fromStart,
                     fromEnd: fromEnd,
+                    pageTurn: pageTurn,
                   );
                 },
               ),
@@ -1666,11 +1693,17 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           : null,
       details: widget.onDetails == null || _changing ? null : _details,
       previousChapter: !_changing && previous != null
-          ? () => _switch(previous, fromEnd: true)
+          ? () => _switch(previous, fromEnd: true, pageTurn: true)
           : null,
       nextChapter: !_changing && next != null
-          ? () => _switch(next, fromStart: true)
+          ? () => _switch(next, fromStart: true, pageTurn: true)
           : null,
+      navigateChapter: (direction) {
+        final target = direction < 0 ? previous : next;
+        if (!_changing && target != null) {
+          _switch(target, fromStart: direction > 0, fromEnd: direction < 0);
+        }
+      },
     );
 
     return ReaderContentView(
@@ -1728,6 +1761,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       onLoadFailure: () => _rejectPending(reader),
       runningTitle: _runningTitle(reader),
       chapterTitle: _chapterTitle(reader),
+      navigationEntry: _titlesFor(reader).$3,
       images: reader == _pending && _operation?.passive == true
           ? _candidateImages
           : _displayImages,
@@ -2025,6 +2059,7 @@ class _ChapterOperation {
   final List<ChapterKey> basis;
   bool passive;
   bool engaged = false;
+  bool pageTurn = false;
   bool ready = false, saved = false, visible = false;
   double progress = 0;
   _ChapterIntent intent = _ChapterIntent.none;

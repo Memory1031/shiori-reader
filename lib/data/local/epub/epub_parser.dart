@@ -22,6 +22,7 @@ import 'epub_audio.dart';
 import 'epub_presentation.dart';
 import 'epub_svg_presentation.dart';
 import 'epub_text_styles.dart';
+import 'epub_stylesheet_decoder.dart';
 import 'epub_rich_styles.dart';
 import 'epub_image_candidates.dart';
 import 'epub_diagnostics.dart';
@@ -29,6 +30,7 @@ import 'epub_footnotes.dart';
 import 'epub_fixed_image.dart';
 import 'epub_trace.dart';
 import 'epub_native_assets.dart';
+import 'epub_front_matter.dart';
 
 final class ParsedEpub {
   ParsedEpub(this.content, this.media, this.diagnostics);
@@ -165,6 +167,9 @@ class EpubParser {
   var _noteChars = 0;
   final presentations = <String, String>{};
   final byPath = <String, ChapterContent>{};
+  final _frontMatter = <ChapterKey, EpubFrontMatterDocument>{};
+  String _publicationTitle = '';
+  List<String> _publicationAuthors = const [];
   final skippedEmptyPaths = <String>{};
   final fragments = <String, Map<String, (String, int)>>{};
   int mediaSize = 0, textSize = 0;
@@ -194,8 +199,9 @@ class EpubParser {
     return MediaRef(sourceId: book.sourceId, mediaId: '${book.novelId}/$hash');
   });
 
-  String text(String path, {int limit = 4 * 1024 * 1024}) {
+  String text(String path, {int limit = 4 * 1024 * 1024, bool css = false}) {
     final b = zip.read(path, limit: limit);
+    if (css) return decodeEpubStylesheet(b);
     final encoding = txtBom(b) ?? TxtEncoding.utf8;
     return decodeTxt(b, encoding);
   }
@@ -397,6 +403,10 @@ class EpubParser {
                   e.name.namespaceUri == null),
         ) ??
         const <XmlElement>[];
+    _publicationTitle = metadataElements('title').firstOrNull?.innerText ?? '';
+    _publicationAuthors = metadataElements(
+      'creator',
+    ).map((e) => e.innerText).toList();
     for (final meta in metadataElements('meta')) {
       if (attr(meta, 'property') == 'rendition:layout' &&
               meta.innerText.trim() == 'pre-paginated' ||
@@ -473,6 +483,9 @@ class EpubParser {
         if (repeatedBlocks > 100000) zipLimit();
         final key = LocalBookIdentity.epubOccurrence(book, path, occurrence);
         chapterPaths[key] = path;
+        if (_frontMatter[original.key] case final info?) {
+          _frontMatter[key] = info;
+        }
         chapters.add(
           ChapterContent(
             key: key,
@@ -609,8 +622,51 @@ class EpubParser {
         .where((e) => e.properties.contains('nav'))
         .firstOrNull;
     var navigation = <LocalNavigationEntry>[];
+    final structural = <ChapterKey, EpubFrontMatter>{};
+    final guide = packageChildren(package, 'guide').firstOrNull;
+    if (guide != null) {
+      for (final reference in packageChildren(guide, 'reference')) {
+        for (final type in (attr(reference, 'type') ?? '').split(
+          RegExp(r'\s+'),
+        )) {
+          final matter = EpubFrontMatter.semantic(
+            type,
+            attr(reference, 'title') ?? '',
+          );
+          if (matter != null) {
+            _frontMatterTarget(
+              opfPath,
+              attr(reference, 'href') ?? '',
+              matter,
+              structural,
+            );
+          }
+        }
+      }
+    }
     if (navItem?.path case final path? when zip.entries.containsKey(path)) {
       final doc = _html(path);
+      for (final landmarks
+          in doc
+              .querySelectorAll('nav')
+              .where((e) => epubStructuralTypes(e).contains('landmarks'))) {
+        for (final link in landmarks.querySelectorAll('a')) {
+          for (final type in epubStructuralTypes(link)) {
+            final matter = EpubFrontMatter.semantic(
+              type,
+              _labelWhitespace(_navigationLabel(link)),
+            );
+            if (matter != null) {
+              _frontMatterTarget(
+                path,
+                link.attributes['href'] ?? '',
+                matter,
+                structural,
+              );
+            }
+          }
+        }
+      }
       final toc = doc.querySelectorAll('nav').where(isToc).firstOrNull;
       final list = toc?.querySelector('ol');
       if (list != null) navigation = _nav(list, path, 0);
@@ -655,6 +711,25 @@ class EpubParser {
         for (final c in chapters)
           LocalNavigationEntry(title: c.title, chapterKey: c.key),
       ];
+    } else {
+      // Structural references name a source file, including every EPUB 3
+      // occurrence of that file in the spine.
+      for (final chapter in chapters) {
+        final matter = structural[byPath[chapterPaths[chapter.key]]?.key];
+        if (matter != null) {
+          structural.putIfAbsent(chapter.key, () => matter);
+        }
+      }
+      navigation = supplementEpubFrontMatter(
+        chapters: chapters,
+        navigation: navigation,
+        readingOrder: primary,
+        documents: _frontMatter,
+        structural: structural,
+        onAdd: () {
+          if (++navCount > 10000) zipLimit();
+        },
+      );
     }
     MediaRef? cover;
     final coverMeta = metadataElements(
@@ -779,7 +854,7 @@ class EpubParser {
         doc,
         path,
         optionalEpubStyleReference,
-        (p) => zip.entries.containsKey(p) ? text(p) : '',
+        (p) => zip.entries.containsKey(p) ? text(p, css: true) : '',
         trace: trace,
       ).map((sheet) => sheet.$2),
     );
@@ -807,6 +882,12 @@ class EpubParser {
       ],
     );
     _fixedChapters.add(chapter.key);
+    _frontMatter[chapter.key] = inspectEpubFrontMatter(
+      doc,
+      chapter,
+      bookTitle: _publicationTitle,
+      authors: _publicationAuthors,
+    );
     trace?.record('document.output', path, reason: 'fixed_image');
     chapters.add(chapter);
     chapterPaths[chapter.key] = path;
@@ -836,7 +917,7 @@ class EpubParser {
       doc,
       path,
       optionalEpubStyleReference,
-      (p) => zip.entries.containsKey(p) ? text(p) : '',
+      (p) => zip.entries.containsKey(p) ? text(p, css: true) : '',
       trace: trace,
     ).toList();
     final fonts = EpubNativeFonts(sheets, optionalEpubStyleReference, font);
@@ -952,7 +1033,7 @@ class EpubParser {
         ? epubPresentation(
             doc,
             path,
-            (p) => zip.entries.containsKey(p) ? text(p) : '',
+            (p) => zip.entries.containsKey(p) ? text(p, css: true) : '',
             (p) => zip.entries.containsKey(p)
                 ? zip.read(p, limit: 8 * 1024 * 1024)
                 : Uint8List(0),
@@ -1987,6 +2068,12 @@ class EpubParser {
     chapters.add(chapter);
     chapterPaths[chapter.key] = path;
     byPath[path] = chapter;
+    _frontMatter[chapter.key] = inspectEpubFrontMatter(
+      doc,
+      chapter,
+      bookTitle: _publicationTitle,
+      authors: _publicationAuthors,
+    );
     trace?.record(
       'document.output',
       path,
@@ -2002,6 +2089,31 @@ class EpubParser {
   }
 
   int navCount = 0;
+  void _frontMatterTarget(
+    String base,
+    String href,
+    EpubFrontMatter matter,
+    Map<ChapterKey, EpubFrontMatter> structural,
+  ) {
+    (String, String?)? ref;
+    try {
+      ref = href.isEmpty ? null : epubReference(base, href);
+    } on LocalParseException catch (error) {
+      if (error.problem != LocalParseProblem.invalid) rethrow;
+      return;
+    } on FormatException {
+      return;
+    }
+    final chapter = ref == null ? null : byPath[ref.$1];
+    if (chapter == null) return;
+    // A landmark inside mixed chapter content is not a whole front-matter page.
+    if (ref!.$2?.isNotEmpty == true &&
+        fragments[ref.$1]?[ref.$2]?.$1 != chapter.blocks.first.blockKey) {
+      return;
+    }
+    structural.putIfAbsent(chapter.key, () => matter);
+  }
+
   LocalNavigationEntry? _target(
     String base,
     String href,

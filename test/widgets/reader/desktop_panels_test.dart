@@ -227,6 +227,8 @@ void main() {
       await key(tester, LogicalKeyboardKey.space);
       final next = harness.pages.capture()!;
       expect(next.chapterFraction, greaterThan(start.chapterFraction));
+      expect(chromeVisible(tester), isFalse);
+      await key(tester, LogicalKeyboardKey.f2);
       for (final (_, control, _) in entries) {
         await open(tester, control);
         await key(tester, LogicalKeyboardKey.space);

@@ -7,6 +7,7 @@ import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
+import '../../shared/local_navigation_title.dart';
 import '../../shared/widgets/state_views.dart';
 
 Future<LocalNavigationEntry?> openLocalCatalog(
@@ -100,7 +101,6 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
   final _followingRows = GlobalKey();
   (ChapterKey?, int, Size, TextScaler)? _positionTarget;
   int _anchor = 0;
-  double _viewportAnchor = 0;
 
   @override
   void didUpdateWidget(LocalNavigationView oldWidget) {
@@ -161,7 +161,11 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
               ? Icons.article_outlined
               : Icons.folder_outlined,
         ),
-        title: Text(entry.title, maxLines: 3, overflow: TextOverflow.ellipsis),
+        title: Text(
+          localNavigationTitle(entry, AppLocalizations.of(context)),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
         onTap: () => widget.onSelect(entry),
       );
       return index == match
@@ -180,7 +184,6 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
         if (_positionTarget != target) {
           _positionTarget = target;
           _anchor = 0;
-          _viewportAnchor = 0;
           if (match > 0) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted || _positionTarget != target) return;
@@ -215,7 +218,9 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
                     math.max(0.0, (height - row.size.height) / 3),
                     height - tail,
                   );
-                  setState(() => _viewportAnchor = top / height);
+                  Scrollable.of(
+                    _currentRow.currentContext!,
+                  ).position.jumpTo(height - top);
                 });
               }
             });
@@ -225,7 +230,10 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
         return CustomScrollView(
           key: ValueKey((target, anchor)),
           center: _followingRows,
-          anchor: _viewportAnchor,
+          // Keep a positive end offset even when opening near the last row:
+          // Flutter's scrollbar only registers drag gestures when max > 0.
+          // The post-frame jump positions the row without moving this origin.
+          anchor: anchor > 0 ? 1 : 0,
           semanticChildCount: rows.length,
           slivers: [
             if (anchor > 0)

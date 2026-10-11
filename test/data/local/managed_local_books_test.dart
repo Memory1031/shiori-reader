@@ -17,6 +17,7 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'local_reading_test.dart' show ForbiddenOnline;
 import 'epub_html_links_test.dart' show htmlLinkFiles;
+import 'epub_front_matter_test.dart' show frontMatterFiles, page, picture;
 
 T ok<T>(Result<T> result) => (result as Success<T>).value;
 CancellationToken token() => CancellationSource().token;
@@ -75,6 +76,47 @@ void main() {
     db = UserDatabase(NativeDatabase(paths.userDatabase));
     store = ok(await ManagedLocalBooks.open(paths, db));
   });
+  test('generated navigation labels survive a managed book reopen', () async {
+    final imported = ok(
+      await store.importBook(
+        bytes: Stream.value(
+          zipFiles(
+            frontMatterFiles({
+              'cover': page('未知', picture, type: 'cover'),
+              'title': page('标题', '<p>离线星空 1</p><p>测试作者</p>'),
+              'a': page('A', '<p>First.</p>'),
+              'source': page('Title page', '<p>Original.</p>'),
+              'b': page('B', '<p>Next.</p>'),
+            }),
+          ),
+        ),
+        format: LocalBookFormat.epub,
+        parse: (session) => const BookDecoder().decode(
+          session,
+          format: LocalBookFormat.epub,
+          filename: 'fixture.epub',
+          cancellation: token(),
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+        ),
+        cancellation: token(),
+      ),
+    );
+    await store.close();
+    store = ok(await ManagedLocalBooks.open(paths, db));
+    final reopened = ok(
+      await store.read(
+        imported.content.detail.summary.key,
+        cancellation: token(),
+      ),
+    )!;
+    final navigation = reopened.content.navigation;
+    expect(navigation[0].generatedLabel, LocalNavigationLabel.cover);
+    expect(navigation[1].generatedLabel, LocalNavigationLabel.titlePage);
+    expect(navigation[3].title, navigation[1].title);
+    expect(navigation[3].generatedLabel, isNull);
+    expect(reopened.content.chapters, imported.content.chapters);
+  });
+
   test(
     'EPUB manifest limit remains separate from the larger TXT budget',
     () async {

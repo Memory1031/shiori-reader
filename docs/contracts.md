@@ -85,7 +85,7 @@ PlatformImportSource 完整验证两平台 List<Map> 或 legacy Map/null 后才�
 
 LocalBookDecoder 接收导入 session、格式、文件名、token 和编码确认回调，严格解码后才提供有界预览。LocalBookStore 唯一负责发布，生产使用 addToShelf 同事务加入书架；LocalBookManagement 删除后失效旧会话，cleanupPending 表示 SQL 已提交但文件待回收。
 
-LocalNavigationRepository 返回嵌套目录与 ChapterKey / 可选 blockKey。LocalPagePresentationRepository 为特殊短页提供可选惰性静态 HTML，普通正文返回空；领域正文仍保存原生语义块，不持有 WebView 对象。发布与兼容见[本地导入](local-import.md)。
+LocalNavigationRepository 返回嵌套目录与 ChapterKey / 可选 blockKey。阅读器生成的名称可附 `generatedLabel` 类型，`title` 保留兼容兜底；原书标题及旧记录缺省不带该标记，未知标记回退到 `title`。LocalPagePresentationRepository 为特殊短页提供可选惰性静态 HTML，普通正文返回空；领域正文仍保存原生语义块，不持有 WebView 对象。发布与兼容见[本地导入](local-import.md)。
 
 可选的 LocalLogicalChapterRepository 从同一已导入快照返回 Reader 专用的只读目录区段索引，包含主阅读顺序、完整块权重、内容版本与块身份；TXT 返回空。索引不改变 ChapterContent、ReaderPosition 或存储格式；逻辑显示与导航合同见[阅读器](reader.md#全书进度与阅读完成)。
 

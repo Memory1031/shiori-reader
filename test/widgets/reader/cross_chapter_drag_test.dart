@@ -417,6 +417,9 @@ void main() {
         h.settings.value = h.settings.value.copyWith(pageTurn: style);
         await h.open(tester);
         final old = active(tester).session;
+        final chrome = active(tester).chrome!;
+        chrome.value = true;
+        await tester.pumpAndSettle();
         for (final y in [140.0, 400.0, 660.0]) {
           final gesture = await drag(tester, 1, y: y);
           expect(frame(tester).grip, closeTo(y / 800, .015));
@@ -424,11 +427,18 @@ void main() {
           await tester.pump();
           expect(frame(tester).progress, 1);
           expect(h.library.sessions, 1);
+          expect(chrome.value, isTrue);
           expect(active(tester).session, same(old));
           await gesture.cancel();
           await tester.pumpAndSettle();
           expect(active(tester).session, same(old));
+          expect(chrome.value, isTrue);
         }
+        final committed = await drag(tester, 1);
+        await committed.up();
+        await tester.pumpAndSettle();
+        expect(active(tester).content.key, h.key(1));
+        expect(chrome.value, isFalse);
         await h.close(tester);
       },
     );
