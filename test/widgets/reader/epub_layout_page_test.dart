@@ -106,7 +106,32 @@ class _Controller extends PlatformInAppWebViewController {
   final nativeScrollRestores = <Offset>[];
   Completer<int?>? readNativeY;
   Completer<void>? restoreNativeScroll;
+  Completer<void>? acceptLoad;
+  Completer<String?>? readTitle;
+  String? currentHtml, pendingHtml;
+  bool loading = true;
+  int concurrentLoads = 0, maxConcurrentLoads = 0;
+  final completionQueries = <String>[];
   bool failLoad = false;
+
+  String? get title => currentHtml == null
+      ? null
+      : RegExp(r'<title>([^<]*)</title>').firstMatch(currentHtml!)?.group(1);
+
+  @override
+  Future<String?> getTitle() async =>
+      readTitle == null ? title : readTitle!.future;
+
+  @override
+  Future<int?> getProgress() async => loading ? 0 : 100;
+
+  @override
+  Future<bool> isLoading() async => loading;
+
+  void completeNavigation() {
+    currentHtml = pendingHtml;
+    loading = false;
+  }
 
   @override
   Future<int?> getScrollX() async {
@@ -126,7 +151,7 @@ class _Controller extends PlatformInAppWebViewController {
     required int y,
     bool animated = false,
   }) async {
-    expect(animated, isFalse);
+    expectSync(animated, isFalse);
     await restoreNativeScroll?.future;
     nativeScroll = Offset(x.toDouble(), y.toDouble());
     nativeScrollRestores.add(nativeScroll);
@@ -137,9 +162,13 @@ class _Controller extends PlatformInAppWebViewController {
     required String source,
     ContentWorld? contentWorld,
   }) async {
+    if (source == '[document.title, document.readyState]') {
+      completionQueries.add(source);
+      return [title, loading ? 'loading' : 'complete'];
+    }
     scripts.add(source);
     if (source == epubPageInspectionSynchronousScript) {
-      expect(source, isNot(contains('await')));
+      expectSync(source, isNot(contains('await')));
       return {'clientWidth': 400, 'clientHeight': 700, 'fontsReady': true};
     }
     if (source.startsWith('(function(){\nconst v=')) {
@@ -164,7 +193,18 @@ class _Controller extends PlatformInAppWebViewController {
   }) async {
     if (failLoad) throw StateError('native theme navigation failed');
     documents.add(data);
+    pendingHtml = data;
+    loading = true;
     nativeScroll = Offset.zero;
+    concurrentLoads++;
+    if (concurrentLoads > maxConcurrentLoads) {
+      maxConcurrentLoads = concurrentLoads;
+    }
+    try {
+      await acceptLoad?.future;
+    } finally {
+      concurrentLoads--;
+    }
   }
 }
 
@@ -178,6 +218,7 @@ class _Headless extends PlatformHeadlessInAppWebView {
   Future<void> run() async {
     if (owner.failCreation) throw StateError('native creation failed');
     await owner.gate?.future;
+    controller.pendingHtml = params.initialData!.data;
     params.onWebViewCreated?.call(wrapped);
   }
 
@@ -186,7 +227,10 @@ class _Headless extends PlatformHeadlessInAppWebView {
     disposed = true;
   }
 
-  void finish() => params.onLoadStop!(wrapped, WebUri('about:blank'));
+  void finish() {
+    controller.completeNavigation();
+    params.onLoadStop!(wrapped, WebUri('about:blank'));
+  }
 }
 
 class _View extends PlatformInAppWebViewWidget {
@@ -197,11 +241,20 @@ class _View extends PlatformInAppWebViewWidget {
       ? (params.headlessWebView as _Headless).controller
       : _inlineController;
   dynamic get wrapped => params.controllerFromPlatform!(controller);
-  void finish() => params.onLoadStop!(wrapped, WebUri('about:blank'));
+  void finish() {
+    controller.completeNavigation();
+    stopFromPreviousNavigation();
+  }
+
+  void stopFromPreviousNavigation() =>
+      params.onLoadStop!(wrapped, WebUri('about:blank'));
   @override
   Widget build(BuildContext context) {
     if (!attached) {
       attached = true;
+      if (params.headlessWebView == null) {
+        controller.pendingHtml = params.initialData!.data;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         params.onWebViewCreated!(wrapped);
       });
@@ -1450,10 +1503,10 @@ void main() {
       }
       expect(ready, 0);
       head.finish();
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(ready, 1);
       head.finish();
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(ready, 1);
       await tester.tapAt(const Offset(30, 200));
       await tester.tapAt(const Offset(400, 200));
@@ -1466,6 +1519,155 @@ void main() {
   );
 
   for (final os in ['android', 'ios']) {
+    testWidgets(
+      '$os retains actual stops while request or identity read is pending',
+      (tester) async {
+        await tester.pumpWidget(page(os: os));
+        await tester.pumpAndSettle();
+        final view = platform.views.single;
+        final controller = view.controller;
+        platform.heads.single.finish();
+        await tester.pumpAndSettle();
+        controller.nativeScroll = const Offset(12, 650);
+        controller.acceptLoad = Completer<void>();
+        await tester.pumpWidget(page(os: os, brightness: Brightness.dark));
+        await tester.pumpAndSettle();
+        // Actual native completion may precede the loadData method reply.
+        view.finish();
+        view.stopFromPreviousNavigation();
+        await tester.pumpAndSettle();
+        expect(ready, 1);
+        controller.acceptLoad!.complete();
+        await tester.pumpAndSettle();
+        expect(ready, 2);
+        expect(controller.nativeScroll, const Offset(12, 650));
+
+        controller.acceptLoad = null;
+        final previousTitle = controller.title;
+        await tester.pumpWidget(page(os: os, paper: const Color(0xffffeedd)));
+        await tester.pumpAndSettle();
+        final titleRead = controller.readTitle = Completer<String?>();
+        view.stopFromPreviousNavigation();
+        await tester.pumpAndSettle();
+        // B's delayed title read must not swallow C's actual completion.
+        view.finish();
+        await tester.pumpAndSettle();
+        expect(ready, 2);
+        controller.readTitle = null;
+        titleRead.complete(previousTitle);
+        await tester.pumpAndSettle();
+        expect(ready, 3);
+        expect(controller.nativeScroll, const Offset(12, 650));
+        expect(controller.documents, hasLength(2));
+        expect(controller.maxConcurrentLoads, 1);
+        expect(failed, 0);
+
+        final retiredTitle = controller.title;
+        await tester.pumpWidget(page(os: os, brightness: Brightness.dark));
+        await tester.pumpAndSettle();
+        final retiredRead = controller.readTitle = Completer<String?>();
+        view.stopFromPreviousNavigation();
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(const SizedBox());
+        retiredRead.complete(retiredTitle);
+        view.finish();
+        await tester.pumpAndSettle();
+        expect(ready, 3);
+        expect(platform.heads.single.disposed, true);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('$os stale stops cannot reenter a pending theme reload', (
+      tester,
+    ) async {
+      await tester.pumpWidget(page(os: os));
+      await tester.pumpAndSettle();
+      final view = platform.views.single;
+      final controller = view.controller;
+      platform.heads.single.finish();
+      await tester.pumpAndSettle();
+      controller.nativeScroll = const Offset(12, 650);
+      controller.readNativeY = Completer<int?>();
+      controller.acceptLoad = Completer<void>();
+      await tester.pumpWidget(page(os: os, brightness: Brightness.dark));
+      await tester.pumpAndSettle();
+      // A repeated completion of A does not commit the pending document B.
+      view.stopFromPreviousNavigation();
+      view.stopFromPreviousNavigation();
+      await tester.pumpAndSettle();
+      expect(controller.nativeScrollReads, ['x', 'y']);
+      expect(controller.documents, isEmpty);
+      expect(ready, 1);
+      controller.readNativeY!.complete(650);
+      await tester.pumpAndSettle();
+      expect(controller.documents, hasLength(1));
+      expect(controller.concurrentLoads, 1);
+      await tester.pumpWidget(page(os: os, paper: const Color(0xffffeedd)));
+      await tester.pumpAndSettle();
+      view.stopFromPreviousNavigation();
+      await tester.pumpAndSettle();
+      expect(controller.documents, hasLength(1));
+      expect(ready, 1);
+      controller.acceptLoad!.complete();
+      await tester.pumpAndSettle();
+      view.stopFromPreviousNavigation();
+      await tester.pumpAndSettle();
+      expect(controller.documents, hasLength(1));
+      expect(ready, 1);
+      view.finish(); // Only B's actual completion may start the latest theme.
+      await tester.pumpAndSettle();
+      expect(controller.documents, hasLength(2));
+      expect(controller.documents.last, contains('#ffeedd'));
+      expect(ready, 1);
+      view.stopFromPreviousNavigation();
+      await tester.pumpAndSettle();
+      expect(ready, 1);
+      view.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 2);
+      expect(controller.nativeScroll, const Offset(12, 650));
+      expect(controller.maxConcurrentLoads, 1);
+      expect(controller.nativeScrollReads, ['x', 'y']);
+      expect(platform.views.single, same(view));
+      expect(failed, 0);
+      expect(controller.scripts, isEmpty);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('$os stale stops cannot acknowledge an uncompleted document', (
+      tester,
+    ) async {
+      await tester.pumpWidget(page(os: os));
+      await tester.pumpAndSettle();
+      final view = platform.views.single;
+      platform.heads.single.finish();
+      await tester.pumpAndSettle();
+      final controller = view.controller;
+      controller.nativeScroll = const Offset(12, 650);
+      await tester.pumpWidget(page(os: os, brightness: Brightness.dark));
+      await tester.pumpAndSettle();
+      expect(controller.documents, hasLength(1));
+      expect(
+        controller.concurrentLoads,
+        0,
+        reason: 'loadData only accepted the request',
+      );
+      view.stopFromPreviousNavigation();
+      view.stopFromPreviousNavigation();
+      await tester.pumpAndSettle();
+      expect(ready, 1, reason: 'the browser is still loading B');
+      expect(controller.nativeScrollRestores, isEmpty);
+      view.finish();
+      await tester.pumpAndSettle();
+      expect(ready, 2);
+      expect(controller.nativeScroll, const Offset(12, 650));
+      expect(controller.nativeScrollRestores, [const Offset(12, 650)]);
+      expect(controller.documents, hasLength(1));
+      expect(failed, 0);
+      await tester.pumpWidget(const SizedBox());
+    });
+
     testWidgets('$os theme change preserves a scrolled authored page', (
       tester,
     ) async {
@@ -1679,7 +1881,7 @@ void main() {
       await tester.pump();
       expect(ready, 0);
       platform.heads.last.finish();
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(ready, 1);
       await tester.pumpWidget(const SizedBox());
     },
@@ -1971,7 +2173,7 @@ void main() {
       expect(view.params.initialSettings!.allowFileAccess, isFalse);
       expect(ready, 0);
       view.finish();
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(ready, 1);
       await tester.pumpWidget(
         page(os: 'windows', html: document.replaceFirst('Static', 'Other')),

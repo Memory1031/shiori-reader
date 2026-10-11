@@ -459,8 +459,10 @@ class _StaticWebViewState extends State<_StaticWebView> {
   InAppWebViewController? _controller;
   InAppWebView? _view;
   String? _loadingDocument;
+  String? _loadingData, _loadingTitle;
+  int _loadGeneration = 0;
+  bool _reloading = false, _finishing = false, _finishPending = false;
   Offset? _themeScrollOffset;
-  bool _restoringScroll = false;
 
   @override
   void didUpdateWidget(_StaticWebView oldWidget) {
@@ -474,7 +476,8 @@ class _StaticWebViewState extends State<_StaticWebView> {
   }
 
   Future<void> _reload() async {
-    if (!mounted || _failed || _controller == null) return;
+    if (!mounted || _failed || _controller == null || _reloading) return;
+    _reloading = true;
     _loaded = false;
     _ready = false;
     _deadline?.cancel();
@@ -509,14 +512,49 @@ class _StaticWebViewState extends State<_StaticWebView> {
         }
       }
       if (!mounted || _failed) return;
-      _loadingDocument = widget.document;
-      await _controller!.loadData(
-        data: _loadingDocument!,
-        baseUrl: WebUri('about:blank'),
-      );
+      final data = _dataFor(widget.document);
+      await _controller!.loadData(data: data, baseUrl: WebUri('about:blank'));
     } catch (_) {
       _fail();
+    } finally {
+      _reloading = false;
+      // Some native hosts finish before the loadData method reply arrives.
+      // Replay that notification only after the single-flight request ends.
+      if (_finishPending && mounted && !_failed) {
+        _finishPending = false;
+        unawaited(_loadFinished());
+      }
     }
+  }
+
+  String _dataFor(String document) {
+    _loadingDocument = document;
+    _loadingTitle = 'shiori-static-${++_loadGeneration}';
+    // about:blank callbacks have no document identity. Inert host metadata
+    // lets native title/progress reads verify the actual document, without
+    // enabling mobile JavaScript or trusting publisher content.
+    return _loadingData = document.replaceFirst(
+      '<head>',
+      '<head><title>$_loadingTitle</title>',
+    );
+  }
+
+  Future<bool> _documentComplete(InAppWebViewController controller) async {
+    if (_environment != null) {
+      // The pinned Windows getTitle implementation returns the URL. Keep
+      // this bounded host read alongside its fixed scroll commands instead.
+      final state = await controller.evaluateJavascript(
+        source: '[document.title, document.readyState]',
+      );
+      return state is List &&
+          state.length == 2 &&
+          state[0] == _loadingTitle &&
+          state[1] == 'complete';
+    }
+    final title = await controller.getTitle();
+    final progress = await controller.getProgress();
+    final loading = await controller.isLoading();
+    return title == _loadingTitle && progress == 100 && !loading;
   }
 
   InAppWebViewSettings get _settings => InAppWebViewSettings(
@@ -555,7 +593,7 @@ class _StaticWebViewState extends State<_StaticWebView> {
     try {
       _environment = await EpubWebViewHost.prepare(context);
       if (!mounted || _failed) return;
-      _loadingDocument = widget.document;
+      final data = _dataFor(widget.document);
       // A Windows environment creates a new inline native view; the plugin
       // does not adopt the headless document. Wait for the visible view's load.
       if (_environment != null) {
@@ -566,7 +604,7 @@ class _StaticWebViewState extends State<_StaticWebView> {
         webViewEnvironment: _environment,
         initialSettings: _settings,
         initialData: InAppWebViewInitialData(
-          data: _loadingDocument!,
+          data: data,
           baseUrl: WebUri('about:blank'),
         ),
         shouldOverrideUrlLoading: _navigation,
@@ -624,39 +662,67 @@ class _StaticWebViewState extends State<_StaticWebView> {
   }
 
   Future<void> _loadFinished() async {
-    if (!mounted || _failed || _restoringScroll) return;
-    if (!identical(_loadingDocument, widget.document)) {
-      unawaited(_reload());
+    if (!mounted || _failed) return;
+    if (_reloading || _finishing) {
+      _finishPending = true;
       return;
     }
-    final offset = _themeScrollOffset;
-    if (offset != null) {
-      _restoringScroll = true;
-      try {
-        if (_environment != null) {
-          await _controller!.evaluateJavascript(
-            source: 'window.scrollTo(${offset.dx}, ${offset.dy})',
-          );
-        } else {
-          await _controller!.scrollTo(
-            x: offset.dx.round(),
-            y: offset.dy.round(),
-          );
-        }
-      } catch (_) {
-        // Keep the readable document if the native view rejects restoration.
-      } finally {
-        _restoringScroll = false;
-      }
-      if (!mounted || _failed) return;
-      if (!identical(_loadingDocument, widget.document)) {
-        unawaited(_reload());
+    final controller = _controller;
+    if (controller == null) return;
+    _finishing = true;
+    var reload = false;
+    final generation = _loadGeneration;
+    try {
+      final complete = await _documentComplete(controller);
+      if (!mounted || _failed || generation != _loadGeneration) return;
+      if (_reloading) {
+        _finishPending = true;
         return;
       }
+      if (!complete) return;
+      if (!identical(_loadingDocument, widget.document)) {
+        reload = true;
+        return;
+      }
+      final offset = _themeScrollOffset;
+      if (offset != null) {
+        try {
+          if (_environment != null) {
+            await controller.evaluateJavascript(
+              source: 'window.scrollTo(${offset.dx}, ${offset.dy})',
+            );
+          } else {
+            await controller.scrollTo(
+              x: offset.dx.round(),
+              y: offset.dy.round(),
+            );
+          }
+        } catch (_) {
+          // Keep the readable document if the native view rejects restoration.
+        }
+        if (!mounted || _failed) return;
+        if (!identical(_loadingDocument, widget.document)) {
+          reload = true;
+          return;
+        }
+      }
+      _themeScrollOffset = null;
+      _loaded = true;
+      _notifyReady();
+    } catch (_) {
+      _fail();
+    } finally {
+      _finishing = false;
+      if (mounted && !_failed) {
+        if (reload) {
+          _finishPending = false;
+          unawaited(_reload());
+        } else if (_finishPending) {
+          _finishPending = false;
+          unawaited(_loadFinished());
+        }
+      }
     }
-    _themeScrollOffset = null;
-    _loaded = true;
-    _notifyReady();
   }
 
   void _notifyReady() {
@@ -711,7 +777,7 @@ class _StaticWebViewState extends State<_StaticWebView> {
       initialSettings: _settings,
       initialData: _headless == null
           ? InAppWebViewInitialData(
-              data: _loadingDocument ?? widget.document,
+              data: _loadingData!,
               baseUrl: WebUri('about:blank'),
             )
           : null,
