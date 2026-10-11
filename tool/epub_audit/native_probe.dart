@@ -687,6 +687,7 @@ Future<Json> runNativeProbe(
         reachedEnd = true;
         break;
       }
+      if (pageNumber + 1 == target.maxPages) break;
       await controller.next();
       await settle();
     }

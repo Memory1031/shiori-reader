@@ -158,6 +158,8 @@ void main() {
       );
       expect(result['assertions']['characterIdentityFailures'], 0);
       expect(result['assertions']['reachedDocumentEnd'], true);
+      expect(result['assertions']['paginationFailures'], 0);
+      expect(result['assertions']['partial'], false);
       expect(result['assertions']['restoreVisible'], true);
       expect(result['layers']['widget_geometry'], isNot('fail'));
     },
@@ -279,6 +281,34 @@ void main() {
       expect(result['assertions']['lowContrastFailures'], greaterThan(0));
     },
   );
+  for (final maxPages in [1, 2, 12]) {
+    testWidgets(
+      'page budget $maxPages preserves correct backward turn and partial coverage',
+      (tester) async {
+        final body =
+            '<p style="border-radius:12px">Target.</p>${List.generate(240, (i) => '<p>Row${i.toString().padLeft(3, '0')}</p>').join()}';
+        final book = await probeBook(tester, body: body),
+            target = targetFor(book, maxPages: maxPages);
+        final result = await runNativeProbe(
+          tester,
+          book,
+          target,
+          target.configurations.first,
+        );
+        expect(result['assertions']['pages'], hasLength(maxPages));
+        expect(result['assertions']['targetVisible'], true);
+        expect(result['assertions']['reachedDocumentEnd'], false);
+        expect(result['assertions']['partial'], true);
+        expect(result['complete'], false);
+        expect(result['reason'], 'page_budget_or_target_coverage_partial');
+        expect(result['assertions']['paginationFailures'], 0);
+        expect(result['assertions']['restoreVisible'], true);
+        expect(result['assertions']['characterIdentityFailures'], 0);
+        expect(result['assertions']['geometryFailures'], 0);
+        expect(result['layers']['widget_geometry'], isNot('fail'));
+      },
+    );
+  }
   testWidgets('page budget is partial and restore must expose actual target', (
     tester,
   ) async {
