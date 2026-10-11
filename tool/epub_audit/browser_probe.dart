@@ -166,11 +166,10 @@ Json sanitizeBrowserMeasurement(Json raw) {
         ancestors.length > 1 &&
             ancestors.any(
               (a) =>
-                  a['scrollbarsHidden'] == false &&
-                  ({'auto', 'scroll'}.contains(a['overflowX']) &&
-                          (a['maxScrollLeft'] as num) > 0 ||
-                      {'auto', 'scroll'}.contains(a['overflowY']) &&
-                          (a['maxScrollTop'] as num) > 0),
+                  {'auto', 'scroll'}.contains(a['overflowX']) &&
+                      (a['maxScrollLeft'] as num) > 0 ||
+                  {'auto', 'scroll'}.contains(a['overflowY']) &&
+                      (a['maxScrollTop'] as num) > 0,
             );
     if (uncertainClip) unknownClipping++;
     var visibleLeft = 0.0,
@@ -195,28 +194,29 @@ Json sanitizeBrowserMeasurement(Json raw) {
         final maximum =
             (ancestor[horizontal ? 'maxScrollLeft' : 'maxScrollTop'] as num)
                 .toDouble();
-        final scrollable =
-            {'auto', 'scroll'}.contains(overflow) &&
-            ancestor['scrollbarsHidden'] == false;
+        // Scrollbar styling does not change wheel/touch scrollability. First
+        // intersect the viewport with the container, then translate the whole
+        // intersection into the text's current coordinates over its scroll
+        // extent, including positions above/left of the current viewport.
+        final scrollable = {'auto', 'scroll'}.contains(overflow);
         if (horizontal) {
           visibleLeft = math.max(visibleLeft, lo);
           visibleRight = math.min(visibleRight, hi);
-          reachableLeft = math.max(
-            reachableLeft,
-            lo - (scrollable ? scroll : 0),
-          );
-          reachableRight = math.min(
-            reachableRight,
-            hi + (scrollable ? maximum - scroll : 0),
-          );
+          reachableLeft = math.max(reachableLeft, lo);
+          reachableRight = math.min(reachableRight, hi);
+          if (scrollable && reachableLeft < reachableRight) {
+            reachableLeft -= scroll;
+            reachableRight += maximum - scroll;
+          }
         } else {
           visibleTop = math.max(visibleTop, lo);
           visibleBottom = math.min(visibleBottom, hi);
-          reachableTop = math.max(reachableTop, lo - (scrollable ? scroll : 0));
-          reachableBottom = math.min(
-            reachableBottom,
-            hi + (scrollable ? maximum - scroll : 0),
-          );
+          reachableTop = math.max(reachableTop, lo);
+          reachableBottom = math.min(reachableBottom, hi);
+          if (scrollable && reachableTop < reachableBottom) {
+            reachableTop -= scroll;
+            reachableBottom += maximum - scroll;
+          }
         }
       }
     }

@@ -84,18 +84,136 @@ void main() {
     final clipped = sanitizeBrowserMeasurement(normal);
     expect((clipped['text'] as List).single['visibleBoxes'], hasLength(1));
     final ancestor = (text['ancestorClips'] as List).single as Json;
+    ancestor['overflowY'] = 'clip';
+    expect(sanitizeBrowserMeasurement(normal)['unreachableClippedRanges'], 2);
     ancestor['overflowY'] = 'auto';
     final scrollable = sanitizeBrowserMeasurement(normal);
     expect(scrollable['observedClippedRanges'], 2);
     expect(scrollable['unreachableClippedRanges'], 0);
     expect(browserGeometryStatus(scrollable), CheckStatus.pass);
     ancestor['scrollbarsHidden'] = true;
-    expect(sanitizeBrowserMeasurement(normal)['unreachableClippedRanges'], 2);
+    expect(sanitizeBrowserMeasurement(normal)['unreachableClippedRanges'], 0);
     text['visibilityUnknown'] = true;
     final complex = sanitizeBrowserMeasurement(normal);
     expect(complex['unknownClippingRanges'], 1);
     expect(browserGeometryStatus(complex), CheckStatus.unknown);
     expect(jsonEncode(complex), isNot(contains('Private source')));
+  });
+  test('scroll reachability includes returning from a nonzero position', () {
+    for (final horizontal in [false, true]) {
+      for (final overflow in ['auto', 'scroll']) {
+        for (final hiddenScrollbar in [false, true]) {
+          for (final scroll in [0, 31, 62]) {
+            final raw = browserSample();
+            final text = (raw['text'] as List).single as Json;
+            text['boxes'] = [
+              for (var i = 0; i < 3; i++)
+                {
+                  'left': horizontal ? 10 + i * 30 - scroll : 10,
+                  'top': horizontal ? 10 : 10 + i * 30 - scroll,
+                  'right': horizontal ? 30 + i * 30 - scroll : 90,
+                  'bottom': horizontal ? 30 : 30 + i * 30 - scroll,
+                },
+            ];
+            text['ancestorClips'] = [
+              {
+                'rect': {
+                  'left': 0,
+                  'top': 0,
+                  'right': horizontal ? 38 : 100,
+                  'bottom': horizontal ? 200 : 38,
+                },
+                'overflowX': horizontal ? overflow : 'hidden',
+                'overflowY': horizontal ? 'hidden' : overflow,
+                'scrollLeft': horizontal ? scroll : 0,
+                'scrollTop': horizontal ? 0 : scroll,
+                'maxScrollLeft': horizontal ? 62 : 0,
+                'maxScrollTop': horizontal ? 0 : 62,
+                'scrollbarsHidden': hiddenScrollbar,
+              },
+            ];
+            final measured = sanitizeBrowserMeasurement(raw);
+            final reason = '$horizontal/$overflow/$hiddenScrollbar/$scroll';
+            expect(measured['observedClippedRanges'], 2, reason: reason);
+            expect(measured['unreachableClippedRanges'], 0, reason: reason);
+            expect(measured['unknownClippingRanges'], 0, reason: reason);
+            expect(browserGeometryStatus(measured), CheckStatus.pass);
+            expect(
+              (measured['text'] as List).single['visibleBoxes'],
+              hasLength(1),
+            );
+            // A range beyond the container's entire scroll extent is a loss,
+            // even though its three normal ranges are reachable.
+            (text['boxes'] as List).add({
+              'left': horizontal ? 120 - scroll : 10,
+              'top': horizontal ? 10 : 120 - scroll,
+              'right': horizontal ? 140 - scroll : 90,
+              'bottom': horizontal ? 30 : 140 - scroll,
+            });
+            final outside = sanitizeBrowserMeasurement(raw);
+            expect(outside['unreachableClippedRanges'], 1, reason: reason);
+            expect(browserGeometryStatus(outside), CheckStatus.fail);
+          }
+        }
+      }
+    }
+  });
+  test('scroll reachability translates the viewport intersection', () {
+    for (final top in [-10, 220]) {
+      final raw = browserSample();
+      final text = (raw['text'] as List).single as Json;
+      text['boxes'] = [
+        for (var i = 0; i < 3; i++)
+          {
+            'left': 10,
+            'top': top + 10 + i * 30 - 62,
+            'right': 90,
+            'bottom': top + 30 + i * 30 - 62,
+          },
+      ];
+      text['ancestorClips'] = [
+        {
+          'rect': {'left': 0, 'top': top, 'right': 100, 'bottom': top + 38},
+          'overflowX': 'hidden',
+          'overflowY': 'auto',
+          'scrollLeft': 0,
+          'scrollTop': 62,
+          'maxScrollLeft': 0,
+          'maxScrollTop': 62,
+          'scrollbarsHidden': true,
+        },
+      ];
+      final measured = sanitizeBrowserMeasurement(raw);
+      expect(measured['unreachableClippedRanges'], top < 0 ? 0 : 3);
+      expect(
+        browserGeometryStatus(measured),
+        top < 0 ? CheckStatus.pass : CheckStatus.fail,
+      );
+    }
+  });
+  test('hidden-scrollbar nested scrolling stays locally unknown', () {
+    final raw = browserSample();
+    final text = (raw['text'] as List).single as Json;
+    text['boxes'] = [
+      {'left': 10, 'top': 60, 'right': 90, 'bottom': 80},
+    ];
+    text['ancestorClips'] = [
+      for (final overflow in ['auto', 'hidden'])
+        {
+          'rect': {'left': 0, 'top': 0, 'right': 100, 'bottom': 38},
+          'overflowX': 'hidden',
+          'overflowY': overflow,
+          'scrollLeft': 0,
+          'scrollTop': 0,
+          'maxScrollLeft': 0,
+          'maxScrollTop': 62,
+          'scrollbarsHidden': true,
+        },
+    ];
+    final measured = sanitizeBrowserMeasurement(raw);
+    expect(measured['unknownClippingRanges'], 1);
+    expect(measured['unreachableClippedRanges'], 0);
+    expect(browserGeometryStatus(measured), CheckStatus.unknown);
   });
   for (final completedFirst in [false, true]) {
     test(
