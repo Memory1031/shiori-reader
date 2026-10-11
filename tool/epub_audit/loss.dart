@@ -763,6 +763,14 @@ final class ReadingLossCollector {
           }.contains(disposition);
           final impact = observation['impact'] as String;
           final confidence = observation['confidence'] as String;
+          // A confirmed cascade proves the winning declaration exists, not
+          // that its native representation lost anything. Keep its fact and
+          // scope association above without spending a verification target.
+          if (impact == 'information' &&
+              !info &&
+              disposition != 'invalid_input') {
+            continue;
+          }
           final family = {'content_integrity', 'navigation'}.contains(impact)
               ? impact == 'navigation'
                     ? LossFamily.interaction

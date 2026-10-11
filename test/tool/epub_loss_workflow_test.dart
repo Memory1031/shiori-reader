@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:test/test.dart';
 import '../../tool/epub_audit/browser_probe.dart';
+import '../../tool/epub_audit/audit.dart';
 import '../../tool/epub_audit/cli.dart';
 import '../../tool/epub_audit/loss_model.dart';
 import '../../tool/epub_audit/plan.dart';
@@ -41,6 +43,8 @@ Json browserSample({
         'lineHeight': '28px',
         'clip': 'hidden',
         'opacity': '1',
+        'ancestorClips': <Json>[],
+        'visibilityUnknown': false,
       },
   ],
   'images': [],
@@ -53,6 +57,208 @@ Json browserSample({
   ],
 };
 void main() {
+  test('ancestor clipping is measured even inside the root viewport', () {
+    final normal = browserSample();
+    final text = (normal['text'] as List).single as Json;
+    text['boxes'] = [
+      for (var i = 0; i < 3; i++)
+        {'left': 10, 'top': 10 + i * 30, 'right': 90, 'bottom': 30 + i * 30},
+    ];
+    text['ancestorClips'] = [];
+    text['visibilityUnknown'] = false;
+    expect(sanitizeBrowserMeasurement(normal)['unreachableClippedRanges'], 0);
+    text['ancestorClips'] = [
+      {
+        'domPath': 'html[1]/body[1]/div[1]',
+        'rect': {'left': 0, 'top': 0, 'right': 100, 'bottom': 38},
+        'overflowX': 'hidden',
+        'overflowY': 'hidden',
+        'scrollLeft': 0,
+        'scrollTop': 0,
+        'maxScrollLeft': 0,
+        'maxScrollTop': 62,
+        'scrollbarsHidden': false,
+      },
+    ];
+    expect(sanitizeBrowserMeasurement(normal)['unreachableClippedRanges'], 2);
+    final clipped = sanitizeBrowserMeasurement(normal);
+    expect((clipped['text'] as List).single['visibleBoxes'], hasLength(1));
+    final ancestor = (text['ancestorClips'] as List).single as Json;
+    ancestor['overflowY'] = 'auto';
+    final scrollable = sanitizeBrowserMeasurement(normal);
+    expect(scrollable['observedClippedRanges'], 2);
+    expect(scrollable['unreachableClippedRanges'], 0);
+    expect(browserGeometryStatus(scrollable), CheckStatus.pass);
+    ancestor['scrollbarsHidden'] = true;
+    expect(sanitizeBrowserMeasurement(normal)['unreachableClippedRanges'], 2);
+    text['visibilityUnknown'] = true;
+    final complex = sanitizeBrowserMeasurement(normal);
+    expect(complex['unknownClippingRanges'], 1);
+    expect(browserGeometryStatus(complex), CheckStatus.unknown);
+    expect(jsonEncode(complex), isNot(contains('Private source')));
+  });
+  for (final completedFirst in [false, true]) {
+    test(
+      'verify interruption stops dispatch and keeps its journal (completed first: $completedFirst)',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'shiori-loss-interrupt-',
+        );
+        final signals = StreamController<ProcessSignal>.broadcast(sync: true);
+        try {
+          final bytes = auditFixture(
+            body:
+                '<p style="border-radius:12px">Target A.</p><p style="border-radius:18px">Target B.</p>',
+          );
+          final snapshot = await produce(bytes);
+          final bundle = await Directory('${root.path}/bundle').create();
+          await writeBundle(snapshot, bundle);
+          final book = {...auditBytes(bytes), 'sha256': snapshot.hash};
+          final scan = <String, dynamic>{
+            'run': {
+              'schemaVersion': 2,
+              'producer': snapshot.producer,
+              'evaluator': await evaluatorIdentity(),
+              'probe': await probeIdentity(),
+              'optionsFingerprint': 'd' * 64,
+              'complete': true,
+            },
+            'books': [book],
+          };
+          final plan = makePlan(scan, maxTargets: 1, maxConfigurations: 1);
+          final target = VerificationTarget.fromJson(
+            (plan['targets'] as List).single as Json,
+          );
+          final first = VerificationTarget(
+            target.candidate,
+            target.chapterKey,
+            target.blockKey,
+            [ProbeConfiguration(), ProbeConfiguration(width: 320)],
+            maxScreenshots: 0,
+          );
+          final secondCandidate =
+              objectList(book['readingLoss'] as Json, 'candidates')
+                  .map(LossCandidate.fromJson)
+                  .firstWhere(
+                    (c) =>
+                        c.location.document ==
+                            target.candidate.location.document &&
+                        c.location.domPath != target.candidate.location.domPath,
+                  );
+          final second = VerificationTarget(
+            secondCandidate,
+            target.chapterKey,
+            null,
+            [ProbeConfiguration()],
+            maxScreenshots: 0,
+          );
+          expect(second.candidate.sourceId, isNot(first.candidate.sourceId));
+          plan['targets'] = [first.toJson(), second.toJson()];
+          await atomicJson('${root.path}/plan.json', plan);
+          final entry = File('${root.path}/worker.dart');
+          final ready = File('${root.path}/ready');
+          await entry.writeAsString(
+            "import 'dart:io'; Future<void> main(List<String> args) async {await File(args.single).writeAsString('ready'); await Future<void>.delayed(Duration(minutes:2));}",
+          );
+          var started = 0, workerExited = false;
+          final result = await verifyCommand(
+            {
+              '--provider': 'native',
+              '--plan': '${root.path}/plan.json',
+              '--bundle': bundle.path,
+              '--allow-root': root.path,
+              '--out': '${root.path}/verification',
+            },
+            testOnlySignals: signals.stream,
+            testOnlyFlutterProbe: (request, output, seconds) async {
+              started++;
+              if (started != (completedFirst ? 2 : 1)) {
+                return {
+                  'complete': true,
+                  'reason': 'executed',
+                  'observedPath': 'native',
+                  'layers': <String, dynamic>{},
+                  'assertions': <String, dynamic>{},
+                };
+              }
+              final worker = boundedProcess(
+                auditDartExecutable(),
+                [entry.path, ready.path],
+                const Duration(seconds: 10),
+                testOnlySignals: signals.stream,
+              );
+              for (var i = 0; i < 200 && !await ready.exists(); i++) {
+                await Future<void>.delayed(const Duration(milliseconds: 25));
+              }
+              expect(await ready.exists(), true);
+              signals.add(ProcessSignal.sigint);
+              final status = await worker;
+              workerExited = true;
+              return {
+                'complete': false,
+                'reason': status,
+                'observedPath': 'not_run',
+                'layers': <String, dynamic>{},
+                'assertions': <String, dynamic>{},
+              };
+            },
+          );
+          expect(result, 130);
+          expect(workerExited, true);
+          expect(started, completedFirst ? 2 : 1);
+          final evidence = await readEvidence('${root.path}/verification');
+          expect(evidence, hasLength(completedFirst ? 2 : 1));
+          expect(evidence.last.reason, 'interrupted');
+          if (completedFirst) {
+            expect(evidence.first.reason, 'executed');
+            expect(evidence.first.complete, true);
+          }
+          final index = await boundedJson(
+            File('${root.path}/verification/verification.json'),
+          );
+          expect(index['complete'], false);
+          expect(index['notRun'], hasLength(completedFirst ? 1 : 2));
+          expect(
+            (index['notRun'] as List).every(
+              (e) => e['reason'] == 'run_interrupted',
+            ),
+            true,
+          );
+        } finally {
+          await signals.close();
+          await root.delete(recursive: true);
+        }
+      },
+    );
+  }
+  test('cancelled scope never dispatches another replay or process', () async {
+    final root = await Directory.systemTemp.createTemp(
+      'shiori-loss-cancelled-',
+    );
+    final cancellation = ProbeCancellation(signals: const Stream.empty())
+      ..cancel();
+    try {
+      expect(
+        await boundedProcess(
+          'nonexistent-worker',
+          [],
+          const Duration(seconds: 1),
+          cancellation: cancellation,
+        ),
+        'interrupted',
+      );
+      final result = await replayOperation(
+        {'action': 'capture', 'input': 'must-not-be-read'},
+        root,
+        cancellation: cancellation,
+      );
+      expect(result['status'], 'interrupted');
+      expect(await File('${root.path}/replay-result.json').exists(), false);
+    } finally {
+      await cancellation.close();
+      await root.delete(recursive: true);
+    }
+  });
   test(
     'browser geometry separates clipping, overlap, scrolling and unknown backgrounds',
     () {

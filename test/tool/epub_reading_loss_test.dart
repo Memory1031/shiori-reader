@@ -35,6 +35,148 @@ Json identified(Json book, List<int> bytes) => {
 
 void main() {
   test(
+    'border unknown and observed clipping do not imply a verified candidate or production defect',
+    () {
+      final bytes = auditFixture(
+        body: '<p style="border-radius:12px">Target.</p>',
+      );
+      final book = identified(auditBytes(bytes), bytes),
+          c = bookCandidates(book).first;
+      VerificationEvidence evidence(
+        Json assertions,
+        EvidenceLayer layer,
+        CheckStatus status,
+      ) => VerificationEvidence(
+        id: 'f' * 64,
+        candidateId: c.id,
+        sourceId: c.sourceId,
+        epubHash: c.location.epubHash,
+        producer: 'a' * 64,
+        probe: 'c' * 64,
+        environment: 'b' * 64,
+        configuration: 'd' * 64,
+        provider: layer == EvidenceLayer.widgetGeometry ? 'native' : 'browser',
+        observedPath: 'native',
+        layers: {layer: status},
+        complete: true,
+        assertions: {'targetVisible': true, ...assertions},
+      );
+      Json decision(VerificationEvidence e) =>
+          (reviewLosses(run(book), [e])['decisions'] as List)
+              .cast<Json>()
+              .firstWhere((d) => d['candidateId'] == c.id);
+      expect(
+        decision(
+          evidence(
+            {'candidateFeatureStatus': 'unknown'},
+            EvidenceLayer.widgetGeometry,
+            CheckStatus.pass,
+          ),
+        )['kind'],
+        'verify_next',
+      );
+      expect(
+        decision(
+          evidence(
+            {'candidateFeatureStatus': 'pass'},
+            EvidenceLayer.widgetGeometry,
+            CheckStatus.pass,
+          ),
+        )['kind'],
+        'defer',
+      );
+      final clipping = <String, dynamic>{
+        'clippingSourceIntent': 'unverified',
+        'geometryFailureCauses': ['unreachable_clipping'],
+      };
+      expect(
+        decision(
+          evidence(clipping, EvidenceLayer.browserGeometry, CheckStatus.fail),
+        )['kind'],
+        'verify_next',
+      );
+      expect(
+        decision(
+          evidence(
+            {
+              ...clipping,
+              'geometryFailureCauses': ['unreachable_clipping', 'low_contrast'],
+            },
+            EvidenceLayer.browserGeometry,
+            CheckStatus.fail,
+          ),
+        )['kind'],
+        'recommend_fix',
+      );
+      final left = run(book)
+        ..['verification'] = [
+          evidence(
+            <String, dynamic>{},
+            EvidenceLayer.widgetGeometry,
+            CheckStatus.fail,
+          ).toJson(),
+        ];
+      final right = run(book)
+        ..['verification'] = [
+          evidence(
+            {'candidateFeatureStatus': 'unknown'},
+            EvidenceLayer.widgetGeometry,
+            CheckStatus.pass,
+          ).toJson(),
+        ];
+      final changes = (compareLossReports(left, right)['changes'] as List)
+          .cast<Json>();
+      expect(
+        changes
+            .where((r) => r['dimension'] == 'widget_geometry')
+            .single['kind'],
+        'unknown_due_to_coverage',
+      );
+    },
+  );
+  test(
+    'successful center and bold cascade retains facts without loss candidates',
+    () {
+      final bytes = auditFixture(
+        body:
+            '<p id="one" style="text-align:center;font-weight:bold">Normal text.<span id="two"></span><span id="missing"></span></p>',
+      );
+      final parser = fixtureParser(bytes), parsed = parser.parse();
+      final paragraph = parsed.content.chapters.first.blocks
+          .whereType<ParagraphBlock>()
+          .single;
+      expect(paragraph.alignment, ParagraphAlignment.center);
+      expect(paragraph.inlineStyles.any((s) => s.bold == true), true);
+      final book = identified(auditBytes(bytes), bytes);
+      expect(
+        (book['findings'] as List).cast<Json>().where(
+          (o) => o['ruleId'] == 'css.native_cascade_observed',
+        ),
+        isNotEmpty,
+      );
+      expect(bookCandidates(book), isEmpty);
+      expect(makePlan(run(book))['selectedTargets'], 0);
+      expect(
+        objectList(book['readingLoss'] as Json, 'sourceFacts').where(
+          (f) => (f['kind'] as String).startsWith(
+            'observation:css.native_cascade_observed',
+          ),
+        ),
+        isNotEmpty,
+      );
+      final lostBytes = auditFixture(
+        body:
+            '<div style="border:2px solid black"><p style="border:2px solid blue">Decorated.</p></div>',
+      );
+      final lost = identified(auditBytes(lostBytes), lostBytes);
+      expect(
+        bookCandidates(lost).any((c) => c.rule == 'box.nested_degraded'),
+        true,
+      );
+      expect(makePlan(run(lost))['selectedTargets'], greaterThan(0));
+    },
+  );
+  test(
     'sidecar exhaustion preserves real failures and cannot invent missing media',
     () {
       final bytes = auditFixture(

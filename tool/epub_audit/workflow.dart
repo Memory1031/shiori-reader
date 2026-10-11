@@ -24,12 +24,26 @@ Future<String> boundedProcess(
   Duration duration, {
   Map<String, String>? environment,
   String? log,
+  Stream<ProcessSignal>? testOnlySignals,
+  ProbeCancellation? cancellation,
 }) async {
-  final process = await Process.start(
-    executable,
-    arguments,
-    environment: environment,
-  );
+  final runCancellation =
+      cancellation ?? ProbeCancellation(signals: testOnlySignals);
+  if (runCancellation.isCancelled) {
+    if (cancellation == null) await runCancellation.close();
+    return 'interrupted';
+  }
+  late final Process process;
+  try {
+    process = await Process.start(
+      executable,
+      arguments,
+      environment: environment,
+    );
+  } catch (_) {
+    if (cancellation == null) await runCancellation.close();
+    rethrow;
+  }
   final sink = log == null ? null : File(log).openWrite();
   var retained = 0;
   Future<void> drain(Stream<List<int>> stream) async {
@@ -43,7 +57,7 @@ Future<String> boundedProcess(
 
   final stdoutDrain = drain(process.stdout),
       stderrDrain = drain(process.stderr);
-  var timedOut = false, interrupted = false;
+  var timedOut = false;
   Future<void>? stopping;
   void stop() {
     stopping ??= stopOwnedProcess(process);
@@ -53,20 +67,13 @@ Future<String> boundedProcess(
     timedOut = true;
     stop();
   });
-  StreamSubscription<ProcessSignal>? signal;
-  try {
-    signal = ProcessSignal.sigint.watch().listen((_) {
-      interrupted = true;
-      stop();
-    });
-  } on SignalException {
-    /* Hard interruption preserves published evidence. */
-  }
+  final signal = runCancellation.changes.listen((_) => stop());
+  if (runCancellation.isCancelled) stop();
   try {
     final code = await process.exitCode;
     if (stopping != null) await stopping;
     await Future.wait([stdoutDrain, stderrDrain]);
-    return interrupted
+    return runCancellation.isCancelled
         ? 'interrupted'
         : timedOut
         ? 'timeout'
@@ -75,8 +82,9 @@ Future<String> boundedProcess(
         : 'probe_failed';
   } finally {
     timer.cancel();
-    await signal?.cancel();
+    await signal.cancel();
     await sink?.close();
+    if (cancellation == null) await runCancellation.close();
   }
 }
 
@@ -84,17 +92,23 @@ Future<Json> replayOperation(
   Json request,
   Directory output, {
   int timeoutSeconds = 60,
+  ProbeCancellation? cancellation,
 }) async {
   final requestFile = p.join(output.path, 'replay-request.json');
   final resultFile = p.join(output.path, 'replay-result.json');
   await atomicJson(requestFile, request);
-  final status = await boundedProcess(auditDartExecutable(), [
-    '--disable-dart-dev',
-    '--packages=${p.absolute('.dart_tool/package_config.json')}',
-    p.absolute('tool/epub_audit/replay_worker.dart'),
-    requestFile,
-    resultFile,
-  ], Duration(seconds: timeoutSeconds));
+  final status = await boundedProcess(
+    auditDartExecutable(),
+    [
+      '--disable-dart-dev',
+      '--packages=${p.absolute('.dart_tool/package_config.json')}',
+      p.absolute('tool/epub_audit/replay_worker.dart'),
+      requestFile,
+      resultFile,
+    ],
+    Duration(seconds: timeoutSeconds),
+    cancellation: cancellation,
+  );
   if (status == 'completed') {
     return boundedJson(File(resultFile), maxBytes: 8 * 1024 * 1024);
   }
@@ -279,8 +293,9 @@ Future<Map<String, String>> authorizedInputs(Map<String, String> v) async {
 Future<Json> flutterProbe(
   Json request,
   Directory privateRoot,
-  int seconds,
-) async {
+  int seconds, {
+  ProbeCancellation? cancellation,
+}) async {
   final requestFile = p.join(privateRoot.path, 'request.json');
   final resultFile = p.join(privateRoot.path, 'probe-result.json');
   request['result'] = resultFile;
@@ -314,6 +329,7 @@ Future<Json> flutterProbe(
     Duration(seconds: seconds),
     environment: {'SHIORI_LOSS_REQUEST': requestFile},
     log: p.join(privateRoot.path, 'flutter-private.log'),
+    cancellation: cancellation,
   );
   if (status == 'completed' && await File(resultFile).exists()) {
     return boundedJson(File(resultFile), maxBytes: 8 * 1024 * 1024);
@@ -327,7 +343,28 @@ Future<Json> flutterProbe(
   };
 }
 
-Future<int> verifyCommand(Map<String, String> v) async {
+Future<int> verifyCommand(
+  Map<String, String> v, {
+  Stream<ProcessSignal>? testOnlySignals,
+  Future<Json> Function(Json, Directory, int)? testOnlyFlutterProbe,
+}) async {
+  final cancellation = ProbeCancellation(signals: testOnlySignals);
+  try {
+    return await _verifyCommand(
+      v,
+      cancellation,
+      testOnlyFlutterProbe: testOnlyFlutterProbe,
+    );
+  } finally {
+    await cancellation.close();
+  }
+}
+
+Future<int> _verifyCommand(
+  Map<String, String> v,
+  ProbeCancellation cancellation, {
+  Future<Json> Function(Json, Directory, int)? testOnlyFlutterProbe,
+}) async {
   final provider = v['--provider'] ?? 'native';
   if (!{'native', 'browser', 'webview'}.contains(provider)) {
     throw const FormatException('Unknown renderer provider');
@@ -394,7 +431,9 @@ Future<int> verifyCommand(Map<String, String> v) async {
   ).openWrite(mode: FileMode.append);
   var retained = 0, ordinal = 0;
   try {
+    verification:
     for (final target in targets) {
+      if (cancellation.isCancelled) break;
       final hash = target.candidate.location.epubHash;
       String? bundle = bundled ?? captured[hash];
       if (bundle == null &&
@@ -413,7 +452,9 @@ Future<int> verifyCommand(Map<String, String> v) async {
           },
           dir,
           timeoutSeconds: target.timeoutSeconds,
+          cancellation: cancellation,
         );
+        if (capturedResult['status'] == 'interrupted') cancellation.cancel();
         if (capturedResult['status'] == 'captured' &&
             (capturedResult['producer'] as Json)['fingerprint'] == producer) {
           bundle = dir.path;
@@ -429,6 +470,7 @@ Future<int> verifyCommand(Map<String, String> v) async {
           );
         }
       }
+      if (cancellation.isCancelled) break;
       if (bundle != null) {
         final manifest = await boundedJson(
           File(p.join(bundle, 'bundle.json')),
@@ -443,6 +485,7 @@ Future<int> verifyCommand(Map<String, String> v) async {
       }
       var targetScreenshots = 0;
       for (final config in target.configurations) {
+        if (cancellation.isCancelled) break verification;
         final dir = await Directory(
           p.join(
             privateDir.path,
@@ -478,7 +521,18 @@ Future<int> verifyCommand(Map<String, String> v) async {
               'screenshot': screenshot,
             };
             if (provider == 'native') {
-              result = await flutterProbe(request, dir, target.timeoutSeconds);
+              result = testOnlyFlutterProbe != null
+                  ? await testOnlyFlutterProbe(
+                      request,
+                      dir,
+                      target.timeoutSeconds,
+                    )
+                  : await flutterProbe(
+                      request,
+                      dir,
+                      target.timeoutSeconds,
+                      cancellation: cancellation,
+                    );
             } else if (provider == 'browser') {
               final htmlFile = p.join(dir.path, 'production-host.html');
               request['htmlOutput'] = htmlFile;
@@ -486,14 +540,17 @@ Future<int> verifyCommand(Map<String, String> v) async {
                 request,
                 dir,
                 target.timeoutSeconds,
+                cancellation: cancellation,
               );
-              if (prepared['status'] == 'host_document_prepared') {
+              if (prepared['status'] == 'host_document_prepared' &&
+                  !cancellation.isCancelled) {
                 result = await runBrowserProbe(
                   await File(htmlFile).readAsString(),
                   dir,
                   target,
                   config,
                   screenshot: screenshot,
+                  cancellation: cancellation,
                 );
               } else {
                 result = prepared;
@@ -503,13 +560,16 @@ Future<int> verifyCommand(Map<String, String> v) async {
                 request,
                 dir,
                 target.timeoutSeconds,
+                cancellation: cancellation,
               );
             }
           } catch (_) {
             result = {
               'complete': false,
               'observedPath': 'not_run',
-              'reason': 'provider_failure',
+              'reason': cancellation.isCancelled
+                  ? 'interrupted'
+                  : 'provider_failure',
               'layers': {
                 for (final layer in EvidenceLayer.values)
                   wireName(layer): 'not_run',
@@ -518,6 +578,7 @@ Future<int> verifyCommand(Map<String, String> v) async {
             };
           }
         }
+        if (result['reason'] == 'interrupted') cancellation.cancel();
         final env = {
           'platform': Platform.operatingSystem,
           'dart': Platform.version,
@@ -627,13 +688,36 @@ Future<int> verifyCommand(Map<String, String> v) async {
       'producer': plan['producer'],
       'evaluator': currentEvaluator,
       'complete':
+          !cancellation.isCancelled &&
           evidence.length ==
-          targets.fold<int>(0, (n, t) => n + t.configurations.length),
+              targets.fold<int>(0, (n, t) => n + t.configurations.length),
       'evidenceCount': evidence.length,
       'notSelected': plan['notSelected'],
+      'interrupted': cancellation.isCancelled,
+      'notRun': [
+        for (final pending in [
+          for (final target in targets)
+            for (final config in target.configurations)
+              {
+                'candidateId': target.candidate.id,
+                'sourceId': target.candidate.sourceId,
+                'configuration': config.fingerprint,
+                'provider': provider,
+              },
+        ].skip(ordinal))
+          {
+            ...pending,
+            'status': 'not_run',
+            'reason': cancellation.isCancelled
+                ? 'run_interrupted'
+                : 'run_incomplete',
+          },
+      ],
     });
   }
-  return evidence.any((e) => e.reason == 'timeout')
+  return cancellation.isCancelled
+      ? 130
+      : evidence.any((e) => e.reason == 'timeout')
       ? 124
       : evidence.any((e) => e.reason == 'interrupted')
       ? 130
@@ -760,8 +844,9 @@ Future<int> reviewCommand(Map<String, String> v) async {
 Future<Json> nativeWebViewProbe(
   Json request,
   Directory output,
-  int seconds,
-) async {
+  int seconds, {
+  ProbeCancellation? cancellation,
+}) async {
   // The explicit host entry is executable independently. A prebuilt diagnostic
   // executable can be supplied via this tool-only environment; never an app
   // installed in the user's regular library. No dependency is installed here.
@@ -797,6 +882,7 @@ Future<Json> nativeWebViewProbe(
     [requestFile],
     Duration(seconds: seconds),
     log: p.join(output.path, 'webview-private.log'),
+    cancellation: cancellation,
   );
   if (status != 'completed' || !await File(resultFile).exists()) {
     return {

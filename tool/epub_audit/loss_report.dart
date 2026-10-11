@@ -338,6 +338,7 @@ Json compareLossReports(Json before, Json after) {
             : left.layers[layer] == CheckStatus.fail &&
                   right.layers[layer] == CheckStatus.pass &&
                   right.complete &&
+                  right.assertions['candidateFeatureStatus'] != 'unknown' &&
                   right.assertions['targetVisible'] == true
             ? 'resolved_with_evidence'
             : 'unknown_due_to_coverage',

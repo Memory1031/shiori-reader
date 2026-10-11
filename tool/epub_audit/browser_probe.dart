@@ -9,6 +9,34 @@ import 'loss_model.dart';
 import 'plan.dart';
 import 'report.dart';
 
+/// A signal remains effective between workers for the whole verification run.
+final class ProbeCancellation {
+  ProbeCancellation({Stream<ProcessSignal>? signals}) {
+    try {
+      _signal = (signals ?? ProcessSignal.sigint.watch()).listen(
+        (_) => cancel(),
+      );
+    } on SignalException {
+      // Unsupported signals cannot turn incomplete evidence into a pass.
+    }
+  }
+  final _changes = StreamController<void>.broadcast(sync: true);
+  StreamSubscription<ProcessSignal>? _signal;
+  bool _cancelled = false;
+  bool get isCancelled => _cancelled;
+  Stream<void> get changes => _changes.stream;
+  void cancel() {
+    if (isCancelled) return;
+    _cancelled = true;
+    _changes.add(null);
+  }
+
+  Future<void> close() async {
+    await _signal?.cancel();
+    await _changes.close();
+  }
+}
+
 Future<void> stopOwnedProcess(Process process) async {
   // Only the process started by this command and its own descendants. Never
   // terminate a user's existing browser or another Flutter invocation.
@@ -98,7 +126,12 @@ Json sanitizeBrowserMeasurement(Json raw) {
       images = objectList(raw, 'images', max: 128),
       links = objectList(raw, 'links', max: 128);
   final safeTexts = <Json>[];
-  var clipped = 0, overlaps = 0, lowContrast = 0, unknownBackground = 0;
+  var clipped = 0,
+      observedClipped = 0,
+      unknownClipping = 0,
+      overlaps = 0,
+      lowContrast = 0,
+      unknownBackground = 0;
   final width = raw['clientWidth'] as num, height = raw['clientHeight'] as num;
   final dx = (raw['displacement'] as List)[0] as num,
       dy = (raw['displacement'] as List)[1] as num;
@@ -122,6 +155,72 @@ Json sanitizeBrowserMeasurement(Json raw) {
   for (final text in texts) {
     final source = text['text'] as String;
     final boxes = (text['boxes'] as List).cast<Json>();
+    final ancestors = objectList(text, 'ancestorClips', max: 128);
+    final uncertainClip =
+        text['visibilityUnknown'] != false ||
+        !text.containsKey('ancestorClips') ||
+        text['rangesComplete'] == false ||
+        ancestors.any((a) => (a['scrollLeft'] as num) < 0) ||
+        // Moving descendants through nested clipping scopes needs more than
+        // the current axis-aligned rectangles; do not invent reachability.
+        ancestors.length > 1 &&
+            ancestors.any(
+              (a) =>
+                  a['scrollbarsHidden'] == false &&
+                  ({'auto', 'scroll'}.contains(a['overflowX']) &&
+                          (a['maxScrollLeft'] as num) > 0 ||
+                      {'auto', 'scroll'}.contains(a['overflowY']) &&
+                          (a['maxScrollTop'] as num) > 0),
+            );
+    if (uncertainClip) unknownClipping++;
+    var visibleLeft = 0.0,
+        visibleTop = 0.0,
+        visibleRight = width.toDouble(),
+        visibleBottom = height.toDouble();
+    var reachableLeft = 0.0,
+        reachableTop = 0.0,
+        reachableRight = (width + dx).toDouble(),
+        reachableBottom = (height + dy).toDouble();
+    for (final ancestor in ancestors) {
+      final r = ancestor['rect'] as Json;
+      for (final axis in ['X', 'Y']) {
+        final overflow = ancestor['overflow$axis'];
+        if (overflow == 'visible') continue;
+        final horizontal = axis == 'X';
+        final lo = (r[horizontal ? 'left' : 'top'] as num).toDouble();
+        final hi = (r[horizontal ? 'right' : 'bottom'] as num).toDouble();
+        final scroll =
+            (ancestor[horizontal ? 'scrollLeft' : 'scrollTop'] as num)
+                .toDouble();
+        final maximum =
+            (ancestor[horizontal ? 'maxScrollLeft' : 'maxScrollTop'] as num)
+                .toDouble();
+        final scrollable =
+            {'auto', 'scroll'}.contains(overflow) &&
+            ancestor['scrollbarsHidden'] == false;
+        if (horizontal) {
+          visibleLeft = math.max(visibleLeft, lo);
+          visibleRight = math.min(visibleRight, hi);
+          reachableLeft = math.max(
+            reachableLeft,
+            lo - (scrollable ? scroll : 0),
+          );
+          reachableRight = math.min(
+            reachableRight,
+            hi + (scrollable ? maximum - scroll : 0),
+          );
+        } else {
+          visibleTop = math.max(visibleTop, lo);
+          visibleBottom = math.min(visibleBottom, hi);
+          reachableTop = math.max(reachableTop, lo - (scrollable ? scroll : 0));
+          reachableBottom = math.min(
+            reachableBottom,
+            hi + (scrollable ? maximum - scroll : 0),
+          );
+        }
+      }
+    }
+    final visibleBoxes = <Json>[];
     final fg = color(text['color'] as String?),
         bg = color(text['background'] as String?);
     double? contrast;
@@ -138,22 +237,45 @@ Json sanitizeBrowserMeasurement(Json raw) {
           right = (rect['right'] as num).toDouble(),
           bottom = (rect['bottom'] as num).toDouble();
       if (right <= left || bottom <= top) {
-        clipped++;
+        if (!uncertainClip) clipped++;
         continue;
       }
-      if (left < -1 ||
-          top < -1 ||
-          right > width + dx + 1 ||
-          bottom > height + dy + 1) {
+      if (!uncertainClip &&
+          (left < reachableLeft - 1 ||
+              top < reachableTop - 1 ||
+              right > reachableRight + 1 ||
+              bottom > reachableBottom + 1)) {
         clipped++;
       }
+      if (!uncertainClip &&
+          (left < visibleLeft - 1 ||
+              top < visibleTop - 1 ||
+              right > visibleRight + 1 ||
+              bottom > visibleBottom + 1)) {
+        observedClipped++;
+      }
+      if (uncertainClip) continue;
+      final shown = <String, dynamic>{
+        'left': math.max(left, visibleLeft),
+        'top': math.max(top, visibleTop),
+        'right': math.min(right, visibleRight),
+        'bottom': math.min(bottom, visibleBottom),
+      };
+      if ((shown['right'] as num) <= (shown['left'] as num) ||
+          (shown['bottom'] as num) <= (shown['top'] as num)) {
+        continue;
+      }
+      visibleBoxes.add(shown);
       for (final other in rectangles.take(256)) {
         final intersectWidth =
-            _min(right, (other['right'] as num).toDouble()) -
-            _max(left, (other['left'] as num).toDouble());
+            _min(shown['right'] as double, (other['right'] as num).toDouble()) -
+            _max(shown['left'] as double, (other['left'] as num).toDouble());
         final intersectHeight =
-            _min(bottom, (other['bottom'] as num).toDouble()) -
-            _max(top, (other['top'] as num).toDouble());
+            _min(
+              shown['bottom'] as double,
+              (other['bottom'] as num).toDouble(),
+            ) -
+            _max(shown['top'] as double, (other['top'] as num).toDouble());
         if (intersectWidth > 3 &&
             intersectHeight > 3 &&
             intersectWidth * intersectHeight >
@@ -161,7 +283,7 @@ Json sanitizeBrowserMeasurement(Json raw) {
           overlaps++;
         }
       }
-      if (rectangles.length < 256) rectangles.add(rect);
+      if (rectangles.length < 256) rectangles.add(shown);
     }
     safeTexts.add({
       'domPath': text['domPath'],
@@ -170,6 +292,29 @@ Json sanitizeBrowserMeasurement(Json raw) {
       'sourceUnit': 'unicode_code_point',
       'browserRangeUnit': 'utf16',
       'boxes': boxes,
+      'visibleBoxes': visibleBoxes,
+      'visibility': uncertainClip
+          ? 'unknown'
+          : visibleBoxes.isEmpty
+          ? 'clipped'
+          : 'visible',
+      'ancestorClips': [
+        for (final a in ancestors)
+          {
+            for (final field in [
+              'domPath',
+              'rect',
+              'overflowX',
+              'overflowY',
+              'scrollLeft',
+              'scrollTop',
+              'maxScrollLeft',
+              'maxScrollTop',
+              'scrollbarsHidden',
+            ])
+              field: a[field],
+          },
+      ],
       'color': text['color'],
       'background': text['background'],
       'contrast': contrast,
@@ -205,6 +350,15 @@ Json sanitizeBrowserMeasurement(Json raw) {
         },
     ],
     'unreachableClippedRanges': clipped,
+    'observedClippedRanges': observedClipped,
+    'unknownClippingRanges': unknownClipping,
+    'clippingSourceIntent': 'unverified',
+    'geometryFailureCauses': [
+      if (clipped > 0) 'unreachable_clipping',
+      if (lowContrast > 0) 'low_contrast',
+      if (images.any((i) => i['complete'] == true && i['naturalWidth'] == 0))
+        'image_decode',
+    ],
     'overlappingTextRanges': overlaps,
     'lowContrastRanges': lowContrast,
     'unknownBackgroundRanges': unknownBackground,
@@ -213,13 +367,35 @@ Json sanitizeBrowserMeasurement(Json raw) {
   };
 }
 
+CheckStatus browserGeometryStatus(Json measurements) =>
+    (measurements['geometryFailureCauses'] as List).isNotEmpty
+    ? CheckStatus.fail
+    : measurements['truncated'] == true ||
+          (measurements['overlappingTextRanges'] as int) > 0 ||
+          (measurements['unknownBackgroundRanges'] as int) > 0 ||
+          (measurements['unknownClippingRanges'] as int) > 0
+    ? CheckStatus.unknown
+    : CheckStatus.pass;
+
 Future<Json> runBrowserProbe(
   String html,
   Directory privateRoot,
   VerificationTarget target,
   ProbeConfiguration configuration, {
   String? screenshot,
+  ProbeCancellation? cancellation,
+  String? testOnlyBeforeInspection,
+  void Function()? testOnlyOnStarted,
 }) async {
+  if (cancellation?.isCancelled == true) {
+    return {
+      'complete': false,
+      'observedPath': 'not_run',
+      'reason': 'interrupted',
+      'layers': <String, dynamic>{},
+      'assertions': <String, dynamic>{},
+    };
+  }
   final executable = installedChromium();
   if (executable == null) {
     return {
@@ -252,14 +428,26 @@ Future<Json> runBrowserProbe(
   ]);
   final out = process.stdout.drain<void>(), err = process.stderr.drain<void>();
   _Cdp? client;
-  final timeout = Timer(
-    Duration(seconds: target.timeoutSeconds),
-    () => unawaited(stopOwnedProcess(process)),
+  final runCancellation = cancellation ?? ProbeCancellation();
+  Future<void>? stopping;
+  void stop() {
+    stopping ??= stopOwnedProcess(process);
+  }
+
+  final cancellationSubscription = runCancellation.changes.listen(
+    (_) => stop(),
   );
+  if (runCancellation.isCancelled) stop();
+  final timeout = Timer(Duration(seconds: target.timeoutSeconds), stop);
   final http = HttpClient()..connectionTimeout = const Duration(seconds: 5);
   try {
+    testOnlyOnStarted?.call();
     final portFile = File(p.join(profile.path, 'DevToolsActivePort'));
-    for (var i = 0; i < 100 && !await portFile.exists(); i++) {
+    for (
+      var i = 0;
+      i < 100 && !await portFile.exists() && !runCancellation.isCancelled;
+      i++
+    ) {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
     if (!await portFile.exists()) {
@@ -295,7 +483,13 @@ Future<Json> runBrowserProbe(
       if (await client.evaluate('document.readyState') == 'complete') break;
       await Future<void>.delayed(const Duration(milliseconds: 25));
     }
+    if (testOnlyBeforeInspection != null) {
+      await client.evaluate(testOnlyBeforeInspection);
+    }
     final before = await client.evaluate(epubPageInspectionScript) as Json;
+    if (runCancellation.isCancelled) {
+      throw const FormatException('Probe interrupted');
+    }
     final measurements = sanitizeBrowserMeasurement(before);
     final scope = target.candidate.location.domPath;
     measurements['targetVisible'] =
@@ -304,7 +498,7 @@ Future<Json> runBrowserProbe(
           (t) =>
               ((t['domPath'] as String) == scope ||
                   (t['domPath'] as String).startsWith('$scope/')) &&
-              (t['boxes'] as List).isNotEmpty,
+              (t['visibleBoxes'] as List).isNotEmpty,
         );
     var clicked = false;
     await client.evaluate(
@@ -360,16 +554,9 @@ Future<Json> runBrowserProbe(
       }
       await File(screenshot).writeAsBytes(png, flush: true);
     }
-    final failed =
-        (measurements['unreachableClippedRanges'] as int) > 0 ||
-        (measurements['lowContrastRanges'] as int) > 0 ||
-        (measurements['images'] as List).cast<Json>().any(
-          (i) => i['complete'] == true && i['naturalWidth'] == 0,
-        );
+    final status = browserGeometryStatus(measurements);
     final unknown =
-        measurements['truncated'] == true ||
-        (measurements['overlappingTextRanges'] as int) > 0 ||
-        (measurements['unknownBackgroundRanges'] as int) > 0;
+        status == CheckStatus.unknown || measurements['targetVisible'] != true;
     return {
       'complete': !unknown,
       'observedPath': 'presentation',
@@ -378,7 +565,7 @@ Future<Json> runBrowserProbe(
       'layers': {
         for (final layer in EvidenceLayer.values)
           wireName(layer): layer == EvidenceLayer.browserGeometry
-              ? failed
+              ? status == CheckStatus.fail
                     ? 'fail'
                     : unknown
                     ? 'unknown'
@@ -390,28 +577,42 @@ Future<Json> runBrowserProbe(
       'assertions': measurements,
       'environmentDetail': await client.call('Browser.getVersion'),
     };
+  } catch (_) {
+    if (!runCancellation.isCancelled) rethrow;
+    return {
+      'complete': false,
+      'observedPath': 'not_run',
+      'reason': 'interrupted',
+      'layers': <String, dynamic>{},
+      'assertions': <String, dynamic>{},
+    };
   } finally {
     timeout.cancel();
+    await cancellationSubscription.cancel();
     http.close(force: true);
     if (client != null) {
-      try {
-        await client.call('Browser.close');
-      } catch (_) {
-        /* Process cleanup below. */
+      if (!runCancellation.isCancelled && stopping == null) {
+        try {
+          await client.call('Browser.close');
+        } catch (_) {
+          /* Process cleanup below. */
+        }
       }
       await client.close();
     }
     try {
       await process.exitCode.timeout(const Duration(seconds: 3));
     } on TimeoutException {
-      await stopOwnedProcess(process);
+      stop();
     }
+    if (stopping != null) await stopping;
     await Future.wait([out, err]);
     final canonical = await profile.resolveSymbolicLinks();
     if (p.equals(p.normalize(profile.absolute.path), p.normalize(canonical)) &&
         p.isWithin(privateRoot.absolute.path, canonical)) {
       await profile.delete(recursive: true);
     }
+    if (cancellation == null) await runCancellation.close();
   }
 }
 

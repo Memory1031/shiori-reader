@@ -132,7 +132,7 @@ Future<void> main(List<String> args) async {
                                     (t['domPath'] as String).startsWith(
                                       '$sourceScope/',
                                     )) &&
-                                (t['boxes'] as List).isNotEmpty,
+                                (t['visibleBoxes'] as List).isNotEmpty,
                           );
                       final hit = (inspection.values['links'] as List)
                           .cast<Json>()
@@ -181,15 +181,9 @@ Future<void> main(List<String> args) async {
                           };
                         }
                       }
-                      final failed =
-                          (measurements['unreachableClippedRanges'] as int) >
-                              0 ||
-                          (measurements['lowContrastRanges'] as int) > 0;
+                      final status = browserGeometryStatus(measurements);
                       final unknown =
-                          measurements['truncated'] == true ||
-                          (measurements['overlappingTextRanges'] as int) > 0 ||
-                          (measurements['unknownBackgroundRanges'] as int) >
-                              0 ||
+                          status == CheckStatus.unknown ||
                           measurements['targetVisible'] != true;
                       unawaited(
                         finish({
@@ -208,7 +202,7 @@ Future<void> main(List<String> args) async {
                               wireName(
                                 layer,
                               ): layer == EvidenceLayer.nativeWebView
-                                  ? failed
+                                  ? status == CheckStatus.fail
                                         ? 'fail'
                                         : unknown
                                         ? 'unknown'

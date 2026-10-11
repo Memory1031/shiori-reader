@@ -372,6 +372,23 @@ Future<Json> runNativeProbe(
       sidecar,
       'correspondences',
     ).map(Correspondence.fromJson).toList();
+    final targetFact = sourceFacts
+        .where((f) => f.id == target.candidate.sourceId)
+        .firstOrNull;
+    final needsBorderPixels =
+        target.candidate.rule.contains('border') ||
+        target.candidate.rule.contains('radius') ||
+        (targetFact?.details['effectiveStyles'] as Map?)?.containsKey(
+              'border-radius',
+            ) ==
+            true;
+    final targetBlock = chapter.blocks
+        .where((b) => b.blockKey == target.blockKey)
+        .firstOrNull;
+    final targetBoxes = [
+      targetBlock?.box,
+      targetBlock?.layout,
+    ].whereType<BlockBox>().toList();
     final sourceByBlock = <String, SourceFact>{};
     for (final f in sourceFacts.where((f) => f.kind == 'text')) {
       final match = correspondences
@@ -631,7 +648,10 @@ Future<Json> runNativeProbe(
           final measured = await tester.runAsync(
             () => borderPixels(render.painter!, render.size),
           );
-          decorations.add(measured!);
+          measured!['candidateScope'] = targetBoxes.contains(
+            (render.painter! as ReaderBoxPainter).box,
+          );
+          decorations.add(measured);
           if (measured['status'] == 'fail') geometryFailures++;
         }
       }
@@ -841,6 +861,18 @@ Future<Json> runNativeProbe(
       layers[EvidenceLayer.fontGlyph] = CheckStatus.unknown;
     }
     assertions.addAll({
+      if (needsBorderPixels)
+        'candidateFeatureStatus':
+            decorations
+                .where((d) => d['candidateScope'] == true)
+                .any((d) => d['status'] == 'fail')
+            ? 'fail'
+            : decorations.where((d) => d['candidateScope'] == true).isEmpty ||
+                  decorations
+                      .where((d) => d['candidateScope'] == true)
+                      .any((d) => d['status'] == 'unknown')
+            ? 'unknown'
+            : 'pass',
       'pages': pages,
       'reachedDocumentEnd': reachedEnd,
       'targetVisible': targetSeen,
@@ -970,14 +1002,28 @@ Future<Json> borderPixels(CustomPainter painter, Size size) async {
     return {'status': 'unknown', 'reason': 'non_simple_or_oversized_painter'};
   }
   final g = painter.geometry;
+  final sides = [
+    painter.box.borders?.top,
+    painter.box.borders?.right,
+    painter.box.borders?.bottom,
+    painter.box.borders?.left,
+  ];
+  final widths = [g.borderTop, g.borderRight, g.borderBottom, g.borderLeft];
+  final colors = sides
+      .map((s) => s?.color ?? painter.box.borderColor ?? 0xff808080)
+      .toSet();
   final width = math.min(g.borderTop, g.borderLeft);
   final radius = g.radius.clamp(0.0, math.min(size.width, size.height) / 2);
   if (radius < 6 ||
       width < 2 ||
       !painter.top ||
       painter.box.backgroundImage != null ||
-      painter.box.borders?.top?.style == BoxBorderStyle.dashed ||
-      painter.box.borders?.top?.style == BoxBorderStyle.dotted) {
+      painter.box.dashed ||
+      sides.any(
+        (s) => (s?.style ?? BoxBorderStyle.solid) != BoxBorderStyle.solid,
+      ) ||
+      widths.any((w) => (w - width).abs() > .01) ||
+      colors.length != 1) {
     return {'status': 'unknown', 'reason': 'not_solid_closed_rounded_corner'};
   }
   final recorder = ui.PictureRecorder();

@@ -276,13 +276,29 @@ Json reviewLosses(
   for (final c in sorted) {
     final matching = accepted.where((e) => e.candidateId == c.id).toList();
     final failed = matching
-        .where((e) => e.layers.values.contains(CheckStatus.fail))
+        .where(
+          (e) =>
+              e.layers.values.contains(CheckStatus.fail) &&
+              !(e.assertions['clippingSourceIntent'] == 'unverified' &&
+                  e.assertions['geometryFailureCauses'] is List &&
+                  (e.assertions['geometryFailureCauses'] as List).length == 1 &&
+                  (e.assertions['geometryFailureCauses'] as List).single ==
+                      'unreachable_clipping' &&
+                  e.layers.entries
+                      .where((l) => l.value == CheckStatus.fail)
+                      .every(
+                        (l) =>
+                            l.key == EvidenceLayer.browserGeometry ||
+                            l.key == EvidenceLayer.nativeWebView,
+                      )),
+        )
         .toList();
     final measured =
         c.classification != 'insufficient_evidence' &&
         matching.any(
           (e) =>
               e.complete &&
+              e.assertions['candidateFeatureStatus'] != 'unknown' &&
               (e.assertions['targetVisible'] == true ||
                   e.observedPath == 'presentation' &&
                       e.assertions['truncated'] == false) &&

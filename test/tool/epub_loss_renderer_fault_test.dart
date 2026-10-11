@@ -4,6 +4,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/features/reader/viewport/reader_box.dart';
+import 'package:shiori/features/reader/reader_authored_colors.dart';
+import 'package:shiori/domain/models/models.dart';
 import '../../tool/epub_audit/native_probe.dart';
 import '../../tool/epub_audit/audit.dart';
 import '../../tool/epub_audit/loss_report.dart';
@@ -68,6 +70,77 @@ class SquareFaultPainter extends ReaderBoxPainter {
 }
 
 void main() {
+  testWidgets(
+    'rounded border certification excludes shaded and unequal sides',
+    (tester) async {
+      BoxBorderSide side(
+        BoxBorderStyle style, {
+        int color = 0xff0000ff,
+        double width = 6,
+      }) =>
+          BoxBorderSide(width: LayoutLength(width), style: style, color: color);
+      final uniform = side(BoxBorderStyle.solid);
+      for (final other in [
+        side(BoxBorderStyle.ridge),
+        side(BoxBorderStyle.groove),
+        side(BoxBorderStyle.solid, color: 0xffff0000),
+        side(BoxBorderStyle.solid, width: 4),
+      ]) {
+        final box = BlockBox(
+          group: 0,
+          radius: LayoutLength(18),
+          borders: BoxBorders(
+            top: uniform,
+            right: uniform,
+            bottom: uniform,
+            left: other,
+          ),
+        );
+        final painter = ReaderBoxPainter(
+          box,
+          ReaderBoxGeometry(box, 100, 20, 800),
+          true,
+          true,
+          ReaderAuthoredColors(ThemeData.light()),
+        );
+        final result = await tester.runAsync(
+          () => borderPixels(painter, const Size(100, 80)),
+        );
+        expect(result!['status'], 'unknown');
+      }
+    },
+  );
+  testWidgets('correct double rounded border cannot fail a solid-only probe', (
+    tester,
+  ) async {
+    final book = await probeBook(
+      tester,
+      body:
+          '<p style="border:6px double blue;border-radius:18px">Double.</p><p>Tail.</p>',
+    );
+    final target = targetFor(book);
+    final block = book.parsed.content.chapters.first.blocks.first;
+    final box = block.box!;
+    final painter = ReaderBoxPainter(
+      box,
+      ReaderBoxGeometry(box, 100, 20, 800),
+      true,
+      true,
+      ReaderAuthoredColors(ThemeData.light()),
+    );
+    final measured = await tester.runAsync(
+      () => borderPixels(painter, const Size(100, 80)),
+    );
+    expect(measured!['status'], 'unknown');
+    final result = await runNativeProbe(
+      tester,
+      book,
+      target,
+      target.configurations.first,
+    );
+    expect(result['layers']['widget_geometry'], isNot('fail'));
+    expect(result['assertions']['candidateFeatureStatus'], 'unknown');
+  });
   testWidgets(
     'wrapped Unicode text uses code point offsets when matching paint',
     (tester) async {
