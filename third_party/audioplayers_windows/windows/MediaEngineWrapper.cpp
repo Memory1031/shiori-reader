@@ -14,6 +14,7 @@
 
 // STL headers
 #include <functional>
+#include <exception>
 #include <memory>
 
 #include <Audioclient.h>
@@ -124,6 +125,7 @@ void MediaEngineWrapper::Pause() {
 }
 
 void MediaEngineWrapper::Shutdown() {
+  if (m_detachCallback) m_detachCallback();
   RunSyncInMTA([&]() {
     auto lock = m_lock.lock();
     if (m_mediaEngine == nullptr) {
@@ -280,11 +282,13 @@ void MediaEngineWrapper::CreateMediaEngine() {
   m_platformRef.Startup();
 
   THROW_IF_FAILED(MFCreateAttributes(creationAttributes.put(), 7));
-  m_callbackHelper = winrt::make<MediaEngineCallbackHelper>(
+  const auto callbackHelper = winrt::make_self<MediaEngineCallbackHelper>(
       [&]() { this->OnLoaded(); },
       [&](MF_MEDIA_ENGINE_ERR error, HRESULT hr) { this->OnError(error, hr); },
       [&](BufferingState state) { this->OnBufferingStateChange(state); },
       [&]() { this->OnPlaybackEnded(); }, [&]() { this->OnSeekCompleted(); });
+  m_callbackHelper = callbackHelper.as<IMFMediaEngineNotify>();
+  m_detachCallback = [callbackHelper] { callbackHelper->DetachParent(); };
   THROW_IF_FAILED(creationAttributes->SetUnknown(MF_MEDIA_ENGINE_CALLBACK,
                                                  m_callbackHelper.get()));
   THROW_IF_FAILED(
@@ -309,15 +313,24 @@ void MediaEngineWrapper::CreateMediaEngine() {
 }
 
 void MediaEngineWrapper::SetMediaSource(IMFMediaSource* mediaSource) {
-  winrt::com_ptr<IUnknown> sourceUnknown;
-  THROW_IF_FAILED(
-      mediaSource->QueryInterface(IID_PPV_ARGS(sourceUnknown.put())));
-  m_mediaEngineExtension->SetMediaSource(sourceUnknown.get());
+  std::exception_ptr error;
+  RunSyncInMTA([&] {
+    try {
+      winrt::com_ptr<IUnknown> sourceUnknown;
+      THROW_IF_FAILED(
+          mediaSource->QueryInterface(IID_PPV_ARGS(sourceUnknown.put())));
+      m_mediaEngineExtension->SetMediaSource(sourceUnknown.get());
 
-  winrt::com_ptr<IMFMediaEngineEx> mediaEngineEx =
-      m_mediaEngine.as<IMFMediaEngineEx>();
-  wil::unique_bstr source = wil::make_bstr(L"customSrc");
-  THROW_IF_FAILED(mediaEngineEx->SetSource(source.get()));
+      winrt::com_ptr<IMFMediaEngineEx> mediaEngineEx =
+          m_mediaEngine.as<IMFMediaEngineEx>();
+      wil::unique_bstr source = wil::make_bstr(L"customSrc");
+      THROW_IF_FAILED(mediaEngineEx->SetSource(source.get()));
+    } catch (...) {
+      // Always return through RunSyncInMTA's completion signal on failure.
+      error = std::current_exception();
+    }
+  });
+  if (error) std::rethrow_exception(error);
 }
 
 void MediaEngineWrapper::ReleaseMediaSource() {

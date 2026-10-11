@@ -42,10 +42,25 @@
 #include "MediaEngineWrapper.h"
 #include "MediaFoundationHelpers.h"
 #include "event_stream_handler.h"
+#include "source_preparation.h"
 
 using namespace winrt;
 
 enum ReleaseMode { stop, release, loop };
+
+struct PreparedAudioSource {
+  // Keep Media Foundation alive until an uninstalled result is discarded.
+  std::shared_ptr<media::MFPlatformRef> platform;
+  winrt::com_ptr<IMFMediaSource> source;
+  bool installed = false;
+  PreparedAudioSource() = default;
+  PreparedAudioSource(PreparedAudioSource&&) = default;
+  ~PreparedAudioSource() {
+    if (source && !installed) source->Shutdown();
+  }
+};
+PreparedAudioSource ResolveAudioSource(const std::string& url,
+                                      const std::vector<uint8_t>& bytes);
 
 static std::unordered_map<std::string, ReleaseMode> const releaseModeMap = {
     {"ReleaseMode.stop", ReleaseMode::stop},
@@ -54,9 +69,13 @@ static std::unordered_map<std::string, ReleaseMode> const releaseModeMap = {
 
 class AudioPlayer {
  public:
+  using SourceResolver = std::function<PreparedAudioSource(
+      const std::string&, const std::vector<uint8_t>&)>;
   AudioPlayer(std::string playerId,
               flutter::MethodChannel<flutter::EncodableValue>* methodChannel,
-              EventStreamHandler<>* eventHandler);
+              EventStreamHandler<>* eventHandler,
+              const std::shared_ptr<audioplayers_windows::PlatformThreadDispatcher>& dispatcher,
+              SourceResolver resolver = ResolveAudioSource);
 
   void Dispose();
 
@@ -102,6 +121,11 @@ class AudioPlayer {
   // Media members
   media::MFPlatformRef m_mfPlatform;
   winrt::com_ptr<media::MediaEngineWrapper> m_mediaEngineWrapper;
+  audioplayers_windows::SourcePreparation m_sourcePreparation;
+  const SourceResolver m_sourceResolver;
+  bool m_disposed = false;
+  void PrepareSource(std::string url, std::vector<uint8_t> bytes);
+  void SourceError(std::exception_ptr error);
 
   bool _isInitialized = false;
   ReleaseMode _releaseMode = ReleaseMode::release;

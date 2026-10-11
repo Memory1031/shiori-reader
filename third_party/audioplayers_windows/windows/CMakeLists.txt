@@ -36,6 +36,7 @@ add_library(${PLUGIN_NAME} SHARED
   "audioplayers_helpers.h"
   "event_stream_handler.h"
   "platform_thread_dispatcher.h"
+  "source_preparation.h"
   "MediaEngineExtension.h"
   "MediaEngineExtension.cpp"
   "MediaFoundationHelpers.h"

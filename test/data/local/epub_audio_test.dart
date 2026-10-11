@@ -1,8 +1,57 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/data/local/epub/epub_parser.dart';
+import 'package:shiori/domain/contracts/contracts.dart';
 import 'support/synthetic_audio.dart';
 
 void main() {
+  test('visible native audio takes precedence over special presentation', () {
+    for (final control in [
+      '<audio controls src="../audio/test.wav"></audio>',
+      '<audio controls src="missing.wav"></audio>',
+      '<div style="visibility:hidden"><audio controls '
+          'style="visibility:visible" src="../audio/test.wav"></audio></div>',
+    ]) {
+      final parser = EpubParser(
+        audioEpubBytes(
+          '<p style="transform:rotate(2deg)">Synthetic audio page.</p>'
+          '$control<p>Tail.</p>',
+        ),
+        LocalBookIdentity.book('a' * 64),
+        'synthetic.epub',
+        includePresentations: true,
+      );
+      final parsed = parser.parse();
+      expect(
+        parsed.content.chapters.first.blocks.whereType<AudioBlock>(),
+        hasLength(1),
+      );
+      expect(parser.presentations, isEmpty);
+    }
+  });
+  test('hidden and non-control audio preserve special presentation', () {
+    for (final control in [
+      '<audio src="../audio/test.wav"></audio>',
+      '<audio controls style="visibility:hidden" src="../audio/test.wav"></audio>',
+      '<div hidden><audio controls src="../audio/test.wav"></audio></div>',
+    ]) {
+      final parser = EpubParser(
+        audioEpubBytes(
+          '<p style="transform:rotate(2deg)">Synthetic special page.</p>'
+          '$control<p>Tail.</p>',
+        ),
+        LocalBookIdentity.book('a' * 64),
+        'synthetic.epub',
+        includePresentations: true,
+      );
+      final parsed = parser.parse();
+      expect(
+        parsed.content.chapters.first.blocks.whereType<AudioBlock>(),
+        isEmpty,
+      );
+      expect(parser.presentations, isNotEmpty);
+    }
+  });
   test(
     'audio controls keep order, media, alignment, targets and JSON identity',
     () {

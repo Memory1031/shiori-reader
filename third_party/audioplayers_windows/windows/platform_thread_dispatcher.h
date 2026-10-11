@@ -17,6 +17,7 @@ namespace audioplayers_windows {
 class PlatformThreadDispatcher {
  public:
   using Task = std::function<void()>;
+  using Poster = std::function<bool(Task)>;
 
   PlatformThreadDispatcher() : state_(std::make_shared<State>()) {
     const auto instance = GetModuleHandleW(nullptr);
@@ -45,14 +46,15 @@ class PlatformThreadDispatcher {
   }
 
   bool Post(Task task) {
-    std::lock_guard<std::mutex> lock(state_->mutex);
-    if (!state_->window) return false;
-    state_->tasks.push_back(std::move(task));
-    if (!PostMessageW(state_->window, kDispatchMessage, 0, 0)) {
-      state_->tasks.pop_back();
-      return false;
-    }
-    return true;
+    return Enqueue(state_, std::move(task));
+  }
+
+  // Workers retain only queue state, never the window-owning dispatcher. Its
+  // destructor and DestroyWindow must remain on the platform thread.
+  Poster GetPoster() const {
+    return [state = state_](Task task) {
+      return Enqueue(state, std::move(task));
+    };
   }
 
   void Shutdown() {
@@ -75,6 +77,17 @@ class PlatformThreadDispatcher {
     std::mutex mutex;
     std::deque<Task> tasks;
   };
+
+  static bool Enqueue(const std::shared_ptr<State>& state, Task task) {
+    std::lock_guard<std::mutex> lock(state->mutex);
+    if (!state->window) return false;
+    state->tasks.push_back(std::move(task));
+    if (!PostMessageW(state->window, kDispatchMessage, 0, 0)) {
+      state->tasks.pop_back();
+      return false;
+    }
+    return true;
+  }
 
   static constexpr wchar_t kWindowClass[] =
       L"Shiori.AudioplayersPlatformThread";

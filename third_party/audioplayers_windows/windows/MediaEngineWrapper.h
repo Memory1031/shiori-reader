@@ -72,6 +72,7 @@ class MediaEngineWrapper
   winrt::com_ptr<IMFMediaEngine> m_mediaEngine;
   winrt::com_ptr<MediaEngineExtension> m_mediaEngineExtension;
   winrt::com_ptr<IMFMediaEngineNotify> m_callbackHelper;
+  std::function<void()> m_detachCallback;
   void CreateMediaEngine();
   void OnLoaded();
   void OnError(MF_MEDIA_ENGINE_ERR error, HRESULT hr);

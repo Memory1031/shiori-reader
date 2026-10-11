@@ -655,19 +655,30 @@ class ReaderBoxPainter extends CustomPainter {
     if (background != null) {
       canvas.drawRRect(outer, Paint()..color = background);
     }
-    final inner = shape(1).outerRect;
     final corners = [
       Offset.zero,
       Offset(size.width, 0),
       Offset(size.width, size.height),
       Offset(0, size.height),
     ];
-    final inside = [
-      inner.topLeft,
-      inner.topRight,
-      inner.bottomRight,
-      inner.bottomLeft,
+    final rays = [
+      Offset(widths[3], widths[0]),
+      Offset(-widths[1], widths[0]),
+      Offset(-widths[1], -widths[2]),
+      Offset(widths[3], -widths[2]),
     ];
+    final center = Offset(size.width / 2, size.height / 2);
+    // Extend side joins beyond the inner rectangle to cover the rounded arcs.
+    Offset extendedJoin(int i) {
+      final ray = rays[i];
+      final scale = math.min(
+        ray.dx == 0 ? double.infinity : center.dx / ray.dx.abs(),
+        ray.dy == 0 ? double.infinity : center.dy / ray.dy.abs(),
+      );
+      return scale.isFinite ? corners[i] + ray * scale : center;
+    }
+
+    final inside = [for (var i = 0; i < 4; i++) extendedJoin(i)];
     final sides = [
       box.borders?.top,
       box.borders?.right,
@@ -694,8 +705,10 @@ class ReaderBoxPainter extends CustomPainter {
           corners[i],
           corners[next],
           inside[next],
+          center,
           inside[i],
         ], true),
+        doAntiAlias: false,
       );
       final columns = box.decorationColumns;
       if (i == 2 && columns != null) {

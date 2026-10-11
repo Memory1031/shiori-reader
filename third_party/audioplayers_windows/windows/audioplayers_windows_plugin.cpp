@@ -213,7 +213,7 @@ void AudioplayersWindowsPlugin::HandleMethodCall(
       return;
     }
 
-    std::thread(&AudioPlayer::SetSourceUrl, player, url).detach();
+    player->SetSourceUrl(std::move(url));
   } else if (method_call.method_name().compare("setSourceBytes") == 0) {
     auto data = GetArgument<std::vector<uint8_t>>("bytes", args,
                                                   std::vector<uint8_t>{});
@@ -224,7 +224,7 @@ void AudioplayersWindowsPlugin::HandleMethodCall(
       return;
     }
 
-    std::thread(&AudioPlayer::SetSourceBytes, player, data).detach();
+    player->SetSourceBytes(std::move(data));
   } else if (method_call.method_name().compare("getDuration") == 0) {
     auto duration = player->GetDuration();
     result->Success(isnan(duration)
@@ -299,7 +299,8 @@ void AudioplayersWindowsPlugin::CreatePlayer(std::string playerId) {
   eventChannel->SetStreamHandler(std::move(eventHandler));
 
   auto player =
-      std::make_unique<AudioPlayer>(playerId, methods.get(), eventHandlerPtr);
+      std::make_unique<AudioPlayer>(playerId, methods.get(), eventHandlerPtr,
+                                   eventDispatcher);
   audioPlayers.insert(std::make_pair(playerId, std::move(player)));
 
   // Keep the event channel and handler alive as long as the plugin/player

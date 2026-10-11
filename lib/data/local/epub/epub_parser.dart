@@ -911,7 +911,44 @@ class EpubParser {
     final anchorIds = {
       for (var i = 0; i < anchorNodes.length; i++) anchorNodes[i]: i,
     };
-    final presentation = includePresentations
+    bool excluded(dom.Element node) =>
+        epubFootnote(node) ||
+        {
+          'script',
+          'style',
+          'noscript',
+          'iframe',
+          'object',
+          'embed',
+          'head',
+          'video',
+          'canvas',
+        }.contains(node.localName) ||
+        node.attributes.containsKey('hidden') ||
+        styles[node]?['display'] == 'none';
+    bool visibility(dom.Element node, bool inherited) =>
+        switch (styles[node]?['visibility']) {
+          'visible' || 'initial' => true,
+          'hidden' || 'collapse' => false,
+          _ => inherited,
+        };
+    // Match native traversal, including restored visibility and consumed audio
+    // subtrees. WebView deliberately has no independent playback lifecycle.
+    bool hasNativeAudio(dom.Element? node, [bool visible = true]) {
+      if (node == null || excluded(node)) return false;
+      visible = visibility(node, visible);
+      if (node.localName == 'audio') {
+        return visible && node.attributes.containsKey('controls');
+      }
+      if (!visible &&
+          {'img', 'image', 'hr', 'br', 'rp'}.contains(node.localName)) {
+        return false;
+      }
+      return node.children.any((child) => hasNativeAudio(child, visible));
+    }
+
+    final presentation =
+        includePresentations && !hasNativeAudio(doc.body ?? doc.documentElement)
         ? epubPresentation(
             doc,
             path,
@@ -1340,22 +1377,7 @@ class EpubParser {
       if (node is! dom.Element) return;
       activeStyle = richStyles[node] ?? const EpubRichStyle();
       final tag = node.localName ?? '';
-      if (epubFootnote(node)) return;
-      if ({
-            'script',
-            'style',
-            'noscript',
-            'iframe',
-            'object',
-            'embed',
-            'head',
-            'video',
-            'canvas',
-          }.contains(tag) ||
-          node.attributes.containsKey('hidden') ||
-          styles[node]?['display'] == 'none') {
-        return;
-      }
+      if (excluded(node)) return;
       final heading = proseHeadingLevel(tag);
       final boundary =
           tag == 'hr' ||
@@ -1369,11 +1391,7 @@ class EpubParser {
         styles[node]?['white-space'],
         tag == 'pre' ? ProseWhiteSpace.pre : whitespace,
       );
-      visible = switch (styles[node]?['visibility']) {
-        'visible' || 'initial' => true,
-        'hidden' || 'collapse' => false,
-        _ => visible,
-      };
+      visible = visibility(node, visible);
       if (!visible &&
           {'img', 'image', 'hr', 'br', 'rp', 'audio'}.contains(tag)) {
         whitespace = previousWhitespace;
