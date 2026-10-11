@@ -20,6 +20,7 @@ import 'package:shiori/app/app.dart';
 import 'package:shiori/app/window_caption.dart';
 import 'package:shiori/app/routes.dart';
 import 'package:shiori/features/reader/epub_layout_page.dart';
+import 'package:shiori/features/reader/epub_page_inspection.dart';
 import 'package:shiori/features/reader/epub_webview_host.dart';
 import 'package:shiori/features/reader/svg_paper_art.dart';
 import 'package:shiori/features/reader/reader_controller.dart';
@@ -105,6 +106,10 @@ class _Controller extends PlatformInAppWebViewController {
     ContentWorld? contentWorld,
   }) async {
     scripts.add(source);
+    if (source == epubPageInspectionSynchronousScript) {
+      expect(source, isNot(contains('await')));
+      return {'clientWidth': 400, 'clientHeight': 700, 'fontsReady': true};
+    }
     if (source.startsWith('(function(){\nconst v=')) {
       return readHit == null ? hitAddress : readHit!.future;
     }
@@ -348,6 +353,7 @@ void main() {
     Color? paper,
     List<LocalContentLink> links = const [],
     ValueChanged<LocalContentLink>? onLink,
+    ValueChanged<EpubPageInspection>? onInspection,
     Future<String> Function(String, Color) prepareArtwork =
         themedSvgPaperArtwork,
   }) => EpubWebViewHost(
@@ -362,6 +368,7 @@ void main() {
         html: html,
         links: links,
         onLink: onLink,
+        onInspection: onInspection,
         prepareArtwork: prepareArtwork,
         onReady: () => ready++,
         onFailed: () => failed++,
@@ -370,6 +377,44 @@ void main() {
         onCenterTap: () => center++,
       ),
     ),
+  );
+
+  testWidgets(
+    'optional fixed inspection preserves host document, CSP and readiness',
+    (tester) async {
+      await tester.pumpWidget(page(os: 'android'));
+      await tester.pumpAndSettle();
+      platform.heads.last.finish();
+      await tester.pumpAndSettle();
+      final ordinary = platform.heads.last.params.initialData!.data;
+      expect(
+        platform.views.last.controller.scripts.contains(
+          epubPageInspectionSynchronousScript,
+        ),
+        false,
+      );
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      final inspections = <EpubPageInspection>[];
+      await tester.pumpWidget(
+        page(os: 'android', onInspection: inspections.add),
+      );
+      await tester.pumpAndSettle();
+      platform.heads.last.finish();
+      await tester.pumpAndSettle();
+      expect(platform.heads.last.params.initialData!.data, ordinary);
+      expect(inspections, hasLength(1));
+      expect(ready, 2);
+      expect(failed, 0);
+      expect(
+        platform.views.last.controller.scripts.where(
+          (s) => s == epubPageInspectionSynchronousScript,
+        ),
+        hasLength(1),
+      );
+      expect(epubPageInspectionScript, contains('root.scrollLeft=original[0]'));
+      expect(epubPageInspectionScript, isNot(contains('fetch(')));
+    },
   );
 
   Future<void> settleSvgArtwork(WidgetTester tester, {int minHeads = 1}) async {

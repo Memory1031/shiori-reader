@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:shiori/data/local/epub/epub_trace.dart';
+import 'loss_report.dart';
 
 typedef Json = Map<String, dynamic>;
-const schemaVersion = 1;
-const auditRulesVersion = '1.2.3';
+const schemaVersion = 2;
+const auditRulesVersion = '2.0.0';
 
 final class AuditOptions {
   const AuditOptions({
@@ -286,6 +287,10 @@ List<Json> aggregateBooks(Iterable<Json> books) {
 }
 
 String reportMarkdown(Json report) {
+  if ((report['run'] as Json)['schemaVersion'] == 2 &&
+      report.containsKey('lossSummary')) {
+    return lossMarkdown(report);
+  }
   final run = report['run'] as Json;
   final lines = <String>[
     '# EPUB 兼容审计',
@@ -342,6 +347,10 @@ String reportMarkdown(Json report) {
 }
 
 Json compareReports(Json before, Json after) {
+  if ((before['run'] as Json).containsKey('producer') ||
+      (after['run'] as Json).containsKey('producer')) {
+    return compareLossReports(before, after);
+  }
   Map<String, Json> indexed(Json book) {
     final groups = <String, List<Json>>{};
     for (final f in (book['findings'] as List? ?? []).cast<Json>()) {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import 'epub_webview_host.dart';
+import 'epub_page_inspection.dart';
 import 'reader_tap_zones.dart';
 import 'svg_paper_art.dart';
 import '../../shared/capabilities.dart';
@@ -61,8 +63,12 @@ class EpubLayoutPage extends StatefulWidget {
     this.links = const [],
     this.onLink,
     this.prepareArtwork = themedSvgPaperArtwork,
+    this.onInspection,
   });
   final Future<String> Function(String html, Color ink) prepareArtwork;
+
+  /// Explicit developer measurement only; ordinary reading never invokes it.
+  final ValueChanged<EpubPageInspection>? onInspection;
   final List<LocalContentLink> links;
   final ValueChanged<LocalContentLink>? onLink;
   final String html;
@@ -282,6 +288,37 @@ return a?a.getAttribute('href'):null;
     if (!mounted || !_ready || identical(_reportedDocument, _document)) return;
     _reportedDocument = _document;
     widget.onReady();
+    if (widget.onInspection != null) unawaited(_inspect(document: _document));
+  }
+
+  Future<void> _inspect({required String? document}) async {
+    try {
+      // Native evaluateJavascript need not await a Promise. Poll the same fixed
+      // read-only measurement until fonts settle, without injecting a bridge.
+      for (var attempt = 0; attempt < 40; attempt++) {
+        final result = await _webController?.evaluateJavascript(
+          source: epubPageInspectionSynchronousScript,
+        );
+        if (!mounted || !identical(document, _document) || !_ready) return;
+        final value = result is String
+            ? jsonDecode(result)
+            : jsonDecode(jsonEncode(result));
+        if (value is Map && value.length < 32 && value['fontsReady'] == true) {
+          widget.onInspection?.call(
+            EpubPageInspection(Map<String, dynamic>.from(value)),
+          );
+          return;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      throw const FormatException('Host fonts or measurement unavailable');
+    } catch (_) {
+      if (mounted && identical(document, _document)) {
+        widget.onInspection?.call(
+          const EpubPageInspection({'error': 'host_measurement_unavailable'}),
+        );
+      }
+    }
   }
 
   @override

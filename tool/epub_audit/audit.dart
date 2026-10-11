@@ -17,6 +17,7 @@ import 'package:shiori/domain/contracts/local_content_links.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'report.dart';
 import 'source.dart';
+import 'loss.dart';
 
 const checkNames = [
   'documents',
@@ -81,8 +82,9 @@ Json auditParsed(
   EpubParser parser,
   ParsedEpub parsed, {
   AuditOptions options = const AuditOptions(),
+  Map<String, String>? privateExpected,
 }) {
-  final audit = _Audit(parser, parsed, options);
+  final audit = _Audit(parser, parsed, options, privateExpected);
   try {
     audit.run();
   } on SourceBudgetExceeded {
@@ -106,14 +108,24 @@ final class _SimpleText {
 }
 
 final class _Audit {
-  _Audit(this.parser, this.parsed, this.options)
-    : source = SourceInventory(parser.bytes, options),
-      findings = FindingCollector(options.maxFindings);
+  _Audit(
+    this.parser,
+    this.parsed,
+    this.options,
+    Map<String, String>? privateExpected,
+  ) : source = SourceInventory(parser.bytes, options),
+      findings = FindingCollector(options.maxFindings),
+      losses = ReadingLossCollector(
+        sha256.convert(parser.bytes).toString(),
+        options.maxFindings * 2,
+        privateExpected: privateExpected,
+      );
   final EpubParser parser;
   final ParsedEpub parsed;
   final AuditOptions options;
   final SourceInventory source;
   final FindingCollector findings;
+  final ReadingLossCollector losses;
   final checks = {for (final name in checkNames) name: AuditCheck()};
   final documents = <Json>[];
   final truncations = <String>[];
@@ -135,6 +147,8 @@ final class _Audit {
       parser.trace?.events ?? const [];
 
   Json report() {
+    losses.observations(findings.findings);
+    losses.unexplained(events);
     if (parser.trace?.truncated == true) truncations.add('trace_capacity');
     if (findings.truncated) truncations.add('finding_capacity');
     if (truncations.isNotEmpty) {
@@ -157,6 +171,7 @@ final class _Audit {
       'checks': {for (final e in checks.entries) e.key: e.value.toJson()},
       'documents': documents,
       'findings': findings.findings,
+      'readingLoss': losses.toJson(),
       'truncationReasons': truncations.toSet().toList(),
       'documentPaths': {
         for (final path in paths.values.toSet())
@@ -190,6 +205,19 @@ final class _Audit {
         'runtime': 'not verified',
       },
     };
+    if (utf8.encode(jsonEncode(result)).length > 8 * 1024 * 1024) {
+      result['readingLoss'] = {
+        'sourceFacts': <Json>[],
+        'representations': <Json>[],
+        'correspondences': <Json>[],
+        'candidates': <Json>[],
+        'displayPaths': <Json>[],
+        'coverage': {
+          'factsComplete': false,
+          'candidateCountAccuracy': 'lower_bound',
+        },
+      };
+    }
     if (utf8.encode(jsonEncode(result)).length > 8 * 1024 * 1024) {
       result['auditComplete'] = false;
       result['findings'] = <Json>[];
@@ -392,29 +420,59 @@ final class _Audit {
           }
         }
       }
-      if (chapter == null) {
-        if (spine.isNotEmpty) audioAudit(path, doc, styles, null);
-        continue;
-      }
-      textAudit(path, doc, styles, chapter, presentation != null || fixed);
-      imageAudit(path, doc, styles, chapter, presentation);
-      structureAudit(path, doc, styles, chapter);
-      sourceLinks(path, doc, styles, chapter);
-      if (presentation != null) {
-        checks['presentation']!.checked++;
-        add(
-          'presentation.generated',
+      // Each occurrence owns its model and instance correspondences. Resource
+      // sharing and a repeated XHTML do not collapse repeated reading content.
+      for (final occurrence
+          in spine.isEmpty ? [-1] : spine.map((s) => s['occurrence'] as int)) {
+        final key = occurrence < 0
+            ? chapter?.key
+            : LocalBookIdentity.epubOccurrence(parser.book, path, occurrence);
+        final actual = [
+          ...parsed.content.chapters,
+          ...parsed.content.auxiliaryChapters,
+        ].where((c) => c.key == key).firstOrNull;
+        final html = actual == null
+            ? null
+            : parser.presentations[actual.key.chapterId];
+        paths[path] = actual == null
+            ? 'unused'
+            : fixed
+            ? 'fixed_image'
+            : html == null
+            ? 'native'
+            : 'presentation';
+        sourceRanges.clear();
+        losses.document(
           path,
-          'inert_document_generated_runtime_unverified',
-          category: 'presentation',
-          impact: 'information',
-          disposition: 'emitted_presentation',
-          evidence: 'parser_decision',
-          counts: {
-            'bytes': utf8.encode(presentation).length,
-            'sha256': digest(presentation),
-          },
+          occurrence,
+          doc,
+          styles,
+          actual,
+          html,
+          (node) => hidden(node, styles),
+          spine: occurrence >= 0,
         );
+        if (actual == null) {
+          if (spine.isNotEmpty) audioAudit(path, doc, styles, null);
+          continue;
+        }
+        textAudit(path, doc, styles, actual, html != null || fixed);
+        imageAudit(path, doc, styles, actual, html);
+        structureAudit(path, doc, styles, actual);
+        sourceLinks(path, doc, styles, actual);
+        if (html != null) {
+          checks['presentation']!.checked++;
+          add(
+            'presentation.generated',
+            path,
+            'inert_document_generated_runtime_unverified',
+            category: 'presentation',
+            impact: 'information',
+            disposition: 'emitted_presentation',
+            evidence: 'parser_decision',
+            counts: {'bytes': utf8.encode(html).length, 'sha256': digest(html)},
+          );
+        }
       }
     }
     modelLinks();
@@ -868,6 +926,13 @@ final class _Audit {
           special ||
           inherited(node, styles, 'white-space') == 'pre-line') {
         unknownTextBlocks++;
+        losses.unknown(
+          path,
+          node,
+          special
+              ? 'selected_presentation_requires_runtime'
+              : 'complex_normalization',
+        );
         checks['text']!.unknown++;
         if (node.querySelector('ruby') != null) checks['ruby']!.unknown++;
         continue;
@@ -905,6 +970,13 @@ final class _Audit {
           break;
         }
       }
+      losses.text(
+        path,
+        node,
+        expected,
+        found < 0 ? null : output[found],
+        normalized.ruby,
+      );
       if (found < 0) {
         checks['text']!.failed++;
         add(
@@ -1055,6 +1127,7 @@ final class _Audit {
         }
       }
       if (convertedNoteref) {
+        losses.media(path, node, 'image', null, consumed: true);
         add(
           'image.noteref_marker',
           path,
@@ -1089,6 +1162,13 @@ final class _Audit {
       }
       checks['images']!.checked++;
       if (selected != null) {
+        losses.media(
+          path,
+          node,
+          'image',
+          selected,
+          valid: parsed.media.containsKey(selected),
+        );
         expected.add(selected);
         selectedResources.add(selected);
         selectedImages++;
@@ -1401,6 +1481,18 @@ final class _Audit {
           location: location,
         );
       }
+      losses.media(
+        path,
+        node,
+        'audio',
+        hash,
+        valid: failure == null,
+        details: {
+          'format': format?.name,
+          'unavailable': unavailable?.name,
+          'displayPathConsistent': pathFor(path) == 'native',
+        },
+      );
     }
     if (output.length > expected.length) {
       checks['structures']!.checked++;
@@ -1567,7 +1659,7 @@ final class _Audit {
             continue;
           }
           checks['footnotes']!.checked++;
-          if (!consume(
+          final consumed = consume(
             (range.$1.blockKey, range.$2, null),
             (l) =>
                 l.isFootnote &&
@@ -1575,7 +1667,17 @@ final class _Audit {
                 l.sourceBlockKey == range.$1.blockKey &&
                 l.sourceOffset == range.$2 &&
                 l.footnoteText == text,
-          )) {
+          );
+          losses.relationship(
+            path,
+            a,
+            range.$1,
+            range.$2,
+            null,
+            consumed,
+            footnote: true,
+          );
+          if (!consumed) {
             checks['footnotes']!.failed++;
             add(
               'footnote.output_missing',
@@ -1670,27 +1772,39 @@ final class _Audit {
           disposition: 'unknown',
           location: location,
         );
-      } else if (!consume(
-        (range.$1.blockKey, range.$2, range.$3),
-        (l) =>
-            !l.isFootnote &&
-            l.source == chapter.key &&
-            l.sourceBlockKey == range.$1.blockKey &&
-            l.sourceOffset == range.$2 &&
-            l.sourceLength == range.$3 &&
-            l.target == target.key &&
-            l.targetBlockKey == anchor?.$1 &&
-            l.targetOffset == anchor?.$2,
-      )) {
-        checks['links']!.failed++;
-        add(
-          'link.relationship_missing',
-          path,
-          'simple_source_range_or_target_range_missing',
-          category: 'links',
-          impact: 'navigation',
-          location: location,
+      } else {
+        final consumed = consume(
+          (range.$1.blockKey, range.$2, range.$3),
+          (l) =>
+              !l.isFootnote &&
+              l.source == chapter.key &&
+              l.sourceBlockKey == range.$1.blockKey &&
+              l.sourceOffset == range.$2 &&
+              l.sourceLength == range.$3 &&
+              l.target == target.key &&
+              l.targetBlockKey == anchor?.$1 &&
+              l.targetOffset == anchor?.$2,
         );
+        losses.relationship(
+          path,
+          a,
+          range.$1,
+          range.$2,
+          range.$3,
+          consumed,
+          footnote: false,
+        );
+        if (!consumed) {
+          checks['links']!.failed++;
+          add(
+            'link.relationship_missing',
+            path,
+            'simple_source_range_or_target_range_missing',
+            category: 'links',
+            impact: 'navigation',
+            location: location,
+          );
+        }
       }
     }
   }

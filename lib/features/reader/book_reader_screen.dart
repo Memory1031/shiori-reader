@@ -43,6 +43,7 @@ class BookReaderScreen extends StatefulWidget {
     this.startAtBeginning = false,
     this.linkDepth = 0,
     this.onReturnToShelf,
+    this.contentLinkObserver,
   });
   final ChapterKey chapter;
   final NovelRepository repository;
@@ -66,6 +67,10 @@ class BookReaderScreen extends StatefulWidget {
   /// home decides what that means, e.g. also selecting the desktop shelf;
   /// without it the reader pops to the first route.
   final VoidCallback? onReturnToShelf;
+
+  /// Optional read-only diagnostic of accepted content-link activation.
+  /// It does not select a target or change navigation behavior.
+  final ValueChanged<LocalContentLink>? contentLinkObserver;
   @override
   State<BookReaderScreen> createState() => _BookReaderScreenState();
 }
@@ -1294,6 +1299,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   Future<void> _followContentLink(LocalContentLink link) async {
     if (_changing || _invalidated) return;
+    widget.contentLinkObserver?.call(link);
     if (link.target == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

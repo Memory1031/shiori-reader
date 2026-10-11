@@ -35,6 +35,35 @@ class PagedReaderController {
   int get cachedPages => _state?._pages.length ?? 0;
   bool get usedFallback => _state?._usedFallback ?? false;
   bool get isRestoring => _state?._restoring ?? false;
+
+  /// Optional read-only diagnostics of the already displayed page. Does not
+  /// seek, measure, populate caches or change the persisted reading position.
+  ReaderViewportInspection? inspectDisplayedPage() {
+    final state = _state, layout = _state?._layout;
+    final page = state?._pages[state._current];
+    if (layout == null || page == null) return null;
+    return ReaderViewportInspection(
+      page,
+      List.unmodifiable(layout.index.chunks),
+      layout.width,
+      layout.height,
+      layout.columns,
+    );
+  }
+}
+
+final class ReaderViewportInspection {
+  const ReaderViewportInspection(
+    this.page,
+    this.chunks,
+    this.width,
+    this.height,
+    this.columns,
+  );
+  final ReaderPage page;
+  final List<RenderChunk> chunks;
+  final double width, height;
+  final int columns;
 }
 
 /// Hosts the viewport's existing horizontal gesture on the reader surface,

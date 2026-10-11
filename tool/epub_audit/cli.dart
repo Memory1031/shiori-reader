@@ -6,8 +6,11 @@ import 'package:path/path.dart' as p;
 import 'package:shiori/data/local/book_decoder.dart';
 import 'audit.dart';
 import 'report.dart';
+import 'replay.dart';
+import 'workflow.dart';
+import 'loss_report.dart';
 
-const helpText = '''EPUB Compatibility Auditor v1 (offline, read-only)
+const helpText = '''EPUB Reading-Loss Auditor v2 (read-only developer tool)
   scan --input book.epub --out NEW_DIRECTORY
   scan --paths paths.json --out NEW_DIRECTORY
   scan --input-dir DIRECTORY [--recursive] --out NEW_DIRECTORY
@@ -15,10 +18,28 @@ const helpText = '''EPUB Compatibility Auditor v1 (offline, read-only)
        [--max-events 100000] [--max-findings 2000]
        [--selection-method LOCAL_DESCRIPTION]
   compare --before RUN_DIRECTORY --after RUN_DIRECTORY --out NEW_DIRECTORY
+  plan --run RUN_DIRECTORY --out NEW_DIRECTORY
+       [--max-targets 12] [--configurations 3] [--max-pages 12]
+       [--timeout-seconds 60] [--screenshots 1] [--provider native|browser|webview]
+  verify --plan PLAN_JSON --paths PATHS_JSON --allow-root DIRECTORY
+         --provider native|browser|webview --out NEW_DIRECTORY [--font FONT_FILE]
+         (or --input EPUB / --input-dir DIRECTORY / --bundle PRIVATE_BUNDLE)
+  review --run RUN_DIRECTORY [--evidence VERIFICATION_DIRECTORY]
+         [--manual REVIEWS_JSON] --out NEW_DIRECTORY
+  capture --input EPUB --allow-root DIRECTORY --out NEW_PRIVATE_DIRECTORY
+          [--timeout-seconds 60]
+  evaluate --bundle PRIVATE_BUNDLE --allow-root DIRECTORY --out NEW_DIRECTORY
+           [--timeout-seconds 60]
 Only explicit inputs are read. Directories are not recursive by default.
 Directory links/junctions are skipped. Output must be a new directory.
 Each book runs in a terminable offline worker; timeout kills and awaits it.
-Reports are private local corpus data. No device/browser rendering is run.
+scan never starts Flutter, a browser, WebView or sound. verify is explicit.
+verify/capture create PRIVATE replay, logs and screenshots containing book data.
+Default native probes use fake audio: routing only, never decode/speaker proof.
+Browser results never certify native WebView. Installed browsers only, no download.
+WebView uses SHIORI_LOSS_WEBVIEW_HOST: an isolated build of
+integration_test/epub_loss_webview.dart; unavailable capability exits 69.
+All output directories must be new. Completed JSONL entries survive interruption.
 Legacy <paths.json> <report.json> is retired: use scan --paths ... --out ... .
 Old differences/policyDifferences are not migrated or reinterpreted.
 ''';
@@ -30,7 +51,15 @@ Future<int> auditMain(List<String> args) async {
   }
   if (args.length == 2 &&
       !args.first.startsWith('--') &&
-      !{'scan', 'compare'}.contains(args.first)) {
+      !{
+        'scan',
+        'compare',
+        'plan',
+        'verify',
+        'review',
+        'capture',
+        'evaluate',
+      }.contains(args.first)) {
     stderr.writeln(
       'Legacy schema retired. Use scan --paths <paths.json> --out <new directory>. Existing reports remain untouched.',
     );
@@ -51,6 +80,56 @@ Future<int> auditMain(List<String> args) async {
         }
         values[arg] = args[++i];
       }
+    }
+    final commands =
+        <String, (Set<String>, Future<int> Function(Map<String, String>))>{
+          'plan': (
+            {
+              '--run',
+              '--out',
+              '--max-targets',
+              '--configurations',
+              '--max-pages',
+              '--timeout-seconds',
+              '--screenshots',
+              '--provider',
+            },
+            planCommand,
+          ),
+          'verify': (
+            {
+              '--plan',
+              '--input',
+              '--paths',
+              '--input-dir',
+              '--bundle',
+              '--allow-root',
+              '--provider',
+              '--out',
+              '--font',
+            },
+            verifyCommand,
+          ),
+          'review': (
+            {'--run', '--evidence', '--manual', '--out'},
+            reviewCommand,
+          ),
+          'capture': (
+            {'--input', '--allow-root', '--out', '--timeout-seconds'},
+            captureCommand,
+          ),
+          'evaluate': (
+            {'--bundle', '--allow-root', '--out', '--timeout-seconds'},
+            evaluateCommand,
+          ),
+        };
+    final command = commands[args.first];
+    if (command != null) {
+      if (flags.isNotEmpty ||
+          values.keys.any((key) => !command.$1.contains(key))) {
+        throw const FormatException();
+      }
+      return await command.$2(values);
     }
     if (args.first == 'scan') {
       if (values.keys.any(
@@ -259,24 +338,21 @@ Future<int> scan(Map<String, String> values, {required bool recursive}) async {
   final watch = Stopwatch()..start();
   final sha = await Process.run('git', ['rev-parse', 'HEAD']);
   final dirty = await Process.run('git', ['status', '--porcelain=v1']);
-  final auditFiles = [
+  final auditFingerprint = await codeFingerprint(Directory.current.path, [
     'tool/epub_compatibility_audit.dart',
-    'tool/epub_audit/audit.dart',
-    'tool/epub_audit/cli.dart',
-    'tool/epub_audit/source.dart',
-    'tool/epub_audit/report.dart',
-    'tool/epub_audit/worker.dart',
+    'tool/epub_audit',
     'lib/data/local/epub/epub_trace.dart',
-  ];
-  final auditFingerprint = digest(
-    jsonEncode([
-      for (final file in auditFiles) await File(file).readAsString(),
-    ]),
-  );
+  ]);
+  final producer = await producerIdentity(),
+      evaluator = await evaluatorIdentity(),
+      probe = await probeIdentity();
   final run = <String, dynamic>{
     'schemaVersion': schemaVersion,
     'auditRulesVersion': auditRulesVersion,
     'auditCodeFingerprint': auditFingerprint,
+    'producer': producer,
+    'evaluator': evaluator,
+    'probe': probe,
     'gitSha': sha.exitCode == 0 ? (sha.stdout as String).trim() : null,
     'dirty': dirty.exitCode == 0
         ? (dirty.stdout as String).trim().isNotEmpty
@@ -290,7 +366,7 @@ Future<int> scan(Map<String, String> values, {required bool recursive}) async {
         : 'directory',
     'recursive': recursive,
     'options': options.toJson(),
-    'optionsFingerprint': digest(jsonEncode([options.toJson(), seconds])),
+    'optionsFingerprint': options.fingerprint,
     'timeoutSeconds': seconds,
     'workerMode': 'pinned_dart_vm_process',
     'maxRetainedResultBytes': 64 * 1024 * 1024,
@@ -324,13 +400,15 @@ Future<int> scan(Map<String, String> values, {required bool recursive}) async {
       for (final b in results)
         {
           for (final e in b.entries)
-            if (!{'findings', 'documents'}.contains(e.key)) e.key: e.value,
+            if (!{'findings', 'documents', 'readingLoss'}.contains(e.key))
+              e.key: e.value,
         },
     ];
     final report = {
       'run': run,
       'books': summaryBooks,
       'aggregate': aggregateBooks(results),
+      'lossSummary': summarizeLosses(results),
     };
     if (run['aggregateComplete'] != true) {
       for (final g in report['aggregate'] as List<Json>) {
@@ -484,6 +562,7 @@ Future<int> scan(Map<String, String> values, {required bool recursive}) async {
       result.remove('documents');
       if (retainedBytes > 64 * 1024 * 1024) {
         result['findings'] = <Json>[];
+        result.remove('readingLoss');
         run['aggregateComplete'] = false;
         run['aggregateTruncation'] = 'retained_result_budget';
       }
@@ -527,13 +606,17 @@ Future<int> scan(Map<String, String> values, {required bool recursive}) async {
 }
 
 Future<Json> readRun(String path) async {
-  final dir = Directory(path);
-  final summary = File(p.join(dir.path, 'report.json'));
+  final dir = Directory(p.absolute(path));
+  final summary = await authorizedFile(
+    p.join(dir.path, 'report.json'),
+    dir.path,
+    maxBytes: 32 * 1024 * 1024,
+  );
   if (await summary.length() > 32 * 1024 * 1024) throw const FormatException();
   final report = jsonDecode(await summary.readAsString()) as Json;
   final run = report['run'] as Json;
-  if (run['schemaVersion'] != schemaVersion) {
-    return {...report, 'books': <Json>[]};
+  if (!{1, schemaVersion}.contains(run['schemaVersion'])) {
+    throw const FormatException('Unsupported report schema');
   }
   final books = <Json>[];
   final journal = File(p.join(dir.path, 'books.jsonl'));
@@ -546,7 +629,9 @@ Future<Json> readRun(String path) async {
             .transform(const Utf8Decoder(allowMalformed: true))
             .transform(const LineSplitter())) {
       try {
-        final row = jsonDecode(line) as Json;
+        final decoded = jsonDecode(line);
+        if (decoded is! Json || decoded['reportFile'] is! String) continue;
+        final row = decoded;
         final filename = row['reportFile'] as String;
         files.add(filename);
         final names = aliases[filename] ??= <String>{};
@@ -561,12 +646,39 @@ Future<Json> readRun(String path) async {
       files.add(b['reportFile'] as String);
     }
   }
+  var retained = 0;
   for (final filename in files) {
     if (!RegExp(r'^book-\d{5}\.json$').hasMatch(filename)) {
       throw const FormatException();
     }
-    final file = File(p.join(dir.path, filename));
+    final file = await authorizedFile(
+      p.join(dir.path, filename),
+      dir.path,
+      maxBytes: 8 * 1024 * 1024,
+    );
     if (await file.length() > 8 * 1024 * 1024) throw const FormatException();
+    retained += await file.length();
+    if (retained > 64 * 1024 * 1024) {
+      final summaryBook = (report['books'] as List)
+          .cast<Json>()
+          .where((b) => b['reportFile'] == filename)
+          .firstOrNull;
+      if (summaryBook != null) {
+        books.add({
+          ...summaryBook,
+          'findings': <Json>[],
+          'readingLoss': {
+            'sourceFacts': <Json>[],
+            'representations': <Json>[],
+            'correspondences': <Json>[],
+            'candidates': <Json>[],
+            'coverage': {'factsComplete': false, 'reason': 'readback_budget'},
+          },
+        });
+      }
+      run['aggregateComplete'] = false;
+      continue;
+    }
     final book = jsonDecode(await file.readAsString()) as Json;
     if (aliases[filename]?.isNotEmpty == true) {
       book['aliases'] = {
