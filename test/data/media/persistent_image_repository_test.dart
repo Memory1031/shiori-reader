@@ -6,6 +6,7 @@ import 'package:shiori/data/cache/cache_policy.dart';
 import 'package:shiori/data/cache/local_cache_management.dart';
 import 'package:shiori/data/local/database/cache_database.dart';
 import 'package:shiori/data/local/files/app_paths.dart';
+import 'package:shiori/data/local/novel_record_store.dart';
 import 'package:shiori/data/media/memory_image_repository.dart';
 import 'package:shiori/data/media/persistent_image_repository.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
@@ -34,7 +35,7 @@ void main() {
     db = CacheDatabase(NativeDatabase(paths.cacheDatabase));
     owner = CacheCoordinator();
     source = Source(() async => Success(Body()));
-    repo = PersistentImageRepository(
+    repo = CountingImages(
       network: MemoryImageRepository(resolve: (_) => source),
       db: db,
       paths: paths,
@@ -47,6 +48,51 @@ void main() {
     await db.close();
     await root.delete(recursive: true);
   });
+  test(
+    'overview verifies each shared image once and rechecks the next inspection',
+    () async {
+      final active = lease(await get());
+      final file = File((active.data as LocalMedia).path);
+      await active.close();
+      final key = NovelKey(sourceId: ref.sourceId, novelId: 'shared');
+      final missing = MediaRef(sourceId: ref.sourceId, mediaId: 'missing');
+      final records = NovelRecordStore(db);
+      for (var i = 0; i < 30; i++) {
+        await records.writeChapter(
+          ChapterContent(
+            key: ChapterKey(novelKey: key, chapterId: '$i'),
+            title: '$i',
+            blocks: [
+              ImageBlock(media: ref),
+              ImageBlock(media: missing),
+            ],
+          ),
+          fetchedAt: DateTime.utc(2026),
+          parserVersion: 1,
+          cancellation: CancellationSource().token,
+        );
+      }
+      final counting = repo as CountingImages;
+      counting.loads.clear();
+      final control = LocalCacheManagement(db, owner, repo);
+      final overview =
+          (await control.inspect() as Success<CacheOverview>).value;
+      expect(overview.chapters, hasLength(30));
+      expect(
+        overview.chapters.every((c) => c.imageCount == 2 && c.savedImages == 1),
+        true,
+      );
+      expect(counting.loads, {ref: 1, missing: 1});
+      await file.writeAsBytes(List.filled(8, 0));
+      final next = (await control.inspect() as Success<CacheOverview>).value;
+      expect(next.chapters.every((c) => c.savedImages == 0), true);
+      expect(counting.loads, {ref: 2, missing: 2});
+      expect(source.calls, 1);
+      expect(await control.clear(), isA<Success>());
+      await repo.maintain();
+      expect(await file.exists(), false);
+    },
+  );
   test('restart reads verified local file with zero network', () async {
     final first = lease(await get());
     expect(first.persistence, MediaPersistence.persistedLocal);
@@ -191,4 +237,23 @@ void main() {
     );
     expect(await get(ReadMode.cacheOnly), isA<Failure>());
   });
+}
+
+class CountingImages extends PersistentImageRepository {
+  CountingImages({
+    required super.network,
+    required super.db,
+    required super.paths,
+    required super.coordinator,
+  });
+  final loads = <MediaRef, int>{};
+  @override
+  Future<Result<LoadResult<MediaLease>>> load(
+    MediaRef ref, {
+    required ReadMode mode,
+    required CancellationToken cancellation,
+  }) {
+    loads.update(ref, (count) => count + 1, ifAbsent: () => 1);
+    return super.load(ref, mode: mode, cancellation: cancellation);
+  }
 }

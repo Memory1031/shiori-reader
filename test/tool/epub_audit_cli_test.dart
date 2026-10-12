@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import '../../tool/epub_audit/cli.dart';
 import '../../tool/epub_audit/report.dart';
+import '../../tool/epub_audit/replay.dart' show authorizedFile;
 import 'support/audit_fixture.dart';
 
 void main() {
@@ -15,6 +16,95 @@ void main() {
   tearDown(() async {
     await temp.delete(recursive: true);
   });
+  test(
+    'macOS system aliases preserve authorization and recursive input',
+    () async {
+      for (final alias in ['/tmp', '/var/tmp']) {
+        final root = await Directory(alias).createTemp('shiori-alias-');
+        try {
+          final nested = await Directory('${root.path}/nested').create();
+          final input = File('${nested.path}/input.epub');
+          await input.writeAsBytes([1]);
+          expect(
+            await explicitInputs({'--input-dir': root.path}, recursive: true),
+            [input.path],
+          );
+          expect(
+            await (await authorizedFile(
+              input.path,
+              root.path,
+              maxBytes: 1,
+            )).readAsBytes(),
+            [1],
+          );
+          expect(
+            await (await authorizedFile(
+              await input.resolveSymbolicLinks(),
+              root.path,
+              maxBytes: 1,
+            )).readAsBytes(),
+            [1],
+          );
+          final output = await newOutput('${root.path}/new/nested');
+          expect(await output.exists(), true);
+          await expectLater(
+            newOutput(output.path),
+            throwsA(isA<FileSystemException>()),
+          );
+        } finally {
+          await root.delete(recursive: true);
+        }
+      }
+    },
+    skip: !Platform.isMacOS,
+  );
+  test(
+    'arbitrary root, file and nested directory links remain unauthorized',
+    () async {
+      final canonical = await temp.resolveSymbolicLinks();
+      final scope = await Directory('$canonical/scope').create();
+      final outside = await Directory('$canonical/outside').create();
+      final inside = File('${scope.path}/inside.epub');
+      await inside.writeAsBytes([1]);
+      final secret = File('${outside.path}/secret.epub');
+      await secret.writeAsBytes([2]);
+      final rootLink = await Link('$canonical/root-link').create(scope.path);
+      await Link('${scope.path}/redirect').create(outside.path);
+      await Link('${scope.path}/linked.epub').create(secret.path);
+      expect(
+        await explicitInputs({'--input-dir': scope.path}, recursive: true),
+        [inside.path],
+      );
+      await expectLater(
+        explicitInputs({'--input-dir': rootLink.path}, recursive: true),
+        throwsA(isA<FileSystemException>()),
+      );
+      await expectLater(
+        newOutput('${rootLink.path}/new'),
+        throwsA(isA<FileSystemException>()),
+      );
+      for (final name in [
+        '${scope.path}/linked.epub',
+        '${scope.path}/redirect/secret.epub',
+        secret.path,
+      ]) {
+        await expectLater(
+          authorizedFile(name, scope.path, maxBytes: 10),
+          throwsFormatException,
+        );
+      }
+      await expectLater(
+        authorizedFile(
+          '${rootLink.path}/inside.epub',
+          rootLink.path,
+          maxBytes: 10,
+        ),
+        throwsFormatException,
+      );
+      expect(await secret.readAsBytes(), [2]);
+    },
+    skip: Platform.isWindows,
+  );
   test(
     'Windows junction does not extend an explicitly selected directory',
     () async {

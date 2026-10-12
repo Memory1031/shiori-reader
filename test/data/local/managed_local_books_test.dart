@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:shiori/data/local/book_decoder.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'support/epub_fixtures.dart';
@@ -21,6 +23,17 @@ import 'epub_front_matter_test.dart' show frontMatterFiles, page, picture;
 
 T ok<T>(Result<T> result) => (result as Success<T>).value;
 CancellationToken token() => CancellationSource().token;
+Future<bool> ownershipBlockedInIsolate(String path) => Isolate.run(() {
+  final connection = sqlite.sqlite3.open(path);
+  try {
+    connection.execute('BEGIN EXCLUSIVE');
+    return false;
+  } on sqlite.SqliteException catch (error) {
+    return error.resultCode == 5;
+  } finally {
+    connection.close();
+  }
+});
 LocalBookContent fixture(LocalImportSession session, {MediaRef? media}) {
   final chapter = LocalBookIdentity.chapter(session.key, 'txt:0');
   return LocalBookContent(
@@ -76,6 +89,94 @@ void main() {
     db = UserDatabase(NativeDatabase(paths.userDatabase));
     store = ok(await ManagedLocalBooks.open(paths, db));
   });
+  test(
+    'live owner excludes startup cleanup until its pending import settles',
+    () async {
+      final parsing = Completer<LocalImportSession>();
+      final release = Completer<void>();
+      final importing = store.importBook(
+        bytes: Stream.value(utf8.encode('owned import')),
+        format: LocalBookFormat.txt,
+        parse: (session) async {
+          parsing.complete(session);
+          await release.future;
+          return fixture(session);
+        },
+        addToShelf: true,
+        cancellation: token(),
+      );
+      final session = await parsing.future;
+      final secondDb = UserDatabase(NativeDatabase(paths.userDatabase));
+      try {
+        expect(await ManagedLocalBooks.open(paths, secondDb), isA<Failure>());
+        expect(
+          utf8.decode(
+            await session.openOriginal().expand((bytes) => bytes).toList(),
+          ),
+          'owned import',
+        );
+        final lockPath =
+            '${paths.localBooks.parent.path}/local-books-owner.sqlite';
+        expect(await ownershipBlockedInIsolate(lockPath), true);
+        final closing = store.close();
+        expect(await ManagedLocalBooks.open(paths, secondDb), isA<Failure>());
+        release.complete();
+        final imported = ok(await importing);
+        await closing;
+        await store.close();
+        store = ok(await ManagedLocalBooks.open(paths, db));
+        expect(
+          ok(
+            await store.read(
+              imported.content.detail.summary.key,
+              cancellation: token(),
+            ),
+          ),
+          isNotNull,
+        );
+        expect(
+          await db.customSelect('SELECT * FROM bookshelf').get(),
+          hasLength(1),
+        );
+      } finally {
+        if (!release.isCompleted) release.complete();
+        await importing;
+        await secondDb.close();
+      }
+    },
+  );
+  test(
+    'failed startup releases ownership without cleaning originals',
+    () async {
+      await store.close();
+      final original = File('${paths.localBooks.path}/${'f' * 64}/original');
+      await original.parent.create();
+      await original.writeAsString('keep');
+      final broken = UserDatabase(NativeDatabase.memory());
+      await broken.customStatement('DROP TABLE local_books');
+      try {
+        expect(await ManagedLocalBooks.open(paths, broken), isA<Failure>());
+        expect(await original.readAsString(), 'keep');
+        store = ok(await ManagedLocalBooks.open(paths, db));
+      } finally {
+        await broken.close();
+      }
+    },
+  );
+  test(
+    'ownership file links are rejected without changing their target',
+    () async {
+      await store.close();
+      final lock = '${paths.localBooks.parent.path}/local-books-owner.sqlite';
+      final target = File('${temp.path}/keep');
+      await target.writeAsString('keep');
+      await File(lock).delete();
+      await Link(lock).create(target.path);
+      expect(await ManagedLocalBooks.open(paths, db), isA<Failure>());
+      expect(await target.readAsString(), 'keep');
+    },
+    skip: Platform.isWindows,
+  );
   test('generated navigation labels survive a managed book reopen', () async {
     final imported = ok(
       await store.importBook(

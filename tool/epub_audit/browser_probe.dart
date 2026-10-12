@@ -8,6 +8,7 @@ import 'package:shiori/shared/epub_link_address.dart';
 import 'loss_model.dart';
 import 'plan.dart';
 import 'report.dart';
+import 'replay.dart' show systemAbsolute;
 
 /// A signal remains effective between workers for the whole verification run.
 final class ProbeCancellation {
@@ -44,6 +45,11 @@ Future<void> stopOwnedProcess(Process process) async {
     await Process.run('taskkill.exe', ['/PID', '${process.pid}', '/T', '/F']);
   } else {
     process.kill(ProcessSignal.sigterm);
+    try {
+      await process.exitCode.timeout(const Duration(seconds: 2));
+    } on TimeoutException {
+      process.kill(ProcessSignal.sigkill);
+    }
   }
   await process.exitCode;
 }
@@ -386,6 +392,7 @@ Future<Json> runBrowserProbe(
   ProbeCancellation? cancellation,
   String? testOnlyBeforeInspection,
   void Function()? testOnlyOnStarted,
+  String? testOnlyExecutable,
 }) async {
   if (cancellation?.isCancelled == true) {
     return {
@@ -396,7 +403,7 @@ Future<Json> runBrowserProbe(
       'assertions': <String, dynamic>{},
     };
   }
-  final executable = installedChromium();
+  final executable = testOnlyExecutable ?? installedChromium();
   if (executable == null) {
     return {
       'complete': false,
@@ -427,6 +434,8 @@ Future<Json> runBrowserProbe(
     'about:blank',
   ]);
   final out = process.stdout.drain<void>(), err = process.stderr.drain<void>();
+  int? exitCode;
+  unawaited(process.exitCode.then((code) => exitCode = code));
   _Cdp? client;
   final runCancellation = cancellation ?? ProbeCancellation();
   Future<void>? stopping;
@@ -445,12 +454,20 @@ Future<Json> runBrowserProbe(
     final portFile = File(p.join(profile.path, 'DevToolsActivePort'));
     for (
       var i = 0;
-      i < 100 && !await portFile.exists() && !runCancellation.isCancelled;
+      i < 100 &&
+          !await portFile.exists() &&
+          !runCancellation.isCancelled &&
+          exitCode == null;
       i++
     ) {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
     if (!await portFile.exists()) {
+      if (exitCode != null) {
+        throw FormatException(
+          'Browser exited before endpoint (code $exitCode)',
+        );
+      }
       throw const FormatException('Browser endpoint unavailable');
     }
     final port = int.parse((await portFile.readAsLines()).first);
@@ -608,8 +625,8 @@ Future<Json> runBrowserProbe(
     if (stopping != null) await stopping;
     await Future.wait([out, err]);
     final canonical = await profile.resolveSymbolicLinks();
-    if (p.equals(p.normalize(profile.absolute.path), p.normalize(canonical)) &&
-        p.isWithin(privateRoot.absolute.path, canonical)) {
+    if (p.equals(systemAbsolute(profile.path), p.normalize(canonical)) &&
+        p.isWithin(systemAbsolute(privateRoot.path), canonical)) {
       await profile.delete(recursive: true);
     }
     if (cancellation == null) await runCancellation.close();

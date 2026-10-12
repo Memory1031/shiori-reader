@@ -50,6 +50,7 @@ class LocalCacheManagement implements CacheManagement {
           )
           .get();
       final chapters = <CachedChapter>[];
+      final persisted = <MediaRef, bool>{};
       final books = <NovelKey, String>{};
       final details = await db
           .customSelect(
@@ -75,17 +76,23 @@ class LocalCacheManagement implements CacheManagement {
         final refs = content.blocks.expand((b) => b.mediaRefs).toSet();
         var saved = 0;
         for (final ref in refs) {
-          final result = await images.load(
-            ref,
-            mode: ReadMode.cacheOnly,
-            cancellation: CancellationSource().token,
-          );
-          if (result case Success(:final value)) {
-            if (value.value.persistence == MediaPersistence.persistedLocal) {
-              saved++;
+          if (!persisted.containsKey(ref)) {
+            final result = await images.load(
+              ref,
+              mode: ReadMode.cacheOnly,
+              cancellation: CancellationSource().token,
+            );
+            persisted[ref] = false;
+            if (result case Success(:final value)) {
+              try {
+                persisted[ref] =
+                    value.value.persistence == MediaPersistence.persistedLocal;
+              } finally {
+                await value.value.close();
+              }
             }
-            await value.value.close();
           }
+          if (persisted[ref]!) saved++;
         }
         chapters.add(
           CachedChapter(

@@ -611,6 +611,66 @@ void main() {
       }
     },
   );
+  for (final interrupt in [false, true]) {
+    test(
+      'owned worker ignoring SIGTERM is reaped (interrupt: $interrupt)',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'shiori-stubborn-worker-',
+        );
+        final cancellation = ProbeCancellation(signals: const Stream.empty());
+        final ready = File('${root.path}/ready');
+        Future<String>? running;
+        try {
+          final entry = File('${root.path}/wait.dart');
+          await entry.writeAsString("""
+import 'dart:async';
+import 'dart:io';
+Future<void> main(List<String> args) async {
+  ProcessSignal.sigterm.watch().listen((_) {});
+  await File(args.single).writeAsString('\$pid');
+  await Completer<void>().future;
+}
+""");
+          running = boundedProcess(
+            auditDartExecutable(),
+            [entry.path, ready.path],
+            Duration(seconds: interrupt ? 30 : 2),
+            cancellation: cancellation,
+          );
+          final deadline = DateTime.now().add(const Duration(seconds: 5));
+          while (!await ready.exists() && DateTime.now().isBefore(deadline)) {
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+          }
+          expect(await ready.exists(), true);
+          if (interrupt) cancellation.cancel();
+          expect(
+            await running.timeout(const Duration(seconds: 6)),
+            interrupt ? 'interrupted' : 'timeout',
+          );
+          expect(
+            Process.killPid(
+              int.parse(await ready.readAsString()),
+              ProcessSignal.sigterm,
+            ),
+            false,
+          );
+        } finally {
+          if (await ready.exists()) {
+            Process.killPid(
+              int.parse(await ready.readAsString()),
+              ProcessSignal.sigkill,
+            );
+          }
+          cancellation.cancel();
+          if (running != null) await running;
+          await cancellation.close();
+          await root.delete(recursive: true);
+        }
+      },
+      skip: Platform.isWindows,
+    );
+  }
   test('new bounded process timeout waits for the owned worker exit', () async {
     final root = await Directory.systemTemp.createTemp('shiori-loss-process-');
     try {

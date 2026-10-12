@@ -216,7 +216,7 @@ Future<Directory> newOutput(String path) async {
   }
   if (!p.equals(
     p.normalize(await ancestor.resolveSymbolicLinks()),
-    p.normalize(ancestor.absolute.path),
+    systemAbsolute(ancestor.path),
   )) {
     throw const FileSystemException('Output ancestor is a link');
   }
@@ -248,7 +248,7 @@ Future<List<String>> explicitInputs(
   } else {
     final root = Directory(p.absolute(values['--input-dir']!));
     final canonical = await root.resolveSymbolicLinks();
-    if (!p.equals(p.normalize(root.path), p.normalize(canonical))) {
+    if (!p.equals(systemAbsolute(root.path), p.normalize(canonical))) {
       throw const FileSystemException('Directory link');
     }
     var visited = 0;
@@ -266,10 +266,7 @@ Future<List<String>> explicitInputs(
         } else if (recursive && type == FileSystemEntityType.directory) {
           final child = Directory(entity.path);
           final resolved = await child.resolveSymbolicLinks();
-          if (p.equals(
-                p.normalize(resolved),
-                p.normalize(child.absolute.path),
-              ) &&
+          if (p.equals(p.normalize(resolved), systemAbsolute(child.path)) &&
               p.isWithin(canonical, resolved)) {
             await walk(child, depth + 1);
           }

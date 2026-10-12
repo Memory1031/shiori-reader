@@ -20,6 +20,19 @@ const replayCodecVersion = 1;
 const maxBundleBytes = 256 * 1024 * 1024;
 const maxModelBytes = 32 * 1024 * 1024;
 
+/// macOS system aliases are trusted; arbitrary directory links remain rejected.
+String systemAbsolute(String name) {
+  final path = p.normalize(p.absolute(name));
+  if (Platform.isMacOS) {
+    for (final alias in ['/var', '/tmp']) {
+      if (p.equals(path, alias) || p.isWithin(alias, path)) {
+        return '/private$path';
+      }
+    }
+  }
+  return path;
+}
+
 Future<String> codeFingerprint(String root, List<String> paths) async {
   final names = <String>[];
   for (final name in paths) {
@@ -142,11 +155,11 @@ Future<File> authorizedFile(
 }) async {
   final root = Directory(p.absolute(allowedRoot));
   final rootCanonical = await root.resolveSymbolicLinks();
-  if (!p.equals(p.normalize(root.path), p.normalize(rootCanonical))) {
+  if (!p.equals(systemAbsolute(root.path), p.normalize(rootCanonical))) {
     throw const FormatException('Linked allowed root');
   }
   final file = File(p.absolute(name));
-  if (!p.isWithin(root.path, file.path)) {
+  if (!p.isWithin(systemAbsolute(root.path), systemAbsolute(file.path))) {
     throw const FormatException('Outside allowed root');
   }
   if (await FileSystemEntity.type(file.path, followLinks: false) !=
@@ -154,7 +167,7 @@ Future<File> authorizedFile(
     throw const FormatException('Not a regular authorized file');
   }
   final canonical = await file.resolveSymbolicLinks();
-  if (!p.equals(p.normalize(file.path), p.normalize(canonical)) ||
+  if (!p.equals(systemAbsolute(file.path), p.normalize(canonical)) ||
       !p.isWithin(rootCanonical, canonical) ||
       await file.length() > maxBytes) {
     throw const FormatException('Linked or oversized file');

@@ -8,6 +8,7 @@ import 'book_decoder.dart';
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import 'database/user_database.dart' show UserDatabase;
@@ -152,6 +153,8 @@ class ManagedLocalBooks
   }
 
   Future<void> _tail = Future.value();
+  sqlite.Database? _ownership;
+  Future<void>? _closing;
   bool _closed = false;
   static const maxOriginalBytes = 128 * 1024 * 1024;
   static const maxMediaBytes = 32 * 1024 * 1024;
@@ -169,11 +172,6 @@ class ManagedLocalBooks
   ) async {
     final store = ManagedLocalBooks._(paths, db);
     try {
-      // Read DB before touching files: an unavailable index must not erase data.
-      final rows = await db
-          .customSelect('SELECT digest,active_bundle FROM local_books')
-          .get();
-      final committed = rows.map((r) => r.read<String>('digest')).toSet();
       for (final dir in [paths.localBooks, paths.localImportStaging]) {
         await dir.create(recursive: true);
         final expected = p.join(
@@ -185,6 +183,25 @@ class ManagedLocalBooks
           throw const FileSystemException('Linked storage root');
         }
       }
+      final lock = p.join(
+        paths.localBooks.parent.path,
+        'local-books-owner.sqlite',
+      );
+      final type = await FileSystemEntity.type(lock, followLinks: false);
+      if (type != FileSystemEntityType.notFound &&
+          type != FileSystemEntityType.file) {
+        throw const FileSystemException('Linked ownership file');
+      }
+      // SQLite locks also exclude other connections in the same process/isolate.
+      // Keep this separate from user.db so normal database writes remain usable.
+      store._ownership = sqlite.sqlite3.open(lock);
+      store._ownership!.execute('PRAGMA journal_mode=MEMORY');
+      store._ownership!.execute('BEGIN EXCLUSIVE');
+      // An unavailable index must not erase data, and ownership precedes snapshot.
+      final rows = await db
+          .customSelect('SELECT digest,active_bundle FROM local_books')
+          .get();
+      final committed = rows.map((r) => r.read<String>('digest')).toSet();
       await for (final entry in paths.localImportStaging.list(
         followLinks: false,
       )) {
@@ -207,6 +224,7 @@ class ManagedLocalBooks
       await db.customStatement('UPDATE local_books SET maintenance=0');
       return Success(store);
     } catch (e) {
+      await store.close();
       return Failure(localFailure(Operation.libraryRead, e));
     }
   }
@@ -779,7 +797,9 @@ class ManagedLocalBooks
   }
 
   @override
-  Future<void> close() async {
+  Future<void> close() => _closing ??= _close();
+
+  Future<void> _close() async {
     _closed = true;
     await _tail;
     await _invalidations.close();
@@ -787,6 +807,8 @@ class ManagedLocalBooks
     _presentations.clear();
     _svgLinksScanned.clear();
     _readCache = null;
+    _ownership?.close();
+    _ownership = null;
   }
 }
 

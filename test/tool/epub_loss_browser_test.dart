@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:test/test.dart';
 import '../../tool/epub_audit/audit.dart';
 import '../../tool/epub_audit/browser_probe.dart';
+import '../../tool/epub_audit/cli.dart' show auditDartExecutable;
 import '../../tool/epub_audit/loss_report.dart';
 import '../../tool/epub_audit/plan.dart';
 import 'support/audit_fixture.dart';
@@ -21,6 +22,37 @@ VerificationTarget browserTarget() {
 }
 
 void main() {
+  test(
+    'failed browser launch reports its exit and cleans its profile',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'shiori-browser-exit-',
+      );
+      try {
+        final target = browserTarget();
+        await expectLater(
+          runBrowserProbe(
+            '<html><body>Self authored.</body></html>',
+            root,
+            target,
+            target.configurations.single,
+            // Dart rejects the browser flags and exits without a debug endpoint.
+            testOnlyExecutable: auditDartExecutable(),
+          ),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'startup exit',
+              contains('Browser exited before endpoint (code '),
+            ),
+          ),
+        );
+        expect(await Directory('${root.path}/browser-profile').exists(), false);
+      } finally {
+        await root.delete(recursive: true);
+      }
+    },
+  );
   test('actual Chromium detects only runtime-injected ancestor clipping', () async {
     final root = await Directory.systemTemp.createTemp('shiori-loss-browser-');
     try {
@@ -74,15 +106,18 @@ void main() {
       await root.delete(recursive: true);
     }
   });
-  test('actual Chromium can scroll back with visible or hidden scrollbars', () async {
-    final root = await Directory.systemTemp.createTemp('shiori-loss-scroll-');
-    try {
-      const html =
-          '<!doctype html><html><head><style>body{margin:0;background:white;color:black}p{margin:0;font:20px/28px sans-serif}</style></head>'
-          '<body><div id="frame"><p>VISIBLE LINE<br>SECOND LINE<br>THIRD LINE</p></div></body></html>';
-      final target = browserTarget();
-      for (final scrollbar in ['auto', 'none']) {
-        for (final scroll in [0, 28, 56]) {
+  for (final scrollbar in ['auto', 'none']) {
+    for (final scroll in [0, 28, 56]) {
+      test('actual Chromium scrolls back ($scrollbar, $scroll)', () async {
+        final root = await Directory.systemTemp.createTemp(
+          'shiori-loss-scroll-',
+        );
+        try {
+          const html =
+              '<!doctype html><html><head><style>body{margin:0;background:white;color:black}p{margin:0;font:20px/28px sans-serif}</style></head>'
+              '<body><div id="frame"><p>VISIBLE LINE<br>SECOND LINE<br>THIRD LINE</p></div></body></html>';
+          final target = browserTarget();
+
           final name = '$scrollbar-$scroll';
           final directory = await Directory('${root.path}/$name').create();
           final measured = await runBrowserProbe(
@@ -123,12 +158,12 @@ void main() {
               '${directory.path}/page.png',
             ).copy('$evidence/$name.png');
           }
+        } finally {
+          await root.delete(recursive: true);
         }
-      }
-    } finally {
-      await root.delete(recursive: true);
+      });
     }
-  });
+  }
   test(
     'actual browser cancellation waits for owned process and cleans profile',
     () async {
