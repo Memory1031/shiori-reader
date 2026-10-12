@@ -85,6 +85,32 @@ void main() {
         );
         expect(book.content.chapters, isNotEmpty);
         expect(await paths.localImportStaging.list().toList(), isEmpty);
+        if (phase == 'preparedWaiting') {
+          final attempt = await db
+              .customSelect('SELECT * FROM local_reparse_attempts')
+              .getSingle();
+          expect(attempt.read<String>('outcome'), 'cancelled');
+          expect(attempt.read<int>('failure_count'), 0);
+          expect(
+            attempt.read<int>('next_retry_at'),
+            lessThanOrEqualTo(DateTime.now().millisecondsSinceEpoch),
+          );
+          store.automaticReparseActivity(resumed: true);
+          store.startAutomaticReparse(initialDelay: Duration.zero);
+          await Future<void>.delayed(Duration.zero);
+          await store.automaticReparseIdle;
+          expect(
+            (await db.customSelect('SELECT * FROM local_books').getSingle())
+                .read<int>('parser_version'),
+            BookDecoder.parserVersion,
+          );
+          final saved =
+              (await library.getProgress(key, cancellation: token()) as Success)
+                  .value;
+          expect(saved.lastReadAt, progress.lastReadAt);
+          expect(saved.completed, progress.completed);
+          expect(saved.position.blockFraction, progress.position.blockFraction);
+        }
         await store.close();
         await db.close();
         return;
@@ -122,6 +148,9 @@ void main() {
         isTrue,
       );
       await db.customStatement('UPDATE local_books SET parser_version=25');
+      if (phase == 'preparedWaiting') {
+        await store.acquireBookUse(key, cancellation: token());
+      }
       store.automaticReparseActivity(resumed: true);
       store.startAutomaticReparse(
         initialDelay: Duration.zero,
@@ -132,6 +161,16 @@ void main() {
       );
       await Future<void>.delayed(Duration.zero);
       await store.automaticReparseIdle;
+      if (phase == 'preparedWaiting') {
+        expect(
+          (await db
+                  .customSelect('SELECT * FROM local_reparse_attempts')
+                  .getSingle())
+              .read<String>('outcome'),
+          'preparedWaiting',
+        );
+        await crash();
+      }
       fail('Crash checkpoint did not terminate the process');
     },
     skip: directory == null || phase == null,

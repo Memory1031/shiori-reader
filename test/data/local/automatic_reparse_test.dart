@@ -180,6 +180,7 @@ void main() {
     Future<void> Function(String)? checkpoint,
     Future<int?> Function(Directory)? freeSpace,
     Stopwatch Function() clock = Stopwatch.new,
+    DateTime Function()? now,
   }) async {
     store.automaticReparseActivity(resumed: true);
     store.startAutomaticReparse(
@@ -189,6 +190,7 @@ void main() {
       checkpoint: checkpoint,
       freeSpace: freeSpace,
       prepareClock: clock,
+      now: now,
     );
     await Future<void>.delayed(
       Duration.zero,
@@ -302,7 +304,7 @@ void main() {
     },
   );
   test(
-    'approximate migration is terminal, preserves history, and manual success clears it',
+    'approximate skip survives manual failure and restart; manual success clears it',
     () async {
       final a = await add('original new text');
       final key = a.content.detail.summary.key;
@@ -329,10 +331,40 @@ void main() {
       final old = ok(await store.read(key, cancellation: token()))!;
       await save(old);
       final before = ok(await library.getProgress(key, cancellation: token()));
-      await start();
+      final decoder = GateDecoder()..resume.complete();
+      await start(decoder: decoder);
       await idle();
       expect((await attempts()).single['outcome'], 'approximatePosition');
       expect(ok(await library.getProgress(key, cancellation: token())), before);
+      final skipped = (await attempts()).single;
+      decoder.failure = const FileSystemException(
+        'Injected write failure',
+        '',
+        OSError('Disk full', 28),
+      );
+      expect(
+        await store.reparseBook(
+          key,
+          cancellation: token(),
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+        ),
+        isA<Failure<LocalReparseResult>>(),
+      );
+      expect((await attempts()).single, skipped);
+      expect(
+        ok(await store.watchBooks().first).single.autoReparseIssue,
+        LocalAutoReparseIssue.approximatePosition,
+      );
+      expect(ok(await library.getProgress(key, cancellation: token())), before);
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      decoder.failure = null;
+      final calls = decoder.calls.length;
+      await start(decoder: decoder);
+      await idle();
+      expect(decoder.calls.length, calls);
+      expect((await row(key))['parser_version'], 25);
+      expect((await attempts()).single, skipped);
       ok(
         await store.reparseBook(
           key,
@@ -341,6 +373,86 @@ void main() {
         ),
       );
       expect(await attempts(), isEmpty);
+    },
+  );
+  for (final reason in ['ambiguousEncoding', 'originalCorrupt']) {
+    test('manual failure preserves terminal $reason', () async {
+      final a = await add('manual terminal $reason');
+      final key = a.content.detail.summary.key;
+      await db.customStatement(
+        'INSERT INTO local_reparse_attempts VALUES(?,?,?,?,?,?)',
+        [key.novelId, BookDecoder.parserVersion, reason, 0, null, 1],
+      );
+      final decoder = GateDecoder()
+        ..resume.complete()
+        ..failure = const LocalParseException(LocalParseProblem.timeout);
+      await start(decoder: decoder);
+      await idle();
+      expect(decoder.calls, isEmpty);
+      final skipped = (await attempts()).single;
+      expect(
+        await store.reparseBook(
+          key,
+          cancellation: token(),
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+        ),
+        isA<Failure<LocalReparseResult>>(),
+      );
+      expect((await attempts()).single, skipped);
+    });
+  }
+  test('manual failures preserve automatic retry history and counts', () async {
+    final a = await add('manual storage failure');
+    final key = a.content.detail.summary.key;
+    final decoder = GateDecoder()
+      ..resume.complete()
+      ..failure = const LocalParseException(LocalParseProblem.timeout);
+    await start(decoder: decoder);
+    await idle();
+    final previous = (await attempts()).single;
+    decoder.failure = const FileSystemException(
+      'Injected write failure',
+      '',
+      OSError('Permission denied', 13),
+    );
+    for (var i = 0; i < 5; i++) {
+      expect(
+        await store.reparseBook(
+          key,
+          cancellation: token(),
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+        ),
+        isA<Failure<LocalReparseResult>>(),
+      );
+      expect((await attempts()).single, previous);
+    }
+    store.automaticReparseActivity(resumed: true);
+    await idle();
+    expect(decoder.calls.length, 6);
+    expect((await row(key))['parser_version'], 25);
+  });
+  test(
+    'five manual failures cannot create automatic failure records or exclude an old book',
+    () async {
+      final a = await add('manual failure without automatic history');
+      final key = a.content.detail.summary.key;
+      final original = File('${paths.localBooks.path}/${key.novelId}/original');
+      final bytes = await original.readAsBytes();
+      await original.writeAsString('Injected corruption');
+      for (var i = 0; i < 5; i++) {
+        final result = await store.reparseBook(
+          key,
+          cancellation: token(),
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+        );
+        expect(result, isA<Failure<LocalReparseResult>>());
+        expect((result as Failure).failure.kind, FailureKind.parse);
+        expect(await attempts(), isEmpty);
+      }
+      await original.writeAsBytes(bytes);
+      await start();
+      await idle();
+      expect((await row(key))['parser_version'], BookDecoder.parserVersion);
     },
   );
   test(
@@ -696,6 +808,147 @@ void main() {
     },
   );
   test(
+    'prepared Reader A survives hidden cancellation and upgrades in the same process',
+    () async {
+      final a = await add('pending Reader A');
+      final key = a.content.detail.summary.key;
+      final controller = ReaderController(
+        repository: LocalReadingRepository(
+          local: store,
+          online: ForbiddenOnline(),
+        ),
+        chapter: a.content.chapters.first.key,
+        library: library,
+      );
+      final decoder = GateDecoder()..resume.complete();
+      try {
+        await controller.load();
+        await controller.retryProgress();
+        controller.sampleProgress(f.progress(a.content).position, true);
+        await start(decoder: decoder, maxBooks: 2);
+        await idle();
+        expect((await attempts()).single['outcome'], 'preparedWaiting');
+        expect(await paths.localImportStaging.list().length, 1);
+        store.automaticReparseActivity(resumed: false, cancelPrepare: true);
+        await idle();
+        expect(await paths.localImportStaging.list().length, 0);
+        expect((await attempts()).single['outcome'], 'cancelled');
+        store.automaticReparseActivity(resumed: true);
+        await idle();
+        expect(decoder.calls.length, 2);
+        expect((await row(key))['active_bundle'], isNull);
+      } finally {
+        controller.onDelete();
+        await controller.closeReader();
+      }
+      await idle();
+      expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+      expect(await attempts(), isEmpty);
+      expect(
+        ok(
+          await library.getProgress(key, cancellation: token()),
+        )!.position.blockFraction,
+        .5,
+      );
+    },
+  );
+  test(
+    'discarding a pending candidate does not replenish the book budget',
+    () async {
+      final a = await add('pending exhausted quota');
+      final key = a.content.detail.summary.key;
+      final lease = (await store.acquireBookUse(key, cancellation: token()))!;
+      final decoder = GateDecoder()..resume.complete();
+      try {
+        await start(decoder: decoder, maxBooks: 1);
+        await idle();
+        store.automaticReparseActivity(resumed: false, cancelPrepare: true);
+        await idle();
+        store.automaticReparseActivity(resumed: true);
+        await idle();
+      } finally {
+        await lease.release();
+      }
+      await idle();
+      expect(decoder.calls.length, 1);
+      expect((await row(key))['parser_version'], 25);
+      expect(await paths.localImportStaging.list().length, 0);
+    },
+  );
+  test(
+    'global import discards pending A but does not suppress its retry',
+    () async {
+      final a = await add('pending import A');
+      final key = a.content.detail.summary.key;
+      final lease = (await store.acquireBookUse(key, cancellation: token()))!;
+      final decoder = GateDecoder()..resume.complete();
+      try {
+        await start(decoder: decoder, maxBooks: 2);
+        await idle();
+        ok(
+          await store.importBook(
+            bytes: Stream.value(utf8.encode('import B')),
+            format: LocalBookFormat.txt,
+            cancellation: token(),
+            parse: (s) => const BookDecoder().decode(
+              s,
+              format: LocalBookFormat.txt,
+              filename: 'B.txt',
+              cancellation: token(),
+              chooseEncoding: (_) async => TxtEncoding.utf8,
+            ),
+          ),
+        );
+        await idle();
+        expect(decoder.calls, [key, key]);
+      } finally {
+        await lease.release();
+      }
+      await idle();
+      expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+    },
+  );
+  test(
+    'manual reparse of B retains the prepared candidate for Reader A',
+    () async {
+      final a = await add('pending unrelated A'),
+          b = await add('manual unrelated B');
+      final key = a.content.detail.summary.key,
+          other = b.content.detail.summary.key;
+      await db.customStatement(
+        'UPDATE local_books SET parser_version=? WHERE digest=?',
+        [BookDecoder.parserVersion, other.novelId],
+      );
+      final lease = (await store.acquireBookUse(key, cancellation: token()))!;
+      final decoder = GateDecoder()..resume.complete();
+      try {
+        await start(decoder: decoder);
+        await idle();
+        final stage =
+            (await paths.localImportStaging.list().toList()).single.path;
+        ok(
+          await store.reparseBook(
+            other,
+            chooseEncoding: (_) async => TxtEncoding.utf8,
+            cancellation: token(),
+          ),
+        );
+        await idle();
+        expect(
+          (await paths.localImportStaging.list().toList()).single.path,
+          stage,
+        );
+        expect((await attempts()).single['outcome'], 'preparedWaiting');
+        expect(decoder.calls, [key, other]);
+      } finally {
+        await lease.release();
+      }
+      await idle();
+      expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+      expect(decoder.calls, [key, other]);
+    },
+  );
+  test(
     'manual reparse cancels and joins prepare before taking maintenance',
     () async {
       final a = await add('manual preemption');
@@ -900,6 +1153,66 @@ void main() {
     },
   );
   test(
+    'inactive completion keeps the prepared bundle without a second decode',
+    () async {
+      final a = await add('inactive completed prepare');
+      final key = a.content.detail.summary.key;
+      final decoder = GateDecoder();
+      await start(decoder: decoder);
+      await decoder.entered.future;
+      store.automaticReparseActivity(resumed: false);
+      decoder.resume.complete();
+      await idle();
+      expect((await row(key))['active_bundle'], isNull);
+      expect((await attempts()).single['outcome'], 'preparedWaiting');
+      final stage =
+          (await paths.localImportStaging.list().toList()).single.path;
+      store.automaticReparseActivity(resumed: true);
+      await idle();
+      expect(decoder.calls, [key]);
+      expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+      expect(await Directory(stage).exists(), isFalse);
+    },
+  );
+  test(
+    'low capacity pauses the scan without spending a book slot; cooldown can retry',
+    () async {
+      final a = await add('low capacity A', shelf: true);
+      await add('low capacity B');
+      await add('low capacity C');
+      final key = a.content.detail.summary.key;
+      var now = DateTime.now();
+      var free = 1, probes = 0;
+      final decoder = GateDecoder()..resume.complete();
+      await start(
+        decoder: decoder,
+        maxBooks: 1,
+        now: () => now,
+        freeSpace: (_) async {
+          probes++;
+          return free;
+        },
+      );
+      await idle();
+      expect(probes, 1);
+      expect(decoder.calls, isEmpty);
+      expect((await attempts()).single['digest'], key.novelId);
+      expect((await attempts()).single['outcome'], 'lowStorage');
+      expect((await attempts()).single['failure_count'], 0);
+      store.automaticReparseActivity(resumed: true);
+      await idle();
+      expect(probes, 1);
+      free = 1 << 31;
+      now = now.add(const Duration(hours: 1));
+      store.automaticReparseActivity(resumed: true);
+      await idle();
+      expect(probes, 2);
+      expect(decoder.calls, [key]);
+      expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+      expect(await attempts(), isEmpty);
+    },
+  );
+  test(
     'store close joins prepare and startup classifies only unfinished attempts',
     () async {
       final a = await add('shutdown');
@@ -920,6 +1233,39 @@ void main() {
       expect((await row(key))['active_bundle'], isNull);
     },
   );
+  for (final shutdown in ['close', 'stop', 'hiddenThenClose']) {
+    test(
+      'lifecycle callbacks during $shutdown do not race pending cleanup',
+      () async {
+        final a = await add('shutdown pending $shutdown');
+        final key = a.content.detail.summary.key;
+        final lease = (await store.acquireBookUse(key, cancellation: token()))!;
+        Future<void>? stopping;
+        try {
+          await start();
+          await idle();
+          expect((await attempts()).single['outcome'], 'preparedWaiting');
+          if (shutdown == 'hiddenThenClose') {
+            store.automaticReparseActivity(resumed: false, cancelPrepare: true);
+          }
+          stopping = shutdown == 'stop'
+              ? store.stopAutomaticReparse()
+              : store.close();
+          store.automaticReparseActivity(resumed: false, cancelPrepare: true);
+          store.automaticReparseActivity(resumed: false, cancelPrepare: true);
+        } finally {
+          await lease.release();
+          await stopping;
+        }
+        await store.close();
+        expect(await paths.localImportStaging.list().length, 0);
+        expect((await attempts()).single['outcome'], 'cancelled');
+        expect((await attempts()).single['failure_count'], 0);
+        store = ok(await ManagedLocalBooks.open(paths, db));
+        expect(ok(await store.read(key, cancellation: token())), isNotNull);
+      },
+    );
+  }
   test(
     'strict saved TXT chooser succeeds; ambiguous missing encoding is terminal',
     () async {

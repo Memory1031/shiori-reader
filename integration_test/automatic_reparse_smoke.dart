@@ -122,6 +122,14 @@ Future<void> main() async {
       await version(books.last.content.detail.summary.key) ==
           BookDecoder.parserVersion,
     );
+    store.automaticReparseActivity(resumed: false, cancelPrepare: true);
+    await store.automaticReparseIdle;
+    require(await paths.localImportStaging.list().isEmpty);
+    store.automaticReparseActivity(resumed: true);
+    await store.automaticReparseIdle;
+    require(await version(a.key.novelKey) == 28);
+    require(await paths.localImportStaging.list().length == 1);
+    report['preparedCancellationRescheduled'] = true;
     reader.onDelete();
     await reader.closeReader();
     reader = null;

@@ -47,7 +47,9 @@ extension _AutomaticReparse on ManagedLocalBooks {
       !_autoStopped &&
       _autoReady &&
       _autoForeground &&
-      _manualOperations == 0;
+      _manualOperations == 0 &&
+      (_autoStorageRetryAt == null ||
+          !_autoNow().isBefore(_autoStorageRetryAt!));
 
   void _wakeAutomatic() {
     if (!_mayStartAutomatic) return;
@@ -74,10 +76,13 @@ extension _AutomaticReparse on ManagedLocalBooks {
     if (_autoPending case final pending?) {
       final source = _autoCancellation = CancellationSource();
       try {
-        await _tryAutomaticCommit(pending);
+        if (!await _tryAutomaticCommit(pending)) {
+          await _writeAutomaticAttempt(pending.key, 'preparedWaiting');
+          checkLocalCancellation(source.token);
+        }
       } catch (error) {
         if (error is LocalCancelled || source.token.isCancelled) {
-          await _clearRunningAttempt(pending.key);
+          await _cancelAutomaticAttempt(pending.key);
         } else {
           await _automaticFailure(pending.key, error);
         }
@@ -137,18 +142,12 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
             baseline.read<int>('maintenance') != 0) {
           continue;
         }
-        // Persist before reading/decoding input: an unfinished attempt is only
-        // evidence of interruption, never proof of an OOM or native crash.
-        await _writeAutomaticAttempt(key, 'running');
         if (!_mayStartAutomatic) {
           source.cancel();
           checkLocalCancellation(source.token);
         }
-        _autoBooksStarted++;
         work = _autoWorkClock = _autoClock()..start();
         deadline = Timer(_autoTimeBudget - _autoPrepareTime, source.cancel);
-        final old = await _read(key, token: source.token);
-        if (old == null) throw const _OriginalCorrupt();
         if (_autoFreeSpace != null) {
           final free = await Future.any<int?>([
             _autoFreeSpace!(paths.localBooks),
@@ -166,6 +165,13 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
             throw const _LowStorage();
           }
         }
+        checkLocalCancellation(source.token);
+        // Capacity refusal is not a started book. Persist before actual input
+        // work so only interrupted active work gets crash backoff on restart.
+        _autoBooksStarted++;
+        await _writeAutomaticAttempt(key, 'running');
+        final old = await _read(key, token: source.token);
+        if (old == null) throw const _OriginalCorrupt();
         prepared = await _prepareReparse(
           this,
           old,
@@ -190,16 +196,16 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
           Map.of(baseline.data),
           prepared,
         );
-        if (!_mayStartAutomatic || source.token.isCancelled) {
-          throw const LocalCancelled();
-        }
+        checkLocalCancellation(source.token);
         if (!await _tryAutomaticCommit(candidate)) {
           // A different deferred bundle cannot be displaced by another reader.
           if (_autoPending == null) {
+            await _writeAutomaticAttempt(key, 'preparedWaiting');
+            checkLocalCancellation(source.token);
             _autoPending = candidate;
             pendingOwnsStage = true;
           } else {
-            await _clearRunningAttempt(key);
+            await _cancelAutomaticAttempt(key);
           }
         }
       } catch (error) {
@@ -209,8 +215,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
           work = null;
         }
         if (error is LocalCancelled) {
-          await _clearRunningAttempt(key);
-          _autoAttempted.remove(key);
+          await _cancelAutomaticAttempt(key);
         } else {
           await _automaticFailure(key, error);
         }
@@ -235,6 +240,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
       return false;
     }
     final token = _autoCancellation?.token ?? CancellationSource().token;
+    await _writeAutomaticAttempt(key, 'running');
     final stamp = await _progressStamp(this, key);
     final read = await LocalLibraryRepository(
       db,
@@ -406,13 +412,18 @@ next_retry_at=excluded.next_retry_at, attempted_at=excluded.attempted_at
   Future<void> _clearRunningAttempt(NovelKey key) async {
     // Restore eligibility without erasing earlier failure counts on cancellation.
     await db.customUpdate(
-      "UPDATE local_reparse_attempts SET outcome='cancelled',next_retry_at=? WHERE digest=? AND outcome='running'",
+      "UPDATE local_reparse_attempts SET outcome='cancelled',next_retry_at=? WHERE digest=? AND outcome IN ('running','preparedWaiting')",
       variables: [
         Variable(_autoNow().millisecondsSinceEpoch),
         Variable(key.novelId),
       ],
       updates: {db.localReparseAttempts},
     );
+  }
+
+  Future<void> _cancelAutomaticAttempt(NovelKey key) async {
+    await _clearRunningAttempt(key);
+    _autoAttempted.remove(key);
   }
 
   Future<void> _automaticFailure(NovelKey key, Object error) async {
@@ -440,11 +451,16 @@ next_retry_at=excluded.next_retry_at, attempted_at=excluded.attempted_at
         )
         .getSingleOrNull();
     final failures = count?.read<int>('failure_count') ?? 0;
+    final retry = terminal ? null : Duration(hours: 1 << failures.clamp(0, 4));
+    if (issue == LocalAutoReparseIssue.lowStorage) {
+      _autoStorageRetryAt = _autoNow().add(retry!);
+      _autoAttempted.remove(key);
+    }
     await _writeAutomaticAttempt(
       key,
       issue.name,
       failure: !terminal && issue != LocalAutoReparseIssue.lowStorage,
-      retry: terminal ? null : Duration(hours: 1 << failures.clamp(0, 4)),
+      retry: retry,
     );
   }
 
@@ -463,7 +479,9 @@ next_retry_at=excluded.next_retry_at, attempted_at=excluded.attempted_at
       await _autoRun;
       if (_autoPending case final pending?
           when key == null || pending.key == key) {
-        await _clearRunningAttempt(pending.key);
+        // Claim before awaiting so shutdown cannot clean the same candidate.
+        _autoPending = null;
+        await _cancelAutomaticAttempt(pending.key);
         await _finishAutoCandidate(pending);
       }
       return await action();

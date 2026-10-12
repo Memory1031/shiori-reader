@@ -48,16 +48,13 @@ class ManagedLocalBooks
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
     required CancellationToken cancellation,
-  }) => _foregroundOperation(key, () async {
-    final result = await _run(
+  }) => _foregroundOperation(
+    key,
+    () => _run(
       Operation.libraryWrite,
       () => _reparse(this, key, chooseEncoding, encoding, cancellation),
-    );
-    if (result case Failure(:final failure) when !failure.isCancellation) {
-      await _automaticFailure(key, StateError('Manual reparse failed'));
-    }
-    return result;
-  });
+    ),
+  );
 
   final _bookUses = <NovelKey, Set<_BookUse>>{};
   final _publishing = <NovelKey, Completer<void>>{};
@@ -78,6 +75,7 @@ class ManagedLocalBooks
   int _autoMaxBooks = automaticReparseBookBudget;
   Duration _autoTimeBudget = automaticReparsePrepareBudget;
   DateTime Function() _autoNow = DateTime.now;
+  DateTime? _autoStorageRetryAt;
   LocalBookDecoder _automaticDecoder = const BookDecoder();
   Future<int?> Function(Directory)? _autoFreeSpace;
   void Function(String, Duration)? _autoMeasure;
@@ -117,6 +115,7 @@ class ManagedLocalBooks
     required bool resumed,
     bool cancelPrepare = false,
   }) {
+    if (_autoStopped || _closing != null || _closed) return;
     _autoForeground = resumed;
     if (cancelPrepare) {
       _autoWorkClock?.stop();
@@ -141,12 +140,16 @@ class ManagedLocalBooks
     _autoCancellation?.cancel();
     await _autoRun;
     if (_autoPending case final pending?) {
+      _autoPending = null;
       await _clearRunningAttempt(pending.key);
       await _finishAutoCandidate(pending);
     }
   }
 
-  Future<void> get automaticReparseIdle => _autoRun ?? Future.value();
+  Future<void> get automaticReparseIdle async {
+    await _autoRun;
+    await _manualIdle?.future;
+  }
 
   @override
   Future<LocalBookUse?> acquireBookUse(
@@ -336,6 +339,11 @@ class ManagedLocalBooks
         );
       }
       await db.customStatement('UPDATE local_books SET maintenance=0');
+      await db.customUpdate(
+        "UPDATE local_reparse_attempts SET outcome='cancelled',next_retry_at=? WHERE outcome='preparedWaiting'",
+        variables: [Variable(DateTime.now().millisecondsSinceEpoch)],
+        updates: {db.localReparseAttempts},
+      );
       await db.customUpdate(
         "UPDATE local_reparse_attempts SET outcome='interrupted',failure_count=failure_count+1,next_retry_at=? WHERE outcome='running'",
         variables: [
