@@ -69,6 +69,7 @@ class ManagedLocalBooks
   CancellationSource? _autoCancellation;
   _AutoPrepared? _autoPending;
   final _autoAttempted = <NovelKey>{};
+  final _autoCASRetries = <NovelKey, int>{};
   int _autoBooksStarted = 0;
   Duration _autoPrepareTime = Duration.zero;
   Stopwatch? _autoWorkClock;
@@ -76,6 +77,7 @@ class ManagedLocalBooks
   Duration _autoTimeBudget = automaticReparsePrepareBudget;
   DateTime Function() _autoNow = DateTime.now;
   DateTime? _autoStorageRetryAt;
+  Timer? _autoStorageWake;
   LocalBookDecoder _automaticDecoder = const BookDecoder();
   Future<int?> Function(Directory)? _autoFreeSpace;
   void Function(String, Duration)? _autoMeasure;
@@ -124,7 +126,15 @@ class ManagedLocalBooks
     if (resumed) _wakeAutomatic();
     if (cancelPrepare && _autoPending != null) {
       unawaited(
-        _foregroundOperation(null, () async => const Success<void>(null)),
+        _foregroundOperation(
+          null,
+          () async => const Success<void>(null),
+        ).then<void>(
+          (_) {},
+          onError: (Object _) {
+            // Retain unfinished metadata/staging for startup recovery.
+          },
+        ),
       );
     }
   }
@@ -136,6 +146,7 @@ class ManagedLocalBooks
   Future<void> _stopAutomaticReparse() async {
     _autoStopped = true;
     _autoDelay?.cancel();
+    _autoStorageWake?.cancel();
     _autoWorkClock?.stop();
     _autoCancellation?.cancel();
     await _autoRun;

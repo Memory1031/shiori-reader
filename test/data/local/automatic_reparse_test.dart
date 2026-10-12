@@ -71,6 +71,25 @@ class BudgetClock extends Stopwatch {
   Duration get elapsed => const Duration(minutes: 3);
 }
 
+class ManualTimer implements Timer {
+  ManualTimer(this.callback);
+  final void Function() callback;
+  bool _active = true;
+  int _tick = 0;
+  @override
+  bool get isActive => _active;
+  @override
+  int get tick => _tick;
+  @override
+  void cancel() => _active = false;
+  void fire() {
+    if (!_active) return;
+    _active = false;
+    _tick++;
+    callback();
+  }
+}
+
 class FlushLibrary extends LocalLibraryRepository {
   FlushLibrary(super.db);
   final entered = Completer<void>(), finish = Completer<void>();
@@ -656,6 +675,72 @@ void main() {
     capacity.complete(1000000000);
     expect(await attempts(), isEmpty);
   });
+  for (final capacityValue in [1, 1 << 31]) {
+    test(
+      'inactive during capacity lookup ($capacityValue) defers input work without spending quota',
+      () async {
+        final a = await add('inactive capacity');
+        final key = a.content.detail.summary.key;
+        final entered = Completer<void>(), capacity = Completer<int?>();
+        final decoder = GateDecoder()..resume.complete();
+        var probes = 0;
+        await start(
+          decoder: decoder,
+          maxBooks: 1,
+          freeSpace: (_) {
+            if (++probes == 1) {
+              entered.complete();
+              return capacity.future;
+            }
+            return Future.value(1 << 31);
+          },
+        );
+        await entered.future;
+        store.automaticReparseActivity(resumed: false);
+        capacity.complete(capacityValue);
+        await idle();
+        expect(decoder.calls, isEmpty);
+        expect(await attempts(), isEmpty);
+        expect((await row(key))['parser_version'], 25);
+        store.automaticReparseActivity(resumed: true);
+        await idle();
+        expect(decoder.calls, [key]);
+        expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+      },
+    );
+  }
+  test(
+    'inactive after attempt persistence defers before the first input read',
+    () async {
+      final a = await add('inactive persisted attempt');
+      final key = a.content.detail.summary.key;
+      final entered = Completer<void>(), finish = Completer<void>();
+      final decoder = GateDecoder()..resume.complete();
+      var once = false;
+      await start(
+        decoder: decoder,
+        maxBooks: 1,
+        checkpoint: (phase) async {
+          if (phase == 'beforePrepare' && !once) {
+            once = true;
+            entered.complete();
+            await finish.future;
+          }
+        },
+      );
+      await entered.future;
+      store.automaticReparseActivity(resumed: false);
+      finish.complete();
+      await idle();
+      expect(decoder.calls, isEmpty);
+      expect((await attempts()).single['outcome'], 'cancelled');
+      expect((await attempts()).single['failure_count'], 0);
+      store.automaticReparseActivity(resumed: true);
+      await idle();
+      expect(decoder.calls, [key]);
+      expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+    },
+  );
   test(
     'publication permission is released even if maintenance rollback fails',
     () async {
@@ -1064,6 +1149,82 @@ void main() {
       expect((await row(key))['maintenance'], 0);
     },
   );
+  for (final phase in ['migration', 'afterRename']) {
+    test('CAS change at $phase retries without any external wake', () async {
+      final a = await add('CAS recheck $phase');
+      final key = a.content.detail.summary.key;
+      await save(a);
+      final decoder = GateDecoder()..resume.complete();
+      var cleared = false;
+      await start(
+        decoder: decoder,
+        maxBooks: phase == 'migration' ? 1 : 2,
+        checkpoint: (at) async {
+          if (at == phase && !cleared) {
+            cleared = true;
+            ok(await library.clearHistory(key, cancellation: token()));
+          }
+        },
+      );
+      await idle();
+      expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+      expect((await row(key))['maintenance'], 0);
+      expect(ok(await library.getProgress(key, cancellation: token())), isNull);
+      expect(decoder.calls.length, phase == 'migration' ? 1 : 2);
+      expect(await paths.localImportStaging.list().length, 0);
+    });
+  }
+  test(
+    'continuous CAS changes stop after two rechecks and retain the old book',
+    () async {
+      final a = await add('bounded CAS changes');
+      final key = a.content.detail.summary.key;
+      final decoder = GateDecoder()..resume.complete();
+      var migrations = 0;
+      await start(
+        decoder: decoder,
+        checkpoint: (phase) async {
+          if (phase == 'migration') {
+            migrations++;
+            ok(await library.clearHistory(key, cancellation: token()));
+          }
+        },
+      );
+      await idle();
+      expect(migrations, 3);
+      expect(decoder.calls, [key]);
+      expect((await row(key))['parser_version'], 25);
+      expect((await attempts()).single['outcome'], 'preparedWaiting');
+      expect((await attempts()).single['failure_count'], 0);
+      expect(ok(await library.getProgress(key, cancellation: token())), isNull);
+    },
+  );
+  test(
+    'CAS reprepare after Rename cannot replenish the launch book budget',
+    () async {
+      final a = await add('CAS exhausted reprepare');
+      final key = a.content.detail.summary.key;
+      final decoder = GateDecoder()..resume.complete();
+      await start(
+        decoder: decoder,
+        maxBooks: 1,
+        checkpoint: (phase) async {
+          if (phase == 'afterRename') {
+            ok(await library.clearHistory(key, cancellation: token()));
+          }
+        },
+      );
+      await idle();
+      expect(decoder.calls, [key]);
+      expect((await row(key))['parser_version'], 25);
+      expect(await paths.localImportStaging.list().length, 0);
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      await start();
+      await idle();
+      expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+    },
+  );
   test(
     'migration is outside publication; a Reader can acquire while it is held',
     () async {
@@ -1210,6 +1371,121 @@ void main() {
       expect(decoder.calls, [key]);
       expect((await row(key))['parser_version'], BookDecoder.parserVersion);
       expect(await attempts(), isEmpty);
+    },
+  );
+  test(
+    'low capacity for B does not block prepared A from publishing',
+    () async {
+      final a = await add('prepared A before low capacity', shelf: true);
+      final b = await add('low capacity B after A');
+      final key = a.content.detail.summary.key,
+          other = b.content.detail.summary.key;
+      final lease = (await store.acquireBookUse(key, cancellation: token()))!;
+      final decoder = GateDecoder()..resume.complete();
+      var probes = 0;
+      try {
+        await save(a);
+        await start(
+          decoder: decoder,
+          freeSpace: (_) async => ++probes == 1 ? 1 << 31 : 1,
+        );
+        await idle();
+        expect(decoder.calls, [key]);
+        expect(
+          (await attempts())
+              .where((r) => r['digest'] == other.novelId)
+              .single['outcome'],
+          'lowStorage',
+        );
+      } finally {
+        await lease.release(progressSaved: true);
+      }
+      await idle();
+      expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+      expect((await row(other))['parser_version'], 25);
+      expect(decoder.calls, [key]);
+      expect(probes, 2);
+    },
+  );
+  for (final mode in ['foreground', 'inactive', 'stop']) {
+    test('capacity cooldown timer respects $mode', () async {
+      final a = await add('capacity timer $mode');
+      final key = a.content.detail.summary.key;
+      final decoder = GateDecoder()..resume.complete();
+      var now = DateTime.now(), free = 1;
+      late ManualTimer timer;
+      await runZoned(
+        () => start(
+          decoder: decoder,
+          now: () => now,
+          freeSpace: (_) async => free,
+        ),
+        zoneSpecification: ZoneSpecification(
+          createTimer: (self, parent, zone, duration, callback) {
+            if (duration == const Duration(hours: 1)) {
+              return timer = ManualTimer(() => zone.runGuarded(callback));
+            }
+            return parent.createTimer(zone, duration, callback);
+          },
+        ),
+      );
+      await idle();
+      expect(timer.isActive, isTrue);
+      if (mode == 'stop') {
+        await store.stopAutomaticReparse();
+        expect(timer.isActive, isFalse);
+      } else {
+        if (mode == 'inactive') store.automaticReparseActivity(resumed: false);
+        now = now.add(const Duration(hours: 1));
+        free = 1 << 31;
+        timer.fire();
+        await idle();
+        if (mode == 'inactive') {
+          expect(decoder.calls, isEmpty);
+          store.automaticReparseActivity(resumed: true);
+          await idle();
+        }
+        expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+        expect(decoder.calls, [key]);
+      }
+    });
+  }
+  test(
+    'background cleanup SQL failure is contained and leaves recovery state intact',
+    () async {
+      final a = await add('background cleanup failure');
+      final key = a.content.detail.summary.key;
+      final lease = (await store.acquireBookUse(key, cancellation: token()))!;
+      try {
+        await save(a);
+        await start();
+        await idle();
+        await db.customStatement('''
+CREATE TRIGGER fail_cancel_attempt BEFORE UPDATE OF outcome ON local_reparse_attempts
+WHEN NEW.outcome='cancelled' BEGIN SELECT RAISE(ABORT,'Injected cancellation failure'); END
+''');
+        store.automaticReparseActivity(resumed: false, cancelPrepare: true);
+        await idle();
+        expect((await attempts()).single['outcome'], 'preparedWaiting');
+        expect((await attempts()).single['failure_count'], 0);
+        expect(await paths.localImportStaging.list().length, 1);
+        expect((await row(key))['parser_version'], 25);
+        expect(ok(await store.read(key, cancellation: token())), isNotNull);
+        expect(
+          ok(
+            await library.getProgress(key, cancellation: token()),
+          )!.position.blockFraction,
+          .5,
+        );
+        await db.customStatement('DROP TRIGGER fail_cancel_attempt');
+      } finally {
+        await lease.release();
+      }
+      await store.close();
+      store = ok(await ManagedLocalBooks.open(paths, db));
+      expect(await paths.localImportStaging.list().length, 0);
+      expect((await attempts()).single['failure_count'], 0);
+      expect(ok(await store.read(key, cancellation: token())), isNotNull);
     },
   );
   test(

@@ -47,7 +47,12 @@ extension _AutomaticReparse on ManagedLocalBooks {
       !_autoStopped &&
       _autoReady &&
       _autoForeground &&
-      _manualOperations == 0 &&
+      _manualOperations == 0;
+
+  bool get _mayStartPrepare =>
+      _mayStartAutomatic &&
+      _autoBooksStarted < _autoMaxBooks &&
+      _autoPrepareTime < _autoTimeBudget &&
       (_autoStorageRetryAt == null ||
           !_autoNow().isBefore(_autoStorageRetryAt!));
 
@@ -91,11 +96,7 @@ extension _AutomaticReparse on ManagedLocalBooks {
         _autoCancellation = null;
       }
     }
-    if (!_mayStartAutomatic ||
-        _autoBooksStarted >= _autoMaxBooks ||
-        _autoPrepareTime >= _autoTimeBudget) {
-      return;
-    }
+    if (!_mayStartPrepare) return;
     final rows = await db
         .customSelect(
           '''
@@ -116,11 +117,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
         )
         .get();
     for (final row in rows) {
-      if (!_mayStartAutomatic ||
-          _autoBooksStarted >= _autoMaxBooks ||
-          _autoPrepareTime >= _autoTimeBudget) {
-        break;
-      }
+      if (!_mayStartPrepare) break;
       final key = LocalBookIdentity.book(row.read<String>('digest'));
       if (_autoAttempted.contains(key) || _autoPending?.key == key) continue;
       // Keep at most one waiting bundle, while allowing all idle books through.
@@ -142,34 +139,45 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
             baseline.read<int>('maintenance') != 0) {
           continue;
         }
-        if (!_mayStartAutomatic) {
-          source.cancel();
-          checkLocalCancellation(source.token);
+        if (!_mayStartPrepare) {
+          await _cancelAutomaticAttempt(key);
+          break;
         }
         work = _autoWorkClock = _autoClock()..start();
         deadline = Timer(_autoTimeBudget - _autoPrepareTime, source.cancel);
+        int? free;
         if (_autoFreeSpace != null) {
-          final free = await Future.any<int?>([
+          free = await Future.any<int?>([
             _autoFreeSpace!(paths.localBooks),
             source.token.whenCancelled.then<int?>(
               (_) => throw const LocalCancelled(),
             ),
           ]);
-          // Reserve the bounded maximum new bundle plus bounded input copy.
-          // This is a conservative refusal threshold, not an EPUB size guess.
-          if (free != null &&
-              free <
-                  ManagedLocalBooks.maxBundleBytes +
-                      ManagedLocalBooks.maxOriginalBytes +
-                      32 * 1024 * 1024) {
-            throw const _LowStorage();
-          }
         }
         checkLocalCancellation(source.token);
+        if (!_mayStartPrepare) {
+          await _cancelAutomaticAttempt(key);
+          break;
+        }
+        // Reserve the bounded maximum new bundle plus bounded input copy.
+        // This is a conservative refusal threshold, not an EPUB size guess.
+        if (free != null &&
+            free <
+                ManagedLocalBooks.maxBundleBytes +
+                    ManagedLocalBooks.maxOriginalBytes +
+                    32 * 1024 * 1024) {
+          throw const _LowStorage();
+        }
         // Capacity refusal is not a started book. Persist before actual input
         // work so only interrupted active work gets crash backoff on restart.
-        _autoBooksStarted++;
         await _writeAutomaticAttempt(key, 'running');
+        await _autoCheckpoint?.call('beforePrepare');
+        checkLocalCancellation(source.token);
+        if (!_mayStartPrepare) {
+          await _cancelAutomaticAttempt(key);
+          break;
+        }
+        _autoBooksStarted++;
         final old = await _read(key, token: source.token);
         if (old == null) throw const _OriginalCorrupt();
         prepared = await _prepareReparse(
@@ -284,6 +292,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
         _unsafeProgress.containsKey(key)) {
       return false;
     }
+    var stateChanged = false;
     final result = await _run(Operation.libraryWrite, () async {
       if (!_mayStartAutomatic ||
           _bookUses[key]?.isNotEmpty == true ||
@@ -299,6 +308,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
         final row = await _bookRow(this, key);
         if (!_sameBaseline(row, candidate.baseline) ||
             await _progressStamp(this, key) != stamp) {
+          stateChanged = true;
           return false;
         }
         await _autoCheckpoint?.call('beforeRename');
@@ -331,6 +341,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
         _reparseChanged(key);
         return true;
       } on _AutoStateChanged {
+        stateChanged = true;
         return false;
       } finally {
         // Once publishing begins, lifecycle/budget cancellation never aborts SQL.
@@ -358,6 +369,12 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
       throw StateError('Automatic publication failed: ${failure.kind.name}');
     }
     final committed = (result as Success<bool>).value;
+    if (stateChanged && (_autoCASRetries[key] ?? 0) < 2) {
+      // Re-enter through the scheduler; migration never runs under the permit.
+      _autoCASRetries[key] = (_autoCASRetries[key] ?? 0) + 1;
+      _autoWakeRequested = true;
+      if (candidate.prepared.published) _autoAttempted.remove(key);
+    }
     if (committed) {
       final cleanupWatch = Stopwatch()..start();
       await _autoCheckpoint?.call('cleanup');
@@ -365,8 +382,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
       _autoMeasure?.call('cleanup', cleanupWatch.elapsed);
       await _finishAutoCandidate(candidate);
     } else if (candidate.prepared.published) {
-      // A failed CAS after rename retires this immutable candidate. Re-prepare
-      // next launch; never rename an already published revision a second time.
+      // Retire after Rename; a bounded recheck must prepare a fresh candidate.
       await _clearRunningAttempt(key);
       await _finishAutoCandidate(candidate);
       return true;
@@ -452,16 +468,24 @@ next_retry_at=excluded.next_retry_at, attempted_at=excluded.attempted_at
         .getSingleOrNull();
     final failures = count?.read<int>('failure_count') ?? 0;
     final retry = terminal ? null : Duration(hours: 1 << failures.clamp(0, 4));
-    if (issue == LocalAutoReparseIssue.lowStorage) {
-      _autoStorageRetryAt = _autoNow().add(retry!);
-      _autoAttempted.remove(key);
-    }
     await _writeAutomaticAttempt(
       key,
       issue.name,
       failure: !terminal && issue != LocalAutoReparseIssue.lowStorage,
       retry: retry,
     );
+    if (issue == LocalAutoReparseIssue.lowStorage) {
+      _autoStorageRetryAt = _autoNow().add(retry!);
+      _autoAttempted.remove(key);
+      _autoStorageWake?.cancel();
+      if (!_autoStopped) {
+        _autoStorageWake = Timer(retry, () {
+          _autoStorageWake = null;
+          _autoStorageRetryAt = null;
+          _wakeAutomatic();
+        });
+      }
+    }
   }
 
   Future<Result<T>> _foregroundOperation<T>(
