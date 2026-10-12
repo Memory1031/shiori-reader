@@ -274,25 +274,19 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
       _autoMeasure?.call('migration', migrationWatch.elapsed);
     }
     await _autoCheckpoint?.call('migration');
-    if (!_exactAutomaticPosition(
+    checkLocalCancellation(token);
+    final exact = _exactAutomaticPosition(
       candidate.old.content,
       candidate.prepared.content,
       progress,
       migration,
-    )) {
-      await _writeAutomaticAttempt(
-        key,
-        LocalAutoReparseIssue.approximatePosition.name,
-      );
-      await _finishAutoCandidate(candidate);
-      return true;
-    }
+    );
     if (!_mayStartAutomatic ||
         _bookUses[key]?.isNotEmpty == true ||
         _unsafeProgress.containsKey(key)) {
       return false;
     }
-    var stateChanged = false;
+    var stateChanged = false, skipped = false;
     final result = await _run(Operation.libraryWrite, () async {
       if (!_mayStartAutomatic ||
           _bookUses[key]?.isNotEmpty == true ||
@@ -311,15 +305,19 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
           stateChanged = true;
           return false;
         }
-        await _autoCheckpoint?.call('beforeRename');
-        await db.customStatement(
-          'UPDATE local_books SET maintenance=1 WHERE digest=?',
-          [key.novelId],
-        );
-        await _renameReparse(this, key, candidate.prepared);
-        await _autoCheckpoint?.call('afterRename');
+        if (exact) {
+          await _autoCheckpoint?.call('beforeRename');
+          await db.customStatement(
+            'UPDATE local_books SET maintenance=1 WHERE digest=?',
+            [key.novelId],
+          );
+          await _renameReparse(this, key, candidate.prepared);
+          await _autoCheckpoint?.call('afterRename');
+        } else {
+          await _autoCheckpoint?.call('approximateDecision');
+        }
         final sqlWatch = Stopwatch()..start();
-        await db.transaction(() async {
+        final resolved = await db.transaction(() async {
           final latest = await _bookRow(this, key);
           if (!_sameBaseline(latest, candidate.baseline) ||
               await _progressStamp(this, key) != stamp) {
@@ -332,10 +330,30 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
               persisted.value != progress) {
             throw const _AutoStateChanged();
           }
-          await _autoCheckpoint?.call('transaction');
-          await _publishReparse(this, key, candidate.prepared, migration);
+          if (exact) {
+            await _autoCheckpoint?.call('transaction');
+            await _publishReparse(this, key, candidate.prepared, migration);
+          } else {
+            checkLocalCancellation(token);
+            if (!_mayStartAutomatic ||
+                _bookUses[key]?.isNotEmpty == true ||
+                _unsafeProgress.containsKey(key)) {
+              return false;
+            }
+            await _writeAutomaticAttempt(
+              key,
+              LocalAutoReparseIssue.approximatePosition.name,
+            );
+            checkLocalCancellation(token);
+          }
+          return true;
         });
         _autoMeasure?.call('transaction', sqlWatch.elapsed);
+        if (!resolved) return false;
+        if (!exact) {
+          skipped = true;
+          return true;
+        }
         await _autoCheckpoint?.call('afterCommit');
         committed = true;
         _reparseChanged(key);
@@ -344,9 +362,9 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
         stateChanged = true;
         return false;
       } finally {
-        // Once publishing begins, lifecycle/budget cancellation never aborts SQL.
+        // Bundle publication remains authoritative after lifecycle cancellation.
         try {
-          if (!committed) {
+          if (!committed && !skipped) {
             await db.customStatement(
               'UPDATE local_books SET maintenance=0 WHERE digest=?',
               [key.novelId],
@@ -354,7 +372,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
           }
         } finally {
           try {
-            if (!committed) {
+            if (!committed && !skipped) {
               await _refreshUncertainPublication(this, key, candidate.prepared);
             }
           } finally {
@@ -366,20 +384,23 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
       }
     });
     if (result case Failure(:final failure)) {
+      if (failure.isCancellation) throw const LocalCancelled();
       throw StateError('Automatic publication failed: ${failure.kind.name}');
     }
-    final committed = (result as Success<bool>).value;
+    final handled = (result as Success<bool>).value;
     if (stateChanged && (_autoCASRetries[key] ?? 0) < 2) {
       // Re-enter through the scheduler; migration never runs under the permit.
       _autoCASRetries[key] = (_autoCASRetries[key] ?? 0) + 1;
       _autoWakeRequested = true;
       if (candidate.prepared.published) _autoAttempted.remove(key);
     }
-    if (committed) {
-      final cleanupWatch = Stopwatch()..start();
-      await _autoCheckpoint?.call('cleanup');
-      await _cleanRevisions(key.novelId, candidate.prepared.bundle);
-      _autoMeasure?.call('cleanup', cleanupWatch.elapsed);
+    if (handled) {
+      if (!skipped) {
+        final cleanupWatch = Stopwatch()..start();
+        await _autoCheckpoint?.call('cleanup');
+        await _cleanRevisions(key.novelId, candidate.prepared.bundle);
+        _autoMeasure?.call('cleanup', cleanupWatch.elapsed);
+      }
       await _finishAutoCandidate(candidate);
     } else if (candidate.prepared.published) {
       // Retire after Rename; a bounded recheck must prepare a fresh candidate.
@@ -387,7 +408,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
       await _finishAutoCandidate(candidate);
       return true;
     }
-    return committed;
+    return handled;
   }
 
   Future<void> _finishAutoCandidate(_AutoPrepared candidate) async {

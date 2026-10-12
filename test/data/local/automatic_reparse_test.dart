@@ -18,6 +18,7 @@ import 'package:shiori/data/repositories/local_reading_repository.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/domain/reparse_position.dart';
 import 'package:shiori/features/reader/reader_controller.dart';
 import '../../domain/reparse_position_test.dart' as f;
 import 'local_reading_test.dart' show ForbiddenOnline;
@@ -193,6 +194,46 @@ void main() {
               )
               .getSingle())
           .data;
+
+  Future<(LocalBookRecord, LocalBookRecord)> approximateFixture(
+    String text,
+  ) async {
+    final next = await add(text);
+    final key = next.content.detail.summary.key;
+    final file = File('${paths.localBooks.path}/${key.novelId}/manifest.json');
+    final map = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+    final chapter = next.content.chapters.first;
+    map['chapters'] = [
+      RecordCodec.chapter(
+        ChapterContent(
+          key: chapter.key,
+          title: chapter.title,
+          blocks: [
+            ParagraphBlock(text: 'Legacy unmatched paragraph'),
+            ...chapter.blocks,
+          ],
+        ),
+      ),
+    ];
+    final bytes = utf8.encode(jsonEncode(map));
+    await file.writeAsBytes(bytes);
+    await db.customStatement(
+      'UPDATE local_books SET manifest_hash=? WHERE digest=?',
+      [sha256.convert(bytes).toString(), key.novelId],
+    );
+    final old = ok(await store.read(key, cancellation: token()))!;
+    await save(old);
+    expect(
+      migrateLocalPosition(
+        old.content,
+        next.content,
+        f.progress(old.content),
+      ).approximate,
+      isTrue,
+    );
+    return (old, next);
+  }
+
   Future<void> start({
     LocalBookDecoder decoder = const BookDecoder(),
     int maxBooks = 15,
@@ -392,6 +433,133 @@ void main() {
         ),
       );
       expect(await attempts(), isEmpty);
+    },
+  );
+  for (final clearStamp in [true, false]) {
+    test(
+      'stale approximate migration cannot terminate after history clears (stamp $clearStamp)',
+      () async {
+        final (old, _) = await approximateFixture(
+          'approximate history race $clearStamp',
+        );
+        final key = old.content.detail.summary.key;
+        final entered = Completer<void>(), finish = Completer<void>();
+        var migrations = 0;
+        await start(
+          maxBooks: 1,
+          checkpoint: (phase) async {
+            if (phase == 'migration' && ++migrations == 1) {
+              entered.complete();
+              await finish.future;
+            }
+          },
+        );
+        await entered.future;
+        if (clearStamp) {
+          ok(await library.clearHistory(key, cancellation: token()));
+        } else {
+          await db.customStatement(
+            'DELETE FROM reading_progress WHERE novel_id=?',
+            [key.novelId],
+          );
+        }
+        finish.complete();
+        await idle();
+        expect(migrations, 2);
+        expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+        expect(
+          ok(await library.getProgress(key, cancellation: token())),
+          isNull,
+        );
+        expect(await attempts(), isEmpty);
+      },
+    );
+  }
+  test(
+    'Reader opened during approximate migration keeps the candidate until its new progress is flushed',
+    () async {
+      final (old, next) = await approximateFixture('approximate Reader race');
+      final key = old.content.detail.summary.key;
+      final entered = Completer<void>(), finish = Completer<void>();
+      var once = false;
+      await start(
+        checkpoint: (phase) async {
+          if (phase == 'migration' && !once) {
+            once = true;
+            entered.complete();
+            await finish.future;
+          }
+        },
+      );
+      await entered.future;
+      final controller = ReaderController(
+        repository: LocalReadingRepository(
+          local: store,
+          online: ForbiddenOnline(),
+        ),
+        chapter: old.content.chapters.first.key,
+        library: library,
+      );
+      try {
+        await controller.load();
+        await controller.retryProgress();
+        controller.sampleProgress(
+          f.progress(old.content, index: 1, fraction: .75).position,
+          false,
+        );
+        finish.complete();
+        await idle();
+        expect((await row(key))['parser_version'], 25);
+        expect((await attempts()).single['outcome'], 'preparedWaiting');
+        expect(
+          ok(await store.watchBooks().first).single.autoReparseIssue,
+          isNull,
+        );
+      } finally {
+        if (!finish.isCompleted) finish.complete();
+        controller.onDelete();
+        await controller.closeReader();
+      }
+      await idle();
+      final saved = ok(await library.getProgress(key, cancellation: token()))!;
+      expect((await row(key))['parser_version'], BookDecoder.parserVersion);
+      expect(
+        saved.position.contentRevision,
+        next.content.chapters.first.contentRevision,
+      );
+      expect(saved.position.blockFraction, .75);
+      expect(saved.completed, isFalse);
+      expect(await attempts(), isEmpty);
+    },
+  );
+  test(
+    'cancellation before the approximate decision cannot persist a terminal outcome',
+    () async {
+      final (old, _) = await approximateFixture(
+        'approximate decision cancellation',
+      );
+      final key = old.content.detail.summary.key;
+      final entered = Completer<void>(), finish = Completer<void>();
+      await start(
+        checkpoint: (phase) async {
+          if (phase == 'approximateDecision') {
+            entered.complete();
+            await finish.future;
+          }
+        },
+      );
+      await entered.future;
+      store.automaticReparseActivity(resumed: false, cancelPrepare: true);
+      finish.complete();
+      await idle();
+      expect((await row(key))['parser_version'], 25);
+      expect((await attempts()).single['outcome'], 'cancelled');
+      expect((await attempts()).single['failure_count'], 0);
+      expect(
+        ok(await library.getProgress(key, cancellation: token())),
+        isNotNull,
+      );
+      expect(await paths.localImportStaging.list().length, 0);
     },
   );
   for (final reason in ['ambiguousEncoding', 'originalCorrupt']) {
