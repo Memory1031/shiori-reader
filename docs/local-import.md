@@ -213,13 +213,25 @@ EPUB 解析结果在 data 层附带最多 100 条固定原因码及截断标记�
 
 旧 EPUB 读取不再把新解析的 catalog/chapters/navigation 替换进内存记录。旧特殊页仅在对应正文 revision 相符时派生；新导入与新 bundle 均保存受限呈现 JSON，hash 进入受校验 manifest。原件与媒体仍各自校验 SHA-256。
 
-- 用户库 v4：local_books 增加 active_bundle、parser_version、maintenance，另增 local_chapter_revisions。NULL bundle 兼容旧根目录格式；升级不自动重新解析。
+- 用户库 v4：local_books 增加 active_bundle、parser_version、maintenance，另增 local_chapter_revisions。NULL bundle 兼容旧根目录格式；旧结果仍可读取，旧解析版本在正常使用时按预算自动升级。
 - 原件长期只保留根目录一份。暂存副本用于解析，完成后删除副本，manifest/媒体/呈现进入不可变 revisions/bundle。
 - SQL 同一事务更新活动 bundle/hash、已有书架快照、进度与 generation、章节版本索引。提交前取消或 SQL 失败不切换；提交后返回真实成功，清理失败使用 cleanupPending。
-- 维护期间拒绝新进度会话及旧写，发 invalidation 退役 Reader。结束后本地仓库发布 detail/catalog/chapter 更新；目录和特殊页后续读取取当前版本。即使旧内容重新申请 generation，正文/catalog revision 校验也拒绝不匹配写入。
-- 迁移快照记录 generation/sequence，最终提交重新核对。期间 clearHistory 会改变 stamp 并阻止发布，不恢复用户刚清除的历史。普通进度保存被 maintenance 阻止，不覆盖待迁移快照。
+- 手动维护期间拒绝新进度会话及旧写，发 invalidation 退役 Reader。结束后本地仓库发布 detail/catalog/chapter 更新；目录和特殊页后续读取取当前版本。即使旧内容重新申请 generation，正文/catalog revision 校验也拒绝不匹配写入。
+- 迁移快照记录 generation/sequence，最终提交重新核对。期间 clearHistory 会改变 stamp 并阻止发布，不恢复用户刚清除的历史。手动维护时普通进度保存被 maintenance 阻止；自动 Prepare 允许正常保存，迁移候选须在最终事务重新校验。
 - 启动先读 SQL 再清 staging/未引用 revisions，并解除遗留 maintenance。活动 manifest 缺失或校验失败时保留已有文件，不因坏指针删除旧资料。不是提供历史版本回滚 UI；正常提交后回收旧资源，避免版本无限累积。
 - 文件发布仍依赖已有 flush + rename + SQLite 事务策略。测试覆盖人工构造崩溃遗留状态，未执行物理断电或真实磁盘耗尽，不宣称硬件掉电证明。
+
+## 自动升级
+
+生产首帧完成后延迟 10 秒，仅在 App resumed 时异步扫描托管 EPUB/TXT 的 parser_version；当前或更高版本不处理。优先书架，再按最近阅读时间、导入时间降序和 digest 排序。每个进程最多开始 15 本，实际 Prepare 单调时钟预算 3 分钟，resumed 不重置。inactive 停止新任务与新提交；hidden/paused 请求取消 Prepare；关闭等待 Worker、文件写入与已开始的发布结束，再释放 Store 和数据库。
+
+单任务 Prepare 复用解析器、SHA-256 校验和产物写入，不占用长时间的发布队列，也不设置 maintenance。最多保留一个等待发布的候选，阅读 A 时 B/C 仍可升级。迁移计算在发布许可之外，只有精确位置及 completed、终点语义、lastReadAt 均安全时才可自动提交；正在阅读的书延后到最后进度写入成功且使用许可释放，不强制失效或重新分页。发布只涵盖轻量复验、短暂 maintenance、Rename 和 SQLite 原子提交；Cleanup 在许可之外执行。
+
+正常取消不计失败，普通失败按 1–16 小时退避、同版本最多 5 次；上次未结束的尝试仅记疑似中断，至少等待一天。近似位置、非交互编码歧义及确认损坏的原件在同解析器版本内停止自动尝试；版本提升或手动处理后重新评估。空间不足不计普通失败次数并可重试。三平台查询实际剩余容量，以有界新 Bundle 与输入副本上限及余量保守检查；查询不可用时依靠资源上限、写入失败回滚和启动恢复，容量检查不保证磁盘不会被其他进程耗尽。
+
+TXT 使用旧 Manifest 保存的编码；非交互 chooser 仅返回已通过严格验证的该编码，缺少编码时只接受可靠自动检测。编码与 BOM 冲突按普通失败处理，不弹选择 UI，不以替换字符解码。
+
+成功升级静默，不需要重新导入或确认；解析出的封面、标题、目录及排版允许变化。失败或不安全时保留旧书和历史，本地文件管理页显示被动原因及异常数量，仍可正常阅读或使用既有单本、多选、全部手动重新解析。
 
 ## 重复资源身份
 
@@ -246,7 +258,7 @@ EPUB 2 重复引用保持拒绝；只有明确 package version=3.0 使用 EPUB 3
 | 辅助链接 | 原生文字内链与“本章注释”菜单导航；脚注使用数字上标及底部面板；linear=no 不参与连续阅读；WebView 导航关闭 | epub_links、epub_footnotes、reparse；widget local_links、footnotes |
 | 诊断 | 每次至多 100 条 data 层原因码快照，不存正文/本机路径；无持久化/UI | epub_diagnostics |
 | TXT | 严格 UTF-8/UTF-16/GB18030、BOM 优先、歧义预览、保守标题识别、原始 code point 身份；16MiB 上限 | txt 系列 |
-| 旧书与重解析 | 已发布 manifest 稳定读取；用户显式重解析，在暂存区生成并原子切换；精确或近似迁移位置，失败/取消保留旧书 | reparse；domain reparse_position；widget local_reparse |
+| 旧书与重解析 | 已发布 manifest 稳定读取；旧解析版本自动升级，近似位置或编码歧义保留旧书；手动重解析仍可明确接受近似迁移 | reparse；domain reparse_position；widget local_reparse |
 | 重启恢复 | schema v4、活动 bundle、进度和辅助资源恢复；旧会话晚写拒绝 | reparse、database migration |
 | DRM / 固定版式 / SMIL / 互动 | 拒绝或受限静态降级；无 DRM 解密、媒体同步、通用浏览器排版 | epub_boundary、epub_presentation |
 

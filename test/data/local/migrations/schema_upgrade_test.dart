@@ -163,12 +163,12 @@ void main() {
             .data
             .values
             .single,
-        6,
+        7,
       );
       await retry.close();
     },
   );
-  for (final version in [1, 2, 3, 4, 5]) {
+  for (final version in [1, 2, 3, 4, 5, 6]) {
     test(
       'retained user v$version snapshot upgrades and preserves every old field',
       () async {
@@ -181,7 +181,7 @@ void main() {
               .data
               .values
               .single,
-          6,
+          7,
         );
         final library = LocalLibraryRepository(db);
         final shelf =

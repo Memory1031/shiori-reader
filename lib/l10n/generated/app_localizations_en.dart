@@ -1535,4 +1535,37 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bookReparseCleanupPending =>
       'Updated book saved. Remaining old files will be cleaned up at the next launch.';
+
+  @override
+  String localAutoReparseUnfinished(int count) {
+    return '$count books could not update automatically';
+  }
+
+  @override
+  String get localAutoReparseApproximate =>
+      'Skipped: reading position cannot migrate precisely';
+
+  @override
+  String get localAutoReparseEncoding => 'Skipped: TXT encoding is uncertain';
+
+  @override
+  String get localAutoReparseOriginal => 'Failed: original file is damaged';
+
+  @override
+  String get localAutoReparseStorage => 'Deferred: storage space is low';
+
+  @override
+  String get localAutoReparseWrite =>
+      'Waiting to retry: file read or write failed';
+
+  @override
+  String get localAutoReparseInterrupted =>
+      'Waiting to retry: the previous update was interrupted';
+
+  @override
+  String get localAutoReparseTimeout => 'Waiting to retry: parsing timed out';
+
+  @override
+  String get localAutoReparseOther =>
+      'Automatic update failed; manual reparsing is available';
 }

@@ -3608,6 +3608,451 @@ class ProgressCatalogsCompanion extends UpdateCompanion<ProgressCatalog> {
   }
 }
 
+class LocalReparseAttempts extends Table
+    with TableInfo<LocalReparseAttempts, LocalReparseAttempt> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  LocalReparseAttempts(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _digestMeta = const VerificationMeta('digest');
+  late final GeneratedColumn<String> digest = GeneratedColumn<String>(
+    'digest',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _targetParserVersionMeta =
+      const VerificationMeta('targetParserVersion');
+  late final GeneratedColumn<int> targetParserVersion = GeneratedColumn<int>(
+    'target_parser_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _outcomeMeta = const VerificationMeta(
+    'outcome',
+  );
+  late final GeneratedColumn<String> outcome = GeneratedColumn<String>(
+    'outcome',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _failureCountMeta = const VerificationMeta(
+    'failureCount',
+  );
+  late final GeneratedColumn<int> failureCount = GeneratedColumn<int>(
+    'failure_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 0 CHECK (failure_count >= 0)',
+    defaultValue: const CustomExpression('0'),
+  );
+  static const VerificationMeta _nextRetryAtMeta = const VerificationMeta(
+    'nextRetryAt',
+  );
+  late final GeneratedColumn<int> nextRetryAt = GeneratedColumn<int>(
+    'next_retry_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _attemptedAtMeta = const VerificationMeta(
+    'attemptedAt',
+  );
+  late final GeneratedColumn<int> attemptedAt = GeneratedColumn<int>(
+    'attempted_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    digest,
+    targetParserVersion,
+    outcome,
+    failureCount,
+    nextRetryAt,
+    attemptedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_reparse_attempts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalReparseAttempt> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('digest')) {
+      context.handle(
+        _digestMeta,
+        digest.isAcceptableOrUnknown(data['digest']!, _digestMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_digestMeta);
+    }
+    if (data.containsKey('target_parser_version')) {
+      context.handle(
+        _targetParserVersionMeta,
+        targetParserVersion.isAcceptableOrUnknown(
+          data['target_parser_version']!,
+          _targetParserVersionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_targetParserVersionMeta);
+    }
+    if (data.containsKey('outcome')) {
+      context.handle(
+        _outcomeMeta,
+        outcome.isAcceptableOrUnknown(data['outcome']!, _outcomeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_outcomeMeta);
+    }
+    if (data.containsKey('failure_count')) {
+      context.handle(
+        _failureCountMeta,
+        failureCount.isAcceptableOrUnknown(
+          data['failure_count']!,
+          _failureCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('next_retry_at')) {
+      context.handle(
+        _nextRetryAtMeta,
+        nextRetryAt.isAcceptableOrUnknown(
+          data['next_retry_at']!,
+          _nextRetryAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('attempted_at')) {
+      context.handle(
+        _attemptedAtMeta,
+        attemptedAt.isAcceptableOrUnknown(
+          data['attempted_at']!,
+          _attemptedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_attemptedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {digest};
+  @override
+  LocalReparseAttempt map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalReparseAttempt(
+      digest: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}digest'],
+      )!,
+      targetParserVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}target_parser_version'],
+      )!,
+      outcome: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}outcome'],
+      )!,
+      failureCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}failure_count'],
+      )!,
+      nextRetryAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}next_retry_at'],
+      ),
+      attemptedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempted_at'],
+      )!,
+    );
+  }
+
+  @override
+  LocalReparseAttempts createAlias(String alias) {
+    return LocalReparseAttempts(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class LocalReparseAttempt extends DataClass
+    implements Insertable<LocalReparseAttempt> {
+  final String digest;
+  final int targetParserVersion;
+  final String outcome;
+  final int failureCount;
+  final int? nextRetryAt;
+  final int attemptedAt;
+  const LocalReparseAttempt({
+    required this.digest,
+    required this.targetParserVersion,
+    required this.outcome,
+    required this.failureCount,
+    this.nextRetryAt,
+    required this.attemptedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['digest'] = Variable<String>(digest);
+    map['target_parser_version'] = Variable<int>(targetParserVersion);
+    map['outcome'] = Variable<String>(outcome);
+    map['failure_count'] = Variable<int>(failureCount);
+    if (!nullToAbsent || nextRetryAt != null) {
+      map['next_retry_at'] = Variable<int>(nextRetryAt);
+    }
+    map['attempted_at'] = Variable<int>(attemptedAt);
+    return map;
+  }
+
+  LocalReparseAttemptsCompanion toCompanion(bool nullToAbsent) {
+    return LocalReparseAttemptsCompanion(
+      digest: Value(digest),
+      targetParserVersion: Value(targetParserVersion),
+      outcome: Value(outcome),
+      failureCount: Value(failureCount),
+      nextRetryAt: nextRetryAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextRetryAt),
+      attemptedAt: Value(attemptedAt),
+    );
+  }
+
+  factory LocalReparseAttempt.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalReparseAttempt(
+      digest: serializer.fromJson<String>(json['digest']),
+      targetParserVersion: serializer.fromJson<int>(
+        json['target_parser_version'],
+      ),
+      outcome: serializer.fromJson<String>(json['outcome']),
+      failureCount: serializer.fromJson<int>(json['failure_count']),
+      nextRetryAt: serializer.fromJson<int?>(json['next_retry_at']),
+      attemptedAt: serializer.fromJson<int>(json['attempted_at']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'digest': serializer.toJson<String>(digest),
+      'target_parser_version': serializer.toJson<int>(targetParserVersion),
+      'outcome': serializer.toJson<String>(outcome),
+      'failure_count': serializer.toJson<int>(failureCount),
+      'next_retry_at': serializer.toJson<int?>(nextRetryAt),
+      'attempted_at': serializer.toJson<int>(attemptedAt),
+    };
+  }
+
+  LocalReparseAttempt copyWith({
+    String? digest,
+    int? targetParserVersion,
+    String? outcome,
+    int? failureCount,
+    Value<int?> nextRetryAt = const Value.absent(),
+    int? attemptedAt,
+  }) => LocalReparseAttempt(
+    digest: digest ?? this.digest,
+    targetParserVersion: targetParserVersion ?? this.targetParserVersion,
+    outcome: outcome ?? this.outcome,
+    failureCount: failureCount ?? this.failureCount,
+    nextRetryAt: nextRetryAt.present ? nextRetryAt.value : this.nextRetryAt,
+    attemptedAt: attemptedAt ?? this.attemptedAt,
+  );
+  LocalReparseAttempt copyWithCompanion(LocalReparseAttemptsCompanion data) {
+    return LocalReparseAttempt(
+      digest: data.digest.present ? data.digest.value : this.digest,
+      targetParserVersion: data.targetParserVersion.present
+          ? data.targetParserVersion.value
+          : this.targetParserVersion,
+      outcome: data.outcome.present ? data.outcome.value : this.outcome,
+      failureCount: data.failureCount.present
+          ? data.failureCount.value
+          : this.failureCount,
+      nextRetryAt: data.nextRetryAt.present
+          ? data.nextRetryAt.value
+          : this.nextRetryAt,
+      attemptedAt: data.attemptedAt.present
+          ? data.attemptedAt.value
+          : this.attemptedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalReparseAttempt(')
+          ..write('digest: $digest, ')
+          ..write('targetParserVersion: $targetParserVersion, ')
+          ..write('outcome: $outcome, ')
+          ..write('failureCount: $failureCount, ')
+          ..write('nextRetryAt: $nextRetryAt, ')
+          ..write('attemptedAt: $attemptedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    digest,
+    targetParserVersion,
+    outcome,
+    failureCount,
+    nextRetryAt,
+    attemptedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalReparseAttempt &&
+          other.digest == this.digest &&
+          other.targetParserVersion == this.targetParserVersion &&
+          other.outcome == this.outcome &&
+          other.failureCount == this.failureCount &&
+          other.nextRetryAt == this.nextRetryAt &&
+          other.attemptedAt == this.attemptedAt);
+}
+
+class LocalReparseAttemptsCompanion
+    extends UpdateCompanion<LocalReparseAttempt> {
+  final Value<String> digest;
+  final Value<int> targetParserVersion;
+  final Value<String> outcome;
+  final Value<int> failureCount;
+  final Value<int?> nextRetryAt;
+  final Value<int> attemptedAt;
+  final Value<int> rowid;
+  const LocalReparseAttemptsCompanion({
+    this.digest = const Value.absent(),
+    this.targetParserVersion = const Value.absent(),
+    this.outcome = const Value.absent(),
+    this.failureCount = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
+    this.attemptedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalReparseAttemptsCompanion.insert({
+    required String digest,
+    required int targetParserVersion,
+    required String outcome,
+    this.failureCount = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
+    required int attemptedAt,
+    this.rowid = const Value.absent(),
+  }) : digest = Value(digest),
+       targetParserVersion = Value(targetParserVersion),
+       outcome = Value(outcome),
+       attemptedAt = Value(attemptedAt);
+  static Insertable<LocalReparseAttempt> custom({
+    Expression<String>? digest,
+    Expression<int>? targetParserVersion,
+    Expression<String>? outcome,
+    Expression<int>? failureCount,
+    Expression<int>? nextRetryAt,
+    Expression<int>? attemptedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (digest != null) 'digest': digest,
+      if (targetParserVersion != null)
+        'target_parser_version': targetParserVersion,
+      if (outcome != null) 'outcome': outcome,
+      if (failureCount != null) 'failure_count': failureCount,
+      if (nextRetryAt != null) 'next_retry_at': nextRetryAt,
+      if (attemptedAt != null) 'attempted_at': attemptedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalReparseAttemptsCompanion copyWith({
+    Value<String>? digest,
+    Value<int>? targetParserVersion,
+    Value<String>? outcome,
+    Value<int>? failureCount,
+    Value<int?>? nextRetryAt,
+    Value<int>? attemptedAt,
+    Value<int>? rowid,
+  }) {
+    return LocalReparseAttemptsCompanion(
+      digest: digest ?? this.digest,
+      targetParserVersion: targetParserVersion ?? this.targetParserVersion,
+      outcome: outcome ?? this.outcome,
+      failureCount: failureCount ?? this.failureCount,
+      nextRetryAt: nextRetryAt ?? this.nextRetryAt,
+      attemptedAt: attemptedAt ?? this.attemptedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (digest.present) {
+      map['digest'] = Variable<String>(digest.value);
+    }
+    if (targetParserVersion.present) {
+      map['target_parser_version'] = Variable<int>(targetParserVersion.value);
+    }
+    if (outcome.present) {
+      map['outcome'] = Variable<String>(outcome.value);
+    }
+    if (failureCount.present) {
+      map['failure_count'] = Variable<int>(failureCount.value);
+    }
+    if (nextRetryAt.present) {
+      map['next_retry_at'] = Variable<int>(nextRetryAt.value);
+    }
+    if (attemptedAt.present) {
+      map['attempted_at'] = Variable<int>(attemptedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalReparseAttemptsCompanion(')
+          ..write('digest: $digest, ')
+          ..write('targetParserVersion: $targetParserVersion, ')
+          ..write('outcome: $outcome, ')
+          ..write('failureCount: $failureCount, ')
+          ..write('nextRetryAt: $nextRetryAt, ')
+          ..write('attemptedAt: $attemptedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$UserDatabase extends GeneratedDatabase {
   _$UserDatabase(QueryExecutor e) : super(e);
   $UserDatabaseManager get managers => $UserDatabaseManager(this);
@@ -3628,6 +4073,9 @@ abstract class _$UserDatabase extends GeneratedDatabase {
   late final LocalChapterRevisions localChapterRevisions =
       LocalChapterRevisions(this);
   late final ProgressCatalogs progressCatalogs = ProgressCatalogs(this);
+  late final LocalReparseAttempts localReparseAttempts = LocalReparseAttempts(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3643,6 +4091,7 @@ abstract class _$UserDatabase extends GeneratedDatabase {
     localBooks,
     localChapterRevisions,
     progressCatalogs,
+    localReparseAttempts,
   ];
 }
 
@@ -5495,6 +5944,243 @@ typedef $ProgressCatalogsProcessedTableManager =
       ProgressCatalog,
       PrefetchHooks Function()
     >;
+typedef $LocalReparseAttemptsCreateCompanionBuilder =
+    LocalReparseAttemptsCompanion Function({
+      required String digest,
+      required int targetParserVersion,
+      required String outcome,
+      Value<int> failureCount,
+      Value<int?> nextRetryAt,
+      required int attemptedAt,
+      Value<int> rowid,
+    });
+typedef $LocalReparseAttemptsUpdateCompanionBuilder =
+    LocalReparseAttemptsCompanion Function({
+      Value<String> digest,
+      Value<int> targetParserVersion,
+      Value<String> outcome,
+      Value<int> failureCount,
+      Value<int?> nextRetryAt,
+      Value<int> attemptedAt,
+      Value<int> rowid,
+    });
+
+class $LocalReparseAttemptsFilterComposer
+    extends Composer<_$UserDatabase, LocalReparseAttempts> {
+  $LocalReparseAttemptsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get digest => $composableBuilder(
+    column: $table.digest,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get targetParserVersion => $composableBuilder(
+    column: $table.targetParserVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get outcome => $composableBuilder(
+    column: $table.outcome,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get failureCount => $composableBuilder(
+    column: $table.failureCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attemptedAt => $composableBuilder(
+    column: $table.attemptedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $LocalReparseAttemptsOrderingComposer
+    extends Composer<_$UserDatabase, LocalReparseAttempts> {
+  $LocalReparseAttemptsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get digest => $composableBuilder(
+    column: $table.digest,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get targetParserVersion => $composableBuilder(
+    column: $table.targetParserVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get outcome => $composableBuilder(
+    column: $table.outcome,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get failureCount => $composableBuilder(
+    column: $table.failureCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attemptedAt => $composableBuilder(
+    column: $table.attemptedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $LocalReparseAttemptsAnnotationComposer
+    extends Composer<_$UserDatabase, LocalReparseAttempts> {
+  $LocalReparseAttemptsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get digest =>
+      $composableBuilder(column: $table.digest, builder: (column) => column);
+
+  GeneratedColumn<int> get targetParserVersion => $composableBuilder(
+    column: $table.targetParserVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get outcome =>
+      $composableBuilder(column: $table.outcome, builder: (column) => column);
+
+  GeneratedColumn<int> get failureCount => $composableBuilder(
+    column: $table.failureCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get nextRetryAt => $composableBuilder(
+    column: $table.nextRetryAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get attemptedAt => $composableBuilder(
+    column: $table.attemptedAt,
+    builder: (column) => column,
+  );
+}
+
+class $LocalReparseAttemptsTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          LocalReparseAttempts,
+          LocalReparseAttempt,
+          $LocalReparseAttemptsFilterComposer,
+          $LocalReparseAttemptsOrderingComposer,
+          $LocalReparseAttemptsAnnotationComposer,
+          $LocalReparseAttemptsCreateCompanionBuilder,
+          $LocalReparseAttemptsUpdateCompanionBuilder,
+          (
+            LocalReparseAttempt,
+            BaseReferences<
+              _$UserDatabase,
+              LocalReparseAttempts,
+              LocalReparseAttempt
+            >,
+          ),
+          LocalReparseAttempt,
+          PrefetchHooks Function()
+        > {
+  $LocalReparseAttemptsTableManager(
+    _$UserDatabase db,
+    LocalReparseAttempts table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $LocalReparseAttemptsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $LocalReparseAttemptsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $LocalReparseAttemptsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> digest = const Value.absent(),
+                Value<int> targetParserVersion = const Value.absent(),
+                Value<String> outcome = const Value.absent(),
+                Value<int> failureCount = const Value.absent(),
+                Value<int?> nextRetryAt = const Value.absent(),
+                Value<int> attemptedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalReparseAttemptsCompanion(
+                digest: digest,
+                targetParserVersion: targetParserVersion,
+                outcome: outcome,
+                failureCount: failureCount,
+                nextRetryAt: nextRetryAt,
+                attemptedAt: attemptedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String digest,
+                required int targetParserVersion,
+                required String outcome,
+                Value<int> failureCount = const Value.absent(),
+                Value<int?> nextRetryAt = const Value.absent(),
+                required int attemptedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalReparseAttemptsCompanion.insert(
+                digest: digest,
+                targetParserVersion: targetParserVersion,
+                outcome: outcome,
+                failureCount: failureCount,
+                nextRetryAt: nextRetryAt,
+                attemptedAt: attemptedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $LocalReparseAttemptsProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      LocalReparseAttempts,
+      LocalReparseAttempt,
+      $LocalReparseAttemptsFilterComposer,
+      $LocalReparseAttemptsOrderingComposer,
+      $LocalReparseAttemptsAnnotationComposer,
+      $LocalReparseAttemptsCreateCompanionBuilder,
+      $LocalReparseAttemptsUpdateCompanionBuilder,
+      (
+        LocalReparseAttempt,
+        BaseReferences<
+          _$UserDatabase,
+          LocalReparseAttempts,
+          LocalReparseAttempt
+        >,
+      ),
+      LocalReparseAttempt,
+      PrefetchHooks Function()
+    >;
 
 class $UserDatabaseManager {
   final _$UserDatabase _db;
@@ -5515,4 +6201,6 @@ class $UserDatabaseManager {
       $LocalChapterRevisionsTableManager(_db, _db.localChapterRevisions);
   $ProgressCatalogsTableManager get progressCatalogs =>
       $ProgressCatalogsTableManager(_db, _db.progressCatalogs);
+  $LocalReparseAttemptsTableManager get localReparseAttempts =>
+      $LocalReparseAttemptsTableManager(_db, _db.localReparseAttempts);
 }

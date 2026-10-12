@@ -15,7 +15,15 @@ import UIKit
     if let controller = window?.rootViewController as? FlutterViewController {
       FlutterMethodChannel(name: "dev.shiori.reader/app", binaryMessenger: controller.binaryMessenger)
         .setMethodCallHandler { call, result in
-          if call.method == "info" {
+          if call.method == "availableStorage" {
+            guard let path = call.arguments as? String else { result(nil); return }
+            DispatchQueue.global(qos: .utility).async {
+              let values = try? URL(fileURLWithPath: path)
+                .resourceValues(forKeys: [.volumeAvailableCapacityKey])
+              let bytes = values?.volumeAvailableCapacity
+              DispatchQueue.main.async { result(bytes) }
+            }
+          } else if call.method == "info" {
             result([
               "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
               "build": Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0

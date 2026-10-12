@@ -462,6 +462,15 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
             ),
             const SizedBox(height: ShioriSpace.tight),
             Text(l.localBooksSubtitle, style: muted),
+            if (books.any((book) => book.autoReparseIssue != null)) ...[
+              const SizedBox(height: ShioriSpace.tight),
+              Text(
+                l.localAutoReparseUnfinished(
+                  books.where((book) => book.autoReparseIssue != null).length,
+                ),
+                style: muted,
+              ),
+            ],
             if (_canReparse || _busy) ...[
               const SizedBox(height: ShioriSpace.item),
               if ((_operation?.busy == true && _reparseFlow?.modal == false) ||
@@ -595,7 +604,11 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       ),
       title: book.title,
       subtitle: [book.format.name.toUpperCase(), ?progress].join(' · '),
-      metadata: imported,
+      metadata: [
+        imported,
+        if (book.autoReparseIssue case final issue?)
+          _autoReparseReason(l, issue),
+      ].join('\n'),
       trailing: desktop
           ? null
           : _selecting
@@ -872,3 +885,16 @@ class _LocalCoverState extends State<_LocalCover> {
     ),
   );
 }
+
+String _autoReparseReason(AppLocalizations l, LocalAutoReparseIssue issue) =>
+    switch (issue) {
+      LocalAutoReparseIssue.approximatePosition =>
+        l.localAutoReparseApproximate,
+      LocalAutoReparseIssue.ambiguousEncoding => l.localAutoReparseEncoding,
+      LocalAutoReparseIssue.originalCorrupt => l.localAutoReparseOriginal,
+      LocalAutoReparseIssue.lowStorage => l.localAutoReparseStorage,
+      LocalAutoReparseIssue.storageWrite => l.localAutoReparseWrite,
+      LocalAutoReparseIssue.interrupted => l.localAutoReparseInterrupted,
+      LocalAutoReparseIssue.timeout => l.localAutoReparseTimeout,
+      LocalAutoReparseIssue.other => l.localAutoReparseOther,
+    };

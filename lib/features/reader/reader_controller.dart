@@ -283,7 +283,49 @@ class ReaderController extends ScopedController {
     unawaited(load());
   }
 
-  Future<void> load() async {
+  LocalBookUse? _bookUse;
+  Future<void>? _useOpening;
+  Future<void>? _closingReader;
+  final _loads = <Future<void>>{};
+  Future<void> _acquireUse() => _useOpening ??= () async {
+    if (repository case LocalBookUsage usage) {
+      _bookUse = await usage.acquireBookUse(
+        chapter.novelKey,
+        cancellation: cancellation,
+      );
+    }
+  }();
+
+  Future<void> load() {
+    final future = _load();
+    _loads.add(future);
+    unawaited(
+      future.then<void>(
+        (_) => _loads.remove(future),
+        onError: (Object _) => _loads.remove(future),
+      ),
+    );
+    return future;
+  }
+
+  Future<void> _load() async {
+    if (isClosed) return;
+    try {
+      if (chapter.novelKey.sourceId == LocalBookIdentity.sourceId &&
+          repository is LocalBookUsage) {
+        await _acquireUse();
+      }
+    } catch (_) {
+      if (!isClosed) {
+        failure = AppFailure(
+          kind: FailureKind.database,
+          operation: Operation.chapter,
+        );
+        status = ReaderStatus.error;
+        update();
+      }
+      return;
+    }
     if (isClosed) return;
     final previousFailure = failure;
     if (previousFailure != null &&
@@ -421,6 +463,12 @@ class ReaderController extends ScopedController {
             ? ReaderStatus.cancelled
             : ReaderStatus.error;
     }
+    if (content == null &&
+        (status == ReaderStatus.error || status == ReaderStatus.cancelled)) {
+      await _bookUse?.release();
+      _bookUse = null;
+      _useOpening = null;
+    }
     update();
   }
 
@@ -428,7 +476,27 @@ class ReaderController extends ScopedController {
   void onClose() {
     _unpin?.call();
     _request?.cancel();
-    unawaited(progress?.close());
     super.onClose();
+    unawaited(closeReader());
+  }
+
+  /// Widget disposal starts this barrier; the lease outlives disposal and all
+  /// in-flight reads until the final progress write actually finishes.
+  Future<void> closeReader() => _closingReader ??= _finishReader();
+  Future<void> _finishReader() async {
+    bool? saved;
+    try {
+      await Future.wait(_loads.toList());
+      await _useOpening;
+      await _progressOpening;
+      await progress?.close();
+      saved = progress?.progressSaved;
+      if (saved == null && _sample != null && library != null) saved = false;
+    } catch (_) {
+      saved = false;
+    } finally {
+      await _bookUse?.release(progressSaved: saved);
+      _bookUse = null;
+    }
   }
 }

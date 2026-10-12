@@ -775,5 +775,15 @@
       }
     }
   },
-  "bookReparseCleanupPending": "Updated book saved. Remaining old files will be cleaned up at the next launch."
+  "bookReparseCleanupPending": "Updated book saved. Remaining old files will be cleaned up at the next launch.",
+  "localAutoReparseUnfinished": "{count} books could not update automatically",
+  "@localAutoReparseUnfinished": {"placeholders": {"count": {"type": "int"}}},
+  "localAutoReparseApproximate": "Skipped: reading position cannot migrate precisely",
+  "localAutoReparseEncoding": "Skipped: TXT encoding is uncertain",
+  "localAutoReparseOriginal": "Failed: original file is damaged",
+  "localAutoReparseStorage": "Deferred: storage space is low",
+  "localAutoReparseWrite": "Waiting to retry: file read or write failed",
+  "localAutoReparseInterrupted": "Waiting to retry: the previous update was interrupted",
+  "localAutoReparseTimeout": "Waiting to retry: parsing timed out",
+  "localAutoReparseOther": "Automatic update failed; manual reparsing is available"
 }

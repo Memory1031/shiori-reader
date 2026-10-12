@@ -8,6 +8,7 @@ import '../../domain/local_chapter_progress.dart';
 class LocalReadingRepository
     implements
         NovelRepository,
+        LocalBookUsage,
         LocalNavigationRepository,
         LocalBookProgressRepository,
         LocalLogicalChapterRepository,
@@ -55,6 +56,17 @@ class LocalReadingRepository
     }
     return resolved;
   }
+
+  @override
+  Future<LocalBookUse?> acquireBookUse(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  }) => local is LocalBookUsage
+      ? (local as LocalBookUsage).acquireBookUse(
+          key,
+          cancellation: cancellation,
+        )
+      : Future.value();
 
   final LocalBookStore local;
   @override

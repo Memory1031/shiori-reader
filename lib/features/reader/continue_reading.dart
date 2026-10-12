@@ -18,6 +18,26 @@ class ContinueController extends ScopedController {
   final NovelKey novel;
   final NovelRepository repository;
   final LibraryRepository library;
+  LocalBookUse? _bookUse;
+  Future<void>? _openingUse;
+  Future<void> _acquireUse() => _openingUse ??= () async {
+    if (repository case LocalBookUsage usage) {
+      _bookUse = await usage.acquireBookUse(novel, cancellation: cancellation);
+    }
+  }();
+  @override
+  void onClose() {
+    super.onClose();
+    unawaited(() async {
+      try {
+        await _openingUse;
+      } catch (_) {
+        /* Cancelled initialization. */
+      }
+      await _bookUse?.release();
+    }());
+  }
+
   ChapterKey? chapter;
   AppFailure? failure;
   bool loading = false, usedFallback = false;
@@ -33,6 +53,8 @@ class ContinueController extends ScopedController {
     failure = null;
     update();
     try {
+      await _acquireUse();
+      if (isClosed) return;
       final progress = await library.getProgress(
         novel,
         cancellation: cancellation,
@@ -102,6 +124,11 @@ class ContinueController extends ScopedController {
         retryPolicy: RetryPolicy.manual,
       );
     } finally {
+      if (chapter == null) {
+        await _bookUse?.release();
+        _bookUse = null;
+        _openingUse = null;
+      }
       if (!isClosed) {
         loading = false;
         update();

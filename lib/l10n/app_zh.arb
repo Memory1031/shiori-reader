@@ -775,5 +775,15 @@
       }
     }
   },
-  "bookReparseCleanupPending": "新内容已保存，残留旧资源将于下次启动时清理。"
+  "bookReparseCleanupPending": "新内容已保存，残留旧资源将于下次启动时清理。",
+  "localAutoReparseUnfinished": "{count} 本书未能自动更新",
+  "@localAutoReparseUnfinished": {"placeholders": {"count": {"type": "int"}}},
+  "localAutoReparseApproximate": "已跳过：阅读位置无法精确迁移",
+  "localAutoReparseEncoding": "已跳过：TXT 编码不确定",
+  "localAutoReparseOriginal": "失败：原件损坏",
+  "localAutoReparseStorage": "暂缓：存储空间不足",
+  "localAutoReparseWrite": "等待重试：文件读写失败",
+  "localAutoReparseInterrupted": "等待重试：上次更新未正常完成",
+  "localAutoReparseTimeout": "等待重试：解析超时",
+  "localAutoReparseOther": "自动更新失败，可手动重新解析"
 }

@@ -119,6 +119,23 @@ bool FlutterWindow::OnCreate() {
       result->Success(flutter::EncodableValue(flutter::EncodableMap{
           {flutter::EncodableValue("version"), flutter::EncodableValue(version)},
           {flutter::EncodableValue("build"), flutter::EncodableValue(FLUTTER_VERSION_BUILD)}}));
+    } else if (call.method_name() == "availableStorage") {
+      const auto* path = call.arguments() ? std::get_if<std::string>(call.arguments()) : nullptr;
+      if (!path || path->empty() || path->find('\0') != std::string::npos) {
+        result->Success();
+        return;
+      }
+      const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                            path->c_str(), -1, nullptr, 0);
+      std::vector<wchar_t> wide(length > 0 ? length : 1);
+      ULARGE_INTEGER available{};
+      if (length > 0 && MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                           path->c_str(), -1, wide.data(), length) &&
+          GetDiskFreeSpaceExW(wide.data(), &available, nullptr, nullptr)) {
+        result->Success(flutter::EncodableValue(static_cast<int64_t>(available.QuadPart)));
+      } else {
+        result->Success();
+      }
     } else if (call.method_name() == "openRelease") {
       const auto* url = call.arguments() ? std::get_if<std::string>(call.arguments()) : nullptr;
       const std::string prefix = "https://github.com/Memory1031/shiori-reader/releases/";

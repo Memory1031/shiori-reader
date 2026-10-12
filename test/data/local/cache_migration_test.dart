@@ -63,7 +63,7 @@ void main() {
             .data
             .values
             .single,
-        6,
+        7,
       );
       await cache.close();
       await users.close();

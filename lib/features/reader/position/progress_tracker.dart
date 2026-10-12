@@ -254,13 +254,22 @@ class ProgressTracker {
     await flush();
   }
 
+  /// Null means this session never sampled progress, so it cannot certify
+  /// that another failed session's latest position reached durable storage.
+  bool? get progressSaved =>
+      _latest == null ? null : _latest == _saved && !unsaved;
+  Future<void>? _closing;
+
   /// Retains the repository until the final accepted snapshot finishes writing.
-  Future<void> close() {
+  Future<void> close() => _closing ??= _close();
+
+  Future<void> _close() async {
     _closed = true;
     // Only _latest was sampled in a stable layout; it is safe to flush on exit.
     _restoring = false;
     _periodic?.cancel();
     _trailing?.cancel();
-    return flush();
+    await _opening;
+    await flush();
   }
 }

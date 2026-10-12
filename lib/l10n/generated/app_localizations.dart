@@ -2629,6 +2629,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Updated book saved. Remaining old files will be cleaned up at the next launch.'**
   String get bookReparseCleanupPending;
+
+  /// No description provided for @localAutoReparseUnfinished.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} books could not update automatically'**
+  String localAutoReparseUnfinished(int count);
+
+  /// No description provided for @localAutoReparseApproximate.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped: reading position cannot migrate precisely'**
+  String get localAutoReparseApproximate;
+
+  /// No description provided for @localAutoReparseEncoding.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped: TXT encoding is uncertain'**
+  String get localAutoReparseEncoding;
+
+  /// No description provided for @localAutoReparseOriginal.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed: original file is damaged'**
+  String get localAutoReparseOriginal;
+
+  /// No description provided for @localAutoReparseStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Deferred: storage space is low'**
+  String get localAutoReparseStorage;
+
+  /// No description provided for @localAutoReparseWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to retry: file read or write failed'**
+  String get localAutoReparseWrite;
+
+  /// No description provided for @localAutoReparseInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to retry: the previous update was interrupted'**
+  String get localAutoReparseInterrupted;
+
+  /// No description provided for @localAutoReparseTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to retry: parsing timed out'**
+  String get localAutoReparseTimeout;
+
+  /// No description provided for @localAutoReparseOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic update failed; manual reparsing is available'**
+  String get localAutoReparseOther;
 }
 
 class _AppLocalizationsDelegate

@@ -126,7 +126,9 @@ final class LocalBookInfo {
     required this.title,
     required this.format,
     required this.importedAt,
+    this.autoReparseIssue,
   });
+  final LocalAutoReparseIssue? autoReparseIssue;
   final NovelKey key;
   final String title;
   final LocalBookFormat format;
@@ -164,7 +166,7 @@ abstract interface class LocalPagePresentationRepository {
   });
 }
 
-/// Emitted before maintenance; consumers must retire old reading controllers.
+/// Emitted before manual maintenance; consumers must retire old reading controllers.
 abstract interface class LocalBookInvalidation {
   Stream<NovelKey> get invalidations;
   Stream<NovelKey> get changes;
@@ -200,6 +202,30 @@ abstract interface class LocalBookProgressRepository {
 /// Null means TXT; an EPUB index may have no reliable logical sections.
 abstract interface class LocalLogicalChapterRepository {
   Future<Result<LocalChapterProgressIndex?>> loadLogicalChapters(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  });
+}
+
+/// Passive management-page reasons; successful upgrades have no marker.
+enum LocalAutoReparseIssue {
+  approximatePosition,
+  ambiguousEncoding,
+  originalCorrupt,
+  lowStorage,
+  storageWrite,
+  interrupted,
+  timeout,
+  other,
+}
+
+/// Acquired before the first published read; held through final progress flush.
+abstract interface class LocalBookUse {
+  Future<void> release({bool? progressSaved});
+}
+
+abstract interface class LocalBookUsage {
+  Future<LocalBookUse?> acquireBookUse(
     NovelKey key, {
     required CancellationToken cancellation,
   });

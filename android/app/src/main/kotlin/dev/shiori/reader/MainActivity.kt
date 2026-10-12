@@ -46,6 +46,13 @@ class MainActivity : FlutterActivity() {
         MethodChannel(engine.dartExecutor.binaryMessenger, "dev.shiori.reader/app")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "availableStorage" -> worker.execute {
+                        val bytes = try {
+                            val path = call.arguments as? String ?: throw IllegalArgumentException()
+                            android.os.StatFs(path).availableBytes
+                        } catch (_: Exception) { null }
+                        runOnUiThread { result.success(bytes) }
+                    }
                     "info" -> {
                         @Suppress("DEPRECATION")
                         val info = packageManager.getPackageInfo(packageName, 0)

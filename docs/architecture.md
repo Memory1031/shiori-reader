@@ -140,7 +140,7 @@ preferences 使用独立 JSON key，Store 串行写入，读取等待已排队�
 
 ### 迁移与生成
 
-保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 / v5 / v6 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
+保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 / v5 / v6 / v7 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
 
 升级 DDL、完整性检查和 user_version 同事务提交；失败回滚，损坏或未知未来版本保留原文件并报错。不提供自动删用户库、drop/recreate 或生产 reset 来绕过故障。旧快照不能被当前 schema 重新导出覆盖。
 

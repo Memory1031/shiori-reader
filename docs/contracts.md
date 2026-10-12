@@ -97,7 +97,14 @@ CacheManagement 提供 inspect、按书 / 全部 clear 和可释放 pin；Readin
 
 LocalBookReparse 接收书籍 Key、编码选择回调/可选 override 与 cancellation；返回 LocalReparseResult（approximate、cleanupPending）。失败前旧版本保持可读，提交后成功优先于取消；新旧正文及进度经同一 SQL 事务发布。LocalBookInvalidation 的 invalidations 在维护开始退役旧 Reader，changes 在提交后触发本地 detail/catalog/chapter 更新；两者广播、无初始事件，消费者取消订阅。
 
-维护期间不发新进度会话，saveProgress 返回 false；clearHistory 仍生效并阻止使用旧快照发布。已重解析书的保存还校验 catalog/content revision，旧正文即使申请到新 generation 也不能覆盖迁移位置。位置迁移不保留像素提示，近似结果供 UI 明示。内容可选 txtEncoding 只属于本地解析元数据，不进入正文身份摘要。详见[结果与边界](local-import.md)。
+手动维护期间不发新进度会话，saveProgress 返回 false；clearHistory 仍生效并阻止使用旧快照发布。已重解析书的保存还校验 catalog/content revision，旧正文即使申请到新 generation 也不能覆盖迁移位置。位置迁移不保留像素提示，近似结果供 UI 明示。内容可选 txtEncoding 只属于本地解析元数据，不进入正文身份摘要。详见[结果与边界](local-import.md)。
+
+自动升级由 ManagedLocalBooks 拥有：Prepare 在串行发布队列之外生成独立暂存产物，不设置 maintenance、不改活动指针或进度，不发 invalidation。LocalBookUsage 在首次读取前提供书籍级使用许可；Reader 与辅助页持有许可，章节 Controller 的关闭屏障等待在途读取和最后 ProgressTracker 写入后才释放。失败的最后写入暂缓该书自动发布，后续更新的阅读会话成功保存并关闭或下次进程启动可重新评估；未采样会话不能证明失败进度已保存。
+
+自动 Commit 在迁移计算之外取得独占发布许可，无活动 Reader 和未保存进度延期才可进入。新 Reader 等待此短暂发布完成；事务内重新校验活动 Bundle/hash/parserVersion、进度 generation/sequence 和实际持久化进度，原子更新解析结果及关联记录。清理旧 Revision 不持发布许可；媒体文件读取沿用串行队列，完成后才允许版本切换。手动操作取消并等待自动 Prepare，已进入 Commit 则等待提交或回滚后重新读取状态。
+
+LocalBookInfo.autoReparseIssue 仅提供本地管理页的被动异常原因；正常排队与成功升级没有标记。尝试记录不含正文、私有路径或堆栈，手动成功及删除清除对应记录。
+
 
 ## 书内链接与连续阅读合同
 

@@ -21,6 +21,7 @@ import 'record_codec.dart';
 import 'epub/epub_parser.dart';
 
 part 'local_book_reparse.dart';
+part 'automatic_local_reparse.dart';
 
 /// Durable imported originals and normalized content. Never uses cache.db.
 /// Single owner, serialized operations; initialize/recover before exposure.
@@ -30,7 +31,8 @@ class ManagedLocalBooks
         LocalBookManagement,
         LocalPagePresentationRepository,
         LocalBookLinkStore,
-        LocalBookReparse {
+        LocalBookReparse,
+        LocalBookUsage {
   ManagedLocalBooks._(this.paths, this.db);
   final AppPaths paths;
   final UserDatabase db;
@@ -46,10 +48,122 @@ class ManagedLocalBooks
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
     required CancellationToken cancellation,
-  }) => _run(
-    Operation.libraryWrite,
-    () => _reparse(this, key, chooseEncoding, encoding, cancellation),
-  );
+  }) => _foregroundOperation(key, () async {
+    final result = await _run(
+      Operation.libraryWrite,
+      () => _reparse(this, key, chooseEncoding, encoding, cancellation),
+    );
+    if (result case Failure(:final failure) when !failure.isCancellation) {
+      await _automaticFailure(key, StateError('Manual reparse failed'));
+    }
+    return result;
+  });
+
+  final _bookUses = <NovelKey, Set<_BookUse>>{};
+  final _publishing = <NovelKey, Completer<void>>{};
+  final _unsafeProgress = <NovelKey, int>{};
+  int _useSequence = 0;
+  int _manualOperations = 0;
+  Completer<void>? _manualIdle;
+  bool _autoReady = false, _autoForeground = false, _autoStopped = false;
+  bool _autoWakeRequested = false;
+  Timer? _autoDelay;
+  Future<void>? _autoRun;
+  CancellationSource? _autoCancellation;
+  _AutoPrepared? _autoPending;
+  final _autoAttempted = <NovelKey>{};
+  int _autoBooksStarted = 0;
+  Duration _autoPrepareTime = Duration.zero;
+  Stopwatch? _autoWorkClock;
+  int _autoMaxBooks = automaticReparseBookBudget;
+  Duration _autoTimeBudget = automaticReparsePrepareBudget;
+  DateTime Function() _autoNow = DateTime.now;
+  LocalBookDecoder _automaticDecoder = const BookDecoder();
+  Future<int?> Function(Directory)? _autoFreeSpace;
+  void Function(String, Duration)? _autoMeasure;
+  Future<void> Function(String)? _autoCheckpoint;
+  Stopwatch Function() _autoClock = Stopwatch.new;
+
+  /// Called once after the production first frame. Overrides support offline
+  /// deterministic tests; no user settings or OS background service.
+  void startAutomaticReparse({
+    Duration initialDelay = automaticReparseInitialDelay,
+    int maxBooks = automaticReparseBookBudget,
+    Duration prepareBudget = automaticReparsePrepareBudget,
+    DateTime Function()? now,
+    LocalBookDecoder decoder = const BookDecoder(),
+    Future<int?> Function(Directory)? freeSpace,
+    void Function(String, Duration)? measure,
+    Future<void> Function(String)? checkpoint,
+    Stopwatch Function() prepareClock = Stopwatch.new,
+  }) {
+    if (_autoDelay != null || _autoReady || _autoStopped || _closed) return;
+    _autoMaxBooks = maxBooks;
+    _autoTimeBudget = prepareBudget;
+    _autoNow = now ?? DateTime.now;
+    _automaticDecoder = decoder;
+    _autoFreeSpace = freeSpace;
+    _autoMeasure = measure;
+    _autoCheckpoint = checkpoint;
+    _autoClock = prepareClock;
+    _autoDelay = Timer(initialDelay, () {
+      _autoReady = true;
+      _wakeAutomatic();
+    });
+  }
+
+  /// inactive only stops scheduling; hidden/paused additionally cancel prepare.
+  void automaticReparseActivity({
+    required bool resumed,
+    bool cancelPrepare = false,
+  }) {
+    _autoForeground = resumed;
+    if (cancelPrepare) {
+      _autoWorkClock?.stop();
+      _autoCancellation?.cancel();
+    }
+    if (resumed) _wakeAutomatic();
+    if (cancelPrepare && _autoPending != null) {
+      unawaited(
+        _foregroundOperation(null, () async => const Success<void>(null)),
+      );
+    }
+  }
+
+  Future<void>? _autoStopping;
+  Future<void> stopAutomaticReparse() =>
+      _autoStopping ??= _stopAutomaticReparse();
+
+  Future<void> _stopAutomaticReparse() async {
+    _autoStopped = true;
+    _autoDelay?.cancel();
+    _autoWorkClock?.stop();
+    _autoCancellation?.cancel();
+    await _autoRun;
+    if (_autoPending case final pending?) {
+      await _clearRunningAttempt(pending.key);
+      await _finishAutoCandidate(pending);
+    }
+  }
+
+  Future<void> get automaticReparseIdle => _autoRun ?? Future.value();
+
+  @override
+  Future<LocalBookUse?> acquireBookUse(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  }) async {
+    if (key.sourceId != LocalBookIdentity.sourceId) return null;
+    while (_publishing.containsKey(key)) {
+      await Future.any([_publishing[key]!.future, cancellation.whenCancelled]);
+      checkLocalCancellation(cancellation);
+    }
+    checkLocalCancellation(cancellation);
+    if (_closed || _autoStopped) throw StateError('Local book store is closed');
+    final use = _BookUse(this, key, _useSequence++);
+    (_bookUses[key] ??= {}).add(use);
+    return use;
+  }
 
   (NovelKey, String, DateTime, int, _StoredBook)? _readCache;
   final _presentations = <NovelKey, (LocalBookContent, Map<String, String>)>{};
@@ -222,6 +336,15 @@ class ManagedLocalBooks
         );
       }
       await db.customStatement('UPDATE local_books SET maintenance=0');
+      await db.customUpdate(
+        "UPDATE local_reparse_attempts SET outcome='interrupted',failure_count=failure_count+1,next_retry_at=? WHERE outcome='running'",
+        variables: [
+          Variable(
+            DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch,
+          ),
+        ],
+        updates: {db.localReparseAttempts},
+      );
       return Success(store);
     } catch (e) {
       await store.close();
@@ -264,112 +387,116 @@ class ManagedLocalBooks
     required LocalBookParser parse,
     bool addToShelf = false,
     required CancellationToken cancellation,
-  }) => _run(Operation.libraryWrite, () async {
-    checkLocalCancellation(cancellation);
-    final stage = await paths.localImportStaging.createTemp('import-');
-    Directory? published;
-    var committed = false;
-    _ImportSession? session;
-    try {
-      final original = File(p.join(stage.path, 'original'));
-      await _writeStream(original, bytes, maxOriginalBytes, cancellation);
-      final digest = (await sha256.bind(original.openRead()).first).toString();
+  }) => _foregroundOperation(
+    null,
+    () => _run(Operation.libraryWrite, () async {
       checkLocalCancellation(cancellation);
-      final key = LocalBookIdentity.book(digest);
-      final existing = await _read(key, token: cancellation);
-      if (existing != null) {
-        if (addToShelf) {
-          await db.transaction(() async {
-            checkLocalCancellation(cancellation);
+      final stage = await paths.localImportStaging.createTemp('import-');
+      Directory? published;
+      var committed = false;
+      _ImportSession? session;
+      try {
+        final original = File(p.join(stage.path, 'original'));
+        await _writeStream(original, bytes, maxOriginalBytes, cancellation);
+        final digest = (await sha256.bind(original.openRead()).first)
+            .toString();
+        checkLocalCancellation(cancellation);
+        final key = LocalBookIdentity.book(digest);
+        final existing = await _read(key, token: cancellation);
+        if (existing != null) {
+          if (addToShelf) {
+            await db.transaction(() async {
+              checkLocalCancellation(cancellation);
+              await writeBookshelfRow(
+                db,
+                BookshelfEntry(
+                  snapshot: existing.content.detail.summary,
+                  addedAt: DateTime.now(),
+                ),
+                DateTime.now(),
+              );
+              checkLocalCancellation(cancellation);
+            });
+          }
+          return existing;
+        }
+        session = _ImportSession(
+          key,
+          stage,
+          cancellation,
+          await original.length(),
+        );
+        final content = await parse(session);
+        await session.finish();
+        checkLocalCancellation(cancellation);
+        final importedAt = DateTime.now().toUtc();
+        final written = await _writeParsedArtifacts(
+          stage: stage,
+          key: key,
+          content: content,
+          session: session,
+          format: format,
+          importedAt: importedAt,
+          original: original,
+          token: cancellation,
+        );
+        final manifest = written.manifest;
+        checkLocalCancellation(cancellation);
+        final destination = p.join(paths.localBooks.path, digest);
+        // The sole owner has already recovered unindexed directories on open.
+        published = await stage.rename(destination);
+        await db.transaction(() async {
+          checkLocalCancellation(cancellation);
+          await db.customStatement(
+            'INSERT INTO local_books(digest,format,title,imported_at,manifest_hash,parser_version) VALUES(?,?,?,?,?,?)',
+            [
+              digest,
+              format.name,
+              content.detail.summary.title,
+              importedAt.millisecondsSinceEpoch,
+              sha256.convert(manifest).toString(),
+              BookDecoder.parserVersion,
+            ],
+          );
+          if (addToShelf) {
             await writeBookshelfRow(
               db,
               BookshelfEntry(
-                snapshot: existing.content.detail.summary,
-                addedAt: DateTime.now(),
+                snapshot: content.detail.summary,
+                addedAt: importedAt,
               ),
-              DateTime.now(),
+              importedAt,
             );
-            checkLocalCancellation(cancellation);
-          });
-        }
-        return existing;
-      }
-      session = _ImportSession(
-        key,
-        stage,
-        cancellation,
-        await original.length(),
-      );
-      final content = await parse(session);
-      await session.finish();
-      checkLocalCancellation(cancellation);
-      final importedAt = DateTime.now().toUtc();
-      final written = await _writeParsedArtifacts(
-        stage: stage,
-        key: key,
-        content: content,
-        session: session,
-        format: format,
-        importedAt: importedAt,
-        original: original,
-        token: cancellation,
-      );
-      final manifest = written.manifest;
-      checkLocalCancellation(cancellation);
-      final destination = p.join(paths.localBooks.path, digest);
-      // The sole owner has already recovered unindexed directories on open.
-      published = await stage.rename(destination);
-      await db.transaction(() async {
-        checkLocalCancellation(cancellation);
-        await db.customStatement(
-          'INSERT INTO local_books(digest,format,title,imported_at,manifest_hash,parser_version) VALUES(?,?,?,?,?,?)',
-          [
-            digest,
-            format.name,
-            content.detail.summary.title,
-            importedAt.millisecondsSinceEpoch,
-            sha256.convert(manifest).toString(),
-            BookDecoder.parserVersion,
-          ],
+          }
+          checkLocalCancellation(cancellation);
+        });
+        db.notifyUpdates({TableUpdate.onTable(db.localBooks)});
+        committed = true;
+        return LocalBookRecord(
+          content: written.content,
+          format: format,
+          importedAt: importedAt,
         );
-        if (addToShelf) {
-          await writeBookshelfRow(
-            db,
-            BookshelfEntry(
-              snapshot: content.detail.summary,
-              addedAt: importedAt,
-            ),
-            importedAt,
-          );
+      } finally {
+        try {
+          await session?.finish();
+        } catch (_) {
+          /* Original failure wins. */
         }
-        checkLocalCancellation(cancellation);
-      });
-      db.notifyUpdates({TableUpdate.onTable(db.localBooks)});
-      committed = true;
-      return LocalBookRecord(
-        content: written.content,
-        format: format,
-        importedAt: importedAt,
-      );
-    } finally {
-      try {
-        await session?.finish();
-      } catch (_) {
-        /* Original failure wins. */
+        // Cleanup failure is recovered at next open; never hide a committed result.
+        try {
+          if (!committed && published != null) {
+            await _deleteChild(paths.localBooks, published.path);
+          }
+          if (await stage.exists()) {
+            await _deleteChild(paths.localImportStaging, stage.path);
+          }
+        } catch (_) {
+          /* Retain bounded staging for startup recovery. */
+        }
       }
-      // Cleanup failure is recovered at next open; never hide a committed result.
-      try {
-        if (!committed && published != null) {
-          await _deleteChild(paths.localBooks, published.path);
-        }
-        if (await stage.exists()) {
-          await _deleteChild(paths.localImportStaging, stage.path);
-        }
-      } catch (_) {
-        /* Retain bounded staging for startup recovery. */
-      }
-    }
-  });
+    }),
+  );
 
   static void _validate(
     LocalBookContent content,
@@ -595,8 +722,8 @@ class ManagedLocalBooks
   Stream<Result<List<LocalBookInfo>>> watchBooks() => localWatch(
     db
         .customSelect(
-          'SELECT digest,title,format,imported_at FROM local_books ORDER BY imported_at DESC,digest',
-          readsFrom: {db.localBooks},
+          'SELECT l.digest,l.title,l.format,l.imported_at,a.outcome FROM local_books l LEFT JOIN local_reparse_attempts a ON a.digest=l.digest AND a.target_parser_version=${BookDecoder.parserVersion} WHERE 1 ORDER BY l.imported_at DESC,l.digest',
+          readsFrom: {db.localBooks, db.localReparseAttempts},
         )
         .watch()
         .map(
@@ -605,6 +732,12 @@ class ManagedLocalBooks
               (r) => LocalBookInfo(
                 key: LocalBookIdentity.book(r.read<String>('digest')),
                 title: r.read<String>('title'),
+                autoReparseIssue: LocalAutoReparseIssue.values
+                    .where(
+                      (issue) =>
+                          issue.name == r.readNullable<String>('outcome'),
+                    )
+                    .firstOrNull,
                 format: LocalBookFormat.values.byName(r.read<String>('format')),
                 importedAt: DateTime.fromMillisecondsSinceEpoch(
                   r.read<int>('imported_at'),
@@ -621,58 +754,66 @@ class ManagedLocalBooks
   Future<Result<LocalBookDeletion>> deleteBook(
     NovelKey key, {
     required CancellationToken cancellation,
-  }) => _run(Operation.libraryWrite, () async {
-    if (key.sourceId != LocalBookIdentity.sourceId ||
-        !_digest.hasMatch(key.novelId)) {
-      throw const FormatException('Invalid local identity');
-    }
-    checkLocalCancellation(cancellation);
-    _presentations.remove(key);
-    _svgLinksScanned.remove(key);
-    if (_readCache?.$1 == key) _readCache = null;
-    await db.transaction(() async {
-      final variables = [Variable(key.sourceId.value), Variable(key.novelId)];
-      // Retain a generation tombstone even across a later re-import.
-      await db.customUpdate(
-        'INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES(?,?,1,-1) ON CONFLICT(source_id,novel_id) DO UPDATE SET generation=generation+1,sequence=-1',
-        variables: variables,
-        updates: {db.progressSessions},
-      );
-      await db.customUpdate(
-        'DELETE FROM reading_progress WHERE source_id=? AND novel_id=?',
-        variables: variables,
-        updates: {db.readingProgress},
-      );
-      await db.customUpdate(
-        'DELETE FROM bookshelf WHERE source_id=? AND novel_id=?',
-        variables: variables,
-        updates: {db.bookshelf},
-      );
-      await db.customUpdate(
-        'DELETE FROM local_chapter_revisions WHERE digest=?',
-        variables: [Variable(key.novelId)],
-        updates: {db.localChapterRevisions},
-      );
-      await db.customUpdate(
-        'DELETE FROM local_books WHERE digest=?',
-        variables: [Variable(key.novelId)],
-        updates: {db.localBooks},
-      );
-      checkLocalCancellation(cancellation);
-    });
-    // SQL is the visibility boundary. A failed filesystem cleanup is an
-    // unindexed orphan recovered on restart; never restore a deleted book.
-    try {
-      final directory = p.join(paths.localBooks.path, key.novelId);
-      if (await FileSystemEntity.type(directory, followLinks: false) !=
-          FileSystemEntityType.notFound) {
-        await _deleteChild(paths.localBooks, directory);
+  }) => _foregroundOperation(
+    key,
+    () => _run(Operation.libraryWrite, () async {
+      if (key.sourceId != LocalBookIdentity.sourceId ||
+          !_digest.hasMatch(key.novelId)) {
+        throw const FormatException('Invalid local identity');
       }
-      return const LocalBookDeletion();
-    } catch (_) {
-      return const LocalBookDeletion(cleanupPending: true);
-    }
-  });
+      checkLocalCancellation(cancellation);
+      _presentations.remove(key);
+      _svgLinksScanned.remove(key);
+      if (_readCache?.$1 == key) _readCache = null;
+      await db.transaction(() async {
+        final variables = [Variable(key.sourceId.value), Variable(key.novelId)];
+        // Retain a generation tombstone even across a later re-import.
+        await db.customUpdate(
+          'INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES(?,?,1,-1) ON CONFLICT(source_id,novel_id) DO UPDATE SET generation=generation+1,sequence=-1',
+          variables: variables,
+          updates: {db.progressSessions},
+        );
+        await db.customUpdate(
+          'DELETE FROM reading_progress WHERE source_id=? AND novel_id=?',
+          variables: variables,
+          updates: {db.readingProgress},
+        );
+        await db.customUpdate(
+          'DELETE FROM bookshelf WHERE source_id=? AND novel_id=?',
+          variables: variables,
+          updates: {db.bookshelf},
+        );
+        await db.customUpdate(
+          'DELETE FROM local_chapter_revisions WHERE digest=?',
+          variables: [Variable(key.novelId)],
+          updates: {db.localChapterRevisions},
+        );
+        await db.customUpdate(
+          'DELETE FROM local_reparse_attempts WHERE digest=?',
+          variables: [Variable(key.novelId)],
+          updates: {db.localReparseAttempts},
+        );
+        await db.customUpdate(
+          'DELETE FROM local_books WHERE digest=?',
+          variables: [Variable(key.novelId)],
+          updates: {db.localBooks},
+        );
+        checkLocalCancellation(cancellation);
+      });
+      // SQL is the visibility boundary. A failed filesystem cleanup is an
+      // unindexed orphan recovered on restart; never restore a deleted book.
+      try {
+        final directory = p.join(paths.localBooks.path, key.novelId);
+        if (await FileSystemEntity.type(directory, followLinks: false) !=
+            FileSystemEntityType.notFound) {
+          await _deleteChild(paths.localBooks, directory);
+        }
+        return const LocalBookDeletion();
+      } catch (_) {
+        return const LocalBookDeletion(cleanupPending: true);
+      }
+    }),
+  );
 
   @override
   Future<Result<Uint8List>> readMedia(
@@ -730,14 +871,15 @@ class ManagedLocalBooks
           active != null && !_digest.hasMatch(active)) {
         return false;
       }
-      if (active != null) {
+      {
         final manifest = await _file(digest, 'manifest.json', bundle: active);
         final row = await db
             .customSelect(
-              'SELECT manifest_hash,format FROM local_books WHERE digest=?',
+              'SELECT active_bundle,manifest_hash,format FROM local_books WHERE digest=?',
               variables: [Variable(digest)],
             )
             .getSingle();
+        if (row.readNullable<String>('active_bundle') != active) return false;
         final format = LocalBookFormat.values.byName(
           row.read<String>('format'),
         );
@@ -800,6 +942,14 @@ class ManagedLocalBooks
   Future<void> close() => _closing ??= _close();
 
   Future<void> _close() async {
+    await stopAutomaticReparse();
+    await _manualIdle?.future;
+    await Future.wait(
+      _bookUses.values
+          .expand((uses) => uses)
+          .map((use) => use.done.future)
+          .toList(),
+    );
     _closed = true;
     await _tail;
     await _invalidations.close();

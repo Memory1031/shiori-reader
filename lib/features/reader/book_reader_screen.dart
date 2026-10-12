@@ -78,6 +78,29 @@ class BookReaderScreen extends StatefulWidget {
 
 class _BookReaderScreenState extends State<BookReaderScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  LocalBookUse? _routeUse;
+  Future<void>? _routeOpening;
+  Future<void> _openBook() async {
+    try {
+      if (widget.repository case LocalBookUsage usage) {
+        _routeUse = await usage.acquireBookUse(
+          widget.chapter.novelKey,
+          cancellation: _titleRequest.token,
+        );
+      }
+      if (!mounted || _titleRequest.token.isCancelled) return;
+      _catalog.onStart();
+      await Future.wait([_loadBookTitle(), _loadOrder(), _loadNavigation()]);
+    } catch (_) {
+      // The chapter controller supplies the ordinary load failure/retry UI.
+    } finally {
+      if (!mounted) {
+        await _routeUse?.release();
+        _routeUse = null;
+      }
+    }
+  }
+
   late ReaderController _reader;
   final _viewports = <ReaderController, PagedReaderController>{};
   StreamSubscription<NovelKey>? _invalidation;
@@ -530,18 +553,15 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 ? ReadMode.cacheOnly
                 : ReadMode.cacheFirst,
           )
-          ..onStart()
           ..addListener(_changed)
           ..addListener(_catalogChanged);
-    unawaited(_loadBookTitle());
-    unawaited(_loadOrder());
-    unawaited(_loadNavigation());
     _reader = _create(
       widget.chapter,
       blockKey: widget.initialBlockKey,
       blockOffset: widget.initialBlockOffset,
       fromStart: widget.startAtBeginning,
     );
+    _routeOpening = _openBook();
     if (widget.repository case LocalBookInvalidation changes) {
       _invalidation = changes.invalidations.listen((key) {
         if (!mounted || key != widget.chapter.novelKey || _invalidated) return;
@@ -602,6 +622,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         ..addListener(_changed);
   void _changed() {
     if (_invalidated) return;
+    if (_reader.content == null && _reader.status == ReaderStatus.error) {
+      unawaited(_releaseRouteUse());
+    }
     final latestCatalog = _catalog.loaded?.value;
     if (_completion != null &&
         !_local &&
@@ -662,6 +685,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     WidgetsBinding.instance.removeObserver(this);
     if (_pending case final pending?) _close(pending);
     _close(_reader);
+    unawaited(_releaseRouteUse());
     _catalog.removeListener(_changed);
     _catalog.removeListener(_catalogChanged);
     _catalogChanges.dispose();
@@ -671,6 +695,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _readingOrderChanges.dispose();
     _chrome.dispose();
     super.dispose();
+  }
+
+  Future<void> _releaseRouteUse() async {
+    await _routeOpening;
+    await _catalog.resourcesReleased;
+    await _routeUse?.release();
+    _routeUse = null;
   }
 
   // The active ReaderContentView flushes its own session on lifecycle changes.

@@ -1407,4 +1407,33 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bookReparseCleanupPending => '新内容已保存，残留旧资源将于下次启动时清理。';
+
+  @override
+  String localAutoReparseUnfinished(int count) {
+    return '$count 本书未能自动更新';
+  }
+
+  @override
+  String get localAutoReparseApproximate => '已跳过：阅读位置无法精确迁移';
+
+  @override
+  String get localAutoReparseEncoding => '已跳过：TXT 编码不确定';
+
+  @override
+  String get localAutoReparseOriginal => '失败：原件损坏';
+
+  @override
+  String get localAutoReparseStorage => '暂缓：存储空间不足';
+
+  @override
+  String get localAutoReparseWrite => '等待重试：文件读写失败';
+
+  @override
+  String get localAutoReparseInterrupted => '等待重试：上次更新未正常完成';
+
+  @override
+  String get localAutoReparseTimeout => '等待重试：解析超时';
+
+  @override
+  String get localAutoReparseOther => '自动更新失败，可手动重新解析';
 }

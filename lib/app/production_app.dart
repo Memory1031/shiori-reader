@@ -2,6 +2,7 @@ import 'image_export.dart';
 import '../shared/image_export_scope.dart';
 import '../domain/contracts/image_export.dart';
 import 'dart:async';
+import '../data/local/files/storage_capacity.dart';
 import '../features/reader/epub_webview_host.dart';
 import '../data/local/book_decoder.dart';
 import '../data/repositories/local_reading_repository.dart';
@@ -66,6 +67,7 @@ class _ProductionAppState extends State<ProductionApp>
   AppFailure? _failure;
   bool _opening = false;
   bool _storesClosed = false;
+  Future<void>? _storesClosing;
   AppPaths? _paths;
   ImageExporter? _imageExporter;
   @override
@@ -152,6 +154,18 @@ class _ProductionAppState extends State<ProductionApp>
       }
       _updates = updates..addListener(_updateChanged);
       setState(() => _opening = false);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _storesClosed) return;
+        databases.localBooks.automaticReparseActivity(
+          resumed:
+              WidgetsBinding.instance.lifecycleState == null ||
+              WidgetsBinding.instance.lifecycleState ==
+                  AppLifecycleState.resumed,
+        );
+        databases.localBooks.startAutomaticReparse(
+          freeSpace: availableStorageBytes,
+        );
+      });
       unawaited(_startUpdates());
     } catch (_) {
       if (mounted) {
@@ -186,10 +200,13 @@ class _ProductionAppState extends State<ProductionApp>
 
   /// Also run before a Windows update exits the process, while the update
   /// controller is still completing its handoff.
-  Future<void> _closeStores() async {
+  Future<void> _closeStores() => _storesClosing ??= _shutdownStores();
+
+  Future<void> _shutdownStores() async {
     // The fields stay set so frames drawn before the window closes still build.
     if (_storesClosed) return;
     _storesClosed = true;
+    await _databases?.localBooks.stopAutomaticReparse();
     await _imports?.shutdown();
     _imports?.dispose();
     await _services?.close();
@@ -206,6 +223,16 @@ class _ProductionAppState extends State<ProductionApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _databases?.localBooks.automaticReparseActivity(
+      resumed: state == AppLifecycleState.resumed,
+      cancelPrepare:
+          state == AppLifecycleState.hidden ||
+          state == AppLifecycleState.paused ||
+          state == AppLifecycleState.detached,
+    );
+    if (state == AppLifecycleState.detached) {
+      unawaited(_closeStores());
+    }
     if (state == AppLifecycleState.resumed) {
       unawaited(_resumeUpdates());
     }
