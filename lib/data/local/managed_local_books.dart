@@ -505,7 +505,16 @@ class ManagedLocalBooks
         // Cleanup failure is recovered at next open; never hide a committed result.
         try {
           if (!committed && published != null) {
-            await _deleteChild(paths.localBooks, published.path);
+            // A failed COMMIT reply is not proof of rollback; keep uncertain files.
+            final reference = await db
+                .customSelect(
+                  'SELECT 1 FROM local_books WHERE digest=?',
+                  variables: [Variable(p.basename(published.path))],
+                )
+                .getSingleOrNull();
+            if (reference == null) {
+              await _deleteChild(paths.localBooks, published.path);
+            }
           }
           if (await stage.exists()) {
             await _deleteChild(paths.localImportStaging, stage.path);
