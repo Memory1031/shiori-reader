@@ -6,12 +6,18 @@ import '../../shared/controllers/scoped_controller.dart';
 
 /// One opaque novel identity per scope. Repository and update stream are borrowed.
 class DetailController extends ScopedController {
-  DetailController({required this.repository, required this.novel});
+  DetailController({
+    required this.repository,
+    required this.novel,
+    this.now = DateTime.now,
+  });
   final NovelRepository repository;
   final NovelKey novel;
   LoadResult<NovelDetail>? loaded;
   AppFailure? failure;
   bool loading = false;
+  final DateTime Function() now;
+  Timer? _cooldown;
   CancellationSource? _request;
   int _updates = 0;
 
@@ -22,7 +28,23 @@ class DetailController extends ScopedController {
           failure!.retryPolicy != RetryPolicy.never &&
               (failure!.kind != FailureKind.rateLimited ||
                   failure!.retryNotBefore != null &&
-                      !DateTime.now().isBefore(failure!.retryNotBefore!)));
+                      !now().isBefore(failure!.retryNotBefore!)));
+
+  void _notify() {
+    _cooldown?.cancel();
+    _cooldown = null;
+    final remaining = failure?.retryNotBefore?.difference(now());
+    if (!isClosed &&
+        failure?.kind == FailureKind.rateLimited &&
+        failure?.retryPolicy != RetryPolicy.never &&
+        remaining != null &&
+        remaining > Duration.zero) {
+      _cooldown = Timer(remaining, () {
+        if (!isClosed) _notify();
+      });
+    }
+    update();
+  }
 
   @override
   void onInit() {
@@ -33,7 +55,7 @@ class DetailController extends ScopedController {
       }
       _updates++;
       _accept(result);
-      update();
+      _notify();
     });
     unawaited(load());
   }
@@ -44,7 +66,7 @@ class DetailController extends ScopedController {
     final updates = _updates;
     loading = true;
     failure = null;
-    update();
+    _notify();
     Result<LoadResult<NovelDetail>> result;
     try {
       result = await repository.loadDetail(
@@ -73,7 +95,7 @@ class DetailController extends ScopedController {
       _accept(result);
       failure = latestFailure ?? failure;
     }
-    update();
+    _notify();
   }
 
   Future<void> refreshDetail() => load(mode: ReadMode.refresh);
@@ -98,6 +120,7 @@ class DetailController extends ScopedController {
 
   @override
   void onClose() {
+    _cooldown?.cancel();
     _request?.cancel();
     super.onClose();
   }

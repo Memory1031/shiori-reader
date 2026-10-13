@@ -11,6 +11,7 @@ class CatalogController extends ScopedController {
     required this.repository,
     required this.novel,
     this.initialMode = ReadMode.cacheFirst,
+    this.now = DateTime.now,
   });
   final ReadMode initialMode;
   final NovelRepository repository;
@@ -18,6 +19,8 @@ class CatalogController extends ScopedController {
   LoadResult<Catalog>? loaded;
   AppFailure? failure;
   bool loading = false;
+  final DateTime Function() now;
+  Timer? _cooldown;
   CancellationSource? _request;
   int _updates = 0;
 
@@ -33,7 +36,23 @@ class CatalogController extends ScopedController {
           failure!.retryPolicy != RetryPolicy.never &&
               (failure!.kind != FailureKind.rateLimited ||
                   failure!.retryNotBefore != null &&
-                      !DateTime.now().isBefore(failure!.retryNotBefore!)));
+                      !now().isBefore(failure!.retryNotBefore!)));
+
+  void _notify() {
+    _cooldown?.cancel();
+    _cooldown = null;
+    final remaining = failure?.retryNotBefore?.difference(now());
+    if (!isClosed &&
+        failure?.kind == FailureKind.rateLimited &&
+        failure?.retryPolicy != RetryPolicy.never &&
+        remaining != null &&
+        remaining > Duration.zero) {
+      _cooldown = Timer(remaining, () {
+        if (!isClosed) _notify();
+      });
+    }
+    update();
+  }
 
   @override
   void onInit() {
@@ -44,7 +63,7 @@ class CatalogController extends ScopedController {
       }
       _updates++;
       _accept(result);
-      update();
+      _notify();
     });
     unawaited(load(mode: initialMode));
   }
@@ -55,7 +74,7 @@ class CatalogController extends ScopedController {
     final updates = _updates;
     loading = true;
     failure = null;
-    update();
+    _notify();
     Result<LoadResult<Catalog>> result;
     try {
       result = await repository.loadCatalog(
@@ -83,7 +102,7 @@ class CatalogController extends ScopedController {
     } else if (_updates == updates) {
       _accept(result);
     }
-    update();
+    _notify();
   }
 
   Future<void> refreshCatalog() => load(mode: ReadMode.refresh);
@@ -112,6 +131,7 @@ class CatalogController extends ScopedController {
 
   @override
   void onClose() {
+    _cooldown?.cancel();
     _request?.cancel();
     super.onClose();
   }

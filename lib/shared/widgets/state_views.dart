@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 
@@ -46,7 +47,7 @@ class EmptyView extends StatelessWidget {
 
 /// Actions are capabilities supplied by the owner, never inferred services.
 /// The owner/transport must also enforce retry budgets and cooldown deadlines.
-class FailureView extends StatelessWidget {
+class FailureView extends StatefulWidget {
   const FailureView({
     super.key,
     required this.failure,
@@ -65,23 +66,67 @@ class FailureView extends StatelessWidget {
   final DateTime Function()? now;
 
   @override
+  State<FailureView> createState() => _FailureViewState();
+}
+
+class _FailureViewState extends State<FailureView> {
+  Timer? _cooldown;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleCooldown();
+  }
+
+  @override
+  void didUpdateWidget(FailureView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _scheduleCooldown();
+  }
+
+  void _scheduleCooldown() {
+    _cooldown?.cancel();
+    _cooldown = null;
+    final remaining = widget.failure.retryNotBefore?.difference(
+      widget.now?.call() ?? DateTime.now(),
+    );
+    if (widget.onRetry != null &&
+        widget.failure.kind == FailureKind.rateLimited &&
+        widget.failure.retryPolicy != RetryPolicy.never &&
+        remaining != null &&
+        remaining > Duration.zero) {
+      _cooldown = Timer(remaining, () {
+        if (!mounted) return;
+        _scheduleCooldown();
+        setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _cooldown?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (failure.isCancellation) return const SizedBox.shrink();
+    if (widget.failure.isCancellation) return const SizedBox.shrink();
     final strings = AppLocalizations.of(context);
 
-    final deadline = failure.retryNotBefore;
+    final deadline = widget.failure.retryNotBefore;
     // Unknown cooldown has no safe immediate retry. Data policy must resolve it.
     final cooledDown =
-        failure.kind != FailureKind.rateLimited ||
+        widget.failure.kind != FailureKind.rateLimited ||
         (deadline != null &&
-            !(now?.call() ?? DateTime.now()).isBefore(deadline));
-    final mayRetry = failure.retryPolicy != RetryPolicy.never;
+            !(widget.now?.call() ?? DateTime.now()).isBefore(deadline));
+    final mayRetry = widget.failure.retryPolicy != RetryPolicy.never;
     return _StateLayout(
       children: [
         Semantics(
           liveRegion: true,
           child: Text(
-            failureMessage(strings, failure),
+            failureMessage(strings, widget.failure),
             textAlign: TextAlign.center,
           ),
         ),
@@ -90,18 +135,23 @@ class FailureView extends StatelessWidget {
           spacing: 12,
           runSpacing: 8,
           children: [
-            if (mayRetry && onRetry != null)
+            if (mayRetry && widget.onRetry != null)
               FilledButton(
-                onPressed: retryAvailable && cooledDown ? onRetry : null,
+                onPressed: widget.retryAvailable && cooledDown
+                    ? widget.onRetry
+                    : null,
                 child: Text(strings.retryAction),
               ),
-            if (onReadCache != null)
+            if (widget.onReadCache != null)
               OutlinedButton(
-                onPressed: onReadCache,
+                onPressed: widget.onReadCache,
                 child: Text(strings.readCacheAction),
               ),
-            if (onBack != null)
-              TextButton(onPressed: onBack, child: Text(strings.backAction)),
+            if (widget.onBack != null)
+              TextButton(
+                onPressed: widget.onBack,
+                child: Text(strings.backAction),
+              ),
           ],
         ),
       ],
