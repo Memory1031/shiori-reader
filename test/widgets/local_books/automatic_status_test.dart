@@ -52,6 +52,8 @@ void main() {
         }
         await h.pump(width: width, lang: locale, scale: scale);
         expect(tester.takeException(), isNull);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.byType(LinearProgressIndicator), findsNothing);
         expect(find.text(h.l.localAutoReparseUnfinished(2)), findsOneWidget);
         expect(
           find.textContaining(h.l.localAutoReparseApproximate),

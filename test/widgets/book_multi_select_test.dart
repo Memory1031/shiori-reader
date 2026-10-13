@@ -8,6 +8,7 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/local_books/local_books_screen.dart';
 import 'package:shiori/features/local_books/local_reparse_flow.dart';
+import 'package:shiori/features/bookshelf/book_batch_views.dart';
 import 'package:shiori/features/bookshelf/book_selection_widgets.dart';
 import 'package:shiori/features/bookshelf/bookshelf_view.dart';
 import 'package:shiori/features/home/home_navigation.dart';
@@ -17,7 +18,7 @@ import 'local_books/harness.dart';
 
 void main() {
   testWidgets(
-    'legacy reparse all holds the shared maintenance lane through Stop and results',
+    'selected reparse holds the shared maintenance lane through Stop and results',
     (tester) async {
       final store = LocalStore(count: 2)
         ..gate = Completer<Result<LocalReparseResult>>();
@@ -35,58 +36,48 @@ void main() {
             ),
           )
           .actions;
-      final enter = tester
-          .widget<IconButton>(find.byKey(const ValueKey('book-multi-select')))
-          .onPressed!;
-      await tester.tap(find.byKey(const ValueKey('local-books-reparse-all')));
+      await tester.tap(find.byKey(const ValueKey('book-multi-select')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('book-selection-all')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('book-selection-reparse')));
       await tester.pumpAndSettle();
       expect(store.calls, isEmpty);
       expect(h.importer.maintenanceBlocked, isTrue);
-      await tester.tap(find.widgetWithText(FilledButton, h.l.localReparseAll));
+      await tester.tap(
+        find.widgetWithText(FilledButton, h.l.bookReparseSelected(2)),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(store.calls, hasLength(1));
       expect(actions.library.writing, isTrue);
-      expect(
-        tester
-            .widget<IconButton>(find.byKey(const ValueKey('book-multi-select')))
-            .onPressed,
-        isNull,
-      );
-      enter();
-      expect(actions.selection.active, isFalse);
-
-      // Even a retained selection and direct action calls cannot bypass the lease.
-      actions.selection.enter();
-      actions.selection.toggleAll();
+      expect(actions.canEnter, isFalse);
+      // Retained/direct calls cannot bypass the in-flight lease.
       await actions.reparseSelected(tester.element(h.page));
       await actions.removeSelected(tester.element(h.page));
       await tester.pump();
       expect(store.calls, hasLength(1));
       expect(store.deletes, 0);
-      expect(find.byType(AlertDialog), findsNothing);
-      actions.leave();
-      await tester.pump();
-
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
       await tester.tap(find.text(h.l.localReparseStop));
       await tester.pump();
       expect(store.calls.single.token.isCancelled, isTrue);
       expect(actions.library.writing, isTrue);
       expect(h.importer.maintenanceBlocked, isTrue);
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
       store.gate!.complete(Success(LocalReparseResult(approximate: false)));
       await tester.pumpAndSettle();
       expect(store.calls, hasLength(1));
-      expect(find.byType(LocalReparseResultView), findsOneWidget);
-      expect(find.text(h.l.localReparseAllSummary(1, 0, 1)), findsOneWidget);
+      expect(find.byType(BookBatchResultView), findsOneWidget);
+      expect(find.text(h.l.bookBatchSummary(1, 0, 1, 0, 0)), findsOneWidget);
       expect(actions.library.writing, isTrue);
-      enter();
-      expect(actions.selection.active, isFalse);
-      await tester.tap(find.widgetWithText(TextButton, h.l.importDone));
+      await tester.tap(find.widgetWithText(OutlinedButton, h.l.importDone));
       await tester.pumpAndSettle();
       expect(actions.library.writing, isFalse);
       expect(h.importer.maintenanceBlocked, isFalse);
-
+      expect(actions.selection.selected, {store.books.last.key});
+      await tester.tap(find.byKey(const ValueKey('book-selection-exit')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('book-multi-select')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Book'));
@@ -123,8 +114,10 @@ void main() {
       await tester.tap(find.text('Local files'));
       await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(ValueKey(('local-book-reparse', h.store.books.first.key))),
+        find.byKey(ValueKey(('local-book-actions', h.store.books.first.key))),
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(h.l.localReparse));
       await tester.pumpAndSettle();
       expect(h.importer.maintenanceBlocked, isTrue);
       expect(
@@ -149,7 +142,7 @@ void main() {
   );
 
   testWidgets(
-    'leaving legacy reparse cancels remaining books and holds the lease until unwind',
+    'leaving single reparse holds the lease until cancellation unwinds',
     (tester) async {
       final store = LocalStore(count: 2)
         ..gate = Completer<Result<LocalReparseResult>>();
@@ -162,9 +155,13 @@ void main() {
       final library = tester
           .widget<LocalBooksScreen>(h.page)
           .libraryController!;
-      await tester.tap(find.byKey(const ValueKey('local-books-reparse-all')));
+      await tester.tap(
+        find.byKey(ValueKey(('local-book-actions', store.books.first.key))),
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, h.l.localReparseAll));
+      await tester.tap(find.text(h.l.localReparse));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, h.l.localReparse));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(store.calls, hasLength(1));

@@ -7,6 +7,7 @@ import 'package:shiori/app/theme/shiori_theme.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/features/local_books/desktop_local_books.dart';
 import 'package:shiori/features/local_books/local_reparse_flow.dart';
+import 'package:shiori/features/bookshelf/book_batch_views.dart';
 import 'package:shiori/shared/widgets/book_list_tile.dart';
 import 'package:shiori/shared/widgets/desktop_content_frame.dart';
 import 'harness.dart';
@@ -106,7 +107,7 @@ void main() {
           of: card,
           matching: find.byKey(const ValueKey('local-books-reparse-all')),
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.descendant(
@@ -284,9 +285,13 @@ void main() {
     (tester) async {
       final h = LocalHarness(tester, store: LocalStore()..gate = Completer());
       await h.pump();
+      await tester.tap(find.byKey(const ValueKey('book-multi-select')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('book-selection-all')));
+      await tester.pumpAndSettle();
       final start = tester
           .widget<FilledButton>(
-            find.byKey(const ValueKey('local-books-reparse-all')),
+            find.byKey(const ValueKey('book-selection-reparse')),
           )
           .onPressed!;
       start();
@@ -294,7 +299,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(h.store.calls, isEmpty);
-      await tester.tap(find.widgetWithText(FilledButton, h.l.localReparseAll));
+      await tester.tap(
+        find.widgetWithText(FilledButton, h.l.bookReparseSelected(45)),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
       expect(h.store.calls, hasLength(1));
@@ -313,8 +320,8 @@ void main() {
         Failure(AppFailure.cancelled(Operation.libraryWrite)),
       );
       await tester.pumpAndSettle();
-      expect(find.byType(LocalReparseResultView), findsOneWidget);
-      expect(find.text(h.l.localReparseAllSummary(0, 0, 45)), findsOneWidget);
+      expect(find.byType(BookBatchResultView), findsOneWidget);
+      expect(find.text(h.l.bookBatchSummary(0, 0, 45, 0, 0)), findsOneWidget);
       await tester.tap(find.text(h.l.importDone));
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsNothing);
@@ -408,9 +415,13 @@ void main() {
     (tester) async {
       final h = LocalHarness(tester, store: LocalStore()..gate = Completer());
       await h.pump();
+      await tester.tap(find.byKey(const ValueKey('book-multi-select')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('book-selection-all')));
+      await tester.pumpAndSettle();
       final start = tester
           .widget<FilledButton>(
-            find.byKey(const ValueKey('local-books-reparse-all')),
+            find.byKey(const ValueKey('book-selection-reparse')),
           )
           .onPressed!;
       start();
@@ -418,7 +429,13 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
       await tester.pumpAndSettle();
       expect(h.store.calls, isEmpty);
-      await confirm(tester, h);
+      start();
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(FilledButton, h.l.bookReparseSelected(45)),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
       final dialog = tester.element(find.byType(AlertDialog));
       Navigator.of(dialog).removeRoute(ModalRoute.of(dialog)!);
       await tester.pumpAndSettle();
@@ -441,20 +458,24 @@ void main() {
     variant: windows,
   );
   testWidgets(
-    'inline operation retains Stop when resized into desktop and section exit cancels',
+    'inline single operation retains Cancel when resized into desktop and section exit cancels',
     (tester) async {
       final h = LocalHarness(tester, store: LocalStore()..gate = Completer());
       await h.pump(width: 839, shell: true);
-      await tester.tap(find.byKey(const ValueKey('local-books-reparse-all')));
+      await tester.tap(
+        find.byKey(ValueKey(('local-book-actions', h.store.books.first.key))),
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, h.l.localReparseAll));
+      await tester.tap(find.text(h.l.localReparse));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, h.l.localReparse));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
       tester.view.physicalSize = const Size(900, 720);
       await tester.pump();
       expect(find.byType(DesktopPageToolbar), findsOneWidget);
-      expect(find.text(h.l.localReparseStop), findsOneWidget);
-      await tester.tap(find.text(h.l.localReparseStop));
+      expect(find.text(h.l.importCancel), findsOneWidget);
+      await tester.tap(find.text(h.l.importCancel));
       await tester.pump();
       expect(h.store.calls.single.token.isCancelled, isTrue);
       h.navigation.select(HomeSection.shelf);
@@ -505,7 +526,7 @@ void main() {
         expect(find.byType(DesktopPageToolbar), findsNothing);
         expect(find.byType(AppBar), findsOneWidget);
         expect(
-          find.byKey(ValueKey(('local-book-reparse', h.store.books.first.key))),
+          find.byKey(ValueKey(('local-book-actions', h.store.books.first.key))),
           findsOneWidget,
         );
         final scaffold = tester.element(find.byType(Scaffold).first);

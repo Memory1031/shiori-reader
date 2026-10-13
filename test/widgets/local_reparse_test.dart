@@ -8,6 +8,8 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/local_books/local_books_screen.dart';
+import 'package:shiori/features/bookshelf/book_batch_views.dart';
+import 'package:shiori/l10n/generated/app_localizations.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/data/repositories/local_reading_repository.dart';
 import '../domain/reparse_position_test.dart' as f;
@@ -114,6 +116,16 @@ class BatchReparseStore extends ReparseStore {
   }
 }
 
+Future<void> openReparseMenu(
+  WidgetTester tester,
+  NovelKey key,
+  String label,
+) async {
+  await tester.tap(find.byKey(ValueKey(('local-book-actions', key))));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label));
+}
+
 void main() {
   Future<void> openBatch(
     WidgetTester tester,
@@ -135,14 +147,19 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    // Reparse-all is the page's primary action, on the library card.
-    await tester.tap(find.byKey(const ValueKey('local-books-reparse-all')));
+    await tester.tap(find.byKey(const ValueKey('book-multi-select')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('book-selection-all')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('book-selection-reparse')));
     await tester.pumpAndSettle();
     expect(store.calls, isEmpty);
     await tester.tap(
       find.widgetWithText(
         FilledButton,
-        lang == 'en' ? 'Reparse all' : '全部重新解析',
+        AppLocalizations.of(
+          tester.element(find.byType(LocalBooksScreen)),
+        ).bookReparseSelected(3),
       ),
     );
     await tester.pump();
@@ -198,8 +215,7 @@ void main() {
         final store = BatchReparseStore();
         await openBatch(tester, store, lang: lang);
         expect(store.calls, [store.books[0].key]);
-        // The card shows batch progress instead of the start button, and
-        // row actions wait for the batch.
+        // Selected batches own one progress panel; row actions wait for it.
         expect(
           find.byKey(const ValueKey('local-books-reparse-all')),
           findsNothing,
@@ -225,9 +241,9 @@ void main() {
         expect(store.overrides, [null, null, null]);
         expect(
           find.descendant(
-            of: find.byType(AlertDialog),
+            of: find.byType(BookBatchPanel),
             matching: find.textContaining(
-              lang == 'en' ? 'Succeeded: 2' : '成功 2 本',
+              lang == 'en' ? '2 books completed' : '已完成 2 本',
             ),
           ),
           findsOneWidget,
@@ -238,7 +254,13 @@ void main() {
           ),
           findsOneWidget,
         );
-        expect(find.textContaining('Book 2\n'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(BookBatchPanel),
+            matching: find.text('Book 2'),
+          ),
+          findsOneWidget,
+        );
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
         await store.events.close();
@@ -258,10 +280,8 @@ void main() {
       expect(store.calls, hasLength(2));
       expect(
         find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.textContaining(
-            'Succeeded: 1 · Failed: 0 · Not processed: 2',
-          ),
+          of: find.byType(BookBatchPanel),
+          matching: find.textContaining('Not processed: 2'),
         ),
         findsOneWidget,
       );
@@ -276,18 +296,20 @@ void main() {
     await openBatch(tester, store);
     await tester.pump(const Duration(milliseconds: 300));
     expect(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('Book 1'),
-      ),
+      find
+          .descendant(
+            of: find.byType(BookBatchPanel),
+            matching: find.text('Book 1'),
+          )
+          .last,
       findsOneWidget,
     );
-    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Cancel'));
     await tester.pumpAndSettle();
     expect(store.calls, hasLength(1));
     expect(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byType(BookBatchPanel),
         matching: find.textContaining('Not processed: 3'),
       ),
       findsOneWidget,
@@ -330,8 +352,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         final label = lang == 'en' ? 'Reparse' : '重新解析';
-        // Each row offers reparse directly.
-        await tester.tap(find.byKey(ValueKey(('local-book-reparse', f.key))));
+        await openReparseMenu(tester, f.key, label);
         await tester.pumpAndSettle();
         expect(store.called, isFalse);
         await tester.tap(find.widgetWithText(FilledButton, label));
@@ -455,7 +476,7 @@ void main() {
     await tester.pumpAndSettle();
     // A reparse marks its row and disables the other row actions.
     final key = store.books[2].key;
-    await tester.tap(find.byKey(ValueKey(('local-book-reparse', key))));
+    await openReparseMenu(tester, key, 'Reparse');
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Reparse'));
     await tester.pump();
@@ -468,11 +489,11 @@ void main() {
     );
     expect(
       tester
-          .widget<IconButton>(
-            find.byKey(ValueKey(('local-book-reparse', store.books[0].key))),
+          .widget<PopupMenuButton<String>>(
+            find.byKey(ValueKey(('local-book-actions', store.books[0].key))),
           )
-          .onPressed,
-      isNull,
+          .enabled,
+      isFalse,
     );
     store.gates[0].complete(Success(LocalReparseResult(approximate: false)));
     await tester.pumpAndSettle();

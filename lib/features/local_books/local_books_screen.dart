@@ -224,9 +224,6 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
   Future<void> _reparse(LocalBookInfo info) =>
       _startReparse([LocalReparseTarget.fromInfo(info)]);
 
-  Future<void> _reparseAll(List<LocalBookInfo> books) =>
-      _startReparse(books.map(LocalReparseTarget.fromInfo), batch: true);
-
   Future<void> _startReparse(
     Iterable<LocalReparseTarget> books, {
     bool batch = false,
@@ -471,23 +468,10 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                 style: muted,
               ),
             ],
-            if (_canReparse || _busy) ...[
+            if ((_operation?.busy == true && _reparseFlow?.modal == false) ||
+                _deleting) ...[
               const SizedBox(height: ShioriSpace.item),
-              if ((_operation?.busy == true && _reparseFlow?.modal == false) ||
-                  _deleting)
-                _reparseProgress(context)
-              else
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: FilledButton.tonalIcon(
-                    key: const ValueKey('local-books-reparse-all'),
-                    onPressed: _busy || _selecting
-                        ? null
-                        : () => _reparseAll(books),
-                    icon: const Icon(Icons.autorenew, size: 20),
-                    label: Text(l.localReparseAll),
-                  ),
-                ),
+              _reparseProgress(context),
             ],
             if (!_busy && (_batchSummary != null || failed)) ...[
               const SizedBox(height: ShioriSpace.medium),
@@ -615,30 +599,21 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
           ? BookSelectionCheck(
               selected: _batch.selection.selected.contains(book.key),
             )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (active)
-                  Padding(
-                    padding: const EdgeInsets.all(ShioriSpace.medium),
-                    child: SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        semanticsLabel: l.localReparse,
-                      ),
-                    ),
-                  )
-                else if (_canReparse)
-                  IconButton(
-                    key: ValueKey(('local-book-reparse', book.key)),
-                    tooltip: l.localReparse,
-                    onPressed: _busy ? null : () => _reparse(book),
-                    icon: const Icon(Icons.autorenew, size: 20),
+          : active
+          ? SizedBox.square(
+              key: ValueKey(('local-book-reparsing', book.key)),
+              dimension: kMinInteractiveDimension,
+              child: Center(
+                child: SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    semanticsLabel: l.localReparseAllProgress(1, 1, book.title),
                   ),
-                _bookMenu(context, book),
-              ],
-            ),
+                ),
+              ),
+            )
+          : _bookMenu(context, book),
     );
     if (desktop) {
       return DesktopLocalBookRow(
