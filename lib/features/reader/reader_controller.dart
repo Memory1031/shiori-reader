@@ -129,6 +129,16 @@ class ReaderController extends ScopedController {
     await progress?.flush();
   }
 
+  Future<bool> saveForExit() async {
+    await _progressOpening;
+    // Reflow may be pending; the queued sample is still the last stable anchor.
+    progress?.restoring(false);
+    await flushProgress();
+    return library == null ||
+        _sample == null ||
+        progress?.progressSaved == true;
+  }
+
   Future<void> retryProgress() async {
     if (restoreFailure != null) {
       // Explicit retry opens a fresh restore attempt. Never apply a late DB

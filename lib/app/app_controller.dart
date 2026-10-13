@@ -17,7 +17,7 @@ class AppController extends ScopedController {
   bool isLoadingSettings = false;
   CancellationSource? _request;
   AppSettings? _pending;
-  bool _writing = false;
+  Future<void>? _writing;
 
   void setAppearance(AppThemeMode mode) {
     if (isClosed || (settings.themeMode == mode && !isLoadingSettings)) return;
@@ -40,26 +40,40 @@ class AppController extends ScopedController {
 
   Future<void> retrySettings() => _pending != null ? _save() : loadSettings();
 
-  Future<void> _save() async {
-    if (_writing || _settingsStore == null) return;
-    _writing = true;
-    try {
-      while (_pending != null) {
-        final candidate = _pending!;
-        _pending = null;
-        final result = await _settingsStore.save(
+  Future<bool> saveForExit() async {
+    await _save();
+    return _settingsStore == null || _pending == null;
+  }
+
+  Future<void> _save() {
+    if (_settingsStore == null) return Future.value();
+    return _writing ??= _drain().whenComplete(() => _writing = null);
+  }
+
+  Future<void> _drain() async {
+    while (_pending != null) {
+      final candidate = _pending!;
+      _pending = null;
+      Result<void> result;
+      try {
+        result = await _settingsStore!.save(
           candidate,
           cancellation: CancellationSource().token,
         );
-        settingsFailure = result is Failure<void> ? result.failure : null;
-        if (!isClosed) update();
-        if (result is Failure<void>) {
-          _pending ??= candidate;
-          break;
-        }
+      } catch (_) {
+        result = Failure(
+          AppFailure(
+            kind: FailureKind.database,
+            operation: Operation.settingsWrite,
+          ),
+        );
       }
-    } finally {
-      _writing = false;
+      settingsFailure = result is Failure<void> ? result.failure : null;
+      if (!isClosed) update();
+      if (result is Failure<void>) {
+        _pending ??= candidate;
+        break;
+      }
     }
   }
 

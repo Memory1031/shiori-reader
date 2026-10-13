@@ -69,6 +69,29 @@ ProgressTracker tracker(
   now: now,
 );
 void main() {
+  test(
+    'flush also drains a sample accepted during its in-flight write',
+    () async {
+      final library = Library()..gate = Completer<void>();
+      final c = content();
+      final t = tracker(library, c);
+      await t.start();
+      t.sample(position(c, .2), completed: false);
+      final saving = t.flush();
+      await Future<void>.delayed(Duration.zero);
+      t.sample(position(c, .8), completed: false);
+      library.gate!.complete();
+      await saving;
+      expect(library.writes.map((entry) => entry.$1.position.blockFraction), [
+        .2,
+        .8,
+      ]);
+      expect(t.progressSaved, isTrue);
+      await t.close();
+      await library.inner.close();
+    },
+  );
+
   test('catalog ordinal is independent of local reading order', () async {
     final library = Library();
     final c = content();

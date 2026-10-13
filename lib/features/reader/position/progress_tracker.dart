@@ -245,7 +245,7 @@ class ProgressTracker {
       _report();
       // No tight retry loop on failure. A later user event or explicit retry can retry.
       if (result is Failure<bool> || _obsolete) return;
-    } while (_again || (_closed && _latest != _saved));
+    } while (_again || _latest != _saved);
   }
 
   Future<void> retry() async {

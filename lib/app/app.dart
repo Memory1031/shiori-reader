@@ -6,6 +6,7 @@ import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/controller_scope.dart';
 import '../shared/widgets/state_views.dart';
 import 'app_controller.dart';
+import 'app_exit.dart';
 import 'routes.dart';
 import 'theme.dart';
 import 'appearance_panel.dart';
@@ -26,12 +27,14 @@ class ShioriApp extends StatefulWidget {
     this.navigatorKey,
     this.scaffoldMessengerKey,
     this.captionSender,
+    this.shutdown,
   });
 
   final Widget Function(BuildContext, Widget)? overlayBuilder;
 
   /// Overrides the native sender for caption integration tests.
   final CaptionSender? captionSender;
+  final Future<void> Function()? shutdown;
   final GlobalKey<NavigatorState>? navigatorKey;
   final GlobalKey<ScaffoldMessengerState>? scaffoldMessengerKey;
   final AppController Function() createController;
@@ -72,7 +75,14 @@ class _ShioriAppState extends State<ShioriApp> {
         final page = _caption == null
             ? app
             : WindowCaptionSync(controller: _caption, child: app);
-        return ReaderFontScope(registry: _readerFonts, child: page);
+        return ReaderFontScope(
+          registry: _readerFonts,
+          child: AppExitScope(
+            save: controller.saveForExit,
+            shutdown: widget.shutdown,
+            child: page,
+          ),
+        );
       },
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       locale: widget.locale,

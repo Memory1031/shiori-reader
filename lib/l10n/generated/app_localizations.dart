@@ -584,6 +584,12 @@ abstract class AppLocalizations {
   /// **'Shiori'**
   String get appTitle;
 
+  /// No description provided for @appClosing.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing Shiori…'**
+  String get appClosing;
+
   /// No description provided for @backAction.
   ///
   /// In en, this message translates to:

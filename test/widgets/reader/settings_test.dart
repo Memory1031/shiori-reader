@@ -50,6 +50,44 @@ class Store implements SettingsStore {
 
 void main() {
   test(
+    'flush joins an in-flight write and drains the latest settings',
+    () async {
+      final store = Store()..saving = Completer<void>();
+      final preferences = ReaderPreferences(store);
+      preferences.update(ReaderSettings(fontSize: 24));
+      final first = preferences.flush();
+      preferences.update(ReaderSettings(fontSize: 30));
+      var finished = false;
+      final exitSave = preferences.flush().then((_) => finished = true);
+      await Future<void>.delayed(Duration.zero);
+      expect(finished, isFalse);
+      expect(store.writes.map((s) => s.fontSize), [24]);
+      store.saving!.complete();
+      await Future.wait([first, exitSave]);
+      expect(store.value.fontSize, 30);
+      expect(preferences.unsaved, isFalse);
+      preferences.dispose();
+    },
+  );
+
+  test(
+    'failed flush retains the latest settings for a later exit retry',
+    () async {
+      final store = Store()..fail = true;
+      final preferences = ReaderPreferences(store);
+      preferences.update(ReaderSettings(fontSize: 30));
+      await preferences.flush();
+      expect(preferences.unsaved, isTrue);
+      expect(store.writes, hasLength(1));
+      store.fail = false;
+      await preferences.flush();
+      expect(preferences.unsaved, isFalse);
+      expect(store.value.fontSize, 30);
+      preferences.dispose();
+    },
+  );
+
+  test(
     'legacy scroll settings open paged without changing other preferences',
     () async {
       final store = Store()

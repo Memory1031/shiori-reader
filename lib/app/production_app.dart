@@ -68,6 +68,7 @@ class _ProductionAppState extends State<ProductionApp>
   bool _opening = false;
   bool _storesClosed = false;
   Future<void>? _storesClosing;
+  Future<void>? _closing;
   AppPaths? _paths;
   ImageExporter? _imageExporter;
   @override
@@ -92,7 +93,7 @@ class _ProductionAppState extends State<ProductionApp>
       _paths = paths;
       _imageExporter = createImageExporter(paths);
       final result = await LocalDatabases.open(paths);
-      if (!mounted) {
+      if (!mounted || _closing != null || _storesClosed) {
         if (result case Success(:final value)) await value.close();
         return;
       }
@@ -147,7 +148,7 @@ class _ProductionAppState extends State<ProductionApp>
         },
         prepareExit: _closeStores,
       );
-      if (!mounted) {
+      if (!mounted || _closing != null || _storesClosed) {
         await updates.shutdown();
         updates.dispose();
         return;
@@ -155,7 +156,7 @@ class _ProductionAppState extends State<ProductionApp>
       _updates = updates..addListener(_updateChanged);
       setState(() => _opening = false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _storesClosed) return;
+        if (!mounted || _closing != null || _storesClosed) return;
         databases.localBooks.automaticReparseActivity(
           resumed:
               WidgetsBinding.instance.lifecycleState == null ||
@@ -191,7 +192,9 @@ class _ProductionAppState extends State<ProductionApp>
     super.dispose();
   }
 
-  Future<void> _close() async {
+  Future<void> _close() => _closing ??= _finishClose();
+
+  Future<void> _finishClose() async {
     _updates?.removeListener(_updateChanged);
     await _updates?.shutdown();
     _updates?.dispose();
@@ -323,6 +326,7 @@ class _ProductionAppState extends State<ProductionApp>
   @override
   Widget build(BuildContext context) => _services == null
       ? ShioriApp(
+          shutdown: _close,
           routes: AppRoutes(
             home: (_) => _failure == null
                 ? const LaunchView()
@@ -335,6 +339,7 @@ class _ProductionAppState extends State<ProductionApp>
         )
       : ShioriApp(
           key: const ValueKey('production-ready'),
+          shutdown: _close,
           navigatorKey: _navigator,
           scaffoldMessengerKey: _messenger,
           overlayBuilder: (context, child) {

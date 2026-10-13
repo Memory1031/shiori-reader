@@ -14,9 +14,14 @@ class ReaderPreferences extends ChangeNotifier {
   AppFailure? failure;
   Timer? _timer;
   ReaderSettings? _pending;
-  bool _writing = false;
+  Future<void>? _writing;
   bool _disposed = false;
   int _revision = 0;
+  bool get unsaved =>
+      store != null &&
+      (_pending != null ||
+          _writing != null ||
+          failure != null && _revision > 0);
 
   Future<void> load() async {
     final revision = _revision;
@@ -43,24 +48,35 @@ class ReaderPreferences extends ChangeNotifier {
     _timer = Timer(const Duration(milliseconds: 300), flush);
   }
 
-  Future<void> flush() async {
+  Future<void> flush() {
     _timer?.cancel();
-    if (_writing || store == null) return;
-    _writing = true;
-    try {
-      while (_pending != null) {
-        final settings = _pending!;
-        _pending = null;
-        // A save accepted before disposal must still be allowed to commit.
-        final result = await store!.save(
+    if (store == null) return Future.value();
+    return _writing ??= _drain().whenComplete(() => _writing = null);
+  }
+
+  Future<void> _drain() async {
+    while (_pending != null) {
+      final settings = _pending!;
+      _pending = null;
+      // A save accepted before disposal must still be allowed to commit.
+      Result<void> result;
+      try {
+        result = await store!.save(
           settings,
           cancellation: CancellationSource().token,
         );
-        failure = result is Failure<void> ? result.failure : null;
-        if (!_disposed) notifyListeners();
+      } catch (_) {
+        result = Failure(
+          AppFailure(
+            kind: FailureKind.database,
+            operation: Operation.settingsWrite,
+          ),
+        );
       }
-    } finally {
-      _writing = false;
+      failure = result is Failure<void> ? result.failure : null;
+      if (failure != null) _pending ??= settings;
+      if (!_disposed) notifyListeners();
+      if (failure != null) return;
     }
   }
 

@@ -256,6 +256,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appTitle => 'Shiori';
 
   @override
+  String get appClosing => '正在关闭 Shiori…';
+
+  @override
   String get backAction => '返回';
 
   @override

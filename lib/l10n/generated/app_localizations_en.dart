@@ -266,6 +266,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Shiori';
 
   @override
+  String get appClosing => 'Closing Shiori…';
+
+  @override
   String get backAction => 'Back';
 
   @override

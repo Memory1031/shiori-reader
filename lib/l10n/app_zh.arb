@@ -95,6 +95,7 @@
   "pagedReading": "左右翻页",
   "scrollReading": "上下滚动",
   "appTitle": "Shiori",
+  "appClosing": "正在关闭 Shiori…",
   "backAction": "返回",
   "connectionFailureMessage": "无法连接，请检查网络后重试。",
   "databaseFailureMessage": "本地存储发生问题，暂时无法完成操作。",

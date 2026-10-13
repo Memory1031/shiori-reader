@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../app/app_exit.dart';
 import '../../app/window_caption.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -138,6 +139,49 @@ class ReaderContentView extends StatefulWidget {
 
 class _ReaderContentViewState extends State<ReaderContentView>
     with WidgetsBindingObserver {
+  AppExitScopeState? _exitOwner;
+  void Function()? _removeExit;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final owner = AppExitScope.of(context);
+    if (owner != _exitOwner) {
+      _removeExit?.call();
+      _exitOwner = owner;
+      _removeExit = owner?.register(_saveForExit);
+    }
+  }
+
+  Future<bool> _saveForExit() async {
+    if (!mounted) return true;
+    widget.onCancelChapter?.call();
+    _dragSurface.currentState?.cancel();
+    _cancelCompletion(immediate: true);
+    await _preferences.flush();
+    final progressSaved = await widget.session?.saveForExit() ?? true;
+    final saved = !_preferences.unsaved && progressSaved;
+    if (mounted && !saved) {
+      _chrome.value = true;
+      final l = AppLocalizations.of(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            progressSaved ? l.readerSettingsFailure : l.readerProgressUnsaved,
+          ),
+          action: SnackBarAction(
+            label: l.retryAction,
+            onPressed: () {
+              _preferences.retry();
+              unawaited(widget.session?.retryProgress());
+            },
+          ),
+        ),
+      );
+    }
+    return saved;
+  }
+
   late final ReaderPreferences _preferences;
   ReaderSettings _settings = ReaderSettings();
   final _paperTurn = ValueNotifier<PageTurnFrame>(PageTurnFrame.rest);
@@ -504,6 +548,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   void _sample(ReaderPosition position, bool completed) {
     widget.session?.finishRestoringProgress();
+    if (_exitOwner?.saving == true) return;
     _lastPageVisible = _usesPresentation || completed;
     if ((widget.completion != null || _completionTurning) &&
         widget.session?.hasPendingNavigation != true) {
@@ -866,6 +911,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   @override
   void dispose() {
+    _removeExit?.call();
     _audio.dispose();
     _panel?.dismiss();
     _panel = null;

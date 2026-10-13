@@ -95,6 +95,7 @@
   "pagedReading": "Paged",
   "scrollReading": "Scroll",
   "appTitle": "Shiori",
+  "appClosing": "Closing Shiori…",
   "backAction": "Back",
   "connectionFailureMessage": "Unable to connect. Check your network and try again.",
   "databaseFailureMessage": "A local storage problem prevented this operation.",
