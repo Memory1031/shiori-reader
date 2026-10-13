@@ -1026,7 +1026,7 @@ Future<int> _writeStream(
   }
 }
 
-class _ImportSession implements LocalImportSession {
+class _ImportSession implements LocalImportSession, EpubPresentationSession {
   _ImportSession(this.key, this.dir, this.token, this.used);
   @override
   final NovelKey key;
@@ -1034,6 +1034,15 @@ class _ImportSession implements LocalImportSession {
   final CancellationToken token;
   int used;
   bool active = true;
+  bool presentationsPrepared = false;
+  (LocalBookContent, Map<String, String>)? presentations;
+  @override
+  void acceptPresentations((LocalBookContent, Map<String, String>)? value) {
+    if (!active) throw StateError('Import session ended');
+    presentationsPrepared = true;
+    presentations = value;
+  }
+
   final media = <String>{};
   final List<Future<MediaRef>> pending = [];
   Future<void> writes = Future.value();
@@ -1113,14 +1122,18 @@ Future<({LocalBookContent content, List<int> manifest})> _writeParsedArtifacts({
   (LocalBookContent, List<int>)? rendered;
   if (format == LocalBookFormat.epub) {
     try {
-      final extracted = await _extractPresentations(
-        await original.readAsBytes(),
-        key,
-        token,
-      );
-      final html = utf8.encode(jsonEncode(extracted.$2));
-      if (html.length <= ManagedLocalBooks.maxPresentationBytes) {
-        rendered = (extracted.$1, html);
+      final extracted = session.presentationsPrepared
+          ? session.presentations
+          : await _extractPresentations(
+              await original.readAsBytes(),
+              key,
+              token,
+            );
+      if (extracted != null) {
+        final html = utf8.encode(jsonEncode(extracted.$2));
+        if (html.length <= ManagedLocalBooks.maxPresentationBytes) {
+          rendered = (extracted.$1, html);
+        }
       }
     } on LocalParseException {
       // Renditions beyond their own limits.

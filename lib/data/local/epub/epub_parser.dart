@@ -166,6 +166,11 @@ class EpubParser {
   final _noteDocuments = <String, Map<String, dom.Element>?>{};
   var _noteChars = 0;
   final presentations = <String, String>{};
+  final _presentationInputs = <String, dom.Document>{};
+  final _auxiliaryAttempted = <String>{};
+  int _auxiliaryAttempts = 0;
+  bool _retainPresentationInputs = false, _renderingForImport = false;
+  bool get hasPresentationInputs => _presentationInputs.isNotEmpty;
   final byPath = <String, ChapterContent>{};
   final _frontMatter = <ChapterKey, EpubFrontMatterDocument>{};
   String _publicationTitle = '';
@@ -330,7 +335,8 @@ class EpubParser {
     return (null, null, reason);
   }
 
-  ParsedEpub parse() {
+  ParsedEpub parse({bool retainPresentationInputs = false}) {
+    _retainPresentationInputs = retainPresentationInputs;
     if (utf8.decode(zip.read('mimetype', limit: 100)).trim() !=
         'application/epub+zip') {
       invalidZip();
@@ -509,115 +515,8 @@ class EpubParser {
       }
     }
     if (chapters.isEmpty) invalidZip();
-    final manifestText = items.values
-        .where(
-          (i) =>
-              i.path != null &&
-              {'application/xhtml+xml', 'text/html'}.contains(i.type),
-        )
-        .map((i) => i.path!)
-        .toSet();
-    final attempted = <String>{};
-    var auxiliaryAttempts = 0;
-    for (var i = 0; i < requestedPaths.length; i++) {
-      final path = requestedPaths[i];
-      if (byPath.containsKey(path) ||
-          skippedEmptyPaths.contains(path) ||
-          !attempted.add(path) ||
-          !manifestText.contains(path) ||
-          !zip.entries.containsKey(path)) {
-        continue;
-      }
-      if (++auxiliaryAttempts > 64) zipLimit();
-      final before = chapters.length;
-      try {
-        _chapter(path);
-      } on LocalParseException catch (error) {
-        if (error.problem != LocalParseProblem.invalid) rethrow;
-        _diagnostics.add(EpubDiagnosticCode.unusableLinkTarget);
-      }
-      if (chapters.length > before) auxiliary.add(chapters.removeLast());
-    }
-    final links = <LocalContentLink>[];
-    for (final source in [...chapters, ...auxiliary]) {
-      if (_fixedChapters.contains(source.key)) continue;
-      final path = chapterPaths[source.key]!;
-      for (final note
-          in _footnotes[path] ??
-              <(int, String, String?, LocalLinkUnavailable?)>[]) {
-        if (note.$1 >= source.blocks.length) continue;
-        final sourceBlock = source.blocks[note.$1];
-        final text = switch (sourceBlock) {
-          ParagraphBlock(:final text) || HeadingBlock(:final text) => text,
-          _ => '',
-        };
-        final offset = text.indexOf(note.$2);
-        if (offset < 0) continue;
-        links.add(
-          LocalContentLink(
-            source: source.key,
-            sourceBlockKey: sourceBlock.blockKey,
-            label: note.$2,
-            sourceOffset: text.substring(0, offset).runes.length,
-            footnoteText: note.$3,
-            target: note.$4 == null ? source.key : null,
-            unavailable: note.$4,
-          ),
-        );
-        if (links.length > 10000) zipLimit();
-      }
-      var rawIndex = -1;
-      for (final raw
-          in rawLinks[path] ??
-              <
-                (
-                  int,
-                  String,
-                  String?,
-                  String?,
-                  LocalLinkUnavailable?,
-                  int?,
-                  int?,
-                )
-              >[]) {
-        rawIndex++;
-        if (raw.$1 >= source.blocks.length) continue;
-        var unavailable = raw.$5;
-        final destination = raw.$3 == path ? source : byPath[raw.$3];
-        (String, int)? anchor;
-        if (unavailable == null) {
-          if (destination == null) {
-            unavailable = manifestText.contains(raw.$3)
-                ? LocalLinkUnavailable.missingDocument
-                : LocalLinkUnavailable.unsupported;
-          } else if (raw.$4?.isNotEmpty == true) {
-            anchor = fragments[raw.$3]?[raw.$4];
-            if (anchor == null) {
-              unavailable = LocalLinkUnavailable.missingAnchor;
-            }
-          }
-        }
-        if (unavailable != null) {
-          _diagnostics.add(EpubDiagnosticCode.unusableLinkTarget);
-        }
-        links.add(
-          LocalContentLink(
-            source: source.key,
-            sourceBlockKey: source.blocks[raw.$1].blockKey,
-            label: raw.$2,
-            region: _linkRegions[path]?[rawIndex],
-            presentationId: _presentationLinkIds[path]?[rawIndex],
-            sourceOffset: raw.$6,
-            sourceLength: raw.$7,
-            target: unavailable == null ? destination?.key : null,
-            targetBlockKey: unavailable == null ? anchor?.$1 : null,
-            targetOffset: unavailable == null ? anchor?.$2 : null,
-            unavailable: unavailable,
-          ),
-        );
-        if (links.length > 10000) zipLimit();
-      }
-    }
+    _parseAuxiliary();
+    final links = _resolveLinks();
     final navItem = items.values
         .where((e) => e.properties.contains('nav'))
         .firstOrNull;
@@ -815,6 +714,214 @@ class EpubParser {
       navigation: navigation,
     );
     return ParsedEpub(content, media, _diagnostics.snapshot());
+  }
+
+  /// Reuses the native parse graph; only newly linked auxiliary documents parse.
+  /// Runs in a separate worker so optional rendering may fail or time out safely.
+  (LocalBookContent, Map<String, String>) renderForImport(
+    LocalBookContent native,
+  ) {
+    _renderingForImport = true;
+    for (final entry in _presentationInputs.entries) {
+      final doc = entry.value, path = entry.key;
+      final hotspots = <EpubSvgHotspot>[];
+      final anchors = doc.body!.querySelectorAll('a[href]');
+      final ids = {for (var i = 0; i < anchors.length; i++) anchors[i]: i};
+      final html = _renderPresentation(doc, path, hotspots, ids);
+      if (html != null) {
+        presentations[byPath[path]!.key.chapterId] = html;
+      }
+      _appendSvgHotspots(path, hotspots);
+    }
+    _parseAuxiliary();
+    final orderedPresentations = <String, String>{};
+    for (final entry in chapterPaths.entries) {
+      if (_fixedChapters.contains(entry.key)) continue;
+      final original = byPath[entry.value];
+      if (presentations[original?.key.chapterId] case final html?) {
+        orderedPresentations[entry.key.chapterId] = html;
+      }
+    }
+    presentations
+      ..clear()
+      ..addAll(orderedPresentations);
+    if (presentations.values.fold<int>(0, (sum, html) => sum + html.length) >
+        16 * 1024 * 1024) {
+      zipLimit();
+    }
+    return (
+      LocalBookContent(
+        detail: native.detail,
+        catalog: native.catalog,
+        chapters: native.chapters,
+        auxiliaryChapters: auxiliary,
+        links: _resolveLinks(),
+        navigation: native.navigation,
+        readingOrder: native.readingOrder,
+      ),
+      presentations,
+    );
+  }
+
+  String? _renderPresentation(
+    dom.Document doc,
+    String path,
+    List<EpubSvgHotspot> hotspots,
+    Map<dom.Element, int> ids,
+  ) => epubPresentation(
+    doc,
+    path,
+    (p) => zip.entries.containsKey(p) ? text(p, css: true) : '',
+    (p) => zip.entries.containsKey(p)
+        ? zip.read(p, limit: 8 * 1024 * 1024)
+        : Uint8List(0),
+    (base, href) => epubReference(base, href)?.$1,
+    resolveStyle: optionalEpubStyleReference,
+    onSvgHotspot: hotspots.add,
+    linkId: (node) => epubNoteref(node) ? null : ids[node],
+  );
+
+  Set<String> get _manifestText => items.values
+      .where(
+        (i) =>
+            i.path != null &&
+            {'application/xhtml+xml', 'text/html'}.contains(i.type),
+      )
+      .map((i) => i.path!)
+      .toSet();
+
+  void _parseAuxiliary() {
+    final manifestText = _manifestText;
+    for (var i = 0; i < requestedPaths.length; i++) {
+      final path = requestedPaths[i];
+      if (byPath.containsKey(path) ||
+          skippedEmptyPaths.contains(path) ||
+          !_auxiliaryAttempted.add(path) ||
+          !manifestText.contains(path) ||
+          !zip.entries.containsKey(path)) {
+        continue;
+      }
+      if (++_auxiliaryAttempts > 64) zipLimit();
+      final before = chapters.length;
+      try {
+        _chapter(path);
+      } on LocalParseException catch (error) {
+        if (error.problem != LocalParseProblem.invalid) rethrow;
+        _diagnostics.add(EpubDiagnosticCode.unusableLinkTarget);
+      }
+      if (chapters.length > before) auxiliary.add(chapters.removeLast());
+    }
+  }
+
+  List<LocalContentLink> _resolveLinks() {
+    final manifestText = _manifestText;
+    final links = <LocalContentLink>[];
+    for (final source in [...chapters, ...auxiliary]) {
+      if (_fixedChapters.contains(source.key)) continue;
+      final path = chapterPaths[source.key]!;
+      for (final note
+          in _footnotes[path] ??
+              <(int, String, String?, LocalLinkUnavailable?)>[]) {
+        if (note.$1 >= source.blocks.length) continue;
+        final sourceBlock = source.blocks[note.$1];
+        final text = switch (sourceBlock) {
+          ParagraphBlock(:final text) || HeadingBlock(:final text) => text,
+          _ => '',
+        };
+        final offset = text.indexOf(note.$2);
+        if (offset < 0) continue;
+        links.add(
+          LocalContentLink(
+            source: source.key,
+            sourceBlockKey: sourceBlock.blockKey,
+            label: note.$2,
+            sourceOffset: text.substring(0, offset).runes.length,
+            footnoteText: note.$3,
+            target: note.$4 == null ? source.key : null,
+            unavailable: note.$4,
+          ),
+        );
+        if (links.length > 10000) zipLimit();
+      }
+      var rawIndex = -1;
+      for (final raw
+          in rawLinks[path] ??
+              <
+                (
+                  int,
+                  String,
+                  String?,
+                  String?,
+                  LocalLinkUnavailable?,
+                  int?,
+                  int?,
+                )
+              >[]) {
+        rawIndex++;
+        if (raw.$1 >= source.blocks.length) continue;
+        var unavailable = raw.$5;
+        final destination = raw.$3 == path ? source : byPath[raw.$3];
+        (String, int)? anchor;
+        if (unavailable == null) {
+          if (destination == null) {
+            unavailable = manifestText.contains(raw.$3)
+                ? LocalLinkUnavailable.missingDocument
+                : LocalLinkUnavailable.unsupported;
+          } else if (raw.$4?.isNotEmpty == true) {
+            anchor = fragments[raw.$3]?[raw.$4];
+            if (anchor == null) {
+              unavailable = LocalLinkUnavailable.missingAnchor;
+            }
+          }
+        }
+        if (unavailable != null) {
+          _diagnostics.add(EpubDiagnosticCode.unusableLinkTarget);
+        }
+        links.add(
+          LocalContentLink(
+            source: source.key,
+            sourceBlockKey: source.blocks[raw.$1].blockKey,
+            label: raw.$2,
+            region: _linkRegions[path]?[rawIndex],
+            presentationId: _presentationLinkIds[path]?[rawIndex],
+            sourceOffset: raw.$6,
+            sourceLength: raw.$7,
+            target: unavailable == null ? destination?.key : null,
+            targetBlockKey: unavailable == null ? anchor?.$1 : null,
+            targetOffset: unavailable == null ? anchor?.$2 : null,
+            unavailable: unavailable,
+          ),
+        );
+        if (links.length > 10000) zipLimit();
+      }
+    }
+    return links;
+  }
+
+  void _appendSvgHotspots(String path, List<EpubSvgHotspot> svgHotspots) {
+    for (final hotspot in svgHotspots) {
+      if (++linkCount > 10000) zipLimit();
+      (String, String?)? ref;
+      LocalLinkUnavailable? unavailable;
+      try {
+        ref = epubReference(path, hotspot.href);
+        if (ref == null) unavailable = LocalLinkUnavailable.external;
+      } on FormatException {
+        unavailable = LocalLinkUnavailable.unsupported;
+      }
+      final records = rawLinks[path] ??= [];
+      (_linkRegions[path] ??= {})[records.length] = hotspot.region;
+      records.add((
+        0,
+        hotspot.label,
+        ref?.$1,
+        ref?.$2,
+        unavailable,
+        null,
+        null,
+      ));
+      if (ref != null) requestedPaths.add(ref.$1);
+    }
   }
 
   dom.Document _html(String path) {
@@ -1084,19 +1191,9 @@ class EpubParser {
     }
 
     final presentation =
-        includePresentations && !hasNativeAudio(doc.body ?? doc.documentElement)
-        ? epubPresentation(
-            doc,
-            path,
-            (p) => zip.entries.containsKey(p) ? text(p, css: true) : '',
-            (p) => zip.entries.containsKey(p)
-                ? zip.read(p, limit: 8 * 1024 * 1024)
-                : Uint8List(0),
-            (base, href) => epubReference(base, href)?.$1,
-            resolveStyle: optionalEpubStyleReference,
-            onSvgHotspot: svgHotspots.add,
-            linkId: (node) => epubNoteref(node) ? null : anchorIds[node],
-          )
+        (includePresentations || _renderingForImport) &&
+            !hasNativeAudio(doc.body ?? doc.documentElement)
+        ? _renderPresentation(doc, path, svgHotspots, anchorIds)
         : null;
     if (presentation != null) {
       presentations[LocalBookIdentity.chapter(book, 'epub:$path').chapterId] =
@@ -2103,29 +2200,13 @@ class EpubParser {
           : filenameTitle(path),
       blocks: blocks,
     );
-    for (final hotspot in svgHotspots) {
-      if (++linkCount > 10000) zipLimit();
-      (String, String?)? ref;
-      LocalLinkUnavailable? unavailable;
-      try {
-        ref = epubReference(path, hotspot.href);
-        if (ref == null) unavailable = LocalLinkUnavailable.external;
-      } on FormatException {
-        unavailable = LocalLinkUnavailable.unsupported;
-      }
-      final records = rawLinks[path] ??= [];
-      (_linkRegions[path] ??= {})[records.length] = hotspot.region;
-      records.add((
-        0,
-        hotspot.label,
-        ref?.$1,
-        ref?.$2,
-        unavailable,
-        null,
-        null,
-      ));
-      if (ref != null) requestedPaths.add(ref.$1);
+    if (_retainPresentationInputs &&
+        !_renderingForImport &&
+        doc.body!.text.length <= 2000 &&
+        !hasNativeAudio(doc.body)) {
+      _presentationInputs[path] = doc;
     }
+    _appendSvgHotspots(path, svgHotspots);
     chapters.add(chapter);
     chapterPaths[chapter.key] = path;
     byPath[path] = chapter;

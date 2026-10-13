@@ -10,6 +10,11 @@ import 'parser_worker.dart';
 import 'txt/txt_decoder.dart';
 import 'txt/txt_parser.dart';
 
+/// Optional data-layer handoff owned by this import, never retained by a decoder.
+abstract interface class EpubPresentationSession {
+  void acceptPresentations((LocalBookContent, Map<String, String>)? value);
+}
+
 /// Stateless production decoder; sessions remain on the storage-owning isolate.
 class BookDecoder implements LocalBookDecoder {
   const BookDecoder({this.epubDiagnostics});
@@ -58,7 +63,13 @@ class BookDecoder implements LocalBookDecoder {
       checkLocalCancellation(cancellation);
       return _txt(bytes, key, filename, chosen, cancellation);
     }
-    final parsed = await _epub(bytes, key, filename, cancellation);
+    final (parsed, parser) = await _epub(
+      bytes,
+      key,
+      filename,
+      cancellation,
+      session is EpubPresentationSession,
+    );
     for (final entry in parsed.media.entries) {
       checkLocalCancellation(cancellation);
       final ref = await session.writeMedia(Stream.value(entry.value));
@@ -67,6 +78,26 @@ class BookDecoder implements LocalBookDecoder {
       }
     }
     checkLocalCancellation(cancellation);
+    if (session is EpubPresentationSession) {
+      (LocalBookContent, Map<String, String>)? presentations = (
+        parsed.content,
+        {},
+      );
+      if (parser != null) {
+        try {
+          presentations = await _renderEpub(
+            parser,
+            parsed.content,
+            cancellation,
+          );
+        } on LocalParseException {
+          // Optional renditions cannot discard successfully parsed native content.
+          presentations = null;
+        }
+      }
+      checkLocalCancellation(cancellation);
+      (session as EpubPresentationSession).acceptPresentations(presentations);
+    }
     epubDiagnostics?.record(parsed.diagnostics);
     return parsed.content;
   }
@@ -86,9 +117,23 @@ Future<LocalBookContent> _txt(
   TxtEncoding e,
   CancellationToken t,
 ) => runParserWorker(() => parseTxt(b, k, f, e), t);
-Future<ParsedEpub> _epub(
+Future<(ParsedEpub, EpubParser?)> _epub(
   Uint8List b,
   NovelKey k,
   String f,
   CancellationToken t,
-) => runParserWorker(() => EpubParser(b, k, f).parse(), t);
+  bool retainPresentations,
+) => runParserWorker(() {
+  final parser = EpubParser(b, k, f);
+  final parsed = parser.parse(retainPresentationInputs: retainPresentations);
+  return (
+    parsed,
+    retainPresentations && parser.hasPresentationInputs ? parser : null,
+  );
+}, t);
+
+Future<(LocalBookContent, Map<String, String>)> _renderEpub(
+  EpubParser parser,
+  LocalBookContent native,
+  CancellationToken token,
+) => runParserWorker(() => parser.renderForImport(native), token);
