@@ -36,7 +36,7 @@ void main() {
           "INSERT INTO bookshelf VALUES('s','n','keep',1,2)",
         );
         await db.users.customStatement(
-          "INSERT INTO progress_sessions VALUES('s','n',4,7)",
+          "INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES('s','n',4,7)",
         );
         await db.users.customStatement(
           'INSERT INTO prefetch_settings VALUES(1,1,0)',

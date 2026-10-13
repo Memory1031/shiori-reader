@@ -156,7 +156,7 @@ void main() {
           final failedReading = LocalReadingRepository(
             local: _UnusedLocalStore(),
             online: _CatalogOnline()..observation = newer,
-            resolveOnlineCatalog: repo.resolveCatalog,
+            bindOnlineCatalog: repo.bindCatalog,
           );
           final failedLoad = await failedReading.loadCatalog(
             key,
@@ -184,9 +184,12 @@ void main() {
         final reading = LocalReadingRepository(
           local: _UnusedLocalStore(),
           online: online,
-          resolveOnlineCatalog: (key, result) async {
-            if (result case Success(:final value)) observed.add(value);
-            return repo.resolveCatalog(key, result);
+          bindOnlineCatalog: (key, token) async {
+            final resolve = await repo.bindCatalog(key, token);
+            return (result) {
+              if (result case Success(:final value)) observed.add(value);
+              return resolve(result);
+            };
           },
         );
         await reading.loadCatalog(

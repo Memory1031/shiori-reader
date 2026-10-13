@@ -41,7 +41,7 @@ Future<void> main() async {
             "INSERT INTO bookshelf VALUES('fixture','book','retained',123,456)",
           );
           raw.execute(
-            "INSERT INTO progress_sessions VALUES('fixture','book',3,8)",
+            "INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES('fixture','book',3,8)",
           );
         } else {
           raw.execute(
@@ -55,7 +55,7 @@ Future<void> main() async {
           ? UserDatabase(NativeDatabase.createInBackground(file))
           : CacheDatabase(NativeDatabase.createInBackground(file));
       try {
-        final expected = entry.key.startsWith('user') ? 3 : 2;
+        final expected = entry.key.startsWith('user') ? 8 : 2;
         final version =
             (await db.customSelect('PRAGMA user_version').getSingle())
                 .data
@@ -78,7 +78,7 @@ Future<void> main() async {
       }
       final reopened = sql.sqlite3.open(file.path);
       try {
-        if (reopened.userVersion != (entry.key.startsWith('user') ? 3 : 2)) {
+        if (reopened.userVersion != (entry.key.startsWith('user') ? 8 : 2)) {
           throw StateError('reopen');
         }
       } finally {

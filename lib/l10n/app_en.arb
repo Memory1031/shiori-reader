@@ -53,6 +53,12 @@
   "homeContinueAction": "Resume",
   "detailAddShelf": "Add to bookshelf",
   "detailRemoveShelf": "Remove from bookshelf",
+  "shelfDelete": "Delete",
+  "onlineRemoveConfirm": "Remove",
+  "localDeleteBook": "Delete local book",
+  "onlineRemoveMessage": "Remove this book from the shelf and clear its cache and reading progress. Reading it again will start from the beginning.",
+  "onlineBookRemoved": "This book was removed from the shelf. Its cache and reading progress were cleared.",
+  "bookDeleteAndRemove": "Delete / remove",
   "detailActionsPending": "Unavailable reading and bookshelf actions are still in development.",
   "detailSynopsis": "Synopsis",
   "detailOnShelf": "In bookshelf",
@@ -673,7 +679,7 @@
   "bookSelectAll": "Select all",
   "bookDeselectAll": "Deselect all",
   "bookRemoveSelected": "Remove",
-  "bookDeleteSelected": "Delete",
+  "bookDeleteSelected": "Delete selected",
   "bookReparseSelected": "Reparse ({count})",
   "@bookReparseSelected": {
     "placeholders": {
@@ -710,7 +716,7 @@
       }
     }
   },
-  "bookBatchOnline": "{count} online books: clear their cache and remove them from the shelf. Reading history is kept.",
+  "bookBatchOnline": "{count} online books: remove them from the shelf and clear their cache and reading progress. Reading them again will start from the beginning.",
   "@bookBatchOnline": {
     "placeholders": {
       "count": {

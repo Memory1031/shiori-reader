@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
@@ -18,17 +19,19 @@ class LocalReadingRepository
   LocalReadingRepository({
     required this.local,
     required this.online,
-    this.resolveOnlineCatalog,
+    this.bindOnlineCatalog,
   });
-  final Future<Result<LoadResult<Catalog>>> Function(
-    NovelKey,
-    Result<LoadResult<Catalog>>,
-  )?
-  resolveOnlineCatalog;
+  final Future<
+    Future<Result<LoadResult<Catalog>>> Function(Result<LoadResult<Catalog>>)
+  >
+  Function(NovelKey, CancellationToken)?
+  bindOnlineCatalog;
   Future<Result<LoadResult<Catalog>>> _observeCatalog(
     NovelKey key,
     Result<LoadResult<Catalog>> result, {
     CancellationToken? cancellation,
+    Future<Result<LoadResult<Catalog>>> Function(Result<LoadResult<Catalog>>)?
+    resolve,
   }) async {
     if (cancellation?.isCancelled == true) {
       return Failure(AppFailure.cancelled(Operation.catalog));
@@ -36,9 +39,8 @@ class LocalReadingRepository
     if (result case Failure(:final failure) when failure.isCancellation) {
       return result;
     }
-    final resolve = resolveOnlineCatalog;
     if (resolve == null) return result;
-    final resolved = await resolve(key, result);
+    final resolved = await resolve(result);
     if (cancellation?.isCancelled == true) {
       return Failure(AppFailure.cancelled(Operation.catalog));
     }
@@ -165,14 +167,31 @@ class LocalReadingRepository
     NovelKey key, {
     required ReadMode mode,
     required CancellationToken cancellation,
-  }) => _local(key)
-      ? _read(key, Operation.catalog, cancellation, (r) => r.content.catalog)
-      : online
-            .loadCatalog(key, mode: mode, cancellation: cancellation)
-            .then(
-              (result) =>
-                  _observeCatalog(key, result, cancellation: cancellation),
-            );
+  }) async {
+    if (_local(key)) {
+      return _read(
+        key,
+        Operation.catalog,
+        cancellation,
+        (r) => r.content.catalog,
+      );
+    }
+    final resolve = await bindOnlineCatalog?.call(key, cancellation);
+    if (cancellation.isCancelled) {
+      return Failure(AppFailure.cancelled(Operation.catalog));
+    }
+    return online
+        .loadCatalog(key, mode: mode, cancellation: cancellation)
+        .then(
+          (result) => _observeCatalog(
+            key,
+            result,
+            cancellation: cancellation,
+            resolve: resolve,
+          ),
+        );
+  }
+
   @override
   Future<Result<LoadResult<ChapterContent>>> loadChapter(
     ChapterKey key, {
@@ -295,9 +314,25 @@ class LocalReadingRepository
                 cancellation: CancellationSource().token,
               ),
             )
-      : online
-            .catalogUpdates(key)
-            .asyncMap((result) => _observeCatalog(key, result));
+      : Stream.multi((sink) {
+          final request = CancellationSource();
+          final resolution = bindOnlineCatalog?.call(key, request.token);
+          final subscription = online
+              .catalogUpdates(key)
+              .asyncMap(
+                (result) async => _observeCatalog(
+                  key,
+                  result,
+                  cancellation: request.token,
+                  resolve: await resolution,
+                ),
+              )
+              .listen(sink.add, onError: sink.addError, onDone: sink.close);
+          sink.onCancel = () {
+            request.cancel();
+            return subscription.cancel();
+          };
+        });
   @override
   Stream<Result<LoadResult<ChapterContent>>> chapterUpdates(ChapterKey key) =>
       _local(key.novelKey)

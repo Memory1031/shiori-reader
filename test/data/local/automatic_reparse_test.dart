@@ -105,6 +105,7 @@ class FlushLibrary extends LocalLibraryRepository {
     ReadingProgress progress, {
     required ProgressWriteStamp stamp,
     required CancellationToken cancellation,
+    LoadResult<Catalog>? catalog,
   }) async {
     if (!entered.isCompleted) entered.complete();
     await finish.future;
@@ -112,6 +113,7 @@ class FlushLibrary extends LocalLibraryRepository {
       progress,
       stamp: stamp,
       cancellation: cancellation,
+      catalog: catalog,
     );
   }
 }

@@ -111,6 +111,7 @@ class SavingLibrary extends ObservedLibrary {
     ReadingProgress progress, {
     required ProgressWriteStamp stamp,
     required CancellationToken cancellation,
+    LoadResult<Catalog>? catalog,
   }) async {
     saveCalls++;
     if (save case final held?) {
@@ -121,6 +122,7 @@ class SavingLibrary extends ObservedLibrary {
       progress,
       stamp: stamp,
       cancellation: cancellation,
+      catalog: catalog,
     );
   }
 }

@@ -93,13 +93,23 @@ void main() {
       final library = LocalLibraryRepository(db);
       final source = _MissingCatalogSource()..count = 3;
       final catalog = source.catalog;
+      await library.putBookshelf(
+        BookshelfEntry(
+          snapshot: NovelSummary(key: catalog.novelKey, title: 'Owned book'),
+          addedAt: DateTime.utc(2026),
+        ),
+        cancellation: CancellationSource().token,
+      );
       var resolutions = 0;
       final repository = LocalReadingRepository(
         local: _UnusedLocalStore(),
         online: source,
-        resolveOnlineCatalog: (key, result) {
-          resolutions++;
-          return library.resolveCatalog(key, result);
+        bindOnlineCatalog: (key, token) async {
+          final resolve = await library.bindCatalog(key, token);
+          return (result) {
+            resolutions++;
+            return resolve(result);
+          };
         },
       );
       final failures = [
@@ -287,7 +297,7 @@ void main() {
         final repository = LocalReadingRepository(
           local: _UnusedLocalStore(),
           online: source,
-          resolveOnlineCatalog: library.resolveCatalog,
+          bindOnlineCatalog: library.bindCatalog,
         );
         await tester.pumpWidget(
           ShioriApp(

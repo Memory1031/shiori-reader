@@ -380,6 +380,42 @@ abstract class AppLocalizations {
   /// **'Remove from bookshelf'**
   String get detailRemoveShelf;
 
+  /// No description provided for @shelfDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get shelfDelete;
+
+  /// No description provided for @onlineRemoveConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get onlineRemoveConfirm;
+
+  /// No description provided for @localDeleteBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete local book'**
+  String get localDeleteBook;
+
+  /// No description provided for @onlineRemoveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this book from the shelf and clear its cache and reading progress. Reading it again will start from the beginning.'**
+  String get onlineRemoveMessage;
+
+  /// No description provided for @onlineBookRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'This book was removed from the shelf. Its cache and reading progress were cleared.'**
+  String get onlineBookRemoved;
+
+  /// No description provided for @bookDeleteAndRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete / remove'**
+  String get bookDeleteAndRemove;
+
   /// No description provided for @detailActionsPending.
   ///
   /// In en, this message translates to:
@@ -2489,7 +2525,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookDeleteSelected.
   ///
   /// In en, this message translates to:
-  /// **'Delete'**
+  /// **'Delete selected'**
   String get bookDeleteSelected;
 
   /// No description provided for @bookReparseSelected.
@@ -2555,7 +2591,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookBatchOnline.
   ///
   /// In en, this message translates to:
-  /// **'{count} online books: clear their cache and remove them from the shelf. Reading history is kept.'**
+  /// **'{count} online books: remove them from the shelf and clear their cache and reading progress. Reading them again will start from the beginning.'**
   String bookBatchOnline(int count);
 
   /// No description provided for @bookBatchLocal.

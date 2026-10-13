@@ -8,6 +8,7 @@ CREATE TABLE progress_sessions (
  source_id TEXT NOT NULL, novel_id TEXT NOT NULL,
  generation INTEGER NOT NULL CHECK(generation >= 1),
  sequence INTEGER NOT NULL DEFAULT -1 CHECK(sequence >= -1),
+ removal_generation INTEGER NOT NULL DEFAULT 0 CHECK(removal_generation >= 0),
  PRIMARY KEY(source_id, novel_id)
 );
 CREATE TABLE reading_progress (

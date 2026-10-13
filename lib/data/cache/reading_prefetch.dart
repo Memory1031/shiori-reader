@@ -19,6 +19,12 @@ class LocalReadingPrefetch implements ReadingPrefetch {
          maxAttempts: coordinator.policy.backgroundAttempts,
        ) {
     _clears = coordinator.clears.listen((_) => pause());
+    _removals = users.removedBooks.listen((key) {
+      final current = _content?.key.novelKey;
+      if (current?.sourceId.value == key.$1 && current?.novelId == key.$2) {
+        leave();
+      }
+    });
   }
   final UserDatabase users;
   final NovelRepository novels;
@@ -27,6 +33,7 @@ class LocalReadingPrefetch implements ReadingPrefetch {
   final BackgroundBudget budget;
   final _events = StreamController<PrefetchState>.broadcast();
   late final StreamSubscription<void> _clears;
+  late final StreamSubscription<(String, String)> _removals;
   PrefetchState _state = const PrefetchState();
   @override
   PrefetchState get state => _state;
@@ -36,6 +43,14 @@ class LocalReadingPrefetch implements ReadingPrefetch {
   Catalog? _catalog;
   ChapterKey? _target;
   int _epoch = 0, _block = 0, _failures = 0;
+  int? _bookEpoch;
+  Future<bool> _bookCurrent() async {
+    final key = _content?.key.novelKey;
+    return key != null &&
+        _bookEpoch ==
+            await users.removalGeneration(key.sourceId.value, key.novelId);
+  }
+
   bool _currentEnabled = true,
       _nextEnabled = true,
       _paused = false,
@@ -72,7 +87,23 @@ class LocalReadingPrefetch implements ReadingPrefetch {
   @override
   Future<void> enter(ChapterContent content, Catalog? catalog) async {
     if (_closed) return;
-    if (_content?.key == content.key &&
+    final requestEpoch = _epoch;
+    final int bookGeneration;
+    try {
+      bookGeneration = await users.removalGeneration(
+        content.key.novelKey.sourceId.value,
+        content.key.novelKey.novelId,
+      );
+    } catch (_) {
+      if (!_closed && requestEpoch == _epoch) {
+        _failures++;
+        _emit(PrefetchPhase.partial);
+      }
+      return;
+    }
+    if (_closed || requestEpoch != _epoch) return;
+    if (_bookEpoch == bookGeneration &&
+        _content?.key == content.key &&
         _content?.contentRevision == content.contentRevision) {
       _catalog = catalog;
       if (_target != null && catalog != null && !_valid(_target!)) {
@@ -84,6 +115,7 @@ class LocalReadingPrefetch implements ReadingPrefetch {
     _cancel?.cancel();
     final epoch = ++_epoch;
     _content = content;
+    _bookEpoch = bookGeneration;
     _catalog = catalog;
     _next = null;
     _target = null;
@@ -99,7 +131,7 @@ class LocalReadingPrefetch implements ReadingPrefetch {
             variables: _identity(content.key),
           )
           .getSingleOrNull();
-      if (_closed || epoch != _epoch) return;
+      if (_closed || epoch != _epoch || !(await _bookCurrent())) return;
       _currentEnabled = settings?.read<int>('current_enabled') != 0;
       _nextEnabled = settings?.read<int>('next_enabled') != 0;
       if (choice != null) {
@@ -147,16 +179,39 @@ class LocalReadingPrefetch implements ReadingPrefetch {
     }
     final epoch = _epoch;
     try {
-      await users.customStatement(
-        target == null
-            ? 'DELETE FROM prefetch_choices WHERE source_id=? AND novel_id=? AND chapter_id=?'
-            : 'INSERT INTO prefetch_choices VALUES(?,?,?,?) ON CONFLICT(source_id,novel_id,chapter_id) DO UPDATE SET target_id=excluded.target_id',
-        [
-          ...content.key.novelKey.identityFields,
-          content.key.chapterId,
-          if (target != null) target.chapterId,
-        ],
-      );
+      await users.transaction(() async {
+        if (_closed || epoch != _epoch || !(await _bookCurrent())) {
+          throw StateError('Retired prefetch');
+        }
+        final identity = [
+          Variable(content.key.novelKey.sourceId.value),
+          Variable(content.key.novelKey.novelId),
+        ];
+        if (target == null) {
+          await users.customUpdate(
+            'DELETE FROM prefetch_choices WHERE source_id=? AND novel_id=? AND chapter_id=?',
+            variables: _identity(content.key),
+            updates: {users.prefetchChoices},
+          );
+        } else {
+          await users.customUpdate(
+            'INSERT INTO prefetch_choices(source_id,novel_id,chapter_id,target_id) '
+            'SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM bookshelf WHERE source_id=? AND novel_id=?) '
+            'OR EXISTS(SELECT 1 FROM reading_progress WHERE source_id=? AND novel_id=?) '
+            'ON CONFLICT(source_id,novel_id,chapter_id) DO UPDATE SET target_id=excluded.target_id',
+            variables: [
+              ..._identity(content.key),
+              Variable(target.chapterId),
+              ...identity,
+              ...identity,
+            ],
+            updates: {users.prefetchChoices},
+          );
+        }
+        if (!(await _bookCurrent()) || epoch != _epoch || _closed) {
+          throw StateError('Retired prefetch');
+        }
+      });
       if (epoch == _epoch && !_closed) {
         _cancel?.cancel();
         _target = target;
@@ -364,6 +419,7 @@ class LocalReadingPrefetch implements ReadingPrefetch {
     await _running;
     _releaseFar(all: true);
     await _clears.cancel();
+    await _removals.cancel();
     await _events.close();
   }
 }

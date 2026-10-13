@@ -104,6 +104,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   late ReaderController _reader;
   final _viewports = <ReaderController, PagedReaderController>{};
   StreamSubscription<NovelKey>? _invalidation;
+  StreamSubscription<NovelKey>? _removal;
+  bool _onlineRemoved = false;
   bool _invalidated = false;
   ReaderController? _pending;
   _ChapterOperation? _operation;
@@ -563,17 +565,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     );
     _routeOpening = _openBook();
     if (widget.repository case LocalBookInvalidation changes) {
-      _invalidation = changes.invalidations.listen((key) {
-        if (!mounted || key != widget.chapter.novelKey || _invalidated) return;
-        _completionTurn?.invalidate();
-        _cancelChapter(immediate: true);
-        _reader.onDelete();
-        _pending?.onDelete();
-        // The failure page's contents would outlive the page behind it.
-        _contentsPanel?.dismiss();
-        _contentsPanel = null;
-        setState(() => _invalidated = true);
-      });
+      _invalidation = changes.invalidations.listen(
+        (key) => _invalidateBook(key),
+      );
+    }
+    if (widget.library case LibraryBookRemoval lifecycle) {
+      _removal = lifecycle.removedBooks.listen(
+        (key) => _invalidateBook(key, removed: true),
+      );
     }
     if (widget.chapterFallback) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -586,6 +585,23 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         }
       });
     }
+  }
+
+  void _invalidateBook(NovelKey key, {bool removed = false}) {
+    if (!mounted || key != widget.chapter.novelKey || _invalidated) return;
+    _completionTurn?.invalidate();
+    _cancelChapter(immediate: true);
+    _reader.onDelete();
+    _pending?.onDelete();
+    _contentsPanel?.dismiss();
+    _contentsPanel = null;
+    if (removed) {
+      _catalog.onDelete();
+    }
+    setState(() {
+      _invalidated = true;
+      _onlineRemoved = removed;
+    });
   }
 
   ReaderController _create(
@@ -677,6 +693,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _contentsPanel = null;
     _restoreSystemUi();
     _invalidation?.cancel();
+    _removal?.cancel();
     _operation?.deadline?.cancel();
     _chapterTurn.dispose();
     _preferences.dispose();
@@ -1951,7 +1968,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(AppLocalizations.of(context).localReparseReaderClosed),
+            child: Text(
+              _onlineRemoved
+                  ? AppLocalizations.of(context).onlineBookRemoved
+                  : AppLocalizations.of(context).localReparseReaderClosed,
+            ),
           ),
         ),
       );

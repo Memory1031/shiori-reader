@@ -9,11 +9,47 @@ import '../local/record_codec.dart';
 import '../local/library_rows.dart';
 
 /// Borrows the single app-owned user database. All writes are transactions.
-class LocalLibraryRepository implements LibraryRepository {
+class LocalLibraryRepository implements LibraryRepository, LibraryBookRemoval {
   LocalLibraryRepository(this.db, {DateTime Function()? now})
     : now = now ?? DateTime.now;
   final UserDatabase db;
   final DateTime Function() now;
+  @override
+  Stream<NovelKey> get removedBooks => db.removedBooks.map(
+    (key) => NovelKey(sourceId: SourceId(key.$1), novelId: key.$2),
+  );
+
+  Future<
+    Future<Result<LoadResult<Catalog>>> Function(Result<LoadResult<Catalog>>)
+  >
+  bindCatalog(NovelKey key, CancellationToken cancellation) async {
+    final generation = await localRead(
+      Operation.catalog,
+      cancellation,
+      () => db.removalGeneration(key.sourceId.value, key.novelId),
+    );
+    return (Result<LoadResult<Catalog>> result) => switch (generation) {
+      Failure(:final failure) => Future<Result<LoadResult<Catalog>>>.value(
+        Failure(failure),
+      ),
+      Success(:final value) => resolveCatalog(
+        key,
+        result,
+        cancellation: cancellation,
+        removalGeneration: value,
+      ),
+    };
+  }
+
+  Future<bool> _owned(NovelKey key) async =>
+      (await db
+              .customSelect(
+                'SELECT 1 FROM bookshelf WHERE $_where UNION ALL SELECT 1 FROM reading_progress WHERE $_where LIMIT 1',
+                variables: [..._key(key), ..._key(key)],
+              )
+              .get())
+          .isNotEmpty;
+
   ReadingProgress _reconcile(
     ReadingProgress progress,
     BookProgressMetrics metrics,
@@ -55,8 +91,14 @@ class LocalLibraryRepository implements LibraryRepository {
   /// durable basis. Cancellation and non-fallback failures remain authoritative.
   Future<Result<LoadResult<Catalog>>> resolveCatalog(
     NovelKey key,
-    Result<LoadResult<Catalog>> result,
-  ) async {
+    Result<LoadResult<Catalog>> result, {
+    CancellationToken? cancellation,
+    int? removalGeneration,
+  }) async {
+    final token = cancellation ?? CancellationSource().token;
+    if (token.isCancelled) {
+      return Failure(AppFailure.cancelled(Operation.catalog));
+    }
     if (result case Success(:final value)) {
       if (value.value.novelKey != key) {
         return Failure(
@@ -67,7 +109,11 @@ class LocalLibraryRepository implements LibraryRepository {
           ),
         );
       }
-      return reconcileCatalog(value);
+      return reconcileCatalog(
+        value,
+        cancellation: token,
+        removalGeneration: removalGeneration,
+      );
     }
     final failure = (result as Failure<LoadResult<Catalog>>).failure;
     final cacheMiss =
@@ -81,11 +127,14 @@ class LocalLibraryRepository implements LibraryRepository {
         }.contains(failure.kind)) {
       return result;
     }
-    final basis = await localRead(
-      Operation.catalog,
-      CancellationSource().token,
-      () => _catalogBasis(key),
-    );
+    final basis = await localRead(Operation.catalog, token, () async {
+      if (removalGeneration != null &&
+          await db.removalGeneration(key.sourceId.value, key.novelId) !=
+              removalGeneration) {
+        throw const LocalCancelled();
+      }
+      return _catalogBasis(key);
+    });
     return switch (basis) {
       Failure(:final failure) => Failure(failure),
       Success(value: null) => result,
@@ -105,56 +154,74 @@ class LocalLibraryRepository implements LibraryRepository {
   /// The accepted basis and its derived progress commit or roll back together.
   /// It survives cache-write failure and restart; a failed observation is retryable.
   Future<Result<LoadResult<Catalog>>> reconcileCatalog(
+    LoadResult<Catalog> observation, {
+    CancellationToken? cancellation,
+    int? removalGeneration,
+  }) => localWrite(
+    db,
+    Operation.progressWrite,
+    cancellation ?? CancellationSource().token,
+    () async {
+      final key = observation.value.novelKey;
+      if (removalGeneration != null &&
+          await db.removalGeneration(key.sourceId.value, key.novelId) !=
+              removalGeneration) {
+        throw const LocalCancelled();
+      }
+      if (!await _owned(key)) return observation;
+      return _acceptCatalog(observation);
+    },
+  );
+
+  Future<LoadResult<Catalog>> _acceptCatalog(
     LoadResult<Catalog> observation,
-  ) {
+  ) async {
     final catalog = observation.value;
-    return localWrite(db, Operation.progressWrite, CancellationSource().token, () async {
-      final current = await _catalogBasis(catalog.novelKey);
-      if (!acceptsCatalogObservation(observation, current)) {
-        // This is a local read of the accepted basis, not a fresh remote fetch.
-        // Preserve refresh diagnostics without returning the rejected catalog.
-        return LoadResult(
-          value: current!.value,
-          origin: LoadOrigin.local,
-          fetchedAt: current.fetchedAt,
-          isStale: observation.isStale,
-          refreshFailure: observation.refreshFailure,
-        );
-      }
-      final row = await db
-          .customSelect(
-            'SELECT * FROM reading_progress WHERE $_where',
-            variables: _key(catalog.novelKey),
-          )
-          .getSingleOrNull();
-      final before = row == null ? null : _progress(row);
-      // Pre-migration snapshots have no fetch time. A conflicting cache cannot
-      // establish a newer basis; wait for a remote observation or matching cache.
-      if (current == null &&
-          observation.origin != LoadOrigin.remote &&
-          before?.bookProgress != null &&
-          before!.catalogRevision != catalog.revision) {
-        // The old snapshot has no catalog payload; keep reading cache content
-        // while progress writes wait for a trustworthy basis.
-        return observation;
-      }
-      await db.customUpdate(
-        'INSERT INTO progress_catalogs(source_id,novel_id,catalog_json,fetched_at,origin) VALUES(?,?,?,?,?) '
-        'ON CONFLICT(source_id,novel_id) DO UPDATE SET catalog_json=excluded.catalog_json,fetched_at=excluded.fetched_at,origin=excluded.origin',
-        variables: [
-          ..._key(catalog.novelKey),
-          Variable(RecordCodec.catalog(catalog)),
-          Variable(observation.fetchedAt.microsecondsSinceEpoch),
-          Variable(observation.origin.name),
-        ],
-        updates: {db.progressCatalogs},
+    final current = await _catalogBasis(catalog.novelKey);
+    if (!acceptsCatalogObservation(observation, current)) {
+      // This is a local read of the accepted basis, not a fresh remote fetch.
+      // Preserve refresh diagnostics without returning the rejected catalog.
+      return LoadResult(
+        value: current!.value,
+        origin: LoadOrigin.local,
+        fetchedAt: current.fetchedAt,
+        isStale: observation.isStale,
+        refreshFailure: observation.refreshFailure,
       );
-      if (before != null) {
-        final after = _reconcile(before, BookProgressMetrics.online(catalog));
-        if (before != after) await writeProgressRow(db, after, now());
-      }
+    }
+    final row = await db
+        .customSelect(
+          'SELECT * FROM reading_progress WHERE $_where',
+          variables: _key(catalog.novelKey),
+        )
+        .getSingleOrNull();
+    final before = row == null ? null : _progress(row);
+    // Pre-migration snapshots have no fetch time. A conflicting cache cannot
+    // establish a newer basis; wait for a remote observation or matching cache.
+    if (current == null &&
+        observation.origin != LoadOrigin.remote &&
+        before?.bookProgress != null &&
+        before!.catalogRevision != catalog.revision) {
+      // The old snapshot has no catalog payload; keep reading cache content
+      // while progress writes wait for a trustworthy basis.
       return observation;
-    });
+    }
+    await db.customUpdate(
+      'INSERT INTO progress_catalogs(source_id,novel_id,catalog_json,fetched_at,origin) VALUES(?,?,?,?,?) '
+      'ON CONFLICT(source_id,novel_id) DO UPDATE SET catalog_json=excluded.catalog_json,fetched_at=excluded.fetched_at,origin=excluded.origin',
+      variables: [
+        ..._key(catalog.novelKey),
+        Variable(RecordCodec.catalog(catalog)),
+        Variable(observation.fetchedAt.microsecondsSinceEpoch),
+        Variable(observation.origin.name),
+      ],
+      updates: {db.progressCatalogs},
+    );
+    if (before != null) {
+      final after = _reconcile(before, BookProgressMetrics.online(catalog));
+      if (before != after) await writeProgressRow(db, after, now());
+    }
+    return observation;
   }
 
   List<Variable> _key(NovelKey key) => [
@@ -276,6 +343,58 @@ class LocalLibraryRepository implements LibraryRepository {
     return removed;
   });
   @override
+  Future<Result<BookshelfEntry?>> removeOnlineBook(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  }) async {
+    if (key.sourceId == LocalBookIdentity.sourceId) {
+      return Failure(
+        AppFailure(
+          kind: FailureKind.unsupported,
+          operation: Operation.libraryWrite,
+        ),
+      );
+    }
+    final result = await localWrite(
+      db,
+      Operation.libraryWrite,
+      cancellation,
+      () async {
+        final row = await db
+            .customSelect(
+              'SELECT * FROM bookshelf WHERE $_where',
+              variables: _key(key),
+            )
+            .getSingleOrNull();
+        final removed = row == null ? null : _book(row);
+        await _advance(key);
+        await db.customUpdate(
+          'UPDATE progress_sessions SET removal_generation=removal_generation+1 WHERE $_where',
+          variables: _key(key),
+          updates: {db.progressSessions},
+        );
+        for (final table in <TableInfo>[
+          db.bookshelf,
+          db.readingProgress,
+          db.progressCatalogs,
+          db.prefetchChoices,
+        ]) {
+          await db.customUpdate(
+            'DELETE FROM ${table.actualTableName} WHERE $_where',
+            variables: _key(key),
+            updates: {table},
+          );
+        }
+        return removed;
+      },
+    );
+    if (result is Success<BookshelfEntry?>) {
+      db.notifyRemoved(key.sourceId.value, key.novelId);
+    }
+    return result;
+  }
+
+  @override
   Future<Result<ReadingProgress?>> getProgress(
     NovelKey key, {
     required CancellationToken cancellation,
@@ -328,6 +447,7 @@ class LocalLibraryRepository implements LibraryRepository {
     ReadingProgress progress, {
     required ProgressWriteStamp stamp,
     required CancellationToken cancellation,
+    LoadResult<Catalog>? catalog,
   }) => localWrite(db, Operation.progressWrite, cancellation, () async {
     final key = progress.novelKey;
     if (!await _available(key)) return false;
@@ -363,6 +483,25 @@ class LocalLibraryRepository implements LibraryRepository {
         session.read<int>('generation') != stamp.generation ||
         stamp.sequence <= session.read<int>('sequence')) {
       return false;
+    }
+    if (key.sourceId != LocalBookIdentity.sourceId) {
+      final time = now().millisecondsSinceEpoch;
+      await db.customUpdate(
+        'INSERT INTO bookshelf(source_id,novel_id,summary_json,added_at,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(source_id,novel_id) DO NOTHING',
+        variables: [
+          ..._key(key),
+          Variable(RecordCodec.summary(progress.snapshot)),
+          Variable(time),
+          Variable(time),
+        ],
+        updates: {db.bookshelf},
+      );
+      if (catalog != null) {
+        if (catalog.value.novelKey != key) {
+          throw const FormatException('Catalog identity mismatch');
+        }
+        await _acceptCatalog(catalog);
+      }
     }
     final basis = key.sourceId == LocalBookIdentity.sourceId
         ? null

@@ -159,6 +159,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get detailRemoveShelf => 'Remove from bookshelf';
 
   @override
+  String get shelfDelete => 'Delete';
+
+  @override
+  String get onlineRemoveConfirm => 'Remove';
+
+  @override
+  String get localDeleteBook => 'Delete local book';
+
+  @override
+  String get onlineRemoveMessage =>
+      'Remove this book from the shelf and clear its cache and reading progress. Reading it again will start from the beginning.';
+
+  @override
+  String get onlineBookRemoved =>
+      'This book was removed from the shelf. Its cache and reading progress were cleared.';
+
+  @override
+  String get bookDeleteAndRemove => 'Delete / remove';
+
+  @override
   String get detailActionsPending =>
       'Unavailable reading and bookshelf actions are still in development.';
 
@@ -1407,7 +1427,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookRemoveSelected => 'Remove';
 
   @override
-  String get bookDeleteSelected => 'Delete';
+  String get bookDeleteSelected => 'Delete selected';
 
   @override
   String bookReparseSelected(int count) {
@@ -1458,7 +1478,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String bookBatchOnline(int count) {
-    return '$count online books: clear their cache and remove them from the shelf. Reading history is kept.';
+    return '$count online books: remove them from the shelf and clear their cache and reading progress. Reading them again will start from the beginning.';
   }
 
   @override

@@ -29,8 +29,9 @@ class ReaderController extends ScopedController {
     bool deferProgress = false,
   }) : _progressActive = !deferProgress;
   bool _progressActive;
+  bool _bookRemoved = false;
   void activateProgress() {
-    if (isClosed || _progressActive) return;
+    if (isClosed || _bookRemoved || _progressActive) return;
     _progressActive = true;
     if (_sample case final sample?) onPosition?.call(sample.$1.blockIndex);
     unawaited(_openProgress());
@@ -64,7 +65,11 @@ class ReaderController extends ScopedController {
     }
     _catalogObservation = observation;
     bookMetrics = BookProgressMetrics.online(observation.value);
-    progress?.updateMetrics(bookMetrics!, catalogOrdinal: _catalogOrdinal);
+    progress?.updateMetrics(
+      bookMetrics!,
+      catalogOrdinal: _catalogOrdinal,
+      catalog: observation,
+    );
   }
 
   int? get _catalogOrdinal => _catalogObservation?.value.flatChapters
@@ -130,7 +135,7 @@ class ReaderController extends ScopedController {
   }
 
   Future<bool> saveForExit() async {
-    if (!_progressActive) return true;
+    if (_bookRemoved || !_progressActive) return true;
     await _progressOpening;
     // Reflow may be pending; the queued sample is still the last stable anchor.
     progress?.restoring(false);
@@ -156,7 +161,8 @@ class ReaderController extends ScopedController {
   Future<void> _openProgress() => _progressOpening ??= _doOpenProgress()
       .whenComplete(() => _progressOpening = null);
   Future<void> _doOpenProgress() async {
-    if (!_progressActive ||
+    if (_bookRemoved ||
+        !_progressActive ||
         library == null ||
         content == null ||
         restoreFailure != null ||
@@ -220,6 +226,7 @@ class ReaderController extends ScopedController {
           catalogRevision:
               bookMetrics?.revision ?? catalog.value.value.revision,
           metrics: bookMetrics,
+          catalog: _catalogObservation,
           previous: startAtBeginning || initialBlockKey != null
               ? null
               : _savedProgress,
@@ -252,6 +259,7 @@ class ReaderController extends ScopedController {
         ordinal: _catalogOrdinal ?? previous.chapterOrdinalSnapshot,
         catalogRevision: bookMetrics?.revision ?? previous.catalogRevision,
         metrics: bookMetrics,
+        catalog: _catalogObservation,
         previous: startAtBeginning || initialBlockKey != null ? null : previous,
         onStatus: () {
           if (!isClosed) update();
@@ -282,6 +290,17 @@ class ReaderController extends ScopedController {
   @override
   void onInit() {
     super.onInit();
+    if (library case LibraryBookRemoval lifecycle) {
+      listenTo(lifecycle.removedBooks, (key) {
+        if (key != chapter.novelKey) return;
+        _bookRemoved = true;
+        _request?.cancel();
+        progress?.discardRemovedBook();
+        status = ReaderStatus.cancelled;
+        content = null;
+        update();
+      });
+    }
     if (library != null) {
       listenTo(repository.catalogUpdates(chapter.novelKey), (result) {
         if (result case Success<LoadResult<Catalog>>(:final value)) {
@@ -320,7 +339,7 @@ class ReaderController extends ScopedController {
   }
 
   Future<void> _load() async {
-    if (isClosed) return;
+    if (isClosed || _bookRemoved) return;
     try {
       if (chapter.novelKey.sourceId == LocalBookIdentity.sourceId &&
           repository is LocalBookUsage) {

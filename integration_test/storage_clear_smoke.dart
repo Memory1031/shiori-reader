@@ -38,7 +38,7 @@ Future<void> main() async {
       "INSERT INTO bookshelf VALUES('s','n','retained',1,2)",
     );
     await db.users.customStatement(
-      "INSERT INTO progress_sessions VALUES('s','n',4,7)",
+      "INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES('s','n',4,7)",
     );
     final original = File('${paths.localBooks.path}/sentinel/original');
     await original.parent.create(recursive: true);

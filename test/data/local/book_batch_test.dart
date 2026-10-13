@@ -209,7 +209,7 @@ void main() {
       );
       expect(
         ok(await repository.getProgress(online.key, cancellation: token())),
-        onlineHistory,
+        isNull,
       );
       expect(
         ok(await store.watchBooks().first).map((item) => item.key).toSet(),
@@ -226,7 +226,7 @@ void main() {
       repository = LocalLibraryRepository(db);
       expect(
         ok(await repository.getProgress(online.key, cancellation: token())),
-        onlineHistory,
+        isNull,
       );
       expect(
         ok(

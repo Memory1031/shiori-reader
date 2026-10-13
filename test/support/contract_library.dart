@@ -73,6 +73,20 @@ final class ContractLibrary implements LibraryRepository {
   }
 
   @override
+  Future<Result<BookshelfEntry?>> removeOnlineBook(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  }) async {
+    if (cancellation.isCancelled) return cancelled(Operation.libraryWrite);
+    final removed = _books.remove(key);
+    _progress.remove(key);
+    _generations[key] = (_generations[key] ?? 0) + 1;
+    _sequences.remove(key);
+    _changes.add(null);
+    return Success(removed);
+  }
+
+  @override
   Future<Result<ReadingProgress?>> getProgress(
     NovelKey key, {
     required CancellationToken cancellation,
@@ -96,6 +110,7 @@ final class ContractLibrary implements LibraryRepository {
     ReadingProgress progress, {
     required ProgressWriteStamp stamp,
     required CancellationToken cancellation,
+    LoadResult<Catalog>? catalog,
   }) async {
     if (cancellation.isCancelled) return cancelled(Operation.progressWrite);
     final key = progress.novelKey;
@@ -105,6 +120,15 @@ final class ContractLibrary implements LibraryRepository {
     }
     _sequences[key] = stamp.sequence;
     _progress[key] = progress;
+    if (key.sourceId != LocalBookIdentity.sourceId) {
+      _books.putIfAbsent(
+        key,
+        () => BookshelfEntry(
+          snapshot: progress.snapshot,
+          addedAt: DateTime.now(),
+        ),
+      );
+    }
     _changes.add(null);
     return const Success(true);
   }

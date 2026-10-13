@@ -131,14 +131,14 @@ void main() {
           if (grid) {
             await tester.longPress(find.byKey(ValueKey(book.key)));
             await tester.pumpAndSettle();
-            await tester.tap(find.text('Remove from bookshelf'));
+            await tester.tap(find.text('Delete local book'));
           } else {
             await tester.drag(
               find.byKey(ValueKey(book.key)),
               const Offset(-200, 0),
             );
             await tester.pumpAndSettle();
-            await tester.tap(find.text('Remove'));
+            await tester.tap(find.text('Delete'));
           }
           await tester.pumpAndSettle();
         }
@@ -347,6 +347,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Remove'));
       await tester.pumpAndSettle();
+      expect(c.books, hasLength(1));
+      await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
+      await tester.pumpAndSettle();
       expect(c.books, isEmpty);
       expect(find.text('Undo removal'), findsNothing);
       await tester.pumpWidget(const SizedBox());
@@ -522,7 +525,7 @@ void main() {
       'Start reading',
       'Novel details',
       'Reparse',
-      'Remove from bookshelf',
+      'Delete local book',
     ]) {
       expect(
         find.descendant(of: sheet, matching: find.text(label)),

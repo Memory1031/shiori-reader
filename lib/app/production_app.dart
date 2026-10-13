@@ -123,7 +123,7 @@ class _ProductionAppState extends State<ProductionApp>
       _novels = LocalReadingRepository(
         local: databases.localBooks,
         online: _services!.novels,
-        resolveOnlineCatalog: _library!.resolveCatalog,
+        bindOnlineCatalog: _library!.bindCatalog,
       );
       _images = LocalImageRepository(
         local: databases.localBooks,

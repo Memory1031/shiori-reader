@@ -600,7 +600,7 @@ void main() {
       await h.pump(local: local);
       Future<void> remove() async {
         await _rightClick(tester, tester.getCenter(find.text('Imported book')));
-        await tester.tap(find.text(h.l.detailRemoveShelf));
+        await tester.tap(find.text(h.l.localDeleteBook));
         await tester.pumpAndSettle();
         expect(find.byType(AlertDialog), findsOneWidget);
       }

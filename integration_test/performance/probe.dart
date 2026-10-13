@@ -567,11 +567,13 @@ class _Library extends LocalLibraryRepository {
     ReadingProgress progress, {
     required ProgressWriteStamp stamp,
     required CancellationToken cancellation,
+    LoadResult<Catalog>? catalog,
   }) async {
     final result = await super.saveProgress(
       progress,
       stamp: stamp,
       cancellation: cancellation,
+      catalog: catalog,
     );
     if (result is Success<bool> && result.value) writes++;
     return result;

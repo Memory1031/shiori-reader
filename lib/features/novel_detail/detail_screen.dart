@@ -81,7 +81,9 @@ class DetailScreen extends StatelessWidget {
               key: const ValueKey('detail-remove'),
               value: 'remove',
               enabled: canChangeShelf,
-              label: strings.detailRemoveShelf,
+              label: novel.sourceId == LocalBookIdentity.sourceId
+                  ? strings.localDeleteBook
+                  : strings.detailRemoveShelf,
             ),
         ],
       );

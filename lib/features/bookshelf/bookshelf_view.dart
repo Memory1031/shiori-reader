@@ -186,8 +186,12 @@ class _BookshelfViewState extends State<BookshelfView> {
         ),
       _BookEntry(
         _BookAction.remove,
-        Icons.bookmark_remove_outlined,
-        strings.detailRemoveShelf,
+        book.key.sourceId == LocalBookIdentity.sourceId
+            ? Icons.delete_outline
+            : Icons.bookmark_remove_outlined,
+        book.key.sourceId == LocalBookIdentity.sourceId
+            ? strings.localDeleteBook
+            : strings.detailRemoveShelf,
         enabled: !controller.writing,
       ),
     ];
@@ -460,11 +464,18 @@ class _BookshelfViewState extends State<BookshelfView> {
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(
-                                            Icons.bookmark_remove_outlined,
+                                          Icon(
+                                            book.key.sourceId ==
+                                                    LocalBookIdentity.sourceId
+                                                ? Icons.delete_outline
+                                                : Icons
+                                                      .bookmark_remove_outlined,
                                           ),
                                           Text(
-                                            strings.shelfRemove,
+                                            book.key.sourceId ==
+                                                    LocalBookIdentity.sourceId
+                                                ? strings.shelfDelete
+                                                : strings.shelfRemove,
                                             textAlign: TextAlign.center,
                                           ),
                                         ],

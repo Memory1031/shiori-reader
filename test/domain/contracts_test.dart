@@ -63,8 +63,12 @@ void main() {
         ),
         false,
       );
-      final entry = BookshelfEntry(snapshot: summary, addedAt: contractNow);
-      await library.putBookshelf(entry, cancellation: token.token);
+      final entry = value(
+        await library.putBookshelf(
+          BookshelfEntry(snapshot: summary, addedAt: contractNow),
+          cancellation: token.token,
+        ),
+      );
       final repeated = value(
         await library.putBookshelf(
           BookshelfEntry(

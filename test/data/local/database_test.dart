@@ -42,7 +42,7 @@ void main() {
     );
     await expectLater(
       users.customStatement(
-        "INSERT INTO progress_sessions VALUES('s','n',0,-1)",
+        "INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES('s','n',0,-1)",
       ),
       throwsA(anything),
     );
@@ -71,7 +71,7 @@ void main() {
       var result = await LocalDatabases.open(paths);
       final first = (result as Success<LocalDatabases>).value;
       await first.users.customStatement(
-        "INSERT INTO progress_sessions VALUES('s','n',4,7)",
+        "INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES('s','n',4,7)",
       );
       await first.close();
       result = await LocalDatabases.open(paths);

@@ -221,6 +221,14 @@ List<Widget> _operationButtons(
       colors = Theme.of(context).colorScheme;
   final hasSelection = actions.selection.selected.isNotEmpty;
   final idle = !actions.busy && !actions.library.writing;
+  final items = actions.selection.snapshot;
+  final allLocal = hasSelection && items.every((book) => book.local);
+  final allOnline = hasSelection && items.every((book) => !book.local);
+  final removalLabel = localOnly || allLocal
+      ? l.bookDeleteSelected
+      : allOnline
+      ? l.onlineRemoveConfirm
+      : l.bookDeleteAndRemove;
   return [
     Tooltip(
       message: _operationHint(l, actions),
@@ -244,9 +252,7 @@ List<Widget> _operationButtons(
       ),
     ),
     Tooltip(
-      message: hasSelection
-          ? (localOnly ? l.bookDeleteSelected : l.bookRemoveSelected)
-          : l.bookNoSelection,
+      message: hasSelection ? removalLabel : l.bookNoSelection,
       child: OutlinedButton.icon(
         key: const ValueKey('book-selection-remove'),
         style: OutlinedButton.styleFrom(foregroundColor: colors.error).copyWith(
@@ -270,10 +276,12 @@ List<Widget> _operationButtons(
             ? () => actions.removeSelected(context)
             : null,
         icon: Icon(
-          localOnly ? Icons.delete_outline : Icons.bookmark_remove_outlined,
+          localOnly || allLocal
+              ? Icons.delete_outline
+              : Icons.bookmark_remove_outlined,
           size: 20,
         ),
-        label: Text(localOnly ? l.bookDeleteSelected : l.bookRemoveSelected),
+        label: Text(removalLabel),
       ),
     ),
   ];
@@ -298,7 +306,8 @@ class BookSelectionBottomBar extends StatelessWidget {
     final needed =
         _labelWidth(context, [
           l.localReparse,
-          localOnly ? l.bookDeleteSelected : l.bookRemoveSelected,
+          l.bookDeleteSelected,
+          if (!localOnly) ...[l.onlineRemoveConfirm, l.bookDeleteAndRemove],
         ]) +
         chrome;
     return SizedBox(

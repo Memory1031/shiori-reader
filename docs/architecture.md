@@ -82,7 +82,7 @@ CachedChapter / CacheOverview / PrefetchState 是不可变投影，预取目标�
 
 搜索显式提交才请求，不随输入自动发请求。结果支持分页、错误重试与空状态；不向应用 UI 暴露 Source 游标、原始协议或站点诊断。详情展示封面、书名、可展开的简介和标签，阅读是主要操作；已在书架的书籍通过更多菜单移出。目录预览最多展示五章并随页面滚动，完整目录保留独立入口；真实分组与合成无卷分组保持区别，目录顺序来自领域快照。
 
-阅读入口汇集在线缓存和本地书籍；本地 EPUB 目录可按嵌套条目 / fragment 直接定位。继续阅读和历史使用语义位置。具体规则见[阅读器](reader.md)、[本地导入](local-import.md)和[缓存](architecture.md)。
+阅读入口汇集在线缓存和本地书籍；本地 EPUB 目录可按嵌套条目 / fragment 直接定位。继续阅读使用语义位置。具体规则见[阅读器](reader.md)、[本地导入](local-import.md)和[缓存](architecture.md)。
 
 ### 桌面工作区
 
@@ -113,7 +113,7 @@ Presentation 依赖领域契约，通过显式注入获得服务。应用根拥�
 
 | 位置 | Schema | 内容 |
 | --- | --- | --- |
-| `users/users.sqlite` | v6 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions、progress_catalogs |
+| `users/users.sqlite` | v8 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions、progress_catalogs、local_reparse_attempts |
 | `disposable/cache.sqlite` | v2 | novel_cache、catalog_cache、chapter_cache、image_cache、image_owners |
 | 平台 preferences | 独立 codec | readerSettings v3、appSettings v2 |
 | `users/update-preferences.json` | v1 | 更新渠道、自动检查开关、检查时间与限流期限 |
@@ -126,9 +126,11 @@ LocalDatabases.open 顺序打开用户库和缓存库，各用 NativeDatabase.cr
 
 ### 事务与 codec
 
-Library 写入由事务串行执行；重复收藏保留首次 addedAt，移除书架保留历史。书架按最近阅读时间（无历史时 addedAt）降序，平局按 Source / Novel 键排序。watch 返回初始及后续不可变快照。
+Library 写入由事务串行执行；重复收藏保留首次 addedAt。正式在线阅读首次有效进度保存与自动入架在同一事务完成，复用进度中的书籍摘要，不额外请求详情；普通搜索、详情及目录浏览不建立长期用户记录。通用 removeFromBookshelf 仍只删除书架记录；产品在线移出经确认后通过 removeOnlineBook 原子清理书架、进度、持久目录及预取选择。书架按最近阅读时间（无历史时 addedAt）降序，平局按 Source / Novel 键排序。watch 返回初始及后续不可变快照。
 
-beginProgressSession 原子递增 generation 并重置 sequence；saveProgress 只接受当前 generation 和严格递增 sequence，旧写返回 false。clearHistory 推进 generation 并保留会话保护行，防止晚响应恢复已清历史。提交前取消可回滚，提交后返回真实结果。
+beginProgressSession 原子递增 generation 并重置 sequence；saveProgress 只接受当前 generation 和严格递增 sequence，旧写返回 false。clearHistory 推进 generation 并保留会话保护行，防止晚响应恢复已清历史。在线移出同时推进写入代次和独立的 removal_generation，后者由目录观测及预取任务核对，随事务回滚；成功通知使旧 Reader 失效。后续明确打开的新阅读会话允许重新入架。提交前取消可回滚，提交后返回真实结果。
+
+在线目录依据仅在已有书架或阅读进度时持久化；首次进度事务可同时建立目录依据，未归属的浏览仍使用可淘汰缓存。
 
 全书进度快照与章节位置一同持久化，沿用上述事务及写入顺序保护。历史记录缺少快照时视为未知；已加载的在线目录更新可重算全书进度，但不新开阅读会话、不改变阅读位置或最近阅读时间。在线目录依据（目录、抓取时间及来源）与进度重算在用户库同一事务提交，独立于可丢弃的目录缓存；重启后仍按已接受的抓取时间仲裁，写入失败可重试同一观测。目录读取与刷新通知向 Reader 返回仲裁选中的目录，使导航、全书进度计算与持久化使用相同依据；选中用户库中的目录时标记为本地读取，并保留本次刷新失败提示。目录缓存缺失或网络读取失败时也可回退到此依据；单纯缓存缺失不作为远端刷新失败提示，取消请求不触发回退，无可用依据则保留原失败。旧目录下的晚写按已持久化的目录依据重算，避免恢复过期的终点状态。升级前没有目录抓取时间的全书快照，不被冲突缓存或其晚写覆盖，直到获得远端目录或同版本缓存依据。
 
@@ -140,7 +142,9 @@ preferences 使用独立 JSON key，Store 串行写入，读取等待已排队�
 
 ### 迁移与生成
 
-保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 / v5 / v6 / v7 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
+保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 / v5 / v6 / v7 / v8 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
+
+v8 升级一次性将有有效进度而无书架的在线作品无损补入书架，保留原位置及已有收藏时间；仅有目录或预取选择、没有书架和进度的孤立记录清理，保留会话代次保护，不联网，也不在每次启动重复扫描。
 
 升级 DDL、完整性检查和 user_version 同事务提交；失败回滚，损坏或未知未来版本保留原文件并报错。不提供自动删用户库、drop/recreate 或生产 reset 来绕过故障。旧快照不能被当前 schema 重新导出覆盖。
 
@@ -190,7 +194,7 @@ v4 仅添加活动 bundle、解析版本、维护标记及章节版本索引，�
 
 ### 清理与竞态
 
-缓存管理页按书或全部清理需要确认；书架 / 详情中在线书移出先清该书缓存，无撤销；本地书经确认后走托管文件完整删除流程，见[本地导入](local-import.md)。清理推进 generation、停止旧预取，晚响应不得回填已清数据；已有活动 lease 在关闭前仍可读取，新读取看到 cache miss。按书清理保留其他书共享的资源。
+缓存管理页按书或全部清理需要确认；书架 / 详情中在线书移出须确认清除缓存和阅读进度，先清该书缓存，再原子清理用户库，无撤销；本地书经确认后走托管文件完整删除流程，见[本地导入](local-import.md)。清理推进 generation、停止旧预取，晚响应不得回填已清数据；已有活动 lease 在关闭前仍可读取，新读取看到 cache miss。按书清理保留其他书共享的资源。
 
 本地导入走独立文件层，清在线缓存不会删除原件、书架、进度或设置。离线列表必须同时校验外层 codec 与内部数据，不兼容记录不能列为可读。
 

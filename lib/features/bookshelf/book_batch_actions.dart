@@ -199,7 +199,11 @@ class BookBatchActions extends ChangeNotifier with WidgetsBindingObserver {
           actions: [
             BookBatchAction(l.importCancel, () => Navigator.pop(dialog, false)),
             BookBatchAction(
-              online == 0 ? l.bookDeleteSelected : l.bookRemoveSelected,
+              online == 0
+                  ? l.bookDeleteSelected
+                  : local == 0
+                  ? l.onlineRemoveConfirm
+                  : l.bookDeleteAndRemove,
               () => Navigator.pop(dialog, true),
               primary: true,
               destructive: true,

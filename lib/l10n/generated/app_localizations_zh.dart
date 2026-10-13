@@ -152,6 +152,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get detailRemoveShelf => '移出书架';
 
   @override
+  String get shelfDelete => '删除';
+
+  @override
+  String get onlineRemoveConfirm => '移出书架';
+
+  @override
+  String get localDeleteBook => '删除本地书籍';
+
+  @override
+  String get onlineRemoveMessage => '将从书架移除，并清除这本书的缓存和阅读进度。再次阅读时将从头开始。';
+
+  @override
+  String get onlineBookRemoved => '这本书已移出书架，缓存和阅读进度已清除。';
+
+  @override
+  String get bookDeleteAndRemove => '删除与移除';
+
+  @override
   String get detailActionsPending => '暂不可用的阅读和书架操作仍在开发中。';
 
   @override
@@ -1282,7 +1300,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookRemoveSelected => '移除';
 
   @override
-  String get bookDeleteSelected => '删除';
+  String get bookDeleteSelected => '删除所选';
 
   @override
   String bookReparseSelected(int count) {
@@ -1332,7 +1350,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String bookBatchOnline(int count) {
-    return '$count 本在线书籍：清理缓存并移出书架，保留阅读历史。';
+    return '$count 本在线书籍：移出书架并清除缓存和阅读进度，再次阅读将从头开始。';
   }
 
   @override

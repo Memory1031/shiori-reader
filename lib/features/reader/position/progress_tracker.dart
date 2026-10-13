@@ -14,6 +14,7 @@ class ProgressTracker {
     required this.catalogRevision,
     this.onStatus,
     this.metrics,
+    this.catalog,
     this.previous,
     DateTime Function()? now,
   }) : now = now ?? DateTime.now;
@@ -24,6 +25,7 @@ class ProgressTracker {
   int ordinal;
   String catalogRevision;
   BookProgressMetrics? metrics;
+  LoadResult<Catalog>? catalog;
   final ReadingProgress? previous;
   BookTerminalState _terminal = BookTerminalState.reading;
   bool _sampled = false;
@@ -156,7 +158,12 @@ class ProgressTracker {
   }
 
   /// Metadata updates never move the semantic reading anchor.
-  void updateMetrics(BookProgressMetrics value, {int? catalogOrdinal}) {
+  void updateMetrics(
+    BookProgressMetrics value, {
+    int? catalogOrdinal,
+    LoadResult<Catalog>? catalog,
+  }) {
+    if (catalog != null) this.catalog = catalog;
     if (value.revision == metrics?.revision) return;
     metrics = value;
     if (catalogOrdinal != null && catalogOrdinal >= 0) ordinal = catalogOrdinal;
@@ -232,6 +239,7 @@ class ProgressTracker {
           sequence: _sequence++,
         ),
         cancellation: _request.token,
+        catalog: catalog,
       );
       switch (result) {
         case Success(value: true):
@@ -246,6 +254,15 @@ class ProgressTracker {
       // No tight retry loop on failure. A later user event or explicit retry can retry.
       if (result is Failure<bool> || _obsolete) return;
     } while (_again || _latest != _saved);
+  }
+
+  /// Only a committed explicit removal may discard the deleted book's snapshot.
+  void discardRemovedBook() {
+    _obsolete = true;
+    _latest = null;
+    _periodic?.cancel();
+    _trailing?.cancel();
+    _request.cancel();
   }
 
   Future<void> retry() async {

@@ -54,12 +54,14 @@ class ObservedLibrary implements LibraryRepository {
     ReadingProgress progress, {
     required ProgressWriteStamp stamp,
     required CancellationToken cancellation,
+    LoadResult<Catalog>? catalog,
   }) {
     writes.add(progress);
     return inner.saveProgress(
       progress,
       stamp: stamp,
       cancellation: cancellation,
+      catalog: catalog,
     );
   }
 

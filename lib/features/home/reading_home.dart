@@ -331,8 +331,14 @@ class _ReadingHomeState extends State<ReadingHome> {
               }
               final removed = await removeShelfBook(context, library, summary);
               if (removed &&
-                  key.sourceId == LocalBookIdentity.sourceId &&
+                  (key.sourceId == LocalBookIdentity.sourceId ||
+                      reader != null) &&
                   context.mounted) {
+                if (reader != null &&
+                    key.sourceId != LocalBookIdentity.sourceId) {
+                  await WidgetsBinding.instance.endOfFrame;
+                  if (!context.mounted) return;
+                }
                 // The book is gone: close its reader, if open, and every
                 // page opened for it, back to the current section's root.
                 Navigator.of(

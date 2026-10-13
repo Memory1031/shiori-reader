@@ -14,6 +14,10 @@ void main() {
       final userSql = File('lib/data/local/database/users.drift')
           .readAsStringSync()
           .replaceAll(' book_progress TEXT,', '')
+          .replaceAll(
+            ' removal_generation INTEGER NOT NULL DEFAULT 0 CHECK(removal_generation >= 0),',
+            '',
+          )
           .split('CREATE TABLE prefetch_choices')
           .first;
       final cache = CacheDatabase(
@@ -63,7 +67,7 @@ void main() {
             .data
             .values
             .single,
-        7,
+        8,
       );
       await cache.close();
       await users.close();

@@ -183,10 +183,7 @@ class LibraryController extends ScopedController {
     if (token.isCancelled) {
       return Failure(AppFailure.cancelled(Operation.libraryWrite));
     }
-    final removed = await repository.removeFromBookshelf(
-      key,
-      cancellation: token,
-    );
+    final removed = await repository.removeOnlineBook(key, cancellation: token);
     return switch (removed) {
       Success() => const Success(LocalBookDeletion()),
       Failure(:final failure) => Failure(failure),

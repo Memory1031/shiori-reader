@@ -37,7 +37,9 @@ void seed(File file, String kind, int version) {
       db.execute(
         "INSERT INTO bookshelf VALUES('s','n','original-summary',123,456)",
       );
-      db.execute("INSERT INTO progress_sessions VALUES('s','n',3,8)");
+      db.execute(
+        "INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES('s','n',3,8)",
+      );
       db.execute(
         "INSERT INTO reading_progress(source_id,novel_id,chapter_id,summary_json,chapter_ordinal,catalog_revision,content_revision,block_key,block_index,block_fraction,chapter_fraction,completed,pixel_offset,layout_key,position_version,last_read_at,updated_at) VALUES('s','n','chapter','original-summary',2,'catalog','content','block',17,.25,.75,0,22.5,'layout',1,123,456)",
       );
@@ -163,12 +165,12 @@ void main() {
             .data
             .values
             .single,
-        7,
+        8,
       );
       await retry.close();
     },
   );
-  for (final version in [1, 2, 3, 4, 5, 6]) {
+  for (final version in [1, 2, 3, 4, 5, 6, 7]) {
     test(
       'retained user v$version snapshot upgrades and preserves every old field',
       () async {
@@ -181,7 +183,7 @@ void main() {
               .data
               .values
               .single,
-          7,
+          8,
         );
         final library = LocalLibraryRepository(db);
         final shelf =
@@ -203,6 +205,11 @@ void main() {
         await db.close();
         final after = rows(file);
         for (final name in before.keys) {
+          if (name == 'progress_sessions') {
+            for (final row in (after[name] as List)) {
+              expect((row as Map).remove('removal_generation'), 0);
+            }
+          }
           if (name == 'reading_progress' && version < 5) {
             for (final row in (after[name] as List)) {
               (row as Map).remove('book_progress');
@@ -235,7 +242,13 @@ void main() {
     );
     await retry.close();
     for (final name in before.keys) {
-      expect(rows(file)[name], before[name]);
+      final actual = rows(file)[name];
+      if (name == 'progress_sessions') {
+        for (final row in actual as List) {
+          expect((row as Map).remove('removal_generation'), 0);
+        }
+      }
+      expect(actual, before[name]);
     }
   });
   test('v3 ALTER operations roll back when v4 table creation fails', () async {
@@ -316,6 +329,11 @@ void main() {
         await retry.close();
         for (final name in before.keys) {
           final actual = rows(file)[name];
+          if (name == 'progress_sessions') {
+            for (final row in actual as List) {
+              expect((row as Map).remove('removal_generation'), 0);
+            }
+          }
           if (name == 'reading_progress') {
             for (final row in actual as List) {
               (row as Map).remove('book_progress');

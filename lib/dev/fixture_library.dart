@@ -6,11 +6,15 @@ import 'package:shiori/domain/models/models.dart';
 import 'fixture_controls.dart';
 
 /// Development-only in-memory library; no durable DB or restart guarantee.
-final class FixtureLibraryRepository implements LibraryRepository {
+final class FixtureLibraryRepository
+    implements LibraryRepository, LibraryBookRemoval {
   final _books = <NovelKey, BookshelfEntry>{};
   final _progress = <NovelKey, ReadingProgress>{};
   final _generations = <NovelKey, int>{};
   final _sequences = <NovelKey, int>{};
+  final _removals = StreamController<NovelKey>.broadcast(sync: true);
+  @override
+  Stream<NovelKey> get removedBooks => _removals.stream;
   final _changes = StreamController<void>.broadcast(sync: true);
   final controls = FixtureControls();
   bool _closed = false;
@@ -22,6 +26,7 @@ final class FixtureLibraryRepository implements LibraryRepository {
     if (_closed) return;
     _closed = true;
     await _changes.close();
+    await _removals.close();
   }
 
   Stream<Result<List<T>>> _watch<T>(List<T> Function() snapshot) =>
@@ -90,6 +95,32 @@ final class FixtureLibraryRepository implements LibraryRepository {
   }
 
   @override
+  Future<Result<BookshelfEntry?>> removeOnlineBook(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  }) async {
+    _check();
+    final failure = await controls.before(Operation.libraryWrite, cancellation);
+    _check();
+    if (failure != null) return Failure(failure);
+    if (key.sourceId == LocalBookIdentity.sourceId) {
+      return Failure(
+        AppFailure(
+          kind: FailureKind.unsupported,
+          operation: Operation.libraryWrite,
+        ),
+      );
+    }
+    final removed = _books.remove(key);
+    _progress.remove(key);
+    _generations[key] = (_generations[key] ?? 0) + 1;
+    _sequences.remove(key);
+    _changes.add(null);
+    _removals.add(key);
+    return Success(removed);
+  }
+
+  @override
   Future<Result<ReadingProgress?>> getProgress(
     NovelKey key, {
     required CancellationToken cancellation,
@@ -123,6 +154,7 @@ final class FixtureLibraryRepository implements LibraryRepository {
     ReadingProgress progress, {
     required ProgressWriteStamp stamp,
     required CancellationToken cancellation,
+    LoadResult<Catalog>? catalog,
   }) async {
     _check();
     final failure = await controls.before(
@@ -138,6 +170,15 @@ final class FixtureLibraryRepository implements LibraryRepository {
     }
     _sequences[key] = stamp.sequence;
     _progress[key] = progress;
+    if (key.sourceId != LocalBookIdentity.sourceId) {
+      _books.putIfAbsent(
+        key,
+        () => BookshelfEntry(
+          snapshot: progress.snapshot,
+          addedAt: DateTime.now(),
+        ),
+      );
+    }
     _changes.add(null);
     return const Success(true);
   }

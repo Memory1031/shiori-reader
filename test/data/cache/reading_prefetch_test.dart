@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/cache/cache_policy.dart';
+import 'package:shiori/data/repositories/library_repository.dart';
 import 'package:shiori/data/cache/reading_prefetch.dart';
 import 'package:shiori/data/local/database/user_database.dart';
 import 'package:shiori/data/network/background_work.dart';
@@ -173,6 +174,13 @@ void main() {
   test(
     'selection survives controller recreation; missing refreshed target is removed',
     () async {
+      await LocalLibraryRepository(users).putBookshelf(
+        BookshelfEntry(
+          snapshot: NovelSummary(key: book, title: 'Owned'),
+          addedAt: DateTime.utc(2026),
+        ),
+        cancellation: CancellationSource().token,
+      );
       await engine.enter(content('volume1'), catalog());
       await settle(engine);
       await engine.select(key('volume3'));
@@ -196,6 +204,62 @@ void main() {
       );
     },
   );
+  test(
+    'unowned choices stay transient; removal cancels old work and new reading can choose',
+    () async {
+      final library = LocalLibraryRepository(users);
+      final token = CancellationSource().token;
+      await engine.enter(content('volume1'), catalog());
+      await settle(engine);
+      expect(await engine.select(key('volume3')), isA<Success>());
+      await settle(engine);
+      expect(
+        await users.customSelect('SELECT * FROM prefetch_choices').get(),
+        isEmpty,
+      );
+      await library.putBookshelf(
+        BookshelfEntry(
+          snapshot: NovelSummary(key: book, title: 'Owned'),
+          addedAt: DateTime.utc(2026),
+        ),
+        cancellation: token,
+      );
+      images.gate = Completer<void>();
+      await engine.enter(content('special', 2), catalog());
+      expect(await engine.select(key('volume3')), isA<Success>());
+      expect(
+        await users.customSelect('SELECT * FROM prefetch_choices').get(),
+        hasLength(1),
+      );
+      expect(
+        await library.removeOnlineBook(book, cancellation: token),
+        isA<Success>(),
+      );
+      expect(await engine.select(key('volume3')), isA<Failure>());
+      images.gate!.complete();
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        await users.customSelect('SELECT * FROM prefetch_choices').get(),
+        isEmpty,
+      );
+      await library.putBookshelf(
+        BookshelfEntry(
+          snapshot: NovelSummary(key: book, title: 'Owned again'),
+          addedAt: DateTime.utc(2026),
+        ),
+        cancellation: token,
+      );
+      images.gate = null;
+      await engine.enter(content('volume1'), catalog());
+      expect(await engine.select(key('volume3')), isA<Success>());
+      await settle(engine);
+      expect(
+        await users.customSelect('SELECT * FROM prefetch_choices').get(),
+        hasLength(1),
+      );
+    },
+  );
+
   test(
     'budget does not reset on navigation or lifecycle; explicit resume retries',
     () async {

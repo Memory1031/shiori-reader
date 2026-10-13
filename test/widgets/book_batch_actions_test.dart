@@ -18,6 +18,7 @@ import 'package:shiori/features/bookshelf/book_selection_controller.dart';
 import 'package:shiori/features/bookshelf/book_selection_widgets.dart';
 import 'package:shiori/features/bookshelf/bookshelf_view.dart';
 import 'package:shiori/features/bookshelf/library_controller.dart';
+import 'package:shiori/features/bookshelf/remove_shelf_book.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 import 'package:shiori/shared/widgets/book_cover.dart';
 import 'bookshelf_test.dart' show RemovalCache;
@@ -293,6 +294,72 @@ final parseFailure = Failure<LocalReparseResult>(
 );
 
 void main() {
+  for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
+    for (final lang in ['zh', 'en']) {
+      testWidgets(
+        'single removal confirmation $lang $platform at large text',
+        (tester) async {
+          final h = ShelfBatchHarness(tester);
+          final desktop = platform == TargetPlatform.windows;
+          await h.pump(
+            desktop: desktop,
+            width: desktop ? 1000 : 390,
+            scale: 1.6,
+            lang: lang,
+            brightness: lang == 'zh' ? Brightness.dark : Brightness.light,
+          );
+          final context = tester.element(find.byType(BookshelfView));
+          final online = NovelSummary(
+            key: h.online.first.key,
+            title: 'Online long title with volume and author',
+          );
+          final cancelled = removeShelfBook(context, h.library, online);
+          await tester.pumpAndSettle();
+          expect(find.text(h.l.onlineRemoveMessage), findsOneWidget);
+          expect(h.cache.cleared, isEmpty);
+          expect(tester.takeException(), isNull);
+          await h.screenshot(
+            'online-remove-$lang-${desktop ? 'desktop' : 'phone'}',
+          );
+          await tester.tap(find.text(h.l.importCancel));
+          await tester.pumpAndSettle();
+          expect(await cancelled, isFalse);
+          expect(h.library.contains(online.key), isTrue);
+          final confirmed = removeShelfBook(context, h.library, online);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.widgetWithText(FilledButton, h.l.onlineRemoveConfirm),
+          );
+          await tester.pumpAndSettle();
+          expect(await confirmed, isTrue);
+          expect(h.cache.cleared, [online.key]);
+          expect(h.library.contains(online.key), isFalse);
+          final local = h.store.books.first;
+          final localCancelled = removeShelfBook(
+            context,
+            h.library,
+            NovelSummary(key: local.key, title: local.title),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.text(h.l.localDeleteMessage(local.title)),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          await h.screenshot(
+            'local-delete-$lang-${desktop ? 'desktop' : 'phone'}',
+          );
+          await tester.tap(find.widgetWithText(TextButton, h.l.importCancel));
+          await tester.pumpAndSettle();
+          expect(await localCancelled, isFalse);
+          expect(h.store.deleteCalls, isEmpty);
+          await h.close();
+        },
+        variant: TargetPlatformVariant.only(platform),
+      );
+    }
+  }
+
   testWidgets(
     'desktop batch dialogs bound text width and collapse completed details',
     (tester) async {
@@ -469,7 +536,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('book-selection-remove')));
       await tester.pumpAndSettle();
       await tester.tap(
-        find.widgetWithText(FilledButton, h.l.bookRemoveSelected),
+        find.widgetWithText(FilledButton, h.l.bookDeleteAndRemove),
       );
       await h.frame();
       expect(h.store.deleteCalls, hasLength(1));
@@ -677,7 +744,7 @@ void main() {
       final row = find.byKey(ValueKey(h.store.books.first.key));
       await tester.drag(row, const Offset(-200, 0));
       await tester.pumpAndSettle();
-      expect(find.text(h.l.shelfRemove), findsOneWidget);
+      expect(find.text(h.l.shelfDelete), findsOneWidget);
       await tester.tap(
         find.byKey(ValueKey(('shelf-more', h.store.books.first.key))),
       );
@@ -685,7 +752,7 @@ void main() {
       await tester.tap(find.text(h.l.bookMultiSelect));
       await tester.pumpAndSettle();
       expect(
-        find.descendant(of: row, matching: find.text(h.l.shelfRemove)),
+        find.descendant(of: row, matching: find.text(h.l.shelfDelete)),
         findsNothing,
       );
       await h.screenshot('09-phone-selection-list');

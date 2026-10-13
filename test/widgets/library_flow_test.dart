@@ -103,7 +103,7 @@ void main() {
         expect(await controller.remove(latest.key), isTrue);
         await tester.pumpAndSettle();
         shows(older);
-        expect(controller.progressFor(latest.key), isNotNull);
+        expect(controller.progressFor(latest.key), isNull);
 
         expect(await controller.remove(older.key), isTrue);
         await tester.pumpAndSettle();
@@ -111,13 +111,14 @@ void main() {
         expect(find.text('Continue reading'), findsNothing);
         expect(find.byType(ContinueReadingCard), findsNothing);
         expect(find.byType(ContinueReadingRow), findsNothing);
-        expect(controller.recent, hasLength(2));
+        expect(controller.recent, isEmpty);
 
-        // Removing an online book keeps its position available when re-added.
+        // Explicitly adding again does not restore the removed reading position.
         expect(await controller.add(older), isTrue);
         await tester.pumpAndSettle();
-        shows(older);
-        expect(controller.progressFor(latest.key), isNotNull);
+        expect(resume, findsNothing);
+        expect(controller.contains(older.key), isTrue);
+        expect(controller.progressFor(latest.key), isNull);
         expect(tester.takeException(), isNull);
       },
       variant: TargetPlatformVariant.only(platform),
@@ -152,13 +153,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    final library = tester
-        .widget<BookshelfView>(find.byType(BookshelfView))
-        .controller;
     await tester.tap(find.text('Resume'));
-    await tester.pumpAndSettle();
-    // An open reader can still use the saved position after shelf removal.
-    expect(await library.remove(summary.key), isTrue);
     await tester.pumpAndSettle();
     for (var cycle = 0; cycle < 2; cycle++) {
       expect(find.byType(ReaderContentView), findsOneWidget);
@@ -179,7 +174,7 @@ void main() {
         find.byType(ReaderContentView, skipOffstage: false),
         findsOneWidget,
       );
-      expect(find.text('Add to bookshelf'), findsOneWidget);
+      expect(find.text('In bookshelf'), findsOneWidget);
       if (cycle == 0) {
         // Reading from details returns to that reader.
         await tester.ensureVisible(find.byKey(const ValueKey('detail-read')));
@@ -206,9 +201,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(DetailScreen, skipOffstage: false), findsNothing);
     expect(find.byType(ReaderContentView, skipOffstage: false), findsOneWidget);
-    await tester.binding.handlePopRoute();
+    if (find.byTooltip('More').evaluate().isEmpty) {
+      await tester.tapAt(tester.getCenter(find.byType(ReaderContentView)));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byTooltip('More'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Novel details'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('detail-more')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove from bookshelf'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
+    await tester.pumpAndSettle();
+    expect(find.byType(DetailScreen, skipOffstage: false), findsNothing);
     expect(find.byType(ReaderContentView, skipOffstage: false), findsNothing);
+    await tester.pump(const Duration(seconds: 3));
+    expect(
+      (await env.library.getProgress(
+                summary.key,
+                cancellation: CancellationSource().token,
+              )
+              as Success<ReadingProgress?>)
+          .value,
+      isNull,
+    );
     expect(find.text('Your bookshelf is empty.'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     await tester.pumpAndSettle();
@@ -216,7 +234,7 @@ void main() {
   });
 
   testWidgets(
-    'detail removal clears cache and preserves progress without a history menu',
+    'detail removal confirms cache and progress loss without a history menu',
     (tester) async {
       final env = FixtureEnvironment(scenario: FixtureScenario.multiVolume);
       final cache = RemovalCache();
@@ -251,6 +269,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Remove from bookshelf'));
       await tester.pumpAndSettle();
+      expect(cache.cleared, isEmpty);
+      await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
+      await tester.pumpAndSettle();
       expect(find.text('Add to bookshelf'), findsOneWidget);
       expect(cache.cleared, [summary.key]);
       await tester.pageBack();
@@ -270,7 +291,7 @@ void main() {
                   )
                   as Success<ReadingProgress?>)
               .value,
-          isNotNull,
+          isNull,
         );
         expect(
           (await env.library.watchBookshelf().first

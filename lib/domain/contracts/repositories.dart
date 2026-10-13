@@ -32,7 +32,7 @@ abstract interface class NovelRepository {
     required CancellationToken cancellation,
   });
 
-  /// Broadcast, no initial event and no I/O on subscribe. Subscribe BEFORE load
+  /// Broadcast, no initial event or Source requests on subscribe. Subscribe BEFORE load
   /// to observe deduplicated background refresh completion, including failures.
   /// Cancel a subscription on dispose. It does not cancel other subscribers.
   /// Only accepted/current results are published, never superseded generations.
@@ -72,6 +72,13 @@ abstract interface class LibraryRepository {
     NovelKey key, {
     required CancellationToken cancellation,
   });
+
+  /// Clears an online book's shelf, progress, catalog basis and prefetch
+  /// choices atomically, retaining and advancing session generations.
+  Future<Result<BookshelfEntry?>> removeOnlineBook(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  });
   Future<Result<ReadingProgress?>> getProgress(
     NovelKey key, {
     required CancellationToken cancellation,
@@ -90,6 +97,7 @@ abstract interface class LibraryRepository {
     ReadingProgress progress, {
     required ProgressWriteStamp stamp,
     required CancellationToken cancellation,
+    LoadResult<Catalog>? catalog,
   });
 
   /// Also invalidate outstanding session generations so late writes cannot
@@ -98,6 +106,11 @@ abstract interface class LibraryRepository {
     NovelKey key, {
     required CancellationToken cancellation,
   });
+}
+
+/// Committed online removals retire active readers; new readers remain legal.
+abstract interface class LibraryBookRemoval {
+  Stream<NovelKey> get removedBooks;
 }
 
 abstract interface class SettingsStore {

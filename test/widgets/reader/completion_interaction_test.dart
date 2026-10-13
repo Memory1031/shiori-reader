@@ -60,6 +60,7 @@ class EndLibrary extends ObservedLibrary {
     ReadingProgress progress, {
     required ProgressWriteStamp stamp,
     required CancellationToken cancellation,
+    LoadResult<Catalog>? catalog,
   }) {
     if (fail) {
       return Future.value(
@@ -76,6 +77,7 @@ class EndLibrary extends ObservedLibrary {
       progress,
       stamp: stamp,
       cancellation: cancellation,
+      catalog: catalog,
     );
   }
 }

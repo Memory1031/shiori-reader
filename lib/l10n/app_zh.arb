@@ -53,6 +53,12 @@
   "homeContinueAction": "继续",
   "detailAddShelf": "加入书架",
   "detailRemoveShelf": "移出书架",
+  "shelfDelete": "删除",
+  "onlineRemoveConfirm": "移出书架",
+  "localDeleteBook": "删除本地书籍",
+  "onlineRemoveMessage": "将从书架移除，并清除这本书的缓存和阅读进度。再次阅读时将从头开始。",
+  "onlineBookRemoved": "这本书已移出书架，缓存和阅读进度已清除。",
+  "bookDeleteAndRemove": "删除与移除",
   "detailActionsPending": "暂不可用的阅读和书架操作仍在开发中。",
   "detailSynopsis": "简介",
   "detailOnShelf": "已在书架",
@@ -673,7 +679,7 @@
   "bookSelectAll": "全选",
   "bookDeselectAll": "取消全选",
   "bookRemoveSelected": "移除",
-  "bookDeleteSelected": "删除",
+  "bookDeleteSelected": "删除所选",
   "bookReparseSelected": "重新解析（{count} 本）",
   "@bookReparseSelected": {
     "placeholders": {
@@ -710,7 +716,7 @@
       }
     }
   },
-  "bookBatchOnline": "{count} 本在线书籍：清理缓存并移出书架，保留阅读历史。",
+  "bookBatchOnline": "{count} 本在线书籍：移出书架并清除缓存和阅读进度，再次阅读将从头开始。",
   "@bookBatchOnline": {
     "placeholders": {
       "count": {

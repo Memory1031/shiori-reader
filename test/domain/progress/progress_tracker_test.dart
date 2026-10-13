@@ -38,6 +38,7 @@ class Library implements LibraryRepository {
     ReadingProgress value, {
     required ProgressWriteStamp stamp,
     required CancellationToken cancellation,
+    LoadResult<Catalog>? catalog,
   }) async {
     writes.add((value, stamp));
     await gate?.future;

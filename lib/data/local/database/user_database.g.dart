@@ -433,12 +433,25 @@ class ProgressSessions extends Table
     $customConstraints: 'NOT NULL DEFAULT (-1) CHECK (sequence >= -1)',
     defaultValue: const CustomExpression('-1'),
   );
+  static const VerificationMeta _removalGenerationMeta = const VerificationMeta(
+    'removalGeneration',
+  );
+  late final GeneratedColumn<int> removalGeneration = GeneratedColumn<int>(
+    'removal_generation',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 0 CHECK (removal_generation >= 0)',
+    defaultValue: const CustomExpression('0'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     sourceId,
     novelId,
     generation,
     sequence,
+    removalGeneration,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -482,6 +495,15 @@ class ProgressSessions extends Table
         sequence.isAcceptableOrUnknown(data['sequence']!, _sequenceMeta),
       );
     }
+    if (data.containsKey('removal_generation')) {
+      context.handle(
+        _removalGenerationMeta,
+        removalGeneration.isAcceptableOrUnknown(
+          data['removal_generation']!,
+          _removalGenerationMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -507,6 +529,10 @@ class ProgressSessions extends Table
         DriftSqlType.int,
         data['${effectivePrefix}sequence'],
       )!,
+      removalGeneration: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}removal_generation'],
+      )!,
     );
   }
 
@@ -528,11 +554,13 @@ class ProgressSession extends DataClass implements Insertable<ProgressSession> {
   final String novelId;
   final int generation;
   final int sequence;
+  final int removalGeneration;
   const ProgressSession({
     required this.sourceId,
     required this.novelId,
     required this.generation,
     required this.sequence,
+    required this.removalGeneration,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -541,6 +569,7 @@ class ProgressSession extends DataClass implements Insertable<ProgressSession> {
     map['novel_id'] = Variable<String>(novelId);
     map['generation'] = Variable<int>(generation);
     map['sequence'] = Variable<int>(sequence);
+    map['removal_generation'] = Variable<int>(removalGeneration);
     return map;
   }
 
@@ -550,6 +579,7 @@ class ProgressSession extends DataClass implements Insertable<ProgressSession> {
       novelId: Value(novelId),
       generation: Value(generation),
       sequence: Value(sequence),
+      removalGeneration: Value(removalGeneration),
     );
   }
 
@@ -563,6 +593,7 @@ class ProgressSession extends DataClass implements Insertable<ProgressSession> {
       novelId: serializer.fromJson<String>(json['novel_id']),
       generation: serializer.fromJson<int>(json['generation']),
       sequence: serializer.fromJson<int>(json['sequence']),
+      removalGeneration: serializer.fromJson<int>(json['removal_generation']),
     );
   }
   @override
@@ -573,6 +604,7 @@ class ProgressSession extends DataClass implements Insertable<ProgressSession> {
       'novel_id': serializer.toJson<String>(novelId),
       'generation': serializer.toJson<int>(generation),
       'sequence': serializer.toJson<int>(sequence),
+      'removal_generation': serializer.toJson<int>(removalGeneration),
     };
   }
 
@@ -581,11 +613,13 @@ class ProgressSession extends DataClass implements Insertable<ProgressSession> {
     String? novelId,
     int? generation,
     int? sequence,
+    int? removalGeneration,
   }) => ProgressSession(
     sourceId: sourceId ?? this.sourceId,
     novelId: novelId ?? this.novelId,
     generation: generation ?? this.generation,
     sequence: sequence ?? this.sequence,
+    removalGeneration: removalGeneration ?? this.removalGeneration,
   );
   ProgressSession copyWithCompanion(ProgressSessionsCompanion data) {
     return ProgressSession(
@@ -595,6 +629,9 @@ class ProgressSession extends DataClass implements Insertable<ProgressSession> {
           ? data.generation.value
           : this.generation,
       sequence: data.sequence.present ? data.sequence.value : this.sequence,
+      removalGeneration: data.removalGeneration.present
+          ? data.removalGeneration.value
+          : this.removalGeneration,
     );
   }
 
@@ -604,13 +641,15 @@ class ProgressSession extends DataClass implements Insertable<ProgressSession> {
           ..write('sourceId: $sourceId, ')
           ..write('novelId: $novelId, ')
           ..write('generation: $generation, ')
-          ..write('sequence: $sequence')
+          ..write('sequence: $sequence, ')
+          ..write('removalGeneration: $removalGeneration')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(sourceId, novelId, generation, sequence);
+  int get hashCode =>
+      Object.hash(sourceId, novelId, generation, sequence, removalGeneration);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -618,7 +657,8 @@ class ProgressSession extends DataClass implements Insertable<ProgressSession> {
           other.sourceId == this.sourceId &&
           other.novelId == this.novelId &&
           other.generation == this.generation &&
-          other.sequence == this.sequence);
+          other.sequence == this.sequence &&
+          other.removalGeneration == this.removalGeneration);
 }
 
 class ProgressSessionsCompanion extends UpdateCompanion<ProgressSession> {
@@ -626,12 +666,14 @@ class ProgressSessionsCompanion extends UpdateCompanion<ProgressSession> {
   final Value<String> novelId;
   final Value<int> generation;
   final Value<int> sequence;
+  final Value<int> removalGeneration;
   final Value<int> rowid;
   const ProgressSessionsCompanion({
     this.sourceId = const Value.absent(),
     this.novelId = const Value.absent(),
     this.generation = const Value.absent(),
     this.sequence = const Value.absent(),
+    this.removalGeneration = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProgressSessionsCompanion.insert({
@@ -639,6 +681,7 @@ class ProgressSessionsCompanion extends UpdateCompanion<ProgressSession> {
     required String novelId,
     required int generation,
     this.sequence = const Value.absent(),
+    this.removalGeneration = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : sourceId = Value(sourceId),
        novelId = Value(novelId),
@@ -648,6 +691,7 @@ class ProgressSessionsCompanion extends UpdateCompanion<ProgressSession> {
     Expression<String>? novelId,
     Expression<int>? generation,
     Expression<int>? sequence,
+    Expression<int>? removalGeneration,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -655,6 +699,7 @@ class ProgressSessionsCompanion extends UpdateCompanion<ProgressSession> {
       if (novelId != null) 'novel_id': novelId,
       if (generation != null) 'generation': generation,
       if (sequence != null) 'sequence': sequence,
+      if (removalGeneration != null) 'removal_generation': removalGeneration,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -664,6 +709,7 @@ class ProgressSessionsCompanion extends UpdateCompanion<ProgressSession> {
     Value<String>? novelId,
     Value<int>? generation,
     Value<int>? sequence,
+    Value<int>? removalGeneration,
     Value<int>? rowid,
   }) {
     return ProgressSessionsCompanion(
@@ -671,6 +717,7 @@ class ProgressSessionsCompanion extends UpdateCompanion<ProgressSession> {
       novelId: novelId ?? this.novelId,
       generation: generation ?? this.generation,
       sequence: sequence ?? this.sequence,
+      removalGeneration: removalGeneration ?? this.removalGeneration,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -690,6 +737,9 @@ class ProgressSessionsCompanion extends UpdateCompanion<ProgressSession> {
     if (sequence.present) {
       map['sequence'] = Variable<int>(sequence.value);
     }
+    if (removalGeneration.present) {
+      map['removal_generation'] = Variable<int>(removalGeneration.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -703,6 +753,7 @@ class ProgressSessionsCompanion extends UpdateCompanion<ProgressSession> {
           ..write('novelId: $novelId, ')
           ..write('generation: $generation, ')
           ..write('sequence: $sequence, ')
+          ..write('removalGeneration: $removalGeneration, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4297,6 +4348,7 @@ typedef $ProgressSessionsCreateCompanionBuilder =
       required String novelId,
       required int generation,
       Value<int> sequence,
+      Value<int> removalGeneration,
       Value<int> rowid,
     });
 typedef $ProgressSessionsUpdateCompanionBuilder =
@@ -4305,6 +4357,7 @@ typedef $ProgressSessionsUpdateCompanionBuilder =
       Value<String> novelId,
       Value<int> generation,
       Value<int> sequence,
+      Value<int> removalGeneration,
       Value<int> rowid,
     });
 
@@ -4334,6 +4387,11 @@ class $ProgressSessionsFilterComposer
 
   ColumnFilters<int> get sequence => $composableBuilder(
     column: $table.sequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get removalGeneration => $composableBuilder(
+    column: $table.removalGeneration,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4366,6 +4424,11 @@ class $ProgressSessionsOrderingComposer
     column: $table.sequence,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get removalGeneration => $composableBuilder(
+    column: $table.removalGeneration,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $ProgressSessionsAnnotationComposer
@@ -4390,6 +4453,11 @@ class $ProgressSessionsAnnotationComposer
 
   GeneratedColumn<int> get sequence =>
       $composableBuilder(column: $table.sequence, builder: (column) => column);
+
+  GeneratedColumn<int> get removalGeneration => $composableBuilder(
+    column: $table.removalGeneration,
+    builder: (column) => column,
+  );
 }
 
 class $ProgressSessionsTableManager
@@ -4427,12 +4495,14 @@ class $ProgressSessionsTableManager
                 Value<String> novelId = const Value.absent(),
                 Value<int> generation = const Value.absent(),
                 Value<int> sequence = const Value.absent(),
+                Value<int> removalGeneration = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProgressSessionsCompanion(
                 sourceId: sourceId,
                 novelId: novelId,
                 generation: generation,
                 sequence: sequence,
+                removalGeneration: removalGeneration,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4441,12 +4511,14 @@ class $ProgressSessionsTableManager
                 required String novelId,
                 required int generation,
                 Value<int> sequence = const Value.absent(),
+                Value<int> removalGeneration = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProgressSessionsCompanion.insert(
                 sourceId: sourceId,
                 novelId: novelId,
                 generation: generation,
                 sequence: sequence,
+                removalGeneration: removalGeneration,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
