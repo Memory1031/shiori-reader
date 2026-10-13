@@ -709,6 +709,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importProcessing => '正在导入书籍…';
 
   @override
+  String get importFileReading => '正在读取文件…';
+
+  @override
+  String get importBookProcessing => '正在处理书籍…';
+
+  @override
   String get importSuccess => '书籍已保存。';
 
   @override

@@ -314,6 +314,8 @@
   "importCancel": "取消",
   "importReceiving": "正在复制文件…",
   "importProcessing": "正在导入书籍…",
+  "importFileReading": "正在读取文件…",
+  "importBookProcessing": "正在处理书籍…",
   "importSuccess": "书籍已保存。",
   "importHint": "选择 TXT 或 EPUB 文件，每个文件最大 128 MiB。",
   "importChoose": "选择文件",

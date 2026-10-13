@@ -7,6 +7,7 @@ import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import 'import_controller.dart';
+import '../../shared/widgets/shiori_task_progress_bar.dart';
 
 String _problemText(AppLocalizations l, ImportProblem p) => switch (p) {
   ImportProblem.encoding => l.importEncodingInvalid,
@@ -150,7 +151,9 @@ class _ImportOverlayState extends State<ImportOverlay>
                           child: Padding(
                             padding: const EdgeInsets.all(ShioriSpace.page),
                             child: c.discarding
-                                ? const LinearProgressIndicator()
+                                ? ShioriTaskProgressBar(
+                                    semanticsLabel: l.loading,
+                                  )
                                 : c.panelOpen
                                 ? _panel(context, c, l)
                                 : _banner(context, c, l),
@@ -219,7 +222,7 @@ class _ImportOverlayState extends State<ImportOverlay>
     children: [
       Text(l.importReceiving),
       const SizedBox(height: ShioriSpace.small),
-      const LinearProgressIndicator(),
+      ShioriTaskProgressBar(semanticsLabel: l.importReceiving),
       const SizedBox(height: ShioriSpace.item),
       Align(
         alignment: Alignment.centerLeft,
@@ -273,9 +276,12 @@ class _ImportOverlayState extends State<ImportOverlay>
           ),
           const SizedBox(height: ShioriSpace.medium),
           if (c.phase == ImportPhase.importing) ...[
-            Text(l.importProcessing),
+            Text(_workLabel(c, l)),
             const SizedBox(height: ShioriSpace.small),
-            LinearProgressIndicator(value: _progressValue(c, item)),
+            ShioriTaskProgressBar(
+              value: _progressValue(c, item),
+              semanticsLabel: _workLabel(c, l),
+            ),
           ] else if (done)
             Text(l.importSuccess)
           else if (c.problem case final problem?)
@@ -313,13 +319,13 @@ class _ImportOverlayState extends State<ImportOverlay>
                         : l.importStart,
                   ),
                 ),
-              if (done && widget.onRead != null)
+              if (done && !c.busy && widget.onRead != null)
                 FilledButton(
                   onPressed: () =>
                       widget.onRead!(item.result!.content.detail.summary.key),
                   child: Text(l.localReadNow),
                 ),
-              if (done)
+              if (done && !c.busy)
                 FilledButton(onPressed: c.finish, child: Text(l.importDone))
               else if (c.busy)
                 TextButton(onPressed: c.cancel, child: Text(l.importStop))
@@ -359,7 +365,7 @@ class _ImportOverlayState extends State<ImportOverlay>
       // A committed item has no active parser while its receipt is being
       // acknowledged. Keep the panel busy until that asynchronous work ends.
       title = current == null
-          ? l.importProcessing
+          ? l.importBookProcessing
           : l.importBatchProgress(c.items.indexOf(current) + 1, total);
       counts = null;
     } else if (allDone) {
@@ -428,8 +434,13 @@ class _ImportOverlayState extends State<ImportOverlay>
         ),
         if (importing) ...[
           const SizedBox(height: ShioriSpace.small),
-          LinearProgressIndicator(
+          if (current != null) ...[
+            Text(_workLabel(c, l)),
+            const SizedBox(height: ShioriSpace.small),
+          ],
+          ShioriTaskProgressBar(
             value: current == null ? null : _progressValue(c, current),
+            semanticsLabel: _workLabel(c, l),
           ),
         ],
         const SizedBox(height: ShioriSpace.item),
@@ -505,7 +516,13 @@ class _ImportOverlayState extends State<ImportOverlay>
     );
   }
 
+  String _workLabel(ImportController c, AppLocalizations l) =>
+      c.workStage == ImportWorkStage.reading
+      ? l.importFileReading
+      : l.importBookProcessing;
+
   double? _progressValue(ImportController c, ImportItemState item) {
+    if (c.workStage != ImportWorkStage.reading) return null;
     final size = item.candidate.size;
     if (size <= 0) return null;
     return (c.copiedBytes / size).clamp(0.0, 1.0);

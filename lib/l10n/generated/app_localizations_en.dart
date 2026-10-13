@@ -771,6 +771,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importProcessing => 'Importing book…';
 
   @override
+  String get importFileReading => 'Reading file…';
+
+  @override
+  String get importBookProcessing => 'Processing book…';
+
+  @override
   String get importSuccess => 'The book has been saved.';
 
   @override

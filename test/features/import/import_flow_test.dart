@@ -441,7 +441,16 @@ void main() {
       await controller.finish();
       source.receive(id: 'receipt-2');
       await controller.refresh();
+      final stages = <ImportWorkStage>[];
+      controller.addListener(() {
+        final stage = controller.workStage;
+        if (stage != null && (stages.isEmpty || stages.last != stage)) {
+          stages.add(stage);
+        }
+      });
       await controller.submit();
+      expect(stages, [ImportWorkStage.reading, ImportWorkStage.processing]);
+      expect(controller.workStage, isNull);
       expect(
         controller.result!.content.detail.summary.key,
         first.content.detail.summary.key,
@@ -1552,7 +1561,7 @@ void main() {
           await tester.pump();
           expect(tester.takeException(), isNull);
           final l = AppLocalizations.of(tester.element(find.byType(Scaffold)));
-          expect(find.text(l.importProcessing), findsOneWidget);
+          expect(find.text(l.importBookProcessing), findsOneWidget);
           expect(find.text(l.importDone), findsNothing);
           expect(find.text(l.importStop), findsOneWidget);
         } finally {

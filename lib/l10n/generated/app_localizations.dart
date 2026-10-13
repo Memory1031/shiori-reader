@@ -1454,6 +1454,18 @@ abstract class AppLocalizations {
   /// **'Importing book…'**
   String get importProcessing;
 
+  /// No description provided for @importFileReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading file…'**
+  String get importFileReading;
+
+  /// No description provided for @importBookProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing book…'**
+  String get importBookProcessing;
+
   /// No description provided for @importSuccess.
   ///
   /// In en, this message translates to:

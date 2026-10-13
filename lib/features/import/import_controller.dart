@@ -10,6 +10,9 @@ enum ImportPhase { idle, receiving, ready, importing, succeeded, failed }
 /// Phase of one staged file inside the import batch.
 enum ImportItemPhase { ready, importing, succeeded, failed }
 
+/// Presentation only; completed input still needs parsing and publication.
+enum ImportWorkStage { reading, processing }
+
 /// One durable receipt and its progress. Ids stay opaque and stable across
 /// app restarts; a failed item keeps its receipt for a later retry.
 class ImportItemState {
@@ -52,6 +55,7 @@ class ImportController extends ChangeNotifier {
   ImportPhase phase = ImportPhase.idle;
   TxtEncodingPreview? encodingPreview;
   int copiedBytes = 0;
+  ImportWorkStage? workStage;
   bool panelOpen = false, snoozed = false, _closed = false, _refreshing = false;
   ImportProblem? _problem;
   ImportProblem? _deferredSourceProblem;
@@ -427,6 +431,7 @@ class ImportController extends ChangeNotifier {
       item.problem = null;
       item.result = null;
       item.phase = ImportItemPhase.importing;
+      workStage = ImportWorkStage.reading;
       phase = ImportPhase.importing;
       _emit();
       switch (await _importOne(item, format, parser, cancellation)) {
@@ -539,6 +544,8 @@ class ImportController extends ChangeNotifier {
       item.phase = ImportItemPhase.failed;
       _emit();
       return _BatchResult.fatal;
+    } finally {
+      workStage = null;
     }
   }
 
@@ -608,6 +615,12 @@ class ImportController extends ChangeNotifier {
       _checkPrefix(prefix, format, item);
       yield prefix;
     }
+    // Resuming past the last yield means the consumer accepted every byte.
+    if (token.isCancelled) {
+      throw const ImportSourceException(ImportProblem.cancelled);
+    }
+    workStage = ImportWorkStage.processing;
+    _emit();
   }
 
   void _checkPrefix(

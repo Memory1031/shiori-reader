@@ -6,6 +6,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
 import '../../shared/widgets/shiori_sheet.dart';
 import '../../shared/widgets/state_views.dart';
+import '../../shared/widgets/shiori_task_progress_bar.dart';
 import 'book_selection_controller.dart';
 
 /// Intrinsic width of batch dialog content; dialogs size to their widest
@@ -164,9 +165,8 @@ class BookBatchProgressView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: ShioriSpace.medium),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(ShioriSpace.tight / 2),
-            child: const LinearProgressIndicator(minHeight: ShioriSpace.tight),
+          ShioriTaskProgressBar(
+            semanticsLabel: AppLocalizations.of(context).loading,
           ),
         ],
       ),
