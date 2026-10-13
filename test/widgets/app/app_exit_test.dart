@@ -19,6 +19,7 @@ import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
+import 'package:shiori/features/reader/reader_controller.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 
 import '../reader/settings_test.dart' show Store;
@@ -34,7 +35,7 @@ Future<void> exitFrames(WidgetTester tester) async {
 
 void main() {
   testWidgets(
-    'local reader releases every book use before SQLite shutdown and restart',
+    'passive chapter preload permits exit and preserves the active chapter on restart',
     (tester) async {
       late Directory temp;
       late AppPaths paths;
@@ -76,7 +77,40 @@ void main() {
             (await store.importBook(
                       bytes: Stream.value(utf8.encode('durable exit')),
                       format: LocalBookFormat.txt,
-                      parse: (s) async => fixture(s),
+                      parse: (s) async {
+                        final first = fixture(s);
+                        final chapters = [
+                          ...first.chapters,
+                          ChapterContent(
+                            key: LocalBookIdentity.chapter(s.key, 'txt:1'),
+                            title: 'Two',
+                            blocks: [
+                              ParagraphBlock(text: 'Unread next chapter'),
+                            ],
+                          ),
+                        ];
+                        return LocalBookContent(
+                          detail: first.detail,
+                          chapters: chapters,
+                          catalog: Catalog(
+                            novelKey: s.key,
+                            volumes: [
+                              Volume(
+                                groupId: 'body',
+                                chapters: [
+                                  for (final (i, chapter) in chapters.indexed)
+                                    Chapter(
+                                      key: chapter.key,
+                                      title: chapter.title,
+                                      ordinal: i,
+                                      volumeGroupId: 'body',
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                       cancellation: CancellationSource().token,
                     )
                     as Success<LocalBookRecord>)
@@ -114,7 +148,12 @@ void main() {
       );
       for (
         var i = 0;
-        i < 100 && find.byType(ReaderContentView).evaluate().isEmpty;
+        i < 100 &&
+            find
+                    .byType(ReaderContentView, skipOffstage: false)
+                    .evaluate()
+                    .length <
+                2;
         i++
       ) {
         await tester.runAsync(
@@ -123,6 +162,18 @@ void main() {
         await tester.pump(const Duration(milliseconds: 16));
       }
       await exitFrames(tester);
+      final views = tester.widgetList<ReaderContentView>(
+        find.byType(ReaderContentView, skipOffstage: false),
+      );
+      expect(views, hasLength(2));
+      final candidate = views.singleWhere(
+        (view) => view.appearanceActive == false,
+      );
+      expect(candidate.session!.chapter, book.content.chapters.last.key);
+      expect(candidate.session!.progress, isNull);
+      expect(candidate.session!.restoreStatus, ReaderRestoreStatus.ready);
+      expect(candidate.viewportController!.capture(), isNotNull);
+      expect(candidate.onCancelChapter, isNull);
       final session = tester
           .widget<ReaderContentView>(find.byType(ReaderContentView).first)
           .session!;
@@ -144,18 +195,42 @@ void main() {
       );
       expect(response, AppExitResponse.exit);
       expect(closed, isTrue);
+      expect(find.byType(SnackBar), findsNothing);
       await tester.runAsync(() async {
         final reopened = UserDatabase(NativeDatabase(paths.userDatabase));
+        final reopenedStore =
+            (await ManagedLocalBooks.open(paths, reopened)
+                    as Success<ManagedLocalBooks>)
+                .value;
+        ReaderController? restored;
         try {
+          final reopenedLibrary = LocalLibraryRepository(reopened);
           final saved =
-              (await LocalLibraryRepository(reopened).getProgress(
+              (await reopenedLibrary.getProgress(
                         content.key.novelKey,
                         cancellation: CancellationSource().token,
                       )
                       as Success<ReadingProgress?>)
                   .value!;
           expect(saved.position.blockFraction, .5);
+          expect(saved.chapterKey, content.key);
+          restored = ReaderController(
+            repository: LocalReadingRepository(
+              local: reopenedStore,
+              online: ForbiddenOnline(),
+            ),
+            library: reopenedLibrary,
+            chapter: saved.chapterKey,
+          );
+          await restored.load();
+          expect(restored.status, ReaderStatus.ready);
+          expect(restored.content!.key, content.key);
+          expect(restored.initialPosition!.blockFraction, .5);
         } finally {
+          restored?.onDelete();
+          restored?.dispose();
+          await restored?.closeReader();
+          await reopenedStore.close();
           await reopened.close();
         }
       });

@@ -130,6 +130,7 @@ class ReaderController extends ScopedController {
   }
 
   Future<bool> saveForExit() async {
+    if (!_progressActive) return true;
     await _progressOpening;
     // Reflow may be pending; the queued sample is still the last stable anchor.
     progress?.restoring(false);
