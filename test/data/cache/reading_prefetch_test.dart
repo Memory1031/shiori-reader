@@ -68,6 +68,7 @@ class Novels implements NovelRepository {
 
 class Images implements ImageRepository {
   final calls = <String>[];
+  final tokens = <CancellationToken>[];
   final leases = <Lease>[];
   Completer<void>? gate;
   FailureKind? failure;
@@ -78,6 +79,7 @@ class Images implements ImageRepository {
     required CancellationToken cancellation,
   }) async {
     calls.add(ref.mediaId);
+    tokens.add(cancellation);
     BackgroundWork.current!.budget.attempt();
     if (gate != null) {
       await Future.any([gate!.future, cancellation.whenCancelled]);
@@ -130,14 +132,24 @@ Future<void> settle(LocalReadingPrefetch engine) async {
   fail('Prefetch failed to settle');
 }
 
+class GatedUsers extends UserDatabase {
+  GatedUsers() : super(NativeDatabase.memory());
+  final generations = <Completer<int>>[];
+  @override
+  Future<int> removalGeneration(String source, String novel) =>
+      generations.isEmpty
+      ? super.removalGeneration(source, novel)
+      : generations.removeAt(0).future;
+}
+
 void main() {
-  late UserDatabase users;
+  late GatedUsers users;
   late CacheCoordinator owner;
   late Novels novels;
   late Images images;
   late LocalReadingPrefetch engine;
   setUp(() {
-    users = UserDatabase(NativeDatabase.memory());
+    users = GatedUsers();
     owner = CacheCoordinator();
     novels = Novels();
     images = Images();
@@ -153,6 +165,116 @@ void main() {
     await owner.close();
     await users.close();
   });
+
+  for (final newerFirst in [false, true]) {
+    test(
+      'latest enter wins with newer query finishing first=$newerFirst',
+      () async {
+        final a = Completer<int>(), b = Completer<int>();
+        users.generations.addAll([a, b]);
+        final first = engine.enter(content('volume1', 1), catalog());
+        final second = engine.enter(content('special', 1), catalog());
+        if (newerFirst) {
+          b.complete(0);
+          await second;
+          await settle(engine);
+          a.complete(0);
+          await first;
+        } else {
+          a.complete(0);
+          await first;
+          expect(images.calls, isEmpty);
+          b.complete(0);
+          await second;
+          await settle(engine);
+        }
+        expect(images.calls, ['special-0']);
+        expect(await engine.select(key('volume1')), isA<Success>());
+        expect(await engine.select(key('special')), isA<Failure>());
+      },
+    );
+  }
+
+  for (final action in ['leave', 'remove', 'close']) {
+    test(
+      '$action invalidates enter waiting for its first generation query',
+      () async {
+        final gate = Completer<int>();
+        users.generations.add(gate);
+        final entering = engine.enter(content('volume1', 1), catalog());
+        switch (action) {
+          case 'leave':
+            engine.leave();
+          case 'remove':
+            expect(
+              await LocalLibraryRepository(users).removeOnlineBook(
+                book,
+                cancellation: CancellationSource().token,
+              ),
+              isA<Success>(),
+            );
+          case 'close':
+            await engine.close();
+        }
+        gate.complete(0);
+        await entering;
+        expect(images.calls, isEmpty);
+        expect(novels.calls, isEmpty);
+        expect(engine.state.phase, PrefetchPhase.idle);
+        expect(await engine.select(key('special')), isA<Failure>());
+      },
+    );
+  }
+
+  test('unrelated removal does not discard the pending enter', () async {
+    final gate = Completer<int>();
+    users.generations.add(gate);
+    final entering = engine.enter(content('volume1', 1), catalog());
+    users.notifyRemoved(book.sourceId.value, 'another-book');
+    gate.complete(0);
+    await entering;
+    await settle(engine);
+    expect(images.calls, ['volume1-0']);
+  });
+
+  test('same chapter notifications keep in-flight prefetch running', () async {
+    images.gate = Completer<void>();
+    await engine.enter(content('volume1', 1), catalog());
+    while (images.calls.isEmpty) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    final a = Completer<int>(), b = Completer<int>();
+    users.generations.addAll([a, b]);
+    final first = engine.enter(content('volume1', 1), catalog());
+    final second = engine.enter(content('volume1', 1), catalog());
+    a.complete(0);
+    await first;
+    b.complete(0);
+    await second;
+    expect(images.tokens.single.isCancelled, isFalse);
+    images.gate!.complete();
+    await settle(engine);
+    expect(images.calls, ['volume1-0']);
+    expect(images.leases.single.isClosed, isFalse);
+  });
+
+  test(
+    'stale enter query failure cannot overwrite newer prefetch state',
+    () async {
+      final a = Completer<int>(), b = Completer<int>();
+      users.generations.addAll([a, b]);
+      final first = engine.enter(content('volume1', 1), catalog());
+      final second = engine.enter(content('special', 1), catalog());
+      a.completeError(StateError('old generation query failed'));
+      await first;
+      b.complete(0);
+      await second;
+      await settle(engine);
+      expect(images.calls, ['special-0']);
+      expect(engine.state.failures, 0);
+      expect(engine.state.phase, PrefetchPhase.complete);
+    },
+  );
   test(
     'unknown relationships never select ordinal; all current images precede one chosen target',
     () async {

@@ -21,7 +21,9 @@ class LocalReadingPrefetch implements ReadingPrefetch {
     _clears = coordinator.clears.listen((_) => pause());
     _removals = users.removedBooks.listen((key) {
       final current = _content?.key.novelKey;
-      if (current?.sourceId.value == key.$1 && current?.novelId == key.$2) {
+      final entering = _enteringBook;
+      if ((current?.sourceId.value == key.$1 && current?.novelId == key.$2) ||
+          (entering?.sourceId.value == key.$1 && entering?.novelId == key.$2)) {
         leave();
       }
     });
@@ -43,6 +45,9 @@ class LocalReadingPrefetch implements ReadingPrefetch {
   Catalog? _catalog;
   ChapterKey? _target;
   int _epoch = 0, _block = 0, _failures = 0;
+  // Request order is separate so repeated chapter notifications keep work alive.
+  int _enterEpoch = 0;
+  NovelKey? _enteringBook;
   int? _bookEpoch;
   Future<bool> _bookCurrent() async {
     final key = _content?.key.novelKey;
@@ -87,7 +92,8 @@ class LocalReadingPrefetch implements ReadingPrefetch {
   @override
   Future<void> enter(ChapterContent content, Catalog? catalog) async {
     if (_closed) return;
-    final requestEpoch = _epoch;
+    final requestEpoch = ++_enterEpoch;
+    _enteringBook = content.key.novelKey;
     final int bookGeneration;
     try {
       bookGeneration = await users.removalGeneration(
@@ -95,13 +101,15 @@ class LocalReadingPrefetch implements ReadingPrefetch {
         content.key.novelKey.novelId,
       );
     } catch (_) {
-      if (!_closed && requestEpoch == _epoch) {
+      if (!_closed && requestEpoch == _enterEpoch) {
+        _enteringBook = null;
         _failures++;
         _emit(PrefetchPhase.partial);
       }
       return;
     }
-    if (_closed || requestEpoch != _epoch) return;
+    if (_closed || requestEpoch != _enterEpoch) return;
+    _enteringBook = null;
     if (_bookEpoch == bookGeneration &&
         _content?.key == content.key &&
         _content?.contentRevision == content.contentRevision) {
@@ -286,6 +294,8 @@ class LocalReadingPrefetch implements ReadingPrefetch {
 
   @override
   void leave() {
+    _enterEpoch++;
+    _enteringBook = null;
     _epoch++;
     _content = null;
     _next = null;
@@ -415,6 +425,8 @@ class LocalReadingPrefetch implements ReadingPrefetch {
 
   Future<void> close() async {
     _closed = true;
+    _enterEpoch++;
+    _enteringBook = null;
     _cancel?.cancel();
     await _running;
     _releaseFar(all: true);
