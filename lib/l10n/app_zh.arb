@@ -674,7 +674,7 @@
   "bookDeselectAll": "取消全选",
   "bookRemoveSelected": "移除",
   "bookDeleteSelected": "删除",
-  "bookReparseSelected": "重新解析所选（{count} 本）",
+  "bookReparseSelected": "重新解析（{count} 本）",
   "@bookReparseSelected": {
     "placeholders": {
       "count": {

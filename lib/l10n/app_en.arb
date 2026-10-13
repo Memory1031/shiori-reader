@@ -674,7 +674,7 @@
   "bookDeselectAll": "Deselect all",
   "bookRemoveSelected": "Remove",
   "bookDeleteSelected": "Delete",
-  "bookReparseSelected": "Reparse selected ({count})",
+  "bookReparseSelected": "Reparse ({count})",
   "@bookReparseSelected": {
     "placeholders": {
       "count": {

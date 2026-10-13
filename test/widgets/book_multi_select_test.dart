@@ -45,7 +45,7 @@ void main() {
       expect(store.calls, isEmpty);
       expect(h.importer.maintenanceBlocked, isTrue);
       await tester.tap(
-        find.widgetWithText(FilledButton, h.l.bookReparseSelected(2)),
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
@@ -85,7 +85,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('book-selection-reparse')));
       await tester.pumpAndSettle();
       await tester.tap(
-        find.widgetWithText(FilledButton, h.l.bookReparseSelected(1)),
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
       );
       await tester.pumpAndSettle();
       expect(store.calls.map((call) => call.key), [
@@ -161,7 +161,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(h.l.localReparse));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, h.l.localReparse));
+      await tester.tap(
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(store.calls, hasLength(1));
@@ -215,7 +217,7 @@ void main() {
       );
       expect(h.source.inbox, hasLength(1));
       await tester.tap(
-        find.widgetWithText(FilledButton, 'Reparse selected (1)'),
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));

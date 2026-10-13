@@ -1411,7 +1411,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String bookReparseSelected(int count) {
-    return 'Reparse selected ($count)';
+    return 'Reparse ($count)';
   }
 
   @override

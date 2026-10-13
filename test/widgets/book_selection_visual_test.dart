@@ -219,6 +219,49 @@ void main() {
     },
   );
 
+  for (final lang in ['zh', 'en']) {
+    testWidgets(
+      'compact 13-book reparse confirmation in $lang',
+      (tester) async {
+        await loadFonts(tester);
+        final h = VisualHarness(tester, GlobalKey(), count: 13);
+        addTearDown(h.close);
+        // Ahem exaggerates widths; large-text wrapping uses the preview font.
+        await h.pump(
+          width: 390,
+          height: 844,
+          lang: lang,
+          scale: fontsLoaded ? 1.6 : 1,
+        );
+        await tester.tap(find.byKey(const ValueKey('book-multi-select')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('book-selection-all')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('book-selection-reparse')));
+        await tester.pumpAndSettle();
+        expect(find.text(h.l.bookReparseSelected(13)), findsOneWidget);
+        final button = find.widgetWithText(FilledButton, h.l.localReparse).last;
+        final label = find.descendant(
+          of: button,
+          matching: find.text(h.l.localReparse),
+        );
+        final paragraph = tester.renderObject<RenderParagraph>(label);
+        expect(
+          paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: 0, extentOffset: h.l.localReparse.length),
+          ),
+          hasLength(1),
+        );
+        expect(h.store.calls, isEmpty);
+        expect(tester.takeException(), isNull);
+        await h.shot('reparse-confirm-13-$lang');
+        await tester.tap(find.text(h.l.importCancel).last);
+        await tester.pumpAndSettle();
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+    );
+  }
+
   testWidgets(
     'Windows real Workspace selection matches page chrome at 1280 and 840',
     (tester) async {

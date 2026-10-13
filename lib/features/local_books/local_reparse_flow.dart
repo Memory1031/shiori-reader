@@ -125,7 +125,7 @@ class LocalReparseFlow extends ChangeNotifier {
                     () => Navigator.pop(dialog, false),
                   ),
                   BookBatchAction(
-                    l.bookReparseSelected(targets.length),
+                    l.localReparse,
                     () => Navigator.pop(dialog, true),
                     primary: true,
                   ),

@@ -337,7 +337,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('book-selection-reparse')));
       await tester.pumpAndSettle();
       await tester.tap(
-        find.widgetWithText(FilledButton, h.l.bookReparseSelected(3)),
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
       );
       await tester.pumpAndSettle();
       expect(find.text(h.l.bookBatchSummary(3, 0, 0, 0, 0)), findsOneWidget);
@@ -395,7 +395,7 @@ void main() {
       expect(h.library.writing, isTrue);
       await h.screenshot('03-mixed-reparse-confirmation');
       await tester.tap(
-        find.widgetWithText(FilledButton, h.l.bookReparseSelected(3)),
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
       );
       await h.frame();
       expect(h.store.calls.map((c) => c.key), [local[0]]);
@@ -423,7 +423,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(h.l.bookReparseSelectedConfirm(1, 2)), findsOneWidget);
       await tester.tap(
-        find.widgetWithText(FilledButton, h.l.bookReparseSelected(1)),
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
       );
       await h.frame();
       expect(h.store.calls.last.key, local[1]);
@@ -523,9 +523,7 @@ void main() {
         await tester.tap(
           find.widgetWithText(
             FilledButton,
-            operation == 'remove'
-                ? h.l.bookDeleteSelected
-                : h.l.bookReparseSelected(3),
+            operation == 'remove' ? h.l.bookDeleteSelected : h.l.localReparse,
           ),
         );
         await h.frame();
@@ -766,7 +764,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('book-selection-reparse')));
       await tester.pumpAndSettle();
       await tester.tap(
-        find.widgetWithText(FilledButton, h.l.bookReparseSelected(3)),
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
       );
       await h.frame();
       final context = tester.element(find.byType(BookshelfView));
@@ -808,7 +806,7 @@ void main() {
       await h.actions.reparseSelected(owner);
       expect(find.byType(BookBatchPanel), findsOneWidget);
       await tester.tap(
-        find.widgetWithText(FilledButton, h.l.bookReparseSelected(3)),
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
       );
       await h.frame();
       await h.repository.removeFromBookshelf(
@@ -855,7 +853,7 @@ void main() {
       expect(find.text(h.l.bookReparseSelectedConfirm(1, 0)), findsOneWidget);
       expect(find.byType(DropdownButton<TxtEncoding>), findsNothing);
       await tester.tap(
-        find.widgetWithText(FilledButton, h.l.bookReparseSelected(1)),
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
       );
       await h.frame();
       expect(find.text('Synthetic sample'), findsOneWidget);

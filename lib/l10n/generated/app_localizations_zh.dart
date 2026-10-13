@@ -1286,7 +1286,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String bookReparseSelected(int count) {
-    return '重新解析所选（$count 本）';
+    return '重新解析（$count 本）';
   }
 
   @override

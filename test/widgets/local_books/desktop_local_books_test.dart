@@ -40,7 +40,7 @@ Future<void> confirm(WidgetTester tester, LocalHarness h) async {
   await menu(tester);
   await tester.tap(find.text(h.l.localReparse));
   await tester.pumpAndSettle();
-  await tester.tap(find.widgetWithText(FilledButton, h.l.localReparse));
+  await tester.tap(find.widgetWithText(FilledButton, h.l.localReparse).last);
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 350));
 }
@@ -300,7 +300,7 @@ void main() {
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(h.store.calls, isEmpty);
       await tester.tap(
-        find.widgetWithText(FilledButton, h.l.bookReparseSelected(45)),
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
@@ -432,7 +432,7 @@ void main() {
       start();
       await tester.pumpAndSettle();
       await tester.tap(
-        find.widgetWithText(FilledButton, h.l.bookReparseSelected(45)),
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
@@ -468,7 +468,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text(h.l.localReparse));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, h.l.localReparse));
+      await tester.tap(
+        find.widgetWithText(FilledButton, h.l.localReparse).last,
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
       tester.view.physicalSize = const Size(900, 720);

@@ -154,14 +154,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('book-selection-reparse')));
     await tester.pumpAndSettle();
     expect(store.calls, isEmpty);
-    await tester.tap(
-      find.widgetWithText(
-        FilledButton,
-        AppLocalizations.of(
-          tester.element(find.byType(LocalBooksScreen)),
-        ).bookReparseSelected(3),
-      ),
+    final l = AppLocalizations.of(
+      tester.element(find.byType(LocalBooksScreen)),
     );
+    await tester.tap(find.widgetWithText(FilledButton, l.localReparse).last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
   }

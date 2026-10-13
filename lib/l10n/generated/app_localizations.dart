@@ -2495,7 +2495,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookReparseSelected.
   ///
   /// In en, this message translates to:
-  /// **'Reparse selected ({count})'**
+  /// **'Reparse ({count})'**
   String bookReparseSelected(int count);
 
   /// No description provided for @bookNoReparse.
