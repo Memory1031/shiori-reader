@@ -349,6 +349,7 @@ class _ProductionAppState extends State<ProductionApp>
               userDataDirectory: _paths!.webView,
               child: ImportOverlay(
                 controller: _imports!,
+                navigatorKey: _navigator,
                 onRead: _readImported,
                 // Above the navigator, so shelf and local-file covers stay
                 // decoded across pages; the reader nests its own scope.

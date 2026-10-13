@@ -80,12 +80,14 @@ void main() {
     });
   });
   late Directory temp;
+  late GlobalKey<NavigatorState> navigatorKey;
   late AppPaths paths;
   late UserDatabase db;
   late ManagedLocalBooks store;
   late SizedSource source;
   late ImportController controller;
   setUp(() async {
+    navigatorKey = GlobalKey<NavigatorState>();
     temp = await Directory.systemTemp.createTemp('local003004-');
     paths = AppPaths(
       support: Directory('${temp.path}/support'),
@@ -545,11 +547,15 @@ void main() {
         });
         await tester.pumpWidget(
           MaterialApp(
+            navigatorKey: navigatorKey,
             locale: Locale(locale),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
-            builder: (_, child) =>
-                ImportOverlay(controller: controller, child: child!),
+            builder: (_, child) => ImportOverlay(
+              controller: controller,
+              navigatorKey: navigatorKey,
+              child: child!,
+            ),
             home: const Scaffold(body: Text('Existing reader')),
           ),
         );
@@ -582,6 +588,7 @@ void main() {
         });
         await tester.pumpWidget(
           MaterialApp(
+            navigatorKey: navigatorKey,
             locale: Locale(locale),
             localizationsDelegates: AppLocalizations.localizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
@@ -589,7 +596,11 @@ void main() {
               data: MediaQuery.of(
                 context,
               ).copyWith(textScaler: const TextScaler.linear(2)),
-              child: ImportOverlay(controller: controller, child: child!),
+              child: ImportOverlay(
+                controller: controller,
+                navigatorKey: navigatorKey,
+                child: child!,
+              ),
             ),
             home: const Scaffold(body: Text('Existing reader')),
           ),

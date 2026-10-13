@@ -171,12 +171,14 @@ Future<void> untilImport(bool Function() condition) async {
 
 void main() {
   late Directory temp;
+  late GlobalKey<NavigatorState> navigatorKey;
   late UserDatabase db;
   late ManagedLocalBooks store;
   late MemorySource source;
   late ImportController controller;
   var parses = 0;
   setUp(() async {
+    navigatorKey = GlobalKey<NavigatorState>();
     temp = await Directory.systemTemp.createTemp('local002-');
     final paths = AppPaths(
       support: Directory('${temp.path}/support'),
@@ -1103,6 +1105,7 @@ void main() {
     ValueChanged<NovelKey>? onRead,
   }) => tester.pumpWidget(
     MaterialApp(
+      navigatorKey: navigatorKey,
       locale: locale,
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -1112,6 +1115,7 @@ void main() {
         ).copyWith(textScaler: TextScaler.linear(scale)),
         child: ImportOverlay(
           controller: controller,
+          navigatorKey: navigatorKey,
           onRead: onRead,
           child: child!,
         ),
@@ -1270,8 +1274,12 @@ void main() {
           );
           await tester.pumpWidget(
             ShioriApp(
-              overlayBuilder: (_, child) =>
-                  ImportOverlay(controller: controller, child: child),
+              navigatorKey: navigatorKey,
+              overlayBuilder: (_, child) => ImportOverlay(
+                controller: controller,
+                navigatorKey: navigatorKey,
+                child: child,
+              ),
               routes: AppRoutes(
                 home: (_) => ReaderContentView(
                   content: content,

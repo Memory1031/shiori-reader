@@ -135,11 +135,14 @@ Future<void> settle(LocalReadingPrefetch engine) async {
 class GatedUsers extends UserDatabase {
   GatedUsers() : super(NativeDatabase.memory());
   final generations = <Completer<int>>[];
+  final queried = <(String, String)>[];
   @override
-  Future<int> removalGeneration(String source, String novel) =>
-      generations.isEmpty
-      ? super.removalGeneration(source, novel)
-      : generations.removeAt(0).future;
+  Future<int> removalGeneration(String source, String novel) {
+    queried.add((source, novel));
+    return generations.isEmpty
+        ? super.removalGeneration(source, novel)
+        : generations.removeAt(0).future;
+  }
 }
 
 void main() {
@@ -165,6 +168,50 @@ void main() {
     await owner.close();
     await users.close();
   });
+
+  for (final failed in [false, true]) {
+    test(
+      'late initialization keeps the newer choice with failed query=$failed',
+      () async {
+        await users.customStatement(
+          'INSERT INTO prefetch_choices VALUES(?,?,?,?),(?,?,?,?)',
+          [
+            book.sourceId.value,
+            book.novelId,
+            'volume1',
+            'translation2',
+            book.sourceId.value,
+            book.novelId,
+            'special',
+            'volume3',
+          ],
+        );
+        final initial = Completer<int>()..complete(0);
+        final validation = Completer<int>();
+        users.generations.addAll([initial, validation]);
+        images.gate = Completer<void>();
+        final old = engine.enter(content('volume1'), catalog());
+        for (var i = 0; i < 500 && users.queried.length < 2; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        expect(users.queried, hasLength(2));
+        await engine.enter(content('special', 1), catalog());
+        expect(engine.state.target, key('volume3'));
+        if (failed) {
+          validation.completeError(StateError('retired query failed'));
+        } else {
+          validation.complete(0);
+        }
+        await old;
+        images.gate!.complete();
+        await settle(engine);
+        expect(engine.state.target, key('volume3'));
+        expect(engine.state.failures, 0);
+        expect(novels.calls, [key('volume3')]);
+        expect(images.calls, ['special-0', 'volume3-0', 'volume3-1']);
+      },
+    );
+  }
 
   for (final newerFirst in [false, true]) {
     test(

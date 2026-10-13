@@ -105,6 +105,7 @@ class GatedStore implements LocalBookStore {
 
 class Harness {
   Harness({this.inputLimits = const {}});
+  final navigatorKey = GlobalKey<NavigatorState>();
   final Map<LocalBookFormat, int> inputLimits;
   final source = StreamSource(), store = GatedStore();
   late final controller = ImportController(
@@ -160,6 +161,7 @@ Future<void> mount(
     RepaintBoundary(
       key: capture,
       child: MaterialApp(
+        navigatorKey: h.navigatorKey,
         debugShowCheckedModeBanner: false,
         locale: Locale(lang),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -177,7 +179,11 @@ Future<void> mount(
             textScaler: TextScaler.linear(scale),
             disableAnimations: reduced,
           ),
-          child: ImportOverlay(controller: h.controller, child: child!),
+          child: ImportOverlay(
+            controller: h.controller,
+            navigatorKey: h.navigatorKey,
+            child: child!,
+          ),
         ),
         home: const Scaffold(body: Center(child: Text('Shiori'))),
       ),

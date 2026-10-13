@@ -45,10 +45,12 @@ class ImportOverlay extends StatefulWidget {
   const ImportOverlay({
     super.key,
     required this.controller,
+    required this.navigatorKey,
     required this.child,
     this.onRead,
   });
   final ImportController controller;
+  final GlobalKey<NavigatorState> navigatorKey;
   final Widget child;
   final ValueChanged<NovelKey>? onRead;
   @override
@@ -57,8 +59,141 @@ class ImportOverlay extends StatefulWidget {
 
 class _ImportOverlayState extends State<ImportOverlay>
     with WidgetsBindingObserver {
-  bool _showing = false;
-  FocusNode? _previousFocus;
+  _ImportRoute? _route;
+  bool _scheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    widget.controller.addListener(_changed);
+  }
+
+  @override
+  void didUpdateWidget(ImportOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_changed);
+      widget.controller.addListener(_changed);
+    }
+  }
+
+  void _changed() {
+    if (_scheduled) return;
+    _scheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduled = false;
+      if (!mounted) return;
+      final navigator = widget.navigatorKey.currentState;
+      final c = widget.controller;
+      if (_route != null &&
+          (!c.interactionOpen ||
+              c.maintenanceBlocked ||
+              _route!.imports != c ||
+              _route!.navigator != navigator)) {
+        final old = _route!;
+        _route = null;
+        if (old.isActive && old.navigator?.mounted == true) {
+          old.navigator!.removeRoute(old);
+        }
+      }
+      if (c.interactionOpen && !c.maintenanceBlocked && navigator != null) {
+        if (_route == null) {
+          final route = _route = _ImportRoute(
+            imports: c,
+            onRead: widget.onRead,
+            barrierLabel: MaterialLocalizations.of(
+              context,
+            ).modalBarrierDismissLabel,
+          );
+          unawaited(
+            navigator.push(route).whenComplete(() {
+              if (mounted && identical(_route, route)) {
+                _route = null;
+                c.dismiss();
+              }
+            }),
+          );
+        } else {
+          _route!.changedInternalState();
+        }
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(widget.controller.refresh());
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_changed);
+    WidgetsBinding.instance.removeObserver(this);
+    final route = _route;
+    _route = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (route?.navigator?.mounted == true && route!.isActive) {
+        route.navigator!.removeRoute(route);
+      }
+    });
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _changed();
+    return widget.child;
+  }
+}
+
+class _ImportRoute extends PopupRoute<void> {
+  _ImportRoute({required this.imports, required this.barrierLabel, this.onRead})
+    : super(traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop);
+  final ImportController imports;
+  final ValueChanged<NovelKey>? onRead;
+  final panelKey = GlobalKey<_ImportPanelState>();
+  @override
+  final String barrierLabel;
+  @override
+  bool get barrierDismissible => !imports.busy;
+  @override
+  Color get barrierColor => Colors.black26;
+  @override
+  Duration get transitionDuration => Duration.zero;
+  @override
+  RoutePopDisposition get popDisposition =>
+      imports.busy || panelKey.currentState?._discardIds != null
+      ? RoutePopDisposition.doNotPop
+      : super.popDisposition;
+  @override
+  Widget buildModalBarrier() => ModalBarrier(
+    key: const ValueKey('import-dismiss-barrier'),
+    color: barrierColor,
+    dismissible: barrierDismissible,
+    onDismiss: () => panelKey.currentState?._dismiss(),
+    semanticsLabel: barrierLabel,
+  );
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) => _ImportPanel(key: panelKey, controller: imports, onRead: onRead);
+}
+
+class _ImportPanel extends StatefulWidget {
+  const _ImportPanel({super.key, required this.controller, this.onRead});
+  final ImportController controller;
+  final ValueChanged<NovelKey>? onRead;
+  @override
+  State<_ImportPanel> createState() => _ImportPanelState();
+}
+
+class _ImportPanelState extends State<_ImportPanel> {
   Set<String>? _discardIds;
   bool _discardRemaining = false, _stopping = false;
   final _discardFocus = FocusNode();
@@ -166,43 +301,8 @@ class _ImportOverlayState extends State<ImportOverlay>
     );
   }
 
-  void _updateFocus(bool show) {
-    if (_showing == show) return;
-    _showing = show;
-    if (show) {
-      _previousFocus = FocusManager.instance.primaryFocus;
-    } else {
-      _discardIds = null;
-      final previous = _previousFocus;
-      _previousFocus = null;
-      // Wait until ExcludeFocus has enabled the underlying route again.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted &&
-            !_showing &&
-            previous?.context != null &&
-            previous!.canRequestFocus) {
-          previous.requestFocus();
-        }
-      });
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(widget.controller.refresh());
-    }
-  }
-
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _discardFocus.dispose();
     super.dispose();
   }
@@ -213,70 +313,50 @@ class _ImportOverlayState extends State<ImportOverlay>
     builder: (context, _) {
       final c = widget.controller;
       final l = AppLocalizations.of(context);
-      final show = !c.maintenanceBlocked && c.interactionOpen;
-      _updateFocus(show);
-      return Stack(
-        children: [
-          ExcludeFocus(excluding: show, child: widget.child),
-          if (show)
-            ModalBarrier(
-              key: const ValueKey('import-dismiss-barrier'),
-              color: Colors.black26,
-              dismissible: !c.busy,
-              onDismiss: _dismiss,
-              semanticsLabel: MaterialLocalizations.of(
-                context,
-              ).modalBarrierDismissLabel,
-            ),
-          if (show)
-            Positioned.fill(
-              child: FocusScope(
-                key: ValueKey(_discardIds != null),
-                autofocus: true,
-                onKeyEvent: (_, event) {
-                  if (event.logicalKey != LogicalKeyboardKey.escape) {
-                    return KeyEventResult.ignored;
-                  }
-                  if (event is KeyDownEvent) _dismiss();
-                  return KeyEventResult.handled;
-                },
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: SafeArea(
+      return PopScope<void>(
+        canPop: !c.busy && _discardIds == null,
+        onPopInvokedWithResult: (_, _) => _dismiss(),
+        child: FocusScope(
+          key: ValueKey(_discardIds != null),
+          autofocus: true,
+          onKeyEvent: (_, event) {
+            if (event.logicalKey != LogicalKeyboardKey.escape) {
+              return KeyEventResult.ignored;
+            }
+            if (event is KeyDownEvent) _dismiss();
+            return KeyEventResult.handled;
+          },
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(ShioriSpace.medium),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: ShioriLayout.panel,
+                    maxHeight: MediaQuery.sizeOf(context).height * .7,
+                  ),
+                  child: Material(
+                    elevation: 8,
+                    borderRadius: BorderRadius.circular(ShioriShape.sheet),
+                    color: Theme.of(context).colorScheme.surface,
+                    surfaceTintColor: Colors.transparent,
                     child: Padding(
-                      padding: const EdgeInsets.all(ShioriSpace.medium),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: ShioriLayout.panel,
-                          maxHeight: MediaQuery.sizeOf(context).height * .7,
-                        ),
-                        child: Material(
-                          elevation: 8,
-                          borderRadius: BorderRadius.circular(
-                            ShioriShape.sheet,
-                          ),
-                          color: Theme.of(context).colorScheme.surface,
-                          surfaceTintColor: Colors.transparent,
-                          child: Padding(
-                            padding: const EdgeInsets.all(ShioriSpace.page),
-                            child: c.discarding
-                                ? ShioriTaskProgressBar(
-                                    semanticsLabel: l.loading,
-                                  )
-                                : _discardIds != null
-                                ? _discardConfirmation(c, l)
-                                : c.panelOpen
-                                ? _panel(context, c, l)
-                                : _banner(context, c, l),
-                          ),
-                        ),
-                      ),
+                      padding: const EdgeInsets.all(ShioriSpace.page),
+                      child: c.discarding
+                          ? ShioriTaskProgressBar(semanticsLabel: l.loading)
+                          : _discardIds != null
+                          ? _discardConfirmation(c, l)
+                          : c.panelOpen
+                          ? _panel(context, c, l)
+                          : _banner(context, c, l),
                     ),
                   ),
                 ),
               ),
             ),
-        ],
+          ),
+        ),
       );
     },
   );

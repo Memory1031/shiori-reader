@@ -139,7 +139,9 @@ class LocalReadingPrefetch implements ReadingPrefetch {
             variables: _identity(content.key),
           )
           .getSingleOrNull();
-      if (_closed || epoch != _epoch || !(await _bookCurrent())) return;
+      if (_closed || epoch != _epoch) return;
+      final bookCurrent = await _bookCurrent();
+      if (_closed || epoch != _epoch || !bookCurrent) return;
       _currentEnabled = settings?.read<int>('current_enabled') != 0;
       _nextEnabled = settings?.read<int>('next_enabled') != 0;
       if (choice != null) {
@@ -150,7 +152,7 @@ class LocalReadingPrefetch implements ReadingPrefetch {
         if (catalog == null || _valid(key)) _target = key;
       }
     } catch (_) {
-      _failures++;
+      if (!_closed && epoch == _epoch) _failures++;
     } finally {
       if (epoch == _epoch) {
         _loading = false;

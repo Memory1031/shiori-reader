@@ -136,6 +136,7 @@ class LocalHarness {
     this.preview,
   }) : store = store ?? LocalStore();
   final WidgetTester tester;
+  final navigatorKey = GlobalKey<NavigatorState>();
   final LocalStore store;
   final CacheManagement? cache;
   final WidgetBuilder? updates;
@@ -155,13 +156,18 @@ class LocalHarness {
       supportsReparse ? store : PlainLocalStore(store);
   String lang = 'en';
   late final Widget app = ShioriApp(
+    navigatorKey: navigatorKey,
     locale: Locale(lang),
     overlayBuilder: (context, child) {
       final overlay = MediaQuery(
         data: MediaQuery.of(
           context,
         ).copyWith(textScaler: TextScaler.linear(scale)),
-        child: ImportOverlay(controller: importer, child: child),
+        child: ImportOverlay(
+          controller: importer,
+          navigatorKey: navigatorKey,
+          child: child,
+        ),
       );
       return preview?.call(context, overlay) ?? overlay;
     },
