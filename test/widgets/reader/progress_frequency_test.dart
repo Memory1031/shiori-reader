@@ -5,11 +5,12 @@ import 'package:shiori/app/routes.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/features/reader/reader_toolbars.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 
 void main() {
   testWidgets(
-    'progress label stays within 4Hz while panel uses latest position',
+    'confirmed progress is immediate and unchanged percent skips text notifications',
     (tester) async {
       final content = const FixtureData().content(
         FixtureScenario.extremeParagraph,
@@ -21,11 +22,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      final label = tester.widget<ValueListenableBuilder<ReaderPosition?>>(
-        find.byWidgetPredicate(
-          (w) => w is ValueListenableBuilder<ReaderPosition?>,
-        ),
+      final labelFinder = find.descendant(
+        of: find.byType(ReaderBottomBar),
+        matching: find.byKey(const ValueKey('reader-progress-text')),
       );
+      final label = tester.widget<ValueListenableBuilder>(labelFinder);
       var notifications = 0;
       void changed() => notifications++;
       label.valueListenable.addListener(changed);
@@ -44,13 +45,12 @@ void main() {
         await tester.pump(const Duration(milliseconds: 16));
       }
       await tester.pump(const Duration(milliseconds: 250));
-      expect(notifications, inInclusiveRange(1, 40));
-      // Opening controls must not use the delayed label's value.
+      expect(notifications, 59);
       viewport.onPosition!(at(.95), false);
+      await tester.pump();
+      expect(find.text('Chapter 95%'), findsWidgets);
       final progressButton = find.ancestor(
-        of: find.byWidgetPredicate(
-          (w) => w is ValueListenableBuilder<ReaderPosition?>,
-        ),
+        of: labelFinder,
         matching: find.byType(TextButton),
       );
       await tester.tap(progressButton);

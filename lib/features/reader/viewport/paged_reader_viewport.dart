@@ -15,6 +15,21 @@ import '../reader_tap_zones.dart';
 import '../reader_margin.dart';
 import '../../../domain/contracts/contracts.dart';
 
+/// One accepted turn's read-only endpoints in a single layout generation.
+/// The instance identifies the operation; null progress ends only that preview.
+@immutable
+final class ReaderTurnPreview {
+  const ReaderTurnPreview({
+    required this.from,
+    required this.to,
+    required this.layoutGeneration,
+    required this.discrete,
+  });
+  final ({ReaderPosition position, bool last}) from, to;
+  final int layoutGeneration;
+  final bool discrete;
+}
+
 class PagedReaderController {
   _PagedReaderViewportState? _state;
   ReaderPosition? capture() => _state?._position;
@@ -274,6 +289,7 @@ class PagedReaderViewport extends StatefulWidget {
     this.onTurning,
     this.onTurnCommitted,
     this.onTurnVisual,
+    this.onTurnPreview,
     this.pageSize,
     this.contentOrigin = Offset.zero,
     this.startAtEnd = false,
@@ -321,6 +337,7 @@ class PagedReaderViewport extends StatefulWidget {
   /// Reports each frame of a turn so the host can paint the curl over the
   /// full reader page; when null the viewport paints it itself.
   final ValueChanged<PageTurnFrame>? onTurnVisual;
+  final void Function(ReaderTurnPreview turn, double? progress)? onTurnPreview;
   final PageTurnStyle turnStyle;
   final Size? pageSize;
   final Offset contentOrigin;
@@ -339,6 +356,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   late final AnimationController _turnAnimation;
   int _current = 0;
   int? _target;
+  ReaderTurnPreview? _turnPreview;
   int? _queuedDirection;
   bool _acceptsQueuedTurn = false;
   int _direction = 1;
@@ -404,11 +422,50 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       _visualQueued = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _visualQueued = false;
-        if (mounted) widget.onTurnVisual?.call(_frame);
+        if (mounted) _reportFrame();
       });
     } else {
-      widget.onTurnVisual?.call(_frame);
+      _reportFrame();
     }
+  }
+
+  void _reportFrame() {
+    widget.onTurnVisual?.call(_frame);
+    if (_turnPreview case final preview?) {
+      widget.onTurnPreview?.call(preview, _turnAnimation.value);
+    }
+  }
+
+  void _beginPreview({required bool discrete}) {
+    if (widget.onTurnPreview == null || _layout == null || _target == null) {
+      return;
+    }
+    ({ReaderPosition position, bool last})? endpoint(int number) {
+      final page = _pages[number];
+      if (page == null) return null;
+      return (
+        position: number == _restorePage && _restoreAnchor != null
+            ? _restoreAnchor!
+            : _layout!.position(page.start),
+        last: page.end.unit >= _layout!.index.chunks.length,
+      );
+    }
+
+    final from = endpoint(_current), to = endpoint(_target!);
+    if (from == null || to == null) return;
+    final preview = _turnPreview = ReaderTurnPreview(
+      from: from,
+      to: to,
+      layoutGeneration: _epoch,
+      discrete: discrete,
+    );
+    widget.onTurnPreview?.call(preview, _turnAnimation.value);
+  }
+
+  void _endPreview() {
+    final preview = _turnPreview;
+    _turnPreview = null;
+    if (preview != null) widget.onTurnPreview?.call(preview, null);
   }
 
   void _attach() {
@@ -442,6 +499,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
 
   void _restore(ReaderPosition position) {
     if (!mounted) return;
+    _endPreview();
     _queuedDirection = null;
     _restoring = true;
     widget.onRestoreStart?.call();
@@ -562,7 +620,6 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       }
       _target = null;
       _userScrolling = false;
-      _turnAnimation.value = 0;
       if (_deferredLayout) {
         _signature = null;
         _deferredLayout = false;
@@ -573,6 +630,8 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       _sample();
       widget.onTurnCommitted?.call();
     }
+    _endPreview();
+    _turnAnimation.value = 0;
     if (!commit) _queuedDirection = null;
     if (_queuedDirection != null) {
       // Let pending layout/route changes settle before consuming the one-slot
@@ -624,6 +683,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       _userScrolling = true;
     });
     widget.onTurning?.call(true);
+    _beginPreview(discrete: true);
     await _finish(true);
   }
 
@@ -648,6 +708,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           _userScrolling = true;
         });
         widget.onTurning?.call(true);
+        _beginPreview(discrete: false);
       }
     }
     if (_boundaryDrag case final drag?) {
@@ -779,6 +840,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       ];
       final changed =
           _signature != signature || !listEquals(_imageGeometry, imageGeometry);
+      if (changed || _positionReset) _endPreview();
       if (changed && _userScrolling) _deferredLayout = true;
       if ((changed && !_userScrolling) || _positionReset) {
         // A seek may remove the recognizer before it receives end/cancel.

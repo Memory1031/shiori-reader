@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/scheduler.dart';
 import '../../app/app_exit.dart';
 import '../../app/window_caption.dart';
 import 'package:flutter/gestures.dart';
@@ -44,6 +45,9 @@ import 'reader_logical_progress.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'viewport/page_turn.dart';
 import 'viewport/reader_box.dart';
+
+typedef _ProgressText = ({String? percent, bool document});
+typedef _ProgressEndpoint = ({Object scope, double fraction, bool document});
 
 /// The body never observes per-frame progress or Chrome visibility changes.
 /// Preferences are injected and scoped to this reading session.
@@ -141,10 +145,16 @@ class _ReaderContentViewState extends State<ReaderContentView>
     with WidgetsBindingObserver {
   AppExitScopeState? _exitOwner;
   void Function()? _removeExit;
+  Size? _progressWindowSize;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final size = MediaQuery.sizeOf(context);
+    if (_progressWindowSize != null && _progressWindowSize != size) {
+      _invalidateProgressPreview();
+    }
+    _progressWindowSize = size;
     final owner = AppExitScope.of(context);
     if (owner != _exitOwner) {
       _removeExit?.call();
@@ -155,6 +165,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   Future<bool> _saveForExit() async {
     if (!mounted) return true;
+    _invalidateProgressPreview();
     widget.onCancelChapter?.call();
     _dragSurface.currentState?.cancel();
     _cancelCompletion(immediate: true);
@@ -260,12 +271,24 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _settings = _preferences.value;
     _preferences.addListener(_changed);
     _position = widget.initialPosition;
+    _confirmedProgressText = _confirmedProgress;
+    _updateProgressText();
     unawaited(_loadPreferences());
   }
 
   @override
   void didUpdateWidget(ReaderContentView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(
+          oldWidget.logicalProgress?.index,
+          widget.logicalProgress?.index,
+        ) ||
+        oldWidget.logicalProgress?.loading != widget.logicalProgress?.loading ||
+        oldWidget.content != widget.content ||
+        !widget.active ||
+        widget.session?.isClosed == true) {
+      _invalidateProgressPreview();
+    }
     if (oldWidget.images != widget.images ||
         oldWidget.audioFactory != widget.audioFactory) {
       _audio.dispose();
@@ -350,6 +373,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   void _changed() {
     if (!mounted || _settings == _preferences.value) return;
+    _invalidateProgressPreview();
     _position = _paged.capture() ?? _position;
     setState(() {
       _settings = _preferences.value;
@@ -359,6 +383,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
+      _invalidateProgressPreview();
       _audio.stop();
       _progressRequest++;
       _dismissProgressPanel();
@@ -534,10 +559,108 @@ class _ReaderContentViewState extends State<ReaderContentView>
           );
   }
 
-  Timer? _positionLabelTimer;
+  final _progressText =
+      ValueNotifier<({_ProgressText shown, _ProgressText confirmed})>((
+        shown: (percent: '0', document: false),
+        confirmed: (percent: '0', document: false),
+      ));
+  ReaderTurnPreview? _progressTurn;
+  _ProgressEndpoint? _progressFrom, _progressTo;
+  double _turnProgress = 0;
+  bool _progressTextQueued = false;
+  _ProgressText _confirmedProgressText = (percent: '0', document: false);
+
+  _ProgressText get _confirmedProgress => (
+    percent: widget.logicalProgress?.loading == true
+        ? null
+        : formatReadingPercent(_visibleScopeFraction),
+    document: widget.logicalProgress != null && _logicalSection == null,
+  );
+
+  _ProgressEndpoint? _progressEndpoint(
+    ({ReaderPosition position, bool last}) endpoint,
+  ) {
+    final logical = widget.logicalProgress, index = logical?.index;
+    if (logical?.loading == true ||
+        (index != null &&
+            index.documents[widget.content.key]?.matches(widget.content) !=
+                true)) {
+      return null;
+    }
+    final section = index?.sectionAt(widget.content.key, endpoint.position);
+    final fraction = endpoint.last ? 1.0 : endpoint.position.chapterFraction;
+    return (
+      scope: section ?? widget.content.key,
+      fraction: section == null
+          ? fraction
+          : section.fraction(index!.coordinate(widget.content.key, fraction)!),
+      document: logical != null && section == null,
+    );
+  }
+
+  void _previewProgress(ReaderTurnPreview turn, double? progress) {
+    if (!mounted) return;
+    if (progress == null) {
+      if (!identical(_progressTurn, turn)) return;
+      _progressTurn = null;
+      _progressFrom = _progressTo = null;
+    } else {
+      if (!identical(_progressTurn, turn)) {
+        _progressTurn = turn;
+        _progressFrom = _progressEndpoint(turn.from);
+        _progressTo = _progressEndpoint(turn.to);
+      }
+      _turnProgress = progress.clamp(0.0, 1.0);
+      if (_exitOwner?.saving == true ||
+          turn.layoutGeneration != _paged.layoutGeneration ||
+          _paged.isRestoring ||
+          widget.session?.isClosed == true) {
+        _progressFrom = _progressTo = null;
+      }
+    }
+    _updateProgressText();
+  }
+
+  void _invalidateProgressPreview() {
+    // Keep the operation identity so later frames cannot revive invalid inputs.
+    _progressFrom = _progressTo = null;
+    _confirmedProgressText = _confirmedProgress;
+    _updateProgressText();
+  }
+
+  void _updateProgressText() {
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      if (_progressTextQueued) return;
+      _progressTextQueued = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _progressTextQueued = false;
+        if (mounted) _updateProgressText();
+      });
+      return;
+    }
+    final confirmed = _confirmedProgressText;
+    var shown = confirmed;
+    final from = _progressFrom, to = _progressTo;
+    if (from != null && to != null) {
+      final discrete = _progressTurn!.discrete;
+      if (discrete || from.scope == to.scope) {
+        final fraction = discrete || _turnProgress == 1
+            ? to.fraction
+            : from.fraction + (to.fraction - from.fraction) * _turnProgress;
+        shown = (
+          percent: formatReadingPercent(fraction),
+          document: to.document,
+        );
+      }
+    }
+    _progressText.value = (shown: shown, confirmed: confirmed);
+  }
+
   bool _announcedReady = false;
   int _layoutEpoch = 0;
   void _layoutInvalidated() {
+    _invalidateProgressPreview();
     _audio.stop();
     _layoutEpoch++;
     _announcedReady = false;
@@ -564,11 +687,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
     _latestReadingPosition = position;
     _lastPageVisible = _usesPresentation || completed;
-    // Display is bounded to 4Hz; persistence still receives every sample.
-    _positionLabelTimer ??= Timer(const Duration(milliseconds: 250), () {
-      _positionLabelTimer = null;
-      _readingPosition.value = _latestReadingPosition;
-    });
+    _readingPosition.value = position;
+    _confirmedProgressText = _confirmedProgress;
+    _updateProgressText();
     widget.session?.sampleProgress(position, completed);
   }
 
@@ -925,7 +1046,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     if (widget.preferences == null) _preferences.dispose();
     _paperTurn.dispose();
     if (widget.chrome == null) _chrome.dispose();
-    _positionLabelTimer?.cancel();
+    _progressText.dispose();
     _readingPosition.dispose();
     super.dispose();
   }
@@ -1422,6 +1543,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
           contentTop,
         ),
         onTurnVisual: (frame) => _paperTurn.value = frame,
+        onTurnPreview: _previewProgress,
         turnStyle: _settings.pageTurn,
         startAtEnd:
             (widget.session?.startAtEnd ?? false) &&
@@ -1515,6 +1637,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   /// drops any book-end state and samples during the transition persist,
   /// and leaves the completion page first when it is showing.
   void _navigateTo(ReaderPosition target) {
+    _invalidateProgressPreview();
     widget.session?.beginPositionNavigation();
     if (widget.completion != null) _actions.completionPrevious?.call();
     _position = target;
@@ -1679,28 +1802,34 @@ class _ReaderContentViewState extends State<ReaderContentView>
     if (intent != null && live()) intent();
   }
 
-  /// Chapter progress text, rebuilt at most at the sampling rate.
+  /// Only formatted labels observe turn previews; accessibility keeps the anchor.
   Widget _progressLabel(
     String Function(String percent) label, {
     TextStyle? style,
     StrutStyle? strut,
-  }) => ValueListenableBuilder<ReaderPosition?>(
-    valueListenable: _readingPosition,
-    builder: (context, position, _) => Text(
-      widget.logicalProgress?.loading == true
-          ? AppLocalizations.of(context).readerChapterProgressLoading
-          : widget.logicalProgress != null && _logicalSection == null
-          ? AppLocalizations.of(context).readerDocumentPercent(
-              formatReadingPercent(_visibleChapterFraction),
-            )
-          : label(formatReadingPercent(_visibleScopeFraction)),
-      textAlign: TextAlign.center,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      strutStyle: strut,
-      style: style,
-    ),
-  );
+  }) =>
+      ValueListenableBuilder<({_ProgressText shown, _ProgressText confirmed})>(
+        key: const ValueKey('reader-progress-text'),
+        valueListenable: _progressText,
+        builder: (context, value, _) {
+          String text(_ProgressText progress) => progress.percent == null
+              ? AppLocalizations.of(context).readerChapterProgressLoading
+              : progress.document
+              ? AppLocalizations.of(
+                  context,
+                ).readerDocumentPercent(progress.percent!)
+              : label(progress.percent!);
+          return Text(
+            text(value.shown),
+            semanticsLabel: text(value.confirmed),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            strutStyle: strut,
+            style: style,
+          );
+        },
+      );
 
   Widget _runningChrome(BuildContext context) {
     final l = AppLocalizations.of(context);
