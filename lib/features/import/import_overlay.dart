@@ -59,6 +59,112 @@ class _ImportOverlayState extends State<ImportOverlay>
     with WidgetsBindingObserver {
   bool _showing = false;
   FocusNode? _previousFocus;
+  Set<String>? _discardIds;
+  bool _discardRemaining = false, _stopping = false;
+  final _discardFocus = FocusNode();
+
+  void _keepFiles() {
+    setState(() => _discardIds = null);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          _discardFocus.context != null &&
+          _discardFocus.canRequestFocus) {
+        _discardFocus.requestFocus();
+      }
+    });
+  }
+
+  void _dismiss() {
+    if (_discardIds != null) {
+      _keepFiles();
+    } else {
+      widget.controller.dismiss();
+    }
+  }
+
+  Future<void> _stop() async {
+    if (_stopping) return;
+    setState(() => _stopping = true);
+    try {
+      await widget.controller.cancel();
+    } finally {
+      if (mounted) setState(() => _stopping = false);
+    }
+  }
+
+  Widget _stopButton(ImportController c, AppLocalizations l) => TextButton(
+    onPressed: _stopping ? null : _stop,
+    child: Text(
+      c.phase == ImportPhase.receiving ? l.importStopReceiving : l.importStop,
+    ),
+  );
+
+  Widget _discardButton(ImportController c, AppLocalizations l) {
+    final remaining =
+        c.items.length > 1 &&
+        c.items.any((item) => item.phase != ImportItemPhase.ready);
+    return TextButton(
+      focusNode: _discardFocus,
+      style: TextButton.styleFrom(
+        foregroundColor: Theme.of(context).colorScheme.error,
+      ),
+      onPressed: () => setState(() {
+        _discardIds = c.items.map((item) => item.candidate.id).toSet();
+        _discardRemaining = remaining;
+      }),
+      child: Text(remaining ? l.importDiscardRemaining : l.importDiscardFiles),
+    );
+  }
+
+  Widget _discardConfirmation(ImportController c, AppLocalizations l) {
+    final title = _discardRemaining
+        ? l.importDiscardRemainingTitle
+        : l.importDiscardTitle;
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      scopesRoute: true,
+      explicitChildNodes: true,
+      namesRoute: true,
+      label: title,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: ShioriSpace.medium),
+            Text(l.importDiscardMessage),
+            const SizedBox(height: ShioriSpace.item),
+            Wrap(
+              spacing: ShioriSpace.medium,
+              runSpacing: ShioriSpace.small,
+              children: [
+                TextButton(
+                  autofocus: true,
+                  onPressed: _keepFiles,
+                  child: Text(l.importKeepFiles),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: scheme.error,
+                    foregroundColor: scheme.onError,
+                  ),
+                  onPressed: c.busy || _stopping
+                      ? null
+                      : () {
+                          final ids = _discardIds!;
+                          setState(() => _discardIds = null);
+                          unawaited(c.discard(receiptIds: ids));
+                        },
+                  child: Text(l.importDiscardFiles),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _updateFocus(bool show) {
     if (_showing == show) return;
@@ -66,6 +172,7 @@ class _ImportOverlayState extends State<ImportOverlay>
     if (show) {
       _previousFocus = FocusManager.instance.primaryFocus;
     } else {
+      _discardIds = null;
       final previous = _previousFocus;
       _previousFocus = null;
       // Wait until ExcludeFocus has enabled the underlying route again.
@@ -96,6 +203,7 @@ class _ImportOverlayState extends State<ImportOverlay>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _discardFocus.dispose();
     super.dispose();
   }
 
@@ -115,7 +223,7 @@ class _ImportOverlayState extends State<ImportOverlay>
               key: const ValueKey('import-dismiss-barrier'),
               color: Colors.black26,
               dismissible: !c.busy,
-              onDismiss: c.dismiss,
+              onDismiss: _dismiss,
               semanticsLabel: MaterialLocalizations.of(
                 context,
               ).modalBarrierDismissLabel,
@@ -123,12 +231,13 @@ class _ImportOverlayState extends State<ImportOverlay>
           if (show)
             Positioned.fill(
               child: FocusScope(
+                key: ValueKey(_discardIds != null),
                 autofocus: true,
                 onKeyEvent: (_, event) {
                   if (event.logicalKey != LogicalKeyboardKey.escape) {
                     return KeyEventResult.ignored;
                   }
-                  if (event is KeyDownEvent) c.dismiss();
+                  if (event is KeyDownEvent) _dismiss();
                   return KeyEventResult.handled;
                 },
                 child: Align(
@@ -154,6 +263,8 @@ class _ImportOverlayState extends State<ImportOverlay>
                                 ? ShioriTaskProgressBar(
                                     semanticsLabel: l.loading,
                                   )
+                                : _discardIds != null
+                                ? _discardConfirmation(c, l)
                                 : c.panelOpen
                                 ? _panel(context, c, l)
                                 : _banner(context, c, l),
@@ -199,10 +310,10 @@ class _ImportOverlayState extends State<ImportOverlay>
           FilledButton(onPressed: c.open, child: Text(l.importReview)),
           if (!c.busy)
             TextButton(onPressed: c.dismiss, child: Text(l.importLater)),
-          TextButton(
-            onPressed: c.busy ? c.cancel : c.discard,
-            child: Text(c.busy ? l.importStop : l.importCancel),
-          ),
+          if (c.busy)
+            _stopButton(c, l)
+          else if (c.items.isNotEmpty)
+            _discardButton(c, l),
         ],
       ),
     ],
@@ -224,10 +335,7 @@ class _ImportOverlayState extends State<ImportOverlay>
       const SizedBox(height: ShioriSpace.small),
       ShioriTaskProgressBar(semanticsLabel: l.importReceiving),
       const SizedBox(height: ShioriSpace.item),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton(onPressed: c.cancel, child: Text(l.importStop)),
-      ),
+      Align(alignment: Alignment.centerLeft, child: _stopButton(c, l)),
     ],
   );
 
@@ -247,9 +355,13 @@ class _ImportOverlayState extends State<ImportOverlay>
         Text(l.importHint),
       if (!c.busy) const SizedBox(height: ShioriSpace.item),
       if (!c.busy)
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton(onPressed: c.pick, child: Text(l.importChoose)),
+        Wrap(
+          spacing: ShioriSpace.medium,
+          runSpacing: ShioriSpace.small,
+          children: [
+            FilledButton(onPressed: c.pick, child: Text(l.importChoose)),
+            TextButton(onPressed: c.dismiss, child: Text(l.importLater)),
+          ],
         ),
     ],
   );
@@ -328,9 +440,11 @@ class _ImportOverlayState extends State<ImportOverlay>
               if (done && !c.busy)
                 FilledButton(onPressed: c.finish, child: Text(l.importDone))
               else if (c.busy)
-                TextButton(onPressed: c.cancel, child: Text(l.importStop))
-              else
-                TextButton(onPressed: c.discard, child: Text(l.importCancel)),
+                _stopButton(c, l)
+              else ...[
+                TextButton(onPressed: c.dismiss, child: Text(l.importLater)),
+                _discardButton(c, l),
+              ],
             ],
           ),
         ],
@@ -449,7 +563,7 @@ class _ImportOverlayState extends State<ImportOverlay>
           runSpacing: 8,
           children: [
             if (importing)
-              TextButton(onPressed: c.cancel, child: Text(l.importStop))
+              _stopButton(c, l)
             else if (allDone)
               FilledButton(onPressed: c.finish, child: Text(l.importDone))
             else ...[
@@ -465,7 +579,8 @@ class _ImportOverlayState extends State<ImportOverlay>
                       : l.importRetryFailed,
                 ),
               ),
-              TextButton(onPressed: c.discard, child: Text(l.importCancel)),
+              TextButton(onPressed: c.dismiss, child: Text(l.importLater)),
+              _discardButton(c, l),
             ],
           ],
         ),
@@ -507,10 +622,7 @@ class _ImportOverlayState extends State<ImportOverlay>
             ),
           ],
           const SizedBox(height: ShioriSpace.item),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(onPressed: c.cancel, child: Text(l.importStop)),
-          ),
+          Align(alignment: Alignment.centerLeft, child: _stopButton(c, l)),
         ],
       ),
     );

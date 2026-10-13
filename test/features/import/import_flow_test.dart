@@ -35,6 +35,8 @@ class MemorySource implements ImportSource {
   List<int> bytes = utf8.encode('This is an offline book.');
   bool readFails = false;
   int pickCalls = 0;
+  int cancelCopyCalls = 0;
+  Completer<void>? cancelCopyGate;
   Completer<void>? ackGate;
   void Function(String)? onAcknowledge;
   Completer<List<ImportCandidate>>? pendingGate;
@@ -73,6 +75,8 @@ class MemorySource implements ImportSource {
 
   @override
   Future<void> cancelCopy() async {
+    cancelCopyCalls++;
+    await cancelCopyGate?.future;
     if (picking != null && !picking!.isCompleted) picking!.complete();
   }
 
@@ -247,6 +251,24 @@ void main() {
       expect(source.acked, ['a']);
       expect(source.inbox.map((item) => item.id), ['b']);
       expect(controller.items.map((item) => item.candidate.id), ['b']);
+      expect(parses, 0);
+    },
+  );
+
+  test(
+    'discard confirmation snapshot excludes arrivals already refreshed',
+    () async {
+      source.receive(id: 'a');
+      await controller.start();
+      final ids = controller.items.map((item) => item.candidate.id).toSet();
+      source.receive(id: 'b');
+      await controller.refresh();
+      expect(controller.items, hasLength(2));
+      await controller.discard(receiptIds: ids);
+      expect(source.acked, ['a']);
+      expect(source.inbox.map((item) => item.id), ['b']);
+      expect(controller.items.map((item) => item.candidate.id), ['b']);
+      expect(controller.phase, ImportPhase.ready);
       expect(parses, 0);
     },
   );
@@ -1099,7 +1121,7 @@ void main() {
   );
 
   testWidgets(
-    'incoming banner cancellation releases receipts and preserves route at large Chinese text',
+    'incoming banner confirmed discard releases receipts and preserves route at large Chinese text',
     (tester) async {
       await controller.start();
       await pumpImportPanel(tester, scale: 1.6);
@@ -1107,7 +1129,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Reader position unchanged'), findsOneWidget);
       expect(find.text('1 个文件待导入'), findsOneWidget);
-      await tester.tap(find.text('取消'));
+      await tester.tap(find.text('放弃文件'));
+      await tester.pumpAndSettle();
+      expect(source.acked, isEmpty);
+      await tester.tap(find.text('放弃文件'));
       await tester.pumpAndSettle();
       expect(find.text('1 个文件待导入'), findsNothing);
       expect(source.inbox, isEmpty);
@@ -1117,7 +1142,9 @@ void main() {
       controller.open();
       await tester.pumpAndSettle();
       expect(find.text('重试'), findsOneWidget);
-      await tester.tap(find.text('取消'));
+      await tester.tap(find.text('放弃文件'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('放弃文件'));
       await tester.pumpAndSettle();
       expect(controller.phase, ImportPhase.idle);
       expect(source.inbox, isEmpty);
@@ -1196,8 +1223,25 @@ void main() {
         find.byKey(const ValueKey('import-dismiss-barrier')),
         findsOneWidget,
       );
+      expect(find.text('稍后'), findsNothing);
       await tester.runAsync(() async {
-        await tester.tap(find.text('停止导入'));
+        source.cancelCopyGate = Completer<void>();
+      });
+      await tester.tap(find.text('停止接收'));
+      await tester.pump();
+      expect(source.cancelCopyCalls, 1);
+      expect(controller.busy, isTrue);
+      expect(
+        tester
+            .widget<TextButton>(find.widgetWithText(TextButton, '停止接收'))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.text('停止接收'));
+      await tester.pump();
+      expect(source.cancelCopyCalls, 1);
+      await tester.runAsync(() async {
+        source.cancelCopyGate!.complete();
         await pick!.timeout(const Duration(seconds: 10));
         await untilImport(() => !controller.panelOpen);
       });
@@ -1278,6 +1322,29 @@ void main() {
           source.events.add(const ImportSourceEvent(completed: true));
           await tester.pumpAndSettle();
           expect(controller.busy, isFalse);
+          final l = AppLocalizations.of(
+            tester.element(find.byType(ImportOverlay)),
+          );
+          await tester.tap(find.text(l.importDiscardFiles));
+          await tester.pumpAndSettle();
+          expect(find.text(l.importKeepFiles), findsOneWidget);
+          final keep = tester.widget<TextButton>(
+            find.widgetWithText(TextButton, l.importKeepFiles),
+          );
+          expect(keep.autofocus, isTrue);
+          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+          await tester.pumpAndSettle();
+          expect(find.text(l.importKeepFiles), findsNothing);
+          expect(controller.interactionOpen, isTrue);
+          expect(source.acked, isEmpty);
+          expect(
+            FocusManager.instance.primaryFocus,
+            tester
+                .widget<TextButton>(
+                  find.widgetWithText(TextButton, l.importDiscardFiles),
+                )
+                .focusNode,
+          );
           await tester.sendKeyEvent(LogicalKeyboardKey.escape);
           await tester.pumpAndSettle();
           expect(
@@ -1302,27 +1369,31 @@ void main() {
     }
 
     for (final count in [1, 3]) {
-      testWidgets('cancel $count selected files allows a fresh selection', (
-        tester,
-      ) async {
-        for (var i = 0; i < count; i++) {
-          source.receive(id: 'cancel-$i');
-        }
-        await controller.start();
-        controller.open();
-        await pumpImportPanel(tester);
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('取消'));
-        await tester.pumpAndSettle();
-        expect(source.inbox, isEmpty);
-        expect(controller.items, isEmpty);
-        expect(controller.panelOpen, false);
-        controller.open();
-        await tester.pumpAndSettle();
-        expect(find.text('选择文件'), findsOneWidget);
-        expect(find.text('Reader position unchanged'), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      });
+      testWidgets(
+        'confirmed discard of $count selected files allows a fresh selection',
+        (tester) async {
+          for (var i = 0; i < count; i++) {
+            source.receive(id: 'cancel-$i');
+          }
+          await controller.start();
+          controller.open();
+          await pumpImportPanel(tester);
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('放弃文件'));
+          await tester.pumpAndSettle();
+          expect(source.acked, isEmpty);
+          await tester.tap(find.text('放弃文件'));
+          await tester.pumpAndSettle();
+          expect(source.inbox, isEmpty);
+          expect(controller.items, isEmpty);
+          expect(controller.panelOpen, false);
+          controller.open();
+          await tester.pumpAndSettle();
+          expect(find.text('选择文件'), findsOneWidget);
+          expect(find.text('Reader position unchanged'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
     for (final expanded in [false, true]) {
       for (final rejection in [ImportProblem.busy, ImportProblem.batchLimit]) {
@@ -1457,7 +1528,8 @@ void main() {
         expect(find.text('book0$i.txt'), findsOneWidget);
       }
       expect(find.text('导入全部'), findsOneWidget);
-      expect(find.text('取消'), findsOneWidget);
+      expect(find.text('稍后'), findsOneWidget);
+      expect(find.text('放弃文件'), findsOneWidget);
       final first = tester.getTopLeft(find.text('book01.txt')).dy;
       final second = tester.getTopLeft(find.text('book02.txt')).dy;
       final third = tester.getTopLeft(find.text('book03.txt')).dy;

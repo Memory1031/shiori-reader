@@ -807,6 +807,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importStop => 'Stop importing';
 
   @override
+  String get importStopReceiving => 'Stop receiving';
+
+  @override
+  String get importDiscardFiles => 'Discard files';
+
+  @override
+  String get importDiscardRemaining => 'Discard remaining files';
+
+  @override
+  String get importDiscardTitle => 'Discard pending files?';
+
+  @override
+  String get importDiscardRemainingTitle => 'Discard remaining files?';
+
+  @override
+  String get importDiscardMessage =>
+      'This will remove Shiori’s temporary import copies. Original files and already imported books will not be affected.';
+
+  @override
+  String get importKeepFiles => 'Keep files';
+
+  @override
   String get importWaiting => 'Waiting';
 
   @override

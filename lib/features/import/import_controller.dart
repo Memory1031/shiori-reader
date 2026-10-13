@@ -159,20 +159,26 @@ class ImportController extends ChangeNotifier {
   }
 
   /// Explicitly releases this batch's remaining inbox copies, never stored books.
-  Future<void> discard() async {
+  Future<void> discard({Set<String>? receiptIds}) async {
     if (_closed || busy || _maintenanceBlocked) return;
+    final snapshot = items
+        .where(
+          (item) =>
+              receiptIds == null || receiptIds.contains(item.candidate.id),
+        )
+        .toList();
     _discarding = true;
     _refreshEpoch++;
     _problem = null;
     _emit();
-    final operation = _operation = _discard();
+    final operation = _operation = _discard(snapshot);
     await operation;
     if (identical(_operation, operation)) _operation = null;
   }
 
-  Future<void> _discard() async {
+  Future<void> _discard(List<ImportItemState> snapshot) async {
     try {
-      for (final item in List<ImportItemState>.of(items)) {
+      for (final item in snapshot) {
         await source.acknowledge(item.candidate.id);
         items.remove(item);
       }
@@ -181,7 +187,7 @@ class ImportController extends ChangeNotifier {
       panelOpen = false;
       snoozed = false;
       _problem = null;
-      phase = ImportPhase.idle;
+      _syncPhase();
     } catch (_) {
       // Keep every unconfirmed receipt visible so cancellation can be retried.
       _problem = ImportProblem.storage;

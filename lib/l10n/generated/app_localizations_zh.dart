@@ -745,6 +745,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importStop => '停止导入';
 
   @override
+  String get importStopReceiving => '停止接收';
+
+  @override
+  String get importDiscardFiles => '放弃文件';
+
+  @override
+  String get importDiscardRemaining => '放弃剩余文件';
+
+  @override
+  String get importDiscardTitle => '放弃待导入文件？';
+
+  @override
+  String get importDiscardRemainingTitle => '放弃剩余文件？';
+
+  @override
+  String get importDiscardMessage => '将清理 Shiori 暂存的待导入文件。外部原文件和已经导入的书籍不受影响。';
+
+  @override
+  String get importKeepFiles => '继续保留';
+
+  @override
   String get importWaiting => '等待导入';
 
   @override

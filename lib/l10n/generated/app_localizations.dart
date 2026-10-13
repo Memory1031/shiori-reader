@@ -1526,6 +1526,48 @@ abstract class AppLocalizations {
   /// **'Stop importing'**
   String get importStop;
 
+  /// No description provided for @importStopReceiving.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop receiving'**
+  String get importStopReceiving;
+
+  /// No description provided for @importDiscardFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard files'**
+  String get importDiscardFiles;
+
+  /// No description provided for @importDiscardRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard remaining files'**
+  String get importDiscardRemaining;
+
+  /// No description provided for @importDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard pending files?'**
+  String get importDiscardTitle;
+
+  /// No description provided for @importDiscardRemainingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard remaining files?'**
+  String get importDiscardRemainingTitle;
+
+  /// No description provided for @importDiscardMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will remove Shiori’s temporary import copies. Original files and already imported books will not be affected.'**
+  String get importDiscardMessage;
+
+  /// No description provided for @importKeepFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep files'**
+  String get importKeepFiles;
+
   /// No description provided for @importWaiting.
   ///
   /// In en, this message translates to:

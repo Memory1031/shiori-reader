@@ -81,7 +81,7 @@ ImportSource 只接收候选副本：不透明 ID、显示名、字节大小、�
 
 PlatformImportSource 完整验证两平台 List<Map> 或 legacy Map/null 后才替换 ID → path 缓存，malformed 响应报告 storage 并保留旧绑定；路径不进入 ImportCandidate。ImportProblem.batchLimit 只表示原生选择 / 接收超过批量上限（项数或整批实际字节数，限额见[本地导入](local-import.md#公共收件箱协议)），单文件超限仍使用 tooLarge；移动端全局收件额度不足为 inboxFull，发布后同步未确认使用 publicationUncertain。它们不扩大控制器 fatal policy，也不增加进度事件字段。
 
-导入控制器按用户确认时的回执快照严格串行处理，晚到文件留待下一次确认；忙碌期间记录刷新需求，空闲后补刷，启动 / 恢复不会自动提交。接收进度不覆盖当前文件的解析进度：单文件失败只标记该项并继续；storage / parserUnavailable 视为全局失败停止后续项；成功项提交后立即按 ID ack 并从 inbox 删除，失败与未处理回执保留待重试（dedup 命中仍视为成功）。「停止导入」停止当前处理，不回滚已成功项、不 ack 未完成回执；非运行态的「取消 / 放弃导入」显式放弃当前批次，逐条 ack 并 discard 剩余 inbox 副本，不删除用户原文件或已入库书籍。取消清理期间禁止重新选择或提交；部分 ack 失败只移除已 ack 项，保留剩余项和 storage 错误供重试；旧 pending 查询不得重新加入已取消回执。
+导入控制器按用户确认时的回执快照严格串行处理，晚到文件留待下一次确认；忙碌期间记录刷新需求，空闲后补刷，启动 / 恢复不会自动提交。接收进度不覆盖当前文件的解析进度：单文件失败只标记该项并继续；storage / parserUnavailable 视为全局失败停止后续项；成功项提交后立即按 ID ack 并从 inbox 删除，失败与未处理回执保留待重试（dedup 命中仍视为成功）。「停止导入」停止当前处理，不回滚已成功项、不 ack 未完成回执；非运行态的「放弃文件」经用户确认后只放弃确认时的回执快照，逐条 ack 并 discard 剩余 inbox 副本，不删除用户原文件或已入库书籍。放弃清理期间禁止重新选择或提交；部分 ack 失败只移除已 ack 项，保留剩余项和 storage 错误供重试；旧 pending 查询不得重新加入已放弃回执。
 
 LocalBookDecoder 接收导入 session、格式、文件名、token 和编码确认回调，严格解码后才提供有界预览。LocalBookStore 唯一负责发布，生产使用 addToShelf 同事务加入书架；LocalBookManagement 删除后失效旧会话，cleanupPending 表示 SQL 已提交但文件待回收。
 
