@@ -6,7 +6,10 @@ import 'package:fake_async/fake_async.dart';
 import 'package:shiori/data/local/record_codec.dart';
 import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shiori/app/app.dart';
+import 'package:shiori/app/routes.dart';
 import 'package:shiori/data/local/book_decoder.dart';
 import 'package:shiori/data/local/database/user_database.dart'
     show UserDatabase;
@@ -20,7 +23,10 @@ import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/domain/reparse_position.dart';
 import 'package:shiori/features/reader/reader_controller.dart';
+import 'package:shiori/features/reader/book_reader_screen.dart';
+import 'package:shiori/features/reader/reader_screen.dart';
 import '../../domain/reparse_position_test.dart' as f;
+import '../../widgets/reader/settings_test.dart' show Store;
 import 'local_reading_test.dart' show ForbiddenOnline;
 import 'support/epub_fixtures.dart';
 
@@ -262,6 +268,149 @@ void main() {
       (await db.customSelect('SELECT * FROM local_reparse_attempts').get())
           .map((r) => r.data)
           .toList();
+
+  for (final failSave in [false, true]) {
+    testWidgets(
+      failSave
+          ? 'passive preload disposal cannot clear a real final save failure'
+          : 'returning to shelf with a passive preload permits prepared reparse commit',
+      (tester) async {
+        Future<void> drain(Future<void> future) async {
+          var done = false;
+          final observed = future.whenComplete(() => done = true);
+          for (var i = 0; !done && i < 300; i++) {
+            await tester.runAsync(
+              () => Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+          expect(done, isTrue, reason: 'Reader/store work must finish');
+          await observed;
+        }
+
+        final a = (await tester.runAsync(
+          () => add('第一章\nRead chapter\n第二章\nUnread chapter'),
+        ))!;
+        expect(a.content.chapters, hasLength(2));
+        final key = a.content.detail.summary.key;
+        final navigator = GlobalKey<NavigatorState>();
+        await tester.pumpWidget(
+          ShioriApp(
+            locale: const Locale('en'),
+            navigatorKey: navigator,
+            routes: AppRoutes(home: (_) => const Scaffold(body: Text('Shelf'))),
+          ),
+        );
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox());
+          await drain(store.close());
+        });
+        navigator.currentState!.push(
+          MaterialPageRoute<void>(
+            builder: (_) => BookReaderScreen(
+              chapter: a.content.chapters.first.key,
+              repository: LocalReadingRepository(
+                local: store,
+                online: ForbiddenOnline(),
+              ),
+              library: library,
+              settings: Store()..value = ReaderSettings(controlsHintSeen: true),
+            ),
+          ),
+        );
+        for (var i = 0; i < 100; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 10)),
+          );
+          await tester.pump(const Duration(milliseconds: 16));
+          final views = tester.widgetList<ReaderContentView>(
+            find.byType(ReaderContentView, skipOffstage: false),
+          );
+          if (views.length == 2 &&
+              views.every(
+                (view) =>
+                    view.session!.restoreStatus == ReaderRestoreStatus.ready,
+              )) {
+            break;
+          }
+        }
+        final views = tester.widgetList<ReaderContentView>(
+          find.byType(ReaderContentView, skipOffstage: false),
+        );
+        expect(views, hasLength(2));
+        final passive = views.singleWhere((view) => !view.appearanceActive!);
+        expect(passive.session!.chapter, a.content.chapters.last.key);
+        expect(passive.session!.progress, isNull);
+        expect(passive.viewportController!.capture(), isNotNull);
+        expect(passive.session!.restoreStatus, ReaderRestoreStatus.ready);
+        final active = views
+            .singleWhere((view) => view.appearanceActive!)
+            .session!;
+        await drain(active.flushProgress());
+        expect(active.progress!.progressSaved, isTrue);
+        if (failSave) {
+          await tester.runAsync(
+            () => db.customStatement(
+              "CREATE TRIGGER fail_save BEFORE INSERT ON reading_progress BEGIN SELECT RAISE(ABORT,'failure'); END",
+            ),
+          );
+        }
+        active.sampleProgress(f.progress(a.content).position, false);
+        final committed = Completer<void>();
+        await drain(() async {
+          await start(
+            checkpoint: (phase) async {
+              if (phase == 'afterCommit') committed.complete();
+            },
+          );
+          await idle();
+        }());
+        expect(
+          (await tester.runAsync(attempts))!.single['outcome'],
+          'preparedWaiting',
+        );
+        expect((await tester.runAsync(() => row(key)))!['parser_version'], 25);
+        if (failSave) {
+          // The newer passive lease must not certify this failed write.
+          active.onDelete();
+          await drain(active.closeReader());
+          expect(active.progress!.progressSaved, isFalse);
+        }
+        navigator.currentState!.pop();
+        for (var i = 0; i < 30; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        expect(find.byType(BookReaderScreen), findsNothing);
+        expect(find.text('Shelf'), findsOneWidget);
+        await drain(() async {
+          await active.closeReader();
+          await passive.session!.closeReader();
+          if (!failSave) await committed.future;
+          await idle();
+        }());
+        expect(active.progress!.progressSaved, !failSave);
+        if (failSave) {
+          expect(committed.isCompleted, isFalse);
+          expect(
+            (await tester.runAsync(attempts))!.single['outcome'],
+            'preparedWaiting',
+          );
+        }
+        expect(
+          (await tester.runAsync(() => row(key)))!['parser_version'],
+          failSave ? 25 : BookDecoder.parserVersion,
+          reason: '${await tester.runAsync(attempts)}',
+        );
+        final saved = ok(
+          (await tester.runAsync(
+            () => library.getProgress(key, cancellation: token()),
+          ))!,
+        )!;
+        expect(saved.chapterKey, a.content.chapters.first.key);
+        if (!failSave) expect(saved.position.blockFraction, .5);
+      },
+    );
+  }
 
   test('initial ten-second delay does not launch while backgrounded', () async {
     final a = await add('initial delay');

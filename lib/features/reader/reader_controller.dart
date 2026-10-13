@@ -501,10 +501,12 @@ class ReaderController extends ScopedController {
       await _useOpening;
       await _progressOpening;
       await progress?.close();
-      saved = progress?.progressSaved;
-      if (saved == null && _sample != null && library != null) saved = false;
+      if (_progressActive) {
+        saved = progress?.progressSaved;
+        if (saved == null && _sample != null && library != null) saved = false;
+      }
     } catch (_) {
-      saved = false;
+      if (_progressActive) saved = false;
     } finally {
       await _bookUse?.release(progressSaved: saved);
       _bookUse = null;
