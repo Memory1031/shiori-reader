@@ -899,29 +899,12 @@ class ManagedLocalBooks
           active != null && !_digest.hasMatch(active)) {
         return false;
       }
-      {
-        final manifest = await _file(digest, 'manifest.json', bundle: active);
-        final row = await db
-            .customSelect(
-              'SELECT active_bundle,manifest_hash,format FROM local_books WHERE digest=?',
-              variables: [Variable(digest)],
-            )
-            .getSingle();
-        if (row.readNullable<String>('active_bundle') != active) return false;
-        final format = LocalBookFormat.values.byName(
-          row.read<String>('format'),
-        );
-        if (await manifest.length() > _manifestLimit(format) ||
-            sha256.convert(await manifest.readAsBytes()).toString() !=
-                row.read<String>('manifest_hash')) {
-          return false;
-        }
-      }
       final root = Directory(p.join(paths.localBooks.path, digest));
       if (await root.resolveSymbolicLinks() !=
           p.join(await paths.localBooks.resolveSymbolicLinks(), digest)) {
         return false;
       }
+      final obsolete = <(Directory, String)>[];
       final revisions = Directory(p.join(root.path, 'revisions'));
       if (await revisions.exists()) {
         if (await revisions.resolveSymbolicLinks() !=
@@ -931,7 +914,7 @@ class ManagedLocalBooks
         await for (final entry in revisions.list(followLinks: false)) {
           if (_digest.hasMatch(p.basename(entry.path)) &&
               p.basename(entry.path) != active) {
-            await _deleteChild(revisions, entry.path);
+            obsolete.add((revisions, entry.path));
           }
         }
       }
@@ -941,9 +924,27 @@ class ManagedLocalBooks
           if (name == 'manifest.json' ||
               name == 'presentations.json' ||
               _digest.hasMatch(name)) {
-            await _deleteChild(root, entry.path);
+            obsolete.add((root, entry.path));
           }
         }
+      }
+      if (obsolete.isEmpty) return true;
+      final manifest = await _file(digest, 'manifest.json', bundle: active);
+      final row = await db
+          .customSelect(
+            'SELECT active_bundle,manifest_hash,format FROM local_books WHERE digest=?',
+            variables: [Variable(digest)],
+          )
+          .getSingle();
+      if (row.readNullable<String>('active_bundle') != active) return false;
+      final format = LocalBookFormat.values.byName(row.read<String>('format'));
+      if (await manifest.length() > _manifestLimit(format) ||
+          sha256.convert(await manifest.readAsBytes()).toString() !=
+              row.read<String>('manifest_hash')) {
+        return false;
+      }
+      for (final (parent, path) in obsolete) {
+        await _deleteChild(parent, path);
       }
       return true;
     } catch (_) {
