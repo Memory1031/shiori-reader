@@ -11,7 +11,8 @@ import 'package:shiori/features/reader/reader_theme.dart';
 
 import '../../../tool/epub_audit/browser_probe.dart';
 import '../../data/local/support/epub_fixtures.dart';
-import '../../tool/epub_loss_browser_test.dart' show browserTarget;
+import '../../tool/epub_loss_browser_test.dart'
+    show browserTarget, chromiumTestSkip;
 
 String presentation(String body) {
   final files = epubFiles();
@@ -143,6 +144,7 @@ window.scrollTo(0,650);check(window.scrollY===650);window.scrollTo(0,0);
         await root.delete(recursive: true);
       }
     },
+    skip: chromiumTestSkip,
     timeout: const Timeout(Duration(minutes: 2)),
   );
 
@@ -199,6 +201,7 @@ getComputedStyle(text[1]).fill!=='rgb(18, 86, 120)')throw Error('SVG fill bounda
         await root.delete(recursive: true);
       }
     },
+    skip: chromiumTestSkip,
     timeout: const Timeout(Duration(minutes: 2)),
   );
 }
