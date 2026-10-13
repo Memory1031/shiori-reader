@@ -780,7 +780,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importSuccess => 'The book has been saved.';
 
   @override
-  String get importHint => 'Choose TXT or EPUB files, up to 128 MiB each.';
+  String get importHint => 'Supports TXT (≤16 MiB) and EPUB (≤64 MiB).';
 
   @override
   String get importChoose => 'Choose file';

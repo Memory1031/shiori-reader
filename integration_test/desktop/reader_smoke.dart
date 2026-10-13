@@ -18,6 +18,7 @@ import 'package:shiori/data/repositories/library_repository.dart';
 import 'package:shiori/data/repositories/local_reading_repository.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
+import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/import/import_controller.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
@@ -168,6 +169,7 @@ ${List.generate(100, (i) => '<p>段落 $i ${'混排正文与翻页检查。' * 2
       ),
       store: _database!.localBooks,
       decoder: const BookDecoder(),
+      inputLimits: LocalBookInputLimits.byFormat,
       addToShelf: true,
     );
     try {

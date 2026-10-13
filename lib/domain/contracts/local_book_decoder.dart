@@ -2,6 +2,16 @@ import '../models/models.dart';
 import 'cancellation.dart';
 import 'local_books.dart';
 
+/// Production input budgets, independent from inbox and decoded-data budgets.
+abstract final class LocalBookInputLimits {
+  static const maxTxtBytes = 16 * 1024 * 1024;
+  static const maxEpubBytes = 64 * 1024 * 1024;
+  static const byFormat = {
+    LocalBookFormat.txt: maxTxtBytes,
+    LocalBookFormat.epub: maxEpubBytes,
+  };
+}
+
 enum TxtEncoding { utf8, utf16le, utf16be, gb18030 }
 
 /// Only strictly decoded choices are offered; preview is never committed text.

@@ -20,8 +20,8 @@ class BookDecoder implements LocalBookDecoder {
   const BookDecoder({this.epubDiagnostics});
   final EpubDiagnosticSlot? epubDiagnostics;
   static const parserVersion = 29;
-  static const maxTxtBytes = 16 * 1024 * 1024;
-  static const maxEpubBytes = 64 * 1024 * 1024;
+  static const maxTxtBytes = LocalBookInputLimits.maxTxtBytes;
+  static const maxEpubBytes = LocalBookInputLimits.maxEpubBytes;
   @override
   Future<LocalBookContent> decode(
     LocalImportSession session, {

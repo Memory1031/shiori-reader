@@ -317,7 +317,7 @@
   "importFileReading": "正在读取文件…",
   "importBookProcessing": "正在处理书籍…",
   "importSuccess": "书籍已保存。",
-  "importHint": "选择 TXT 或 EPUB 文件，每个文件最大 128 MiB。",
+  "importHint": "支持 TXT（≤16 MiB）和 EPUB（≤64 MiB）。",
   "importChoose": "选择文件",
   "importStart": "导入",
   "importRetry": "重试",

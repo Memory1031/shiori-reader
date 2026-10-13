@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +43,31 @@ class RejectingDecoder implements LocalBookDecoder {
   }
 }
 
+class SizedSource extends MemorySource {
+  final reads = <String>[];
+  final actualSizes = <String, int>{};
+  @override
+  Stream<List<int>> read(ImportCandidate candidate) {
+    reads.add(candidate.id);
+    final actual = actualSizes[candidate.id];
+    return actual == null ? super.read(candidate) : _large(candidate, actual);
+  }
+
+  Stream<List<int>> _large(ImportCandidate candidate, int size) async* {
+    final chunk = Uint8List(64 * 1024)..fillRange(0, 64 * 1024, 65);
+    var remaining = size;
+    if (candidate.name.endsWith('.epub')) {
+      yield [80, 75, 3, 4];
+      remaining -= 4;
+    }
+    while (remaining > 0) {
+      final count = remaining < chunk.length ? remaining : chunk.length;
+      yield Uint8List.sublistView(chunk, 0, count);
+      remaining -= count;
+    }
+  }
+}
+
 void main() {
   testWidgets('self-authored PNG decodes with the actual Flutter codec', (
     tester,
@@ -57,7 +83,7 @@ void main() {
   late AppPaths paths;
   late UserDatabase db;
   late ManagedLocalBooks store;
-  late MemorySource source;
+  late SizedSource source;
   late ImportController controller;
   setUp(() async {
     temp = await Directory.systemTemp.createTemp('local003004-');
@@ -71,11 +97,12 @@ void main() {
     store =
         (await ManagedLocalBooks.open(paths, db) as Success<ManagedLocalBooks>)
             .value;
-    source = MemorySource();
+    source = SizedSource();
     controller = ImportController(
       source: source,
       store: store,
       decoder: const BookDecoder(),
+      inputLimits: LocalBookInputLimits.byFormat,
     );
   });
   tearDown(() async {
@@ -90,6 +117,74 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 10));
     }
     expect(condition(), true);
+  }
+
+  test('known oversized TXT is nonfatal between valid EPUB and TXT', () async {
+    source.receive(
+      id: 'epub',
+      name: 'good.epub',
+      content: zipFiles(epubFiles()),
+    );
+    source.receive(id: 'oversized', name: 'big.txt', size: 40 * 1024 * 1024);
+    source.receive(
+      id: 'txt',
+      name: 'good.txt',
+      content: utf8.encode('Valid book'),
+    );
+    await controller.start();
+    await controller.submit();
+    expect(controller.succeededCount, 2);
+    expect(controller.failedCount, 1);
+    expect(controller.items[1].problem, ImportProblem.parseLimit);
+    expect(
+      controller.items.where((item) => item.phase == ImportItemPhase.ready),
+      isEmpty,
+    );
+    expect(source.reads, ['epub', 'txt']);
+    expect(source.acked, ['epub', 'txt']);
+    expect(source.inbox.map((item) => item.id), ['oversized']);
+    await controller.submit();
+    expect(source.reads, ['epub', 'txt']);
+    expect(controller.succeededCount, 2);
+    expect(
+      await db.customSelect('SELECT * FROM local_books').get(),
+      hasLength(2),
+    );
+    expect(await paths.localImportStaging.list().toList(), isEmpty);
+  });
+
+  for (final format in LocalBookFormat.values) {
+    test(
+      'underreported $format still fails real byte validation without publication',
+      () async {
+        source.receive(
+          id: 'good',
+          content: utf8.encode('Earlier committed book'),
+        );
+        source.receive(id: 'large', name: 'large.${format.name}', size: 10);
+        source.actualSizes['large'] =
+            LocalBookInputLimits.byFormat[format]! + 1;
+        await controller.start();
+        await controller.submit();
+        expect(source.reads, ['good', 'large']);
+        expect(controller.succeededCount, 1);
+        expect(controller.items.last.problem, ImportProblem.parseLimit);
+        expect(source.acked, ['good']);
+        expect(source.inbox.map((item) => item.id), ['large']);
+        expect(
+          await db.customSelect('SELECT * FROM local_books').get(),
+          hasLength(1),
+        );
+        expect(await paths.localImportStaging.list().toList(), isEmpty);
+        final key = controller.items.first.result!.content.detail.summary.key;
+        final read = await store.read(
+          key,
+          cancellation: CancellationSource().token,
+        );
+        expect(read, isA<Success<LocalBookRecord?>>());
+        expect((read as Success<LocalBookRecord?>).value, isNotNull);
+      },
+    );
   }
 
   test(
@@ -279,12 +374,13 @@ void main() {
         isEmpty,
       );
       // Prevent double-close of the test source in tearDown.
-      source = MemorySource();
+      source = SizedSource();
       controller.dispose();
       controller = ImportController(
         source: source,
         store: store,
         decoder: const BookDecoder(),
+        inputLimits: LocalBookInputLimits.byFormat,
       );
     },
   );

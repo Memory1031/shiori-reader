@@ -718,7 +718,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importSuccess => '书籍已保存。';
 
   @override
-  String get importHint => '选择 TXT 或 EPUB 文件，每个文件最大 128 MiB。';
+  String get importHint => '支持 TXT（≤16 MiB）和 EPUB（≤64 MiB）。';
 
   @override
   String get importChoose => '选择文件';

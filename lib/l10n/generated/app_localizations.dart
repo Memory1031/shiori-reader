@@ -1475,7 +1475,7 @@ abstract class AppLocalizations {
   /// No description provided for @importHint.
   ///
   /// In en, this message translates to:
-  /// **'Choose TXT or EPUB files, up to 128 MiB each.'**
+  /// **'Supports TXT (≤16 MiB) and EPUB (≤64 MiB).'**
   String get importHint;
 
   /// No description provided for @importChoose.

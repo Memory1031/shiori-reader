@@ -104,10 +104,13 @@ class GatedStore implements LocalBookStore {
 }
 
 class Harness {
+  Harness({this.inputLimits = const {}});
+  final Map<LocalBookFormat, int> inputLimits;
   final source = StreamSource(), store = GatedStore();
   late final controller = ImportController(
     source: source,
     store: store,
+    inputLimits: inputLimits,
     parsers: {
       LocalBookFormat.txt: (session) async {
         final gate = store.gates.last;

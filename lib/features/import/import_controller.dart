@@ -42,13 +42,16 @@ class ImportController extends ChangeNotifier {
     required this.store,
     Map<LocalBookFormat, LocalBookParser> parsers = const {},
     this.decoder,
+    Map<LocalBookFormat, int> inputLimits = const {},
     this.addToShelf = false,
-  }) : parsers = Map.unmodifiable(parsers);
+  }) : parsers = Map.unmodifiable(parsers),
+       inputLimits = Map.unmodifiable(inputLimits);
   static const maxBytes = 128 * 1024 * 1024;
   final ImportSource source;
   final LocalBookStore store;
   final Map<LocalBookFormat, LocalBookParser> parsers;
   final LocalBookDecoder? decoder;
+  final Map<LocalBookFormat, int> inputLimits;
   final bool addToShelf;
 
   final items = <ImportItemState>[];
@@ -467,14 +470,14 @@ class ImportController extends ChangeNotifier {
 
   ImportProblem? _rejectReason(ImportCandidate input) {
     final format = _formatOf(input);
-    return input.error ??
-        (input.size > maxBytes
-            ? ImportProblem.tooLarge
-            : input.size == 0
-            ? ImportProblem.invalidContent
-            : format == null
-            ? ImportProblem.unsupported
-            : null);
+    if (input.error != null) return input.error;
+    if (input.size > maxBytes) return ImportProblem.tooLarge;
+    if (input.size <= 0) return ImportProblem.invalidContent;
+    if (format == null) return ImportProblem.unsupported;
+    final limit = inputLimits[format];
+    return limit != null && input.size > limit
+        ? ImportProblem.parseLimit
+        : null;
   }
 
   LocalBookFormat? _formatOf(ImportCandidate input) =>

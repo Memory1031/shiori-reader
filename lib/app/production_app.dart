@@ -22,6 +22,7 @@ import '../data/repositories/library_repository.dart';
 import '../domain/contracts/contracts.dart';
 import '../domain/contracts/app_updates.dart';
 import '../domain/contracts/import_source.dart';
+import '../domain/contracts/local_book_decoder.dart';
 import '../features/home/home_navigation.dart';
 import '../features/home/reading_home.dart';
 import '../shared/app_logger.dart';
@@ -110,6 +111,7 @@ class _ProductionAppState extends State<ProductionApp>
         source: unownedImports,
         store: databases.localBooks,
         decoder: const BookDecoder(),
+        inputLimits: LocalBookInputLimits.byFormat,
         addToShelf: true,
       );
       unownedImports = null; // ImportController now owns shutdown.

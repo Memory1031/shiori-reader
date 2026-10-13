@@ -317,7 +317,7 @@
   "importFileReading": "Reading file…",
   "importBookProcessing": "Processing book…",
   "importSuccess": "The book has been saved.",
-  "importHint": "Choose TXT or EPUB files, up to 128 MiB each.",
+  "importHint": "Supports TXT (≤16 MiB) and EPUB (≤64 MiB).",
   "importChoose": "Choose file",
   "importStart": "Import",
   "importRetry": "Retry",
