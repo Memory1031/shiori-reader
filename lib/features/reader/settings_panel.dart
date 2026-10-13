@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/capabilities.dart';
 import '../../shared/widgets/shiori_sheet.dart';
 import 'reader_margin.dart';
 import 'reader_preferences.dart';
@@ -743,6 +744,9 @@ class _RepeatButtonState extends State<_RepeatButton> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onStep != null;
+    final size = ShioriCapabilities.of(context).touchFirst
+        ? kMinInteractiveDimension
+        : _controlHeight;
     return Semantics(
       button: true,
       enabled: enabled,
@@ -764,8 +768,8 @@ class _RepeatButtonState extends State<_RepeatButton> {
         child: IconButton(
           onPressed: widget.onStep,
           style: IconButton.styleFrom(
-            minimumSize: const Size.square(_controlHeight),
-            fixedSize: const Size.square(_controlHeight),
+            minimumSize: Size.square(size),
+            fixedSize: Size.square(size),
             padding: EdgeInsets.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             shape: RoundedRectangleBorder(
