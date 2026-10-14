@@ -7,12 +7,14 @@ import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/state_views.dart';
+import '../../shared/widgets/catalog_browsing.dart';
 import '../local_books/local_catalog.dart';
 import '../novel_detail/catalog_controller.dart';
 import '../novel_detail/catalog_view.dart';
 import 'article_contents.dart';
 import 'reader_panel.dart';
 import 'reader_sheet.dart';
+import 'reader_contents_session.dart';
 
 /// One navigation level of the reader contents, e.g. headings inside the
 /// current article or the book's volume catalog. [build] receives `done`,
@@ -22,8 +24,10 @@ class ReaderContentsLayer {
     required this.label,
     required this.build,
     this.action,
+    this.kind = ReaderContentsKind.book,
   });
   final String label;
+  final ReaderContentsKind kind;
   final Widget Function(BuildContext context, ReaderPanelDone done) build;
 
   /// Optional header control for this layer, such as refreshing a catalog.
@@ -37,12 +41,14 @@ class ReaderContentsPanel extends StatefulWidget {
     super.key,
     required this.layers,
     required this.onDone,
-    this.initialLayer = 0,
+    this.initialLayer,
+    this.session,
     this.closeButton = false,
   });
   final List<ReaderContentsLayer> layers;
   final ReaderPanelDone onDone;
-  final int initialLayer;
+  final int? initialLayer;
+  final ReaderContentsSession? session;
 
   /// Ends the header with a close control calling [onDone], for a host
   /// without a drag handle. The header then keeps its own top spacing.
@@ -52,7 +58,12 @@ class ReaderContentsPanel extends StatefulWidget {
 }
 
 class _ReaderContentsPanelState extends State<ReaderContentsPanel> {
-  late int _layer = widget.initialLayer.clamp(0, widget.layers.length - 1);
+  late int _layer =
+      (widget.initialLayer ??
+              widget.layers.indexWhere(
+                (l) => l.kind == widget.session?.selected,
+              ))
+          .clamp(0, widget.layers.length - 1);
 
   @override
   Widget build(BuildContext context) {
@@ -108,8 +119,13 @@ class _ReaderContentsPanelState extends State<ReaderContentsPanel> {
                   ),
               ],
               selected: {_layer},
-              onSelectionChanged: (value) =>
-                  setState(() => _layer = value.single),
+              onSelectionChanged: (value) {
+                if (ModalRoute.of(context)?.isCurrent == false) return;
+                setState(() => _layer = value.single);
+                if (widget.session?.active == true) {
+                  widget.session!.selected = widget.layers[_layer].kind;
+                }
+              },
             ),
           ),
         // Row fills and splashes paint on the nearest Material; give the list
@@ -133,13 +149,15 @@ class _ReaderContentsPanelState extends State<ReaderContentsPanel> {
 Future<void> showReaderContents(
   BuildContext context, {
   required List<ReaderContentsLayer> layers,
-  int initialLayer = 0,
+  int? initialLayer,
+  ReaderContentsSession? session,
 }) => showReaderSheet<void>(
   context,
   size: ReaderSheetSize.tall,
   builder: (sheet) => ReaderContentsPanel(
     layers: layers,
     initialLayer: initialLayer,
+    session: session,
     onDone: readerSheetDone(sheet),
   ),
 );
@@ -149,9 +167,11 @@ ReaderContentsLayer articleContentsLayer(
   BuildContext context,
   ChapterContent content, {
   required ValueChanged<ReaderPosition> onSelect,
+  CatalogBrowsingState? browsing,
 }) {
   final l = AppLocalizations.of(context);
   return ReaderContentsLayer(
+    kind: ReaderContentsKind.article,
     label: l.articleContents,
     build: (context, done) {
       final entries = articleContents(content);
@@ -168,14 +188,142 @@ ReaderContentsLayer articleContentsLayer(
           Expanded(
             child: entries.isEmpty
                 ? EmptyView(message: l.articleContentsEmpty)
-                : ListView.builder(
-                    itemCount: entries.length,
-                    itemBuilder: (context, i) => ListTile(
-                      key: ValueKey(entries[i].position.blockKey),
-                      title: Text(entries[i].title),
-                      onTap: () => done(() => onSelect(entries[i].position)),
-                    ),
+                : _ArticleContentsList(
+                    content: content,
+                    browsing: browsing,
+                    entries: entries,
+                    onSelect: (position) => done(() => onSelect(position)),
                   ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+class _ArticleContentsList extends StatefulWidget {
+  const _ArticleContentsList({
+    required this.content,
+    required this.entries,
+    required this.onSelect,
+    this.browsing,
+  });
+  final ChapterContent content;
+  final List<({String title, ReaderPosition position})> entries;
+  final ValueChanged<ReaderPosition> onSelect;
+  final CatalogBrowsingState? browsing;
+  @override
+  State<_ArticleContentsList> createState() => _ArticleContentsListState();
+}
+
+class _ArticleContentsListState extends State<_ArticleContentsList> {
+  late int? _attachment = widget.browsing == null ? null : -1;
+  ScrollController? _scroll;
+  var _followingRows = GlobalKey(), _precedingRows = GlobalKey();
+  int _center = 0;
+  bool _endAnchor = false;
+  bool _rememberPending = false;
+  @override
+  void didUpdateWidget(_ArticleContentsList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.browsing != widget.browsing) {
+      _attachment = widget.browsing == null ? null : -1;
+      _scroll?.dispose();
+      _scroll = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _scroll?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, bounds) {
+      final state = widget.browsing;
+      if (ModalRoute.of(context)?.isCurrent != false &&
+          state != null &&
+          _attachment! < 0) {
+        _attachment = state.attach();
+      }
+      if (state?.configure(_attachment!, (
+                widget.content.key,
+                widget.content.contentRevision,
+              ), catalogBrowsingLayout(context, bounds.biggest)) ==
+              true ||
+          _scroll == null) {
+        _followingRows = GlobalKey();
+        _precedingRows = GlobalKey();
+        _scroll?.dispose();
+        final restored = state?.owns(_attachment!) == true
+            ? state!.position
+            : null;
+        _center = restored?.center ?? 0;
+        _endAnchor = restored != null && _center > 0;
+        final scroll = _scroll = ScrollController(
+          initialScrollOffset: restored?.offset ?? 0,
+          keepScrollOffset: state == null,
+        );
+        final version = state?.revision;
+        scroll.addListener(() {
+          if (state == null || _rememberPending) return;
+          _rememberPending = true;
+          final attachment = _attachment!;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _rememberPending = false;
+            if (!mounted || !scroll.hasClients) return;
+            final row = captureCatalogBrowsing(
+              scroll.position,
+              center: _center,
+              before: _precedingRows.currentContext?.findRenderObject(),
+              after: _followingRows.currentContext?.findRenderObject(),
+              endAnchor: _endAnchor,
+              restoreEndAnchor: true,
+            );
+            if (row != null) {
+              state.remember(attachment, version!, row.center, row.offset);
+            }
+          });
+        });
+      }
+      Widget row(BuildContext context, int i) => ListTile(
+        key: ValueKey(widget.entries[i].position.blockKey),
+        title: Text(widget.entries[i].title),
+        onTap: () => widget.onSelect(widget.entries[i].position),
+      );
+      if (state == null) {
+        return ListView.builder(
+          controller: _scroll,
+          itemCount: widget.entries.length,
+          itemBuilder: row,
+        );
+      }
+      final center = _center;
+      return CustomScrollView(
+        key: ValueKey((state, state.revision)),
+        controller: _scroll,
+        center: _followingRows,
+        anchor: _endAnchor ? 1 : 0,
+        semanticChildCount: widget.entries.length,
+        slivers: [
+          if (center > 0)
+            SliverList(
+              key: _precedingRows,
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => row(context, center - index - 1),
+                childCount: center,
+                semanticIndexCallback: (_, index) => center - index - 1,
+              ),
+            ),
+          SliverList(
+            key: _followingRows,
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => row(context, center + index),
+              childCount: widget.entries.length - center,
+              semanticIndexOffset: center,
+            ),
           ),
         ],
       );
@@ -202,6 +350,7 @@ ReaderContentsLayer volumeContentsLayer(
   required ValueChanged<ChapterKey> onSelect,
   required VoidCallback onRetry,
   VoidCallback? onRefresh,
+  CatalogBrowsingState? browsing,
 }) {
   final l = AppLocalizations.of(context);
   return ReaderContentsLayer(
@@ -266,6 +415,7 @@ ReaderContentsLayer volumeContentsLayer(
                 child: CatalogView(
                   catalog: loaded.value,
                   current: current,
+                  browsing: browsing,
                   onSelect: (key) => done(() => onSelect(key)),
                 ),
               ),
@@ -287,6 +437,7 @@ ReaderContentsLayer localContentsLayer(
   LocalNavigationEntry? selectedEntry,
   required VoidCallback onRetry,
   required ValueChanged<LocalNavigationEntry> onSelect,
+  CatalogBrowsingState? browsing,
 }) => ReaderContentsLayer(
   label: AppLocalizations.of(context).localBookContents,
   build: (context, done) => AnimatedBuilder(
@@ -302,6 +453,7 @@ ReaderContentsLayer localContentsLayer(
         current: current,
         selectedEntry: selectedEntry,
         readingOrder: readingOrder(),
+        browsing: browsing,
         onSelect: (entry) => done(() => onSelect(entry)),
       ),
     },

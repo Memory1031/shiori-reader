@@ -29,6 +29,7 @@ import 'reader_actions.dart';
 import 'reader_chrome.dart';
 import 'reader_commands.dart';
 import 'reader_contents.dart';
+import 'reader_contents_session.dart';
 import 'reader_panel.dart';
 import 'reader_progress_panel.dart';
 import 'reader_sheet.dart';
@@ -78,6 +79,8 @@ class ReaderContentView extends StatefulWidget {
     this.initialPosition,
     this.actions = const ReaderActions(),
     this.articleContents = true,
+    this.contentsSession,
+    this.onPosition,
     this.completion,
     this.completionTarget,
     this.completionBasis,
@@ -118,6 +121,8 @@ class ReaderContentView extends StatefulWidget {
 
   /// Whether headings recognised inside the article form their own layer.
   final bool articleContents;
+  final ReaderContentsSession? contentsSession;
+  final ValueChanged<ReaderPosition>? onPosition;
   final BookTerminalState? completion, completionTarget;
   final Object? completionBasis;
   final String? bookTitle;
@@ -534,6 +539,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       articleContentsLayer(
         context,
         widget.content,
+        browsing: widget.contentsSession?.article,
         onSelect: (target) {
           if (mounted) _navigateTo(target);
         },
@@ -549,7 +555,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
       return showReaderContents(
         context,
         layers: layers,
-        initialLayer: book ? layers.length - 1 : 0,
+        initialLayer: book ? layers.length - 1 : null,
+        session: widget.contentsSession,
       );
     }
     final layers = _contentsLayers(context);
@@ -564,7 +571,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
             : AppLocalizations.of(context).catalogTitle,
         builder: (context, panel) => ReaderContentsPanel(
           layers: layers,
-          initialLayer: book ? layers.length - 1 : 0,
+          initialLayer: book ? layers.length - 1 : null,
+          session: widget.contentsSession,
           closeButton: true,
           onDone: ([then]) => panel.close(then),
         ),
@@ -732,6 +740,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _confirmedProgressText = _confirmedProgress;
     _updateProgressText();
     widget.session?.sampleProgress(position, completed);
+    widget.onPosition?.call(position);
   }
 
   ReaderPosition? _position;

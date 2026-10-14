@@ -7,6 +7,7 @@ import '../../shared/capabilities.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
+import '../../shared/widgets/catalog_browsing.dart';
 import 'catalog_controller.dart';
 
 Future<ChapterKey?> openCatalog(
@@ -92,8 +93,10 @@ class CatalogView extends StatefulWidget {
     required this.catalog,
     required this.onSelect,
     this.current,
+    this.browsing,
   });
   final Catalog catalog;
+  final CatalogBrowsingState? browsing;
   final ChapterKey? current;
   final ValueChanged<ChapterKey> onSelect;
   @override
@@ -103,9 +106,51 @@ class CatalogView extends StatefulWidget {
 class _CatalogViewState extends State<CatalogView> {
   final _collapsed = <String>{};
   ChapterKey? _selected;
+  late int? _attachment = widget.browsing == null ? null : -1;
+  ScrollController? _scroll;
+  int _center = 0;
+  bool _endAnchor = false;
+  Object? _origin;
+  var _followingRows = GlobalKey(), _precedingRows = GlobalKey();
+  bool _rememberPending = false;
+  Object _identity(Object row) =>
+      row is Volume ? row.groupId : (row as Chapter).key;
+
+  void _remember(CatalogBrowsingState state, int version) {
+    if (_rememberPending) return;
+    _rememberPending = true;
+    final attachment = _attachment!, scroll = _scroll!;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _rememberPending = false;
+      if (!mounted || !scroll.hasClients) return;
+      final row = captureCatalogBrowsing(
+        scroll.position,
+        center: _center,
+        before: _precedingRows.currentContext?.findRenderObject(),
+        after: _followingRows.currentContext?.findRenderObject(),
+        endAnchor: _endAnchor,
+        restoreEndAnchor: true,
+      );
+      if (row != null) {
+        state.remember(attachment, version, row.center, row.offset);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll?.dispose();
+    super.dispose();
+  }
+
   @override
   void didUpdateWidget(CatalogView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.browsing != widget.browsing) {
+      _attachment = widget.browsing == null ? null : -1;
+      _scroll?.dispose();
+      _scroll = null;
+    }
     if (oldWidget.catalog.novelKey != widget.catalog.novelKey) {
       _collapsed.clear();
       _selected = null;
@@ -120,7 +165,26 @@ class _CatalogViewState extends State<CatalogView> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(builder: _build);
+
+  Widget _build(BuildContext context, BoxConstraints bounds) {
+    final browsing = widget.browsing;
+    if (ModalRoute.of(context)?.isCurrent != false &&
+        browsing != null &&
+        _attachment! < 0) {
+      _attachment = browsing.attach();
+    }
+    final changed =
+        browsing?.configure(_attachment!, (
+          widget.catalog.revision,
+          widget.current,
+        ), catalogBrowsingLayout(context, bounds.biggest)) ==
+        true;
+    if (browsing?.owns(_attachment!) == true) {
+      _collapsed
+        ..clear()
+        ..addAll(browsing!.collapsed);
+    }
     final strings = AppLocalizations.of(context);
     if (widget.catalog.flatChapters.isEmpty) {
       return EmptyView(message: strings.catalogEmpty);
@@ -175,6 +239,15 @@ class _CatalogViewState extends State<CatalogView> {
               onTap: () => setState(() {
                 if (!_collapsed.add(row.groupId)) {
                   _collapsed.remove(row.groupId);
+                }
+                if (browsing?.owns(_attachment!) == true) {
+                  // Folded rows change the index space before the next layout.
+                  browsing!.position = null;
+                  browsing.collapsed
+                    ..clear()
+                    ..addAll(_collapsed);
+                  final version = browsing.revision;
+                  _remember(browsing, version);
                 }
               }),
             ),
@@ -246,15 +319,57 @@ class _CatalogViewState extends State<CatalogView> {
     final match = widget.current == null
         ? -1
         : rows.indexWhere((row) => row is Chapter && row.key == widget.current);
-    final anchor = match < 0 ? 0 : match;
-    const center = ValueKey('catalog-anchor');
+    var anchor = match < 0 ? 0 : match;
+    var reset = changed || _scroll == null;
+    if (!reset && browsing != null) {
+      final old = rows.indexWhere((row) => _identity(row) == _origin);
+      if (old < 0) {
+        reset = true;
+        if (browsing.owns(_attachment!)) browsing.position = null;
+      } else {
+        anchor = old;
+      }
+    }
+    if (reset) {
+      _followingRows = GlobalKey();
+      _precedingRows = GlobalKey();
+      final restored = browsing?.owns(_attachment!) == true
+          ? browsing!.position
+          : null;
+      if (restored != null &&
+          restored.center >= 0 &&
+          restored.center < rows.length) {
+        anchor = restored.center;
+      }
+      _origin = _identity(rows[anchor]);
+      _endAnchor = restored != null && anchor > 0;
+      _scroll?.dispose();
+      final scroll = _scroll = ScrollController(
+        initialScrollOffset: restored?.offset ?? 0,
+        keepScrollOffset: browsing == null,
+      );
+      final version = browsing?.revision;
+      scroll.addListener(() {
+        if (browsing != null) _remember(browsing, version!);
+      });
+    }
+    _center = anchor;
     return CustomScrollView(
-      key: ValueKey((widget.catalog.novelKey, widget.current)),
-      center: center,
+      controller: _scroll,
+      key: ValueKey((
+        widget.catalog.novelKey,
+        widget.current,
+        browsing,
+        browsing?.revision,
+        browsing == null ? null : _origin,
+      )),
+      center: _followingRows,
+      anchor: _endAnchor ? 1 : 0,
       semanticChildCount: rows.length,
       slivers: [
         if (anchor > 0)
           SliverList(
+            key: _precedingRows,
             delegate: SliverChildBuilderDelegate(
               (context, index) => buildRow(context, anchor - index - 1),
               childCount: anchor,
@@ -262,7 +377,7 @@ class _CatalogViewState extends State<CatalogView> {
             ),
           ),
         SliverPadding(
-          key: center,
+          key: _followingRows,
           padding: const EdgeInsets.only(bottom: 4),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(

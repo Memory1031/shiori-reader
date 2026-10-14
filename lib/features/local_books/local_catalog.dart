@@ -9,6 +9,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
 import '../../shared/local_navigation_title.dart';
 import '../../shared/widgets/state_views.dart';
+import '../../shared/widgets/catalog_browsing.dart';
 
 Future<LocalNavigationEntry?> openLocalCatalog(
   BuildContext context, {
@@ -86,25 +87,41 @@ class LocalNavigationView extends StatefulWidget {
     this.current,
     this.readingOrder = const [],
     this.selectedEntry,
+    this.browsing,
   });
   final List<LocalNavigationEntry> entries;
   final ValueChanged<LocalNavigationEntry> onSelect;
   final ChapterKey? current;
   final List<ChapterKey> readingOrder;
   final LocalNavigationEntry? selectedEntry;
+  final CatalogBrowsingState? browsing;
   @override
   State<LocalNavigationView> createState() => _LocalNavigationViewState();
 }
 
 class _LocalNavigationViewState extends State<LocalNavigationView> {
   final _currentRow = GlobalKey();
-  final _followingRows = GlobalKey();
-  (ChapterKey?, int, Size, TextScaler)? _positionTarget;
+  var _followingRows = GlobalKey();
+  var _precedingRows = GlobalKey();
+  (ChapterKey?, int, Size, TextScaler, Object?, int?)? _positionTarget;
   int _anchor = 0;
+  bool _positioning = false;
+  late int? _attachment = widget.browsing == null ? null : -1;
+  ScrollController? _scroll;
+  bool _rememberPending = false;
+  @override
+  void dispose() {
+    _scroll?.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(LocalNavigationView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.browsing != widget.browsing) {
+      _attachment = widget.browsing == null ? null : -1;
+      _positionTarget = null;
+    }
     if (!identical(oldWidget.entries, widget.entries)) _positionTarget = null;
   }
 
@@ -175,16 +192,62 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final browsing = widget.browsing;
+        if (ModalRoute.of(context)?.isCurrent != false &&
+            browsing != null &&
+            _attachment! < 0) {
+          _attachment = browsing.attach();
+        }
+        final changed =
+            browsing?.configure(_attachment!, (
+              widget.entries,
+              widget.readingOrder,
+            ), catalogBrowsingLayout(context, constraints.biggest)) ==
+            true;
+        if (changed) _positionTarget = null;
         final target = (
           current,
           match,
           constraints.biggest,
           MediaQuery.textScalerOf(context),
+          browsing,
+          browsing?.revision,
         );
         if (_positionTarget != target) {
           _positionTarget = target;
-          _anchor = 0;
-          if (match > 0) {
+          _followingRows = GlobalKey();
+          _precedingRows = GlobalKey();
+          final restored = browsing?.owns(_attachment!) == true
+              ? browsing!.position
+              : null;
+          _anchor = restored?.center ?? 0;
+          _positioning = restored == null && match > 0;
+          _scroll?.dispose();
+          final scroll = _scroll = ScrollController(
+            initialScrollOffset: restored?.offset ?? 0,
+            keepScrollOffset: browsing == null,
+          );
+          final version = browsing?.revision;
+          scroll.addListener(() {
+            if (_positioning || browsing == null || _rememberPending) return;
+            _rememberPending = true;
+            final attachment = _attachment!;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _rememberPending = false;
+              if (!mounted || _positioning || !scroll.hasClients) return;
+              final row = captureCatalogBrowsing(
+                scroll.position,
+                center: _anchor,
+                before: _precedingRows.currentContext?.findRenderObject(),
+                after: _followingRows.currentContext?.findRenderObject(),
+                endAnchor: true,
+              );
+              if (row != null) {
+                browsing.remember(attachment, version!, row.center, row.offset);
+              }
+            });
+          });
+          if (_positioning) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted || _positionTarget != target) return;
               final rowContext = _currentRow.currentContext;
@@ -199,10 +262,15 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
                 if (position.pixels > start || position.pixels < end) {
                   position.ensureVisible(row, alignment: 1 / 3);
                 }
+                _positioning = false;
               } else {
                 // The target is beyond the lazily built first screen. Anchor
                 // directly there without laying out thousands of preceding rows.
-                setState(() => _anchor = match);
+                setState(() {
+                  _anchor = match;
+                  _followingRows = GlobalKey();
+                  _precedingRows = GlobalKey();
+                });
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (!mounted || _positionTarget != target) return;
                   final row = _currentRow.currentContext?.findRenderObject();
@@ -221,6 +289,7 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
                   Scrollable.of(
                     _currentRow.currentContext!,
                   ).position.jumpTo(height - top);
+                  _positioning = false;
                 });
               }
             });
@@ -228,7 +297,8 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
         }
         final anchor = _anchor;
         return CustomScrollView(
-          key: ValueKey((target, anchor)),
+          controller: _scroll,
+          key: ValueKey((target, anchor, browsing?.revision)),
           center: _followingRows,
           // Keep a positive end offset even when opening near the last row:
           // Flutter's scrollbar only registers drag gestures when max > 0.
@@ -238,6 +308,7 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
           slivers: [
             if (anchor > 0)
               SliverList(
+                key: _precedingRows,
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => buildRow(context, anchor - index - 1),
                   childCount: anchor,

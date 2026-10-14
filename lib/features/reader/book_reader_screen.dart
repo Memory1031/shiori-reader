@@ -22,6 +22,7 @@ import 'reader_notes.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'reader_chrome.dart';
 import 'reader_contents.dart';
+import 'reader_contents_session.dart';
 import 'reader_panel.dart';
 import '../../domain/local_chapter_progress.dart';
 import 'reader_logical_progress.dart';
@@ -112,6 +113,20 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   bool _onlineRemoved = false;
   bool _invalidated = false;
   final _returnAnchors = <_ReturnAnchor>[];
+  final _contentsSession = ReaderContentsSession();
+
+  void _syncContentsContext() {
+    final content = _reader.content, index = _logicalIndex;
+    final section =
+        content != null &&
+            index?.documents[_reader.chapter]?.matches(content) == true &&
+            (_catalog.loaded == null ||
+                _catalog.loaded!.value.revision == index!.metrics.revision)
+        ? index!.sectionAt(_reader.chapter, _reader.currentPosition)
+        : null;
+    _contentsSession.readingContext(section?.entry ?? _reader.chapter);
+  }
+
   final _quickReturn = ValueNotifier(false);
   Timer? _returnTimer;
   int _navigationGeneration = 0;
@@ -165,6 +180,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _ReturnAnchor? origin, [
     _ReturnAnchor? returning,
   ]) {
+    _syncContentsContext();
     final destination = _captureAnchor();
     final moved =
         origin != null &&
@@ -178,6 +194,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         if (_returnAnchors.length > 8) _returnAnchors.removeAt(0);
       case _LocationIntent.explicit:
         if (!moved) return;
+        _contentsSession.invalidateBrowsing();
         _returnAnchors.clear();
         _hideQuickReturn();
         return;
@@ -511,6 +528,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       }
     });
     _readingOrderChanges.value++;
+    _syncContentsContext();
     if (_logicalIndex == null) {
       await Future.wait([_loadPhysicalNavigation(), _loadPhysicalOrder()]);
     }
@@ -777,6 +795,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (!mounted || key != widget.chapter.novelKey || _invalidated) return;
     _navigationGeneration++;
     _returnAnchors.clear();
+    _contentsSession.dispose();
     _hideQuickReturn();
     _completionTurn?.invalidate();
     _cancelChapter(immediate: true);
@@ -881,6 +900,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   void dispose() {
+    _contentsSession.dispose();
     _contentsPanel?.dismiss();
     _contentsPanel = null;
     _navigationGeneration++;
@@ -1841,6 +1861,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
             return;
           }
           if (intent == _LocationIntent.explicit) {
+            _contentsSession.invalidateBrowsing();
             setState(_returnAnchors.clear);
           }
         },
@@ -1861,6 +1882,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       return localContentsLayer(
         context,
         navigation: _navigationTree,
+        browsing: _contentsSession.local,
         readingOrder: () => _readingSequence().$1,
         readingOrderChanges: Listenable.merge([
           _readingOrderChanges,
@@ -1879,6 +1901,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     return volumeContentsLayer(
       context,
       catalog: _catalog,
+      browsing: _contentsSession.online,
       changes: _catalogChanges,
       current: _reader.chapter,
       onRetry: _retryCatalog,
@@ -1907,7 +1930,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   Future<void> _contents() async {
     if (!ShioriCapabilities.of(context).pointerFirst) {
-      return showReaderContents(context, layers: [_bookContents(context)]);
+      return showReaderContents(
+        context,
+        layers: [_bookContents(context)],
+        session: _contentsSession,
+      );
     }
     if (_contentsPanel != null || _invalidated) return;
     final layer = _bookContents(context);
@@ -1917,6 +1944,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       semanticLabel: layer.label,
       builder: (context, panel) => ReaderContentsPanel(
         layers: [layer],
+        session: _contentsSession,
         closeButton: true,
         onDone: ([then]) {
           if (mounted && panel.isValid && identical(_contentsPanel, panel)) {
@@ -2157,6 +2185,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       ),
       initialPosition: reader.initialPosition,
       articleContents: !_local,
+      contentsSession: _contentsSession,
+      onPosition: (_) {
+        if (active && reader == _reader && mounted && !_invalidated) {
+          _syncContentsContext();
+        }
+      },
       returnToOrigin: widget.linkDepth > 0,
       quickReturn: _local ? _quickReturn : null,
       chrome: _chrome,
