@@ -342,6 +342,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unsupportedMessage => '暂不支持此功能。';
 
   @override
+  String get unrecognizedSourceResponseMessage => '书源未能完成本次请求，原因暂时无法确定。';
+
+  @override
   String get readerSettings => '阅读设置';
 
   @override

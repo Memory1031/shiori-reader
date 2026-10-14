@@ -186,12 +186,68 @@ void main() {
           cancellation: token,
         );
         expect(result, isA<Failure>());
+        final failure = (result as Failure).failure;
+        final nonzero = body.contains('123');
         expect(
-          (result as Failure).failure.toString(),
-          isNot(contains('sentinel')),
+          failure.kind,
+          nonzero ? FailureKind.unsupported : FailureKind.parse,
         );
+        expect(
+          failure.context,
+          nonzero
+              ? FailureContext.unrecognizedSourceResponse
+              : FailureContext.invalidContent,
+        );
+        expect(failure.retryPolicy, RetryPolicy.never);
+        expect(failure.operation, Operation.search);
+        expect(failure.toString(), isNot(contains('sentinel')));
         expect(adapter.requests.length, 1);
+        expect(logger.events.toString(), isNot(contains('sentinel')));
         api.close();
+      }
+    },
+  );
+  test(
+    'nonzero business codes retain context through each production source path',
+    () async {
+      final key = lightNovelKey(31607);
+      for (final operation in [
+        Operation.search,
+        Operation.novelDetail,
+        Operation.catalog,
+        Operation.chapter,
+      ]) {
+        final adapter = TestAdapter(
+          (_) => response(
+            bytes: utf8.encode('{"code":123,"message":"secret sentinel"}'),
+          ),
+        );
+        final source = LightNovelSource(
+          scheduler: scheduler,
+          logger: logger,
+          adapter: adapter,
+        );
+        final Result result = await switch (operation) {
+          Operation.search => source.search('fixture', cancellation: token),
+          Operation.novelDetail => source.getNovelDetail(
+            key,
+            cancellation: token,
+          ),
+          Operation.catalog => source.getCatalog(key, cancellation: token),
+          _ => source.getChapter(
+            lightNovelChapterKey(key, 309555),
+            cancellation: token,
+          ),
+        };
+        final failure = (result as Failure).failure;
+        expect(failure.kind, FailureKind.unsupported);
+        expect(failure.context, FailureContext.unrecognizedSourceResponse);
+        expect(failure.operation, operation);
+        expect(failure.retryPolicy, RetryPolicy.never);
+        expect(adapter.requests.length, 1);
+        expect(failure.toString(), isNot(contains('sentinel')));
+        expect(logger.events.toString(), isNot(contains('sentinel')));
+        source.close();
       }
     },
   );

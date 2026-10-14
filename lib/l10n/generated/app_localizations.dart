@@ -752,6 +752,12 @@ abstract class AppLocalizations {
   /// **'This feature is not supported yet.'**
   String get unsupportedMessage;
 
+  /// No description provided for @unrecognizedSourceResponseMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The source could not complete this request. The cause is unknown.'**
+  String get unrecognizedSourceResponseMessage;
+
   /// No description provided for @readerSettings.
   ///
   /// In en, this message translates to:

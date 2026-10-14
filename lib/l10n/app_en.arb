@@ -124,6 +124,7 @@
   "sourceUnavailableMessage": "The content service is temporarily unavailable. Try again later.",
   "tooLargeMessage": "This content is too large to process.",
   "unsupportedMessage": "This feature is not supported yet.",
+  "unrecognizedSourceResponseMessage": "The source could not complete this request. The cause is unknown.",
   "readerSettings": "Reading settings",
   "readerFontSize": "Font size",
   "readerLineHeight": "Line height",

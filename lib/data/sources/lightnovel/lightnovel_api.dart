@@ -109,6 +109,7 @@ final class LightNovelApi {
           AppFailure(
             kind: FailureKind.unsupported,
             operation: endpoint.operation,
+            context: FailureContext.unrecognizedSourceResponse,
           ),
         );
       }

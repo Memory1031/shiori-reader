@@ -124,6 +124,7 @@
   "sourceUnavailableMessage": "内容服务暂时不可用，请稍后再试。",
   "tooLargeMessage": "内容超出当前可处理的大小。",
   "unsupportedMessage": "暂不支持此功能。",
+  "unrecognizedSourceResponseMessage": "书源未能完成本次请求，原因暂时无法确定。",
   "readerSettings": "阅读设置",
   "readerFontSize": "字号",
   "readerLineHeight": "行高",

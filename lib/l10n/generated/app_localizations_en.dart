@@ -359,6 +359,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unsupportedMessage => 'This feature is not supported yet.';
 
   @override
+  String get unrecognizedSourceResponseMessage =>
+      'The source could not complete this request. The cause is unknown.';
+
+  @override
   String get readerSettings => 'Reading settings';
 
   @override

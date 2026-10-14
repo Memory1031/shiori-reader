@@ -47,6 +47,7 @@ enum FailureContext {
   sessionExpired,
   loginRequired,
   challengeRequired,
+  unrecognizedSourceResponse,
 }
 
 final class AppFailure extends ValueModel {

@@ -174,7 +174,10 @@ String failureMessage(AppLocalizations strings, AppFailure failure) {
     FailureKind.rateLimited => strings.rateLimitedMessage,
     FailureKind.database => strings.databaseFailureMessage,
     FailureKind.cache => strings.cacheFailureMessage,
-    FailureKind.unsupported => strings.unsupportedMessage,
+    FailureKind.unsupported =>
+      failure.context == FailureContext.unrecognizedSourceResponse
+          ? strings.unrecognizedSourceResponseMessage
+          : strings.unsupportedMessage,
     FailureKind.tooLarge => strings.tooLargeMessage,
     FailureKind.cancelled => '',
   };
