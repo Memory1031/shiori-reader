@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -36,10 +37,12 @@ class VolumePreview extends StatelessWidget {
       repository: repository,
       novel: novel,
       initialMode: ReadMode.cacheOnly,
+      fetchMissingOnInit: novel.sourceId != LocalBookIdentity.sourceId,
     ),
     builder: (context, controller) {
       final l = AppLocalizations.of(context);
       final catalog = controller.loaded?.value;
+      final online = novel.sourceId != LocalBookIdentity.sourceId;
       final localNavigation =
           novel.sourceId == LocalBookIdentity.sourceId &&
               repository is LocalNavigationRepository
@@ -51,16 +54,47 @@ class VolumePreview extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  l.catalogTitle,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
+                if (online)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l.catalogTitle,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('detail-catalog-refresh'),
+                        tooltip: l.catalogRefresh,
+                        onPressed: controller.canLoad
+                            ? controller.refreshCatalog
+                            : null,
+                        icon: const Icon(Icons.refresh),
+                      ),
+                    ],
+                  )
+                else
+                  Text(
+                    l.catalogTitle,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                if (online && controller.loaded != null)
+                  Text(
+                    l.catalogLastFetched(
+                      DateFormat.yMd(
+                        Localizations.localeOf(context).toString(),
+                      ).add_Hm().format(controller.loaded!.fetchedAt.toLocal()),
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 const SizedBox(height: ShioriSpace.item),
                 if (localNavigation == null && controller.loading)
                   const LinearProgressIndicator(),
                 if (localNavigation == null &&
                     controller.failure != null &&
-                    controller.failure!.context != FailureContext.cacheMiss)
+                    (online ||
+                        controller.failure!.context !=
+                            FailureContext.cacheMiss))
                   Text(
                     failureMessage(l, controller.failure!),
                     style: Theme.of(context).textTheme.bodySmall,
@@ -76,7 +110,7 @@ class VolumePreview extends StatelessWidget {
               onTarget: onTarget,
               onChapter: onChapter,
             )
-          else if (catalog == null)
+          else if (catalog == null && !online)
             _boxed(
               TextButton.icon(
                 onPressed: controller.canLoad ? controller.load : null,
@@ -84,6 +118,18 @@ class VolumePreview extends StatelessWidget {
                 label: Text(l.volumesLoad),
               ),
             )
+          else if (catalog == null &&
+              !controller.loading &&
+              controller.failure != null &&
+              controller.failure!.retryPolicy != RetryPolicy.never)
+            _boxed(
+              TextButton(
+                onPressed: controller.canLoad ? controller.load : null,
+                child: Text(l.retryAction),
+              ),
+            )
+          else if (catalog == null)
+            const SliverToBoxAdapter(child: SizedBox.shrink())
           else if (catalog.flatChapters.isEmpty)
             _boxed(EmptyView(message: l.catalogEmpty))
           else

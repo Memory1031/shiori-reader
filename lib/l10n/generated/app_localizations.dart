@@ -590,6 +590,18 @@ abstract class AppLocalizations {
   /// **'Contents'**
   String get catalogTitle;
 
+  /// No description provided for @catalogRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh contents'**
+  String get catalogRefresh;
+
+  /// No description provided for @catalogLastFetched.
+  ///
+  /// In en, this message translates to:
+  /// **'Last fetched: {time}'**
+  String catalogLastFetched(String time);
+
   /// No description provided for @loadMoreAction.
   ///
   /// In en, this message translates to:

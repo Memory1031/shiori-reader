@@ -259,6 +259,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get catalogTitle => '目录';
 
   @override
+  String get catalogRefresh => '刷新目录';
+
+  @override
+  String catalogLastFetched(String time) {
+    return '上次获取：$time';
+  }
+
+  @override
   String get loadMoreAction => '加载更多';
 
   @override

@@ -271,6 +271,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get catalogTitle => 'Contents';
 
   @override
+  String get catalogRefresh => 'Refresh contents';
+
+  @override
+  String catalogLastFetched(String time) {
+    return 'Last fetched: $time';
+  }
+
+  @override
   String get loadMoreAction => 'Load more';
 
   @override

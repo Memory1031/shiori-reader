@@ -838,7 +838,7 @@ void main() {
       h.focusOf(h.key('detail-back')).requestFocus();
       await tester.pump();
       final keys = <Object?>[h.focused()];
-      for (var i = 0; i < 7; i++) {
+      for (var i = 0; i < 8; i++) {
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
         await tester.pumpAndSettle();
         keys.add(h.focused());
@@ -853,6 +853,7 @@ void main() {
       'detail-shelf',
       'detail-tags-toggle',
       'detail-synopsis-toggle',
+      'detail-catalog-refresh',
       'preview-chapter',
       'preview-chapter',
     ]);
@@ -864,6 +865,7 @@ void main() {
       'detail-read',
       'detail-shelf',
       'detail-synopsis-toggle',
+      'detail-catalog-refresh',
       'preview-chapter',
       'preview-chapter',
     ]);
@@ -961,7 +963,16 @@ void main() {
         await h.resize(width);
         await h.expectReachable(label);
         // The heading spans the section: the text column on its frame.
-        final section = h.rect(find.text(h.l.catalogTitle));
+        final section = h.rect(
+          novel == local
+              ? find.text(h.l.catalogTitle)
+              : find
+                    .ancestor(
+                      of: find.text(h.l.catalogTitle),
+                      matching: find.byType(Row),
+                    )
+                    .first,
+        );
         final row = h.rect(first);
         expect(
           section.left,
@@ -1074,30 +1085,28 @@ void main() {
   }
 
   group('catalog states', () {
-    testWidgets('a cache miss offers loading, which reads cache first', (
-      tester,
-    ) async {
-      final repo = Requests(book(online))
-        ..catalog = (mode) async => mode == ReadMode.cacheOnly
-            ? Failure(cacheMiss)
-            : Success(fresh(catalogOf(online)));
-      final h = DetailHarness(tester, repo);
-      await h.pump(width: 1280);
-      expect(find.text('Chapter 1'), findsNothing);
-      await h.resize(900);
-      await h.resize(1280);
-      expect(repo.catalogs, [ReadMode.cacheOnly]);
-      await h.expectReachable(find.text(h.l.volumesLoad));
-      await tester.tap(find.text(h.l.volumesLoad));
-      await tester.pumpAndSettle();
-      expect(repo.catalogs, [ReadMode.cacheOnly, ReadMode.cacheFirst]);
-      expect(repo.details, [ReadMode.cacheFirst]);
-      expect(find.text('Chapter 1'), findsOneWidget);
-      await h.resize(900);
-      expect(repo.catalogs, [ReadMode.cacheOnly, ReadMode.cacheFirst]);
-      expect(tester.takeException(), isNull);
-      await h.close();
-    }, variant: _desktop);
+    testWidgets(
+      'a cache miss automatically reads once; rebuilding does not refetch',
+      (tester) async {
+        final repo = Requests(book(online))
+          ..catalog = (mode) async => mode == ReadMode.cacheOnly
+              ? Failure(cacheMiss)
+              : Success(fresh(catalogOf(online)));
+        final h = DetailHarness(tester, repo);
+        await h.pump(width: 1280);
+        expect(find.text('Chapter 1'), findsOneWidget);
+        await h.resize(900);
+        await h.resize(1280);
+        expect(repo.catalogs, [ReadMode.cacheOnly, ReadMode.cacheFirst]);
+        expect(repo.details, [ReadMode.cacheFirst]);
+        expect(find.text('Chapter 1'), findsOneWidget);
+        await h.resize(900);
+        expect(repo.catalogs, [ReadMode.cacheOnly, ReadMode.cacheFirst]);
+        expect(tester.takeException(), isNull);
+        await h.close();
+      },
+      variant: _desktop,
+    );
 
     testWidgets('a catalog failure is shown with a way to load again', (
       tester,
@@ -1110,10 +1119,10 @@ void main() {
       for (final width in [1280.0, 900.0]) {
         await h.resize(width);
         await h.expectReachable(message);
-        await h.expectReachable(find.text(h.l.volumesLoad));
+        await h.expectReachable(find.text(h.l.retryAction));
         expect(tester.takeException(), isNull);
       }
-      await tester.tap(find.text(h.l.volumesLoad));
+      await tester.tap(find.text(h.l.retryAction));
       await tester.pumpAndSettle();
       expect(repo.catalogs, [ReadMode.cacheOnly, ReadMode.cacheFirst]);
       await h.close();

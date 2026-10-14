@@ -11,9 +11,11 @@ class CatalogController extends ScopedController {
     required this.repository,
     required this.novel,
     this.initialMode = ReadMode.cacheFirst,
+    this.fetchMissingOnInit = false,
     this.now = DateTime.now,
   });
   final ReadMode initialMode;
+  final bool fetchMissingOnInit;
   final NovelRepository repository;
   final NovelKey novel;
   LoadResult<Catalog>? loaded;
@@ -65,10 +67,13 @@ class CatalogController extends ScopedController {
       _accept(result);
       _notify();
     });
-    unawaited(load(mode: initialMode));
+    unawaited(load(mode: initialMode, fetchMissing: fetchMissingOnInit));
   }
 
-  Future<void> load({ReadMode mode = ReadMode.cacheFirst}) async {
+  Future<void> load({
+    ReadMode mode = ReadMode.cacheFirst,
+    bool fetchMissing = false,
+  }) async {
     if (!canLoad) return;
     final request = _request = CancellationSource();
     final updates = _updates;
@@ -103,6 +108,14 @@ class CatalogController extends ScopedController {
       _accept(result);
     }
     _notify();
+    if (result case Failure<LoadResult<Catalog>>(:final failure)
+        when fetchMissing &&
+            mode == ReadMode.cacheOnly &&
+            failure.context == FailureContext.cacheMiss &&
+            loaded == null &&
+            this.failure?.context == FailureContext.cacheMiss) {
+      await load();
+    }
   }
 
   Future<void> refreshCatalog() => load(mode: ReadMode.refresh);
