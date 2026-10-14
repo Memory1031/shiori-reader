@@ -77,7 +77,7 @@ Future<void> main() async {
               chooseEncoding: (_) async => TxtEncoding.utf8,
             ),
           ),
-        ),
+        ).book,
       );
     }
     await db.customStatement('UPDATE local_books SET parser_version=28');

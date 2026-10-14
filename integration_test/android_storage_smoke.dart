@@ -107,7 +107,7 @@ Future<void> main() async {
               );
             },
           ),
-        ),
+        ).book,
       );
     }
     final library = LocalLibraryRepository(db.users);
@@ -328,7 +328,7 @@ Future<void> main() async {
       },
     );
     require(
-      failed is Failure<LocalBookRecord> &&
+      failed is Failure<LocalBookImportResult> &&
           failed.failure.kind == FailureKind.database,
     );
     require(ok(await faultStore.watchBooks().first).isEmpty);

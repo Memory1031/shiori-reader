@@ -113,8 +113,9 @@ void main() {
                       },
                       cancellation: CancellationSource().token,
                     )
-                    as Success<LocalBookRecord>)
-                .value;
+                    as Success<LocalBookImportResult>)
+                .value
+                .book;
       });
       final library = LocalLibraryRepository(db);
       addTearDown(() async {

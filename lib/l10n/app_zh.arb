@@ -355,6 +355,8 @@
   "importWaiting": "等待导入",
   "importItemImporting": "正在导入",
   "importItemImported": "已导入",
+  "importAlreadyExists": "书籍已存在，未重复导入。",
+  "importItemExisting": "已存在，未重复导入",
   "importBatchReady": "准备导入 {count} 本书",
   "@importBatchReady": {
     "placeholders": {
@@ -374,9 +376,9 @@
       }
     }
   },
-  "importBatchFinished": "导入完成",
-  "importBatchDone": "已导入 {count} 本书",
-  "@importBatchDone": {
+  "importBatchComplete": "导入处理完成",
+  "importBatchCreated": "新增 {count} 本",
+  "@importBatchCreated": {
     "placeholders": {
       "count": {
         "type": "int"
@@ -384,13 +386,26 @@
     }
   },
   "importBatchStopped": "导入已停止",
-  "importBatchSummary": "成功 {succeeded} 本 · 失败 {failed} 本",
-  "@importBatchSummary": {
+  "importBatchExisting": "已存在 {count} 本",
+  "@importBatchExisting": {
     "placeholders": {
-      "succeeded": {
+      "count": {
         "type": "int"
-      },
-      "failed": {
+      }
+    }
+  },
+  "importBatchFailed": "失败 {count} 本",
+  "@importBatchFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importBatchAllExisting": "已存在 {count} 本，未新增书籍",
+  "@importBatchAllExisting": {
+    "placeholders": {
+      "count": {
         "type": "int"
       }
     }

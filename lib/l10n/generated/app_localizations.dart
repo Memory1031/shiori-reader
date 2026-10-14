@@ -1658,6 +1658,18 @@ abstract class AppLocalizations {
   /// **'Imported'**
   String get importItemImported;
 
+  /// No description provided for @importAlreadyExists.
+  ///
+  /// In en, this message translates to:
+  /// **'Already in your library. No duplicate was created.'**
+  String get importAlreadyExists;
+
+  /// No description provided for @importItemExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'Already exists; no duplicate created'**
+  String get importItemExisting;
+
   /// No description provided for @importBatchReady.
   ///
   /// In en, this message translates to:
@@ -1670,17 +1682,17 @@ abstract class AppLocalizations {
   /// **'Importing {current} of {total}'**
   String importBatchProgress(int current, int total);
 
-  /// No description provided for @importBatchFinished.
+  /// No description provided for @importBatchComplete.
   ///
   /// In en, this message translates to:
-  /// **'Finished importing'**
-  String get importBatchFinished;
+  /// **'Import processing complete'**
+  String get importBatchComplete;
 
-  /// No description provided for @importBatchDone.
+  /// No description provided for @importBatchCreated.
   ///
   /// In en, this message translates to:
-  /// **'Imported {count} books'**
-  String importBatchDone(int count);
+  /// **'{count} added'**
+  String importBatchCreated(int count);
 
   /// No description provided for @importBatchStopped.
   ///
@@ -1688,11 +1700,23 @@ abstract class AppLocalizations {
   /// **'Import stopped'**
   String get importBatchStopped;
 
-  /// No description provided for @importBatchSummary.
+  /// No description provided for @importBatchExisting.
   ///
   /// In en, this message translates to:
-  /// **'{succeeded} imported · {failed} failed'**
-  String importBatchSummary(int succeeded, int failed);
+  /// **'{count, plural, =1{1 already exists} other{{count} already exist}}'**
+  String importBatchExisting(int count);
+
+  /// No description provided for @importBatchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} failed'**
+  String importBatchFailed(int count);
+
+  /// No description provided for @importBatchAllExisting.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} already exist. No books were added.'**
+  String importBatchAllExisting(int count);
 
   /// No description provided for @importBatchRemaining.
   ///

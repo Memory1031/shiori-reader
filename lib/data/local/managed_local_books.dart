@@ -400,7 +400,7 @@ class ManagedLocalBooks
   }
 
   @override
-  Future<Result<LocalBookRecord>> importBook({
+  Future<Result<LocalBookImportResult>> importBook({
     required Stream<List<int>> bytes,
     required LocalBookFormat format,
     required LocalBookParser parse,
@@ -437,7 +437,10 @@ class ManagedLocalBooks
               checkLocalCancellation(cancellation);
             });
           }
-          return existing;
+          return LocalBookImportResult(
+            book: existing,
+            disposition: LocalBookImportDisposition.existing,
+          );
         }
         session = _ImportSession(
           key,
@@ -491,10 +494,13 @@ class ManagedLocalBooks
         });
         db.notifyUpdates({TableUpdate.onTable(db.localBooks)});
         committed = true;
-        return LocalBookRecord(
-          content: written.content,
-          format: format,
-          importedAt: importedAt,
+        return LocalBookImportResult(
+          book: LocalBookRecord(
+            content: written.content,
+            format: format,
+            importedAt: importedAt,
+          ),
+          disposition: LocalBookImportDisposition.created,
         );
       } finally {
         try {

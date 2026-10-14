@@ -818,6 +818,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importItemImported => '已导入';
 
   @override
+  String get importAlreadyExists => '书籍已存在，未重复导入。';
+
+  @override
+  String get importItemExisting => '已存在，未重复导入';
+
+  @override
   String importBatchReady(int count) {
     return '准备导入 $count 本书';
   }
@@ -828,19 +834,29 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get importBatchFinished => '导入完成';
+  String get importBatchComplete => '导入处理完成';
 
   @override
-  String importBatchDone(int count) {
-    return '已导入 $count 本书';
+  String importBatchCreated(int count) {
+    return '新增 $count 本';
   }
 
   @override
   String get importBatchStopped => '导入已停止';
 
   @override
-  String importBatchSummary(int succeeded, int failed) {
-    return '成功 $succeeded 本 · 失败 $failed 本';
+  String importBatchExisting(int count) {
+    return '已存在 $count 本';
+  }
+
+  @override
+  String importBatchFailed(int count) {
+    return '失败 $count 本';
+  }
+
+  @override
+  String importBatchAllExisting(int count) {
+    return '已存在 $count 本，未新增书籍';
   }
 
   @override

@@ -25,6 +25,7 @@ class ImportItemState {
   ImportItemPhase phase;
   ImportProblem? problem;
   LocalBookRecord? result;
+  LocalBookImportDisposition? disposition;
 
   /// Manual TXT encoding override; scoped to this item, never reused for the
   /// next file.
@@ -110,6 +111,16 @@ class ImportController extends ChangeNotifier {
 
   int get succeededCount =>
       items.where((item) => item.phase == ImportItemPhase.succeeded).length;
+  int get createdCount => _dispositionCount(LocalBookImportDisposition.created);
+  int get existingCount =>
+      _dispositionCount(LocalBookImportDisposition.existing);
+  int _dispositionCount(LocalBookImportDisposition disposition) => items
+      .where(
+        (item) =>
+            item.phase == ImportItemPhase.succeeded &&
+            item.disposition == disposition,
+      )
+      .length;
   int get failedCount =>
       items.where((item) => item.phase == ImportItemPhase.failed).length;
 
@@ -411,6 +422,8 @@ class ImportController extends ChangeNotifier {
     for (final item in confirmed) {
       if (item.phase == ImportItemPhase.succeeded) continue;
       if (cancellation.token.isCancelled) break;
+      item.result = null;
+      item.disposition = null;
       copiedBytes = 0;
       final reject = _rejectReason(item.candidate);
       if (reject != null) {
@@ -438,7 +451,6 @@ class ImportController extends ChangeNotifier {
         return;
       }
       item.problem = null;
-      item.result = null;
       item.phase = ImportItemPhase.importing;
       workStage = ImportWorkStage.reading;
       phase = ImportPhase.importing;
@@ -508,8 +520,9 @@ class ImportController extends ChangeNotifier {
         addToShelf: addToShelf,
         cancellation: cancellation.token,
       );
-      if (value case Success<LocalBookRecord>(:final value)) {
-        item.result = value;
+      if (value case Success<LocalBookImportResult>(:final value)) {
+        item.result = value.book;
+        item.disposition = value.disposition;
         item.phase = ImportItemPhase.succeeded;
         // A committed success wins over late cancellation. If ack fails, leave
         // the durable receipt for content-hash deduplication on the next launch.
@@ -518,7 +531,7 @@ class ImportController extends ChangeNotifier {
         } catch (_) {}
         _emit();
         return _BatchResult.done;
-      } else if (value case Failure<LocalBookRecord>(:final failure)) {
+      } else if (value case Failure<LocalBookImportResult>(:final failure)) {
         // Any failure after a user cancellation is the cancellation itself;
         // store failures may surface as generic kinds there.
         if (failure.isCancellation || cancellation.token.isCancelled) {

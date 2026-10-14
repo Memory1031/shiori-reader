@@ -88,6 +88,15 @@ final class LocalBookRecord {
   final DateTime importedAt;
 }
 
+enum LocalBookImportDisposition { created, existing }
+
+/// Outcome of this import attempt, separate from the persisted book record.
+final class LocalBookImportResult {
+  const LocalBookImportResult({required this.book, required this.disposition});
+  final LocalBookRecord book;
+  final LocalBookImportDisposition disposition;
+}
+
 /// Valid only during the awaited parser callback. No paths or platform handles.
 abstract interface class LocalImportSession {
   NovelKey get key;
@@ -102,7 +111,7 @@ typedef LocalBookParser =
 /// Import publishes atomically after parsing. Existing files win on duplicates.
 /// A committed success remains authoritative after cancellation.
 abstract interface class LocalBookStore {
-  Future<Result<LocalBookRecord>> importBook({
+  Future<Result<LocalBookImportResult>> importBook({
     required Stream<List<int>> bytes,
     required LocalBookFormat format,
     required LocalBookParser parse,

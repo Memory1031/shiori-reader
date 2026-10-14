@@ -112,7 +112,7 @@ void main() {
               chooseEncoding: (_) async => TxtEncoding.utf8,
             ),
           ),
-        );
+        ).book;
         // Reopen the managed store; runtime-only metadata cannot pass this.
         await store.close();
         store = value(await ManagedLocalBooks.open(paths, db));
@@ -430,7 +430,7 @@ void main() {
               chooseEncoding: (_) async => TxtEncoding.utf8,
             ),
           ),
-        );
+        ).book;
         final book = imported.content, key = book.detail.summary.key;
         final chapters = book.chapters
             .map(

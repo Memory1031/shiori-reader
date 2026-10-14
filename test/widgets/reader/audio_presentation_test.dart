@@ -91,7 +91,7 @@ void main() {
               chooseEncoding: (_) async => TxtEncoding.utf8,
             ),
           ),
-        );
+        ).book;
         await store.close();
         store = value(await ManagedLocalBooks.open(paths, db));
         record = value(

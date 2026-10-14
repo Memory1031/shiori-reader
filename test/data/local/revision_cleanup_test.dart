@@ -80,8 +80,9 @@ void main() {
                         parse: (s) async => fixture(s),
                         cancellation: CancellationSource().token,
                       )
-                      as Success<LocalBookRecord>)
-                  .value;
+                      as Success<LocalBookImportResult>)
+                  .value
+                  .book;
           final digest = book.content.detail.summary.key.novelId;
           final root = '${paths.localBooks.path}/$digest';
           final active = 'a' * 64;

@@ -94,7 +94,7 @@ void main() {
               chooseEncoding: (_) async => TxtEncoding.utf8,
             ),
           ),
-        );
+        ).book;
         final b = ok(
           await store.importBook(
             bytes: Stream.value(utf8.encode('unrelated chapter')),
@@ -108,7 +108,7 @@ void main() {
               chooseEncoding: (_) async => TxtEncoding.utf8,
             ),
           ),
-        );
+        ).book;
         await db.customStatement('UPDATE local_books SET parser_version=28');
         final library = LocalLibraryRepository(db);
         final key = a.content.detail.summary.key;
@@ -225,7 +225,7 @@ void main() {
               chooseEncoding: (_) async => TxtEncoding.utf8,
             ),
           ),
-        );
+        ).book;
         await db.customStatement('UPDATE local_books SET parser_version=28');
         final times = <String, Object?>{
           'chapters': book.content.chapters.length,

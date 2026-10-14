@@ -44,7 +44,8 @@ void main() {
           ),
           cancellation: cancellation.token,
         );
-        final content = (imported as Success<LocalBookRecord>).value.content;
+        final content =
+            (imported as Success<LocalBookImportResult>).value.book.content;
         final audio = content.chapters.first.blocks
             .whereType<AudioBlock>()
             .single;

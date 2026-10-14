@@ -70,7 +70,7 @@ void main() {
         chooseEncoding: (_) async => TxtEncoding.utf8,
       ),
     ),
-  );
+  ).book;
   test(
     'hanging metadata reparse preserves exact legacy offsets after reopening',
     () async {
@@ -92,7 +92,7 @@ void main() {
             chooseEncoding: (_) async => TxtEncoding.utf8,
           ),
         ),
-      );
+      ).book;
       final key = imported.content.detail.summary.key;
       final parsed = imported.content.chapters.first;
       final styled = parsed.blocks.single as ParagraphBlock;
@@ -191,7 +191,7 @@ void main() {
             chooseEncoding: (_) async => TxtEncoding.utf8,
           ),
         ),
-      );
+      ).book;
       final key = imported.content.detail.summary.key;
       final parsed = imported.content.chapters.first;
       final styled = parsed.blocks.single as ParagraphBlock;
@@ -292,7 +292,7 @@ void main() {
             chooseEncoding: (_) async => TxtEncoding.utf8,
           ),
         ),
-      );
+      ).book;
       final key = imported.content.detail.summary.key;
       final chapter = imported.content.chapters.first;
       // Simulate a manifest produced before explicit gaps were retained in prose.
@@ -486,7 +486,7 @@ void main() {
             chooseEncoding: (_) async => TxtEncoding.utf8,
           ),
         ),
-      );
+      ).book;
       final key = old.content.detail.summary.key;
       final generation = ok(
         await library.beginProgressSession(key, cancellation: token()),
@@ -641,7 +641,7 @@ void main() {
             chooseEncoding: (_) async => TxtEncoding.utf8,
           ),
         ),
-      );
+      ).book;
       final cs = old.content.chapters;
       expect(cs.length, 4);
       expect(cs.map((c) => c.key).toSet().length, 4);
@@ -913,7 +913,7 @@ void main() {
             chooseEncoding: (_) async => TxtEncoding.utf8,
           ),
         ),
-      );
+      ).book;
       final key = old.content.detail.summary.key;
       await store.close();
       store = ok(await ManagedLocalBooks.open(paths, db));

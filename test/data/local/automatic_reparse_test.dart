@@ -161,7 +161,7 @@ void main() {
           chooseEncoding: (_) async => TxtEncoding.utf8,
         ),
       ),
-    );
+    ).book;
     await db.customStatement(
       'UPDATE local_books SET parser_version=25 WHERE digest=?',
       [result.content.detail.summary.key.novelId],
@@ -1302,7 +1302,7 @@ void main() {
               chooseEncoding: (_) async => TxtEncoding.utf8,
             ),
           ),
-        );
+        ).book;
         await idle();
         expect(decoder.calls, [key, key]);
       } finally {

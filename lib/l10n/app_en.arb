@@ -355,6 +355,8 @@
   "importWaiting": "Waiting",
   "importItemImporting": "Importing",
   "importItemImported": "Imported",
+  "importAlreadyExists": "Already in your library. No duplicate was created.",
+  "importItemExisting": "Already exists; no duplicate created",
   "importBatchReady": "Ready to import {count} books",
   "@importBatchReady": {
     "placeholders": {
@@ -374,9 +376,9 @@
       }
     }
   },
-  "importBatchFinished": "Finished importing",
-  "importBatchDone": "Imported {count} books",
-  "@importBatchDone": {
+  "importBatchComplete": "Import processing complete",
+  "importBatchCreated": "{count} added",
+  "@importBatchCreated": {
     "placeholders": {
       "count": {
         "type": "int"
@@ -384,13 +386,26 @@
     }
   },
   "importBatchStopped": "Import stopped",
-  "importBatchSummary": "{succeeded} imported · {failed} failed",
-  "@importBatchSummary": {
+  "importBatchExisting": "{count, plural, =1{1 already exists} other{{count} already exist}}",
+  "@importBatchExisting": {
     "placeholders": {
-      "succeeded": {
+      "count": {
         "type": "int"
-      },
-      "failed": {
+      }
+    }
+  },
+  "importBatchFailed": "{count} failed",
+  "@importBatchFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importBatchAllExisting": "{count} already exist. No books were added.",
+  "@importBatchAllExisting": {
+    "placeholders": {
+      "count": {
         "type": "int"
       }
     }

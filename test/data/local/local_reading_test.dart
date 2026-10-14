@@ -60,7 +60,7 @@ void main() {
     await db.close();
     await temp.delete(recursive: true);
   });
-  Future<Result<LocalBookRecord>> add(LocalBookFormat format) {
+  Future<Result<LocalBookImportResult>> add(LocalBookFormat format) {
     final bytes = format == LocalBookFormat.txt
         ? utf8.encode('第一章 星光\n开头正文。\n第二章 日出\n日出正文。')
         : epubBytes;
@@ -102,7 +102,9 @@ void main() {
     test(
       '${format.name}: import, shelf removal, duplicate, reopen and offline dispatch',
       () async {
-        final record = ok(await add(format));
+        final imported = ok(await add(format));
+        expect(imported.disposition, LocalBookImportDisposition.created);
+        final record = imported.book;
         final key = record.content.detail.summary.key;
         final originalShelf = ok(await library.watchBookshelf().first).single;
         expect(originalShelf.snapshot.key, key);
@@ -127,8 +129,27 @@ void main() {
           ok(await library.getProgress(key, cancellation: token())),
           isNotNull,
         );
-        expect(ok(await add(format)).importedAt, record.importedAt);
+        final beforeDuplicate = ok(
+          await library.getProgress(key, cancellation: token()),
+        );
+        final duplicate = ok(await add(format));
+        expect(duplicate.disposition, LocalBookImportDisposition.existing);
+        expect(duplicate.book.content.detail.summary.key, key);
+        expect(duplicate.book.importedAt, record.importedAt);
+        expect(
+          ok(await library.getProgress(key, cancellation: token())),
+          beforeDuplicate,
+        );
         expect(ok(await library.watchBookshelf().first), hasLength(1));
+        final restoredShelf = ok(await library.watchBookshelf().first).single;
+        expect(
+          ok(await add(format)).disposition,
+          LocalBookImportDisposition.existing,
+        );
+        expect(
+          ok(await library.watchBookshelf().first).single.addedAt,
+          restoredShelf.addedAt,
+        );
         // External input is no longer needed; disposable online cache is unrelated.
         await paths.disposable.delete(recursive: true);
         await store.close();
@@ -203,7 +224,7 @@ void main() {
   test(
     'shelf removal deletes managed files and progress, rejects old writes after reimport',
     () async {
-      final record = ok(await add(LocalBookFormat.epub));
+      final record = ok(await add(LocalBookFormat.epub)).book;
       final key = record.content.detail.summary.key;
       final cover = record.content.detail.summary.cover!;
       final lease = ok(
@@ -269,7 +290,7 @@ void main() {
         await library.beginProgressSession(key, cancellation: token()),
         isA<Failure>(),
       );
-      ok(await add(LocalBookFormat.epub));
+      ok(await add(LocalBookFormat.epub)).book;
       expect(
         ok(
           await library.saveProgress(
@@ -289,7 +310,7 @@ void main() {
   test(
     'cancelled deletion preserves files, shelf and progress generation',
     () async {
-      final record = ok(await add(LocalBookFormat.txt));
+      final record = ok(await add(LocalBookFormat.txt)).book;
       final key = record.content.detail.summary.key;
       final source = CancellationSource()..cancel();
       expect(
@@ -303,7 +324,7 @@ void main() {
   test(
     'reader explicit fragment overrides saved position; missing anchor starts chapter',
     () async {
-      final record = ok(await add(LocalBookFormat.epub));
+      final record = ok(await add(LocalBookFormat.epub)).book;
       final chapter = record.content.chapters.first;
       final target = record.content.navigation.last.children.first;
       final generation = ok(

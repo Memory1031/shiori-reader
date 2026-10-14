@@ -121,7 +121,7 @@ void main() {
         final closing = store.close();
         expect(await ManagedLocalBooks.open(paths, secondDb), isA<Failure>());
         release.complete();
-        final imported = ok(await importing);
+        final imported = ok(await importing).book;
         await closing;
         await store.close();
         store = ok(await ManagedLocalBooks.open(paths, db));
@@ -201,7 +201,7 @@ void main() {
         ),
         cancellation: token(),
       ),
-    );
+    ).book;
     await store.close();
     store = ok(await ManagedLocalBooks.open(paths, db));
     final reopened = ok(
@@ -234,7 +234,7 @@ void main() {
           ),
           cancellation: token(),
         ),
-      );
+      ).book;
       final key = imported.content.detail.summary.key;
       final file = File(
         '${paths.localBooks.path}/${key.novelId}/manifest.json',
@@ -260,7 +260,7 @@ void main() {
           parse: (session) async => fixture(session),
           cancellation: token(),
         ),
-      );
+      ).book;
       final key = imported.content.detail.summary.key;
       final first = ok(await store.read(key, cancellation: token()));
       final second = ok(await store.read(key, cancellation: token()));
@@ -301,7 +301,7 @@ void main() {
             chooseEncoding: (_) async => TxtEncoding.utf8,
           ),
         ),
-      );
+      ).book;
       final chapter = imported.content.chapters.first;
       await store.close();
       store = ok(await ManagedLocalBooks.open(paths, db));
@@ -367,7 +367,7 @@ void main() {
             chooseEncoding: (_) async => TxtEncoding.utf8,
           ),
         ),
-      );
+      ).book;
       final chapter = imported.content.chapters.first;
       final titlePage = imported.content.chapters.last;
       expect(
@@ -530,7 +530,7 @@ void main() {
             chooseEncoding: (_) async => TxtEncoding.utf8,
           ),
         ),
-      );
+      ).book;
       final key = imported.content.detail.summary.key;
       final a = imported.content.chapters.first;
       final b = imported.content.chapters.last;
@@ -618,7 +618,7 @@ void main() {
             chooseEncoding: (_) async => TxtEncoding.utf8,
           ),
         ),
-      );
+      ).book;
       final chapter = imported.content.chapters.first;
       final key = chapter.key.novelKey;
       final original = File('${paths.localBooks.path}/${key.novelId}/original');
@@ -683,7 +683,7 @@ void main() {
     },
   );
 
-  Future<Result<LocalBookRecord>> add(
+  Future<Result<LocalBookImportResult>> add(
     String text, {
     LocalBookParser? parse,
     CancellationToken? cancellation,
@@ -697,11 +697,17 @@ void main() {
   test(
     'duplicate bytes skip parser; same title different bytes keep distinct identity',
     () async {
-      final first = ok(await add('a'));
-      final duplicate = ok(
+      final firstImport = ok(await add('a'));
+      final duplicateImport = ok(
         await add('a', parse: (_) => throw StateError('Must not parse twice')),
       );
-      final second = ok(await add('b'));
+      final secondImport = ok(await add('b'));
+      expect(firstImport.disposition, LocalBookImportDisposition.created);
+      expect(duplicateImport.disposition, LocalBookImportDisposition.existing);
+      expect(secondImport.disposition, LocalBookImportDisposition.created);
+      final first = firstImport.book;
+      final duplicate = duplicateImport.book;
+      final second = secondImport.book;
       expect(
         first.content.detail.summary.key,
         duplicate.content.detail.summary.key,
@@ -725,18 +731,18 @@ void main() {
       await db.customStatement(
         "CREATE TRIGGER fail_import BEFORE INSERT ON local_books BEGIN SELECT RAISE(ABORT,'test'); END",
       );
-      expect(await add('a'), isA<Failure<LocalBookRecord>>());
+      expect(await add('a'), isA<Failure<LocalBookImportResult>>());
       expect(await paths.localBooks.list().toList(), isEmpty);
       expect(await paths.localImportStaging.list().toList(), isEmpty);
       await db.customStatement('DROP TRIGGER fail_import');
-      expect(await add('a'), isA<Success<LocalBookRecord>>());
+      expect(await add('a'), isA<Success<LocalBookImportResult>>());
     },
   );
 
   test('parser and media IO failures do not publish a half book', () async {
     expect(
       await add('a', parse: (_) => throw const FormatException('broken')),
-      isA<Failure<LocalBookRecord>>(),
+      isA<Failure<LocalBookImportResult>>(),
     );
     expect(
       await add(
@@ -748,7 +754,7 @@ void main() {
           return fixture(s);
         },
       ),
-      isA<Failure<LocalBookRecord>>(),
+      isA<Failure<LocalBookImportResult>>(),
     );
     expect(await db.customSelect('SELECT * FROM local_books').get(), isEmpty);
     expect(await paths.localBooks.list().toList(), isEmpty);
@@ -790,7 +796,7 @@ void main() {
   test(
     'restart recovers staged and renamed but uncommitted imports, preserves committed data',
     () async {
-      final saved = ok(await add('a'));
+      final saved = ok(await add('a')).book;
       final orphan = sha256.convert([99]).toString();
       await Directory('${paths.localBooks.path}/$orphan').create();
       await Directory(
@@ -831,7 +837,7 @@ void main() {
             );
           },
         ),
-      );
+      ).book;
       await store.close();
       await db.close();
       await Directory('${temp.path}/a').rename('${temp.path}/b');
@@ -862,7 +868,7 @@ void main() {
   );
 
   test('disposable clear and bookshelf removal preserve owned files', () async {
-    final saved = ok(await add('a'));
+    final saved = ok(await add('a')).book;
     await db.customStatement(
       "INSERT INTO bookshelf VALUES('local',?,'fixture',1,1)",
       [saved.content.detail.summary.key.novelId],
@@ -900,7 +906,7 @@ void main() {
             ),
           ),
         ),
-        isA<Failure<LocalBookRecord>>(),
+        isA<Failure<LocalBookImportResult>>(),
       );
       final saved = ok(
         await add(
@@ -908,7 +914,7 @@ void main() {
           parse: (s) async =>
               fixture(s, media: await s.writeMedia(Stream.value([1, 2, 3]))),
         ),
-      );
+      ).book;
       final ref = saved.content.detail.summary.cover!;
       await File('${paths.localBooks.path}/${ref.mediaId}').writeAsBytes([9]);
       expect(await store.readMedia(ref, cancellation: token()), isA<Failure>());
@@ -1019,7 +1025,7 @@ void main() {
               chooseEncoding: (_) async => TxtEncoding.utf8,
             ),
           ),
-        );
+        ).book;
 
     Directory root(NovelKey key) =>
         Directory('${paths.localBooks.path}/${key.novelId}');
@@ -1168,7 +1174,7 @@ void main() {
             parse: (session) async => fixture(session),
             cancellation: token(),
           ),
-        );
+        ).book;
         final key = imported.content.detail.summary.key;
         expect(
           await File('${root(key).path}/presentations.json').exists(),

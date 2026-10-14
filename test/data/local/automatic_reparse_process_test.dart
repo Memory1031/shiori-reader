@@ -128,8 +128,9 @@ void main() {
                       chooseEncoding: (_) async => TxtEncoding.utf8,
                     ),
                   )
-                  as Success<LocalBookRecord>)
-              .value;
+                  as Success<LocalBookImportResult>)
+              .value
+              .book;
       final generation =
           (await library.beginProgressSession(key, cancellation: token())
                   as Success<int>)

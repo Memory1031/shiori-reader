@@ -20,7 +20,7 @@ class CountingSource extends MemorySource {
 class CountingStore implements LocalBookStore {
   int imports = 0, parses = 0, publications = 0;
   @override
-  Future<Result<LocalBookRecord>> importBook({
+  Future<Result<LocalBookImportResult>> importBook({
     required Stream<List<int>> bytes,
     required LocalBookFormat format,
     required LocalBookParser parse,
@@ -35,10 +35,13 @@ class CountingStore implements LocalBookStore {
     );
     publications++;
     return Success(
-      LocalBookRecord(
-        content: content,
-        format: format,
-        importedAt: DateTime.utc(2026),
+      LocalBookImportResult(
+        book: LocalBookRecord(
+          content: content,
+          format: format,
+          importedAt: DateTime.utc(2026),
+        ),
+        disposition: LocalBookImportDisposition.created,
       ),
     );
   }

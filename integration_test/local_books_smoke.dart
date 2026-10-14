@@ -73,7 +73,7 @@ void main() async {
           );
         },
       ),
-    );
+    ).book;
     step = 'media';
     final media = value(
       await store.readMedia(

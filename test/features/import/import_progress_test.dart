@@ -46,7 +46,7 @@ class GatedStore implements LocalBookStore {
   final gates = <Gates>[], saved = <LocalBookRecord>[];
   Completer<void>? deliveryGate;
   @override
-  Future<Result<LocalBookRecord>> importBook({
+  Future<Result<LocalBookImportResult>> importBook({
     required Stream<List<int>> bytes,
     required LocalBookFormat format,
     required LocalBookParser parse,
@@ -84,7 +84,12 @@ class GatedStore implements LocalBookStore {
         importedAt: DateTime.utc(2026),
       );
       saved.add(record);
-      return Success(record);
+      return Success(
+        LocalBookImportResult(
+          book: record,
+          disposition: LocalBookImportDisposition.created,
+        ),
+      );
     } on ImportSourceException {
       rethrow;
     } catch (_) {

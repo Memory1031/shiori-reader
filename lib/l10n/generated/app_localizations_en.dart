@@ -903,6 +903,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importItemImported => 'Imported';
 
   @override
+  String get importAlreadyExists =>
+      'Already in your library. No duplicate was created.';
+
+  @override
+  String get importItemExisting => 'Already exists; no duplicate created';
+
+  @override
   String importBatchReady(int count) {
     return 'Ready to import $count books';
   }
@@ -913,19 +920,35 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get importBatchFinished => 'Finished importing';
+  String get importBatchComplete => 'Import processing complete';
 
   @override
-  String importBatchDone(int count) {
-    return 'Imported $count books';
+  String importBatchCreated(int count) {
+    return '$count added';
   }
 
   @override
   String get importBatchStopped => 'Import stopped';
 
   @override
-  String importBatchSummary(int succeeded, int failed) {
-    return '$succeeded imported · $failed failed';
+  String importBatchExisting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count already exist',
+      one: '1 already exists',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String importBatchFailed(int count) {
+    return '$count failed';
+  }
+
+  @override
+  String importBatchAllExisting(int count) {
+    return '$count already exist. No books were added.';
   }
 
   @override

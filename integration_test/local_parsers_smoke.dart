@@ -68,7 +68,7 @@ Future<void> main() async {
           },
         ),
       );
-      records.add(ok(result));
+      records.add(ok(result).book);
     }
     if ((records[1].content.chapters.single.blocks.single as ParagraphBlock)
             .text !=
@@ -119,7 +119,7 @@ Future<void> main() async {
           cancellation: token,
           parse: (_) async => throw StateError('Unexpected duplicate parse'),
         ),
-      );
+      ).book;
       if (duplicate.content.detail.summary.key !=
           saved.content.detail.summary.key) {
         throw StateError('Duplicate identity');

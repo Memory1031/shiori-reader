@@ -58,7 +58,7 @@ void main() {
             cancellation: token(),
           ),
         ),
-      );
+      ).book;
       final first = await add('第一章\nSynthetic selected text.');
       final untouched = await add('第一章\nSynthetic untouched text.');
       final broken = ok(
@@ -69,7 +69,7 @@ void main() {
           cancellation: token(),
           parse: (session) async => fixture(session),
         ),
-      );
+      ).book;
       final a = first.content.detail.summary.key,
           b = broken.content.detail.summary.key,
           other = untouched.content.detail.summary.key;

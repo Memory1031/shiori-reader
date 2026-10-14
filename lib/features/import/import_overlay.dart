@@ -4,6 +4,7 @@ import '../../app/theme/shiori_theme.dart';
 import 'package:flutter/services.dart';
 import '../../domain/contracts/import_source.dart';
 import '../../domain/contracts/local_book_decoder.dart';
+import '../../domain/contracts/local_books.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import 'import_controller.dart';
@@ -475,7 +476,11 @@ class _ImportPanelState extends State<_ImportPanel> {
               semanticsLabel: _workLabel(c, l),
             ),
           ] else if (done)
-            Text(l.importSuccess)
+            Text(
+              item.disposition == LocalBookImportDisposition.existing
+                  ? l.importAlreadyExists
+                  : l.importSuccess,
+            )
           else if (c.problem case final problem?)
             Text(_problemText(l, problem), key: const ValueKey('import-error'))
           else
@@ -552,6 +557,14 @@ class _ImportPanelState extends State<_ImportPanel> {
         ? c.batchProblem
         : null;
     final ran = succeeded > 0 || failed > 0;
+    final summary = c.existingCount == total
+        ? l.importBatchAllExisting(total)
+        : [
+            if (c.createdCount > 0) l.importBatchCreated(c.createdCount),
+            if (c.existingCount > 0) l.importBatchExisting(c.existingCount),
+            if (failed > 0) l.importBatchFailed(failed),
+            if (pending > 0) l.importBatchRemaining(pending),
+          ].join(' · ');
 
     final String title;
     final String? counts;
@@ -563,19 +576,17 @@ class _ImportPanelState extends State<_ImportPanel> {
           : l.importBatchProgress(c.items.indexOf(current) + 1, total);
       counts = null;
     } else if (allDone) {
-      title = l.importBatchDone(total);
-      counts = null;
+      title = l.importBatchComplete;
+      counts = summary;
     } else if (c.phase == ImportPhase.failed && ran) {
       title = fatalReason != null
           ? l.importBatchStopped
-          : l.importBatchFinished;
-      counts = pending > 0
-          ? '${l.importBatchSummary(succeeded, failed)} · ${l.importBatchRemaining(pending)}'
-          : l.importBatchSummary(succeeded, failed);
+          : l.importBatchComplete;
+      counts = summary;
     } else if (ran) {
       // Stopped earlier by the user; the run resumes with the same receipts.
-      title = l.importBatchDone(succeeded);
-      counts = pending > 0 ? l.importBatchRemaining(pending) : null;
+      title = l.importBatchStopped;
+      counts = summary;
     } else {
       title = l.importBatchReady(total);
       counts = null;
@@ -739,7 +750,12 @@ class _ImportItemTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final status = switch (item.phase) {
-      ImportItemPhase.succeeded => (Icons.check_circle, l.importItemImported),
+      ImportItemPhase.succeeded => (
+        Icons.check_circle,
+        item.disposition == LocalBookImportDisposition.existing
+            ? l.importItemExisting
+            : l.importItemImported,
+      ),
       ImportItemPhase.importing => (null, l.importItemImporting),
       ImportItemPhase.failed => (
         Icons.error_outline,

@@ -58,7 +58,7 @@ void main() {
               chooseEncoding: (_) async => TxtEncoding.utf8,
             ),
           ),
-        );
+        ).book;
         await store.close();
         await db.close();
         db = UserDatabase(NativeDatabase(paths.userDatabase));

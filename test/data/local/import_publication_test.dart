@@ -80,7 +80,7 @@ void main() {
       final digest = sha256.convert(bytes).toString();
       final directory = Directory('${paths.localBooks.path}/$digest');
       var parses = 0;
-      Future<Result<LocalBookRecord>> import() => store.importBook(
+      Future<Result<LocalBookImportResult>> import() => store.importBook(
         bytes: Stream.value(bytes),
         format: LocalBookFormat.txt,
         parse: (session) async {
@@ -111,12 +111,19 @@ void main() {
           expect(await import(), isA<Failure>());
           expect(parses, 1);
         } else {
-          final retry = (await import() as Success<LocalBookRecord>).value;
-          expect(retry.content.detail.summary.key.novelId, digest);
+          final retry =
+              (await import() as Success<LocalBookImportResult>).value;
+          expect(
+            retry.disposition,
+            fault == _Fault.rollback
+                ? LocalBookImportDisposition.created
+                : LocalBookImportDisposition.existing,
+          );
+          expect(retry.book.content.detail.summary.key.novelId, digest);
           expect(parses, fault == _Fault.rollback ? 2 : 1);
           expect(
             await store.read(
-              retry.content.detail.summary.key,
+              retry.book.content.detail.summary.key,
               cancellation: CancellationSource().token,
             ),
             isA<Success<LocalBookRecord?>>(),

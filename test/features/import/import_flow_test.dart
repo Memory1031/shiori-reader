@@ -339,6 +339,10 @@ void main() {
       await controller.refresh();
       await untilImport(() => controller.items.length == 2);
       expect(controller.items.first.phase, ImportItemPhase.succeeded);
+      expect(
+        controller.items.first.disposition,
+        LocalBookImportDisposition.created,
+      );
       await controller.submit();
       expect(parses, 2);
       expect(await committed(), 2);
@@ -351,6 +355,10 @@ void main() {
       ); // Real ManagedLocalBooks SHA-256 dedup, no second parse.
       expect(await committed(), 2);
       expect(source.inbox, isEmpty);
+      expect(
+        controller.items.single.disposition,
+        LocalBookImportDisposition.existing,
+      );
     },
   );
 
@@ -683,6 +691,9 @@ void main() {
           ImportItemPhase.succeeded,
         ]);
         expect(controller.items[1].problem, ImportProblem.invalidContent);
+        expect(controller.items[1].disposition, isNull);
+        expect(controller.createdCount, 2);
+        expect(controller.existingCount, 0);
         expect(source.acked, ['a', 'c']);
         expect(parses, 2);
         expect(await committed(), 2);
@@ -696,6 +707,11 @@ void main() {
         expect(source.acked, ['a', 'c', 'b']);
         expect(source.inbox, isEmpty);
         expect(await committed(), 3);
+        expect(controller.createdCount, 3);
+        expect(
+          controller.succeededCount,
+          controller.createdCount + controller.existingCount,
+        );
       },
     );
 
@@ -729,12 +745,38 @@ void main() {
           ImportItemPhase.succeeded,
         });
         expect(parses, 1);
+        expect(controller.items.map((i) => i.disposition), [
+          LocalBookImportDisposition.created,
+          LocalBookImportDisposition.existing,
+        ]);
+        expect(controller.createdCount, 1);
+        expect(controller.existingCount, 1);
+        expect(controller.succeededCount, 2);
+        await controller.refresh();
+        expect(controller.existingCount, 1);
         expect(source.acked, ['a', 'b']);
         expect(await committed(), 1);
         expect(
           controller.items[0].result!.content.detail.summary.key,
           controller.items[1].result!.content.detail.summary.key,
         );
+        final firstKey =
+            controller.items.first.result!.content.detail.summary.key;
+        await controller.finish();
+        source.receive(
+          id: 'c',
+          name: 'a.txt',
+          content: utf8.encode('different bytes, same name'),
+        );
+        await controller.refresh();
+        await controller.submit();
+        expect(
+          controller.items.single.disposition,
+          LocalBookImportDisposition.created,
+        );
+        expect(controller.result!.content.detail.summary.key, isNot(firstKey));
+        expect(await committed(), 2);
+        expect(parses, 2);
       },
     );
 
@@ -787,6 +829,12 @@ void main() {
         expect(await committed(), 1);
         expect(controller.phase, ImportPhase.idle);
         expect(controller.result, isNull);
+        expect(controller.createdCount, 1);
+        expect(controller.existingCount, 0);
+        expect(
+          controller.items.skip(1).every((i) => i.disposition == null),
+          true,
+        );
       },
     );
 
@@ -925,6 +973,10 @@ void main() {
         await controller.submit();
         // The commit stays authoritative; only the inbox cleanup failed.
         expect(controller.items.single.phase, ImportItemPhase.succeeded);
+        expect(
+          controller.items.single.disposition,
+          LocalBookImportDisposition.created,
+        );
         expect(await committed(), 1);
         expect(source.acked, isEmpty);
         expect(source.inbox.map((c) => c.id), ['a']);
@@ -951,6 +1003,12 @@ void main() {
         // SHA-256 dedup short-circuits before the parser: the relaunch never
         // parses and only retries the inbox cleanup.
         expect(secondParses, 0);
+        expect(
+          controller.items.single.disposition,
+          LocalBookImportDisposition.existing,
+        );
+        expect(controller.createdCount, 0);
+        expect(controller.existingCount, 1);
         expect(await committed(), 1);
         expect(source.acked, ['a']);
         expect(source.inbox, isEmpty);
@@ -1123,6 +1181,70 @@ void main() {
       home: const Scaffold(body: Text('Reader position unchanged')),
     ),
   );
+
+  testWidgets(
+    'existing single book offers read-now for the stored identity and done',
+    (tester) async {
+      source.receive(id: 'original');
+      await controller.start();
+      await tester.runAsync(() => controller.submit());
+      final key = controller.result!.content.detail.summary.key;
+      await controller.finish();
+      source.receive(id: 'copy', name: 'Renamed.txt');
+      await controller.refresh();
+      NovelKey? readKey;
+      await pumpImportPanel(tester, onRead: (value) => readKey = value);
+      controller.open();
+      await tester.runAsync(() => controller.submit());
+      await tester.pumpAndSettle();
+      expect(find.text('书籍已存在，未重复导入。'), findsOneWidget);
+      expect(find.text('书籍已保存。'), findsNothing);
+      expect(find.text('重试'), findsNothing);
+      await tester.tap(find.text('立即阅读'));
+      expect(readKey, key);
+      await tester.tap(find.text('完成'));
+      await tester.pumpAndSettle();
+      expect(controller.items, isEmpty);
+      expect(source.inbox, isEmpty);
+      expect(parses, 1);
+      expect(await tester.runAsync(committed), 1);
+      expect(tester.takeException(), null);
+    },
+  );
+
+  testWidgets('all-existing batch reports no new books at large English text', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(320, 844)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    source.receive(id: 'original');
+    await controller.start();
+    await tester.runAsync(() => controller.submit());
+    await controller.finish();
+    source.receive(id: 'a', name: 'One.txt');
+    source.receive(id: 'b', name: 'Two.txt');
+    await controller.refresh();
+    await pumpImportPanel(tester, locale: const Locale('en'), scale: 1.3);
+    controller.open();
+    await tester.runAsync(() => controller.submit());
+    await tester.pumpAndSettle();
+    expect(find.text('Import processing complete'), findsOneWidget);
+    expect(find.text('2 already exist. No books were added.'), findsOneWidget);
+    expect(find.text('Already exists; no duplicate created'), findsNWidgets(2));
+    expect(find.text('Read now'), findsNothing);
+    expect(find.text('Retry failed'), findsNothing);
+    expect(controller.createdCount, 0);
+    expect(controller.existingCount, 2);
+    expect(controller.succeededCount, 2);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+    expect(controller.items, isEmpty);
+    expect(source.inbox, isEmpty);
+    expect(parses, 1);
+    expect(tester.takeException(), null);
+  });
 
   testWidgets(
     'incoming banner confirmed discard releases receipts and preserves route at large Chinese text',
@@ -1605,7 +1727,8 @@ void main() {
         });
       }
       await tester.pumpAndSettle();
-      expect(find.text('已导入 3 本书'), findsOneWidget);
+      expect(find.text('导入处理完成'), findsOneWidget);
+      expect(find.text('新增 3 本'), findsOneWidget);
     });
 
     for (final pausedId in ['a', 'b']) {
@@ -1652,36 +1775,44 @@ void main() {
         }
         await tester.pumpAndSettle();
         expect(controller.phase, ImportPhase.succeeded);
-        expect(find.text('已导入 2 本书'), findsOneWidget);
+        expect(find.text('导入处理完成'), findsOneWidget);
+        expect(find.text('新增 2 本'), findsOneWidget);
         expect(find.text('完成'), findsOneWidget);
         expect(source.acked, ['a', 'b']);
       });
     }
 
-    testWidgets('partial failure shows summary and retry entry', (
-      tester,
-    ) async {
-      source.receive(id: 'a', name: 'a.txt', content: utf8.encode('alpha'));
-      source.receive(
-        id: 'b',
-        name: 'broken.epub',
-        content: utf8.encode('not a zip'),
-      );
-      source.receive(id: 'c', name: 'c.txt', content: utf8.encode('gamma'));
-      await controller.start();
-      await pumpImportPanel(tester);
-      await tester.pumpAndSettle();
-      controller.open();
-      await tester.pumpAndSettle();
-      await tester.runAsync(() => controller.submit());
-      await tester.pumpAndSettle();
-      expect(find.text('导入完成'), findsOneWidget);
-      expect(find.textContaining('成功 2 本'), findsOneWidget);
-      expect(find.textContaining('失败 1 本'), findsOneWidget);
-      expect(find.textContaining('内容与格式不符'), findsOneWidget);
-      expect(find.text('重试失败项'), findsOneWidget);
-      expect(tester.takeException(), null);
-    });
+    testWidgets(
+      'mixed new, existing and failed items show distinct summary and rows',
+      (tester) async {
+        source.receive(id: 'a', name: 'a.txt', content: utf8.encode('alpha'));
+        source.receive(
+          id: 'b',
+          name: 'broken.epub',
+          content: utf8.encode('not a zip'),
+        );
+        source.receive(
+          id: 'c',
+          name: 'copy.txt',
+          content: utf8.encode('alpha'),
+        );
+        await controller.start();
+        await pumpImportPanel(tester);
+        await tester.pumpAndSettle();
+        controller.open();
+        await tester.pumpAndSettle();
+        await tester.runAsync(() => controller.submit());
+        await tester.pumpAndSettle();
+        expect(find.text('导入处理完成'), findsOneWidget);
+        expect(find.text('新增 1 本 · 已存在 1 本 · 失败 1 本'), findsOneWidget);
+        expect(find.text('已导入'), findsOneWidget);
+        expect(find.text('已存在，未重复导入'), findsOneWidget);
+        expect(find.textContaining('失败 1 本'), findsOneWidget);
+        expect(find.textContaining('内容与格式不符'), findsOneWidget);
+        expect(find.text('重试失败项'), findsOneWidget);
+        expect(tester.takeException(), null);
+      },
+    );
 
     testWidgets('retry failed commits the remaining receipt only', (
       tester,
@@ -1708,7 +1839,8 @@ void main() {
         }
       });
       await tester.pumpAndSettle();
-      expect(find.text('已导入 3 本书'), findsOneWidget);
+      expect(find.text('导入处理完成'), findsOneWidget);
+      expect(find.text('新增 3 本'), findsOneWidget);
       expect(source.acked, ['a', 'c', 'b']);
       expect(parses, 3); // Committed items never re-parse.
       expect(tester.takeException(), null);
@@ -1753,7 +1885,7 @@ void main() {
       expect(find.textContaining('剩余 1 本未处理'), findsOneWidget);
       expect(find.text('等待导入'), findsOneWidget); // c never started
       expect(find.textContaining('内容与格式不符'), findsOneWidget); // a's own row
-      expect(find.text('导入完成'), findsNothing);
+      expect(find.text('导入处理完成'), findsNothing);
       expect(tester.takeException(), null);
     });
 
@@ -1789,7 +1921,8 @@ void main() {
         await run;
       });
       await tester.pumpAndSettle();
-      expect(find.text('已导入 2 本书'), findsOneWidget);
+      expect(find.text('导入处理完成'), findsOneWidget);
+      expect(find.text('新增 2 本'), findsOneWidget);
       expect(source.acked, ['a', 'b']);
     });
 
