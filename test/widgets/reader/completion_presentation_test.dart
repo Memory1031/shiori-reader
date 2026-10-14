@@ -18,9 +18,13 @@ import 'package:shiori/l10n/generated/app_localizations.dart';
 import 'settings_test.dart' show Store;
 
 void main() {
-  for (final scale in [1.0, 2.0]) {
+  for (final (scale, platform) in [
+    (1.0, TargetPlatform.android),
+    (2.0, TargetPlatform.android),
+    (2.0, TargetPlatform.windows),
+  ]) {
     testWidgets(
-      'completion status follows its page at text scale $scale',
+      'completion status follows its page at text scale $scale on $platform',
       (tester) async {
         tester.view.physicalSize = const Size(320, 568);
         tester.view.devicePixelRatio = 1;
@@ -149,11 +153,7 @@ void main() {
         }
         await tester.pumpWidget(const SizedBox());
       },
-      variant: TargetPlatformVariant({
-        TargetPlatform.android,
-        TargetPlatform.iOS,
-        TargetPlatform.windows,
-      }),
+      variant: TargetPlatformVariant.only(platform),
     );
   }
 

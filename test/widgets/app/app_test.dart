@@ -14,6 +14,7 @@ import 'package:shiori/shared/controllers/scoped_controller.dart';
 import 'package:shiori/shared/widgets/app_scaffold.dart';
 import 'package:shiori/shared/widgets/controller_scope.dart';
 import 'package:shiori/shared/widgets/state_views.dart';
+import 'package:shiori/main.dart' as entrypoint;
 
 import '../../support/contract_fakes.dart';
 
@@ -120,6 +121,11 @@ Widget _screen(Widget body) => MaterialApp(
 );
 
 void main() {
+  testWidgets('mobile shell starts without services', (tester) async {
+    await tester.pumpWidget(const entrypoint.ShioriApp());
+    expect(find.text('Shiori'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
     'composition injects settings and applies theme without globals',
     (tester) async {

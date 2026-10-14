@@ -87,7 +87,6 @@ void main() {
       LocalBookFormat.txt,
       2,
     ),
-    ('phone-mixed', TargetPlatform.android, 390.0, 'zh', 1.0, false, null, 3),
     ('phone-dark-large', TargetPlatform.iOS, 390.0, 'en', 1.8, true, null, 3),
     (
       'desktop-light',

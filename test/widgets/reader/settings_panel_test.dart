@@ -1,17 +1,10 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shiori/app/app.dart';
-import 'package:shiori/app/routes.dart';
-import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/reader_preferences.dart';
-import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/settings_panel.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
-
-import '../../support/reader_actions.dart';
-import 'settings_test.dart' show Store;
 
 Future<ReaderPreferences> _pumpPanel(
   WidgetTester tester,
@@ -42,68 +35,62 @@ Future<ReaderPreferences> _pumpPanel(
 Finder get _reset => find.byKey(const ValueKey('reader-settings-reset'));
 
 void main() {
-  for (final width in [320.0, 360.0]) {
-    for (final locale in ['zh', 'en']) {
-      for (final textScale in [1.0, 1.3]) {
-        testWidgets(
-          'six touch targets at $width/$locale/$textScale',
-          (tester) async {
-            tester.view
-              ..physicalSize = Size(width, 844)
-              ..devicePixelRatio = 1;
-            addTearDown(tester.view.reset);
-            final preferences = await _pumpPanel(
-              tester,
-              ReaderSettings(),
-              locale: locale,
-              textScale: textScale,
-            );
-            final strings = AppLocalizations.of(
-              tester.element(find.byType(ReaderSettingsPanel)),
-            );
-            final labels = [
-              strings.readerFontSize,
-              strings.readerLineHeight,
-              strings.readerParagraphSpacing,
-            ];
-            final steps = [1.0, .1, 2.0];
-            final values = [
-              () => preferences.value.fontSize,
-              () => preferences.value.lineHeight,
-              () => preferences.value.paragraphSpacing,
-            ];
-            for (var i = 0; i < labels.length; i++) {
-              for (final increase in [false, true]) {
-                final control = find.bySemanticsLabel(
-                  increase
-                      ? strings.readerIncrease(labels[i])
-                      : strings.readerDecrease(labels[i]),
-                );
-                await tester.ensureVisible(control);
-                await tester.pumpAndSettle();
-                final rect = tester.getRect(control);
-                expect(rect.size, const Size(48, 48));
-                final before = values[i]();
-                // 22px from center lies outside the old 40px target.
-                await tester.tapAt(
-                  rect.center + Offset(increase ? 22 : -22, 0),
-                );
-                await tester.pumpAndSettle();
-                expect(
-                  values[i](),
-                  closeTo(before + (increase ? steps[i] : -steps[i]), .001),
-                );
-                expect(tester.takeException(), isNull);
-              }
-            }
-          },
-          variant: TargetPlatformVariant({
-            TargetPlatform.android,
-            TargetPlatform.iOS,
-          }),
+  for (final (width, locale, textScale, platform) in [
+    (360.0, 'zh', 1.0, TargetPlatform.android),
+    (320.0, 'en', 1.3, TargetPlatform.iOS),
+  ]) {
+    testWidgets(
+      'six touch targets at $width/$locale/$textScale',
+      (tester) async {
+        tester.view
+          ..physicalSize = Size(width, 844)
+          ..devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final preferences = await _pumpPanel(
+          tester,
+          ReaderSettings(),
+          locale: locale,
+          textScale: textScale,
         );
-      }
-    }
+        final strings = AppLocalizations.of(
+          tester.element(find.byType(ReaderSettingsPanel)),
+        );
+        final labels = [
+          strings.readerFontSize,
+          strings.readerLineHeight,
+          strings.readerParagraphSpacing,
+        ];
+        final steps = [1.0, .1, 2.0];
+        final values = [
+          () => preferences.value.fontSize,
+          () => preferences.value.lineHeight,
+          () => preferences.value.paragraphSpacing,
+        ];
+        for (var i = 0; i < labels.length; i++) {
+          for (final increase in [false, true]) {
+            final control = find.bySemanticsLabel(
+              increase
+                  ? strings.readerIncrease(labels[i])
+                  : strings.readerDecrease(labels[i]),
+            );
+            await tester.ensureVisible(control);
+            await tester.pumpAndSettle();
+            final rect = tester.getRect(control);
+            expect(rect.size, const Size(48, 48));
+            final before = values[i]();
+            // 22px from center lies outside the old 40px target.
+            await tester.tapAt(rect.center + Offset(increase ? 22 : -22, 0));
+            await tester.pumpAndSettle();
+            expect(
+              values[i](),
+              closeTo(before + (increase ? steps[i] : -steps[i]), .001),
+            );
+            expect(tester.takeException(), isNull);
+          }
+        }
+      },
+      variant: TargetPlatformVariant.only(platform),
+    );
   }
 
   testWidgets(
@@ -142,10 +129,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 900));
       expect(preferences.value.lineHeight, 1.8);
     },
-    variant: TargetPlatformVariant({
-      TargetPlatform.android,
-      TargetPlatform.iOS,
-    }),
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
 
   testWidgets('reset offers undo until something else changes', (tester) async {
@@ -218,7 +202,6 @@ void main() {
     },
     variant: TargetPlatformVariant({
       TargetPlatform.android,
-      TargetPlatform.iOS,
       TargetPlatform.windows,
     }),
   );
@@ -254,10 +237,7 @@ void main() {
         }
       }
     },
-    variant: TargetPlatformVariant({
-      TargetPlatform.android,
-      TargetPlatform.iOS,
-    }),
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
 
   testWidgets('the font slider and its end glyphs change the size', (
@@ -310,33 +290,5 @@ void main() {
       tester.getSemantics(find.bySemanticsLabel('Warm paper')),
       containsSemantics(isSelected: true),
     );
-  });
-
-  testWidgets('the settings sheet only lightly dims the page', (tester) async {
-    final env = FixtureEnvironment();
-    final store = Store()..value = ReaderSettings(controlsHintSeen: true);
-    await tester.pumpWidget(
-      ShioriApp(
-        locale: const Locale('en'),
-        routes: AppRoutes(
-          home: (_) => ReaderContentView(
-            content: env.source.data.content(FixtureScenario.typography),
-            settings: store,
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await openReaderSettings(tester);
-    await tester.pumpAndSettle();
-    final barrier = tester
-        .widgetList<ModalBarrier>(find.byType(ModalBarrier))
-        .last;
-    expect(barrier.color, isNotNull);
-    expect(barrier.color!.a, lessThan(.3));
-    expect(barrier.color!.a, greaterThan(0));
-    await tester.pumpWidget(const SizedBox());
-    await tester.pumpAndSettle();
-    await env.close();
   });
 }

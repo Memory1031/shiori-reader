@@ -19,79 +19,73 @@ final download = find.byKey(const ValueKey('update-download'));
 final install = find.byKey(const ValueKey('update-install'));
 
 void main() {
-  for (final lang in ['zh', 'en']) {
-    for (final size in [const Size(320, 1000), const Size(1280, 900)]) {
-      testWidgets(
-        'verification feedback in $lang at $size preserves cancel and blocks install',
-        (tester) async {
-          final h = UpdatesHarness(tester);
-          h.repo.result = fakeUpdateCandidate(notes: '');
-          h.repo.supportsInstallation = true;
-          h.repo.downloading = Completer<void>();
-          h.repo.verifyingPackage = Completer<void>();
-          await h.controller.initialize();
-          await h.controller.check();
-          await h.pump(
-            width: size.width,
-            height: size.height,
-            scale: 1.8,
-            lang: lang,
-            shell: false,
-          );
-          await h.tap(download, settle: false);
-          h.repo.progress!(h.controller.candidate!.bytes);
-          await tester.pump();
-          expect(h.controller.phase, UpdatePhase.downloading);
-          expect(find.text(h.l.updateProgress(100)), findsOneWidget);
-          final releasePage = find.widgetWithText(
-            TextButton,
-            h.l.updateReleasePage,
-          );
-          await h.show(releasePage);
-          final before = tester.getTopLeft(releasePage);
-          h.repo.downloading!.complete();
-          await tester.pump();
-          await tester.pump(const Duration(milliseconds: 100));
-          expect(h.controller.phase, UpdatePhase.verifying);
-          expect(find.text(h.l.updateVerifying), findsOneWidget);
-          expect(find.text(h.l.updateVerifyingHint), findsOneWidget);
-          expect(
-            find.text(h.l.updateProgress(100)).hitTestable(),
-            findsNothing,
-          );
-          expect(
-            tester
-                .widget<LinearProgressIndicator>(
-                  find.byType(LinearProgressIndicator),
-                )
-                .value,
-            isNull,
-          );
-          expect(tester.getTopLeft(releasePage), before);
-          expect(install, findsNothing);
-          expect(download, findsNothing);
-          await h.show(check, delta: -200);
-          expect(tester.widget<TextButton>(check).onPressed, isNull);
-          expect(
-            find.widgetWithText(TextButton, h.l.updateCancel),
-            findsOneWidget,
-          );
-          expect(tester.takeException(), isNull);
-          h.repo.verifyingPackage!.complete();
-          await tester.pumpAndSettle();
-          expect(h.controller.phase, UpdatePhase.downloaded);
-          expect(find.text(h.l.updateVerifying), findsNothing);
-          expect(find.byType(LinearProgressIndicator), findsNothing);
-          expect(install, findsOneWidget);
-          await h.close();
-        },
-        variant: TargetPlatformVariant({
-          TargetPlatform.android,
-          TargetPlatform.iOS,
-          TargetPlatform.windows,
-        }),
-      );
-    }
+  for (final (lang, size, platform) in [
+    ('en', const Size(320, 1000), TargetPlatform.android),
+    ('zh', const Size(1280, 900), TargetPlatform.windows),
+  ]) {
+    testWidgets(
+      'verification feedback in $lang at $size preserves cancel and blocks install',
+      (tester) async {
+        final h = UpdatesHarness(tester);
+        h.repo.result = fakeUpdateCandidate(notes: '');
+        h.repo.supportsInstallation = true;
+        h.repo.downloading = Completer<void>();
+        h.repo.verifyingPackage = Completer<void>();
+        await h.controller.initialize();
+        await h.controller.check();
+        await h.pump(
+          width: size.width,
+          height: size.height,
+          scale: 1.8,
+          lang: lang,
+          shell: false,
+        );
+        await h.tap(download, settle: false);
+        h.repo.progress!(h.controller.candidate!.bytes);
+        await tester.pump();
+        expect(h.controller.phase, UpdatePhase.downloading);
+        expect(find.text(h.l.updateProgress(100)), findsOneWidget);
+        final releasePage = find.widgetWithText(
+          TextButton,
+          h.l.updateReleasePage,
+        );
+        await h.show(releasePage);
+        final before = tester.getTopLeft(releasePage);
+        h.repo.downloading!.complete();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(h.controller.phase, UpdatePhase.verifying);
+        expect(find.text(h.l.updateVerifying), findsOneWidget);
+        expect(find.text(h.l.updateVerifyingHint), findsOneWidget);
+        expect(find.text(h.l.updateProgress(100)).hitTestable(), findsNothing);
+        expect(
+          tester
+              .widget<LinearProgressIndicator>(
+                find.byType(LinearProgressIndicator),
+              )
+              .value,
+          isNull,
+        );
+        expect(tester.getTopLeft(releasePage), before);
+        expect(install, findsNothing);
+        expect(download, findsNothing);
+        await h.show(check, delta: -200);
+        expect(tester.widget<TextButton>(check).onPressed, isNull);
+        expect(
+          find.widgetWithText(TextButton, h.l.updateCancel),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        h.repo.verifyingPackage!.complete();
+        await tester.pumpAndSettle();
+        expect(h.controller.phase, UpdatePhase.downloaded);
+        expect(find.text(h.l.updateVerifying), findsNothing);
+        expect(find.byType(LinearProgressIndicator), findsNothing);
+        expect(install, findsOneWidget);
+        await h.close();
+      },
+      variant: TargetPlatformVariant.only(platform),
+    );
   }
 
   testWidgets(

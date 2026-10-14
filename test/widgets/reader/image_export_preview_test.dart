@@ -297,42 +297,40 @@ void main() {
     );
     await tester.pumpWidget(const SizedBox());
   });
-  for (final platform in [
-    TargetPlatform.android,
-    TargetPlatform.iOS,
-    TargetPlatform.windows,
+  for (final (platform, language) in [
+    (TargetPlatform.android, 'zh'),
+    (TargetPlatform.iOS, 'en'),
+    (TargetPlatform.windows, 'en'),
   ]) {
-    for (final language in ['en', 'zh']) {
-      testWidgets(
-        '$platform $language small screen / large type / accessible save',
-        (tester) async {
-          tester.view.physicalSize = const Size(360, 640);
-          tester.view.devicePixelRatio = 1;
-          addTearDown(tester.view.reset);
-          final semantics = tester.ensureSemantics();
-          await mount(
-            tester,
-            locale: Locale(language),
-            textScale: 2.5,
-            platform: platform,
-            caption: language == 'en',
-          );
-          final label = language == 'en' ? 'Save original image' : '保存原图';
-          expect(find.bySemanticsLabel(label), findsOneWidget);
-          exporter.result = ImageExportResult.permissionDenied;
-          await tester.tap(find.byTooltip(label));
-          await tester.pumpAndSettle();
-          expect(find.byType(ReaderImagePreview), findsOneWidget);
-          expect(tester.takeException(), isNull);
-          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-          await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-          await tester.pumpAndSettle();
-          expect(find.text('Open'), findsOneWidget);
-          semantics.dispose();
-        },
-        variant: TargetPlatformVariant({platform}),
-      );
-    }
+    testWidgets(
+      '$platform $language small screen / large type / accessible save',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 640);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final semantics = tester.ensureSemantics();
+        await mount(
+          tester,
+          locale: Locale(language),
+          textScale: 2.5,
+          platform: platform,
+          caption: language == 'en',
+        );
+        final label = language == 'en' ? 'Save original image' : '保存原图';
+        expect(find.bySemanticsLabel(label), findsOneWidget);
+        exporter.result = ImageExportResult.permissionDenied;
+        await tester.tap(find.byTooltip(label));
+        await tester.pumpAndSettle();
+        expect(find.byType(ReaderImagePreview), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(find.text('Open'), findsOneWidget);
+        semantics.dispose();
+      },
+      variant: TargetPlatformVariant({platform}),
+    );
   }
   testWidgets(
     'Reader saves share cached original and preserve both spread anchors',

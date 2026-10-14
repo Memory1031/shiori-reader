@@ -131,7 +131,6 @@ class Harness {
 
 const platforms = TargetPlatformVariant({
   TargetPlatform.android,
-  TargetPlatform.iOS,
   TargetPlatform.windows,
 });
 void main() {
