@@ -57,14 +57,15 @@ Future<void> stopOwnedProcess(Process process) async {
 String? installedChromium() {
   final paths = Platform.isWindows
       ? [
+          // Prefer Chrome's standalone headless process over Edge's launcher.
+          p.join(
+            Platform.environment['PROGRAMFILES'] ?? r'C:\Program Files',
+            'Google/Chrome/Application/chrome.exe',
+          ),
           p.join(
             Platform.environment['PROGRAMFILES(X86)'] ??
                 r'C:\Program Files (x86)',
             'Microsoft/Edge/Application/msedge.exe',
-          ),
-          p.join(
-            Platform.environment['PROGRAMFILES'] ?? r'C:\Program Files',
-            'Google/Chrome/Application/chrome.exe',
           ),
         ]
       : [

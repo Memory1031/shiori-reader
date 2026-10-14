@@ -409,7 +409,11 @@ void main() {
       () async {
         await db.close();
         final dir = await Directory.systemTemp.createTemp('online-ownership-');
-        addTearDown(() => dir.delete(recursive: true));
+        addTearDown(() async {
+          // Test-local cleanup runs before the outer database teardown.
+          await db.close();
+          await dir.delete(recursive: true);
+        });
         final file = File('${dir.path}/users.sqlite');
         legacy.seed(file, 'user', 7);
         final raw = sql.sqlite3.open(file.path);
