@@ -29,6 +29,11 @@ class AppController extends ScopedController {
     _setSettings(settings.copyWith(accent: accent));
   }
 
+  void setShelfGrid(bool grid) {
+    if (isClosed || (settings.shelfGrid == grid && !isLoadingSettings)) return;
+    _setSettings(settings.copyWith(shelfGrid: grid));
+  }
+
   void _setSettings(AppSettings value) {
     _request?.cancel();
     isLoadingSettings = false;

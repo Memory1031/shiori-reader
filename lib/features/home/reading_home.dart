@@ -47,6 +47,8 @@ class ReadingHome extends StatefulWidget {
     this.navigation,
     this.updates,
     this.importController,
+    this.initialShelfGrid = true,
+    this.onShelfGridChanged,
   });
   final NovelRepository repository;
   final LibraryRepository library;
@@ -69,6 +71,8 @@ class ReadingHome extends StatefulWidget {
   /// runs [onUpdates] instead.
   final WidgetBuilder? updates;
   final ImportController? importController;
+  final bool initialShelfGrid;
+  final ValueChanged<bool>? onShelfGridChanged;
   @override
   State<ReadingHome> createState() => _ReadingHomeState();
 }
@@ -89,7 +93,7 @@ class _ReadingHomeState extends State<ReadingHome> {
   // Owned here rather than by the shelf page, which is rebuilt whenever its
   // section is selected again: the grid choice and each layout's scroll
   // position survive visiting other sections.
-  final _shelfGrid = ValueNotifier(true);
+  late final _shelfGrid = ValueNotifier(widget.initialShelfGrid);
   final _shelfStorage = PageStorageBucket();
 
   // Home lives for the app run, so local cover references survive leaving
@@ -100,6 +104,7 @@ class _ReadingHomeState extends State<ReadingHome> {
   @override
   void initState() {
     super.initState();
+    _shelfGrid.addListener(_shelfLayoutChanged);
     _library =
         LibraryController(
             widget.library,
@@ -127,6 +132,11 @@ class _ReadingHomeState extends State<ReadingHome> {
   @override
   void didUpdateWidget(ReadingHome oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialShelfGrid != widget.initialShelfGrid) {
+      _shelfGrid.removeListener(_shelfLayoutChanged);
+      _shelfGrid.value = widget.initialShelfGrid;
+      _shelfGrid.addListener(_shelfLayoutChanged);
+    }
     final old = oldWidget.navigation ?? _ownNavigation;
     if (old != _navigation) {
       old?.removeListener(_navigate);
@@ -141,6 +151,9 @@ class _ReadingHomeState extends State<ReadingHome> {
   void _importChanged() {
     if (!_library.isClosed) _library.update();
   }
+
+  void _shelfLayoutChanged() =>
+      widget.onShelfGridChanged?.call(_shelfGrid.value);
 
   void _changed() {
     if (mounted) setState(() {});
@@ -167,6 +180,7 @@ class _ReadingHomeState extends State<ReadingHome> {
     widget.importController?.removeListener(_importChanged);
     _navigation.removeListener(_navigate);
     _ownNavigation?.dispose();
+    _shelfGrid.removeListener(_shelfLayoutChanged);
     _shelfGrid.dispose();
     _shelfActions.removeListener(_changed);
     _shelfActions.dispose();

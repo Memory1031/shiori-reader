@@ -364,6 +364,8 @@ class _ProductionAppState extends State<ProductionApp>
           },
           createController: () => AppController(settingsStore: _appearance),
           homeBuilder: (context, app) => ReadingHome(
+            initialShelfGrid: app.settings.shelfGrid,
+            onShelfGridChanged: app.setShelfGrid,
             repository: _novels!,
             library: _library!,
             sources: _services!.registry.descriptors,

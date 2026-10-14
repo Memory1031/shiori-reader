@@ -10,19 +10,45 @@ import 'repositories_test.dart' show Preferences, token, value;
 
 void main() {
   test(
-    'v1 appearance adopts teal without losing brightness; all v2 accents round trip',
+    'v1/v2 preserve appearance and default to grid; all v3 layouts round trip',
     () {
       expect(
         AppSettings.fromJson({'schemaVersion': 1, 'themeMode': 'dark'}),
         AppSettings(themeMode: AppThemeMode.dark, accent: AppAccent.teal),
       );
       for (final accent in AppAccent.values) {
-        final settings = AppSettings(
-          themeMode: AppThemeMode.dark,
-          accent: accent,
+        expect(
+          AppSettings.fromJson({
+            'schemaVersion': 2,
+            'themeMode': 'dark',
+            'accent': accent.name,
+          }),
+          AppSettings(themeMode: AppThemeMode.dark, accent: accent),
         );
-        expect(AppSettings.fromJson(settings.toJson()), settings);
+        for (final grid in [true, false]) {
+          final settings = AppSettings(
+            themeMode: AppThemeMode.dark,
+            accent: accent,
+            shelfGrid: grid,
+          );
+          expect(settings.toJson()['schemaVersion'], 3);
+          expect(AppSettings.fromJson(settings.toJson()), settings);
+          expect(
+            settings.copyWith(themeMode: AppThemeMode.light).shelfGrid,
+            grid,
+          );
+          expect(settings.copyWith(shelfGrid: !grid).accent, accent);
+          expect(settings.copyWith(shelfGrid: !grid), isNot(settings));
+        }
       }
+      expect(
+        AppSettings.fromJson({
+          'schemaVersion': 3,
+          'themeMode': 'dark',
+          'accent': 'softPink',
+        }),
+        AppSettings(themeMode: AppThemeMode.dark, accent: AppAccent.softPink),
+      );
     },
   );
 
@@ -63,17 +89,33 @@ void main() {
       );
       expect(prefs.data[paths.settingsKey], original);
       await app.save(
-        AppSettings(themeMode: AppThemeMode.light),
+        AppSettings(
+          themeMode: AppThemeMode.light,
+          accent: AppAccent.softPink,
+          shelfGrid: false,
+        ),
         cancellation: token(),
       );
       expect(prefs.data[paths.settingsKey], original);
       final application = prefs.data[paths.appSettingsKey];
+      expect(
+        value(await app.load(cancellation: token())),
+        AppSettings(
+          themeMode: AppThemeMode.light,
+          accent: AppAccent.softPink,
+          shelfGrid: false,
+        ),
+      );
       await reader.save(
         ReaderSettings(paper: ReaderPaper.warm),
         cancellation: token(),
       );
       expect(prefs.data[paths.appSettingsKey], application);
-      for (final invalid in ['not json', '{"schemaVersion":99}']) {
+      for (final invalid in [
+        'not json',
+        '{"schemaVersion":99}',
+        '{"schemaVersion":3,"themeMode":"dark","accent":"softPink","shelfGrid":"list"}',
+      ]) {
         prefs.data[paths.appSettingsKey] = invalid;
         expect(value(await app.load(cancellation: token())), AppSettings());
         expect(prefs.data[paths.appSettingsKey], invalid);

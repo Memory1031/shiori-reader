@@ -28,6 +28,81 @@ class AppStore implements AppSettingsStore {
 }
 
 void main() {
+  test(
+    'layout failure keeps latest full settings for retry without extra writes',
+    () async {
+      final store = AppStore()..pending = Completer<Result<void>>();
+      final controller = AppController(settingsStore: store);
+      controller.setShelfGrid(false);
+      controller.setShelfGrid(true);
+      controller.setShelfGrid(false);
+      controller.setAppearance(AppThemeMode.dark);
+      controller.setAccent(AppAccent.softPink);
+      expect(store.writes, hasLength(1));
+      store.pending!.complete(
+        Failure(
+          AppFailure(
+            kind: FailureKind.database,
+            operation: Operation.settingsWrite,
+          ),
+        ),
+      );
+      expect(await controller.saveForExit(), isFalse);
+      expect(
+        controller.settings,
+        AppSettings(
+          themeMode: AppThemeMode.dark,
+          accent: AppAccent.softPink,
+          shelfGrid: false,
+        ),
+      );
+      expect(controller.settingsFailure, isNotNull);
+      store.pending = null;
+      await controller.retrySettings();
+      expect(store.value, controller.settings);
+      expect(store.writes, hasLength(2));
+      expect(controller.settingsFailure, isNull);
+      controller.setShelfGrid(false);
+      expect(store.writes, hasLength(2));
+      controller.setAppearance(AppThemeMode.light);
+      expect(await controller.saveForExit(), isTrue);
+      expect(store.value.shelfGrid, isFalse);
+      expect(store.value.accent, AppAccent.softPink);
+      controller.onDelete();
+      controller.dispose();
+    },
+  );
+
+  test(
+    'old layout acknowledgement cannot revert preview; exit waits for latest write',
+    () async {
+      final first = Completer<Result<void>>(),
+          latest = Completer<Result<void>>();
+      final store = AppStore()..pending = first;
+      final controller = AppController(settingsStore: store);
+      controller.setShelfGrid(false);
+      controller.setShelfGrid(true);
+      controller.setAppearance(AppThemeMode.dark);
+      var exited = false;
+      final exit = controller.saveForExit().then((value) {
+        exited = true;
+        return value;
+      });
+      store.pending = latest;
+      first.complete(const Success(null));
+      await Future<void>.delayed(Duration.zero);
+      expect(exited, isFalse);
+      expect(controller.settings.shelfGrid, isTrue);
+      expect(store.value.shelfGrid, isFalse);
+      expect(store.writes, hasLength(2));
+      latest.complete(const Success(null));
+      expect(await exit, isTrue);
+      expect(store.value, AppSettings(themeMode: AppThemeMode.dark));
+      controller.onDelete();
+      controller.dispose();
+    },
+  );
+
   testWidgets(
     'accent selection keeps an explicit check through hover and theme changes',
     (tester) async {

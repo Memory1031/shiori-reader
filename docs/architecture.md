@@ -53,7 +53,7 @@ ReaderPosition 的 blockIndex 非负，blockFraction / chapterFraction 必须有
 
 像素提示必须同时包含合法 pixelOffset 和 layoutKey，仅用于同布局提示，不能替代语义位置。ReaderSettings 当前 schemaVersion=3，默认字号 20、行高 1.6、段间距 20、左右边距 40；有效历史排版保留，未知版本拒绝。ReaderMode.scroll 只保留兼容解码，生产偏好层归一化为 paged，详见[阅读器](reader.md)。
 
-AppSettings 独立 schemaVersion=2，包含 system / light / dark 和 teal / blueGrey / warmBrown / softPink；旧 v1 补默认青绿，不借用阅读主题。ReaderPaper 表示阅读纸色，controlsHintSeen 记录提示已确认；恢复默认保留该提示状态。所有值模型不含 Flutter Color 或语言文案。
+AppSettings 独立 schemaVersion=3，包含 system / light / dark、teal / blueGrey / warmBrown / softPink 和书架网格／列表偏好；旧 v1 补默认青绿，v1 / v2 缺少布局时默认网格，不借用阅读主题。应用设置加载完成后才首次展示书架，布局随应用设置持久化。ReaderPaper 表示阅读纸色，controlsHintSeen 记录提示已确认；恢复默认保留该提示状态。所有值模型不含 Flutter Color 或语言文案。
 
 
 
