@@ -10,6 +10,73 @@ import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/dev/viewport/reader_viewport.dart';
 
 void main() {
+  final sections = ChapterContent(
+    key: fixtureChapterKey(FixtureScenario.shortChapter),
+    title: 'Current section matching',
+    blocks: [
+      for (var i = 0; i < 110; i++)
+        if (i == 8 || i == 70)
+          HeadingBlock(text: 'Repeated heading', level: 2)
+        else if (i == 32)
+          ParagraphBlock(text: '第二话 Existing recognised heading')
+        else
+          ParagraphBlock(text: 'Ordinary prose $i.'),
+    ],
+  );
+  final headings = articleContents(sections);
+  ReaderPosition at(int block, {String? revision, String? key}) =>
+      ReaderPosition(
+        contentRevision: revision ?? sections.contentRevision,
+        blockKey: key ?? sections.blocks[block].blockKey,
+        blockIndex: block,
+        blockFraction: .4,
+        chapterFraction: 1, // Matching must ignore coarse progress.
+      );
+  for (final sample in [
+    (0, null),
+    (8, 0),
+    (20, 0),
+    (31, 0),
+    (32, 1),
+    (50, 1),
+    (70, 2),
+    (100, 2),
+  ]) {
+    test(
+      'current article section uses the preceding heading at block ${sample.$1}',
+      () {
+        expect(
+          currentArticleSection(sections, headings, at(sample.$1)),
+          sample.$2,
+        );
+        expect(headings.map((e) => e.position.blockIndex), [8, 32, 70]);
+      },
+    );
+  }
+  test(
+    'missing, stale and mismatched anchors never select an article section',
+    () {
+      expect(currentArticleSection(sections, headings, null), isNull);
+      expect(
+        currentArticleSection(sections, headings, at(70, revision: 'old')),
+        isNull,
+      );
+      expect(
+        currentArticleSection(
+          sections,
+          headings,
+          at(70, key: sections.blocks[8].blockKey),
+        ),
+        isNull,
+      );
+      expect(currentArticleSection(sections, const [], at(70)), isNull);
+      expect(headings.first.title, headings.last.title);
+      expect(
+        headings.first.position.blockKey,
+        isNot(headings.last.position.blockKey),
+      );
+    },
+  );
   test(
     'CJK width balances spare space without changing explicit alignment',
     () {

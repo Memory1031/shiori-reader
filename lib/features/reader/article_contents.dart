@@ -33,3 +33,28 @@ List<({String title, ReaderPosition position})> articleContents(
   }
   return result;
 }
+
+/// Match the last heading at or before a confirmed anchor in this content.
+int? currentArticleSection(
+  ChapterContent content,
+  List<({String title, ReaderPosition position})> entries,
+  ReaderPosition? position,
+) {
+  if (position == null ||
+      position.contentRevision != content.contentRevision ||
+      position.blockIndex < 0 ||
+      position.blockIndex >= content.blocks.length ||
+      content.blocks[position.blockIndex].blockKey != position.blockKey) {
+    return null;
+  }
+  var low = 0, high = entries.length;
+  while (low < high) {
+    final middle = (low + high) ~/ 2;
+    if (entries[middle].position.blockIndex <= position.blockIndex) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+  return low == 0 ? null : low - 1;
+}

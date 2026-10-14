@@ -29,6 +29,7 @@ import 'reader_actions.dart';
 import 'reader_chrome.dart';
 import 'reader_commands.dart';
 import 'reader_contents.dart';
+import 'article_contents.dart';
 import 'reader_contents_session.dart';
 import 'reader_panel.dart';
 import 'reader_progress_panel.dart';
@@ -534,18 +535,28 @@ class _ReaderContentViewState extends State<ReaderContentView>
     await _preferences.flush();
   }
 
-  List<ReaderContentsLayer> _contentsLayers(BuildContext context) => [
-    if (widget.articleContents)
-      articleContentsLayer(
-        context,
-        widget.content,
-        browsing: widget.contentsSession?.article,
-        onSelect: (target) {
-          if (mounted) _navigateTo(target);
-        },
-      ),
-    if (_actions.bookContents case final book?) book(context),
-  ];
+  late ChapterContent _articleContent = widget.content;
+  late var _articleEntries = articleContents(_articleContent);
+  List<ReaderContentsLayer> _contentsLayers(BuildContext context) {
+    if (widget.articleContents && !identical(_articleContent, widget.content)) {
+      _articleContent = widget.content;
+      _articleEntries = articleContents(_articleContent);
+    }
+    return [
+      if (widget.articleContents)
+        articleContentsLayer(
+          context,
+          widget.content,
+          entries: _articleEntries,
+          current: _readingPosition,
+          browsing: widget.contentsSession?.article,
+          onSelect: (target) {
+            if (mounted) _navigateTo(target);
+          },
+        ),
+      if (_actions.bookContents case final book?) book(context),
+    ];
+  }
 
   /// [book] opens on the book-level layer, e.g. from the completion page.
   Future<void> _contents(BuildContext context, {bool book = false}) async {

@@ -168,13 +168,15 @@ ReaderContentsLayer articleContentsLayer(
   ChapterContent content, {
   required ValueChanged<ReaderPosition> onSelect,
   CatalogBrowsingState? browsing,
+  List<({String title, ReaderPosition position})>? entries,
+  ValueListenable<ReaderPosition?>? current,
 }) {
   final l = AppLocalizations.of(context);
+  final headings = entries ?? articleContents(content);
   return ReaderContentsLayer(
     kind: ReaderContentsKind.article,
     label: l.articleContents,
     build: (context, done) {
-      final entries = articleContents(content);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -186,12 +188,13 @@ ReaderContentsLayer articleContentsLayer(
             ),
           ),
           Expanded(
-            child: entries.isEmpty
+            child: headings.isEmpty
                 ? EmptyView(message: l.articleContentsEmpty)
                 : _ArticleContentsList(
                     content: content,
                     browsing: browsing,
-                    entries: entries,
+                    entries: headings,
+                    current: current,
                     onSelect: (position) => done(() => onSelect(position)),
                   ),
           ),
@@ -207,11 +210,13 @@ class _ArticleContentsList extends StatefulWidget {
     required this.entries,
     required this.onSelect,
     this.browsing,
+    this.current,
   });
   final ChapterContent content;
   final List<({String title, ReaderPosition position})> entries;
   final ValueChanged<ReaderPosition> onSelect;
   final CatalogBrowsingState? browsing;
+  final ValueListenable<ReaderPosition?>? current;
   @override
   State<_ArticleContentsList> createState() => _ArticleContentsListState();
 }
@@ -223,13 +228,19 @@ class _ArticleContentsListState extends State<_ArticleContentsList> {
   int _center = 0;
   bool _endAnchor = false;
   bool _rememberPending = false;
+  bool _located = false, _positioning = false;
   @override
   void didUpdateWidget(_ArticleContentsList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.browsing != widget.browsing) {
-      _attachment = widget.browsing == null ? null : -1;
+    if (oldWidget.browsing != widget.browsing ||
+        oldWidget.content.key != widget.content.key ||
+        oldWidget.content.contentRevision != widget.content.contentRevision) {
+      if (oldWidget.browsing != widget.browsing) {
+        _attachment = widget.browsing == null ? null : -1;
+      }
       _scroll?.dispose();
       _scroll = null;
+      _located = false;
     }
   }
 
@@ -240,94 +251,145 @@ class _ArticleContentsListState extends State<_ArticleContentsList> {
   }
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, bounds) {
-      final state = widget.browsing;
-      if (ModalRoute.of(context)?.isCurrent != false &&
-          state != null &&
-          _attachment! < 0) {
-        _attachment = state.attach();
-      }
-      if (state?.configure(_attachment!, (
-                widget.content.key,
-                widget.content.contentRevision,
-              ), catalogBrowsingLayout(context, bounds.biggest)) ==
-              true ||
-          _scroll == null) {
-        _followingRows = GlobalKey();
-        _precedingRows = GlobalKey();
-        _scroll?.dispose();
-        final restored = state?.owns(_attachment!) == true
-            ? state!.position
-            : null;
-        _center = restored?.center ?? 0;
-        _endAnchor = restored != null && _center > 0;
-        final scroll = _scroll = ScrollController(
-          initialScrollOffset: restored?.offset ?? 0,
-          keepScrollOffset: state == null,
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.current ?? const AlwaysStoppedAnimation(null),
+    builder: (context, _) => LayoutBuilder(
+      builder: (context, bounds) {
+        final state = widget.browsing;
+        final route = ModalRoute.of(context);
+        final foreground = route?.isCurrent != false;
+        final selected = currentArticleSection(
+          widget.content,
+          widget.entries,
+          widget.current?.value,
         );
-        final version = state?.revision;
-        scroll.addListener(() {
-          if (state == null || _rememberPending) return;
-          _rememberPending = true;
-          final attachment = _attachment!;
+        if (foreground && state != null && _attachment! < 0) {
+          _attachment = state.attach();
+        }
+        final changed =
+            state?.configure(_attachment!, (
+              widget.content.key,
+              widget.content.contentRevision,
+            ), catalogBrowsingLayout(context, bounds.biggest)) ==
+            true;
+        if (changed) _located = false;
+        if (changed ||
+            _scroll == null ||
+            (!_located && selected != null && foreground)) {
+          _followingRows = GlobalKey();
+          _precedingRows = GlobalKey();
+          _scroll?.dispose();
+          final restored = state?.owns(_attachment!) == true
+              ? state!.position
+              : null;
+          _center = restored?.center ?? (foreground ? selected : null) ?? 0;
+          _endAnchor = _center > 0;
+          _located =
+              restored != null ||
+              foreground &&
+                  widget.current?.value?.contentRevision ==
+                      widget.content.contentRevision;
+          _positioning = true;
+          final scroll = _scroll = ScrollController(
+            initialScrollOffset:
+                restored?.offset ?? (_endAnchor ? bounds.maxHeight * 2 / 3 : 0),
+            keepScrollOffset: state == null,
+          );
+          final version = state?.revision;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _rememberPending = false;
-            if (!mounted || !scroll.hasClients) return;
-            final row = captureCatalogBrowsing(
-              scroll.position,
-              center: _center,
-              before: _precedingRows.currentContext?.findRenderObject(),
-              after: _followingRows.currentContext?.findRenderObject(),
-              endAnchor: _endAnchor,
-              restoreEndAnchor: true,
-            );
-            if (row != null) {
-              state.remember(attachment, version!, row.center, row.offset);
+            if (!mounted || !identical(_scroll, scroll)) return;
+            // Stop initial edge correction before accepting manual browsing.
+            if (scroll.hasClients) {
+              final p = scroll.position;
+              if (p.pixels < p.minScrollExtent ||
+                  p.pixels > p.maxScrollExtent) {
+                scroll.jumpTo(
+                  p.pixels.clamp(p.minScrollExtent, p.maxScrollExtent),
+                );
+              }
             }
+            _positioning = false;
           });
-        });
-      }
-      Widget row(BuildContext context, int i) => ListTile(
-        key: ValueKey(widget.entries[i].position.blockKey),
-        title: Text(widget.entries[i].title),
-        onTap: () => widget.onSelect(widget.entries[i].position),
-      );
-      if (state == null) {
-        return ListView.builder(
-          controller: _scroll,
-          itemCount: widget.entries.length,
-          itemBuilder: row,
+          scroll.addListener(() {
+            if (_positioning) return;
+            _located = true;
+            if (state == null || _rememberPending) return;
+            _rememberPending = true;
+            final attachment = _attachment!;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _rememberPending = false;
+              if (!mounted || !scroll.hasClients) return;
+              final row = captureCatalogBrowsing(
+                scroll.position,
+                center: _center,
+                before: _precedingRows.currentContext?.findRenderObject(),
+                after: _followingRows.currentContext?.findRenderObject(),
+                endAnchor: _endAnchor,
+                restoreEndAnchor: true,
+              );
+              if (row != null) {
+                state.remember(attachment, version!, row.center, row.offset);
+              }
+            });
+          });
+        }
+        Widget row(BuildContext context, int i) => ListTile(
+          key: ValueKey(widget.entries[i].position.blockKey),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ShioriShape.control),
+          ),
+          selected: i == selected,
+          minLeadingWidth: ShioriSpace.item,
+          horizontalTitleGap: ShioriSpace.medium,
+          leading: SizedBox(
+            width: ShioriSpace.item,
+            child: i == selected
+                ? const Icon(Icons.bookmark, size: ShioriSpace.item)
+                : null,
+          ),
+          title: Text(widget.entries[i].title),
+          onTap: () {
+            if (mounted && route?.isCurrent != false) {
+              widget.onSelect(widget.entries[i].position);
+            }
+          },
         );
-      }
-      final center = _center;
-      return CustomScrollView(
-        key: ValueKey((state, state.revision)),
-        controller: _scroll,
-        center: _followingRows,
-        anchor: _endAnchor ? 1 : 0,
-        semanticChildCount: widget.entries.length,
-        slivers: [
-          if (center > 0)
+        if (state == null && widget.current == null) {
+          return ListView.builder(
+            controller: _scroll,
+            itemCount: widget.entries.length,
+            itemBuilder: row,
+          );
+        }
+        final center = _center;
+        return CustomScrollView(
+          key: ValueKey((state, state?.revision, _scroll)),
+          controller: _scroll,
+          center: _followingRows,
+          anchor: _endAnchor ? 1 : 0,
+          semanticChildCount: widget.entries.length,
+          slivers: [
+            if (center > 0)
+              SliverList(
+                key: _precedingRows,
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => row(context, center - index - 1),
+                  childCount: center,
+                  semanticIndexCallback: (_, index) => center - index - 1,
+                ),
+              ),
             SliverList(
-              key: _precedingRows,
+              key: _followingRows,
               delegate: SliverChildBuilderDelegate(
-                (context, index) => row(context, center - index - 1),
-                childCount: center,
-                semanticIndexCallback: (_, index) => center - index - 1,
+                (context, index) => row(context, center + index),
+                childCount: widget.entries.length - center,
+                semanticIndexOffset: center,
               ),
             ),
-          SliverList(
-            key: _followingRows,
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => row(context, center + index),
-              childCount: widget.entries.length - center,
-              semanticIndexOffset: center,
-            ),
-          ),
-        ],
-      );
-    },
+          ],
+        );
+      },
+    ),
   );
 }
 
