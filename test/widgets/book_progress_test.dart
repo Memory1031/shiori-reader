@@ -48,6 +48,170 @@ Future<void> seed(
 }
 
 void main() {
+  ReadingProgress progress(
+    String id,
+    int day,
+    BookTerminalState? terminal, {
+    bool completed = false,
+    double fraction = .45,
+  }) {
+    final key = NovelKey(sourceId: SourceId('fixture'), novelId: id);
+    return ReadingProgress(
+      snapshot: NovelSummary(key: key, title: id),
+      chapterKey: ChapterKey(novelKey: key, chapterId: 'chapter'),
+      chapterOrdinalSnapshot: 0,
+      catalogRevision: 'catalog',
+      position: ReaderPosition(
+        contentRevision: 'content',
+        blockKey: 'block',
+        blockIndex: 0,
+        blockFraction: 0,
+        chapterFraction: completed ? 1 : .45,
+      ),
+      completed: completed,
+      lastReadAt: DateTime.utc(2026, 1, day),
+      bookProgress: terminal == null
+          ? null
+          : BookProgressSnapshot(
+              fraction: terminal == BookTerminalState.reading ? fraction : 1,
+              chapterCount: 10,
+              terminal: terminal,
+            ),
+    );
+  }
+
+  LibraryController controller(
+    List<ReadingProgress> history,
+    List<ReadingProgress> shelf,
+  ) {
+    final repo = FixtureLibraryRepository();
+    final value = LibraryController(repo)
+      ..recent = List.unmodifiable(history)
+      ..books = List.unmodifiable(
+        shelf.map(
+          (p) =>
+              BookshelfEntry(snapshot: p.snapshot, addedAt: DateTime.utc(2026)),
+        ),
+      );
+    addTearDown(() async {
+      value.onDelete();
+      value.dispose();
+      await repo.close();
+    });
+    return value;
+  }
+
+  for (final terminal in [
+    BookTerminalState.finished,
+    BookTerminalState.caughtUp,
+    BookTerminalState.currentEnd,
+  ]) {
+    test(
+      'continue prefers an older reading book over $terminal without reordering',
+      () {
+        final older = progress('older', 1, BookTerminalState.reading),
+            latest = progress('latest', 2, terminal);
+        final value = controller([latest, older], [older, latest]);
+        expect(value.continueReadingProgress, same(older));
+        expect(value.recent, [latest, older]);
+        expect(value.books.map((b) => b.snapshot.key), [
+          older.novelKey,
+          latest.novelKey,
+        ]);
+        expect(value.sorted.map((b) => b.snapshot.key), [
+          latest.novelKey,
+          older.novelKey,
+        ]);
+      },
+    );
+  }
+  for (final states in [
+    (BookTerminalState.reading, BookTerminalState.reading),
+    (BookTerminalState.finished, BookTerminalState.caughtUp),
+    (BookTerminalState.currentEnd, BookTerminalState.finished),
+    (BookTerminalState.reading, null),
+  ]) {
+    test(
+      'continue keeps recent order within priority ${states.$1}/${states.$2}',
+      () {
+        final older = progress('older', 1, states.$1),
+            latest = progress('latest', 2, states.$2);
+        expect(
+          controller([latest, older], [older, latest]).continueReadingProgress,
+          same(latest),
+        );
+      },
+    );
+  }
+  test(
+    'legacy progress remains preferred even when its chapter is completed',
+    () {
+      final legacy = progress('legacy', 1, null, completed: true),
+          latest = progress('latest', 2, BookTerminalState.finished);
+      expect(
+        controller([latest, legacy], [legacy, latest]).continueReadingProgress,
+        same(legacy),
+      );
+    },
+  );
+  for (final sample in [(true, .45), (false, 1.0)]) {
+    test(
+      'continue uses terminal rather than completed=${sample.$1} or fraction=${sample.$2}',
+      () {
+        final older = progress(
+              'reading',
+              1,
+              BookTerminalState.reading,
+              completed: sample.$1,
+              fraction: sample.$2,
+            ),
+            latest = progress('latest', 2, BookTerminalState.finished);
+        expect(
+          controller([latest, older], [older, latest]).continueReadingProgress,
+          same(older),
+        );
+      },
+    );
+  }
+  test('a lone finished book remains a valid fallback', () {
+    final finished = progress('finished', 1, BookTerminalState.finished);
+    expect(
+      controller([finished], [finished]).continueReadingProgress,
+      same(finished),
+    );
+  });
+  test(
+    'continue skips history outside the shelf for both priority and fallback',
+    () {
+      final removed = progress('removed', 3, null),
+          finished = progress('finished', 2, BookTerminalState.finished),
+          reading = progress('reading', 1, BookTerminalState.reading);
+      expect(
+        controller(
+          [removed, finished, reading],
+          [finished, reading],
+        ).continueReadingProgress,
+        same(reading),
+      );
+      expect(
+        controller([removed, finished], [finished]).continueReadingProgress,
+        same(finished),
+      );
+    },
+  );
+  for (final empty in ['shelf', 'history', 'matching history']) {
+    test('continue returns null without $empty', () {
+      final saved = progress('saved', 1, BookTerminalState.reading),
+          other = progress('other', 2, BookTerminalState.reading);
+      expect(
+        controller(
+          empty == 'history' ? [] : [saved],
+          empty == 'shelf' ? [] : [other],
+        ).continueReadingProgress,
+        isNull,
+      );
+    });
+  }
   testWidgets(
     'grid has only cover source and title; list retains progress text',
     (tester) async {
