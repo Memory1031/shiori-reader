@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show ValueListenable, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -34,6 +36,13 @@ class PagedReaderController {
   _PagedReaderViewportState? _state;
   ReaderPosition? capture() => _state?._position;
   void restore(ReaderPosition position) => _state?._restore(position);
+
+  /// Resolves after the requested anchor has been painted and sampled.
+  /// Superseded, detached or no longer owned restores return false.
+  Future<bool> restoreConfirmed(
+    ReaderPosition position, {
+    required bool Function() isCurrent,
+  }) => _state?._restoreConfirmed(position, isCurrent) ?? Future.value(false);
   Future<void> next({bool queueIfTurning = false}) =>
       _state?._turn(1, queueIfTurning: queueIfTurning) ?? Future.value();
   Future<void> previous({bool queueIfTurning = false}) =>
@@ -50,6 +59,7 @@ class PagedReaderController {
   int get cachedPages => _state?._pages.length ?? 0;
   bool get usedFallback => _state?._usedFallback ?? false;
   bool get isRestoring => _state?._restoring ?? false;
+  bool get isTurning => _state?._userScrolling ?? false;
 
   /// Optional read-only diagnostics of the already displayed page. Does not
   /// seek, measure, populate caches or change the persisted reading position.
@@ -492,13 +502,38 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
 
   @override
   void dispose() {
+    _restoreResult?.complete(false);
+    _restoreResult = null;
     widget.controller._state = null;
     _turnAnimation.dispose();
     super.dispose();
   }
 
+  Completer<bool>? _restoreResult;
+  ReaderPosition? _requestedPosition, _restoreOrigin;
+  bool Function()? _restoreCurrent;
+
+  Future<bool> _restoreConfirmed(
+    ReaderPosition position,
+    bool Function() isCurrent,
+  ) {
+    if (!mounted || _restoring || _userScrolling || !isCurrent()) {
+      return Future.value(false);
+    }
+    final origin = _position;
+    _restore(position);
+    _restoreOrigin = origin;
+    _requestedPosition = position;
+    _restoreCurrent = isCurrent;
+    final result = _restoreResult = Completer<bool>();
+    return result.future;
+  }
+
   void _restore(ReaderPosition position) {
     if (!mounted) return;
+    _restoreResult?.complete(false);
+    _restoreResult = null;
+    _restoreCurrent = null;
     _endPreview();
     _queuedDirection = null;
     _restoring = true;
@@ -516,8 +551,24 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   void _readyAfterFrame(int epoch) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || epoch != _epoch || !_restoring) return;
+      final result = _restoreResult;
+      if (result != null &&
+          (!_restoreCurrent!() ||
+              _usedFallback ||
+              widget.content.contentRevision !=
+                  _requestedPosition!.contentRevision)) {
+        final origin = _restoreOrigin;
+        _restoreResult = null;
+        result.complete(false);
+        if (origin != null) _restore(origin);
+        return;
+      }
       _restoring = false;
       _sample();
+      if (result != null && identical(result, _restoreResult)) {
+        _restoreResult = null;
+        result.complete(_position == _requestedPosition);
+      }
     });
   }
 

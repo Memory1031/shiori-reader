@@ -499,6 +499,7 @@
   "readerNotesLinks": "链接",
   "readerLinkHere": "本章内",
   "readerLinkElsewhere": "书中其他位置",
+  "readerPreviousLocation": "返回上一处",
   "readerLinkReturn": "返回原位置",
   "readerLinkUnavailable": "此链接不可用，仅支持书内有效文档和锚点。",
   "readerLinkDepth": "已达到链接层级上限，请先返回。",

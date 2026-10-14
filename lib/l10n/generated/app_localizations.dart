@@ -1952,6 +1952,12 @@ abstract class AppLocalizations {
   /// **'Elsewhere in this book'**
   String get readerLinkElsewhere;
 
+  /// No description provided for @readerPreviousLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to previous location'**
+  String get readerPreviousLocation;
+
   /// No description provided for @readerLinkReturn.
   ///
   /// In en, this message translates to:

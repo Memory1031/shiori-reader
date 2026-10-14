@@ -16,6 +16,7 @@ enum ReaderCommand {
   details,
   retrySave,
   retrySettings,
+  previousLocation,
 }
 
 /// Runs a [ReaderCommand] from a shortcut.

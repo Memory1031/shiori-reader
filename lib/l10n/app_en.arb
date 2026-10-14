@@ -499,6 +499,7 @@
   "readerNotesLinks": "Links",
   "readerLinkHere": "In this chapter",
   "readerLinkElsewhere": "Elsewhere in this book",
+  "readerPreviousLocation": "Back to previous location",
   "readerLinkReturn": "Return to reading",
   "readerLinkUnavailable": "Link unavailable. Only valid documents and anchors within this book can be opened.",
   "readerLinkDepth": "Link depth limit reached. Return before opening another link.",

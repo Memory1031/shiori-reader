@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../../domain/contracts/contracts.dart';
+import '../../domain/models/models.dart';
 import 'reader_contents.dart';
 import 'reader_panel.dart';
 
@@ -24,6 +25,9 @@ class ReaderActions {
     this.links,
     this.contentLink,
     this.bookContents,
+    this.previousLocation,
+    this.navigatePosition,
+    this.pageTurnCommitted,
   });
 
   /// Turn to the neighbouring chapter at a page boundary.
@@ -53,6 +57,11 @@ class ReaderActions {
   /// a footnote opens over the page too.
   final void Function(ReaderPanels panels)? links;
   final ValueChanged<LocalContentLink>? contentLink;
+  final VoidCallback? previousLocation, pageTurnCommitted;
+
+  /// Explicit position selection; the predicate stays bound to its page/panel.
+  final Future<void> Function(ReaderPosition, bool Function())?
+  navigatePosition;
 
   /// The book-level contents layer (volume catalog or local navigation).
   final ReaderContentsLayer Function(BuildContext context)? bookContents;

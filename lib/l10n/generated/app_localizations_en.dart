@@ -1075,6 +1075,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerLinkElsewhere => 'Elsewhere in this book';
 
   @override
+  String get readerPreviousLocation => 'Back to previous location';
+
+  @override
   String get readerLinkReturn => 'Return to reading';
 
   @override

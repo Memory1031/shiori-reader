@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/scheduler.dart';
 import '../../app/app_exit.dart';
 import '../../app/window_caption.dart';
@@ -85,6 +86,7 @@ class ReaderContentView extends StatefulWidget {
     this.viewportController,
     this.returnToOrigin = false,
     this.chrome,
+    this.quickReturn,
     this.active = true,
     this.appearanceActive,
   });
@@ -127,6 +129,7 @@ class ReaderContentView extends StatefulWidget {
   /// Toolbar visibility, owned by the caller when it must outlive this view
   /// (e.g. so the screen can close the toolbars on back).
   final ValueNotifier<bool>? chrome;
+  final ValueListenable<bool>? quickReturn;
 
   /// Whether this page takes commands: false for a chapter still turning in
   /// and while the host is changing chapters or leaving. It only gates input
@@ -779,6 +782,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       ReaderCommand.notes => text && _actions.links != null,
       ReaderCommand.prefetch => text && _actions.prefetch != null,
       ReaderCommand.details => _actions.details != null,
+      ReaderCommand.previousLocation => _actions.previousLocation != null,
       ReaderCommand.retrySave => _unsaved,
       ReaderCommand.retrySettings => _preferences.failure != null,
     };
@@ -806,6 +810,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
         _actions.prefetch?.call(_PagePanels(this, context));
       case ReaderCommand.details:
         _actions.details?.call();
+      case ReaderCommand.previousLocation:
+        _actions.previousLocation?.call();
       case ReaderCommand.retrySave:
         widget.session?.retryProgress();
     }
@@ -886,6 +892,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       (ReaderCommand.contents, l.catalogTitle),
       (ReaderCommand.progress, l.readerProgressLabel),
       (ReaderCommand.settings, l.readerSettings),
+      (ReaderCommand.previousLocation, l.readerPreviousLocation),
       (ReaderCommand.notes, l.readerLinks),
       (ReaderCommand.details, l.novelDetailsTitle),
       (
@@ -1559,7 +1566,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
           }
         },
         onPosition: _sample,
-        onTurnCommitted: () => _chrome.value = false,
+        onTurnCommitted: () {
+          _chrome.value = false;
+          _actions.pageTurnCommitted?.call();
+        },
         onRestoreStart: _layoutInvalidated,
         controller: _paged,
         onLink: _actions.contentLink,
@@ -1640,8 +1650,24 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _invalidateProgressPreview();
     widget.session?.beginPositionNavigation();
     if (widget.completion != null) _actions.completionPrevious?.call();
-    _position = target;
-    _paged.restore(target);
+    if (_actions.navigatePosition case final navigate?) {
+      final session = widget.session, content = widget.content;
+      final panel = _panel, route = _progressRoute;
+      final request = _progressRequest;
+      bool accepts() =>
+          mounted &&
+          identical(widget.session, session) &&
+          widget.content == content &&
+          session?.isClosed != true &&
+          request == _progressRequest &&
+          (_routeCurrent ||
+              panel?.isValid == true && panel!.route.isCurrent ||
+              route?.isActive == true && route!.isCurrent);
+      unawaited(navigate(target, accepts));
+    } else {
+      _position = target;
+      _paged.restore(target);
+    }
   }
 
   Future<void> _progressPanel(BuildContext context) async {
@@ -1834,8 +1860,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
   Widget _runningChrome(BuildContext context) {
     final l = AppLocalizations.of(context);
     final label = Theme.of(context).textTheme.labelSmall ?? const TextStyle();
-    return ReaderRunningChrome(
-      metrics: ReaderChromeMetrics.of(context),
+    final metrics = ReaderChromeMetrics.of(context);
+    final running = ReaderRunningChrome(
+      reserveReturnSpace: widget.quickReturn != null,
+      metrics: metrics,
       margin: _margin,
       title: widget.runningTitle ?? widget.content.title,
       statusRow: ShioriCapabilities.of(context).immersiveSystemUi,
@@ -1853,11 +1881,42 @@ class _ReaderContentViewState extends State<ReaderContentView>
         ),
       ),
     );
+    final visibility = widget.quickReturn;
+    if (visibility == null) return running;
+    return Stack(
+      children: [
+        running,
+        Positioned(
+          top: 0,
+          left: ShioriSpace.small,
+          child: ValueListenableBuilder<bool>(
+            valueListenable: visibility,
+            builder: (context, visible, _) => ReaderLocationReturn(
+              metrics: metrics,
+              visible:
+                  visible &&
+                  _interactive &&
+                  !_paged.isRestoring &&
+                  (_actions.previousLocation != null || widget.returnToOrigin),
+              onPressed: () {
+                if (!_interactive) return;
+                if (_actions.previousLocation != null) {
+                  _run(context, ReaderCommand.previousLocation);
+                } else if (widget.returnToOrigin) {
+                  _leave(context);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   /// Overflow menu entries: what the bottom bar does not already offer.
   List<(ReaderCommand, String)> _menu(AppLocalizations l) => [
     for (final (command, label) in [
+      (ReaderCommand.previousLocation, l.readerPreviousLocation),
       (ReaderCommand.notes, l.readerLinks),
       (ReaderCommand.prefetch, l.prefetchTitle),
       (ReaderCommand.details, l.novelDetailsTitle),

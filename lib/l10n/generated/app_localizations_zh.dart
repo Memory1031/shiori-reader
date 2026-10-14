@@ -983,6 +983,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerLinkElsewhere => '书中其他位置';
 
   @override
+  String get readerPreviousLocation => '返回上一处';
+
+  @override
   String get readerLinkReturn => '返回原位置';
 
   @override

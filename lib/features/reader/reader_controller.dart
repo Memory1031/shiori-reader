@@ -91,6 +91,7 @@ class ReaderController extends ScopedController {
   bool usedFallback = false;
   ReaderRestoreStatus restoreStatus = ReaderRestoreStatus.loading;
   (ReaderPosition, bool)? _sample;
+  ReaderPosition? get currentPosition => _sample?.$1;
   bool _restoring = false;
   bool _openingProgress = false;
 

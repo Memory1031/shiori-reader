@@ -234,6 +234,7 @@ class ReaderRunningChrome extends StatelessWidget {
     required this.title,
     required this.progress,
     required this.statusRow,
+    this.reserveReturnSpace = false,
   });
   final ReaderChromeMetrics metrics;
 
@@ -242,17 +243,21 @@ class ReaderRunningChrome extends StatelessWidget {
   final String title;
   final Widget progress;
   final bool statusRow;
+  final bool reserveReturnSpace;
 
   @override
   Widget build(BuildContext context) {
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final titleMargin = reserveReturnSpace && margin < 48 + ShioriSpace.small
+        ? 48 + ShioriSpace.small
+        : margin;
     return IgnorePointer(
       child: Stack(
         children: [
           Positioned(
             top: 0,
-            left: margin,
-            right: margin,
+            left: titleMargin,
+            right: titleMargin,
             height: metrics.header,
             child: Padding(
               padding: const EdgeInsets.only(
@@ -262,6 +267,7 @@ class ReaderRunningChrome extends StatelessWidget {
               child: Center(
                 child: Text(
                   title,
+                  key: const ValueKey('reader-running-title'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
@@ -291,6 +297,70 @@ class ReaderRunningChrome extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Independent of the non-interactive running title and of page geometry.
+class ReaderLocationReturn extends StatelessWidget {
+  const ReaderLocationReturn({
+    super.key,
+    required this.visible,
+    required this.onPressed,
+    required this.metrics,
+  });
+  final ReaderChromeMetrics metrics;
+  final bool visible;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final height = metrics.header < 48 ? 48.0 : metrics.header;
+    return IgnorePointer(
+      ignoring: !visible,
+      child: ExcludeFocus(
+        excluding: !visible,
+        child: ExcludeSemantics(
+          excluding: !visible,
+          child: AnimatedOpacity(
+            opacity: visible ? 1 : 0,
+            duration: ShioriMotion.of(context, ShioriMotion.feedback),
+            curve: Curves.easeOut,
+            child: SizedBox(
+              width: 48,
+              height: height,
+              child: IconButton(
+                key: const ValueKey('reader-location-return'),
+                tooltip: AppLocalizations.of(context).readerPreviousLocation,
+                onPressed: onPressed,
+                style: IconButton.styleFrom(
+                  // Match the running title's centre after its asymmetric gutters.
+                  padding: EdgeInsets.only(
+                    top:
+                        metrics.header +
+                        ReaderChromeMetrics.edge -
+                        ReaderChromeMetrics.inner -
+                        height,
+                  ),
+                  foregroundColor: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(ShioriShape.control),
+                  ),
+                ),
+                icon: Icon(
+                  Icons.undo_rounded,
+                  size: 22,
+                  semanticLabel: AppLocalizations.of(
+                    context,
+                  ).readerPreviousLocation,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
