@@ -104,6 +104,7 @@ class BookReaderScreen extends StatefulWidget {
 class _BookReaderScreenState extends State<BookReaderScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   LocalBookUse? _routeUse;
+  final _disposed = Completer<void>();
   Future<void>? _routeOpening;
   Future<void> _openBook() async {
     try {
@@ -920,6 +921,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   void dispose() {
+    _disposed.complete();
     _contentsSession.dispose();
     _contentsPanel?.dismiss();
     _contentsPanel = null;
@@ -1703,9 +1705,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     // The cache route owns later selections; only its first successful open
     // needs this reader's save/removal barrier.
     final reader = widget;
+    var retired = false;
     Future<bool> Function(bool Function())? retire = _retireForCache;
     _beginLeaving();
-    await Navigator.of(context, rootNavigator: true).push<void>(
+    final cacheClosed = Navigator.of(context, rootNavigator: true).push<void>(
       platformPageRoute<void>(
         context,
         settings: const RouteSettings(name: '/cache'),
@@ -1713,14 +1716,17 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           reader: reader,
           beforeOpen: (accepts) async {
             final original = retire;
-            if (original == null) return true;
+            if (original == null) return retired;
             if (!await original(accepts)) return false;
+            retired = true;
             retire = null;
             return true;
           },
         ),
       ),
     );
+    // The cache route can outlive this State after opening an offline reader.
+    await Future.any<void>([cacheClosed, _disposed.future]);
     retire = null;
     if (!mounted || _invalidated || _route?.isCurrent != true) return;
     setState(() => _leavingInsets = null);

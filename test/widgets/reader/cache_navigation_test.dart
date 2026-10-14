@@ -505,15 +505,76 @@ void main() {
   );
 
   testWidgets(
-    'viewing cache only returns to unchanged A without a residual sheet',
+    'source disposal detaches its cache barrier before the cache route closes',
     (tester) async {
       final h = Harness(tester);
       await h.pump();
+      await h.manage();
+      final page = tester.element(find.byType(CacheScreen));
+      final cacheRoute = ModalRoute.of(page)!;
+      final beforeOpen = tester
+          .widget<ReaderCacheScreen>(find.byType(ReaderCacheScreen))
+          .beforeOpen;
+      h.navigator.currentState!.removeRoute(h.originalRoute);
+      await tester.pumpAndSettle();
+      expect(h.original.isClosed, isTrue);
+      expect(cacheRoute.isCurrent, isTrue);
+      expect(tester.element(find.byType(CacheScreen)), same(page));
+      var sourceChecks = 0;
+      expect(
+        await beforeOpen(() {
+          sourceChecks++;
+          return true;
+        }),
+        isFalse,
+      );
+      // A retained source callback evaluates its predicate even after disposal.
+      expect(sourceChecks, 0);
+      await h.back();
+      expect(find.text('Home'), findsOneWidget);
+      await h.close();
+    },
+    variant: platforms,
+  );
+
+  testWidgets(
+    'viewing cache only returns to unchanged A without a residual sheet',
+    (tester) async {
+      final modes = <Object?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'SystemChrome.setEnabledSystemUIMode') {
+            modes.add(call.arguments);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      final h = Harness(tester);
+      await h.pump();
+      final page = tester.getRect(find.byType(ReaderContentView).first);
       await h.manage();
       await h.back();
       expect(h.originalRoute.isCurrent, isTrue);
       expect(h.original.isClosed, isFalse);
       expect(h.original.currentPosition, h.anchor);
+      expect(tester.getRect(find.byType(ReaderContentView).first), page);
+      expect(
+        modes,
+        debugDefaultTargetPlatformOverride == TargetPlatform.windows
+            ? isEmpty
+            : [
+                'SystemUiMode.immersiveSticky',
+                'SystemUiMode.edgeToEdge',
+                'SystemUiMode.immersiveSticky',
+              ],
+      );
       expect(find.byType(PrefetchPanel), findsNothing);
       await h.close();
     },
