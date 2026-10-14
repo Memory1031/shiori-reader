@@ -1,31 +1,25 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
-import '../../shared/capabilities.dart';
 import '../../shared/widgets/shiori_sheet.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
-import 'cache_screen.dart';
 
-Future<void> showPrefetchSheet(
+Future<bool?> showPrefetchSheet(
   BuildContext context, {
   required CacheManagement cache,
   required Catalog? catalog,
   required ChapterKey current,
-}) => showShioriSheet<void>(
+}) => showShioriSheet<bool>(
   context,
   size: ShioriSheetSize.tall,
-  builder: (context) =>
-      PrefetchPanel(cache: cache, catalog: catalog, current: current),
+  builder: (context) => PrefetchPanel(
+    cache: cache,
+    catalog: catalog,
+    current: current,
+    onManage: () => Navigator.of(context).pop(true),
+  ),
 );
-
-/// Cache management, as opened from prefetch settings.
-Route<void> cacheManagementRoute(BuildContext context, CacheManagement cache) =>
-    platformPageRoute<void>(
-      context,
-      settings: const RouteSettings(name: '/cache'),
-      builder: (_) => CacheScreen(cache: cache),
-    );
 
 /// Prefetch settings and progress for the book being read, following the
 /// engine's live state. Placement agnostic: a sheet on phones, a side panel
@@ -47,8 +41,7 @@ class PrefetchPanel extends StatefulWidget {
   /// handle.
   final VoidCallback? onClose;
 
-  /// Opens cache management in the host's stead, e.g. once a panel over the
-  /// reader has closed. When null the panel pushes it above itself.
+  /// Requests management from the host after this panel closes.
   final VoidCallback? onManage;
   @override
   State<PrefetchPanel> createState() => _PrefetchPanelState();
@@ -160,11 +153,7 @@ class _PrefetchPanelState extends State<PrefetchPanel> {
                   child: Text(l.prefetchResume),
                 ),
                 TextButton(
-                  onPressed:
-                      widget.onManage ??
-                      () => Navigator.of(
-                        context,
-                      ).push(cacheManagementRoute(context, widget.cache)),
+                  onPressed: widget.onManage,
                   child: Text(l.cacheTitle),
                 ),
               ],

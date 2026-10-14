@@ -202,14 +202,13 @@ class _ReadingHomeState extends State<ReadingHome> {
       cache: widget.cache,
       onReturnToShelf: _returnToShelf,
     ),
-    offlineReader: (_, key) => BookReaderScreen(
+    offlineReader: (_, key) => BookReaderScreen.offline(
       chapter: key,
       repository: widget.repository,
       images: widget.images,
       library: widget.library,
       settings: widget.settings,
       cache: widget.cache,
-      offline: true,
       onReturnToShelf: _returnToShelf,
     ),
     cache: widget.cache == null

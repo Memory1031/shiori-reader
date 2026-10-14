@@ -17,6 +17,7 @@ import 'position/position_resolver.dart';
 import 'reader_screen.dart';
 import 'viewport/page_turn.dart';
 import '../cache/prefetch_sheet.dart';
+import 'reader_cache_screen.dart';
 import '../../shared/source_image.dart';
 import 'reader_notes.dart';
 import 'viewport/paged_reader_viewport.dart';
@@ -29,6 +30,25 @@ import 'reader_logical_progress.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
 class BookReaderScreen extends StatefulWidget {
+  factory BookReaderScreen.offline({
+    required ChapterKey chapter,
+    required NovelRepository repository,
+    ImageRepository? images,
+    LibraryRepository? library,
+    SettingsStore? settings,
+    CacheManagement? cache,
+    VoidCallback? onReturnToShelf,
+  }) => BookReaderScreen(
+    chapter: chapter,
+    repository: repository,
+    images: images,
+    library: library,
+    settings: settings,
+    cache: cache,
+    onReturnToShelf: onReturnToShelf,
+    offline: true,
+  );
+
   const BookReaderScreen({
     super.key,
     required this.chapter,
@@ -950,7 +970,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
-  Future<bool> _save([_ChapterOperation? operation]) async {
+  Future<bool> _save(
+    _ChapterOperation? operation, {
+    bool Function()? accepts,
+  }) async {
     final reader = _reader;
     if (operation != null &&
         reader.content != null &&
@@ -961,17 +984,25 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     final saved = await reader.saveForExit();
     if (!mounted ||
         reader != _reader ||
+        accepts?.call() == false ||
         operation != null && !_valid(operation)) {
       return false;
     }
     if (!saved) {
       // Retired writers can close read-only; the post-pop path reports the
       // failed acknowledgement without offering an ineffective retry.
-      if (operation == null && reader.progress?.obsolete == true) return false;
+      if (operation == null &&
+          accepts == null &&
+          reader.progress?.obsolete == true) {
+        return false;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            reader.progressStatus == ReaderProgressStatus.paused
+            reader.progress?.obsolete == true
+                ? '${AppLocalizations.of(context).readerReadingProgress} · '
+                      '${AppLocalizations.of(context).readerProgressNotSaved}'
+                : reader.progressStatus == ReaderProgressStatus.paused
                 ? AppLocalizations.of(context).readerRestoreReadFailed
                 : AppLocalizations.of(context).readerProgressUnsaved,
           ),
@@ -1554,7 +1585,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
     if (_changing || _canPop) return;
     setState(() => _changing = true);
-    final saved = await _save();
+    final saved = await _save(null);
     if (!mounted) return;
     final canLeave = saved || _reader.progress?.obsolete == true;
     setState(() {
@@ -1637,28 +1668,30 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   Future<void> _prefetch(ReaderPanels panels, ReaderController source) async {
     final cache = _cache;
     if (cache?.prefetch == null) return;
+    if (_changing || _invalidated) return;
+    final bool? manage;
     if (!panels.desktop) {
-      return showPrefetchSheet(
+      manage = await showPrefetchSheet(
         context,
         cache: cache!,
         catalog: _catalog.loaded?.value,
         current: source.chapter,
       );
+    } else {
+      final panel = panels.open<bool>(
+        ReaderPanelPlacement.end,
+        semanticLabel: AppLocalizations.of(context).prefetchTitle,
+        builder: (context, panel) => PrefetchPanel(
+          cache: cache!,
+          catalog: _catalog.loaded?.value,
+          current: source.chapter,
+          onClose: () => panel.close(),
+          onManage: () => panel.close(true),
+        ),
+      );
+      if (panel == null) return;
+      manage = await panel.closed;
     }
-    if (_changing || _invalidated) return;
-    final panel = panels.open<bool>(
-      ReaderPanelPlacement.end,
-      semanticLabel: AppLocalizations.of(context).prefetchTitle,
-      builder: (context, panel) => PrefetchPanel(
-        cache: cache!,
-        catalog: _catalog.loaded?.value,
-        current: source.chapter,
-        onClose: () => panel.close(),
-        onManage: () => panel.close(true),
-      ),
-    );
-    if (panel == null) return;
-    final manage = await panel.closed;
     if (manage != true ||
         !mounted ||
         !panels.live ||
@@ -1667,7 +1700,55 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         source != _reader) {
       return;
     }
-    await Navigator.of(context).push(cacheManagementRoute(context, cache!));
+    // The cache route owns later selections; only its first successful open
+    // needs this reader's save/removal barrier.
+    final reader = widget;
+    Future<bool> Function(bool Function())? retire = _retireForCache;
+    _beginLeaving();
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      platformPageRoute<void>(
+        context,
+        settings: const RouteSettings(name: '/cache'),
+        builder: (_) => ReaderCacheScreen(
+          reader: reader,
+          beforeOpen: (accepts) async {
+            final original = retire;
+            if (original == null) return true;
+            if (!await original(accepts)) return false;
+            retire = null;
+            return true;
+          },
+        ),
+      ),
+    );
+    retire = null;
+    if (!mounted || _invalidated || _route?.isCurrent != true) return;
+    setState(() => _leavingInsets = null);
+    _enterSystemUi();
+  }
+
+  Future<bool> _retireForCache(bool Function() accepts) async {
+    bool valid() =>
+        accepts() &&
+        mounted &&
+        !_invalidated &&
+        !_changing &&
+        _route?.isActive == true &&
+        !_reader.isClosed;
+    if (!valid()) return false;
+    final source = _reader;
+    final route = _route!;
+    final navigator = route.navigator!;
+    setState(() => _changing = true);
+    final saved = await _save(
+      null,
+      accepts: () => accepts() && !_invalidated && !source.isClosed,
+    );
+    if (!mounted) return false;
+    setState(() => _changing = false);
+    if (!saved || !valid() || source != _reader) return false;
+    navigator.removeRoute(route);
+    return true;
   }
 
   Future<void> _followContentLink(LocalContentLink link) async {
@@ -1964,7 +2045,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   Future<void> _details() async {
     if (_changing || widget.onDetails == null) return;
     setState(() => _changing = true);
-    if (!await _save()) {
+    if (!await _save(null)) {
       if (mounted) setState(() => _changing = false);
       return;
     }

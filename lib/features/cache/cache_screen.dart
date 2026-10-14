@@ -16,6 +16,7 @@ class CacheScreen extends StatefulWidget {
     super.key,
     required this.cache,
     this.onRead,
+    this.openingChapter,
     this.novel,
     this.summaryOf,
     this.images,
@@ -27,6 +28,7 @@ class CacheScreen extends StatefulWidget {
   final NovelSummary? Function(NovelKey key)? summaryOf;
   final ImageRepository? images;
   final ValueChanged<ChapterKey>? onRead;
+  final ChapterKey? openingChapter;
   final NovelKey? novel;
   @override
   State<CacheScreen> createState() => _CacheScreenState();
@@ -38,6 +40,7 @@ class _CacheScreenState extends State<CacheScreen> {
   CacheOverview? _overview;
   AppFailure? _failure;
   bool _busy = false;
+  bool get _locked => _busy || widget.openingChapter != null;
   StreamSubscription<PrefetchState>? _subscription;
   @override
   void initState() {
@@ -74,7 +77,7 @@ class _CacheScreenState extends State<CacheScreen> {
   }
 
   Future<void> _clear(NovelKey? key) async {
-    if (_busy) return;
+    if (_locked) return;
     final l = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -93,7 +96,7 @@ class _CacheScreenState extends State<CacheScreen> {
         ],
       ),
     );
-    if (confirmed != true || !mounted || _busy) return;
+    if (confirmed != true || !mounted || _locked) return;
     setState(() => _busy = true);
     final result = await widget.cache.clear(novel: key);
     if (!mounted) return;
@@ -123,7 +126,7 @@ class _CacheScreenState extends State<CacheScreen> {
     final pointer = ShioriCapabilities.of(context).pointerFirst;
     final refresh = IconButton(
       key: const ValueKey('cache-refresh'),
-      onPressed: _busy ? null : _load,
+      onPressed: _locked ? null : _load,
       tooltip: l.retryAction,
       icon: _busy && _overview != null
           ? SizedBox.square(
@@ -379,7 +382,7 @@ class _CacheScreenState extends State<CacheScreen> {
                   TextButton.icon(
                     key: const ValueKey('cache-clear-all'),
                     style: TextButton.styleFrom(foregroundColor: colors.error),
-                    onPressed: _busy ? null : () => _clear(widget.novel),
+                    onPressed: _locked ? null : () => _clear(widget.novel),
                     icon: const Icon(Icons.delete_outline, size: 18),
                     label: Text(
                       widget.novel == null ? l.cacheClearAll : l.cacheClearBook,
@@ -455,7 +458,7 @@ class _CacheScreenState extends State<CacheScreen> {
     );
     final mobileMenu = PopupMenuButton<String>(
       key: ValueKey(('cache-book-actions', key)),
-      enabled: !_busy,
+      enabled: !_locked,
       tooltip: l.moreActions,
       icon: const Icon(Icons.more_horiz, size: 20),
       onSelected: (_) => _clear(key),
@@ -476,7 +479,7 @@ class _CacheScreenState extends State<CacheScreen> {
     );
     return CacheBookMenu(
       desktop: DesktopLayoutScope.useDesktopPage(context),
-      enabled: !_busy,
+      enabled: !_locked,
       onClear: () => _clear(key),
       mobileMenu: mobileMenu,
       builder: (menu) {
@@ -555,10 +558,18 @@ class _CacheScreenState extends State<CacheScreen> {
                             ),
                             style: muted,
                           ),
-                    trailing: widget.onRead == null
+                    trailing: widget.openingChapter == chapter.key
+                        ? SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              semanticsLabel: l.loading,
+                            ),
+                          )
+                        : widget.onRead == null
                         ? null
                         : const Icon(Icons.chevron_right, size: 18),
-                    onTap: _busy || widget.onRead == null
+                    onTap: _locked || widget.onRead == null
                         ? null
                         : () => widget.onRead!(chapter.key),
                   ),
