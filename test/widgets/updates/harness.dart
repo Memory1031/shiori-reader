@@ -16,10 +16,9 @@ import 'package:shiori/l10n/generated/app_localizations.dart';
 import '../../support/fake_update_repository.dart';
 
 class ControlledUpdates extends FakeUpdateRepository {
-  int loads = 0, downloads = 0;
-  Completer<void>? loading, checking, downloading;
+  int loads = 0;
+  Completer<void>? loading, checking, downloading, verifyingPackage;
   CancellationToken? checkToken, downloadToken;
-  void Function(int)? progress;
 
   Future<void> waitFor(Completer<void>? gate, CancellationToken token) async {
     if (gate != null) await Future.any([gate.future, token.whenCancelled]);
@@ -49,13 +48,17 @@ class ControlledUpdates extends FakeUpdateRepository {
   Future<void> download(
     UpdateCandidate candidate,
     CancellationToken token,
-    void Function(int) onProgress,
-  ) async {
+    void Function(int) onProgress, {
+    void Function()? onVerifying,
+  }) async {
     downloads++;
     downloadToken = token;
     progress = onProgress;
     await waitFor(downloading, token);
     onProgress(candidate.bytes);
+    onVerifying?.call();
+    await waitFor(verifyingPackage, token);
+    if (failure case final error?) throw error;
     restored = candidate;
   }
 }

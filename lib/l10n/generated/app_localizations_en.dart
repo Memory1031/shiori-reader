@@ -704,7 +704,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cacheEmpty => 'No cached articles yet';
 
   @override
-  String get cacheClearTitle => 'Clear cached content?';
+  String get cacheClearTitle => 'Clear all cache?';
+
+  @override
+  String get cacheClearBookTitle => 'Clear this book\'s cache?';
+
+  @override
+  String get cacheUnnamedBook => 'This book';
+
+  @override
+  String cacheClearBookCount(int chapters) {
+    String _temp0 = intl.Intl.pluralLogic(
+      chapters,
+      locale: localeName,
+      other: '$chapters chapters',
+      one: '1 chapter',
+      zero: '0 chapters',
+    );
+    return 'Currently cached: $_temp0.';
+  }
+
+  @override
+  String cacheClearAllCount(int books, int chapters) {
+    String _temp0 = intl.Intl.pluralLogic(
+      books,
+      locale: localeName,
+      other: '$books books',
+      one: '1 book',
+      zero: '0 books',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      chapters,
+      locale: localeName,
+      other: '$chapters chapters',
+      one: '1 chapter',
+      zero: '0 chapters',
+    );
+    return 'The current cache list contains $_temp0 and $_temp1.';
+  }
+
+  @override
+  String get cacheClearAllExplanation =>
+      'This clears the related online text, catalogs, book details and image cache. Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.';
 
   @override
   String get cacheClearExplanation =>
@@ -1277,6 +1318,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateDownload => 'Download update';
+
+  @override
+  String get updateVerifying => 'Verifying update package…';
+
+  @override
+  String get updateVerifyingHint =>
+      'Download complete. Checking file integrity.';
 
   @override
   String get updateDownloaded =>

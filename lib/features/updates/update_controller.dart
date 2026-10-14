@@ -4,7 +4,15 @@ import '../../domain/contracts/app_updates.dart';
 import '../../domain/contracts/cancellation.dart';
 import '../../domain/models/release_identity.dart';
 
-enum UpdatePhase { loading, idle, checking, available, downloading, downloaded }
+enum UpdatePhase {
+  loading,
+  idle,
+  checking,
+  available,
+  downloading,
+  verifying,
+  downloaded,
+}
 
 class UpdateController extends ChangeNotifier {
   UpdateController(
@@ -57,6 +65,7 @@ class UpdateController extends ChangeNotifier {
       } finally {
         if (phase == UpdatePhase.checking ||
             phase == UpdatePhase.downloading ||
+            phase == UpdatePhase.verifying ||
             phase == UpdatePhase.loading) {
           phase = candidate == null ? UpdatePhase.idle : UpdatePhase.available;
         }
@@ -224,15 +233,28 @@ class UpdateController extends ChangeNotifier {
     received = 0;
     _changed();
     var notifiedAt = _now();
-    await repository.download(target, token, (value) {
-      received = value;
-      final now = _now();
-      if (value == target.bytes ||
-          now.difference(notifiedAt) >= const Duration(milliseconds: 100)) {
-        notifiedAt = now;
+    bool active() =>
+        !_closed && !token.isCancelled && identical(_cancel?.token, token);
+    await repository.download(
+      target,
+      token,
+      (value) {
+        if (!active() || phase != UpdatePhase.downloading) return;
+        received = value;
+        final now = _now();
+        if (value == target.bytes ||
+            now.difference(notifiedAt) >= const Duration(milliseconds: 100)) {
+          notifiedAt = now;
+          _changed();
+        }
+      },
+      onVerifying: () {
+        if (!active() || phase != UpdatePhase.downloading) return;
+        phase = UpdatePhase.verifying;
         _changed();
-      }
-    });
+      },
+    );
+    checkCancelled(token);
     phase = UpdatePhase.downloaded;
   });
   void cancel() => _cancel?.cancel();

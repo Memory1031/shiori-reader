@@ -648,7 +648,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cacheEmpty => '还没有缓存的正文';
 
   @override
-  String get cacheClearTitle => '清除缓存？';
+  String get cacheClearTitle => '清除全部缓存？';
+
+  @override
+  String get cacheClearBookTitle => '清除这本书的缓存？';
+
+  @override
+  String get cacheUnnamedBook => '这本书';
+
+  @override
+  String cacheClearBookCount(int chapters) {
+    return '当前已缓存 $chapters 个章节。';
+  }
+
+  @override
+  String cacheClearAllCount(int books, int chapters) {
+    return '当前缓存列表中有 $books 本书、$chapters 个章节。';
+  }
+
+  @override
+  String get cacheClearAllExplanation =>
+      '这将清除相关的在线正文、目录、资料和图片缓存。书架、阅读进度和设置会保留。再次打开已清理内容可能需要联网。';
 
   @override
   String get cacheClearExplanation => '书架、阅读进度和设置会保留。再次打开已清理内容可能需要联网。';
@@ -1172,6 +1192,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get updateDownload => '下载更新';
+
+  @override
+  String get updateVerifying => '正在校验更新包…';
+
+  @override
+  String get updateVerifyingHint => '下载已完成，正在检查文件完整性。';
 
   @override
   String get updateDownloaded => '下载完成，已通过校验。可前往发布页查看安装说明。';

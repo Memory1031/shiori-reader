@@ -370,8 +370,9 @@ final class GithubUpdateRepository implements AppUpdateRepository {
   Future<void> download(
     UpdateCandidate candidate,
     CancellationToken token,
-    void Function(int received) onProgress,
-  ) => _guard(() async {
+    void Function(int received) onProgress, {
+    void Function()? onVerifying,
+  }) => _guard(() async {
     final value = _selected;
     if (value == null || value.candidate != candidate) {
       throw const UpdateIssue(UpdateProblem.verification);
@@ -408,6 +409,8 @@ final class GithubUpdateRepository implements AppUpdateRepository {
       await output.flush();
       await output.close();
       output = null;
+      checkUpdateCancellation(token);
+      onVerifying?.call();
       await _verifyPackage(part, value, token);
       await part.rename(completed.path);
     } finally {

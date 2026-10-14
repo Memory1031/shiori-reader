@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/domain/contracts/app_updates.dart';
 import 'package:shiori/domain/models/release_identity.dart';
@@ -209,5 +210,117 @@ void main() {
     await controller.check();
     expect(controller.phase, UpdatePhase.downloaded);
     expect(controller.issue?.problem, UpdateProblem.network);
+  });
+
+  test(
+    '100 percent waits for verification; verification remains exclusive',
+    () async {
+      repository.result = fakeUpdateCandidate();
+      repository.supportsInstallation = true;
+      repository.beforeVerifying = Completer<void>();
+      repository.verification = Completer<void>();
+      await controller.initialize();
+      await controller.check();
+      final downloading = controller.download();
+      await repository.downloadStarted.future;
+      expect(controller.received, controller.candidate!.bytes);
+      expect(controller.phase, UpdatePhase.downloading);
+      repository.beforeVerifying!.complete();
+      await repository.verificationStarted.future;
+      expect(controller.phase, UpdatePhase.verifying);
+      expect(controller.busy, isTrue);
+      final checks = repository.checks;
+      await controller.check();
+      await controller.download();
+      await controller.install();
+      expect(repository.checks, checks);
+      expect(repository.downloads, 1);
+      expect(repository.installs, 0);
+      repository.progress!(1);
+      expect(controller.received, controller.candidate!.bytes);
+      repository.verification!.complete();
+      await downloading;
+      expect(controller.phase, UpdatePhase.downloaded);
+      expect(controller.busy, isFalse);
+      repository.verifying!();
+      repository.progress!(2);
+      expect(controller.phase, UpdatePhase.downloaded);
+      expect(controller.received, controller.candidate!.bytes);
+    },
+  );
+
+  for (final verifying in [false, true]) {
+    test(
+      'cancel during ${verifying ? 'verification' : 'download'} rejects late callbacks across retry',
+      () async {
+        repository.result = fakeUpdateCandidate();
+        repository.beforeVerifying = verifying ? null : Completer<void>();
+        repository.verification = Completer<void>();
+        await controller.initialize();
+        await controller.check();
+        final downloading = controller.download();
+        await repository.downloadStarted.future;
+        if (verifying) await repository.verificationStarted.future;
+        final lateProgress = repository.progress!;
+        final lateVerifying = repository.verifying!;
+        controller.cancel();
+        lateProgress(1);
+        lateVerifying();
+        expect(
+          controller.phase,
+          verifying ? UpdatePhase.verifying : UpdatePhase.downloading,
+        );
+        await downloading;
+        expect(controller.phase, UpdatePhase.available);
+        expect(controller.issue, isNull);
+        expect(repository.restored, isNull);
+        repository.beforeVerifying = Completer<void>();
+        final retry = controller.download();
+        lateProgress(1);
+        lateVerifying();
+        expect(controller.phase, UpdatePhase.downloading);
+        expect(controller.received, controller.candidate!.bytes);
+        controller.cancel();
+        await retry;
+      },
+    );
+  }
+
+  for (final problem in [UpdateProblem.verification, UpdateProblem.storage]) {
+    test('$problem exits verification and allows a new download', () async {
+      repository.result = fakeUpdateCandidate();
+      repository.verification = Completer<void>();
+      await controller.initialize();
+      await controller.check();
+      final downloading = controller.download();
+      await repository.verificationStarted.future;
+      repository.failure = UpdateIssue(problem);
+      repository.verification!.complete();
+      await downloading;
+      expect(controller.phase, UpdatePhase.available);
+      expect(controller.busy, isFalse);
+      expect(controller.issue?.problem, problem);
+      repository.failure = null;
+      repository.verification = null;
+      await controller.download();
+      expect(controller.phase, UpdatePhase.downloaded);
+      expect(controller.issue, isNull);
+    });
+  }
+
+  test('shutdown cancels verification before closing the repository', () async {
+    repository.result = fakeUpdateCandidate();
+    repository.verification = Completer<void>();
+    await controller.initialize();
+    await controller.check();
+    final downloading = controller.download();
+    await repository.verificationStarted.future;
+    await controller.shutdown();
+    await downloading;
+    repository.verifying!();
+    expect(repository.closed, isTrue);
+    expect(repository.restored, isNull);
+    expect(controller.phase, UpdatePhase.available);
+    expect(controller.busy, isFalse);
   });
 }

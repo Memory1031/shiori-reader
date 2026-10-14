@@ -46,6 +46,11 @@ class FakeUpdateRepository implements AppUpdateRepository {
   UpdateIssue? failure;
   UpdateIssue? restoreFailure;
   bool blockDownload = false;
+  Completer<void>? beforeVerifying, verification;
+  final verificationStarted = Completer<void>();
+  int downloads = 0;
+  void Function(int)? progress;
+  void Function()? verifying;
   bool closed = false;
   int checks = 0;
   final downloadStarted = Completer<void>();
@@ -81,16 +86,30 @@ class FakeUpdateRepository implements AppUpdateRepository {
   Future<void> download(
     UpdateCandidate candidate,
     CancellationToken token,
-    void Function(int) onProgress,
-  ) async {
-    downloadStarted.complete();
+    void Function(int) onProgress, {
+    void Function()? onVerifying,
+  }) async {
+    downloads++;
+    progress = onProgress;
+    verifying = onVerifying;
+    if (!downloadStarted.isCompleted) downloadStarted.complete();
     onProgress(20);
     if (blockDownload) {
       await token.whenCancelled;
       throw const UpdateIssue(UpdateProblem.cancelled);
     }
     onProgress(candidate.bytes);
+    await _wait(beforeVerifying, token);
+    onVerifying?.call();
+    if (!verificationStarted.isCompleted) verificationStarted.complete();
+    await _wait(verification, token);
+    if (failure case final error?) throw error;
     restored = candidate;
+  }
+
+  Future<void> _wait(Completer<void>? gate, CancellationToken token) async {
+    if (gate != null) await Future.any([gate.future, token.whenCancelled]);
+    if (token.isCancelled) throw const UpdateIssue(UpdateProblem.cancelled);
   }
 
   @override

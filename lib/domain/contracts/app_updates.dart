@@ -108,10 +108,14 @@ abstract interface class AppUpdateRepository {
     UpdateChannel channel,
     CancellationToken token,
   );
+
+  /// [onVerifying] runs after the download stream and file writes close,
+  /// before package integrity verification begins.
   Future<void> download(
     UpdateCandidate candidate,
     CancellationToken token,
-    void Function(int received) onProgress,
-  );
+    void Function(int received) onProgress, {
+    void Function()? onVerifying,
+  });
   Future<void> close();
 }

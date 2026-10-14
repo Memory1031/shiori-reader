@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -46,6 +47,72 @@ void main() {
   tearDown(() async {
     await repo.close();
     await temp.delete(recursive: true);
+  });
+  test(
+    'verification starts after stream return and closed file, before publication',
+    () async {
+      final target = (await repo.check(UpdateChannel.beta, token()))!;
+      final atEnd = Completer<void>();
+      final releaseStream = Completer<void>();
+      var streamReturned = false;
+      var verifications = 0;
+      http.finishDownload = () async {
+        atEnd.complete();
+        await releaseStream.future;
+        streamReturned = true;
+      };
+      final download = repo.download(
+        target,
+        token(),
+        (received) {
+          expect(streamReturned, isFalse);
+          expect(verifications, 0);
+        },
+        onVerifying: () {
+          verifications++;
+          expect(streamReturned, isTrue);
+          final part = storage.file('package.part');
+          expect(part.readAsBytesSync(), fixture.package('windows-x64'));
+          expect(storage.file('package.bin').existsSync(), isFalse);
+          // Windows rejects renaming a file still held by RandomAccessFile.
+          final moved = part.renameSync(storage.file('closed.part').path);
+          moved.renameSync(part.path);
+        },
+      );
+      await atEnd.future;
+      expect(verifications, 0);
+      releaseStream.complete();
+      await download;
+      expect(verifications, 1);
+      expect(await storage.file('package.bin').exists(), isTrue);
+      expect(await storage.file('package.part').exists(), isFalse);
+    },
+  );
+
+  test('cancellation on final bytes never emits verification', () async {
+    final target = (await repo.check(UpdateChannel.beta, token()))!;
+    final source = CancellationSource();
+    var verifications = 0;
+    await expectLater(
+      repo.download(target, source.token, (received) {
+        if (received == target.bytes) source.cancel();
+      }, onVerifying: () => verifications++),
+      throwsA(issue(UpdateProblem.cancelled)),
+    );
+    expect(verifications, 0);
+    expect(await storage.file('package.part').exists(), isFalse);
+    expect(await storage.file('package.bin').exists(), isFalse);
+  });
+
+  test('cancel at verification start cleans temporary package', () async {
+    final target = (await repo.check(UpdateChannel.beta, token()))!;
+    final source = CancellationSource();
+    await expectLater(
+      repo.download(target, source.token, (_) {}, onVerifying: source.cancel),
+      throwsA(issue(UpdateProblem.cancelled)),
+    );
+    expect(await storage.file('package.part').exists(), isFalse);
+    expect(await storage.file('package.bin').exists(), isFalse);
   });
   test(
     'handoff rechecks bytes; only signed APK metadata reaches native code',

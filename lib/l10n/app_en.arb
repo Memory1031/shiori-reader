@@ -294,7 +294,18 @@
   "cacheNoChapters": "Metadata only · No offline chapters",
   "cacheClearAll": "Clear all cache",
   "cacheEmpty": "No cached articles yet",
-  "cacheClearTitle": "Clear cached content?",
+  "cacheClearTitle": "Clear all cache?",
+  "cacheClearBookTitle": "Clear this book's cache?",
+  "cacheUnnamedBook": "This book",
+  "cacheClearBookCount": "Currently cached: {chapters, plural, =0{0 chapters} =1{1 chapter} other{{chapters} chapters}}.",
+  "@cacheClearBookCount": {
+    "placeholders": {"chapters": {"type": "int"}}
+  },
+  "cacheClearAllCount": "The current cache list contains {books, plural, =0{0 books} =1{1 book} other{{books} books}} and {chapters, plural, =0{0 chapters} =1{1 chapter} other{{chapters} chapters}}.",
+  "@cacheClearAllCount": {
+    "placeholders": {"books": {"type": "int"}, "chapters": {"type": "int"}}
+  },
+  "cacheClearAllExplanation": "This clears the related online text, catalogs, book details and image cache. Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.",
   "cacheClearExplanation": "Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.",
   "cacheClearBook": "Clear book cache",
   "cacheCancel": "Cancel",
@@ -620,6 +631,8 @@
     }
   },
   "updateDownload": "Download update",
+  "updateVerifying": "Verifying update package…",
+  "updateVerifyingHint": "Download complete. Checking file integrity.",
   "updateDownloaded": "Download verified. Visit the release page for installation instructions.",
   "updateReleasePage": "View full release notes",
   "updateLinkCopied": "Could not open the browser. Link copied.",

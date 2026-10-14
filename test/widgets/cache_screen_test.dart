@@ -6,12 +6,17 @@ import 'package:shiori/app/routes.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/cache/cache_screen.dart';
+import 'package:shiori/l10n/generated/app_localizations.dart';
+import 'package:shiori/shared/widgets/state_views.dart';
 
 class Cache implements CacheManagement {
   final novel = NovelKey(sourceId: SourceId('fixture'), novelId: 'book');
   int clears = 0;
   NovelKey? clearedNovel;
   CacheOverview? data;
+  int inspections = 0;
+  Result<void> clearResult = const Success(null);
+  Completer<Result<void>>? clearing;
   Completer<Result<CacheOverview>>? pending;
   @override
   ReadingPrefetch? get prefetch => null;
@@ -21,34 +26,254 @@ class Cache implements CacheManagement {
   Future<Result<void>> clear({NovelKey? novel}) async {
     clears++;
     clearedNovel = novel;
-    return const Success(null);
+    return clearing == null ? clearResult : clearing!.future;
   }
 
   @override
-  Future<Result<CacheOverview>> inspect({NovelKey? novel}) async =>
-      pending != null
-      ? await pending!.future
-      : Success(
-          data ??
-              CacheOverview(
-                textBytes: 100,
-                imageBytes: 200,
-                books: {this.novel: 'Fixture book'},
-                chapters: clears > 0
-                    ? []
-                    : [
-                        CachedChapter(
-                          key: ChapterKey(novelKey: this.novel, chapterId: 'c'),
-                          title: 'Volume 1',
-                          imageCount: 2,
-                          savedImages: 1,
-                        ),
-                      ],
-              ),
-        );
+  Future<Result<CacheOverview>> inspect({NovelKey? novel}) async {
+    inspections++;
+    return pending != null
+        ? await pending!.future
+        : Success(
+            data ??
+                CacheOverview(
+                  textBytes: 100,
+                  imageBytes: 200,
+                  books: {this.novel: 'Fixture book'},
+                  chapters: clears > 0
+                      ? []
+                      : [
+                          CachedChapter(
+                            key: ChapterKey(
+                              novelKey: this.novel,
+                              chapterId: 'c',
+                            ),
+                            title: 'Volume 1',
+                            imageCount: 2,
+                            savedImages: 1,
+                          ),
+                        ],
+                ),
+          );
+  }
 }
 
 void main() {
+  for (final lang in ['zh', 'en']) {
+    for (final width in [320.0, 1280.0]) {
+      testWidgets(
+        'clear scope and counts in $lang at $width with large text',
+        (tester) async {
+          tester.view
+            ..physicalSize = Size(width, 1000)
+            ..devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final cache = Cache();
+          final other = NovelKey(
+            sourceId: SourceId('fixture'),
+            novelId: 'other',
+          );
+          final metadata = NovelKey(
+            sourceId: SourceId('fixture'),
+            novelId: 'opaque-metadata',
+          );
+          final chapterOnly = NovelKey(
+            sourceId: SourceId('fixture'),
+            novelId: 'chapter-only',
+          );
+          CachedChapter chapter(NovelKey key, String id) => CachedChapter(
+            key: ChapterKey(novelKey: key, chapterId: id),
+            title: id,
+            imageCount: 0,
+            savedImages: 0,
+          );
+          final title = lang == 'zh'
+              ? '一部需要换行展示的很长很长的示例小说书名'
+              : 'A very long example book title that needs to wrap across lines';
+          cache.data = CacheOverview(
+            textBytes: 100,
+            imageBytes: 200,
+            books: {cache.novel: title, other: 'Other', metadata: ''},
+            chapters: [
+              chapter(cache.novel, 'one'),
+              chapter(cache.novel, 'two'),
+              chapter(other, 'three'),
+              chapter(chapterOnly, 'four'),
+            ],
+          );
+          await tester.pumpWidget(
+            ShioriApp(
+              locale: Locale(lang),
+              overlayBuilder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(1.8)),
+                child: child,
+              ),
+              routes: AppRoutes(home: (_) => CacheScreen(cache: cache)),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final l = AppLocalizations.of(
+            tester.element(find.byType(CacheScreen)),
+          );
+          Future<void> openBook(NovelKey key) async {
+            final menu = width >= 840
+                ? find
+                      .descendant(
+                        of: find.byKey(ValueKey(('cache-book', key))),
+                        matching: find.byType(IconButton),
+                      )
+                      .last
+                : find.byKey(ValueKey(('cache-book-actions', key)));
+            await tester.scrollUntilVisible(
+              menu,
+              200,
+              scrollable: find.byType(Scrollable).first,
+              maxScrolls: 30,
+            );
+            await tester.ensureVisible(menu);
+            await tester.pumpAndSettle();
+            await tester.tap(menu);
+            await tester.pumpAndSettle();
+            await tester.tap(find.text(l.cacheClearBook).last);
+            await tester.pumpAndSettle();
+          }
+
+          await openBook(cache.novel);
+          final dialog = find.byType(AlertDialog);
+          expect(
+            find.descendant(of: dialog, matching: find.text(title)),
+            findsOneWidget,
+          );
+          expect(find.text(l.cacheClearBookTitle), findsOneWidget);
+          expect(find.text(l.cacheClearBookCount(2)), findsOneWidget);
+          expect(cache.inspections, 1);
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.text(l.cacheCancel));
+          await tester.pumpAndSettle();
+          expect(cache.clears, 0);
+          await openBook(metadata);
+          expect(find.text(l.cacheUnnamedBook), findsOneWidget);
+          expect(find.text(l.cacheClearBookCount(0)), findsOneWidget);
+          expect(find.textContaining('opaque-metadata'), findsNothing);
+          await tester.tap(find.text(l.cacheCancel));
+          await tester.pumpAndSettle();
+          await openBook(chapterOnly);
+          expect(find.text(l.cacheUnnamedBook), findsOneWidget);
+          expect(find.text(l.cacheClearBookCount(1)), findsOneWidget);
+          await tester.tap(find.text(l.cacheCancel));
+          await tester.pumpAndSettle();
+          final all = find.byKey(const ValueKey('cache-clear-all'));
+          await tester.scrollUntilVisible(
+            all,
+            -200,
+            scrollable: find.byType(Scrollable).first,
+            maxScrolls: 30,
+          );
+          await tester.ensureVisible(all);
+          await tester.pumpAndSettle();
+          await tester.tap(all);
+          await tester.pumpAndSettle();
+          expect(find.text(l.cacheClearTitle), findsOneWidget);
+          expect(find.text(l.cacheClearAllCount(4, 4)), findsOneWidget);
+          expect(find.text(l.cacheClearAllExplanation), findsOneWidget);
+          expect(cache.inspections, 1);
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.text(l.cacheClear));
+          await tester.pumpAndSettle();
+          expect(cache.clears, 1);
+          expect(cache.clearedNovel, isNull);
+        },
+        variant: TargetPlatformVariant.only(TargetPlatform.windows),
+      );
+    }
+  }
+
+  testWidgets(
+    'empty list with unlisted resources reports zero without predicting space',
+    (tester) async {
+      final cache = Cache()
+        ..data = CacheOverview(textBytes: 10, imageBytes: 20, chapters: []);
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          routes: AppRoutes(home: (_) => CacheScreen(cache: cache)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('cache-clear-all')));
+      await tester.pumpAndSettle();
+      final l = AppLocalizations.of(tester.element(find.byType(CacheScreen)));
+      expect(find.text(l.cacheClearAllCount(0, 0)), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.textContaining('MiB'),
+        ),
+        findsNothing,
+      );
+      expect(cache.inspections, 1);
+      await tester.tap(find.text(l.cacheCancel));
+      await tester.pumpAndSettle();
+      expect(cache.clears, 0);
+    },
+  );
+
+  testWidgets('scoped clear remains locked until failure returns', (
+    tester,
+  ) async {
+    final cache = Cache()..clearing = Completer<Result<void>>();
+    await tester.pumpWidget(
+      ShioriApp(
+        locale: const Locale('en'),
+        routes: AppRoutes(
+          home: (_) => CacheScreen(cache: cache, novel: cache.novel),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('cache-clear-all')));
+    await tester.pumpAndSettle();
+    final l = AppLocalizations.of(tester.element(find.byType(CacheScreen)));
+    expect(find.text(l.cacheClearBookTitle), findsOneWidget);
+    await tester.tap(find.text(l.cacheClear));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(cache.clearedNovel, cache.novel);
+    expect(
+      tester
+          .widget<TextButton>(find.byKey(const ValueKey('cache-clear-all')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<PopupMenuButton<String>>(
+            find.byKey(ValueKey(('cache-book-actions', cache.novel))),
+          )
+          .enabled,
+      isFalse,
+    );
+    expect(cache.clears, 1);
+    cache.clearing!.complete(
+      Failure(
+        AppFailure(
+          kind: FailureKind.cache,
+          operation: Operation.libraryRead,
+          retryPolicy: RetryPolicy.manual,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(FailureView), findsOneWidget);
+    expect(
+      tester
+          .widget<TextButton>(find.byKey(const ValueKey('cache-clear-all')))
+          .onPressed,
+      isNotNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('refresh preserves expanded chapters through failure and retry', (
     tester,
   ) async {

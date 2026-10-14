@@ -79,17 +79,54 @@ class _CacheScreenState extends State<CacheScreen> {
   Future<void> _clear(NovelKey? key) async {
     if (_locked) return;
     final l = AppLocalizations.of(context);
+    final overview = _overview;
+    final chapters = overview?.chapters ?? const <CachedChapter>[];
+    final books = {
+      ...?overview?.books.keys,
+      for (final chapter in chapters) chapter.key.novelKey,
+    };
+    final bookTitle = overview?.books[key]?.trim();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l.cacheClearTitle),
-        content: Text(l.cacheClearExplanation),
+        scrollable: true,
+        constraints: const BoxConstraints(maxWidth: ShioriLayout.panel),
+        title: Text(key == null ? l.cacheClearTitle : l.cacheClearBookTitle),
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (key != null) ...[
+              Text(
+                bookTitle?.isNotEmpty == true ? bookTitle! : l.cacheUnnamedBook,
+              ),
+              const SizedBox(height: ShioriSpace.medium),
+              Text(
+                l.cacheClearBookCount(
+                  chapters
+                      .where((chapter) => chapter.key.novelKey == key)
+                      .length,
+                ),
+              ),
+            ] else
+              Text(l.cacheClearAllCount(books.length, chapters.length)),
+            const SizedBox(height: ShioriSpace.medium),
+            Text(
+              key == null
+                  ? l.cacheClearAllExplanation
+                  : l.cacheClearExplanation,
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(l.cacheCancel),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
             onPressed: () => Navigator.pop(context, true),
             child: Text(l.cacheClear),
           ),

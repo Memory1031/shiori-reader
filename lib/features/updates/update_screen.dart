@@ -281,6 +281,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
                           // wide Workspace. Bound the action Wrap separately
                           // so Check + Cancel can reflow at large text sizes.
                           if (desktop ||
+                              c.busy ||
                               (constraints.maxWidth < 400 &&
                                   MediaQuery.textScalerOf(context).scale(14) >
                                       18)) {
@@ -487,12 +488,52 @@ class _UpdateScreenState extends State<UpdateScreen> {
               ),
             ],
             const SizedBox(height: ShioriSpace.page),
-            if (c.phase == UpdatePhase.downloading) ...[
+            if (c.phase == UpdatePhase.downloading ||
+                c.phase == UpdatePhase.verifying) ...[
               LinearProgressIndicator(
-                value: (c.received / target.bytes).clamp(0, 1),
+                value: c.phase == UpdatePhase.verifying
+                    ? null
+                    : (c.received / target.bytes).clamp(0, 1),
+                semanticsLabel: c.phase == UpdatePhase.verifying
+                    ? l.updateVerifying
+                    : null,
               ),
               const SizedBox(height: ShioriSpace.small),
-              Text(l.updateProgress((c.received * 100 / target.bytes).floor())),
+              Stack(
+                children: [
+                  Visibility(
+                    visible: c.phase == UpdatePhase.downloading,
+                    maintainSize: true,
+                    maintainAnimation: true,
+                    maintainState: true,
+                    child: Text(
+                      l.updateProgress(
+                        (c.received * 100 / target.bytes).floor(),
+                      ),
+                    ),
+                  ),
+                  Visibility(
+                    visible: c.phase == UpdatePhase.verifying,
+                    maintainSize: true,
+                    maintainAnimation: true,
+                    maintainState: true,
+                    child: Text(l.updateVerifying),
+                  ),
+                ],
+              ),
+              const SizedBox(height: ShioriSpace.tight),
+              // Reserve the same text footprint while downloading so the
+              // release-page action does not move when verification starts.
+              Visibility(
+                visible: c.phase == UpdatePhase.verifying,
+                maintainSize: true,
+                maintainAnimation: true,
+                maintainState: true,
+                child: Text(
+                  l.updateVerifyingHint,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
             ] else if (c.installing)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,

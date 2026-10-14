@@ -294,7 +294,18 @@
   "cacheNoChapters": "仅缓存资料，暂无离线正文",
   "cacheClearAll": "清除全部缓存",
   "cacheEmpty": "还没有缓存的正文",
-  "cacheClearTitle": "清除缓存？",
+  "cacheClearTitle": "清除全部缓存？",
+  "cacheClearBookTitle": "清除这本书的缓存？",
+  "cacheUnnamedBook": "这本书",
+  "cacheClearBookCount": "当前已缓存 {chapters} 个章节。",
+  "@cacheClearBookCount": {
+    "placeholders": {"chapters": {"type": "int"}}
+  },
+  "cacheClearAllCount": "当前缓存列表中有 {books} 本书、{chapters} 个章节。",
+  "@cacheClearAllCount": {
+    "placeholders": {"books": {"type": "int"}, "chapters": {"type": "int"}}
+  },
+  "cacheClearAllExplanation": "这将清除相关的在线正文、目录、资料和图片缓存。书架、阅读进度和设置会保留。再次打开已清理内容可能需要联网。",
   "cacheClearExplanation": "书架、阅读进度和设置会保留。再次打开已清理内容可能需要联网。",
   "cacheClearBook": "清除此书缓存",
   "cacheCancel": "取消",
@@ -620,6 +631,8 @@
     }
   },
   "updateDownload": "下载更新",
+  "updateVerifying": "正在校验更新包…",
+  "updateVerifyingHint": "下载已完成，正在检查文件完整性。",
   "updateDownloaded": "下载完成，已通过校验。可前往发布页查看安装说明。",
   "updateReleasePage": "查看完整发布说明",
   "updateLinkCopied": "无法打开浏览器，链接已复制。",

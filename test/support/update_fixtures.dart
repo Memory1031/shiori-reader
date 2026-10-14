@@ -73,6 +73,7 @@ class FixtureUpdateHttp implements UpdateHttp {
   bool closed = false;
   String? badCase;
   UpdateIssue? failure;
+  Future<void> Function()? finishDownload;
   @override
   Future<UpdateReply> read(
     Uri uri,
@@ -124,6 +125,7 @@ class FixtureUpdateHttp implements UpdateHttp {
     checkUpdateCancellation(token);
     await chunk(bytes.sublist(12));
     if (overflow) await chunk([0]);
+    await finishDownload?.call();
     checkUpdateCancellation(token);
   }
 

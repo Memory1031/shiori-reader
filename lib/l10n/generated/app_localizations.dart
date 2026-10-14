@@ -1331,8 +1331,38 @@ abstract class AppLocalizations {
   /// No description provided for @cacheClearTitle.
   ///
   /// In en, this message translates to:
-  /// **'Clear cached content?'**
+  /// **'Clear all cache?'**
   String get cacheClearTitle;
+
+  /// No description provided for @cacheClearBookTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear this book\'s cache?'**
+  String get cacheClearBookTitle;
+
+  /// No description provided for @cacheUnnamedBook.
+  ///
+  /// In en, this message translates to:
+  /// **'This book'**
+  String get cacheUnnamedBook;
+
+  /// No description provided for @cacheClearBookCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently cached: {chapters, plural, =0{0 chapters} =1{1 chapter} other{{chapters} chapters}}.'**
+  String cacheClearBookCount(int chapters);
+
+  /// No description provided for @cacheClearAllCount.
+  ///
+  /// In en, this message translates to:
+  /// **'The current cache list contains {books, plural, =0{0 books} =1{1 book} other{{books} books}} and {chapters, plural, =0{0 chapters} =1{1 chapter} other{{chapters} chapters}}.'**
+  String cacheClearAllCount(int books, int chapters);
+
+  /// No description provided for @cacheClearAllExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'This clears the related online text, catalogs, book details and image cache. Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.'**
+  String get cacheClearAllExplanation;
 
   /// No description provided for @cacheClearExplanation.
   ///
@@ -2293,6 +2323,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Download update'**
   String get updateDownload;
+
+  /// No description provided for @updateVerifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying update package…'**
+  String get updateVerifying;
+
+  /// No description provided for @updateVerifyingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Download complete. Checking file integrity.'**
+  String get updateVerifyingHint;
 
   /// No description provided for @updateDownloaded.
   ///
