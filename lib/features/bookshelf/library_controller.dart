@@ -92,9 +92,10 @@ class LibraryController extends ScopedController {
   bool contains(NovelKey key) => books.any((b) => b.snapshot.key == key);
   ReadingProgress? progressFor(NovelKey key) => _progressByBook[key];
   ReadingProgress? get continueReadingProgress {
+    final shelfKeys = {for (final book in books) book.snapshot.key};
     ReadingProgress? fallback;
     for (final progress in recent) {
-      if (!contains(progress.novelKey)) continue;
+      if (!shelfKeys.contains(progress.novelKey)) continue;
       fallback ??= progress;
       final terminal = progress.bookProgress?.terminal;
       if (terminal == null || terminal == BookTerminalState.reading) {

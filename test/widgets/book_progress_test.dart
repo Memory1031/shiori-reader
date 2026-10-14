@@ -180,6 +180,19 @@ void main() {
       same(finished),
     );
   });
+  test('continue matches value keys and follows current shelf membership', () {
+    final reading = progress('reading', 1, BookTerminalState.reading),
+        finished = progress('finished', 2, BookTerminalState.finished);
+    final value = controller(
+      [finished, reading],
+      [finished, progress('reading', 1, BookTerminalState.reading)],
+    );
+    expect(value.continueReadingProgress, same(reading));
+    value.books = [value.books.first];
+    expect(value.continueReadingProgress, same(finished));
+    value.books = const [];
+    expect(value.continueReadingProgress, isNull);
+  });
   test(
     'continue skips history outside the shelf for both priority and fallback',
     () {
