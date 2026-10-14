@@ -65,6 +65,7 @@ If unsure whether a documentation change is necessary, do not make it.
 
 ## Validation and evidence
 
+- Before adding, changing, or removing tests, read and follow [the testing strategy](docs/testing.md). Test actual behavior risks, not test counts; default to affected targeted tests, use its triggers for full regression, and preserve critical regression coverage when deduplicating.
 - Run checks appropriate to the change and the task's acceptance criteria. Default tests to offline, deterministic fixtures; live Source checks require explicit opt-in and documented request limits.
 - Before tests, integration validation, or profiling temporarily change the application entry point or build arguments, record the original configuration. Restore the normal application entry point and original non-test arguments afterward, including after failure or interruption. Check Git-ignored generated configuration, including `FLUTTER_TARGET` and `DART_DEFINES` in iOS `Generated.xcconfig` and `flutter_export_environment.sh`; prefer regenerating it with the pinned FVM toolchain and verify that subsequent builds from Xcode or other IDEs use the normal application entry point. An unchanged `git diff` does not prove restoration. Report any configuration that could not be restored.
 - Format Dart changes with the pinned FVM toolchain before committing (`fvm dart format` on touched files, or `fvm dart format lib test`); CI runs `dart format --set-exit-if-changed lib test` and rejects unformatted files. Full local check commands: [docs/development.md](docs/development.md).

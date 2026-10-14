@@ -44,16 +44,31 @@ fvm flutter build ios --config-only --release --no-codesign --no-pub
 
 ## 本地检查
 
-提交前按改动范围运行相关 UT；跨模块或发布准备时运行完整离线测试。日常 GitHub CI 不运行 UT，保留格式、分析及生成一致性检查；不要将 CI 成功当作本地测试证据。修改发布工具时另运行 `python3 -m unittest discover -s tool -p 'test_release_android.py'`（Windows 可使用本机 Python 命令）。
+新增、修改或删除测试前遵守[测试策略与维护规范](testing.md)。日常默认按实际影响面运行定向测试；纯视觉或静态文案无新行为风险时可只做静态与渲染检查。完整回归按该规范的触发条件执行，不是每个 Commit 的默认步骤。日常 GitHub CI 不运行 Flutter 测试，保留格式、分析及生成一致性检查；不要将 CI 成功当作本地测试证据。修改发布工具时另运行 `python3 -m unittest discover -s tool -p 'test_release_android.py'`（Windows 可使用本机 Python 命令）。
+
+日常静态检查，生成命令按相关输入是否修改选择：
 
 ```sh
 fvm dart tool/check_ci_yaml.dart
 fvm flutter gen-l10n
 fvm dart format --output=none --set-exit-if-changed lib test
 fvm flutter analyze --no-pub
-fvm flutter test --no-pub
 (cd tools/source_probe && fvm dart format --output=none --set-exit-if-changed bin lib test)
-(cd tools/source_probe && fvm dart analyze && fvm dart test && fvm dart bin/source_probe.dart)
+(cd tools/source_probe && fvm dart analyze)
+```
+
+定向测试示例，按实际改动替换文件或相关模块目录；不要因为修改了一个页面就执行整个 Widget 目录：
+
+```sh
+fvm flutter test --no-pub test/data/sources/lightnovel/session_test.dart test/widgets/shared/failure_message_test.dart
+```
+
+修改独立 Source 调查工具时，在其目录运行对应的 `fvm dart test` 和离线 `fvm dart bin/source_probe.dart`。
+
+完整项目离线回归只在[测试规范](testing.md#按风险安排执行范围)规定的阶段收尾、发布候选、大范围测试基建／核心架构调整，或用户明确要求时执行：
+
+```sh
+fvm flutter test --no-pub
 ```
 
 默认测试与 Source 调查工具不发真实书源请求；安装 SDK / 依赖本身需要网络。真实书源验收必须显式授权并限制请求，见[调查工具](../tools/source_probe/README.md)。
