@@ -382,6 +382,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerReset => 'Reset defaults';
 
   @override
+  String get readerProgressNotSaved => 'Not saved';
+
+  @override
+  String get readerProgressSavingPaused => 'Paused';
+
+  @override
+  String get readerRetrySaveProgress => 'Retry saving progress';
+
+  @override
+  String get readerRetryReadProgress => 'Retry reading progress';
+
+  @override
   String get readerProgressUnsaved =>
       'Reading progress not saved. Tap to retry.';
 

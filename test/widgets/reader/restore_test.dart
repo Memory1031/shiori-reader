@@ -362,7 +362,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('More'));
       await tester.pumpAndSettle();
-      await tester.tap(find.textContaining('Could not read saved progress'));
+      await tester.tap(find.text('Retry reading progress'));
       await tester.pumpAndSettle();
       await tester.pump(const Duration(milliseconds: 400));
       expect(library.writes, isNotEmpty);

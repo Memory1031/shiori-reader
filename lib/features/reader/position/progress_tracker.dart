@@ -47,9 +47,11 @@ class ProgressTracker {
   bool _again = false;
   AppFailure? failure;
   bool get unsaved => failure != null || _obsolete;
+  bool get canRetry => !_closed && !_obsolete;
+  bool get obsolete => _obsolete;
   bool _reportedUnsaved = false;
-  void _report() {
-    if (_closed || unsaved == _reportedUnsaved) return;
+  void _report({bool committed = false}) {
+    if (_closed || !committed && unsaved == _reportedUnsaved) return;
     _reportedUnsaved = unsaved;
     onStatus?.call();
   }
@@ -244,13 +246,16 @@ class ProgressTracker {
       switch (result) {
         case Success(value: true):
           _saved = candidate;
-          failure = null;
+          // An intermediate success cannot acknowledge a newer pending anchor.
+          if (_latest == candidate) failure = null;
         case Success(value: false):
           _obsolete = true;
         case Failure(:final failure):
           this.failure = failure;
       }
-      _report();
+      _report(
+        committed: result is Success<bool> && result.value && _latest == _saved,
+      );
       // No tight retry loop on failure. A later user event or explicit retry can retry.
       if (result is Failure<bool> || _obsolete) return;
     } while (_again || _latest != _saved);

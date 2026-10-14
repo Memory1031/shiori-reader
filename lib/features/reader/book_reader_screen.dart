@@ -130,6 +130,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       _foreground &&
       _route?.isCurrent != false &&
       !_reader.isClosed &&
+      _reader.status == ReaderStatus.ready &&
+      _reader.currentPosition != null &&
       _viewports[_reader]?.isRestoring != true &&
       _viewports[_reader]?.isTurning != true;
 
@@ -825,6 +827,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         ..addListener(_changed);
   void _changed() {
     if (_invalidated) return;
+    if (_reader.status != ReaderStatus.ready && _operation != null) {
+      unawaited(_cancelChapter(immediate: true));
+    }
     if (_reader.content == null && _reader.status == ReaderStatus.error) {
       unawaited(_releaseRouteUse());
     }
@@ -927,25 +932,38 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   Future<bool> _save([_ChapterOperation? operation]) async {
     final reader = _reader;
-    await reader.flushProgress();
+    if (operation != null &&
+        reader.content != null &&
+        (reader.status != ReaderStatus.ready ||
+            reader.currentPosition == null)) {
+      return false;
+    }
+    final saved = await reader.saveForExit();
     if (!mounted ||
         reader != _reader ||
         operation != null && !_valid(operation)) {
       return false;
     }
-    if (_reader.progress?.unsaved == true || _reader.progressFailure != null) {
+    if (!saved) {
+      // Retired writers can close read-only; the post-pop path reports the
+      // failed acknowledgement without offering an ineffective retry.
+      if (operation == null && reader.progress?.obsolete == true) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context).readerProgressUnsaved),
-          action: SnackBarAction(
-            label: AppLocalizations.of(context).retryAction,
-            onPressed: _reader.retryProgress,
+          content: Text(
+            reader.progressStatus == ReaderProgressStatus.paused
+                ? AppLocalizations.of(context).readerRestoreReadFailed
+                : AppLocalizations.of(context).readerProgressUnsaved,
           ),
+          action: reader.canRetryProgress
+              ? SnackBarAction(
+                  label: AppLocalizations.of(context).retryAction,
+                  onPressed: _reader.retryProgress,
+                )
+              : null,
         ),
       );
-      // Existing read-only/error exits remain possible without a tracker;
-      // a new chapter must never take over through a failed save gate.
-      return operation == null && _reader.progress == null;
+      return false;
     }
     return true;
   }
@@ -1480,8 +1498,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
     if (chromeVisible || _completionTurn != null) return false;
     return !_changing &&
-        _reader.progressFailure == null &&
-        _reader.progress?.unsaved != true;
+        (_reader.progress?.obsolete == true ||
+            !(_reader.hasUnsavedProgress &&
+                _reader.progressStatus != ReaderProgressStatus.normal));
   }
 
   /// After a direct pop, persist the last samples and surface a failed save
@@ -1490,9 +1509,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     final messenger = ScaffoldMessenger.maybeOf(context);
     final l = AppLocalizations.of(context);
     final reader = _reader;
-    await reader.flushProgress();
-    if (reader.progress?.unsaved == true || reader.progressFailure != null) {
-      messenger?.showSnackBar(SnackBar(content: Text(l.readerProgressUnsaved)));
+    if (!await reader.saveForExit()) {
+      messenger?.showSnackBar(
+        SnackBar(
+          content: Text(
+            reader.progressStatus == ReaderProgressStatus.paused
+                ? l.readerRestoreReadFailed
+                : l.readerProgressUnsaved,
+          ),
+        ),
+      );
     }
   }
 
@@ -1510,11 +1536,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     setState(() => _changing = true);
     final saved = await _save();
     if (!mounted) return;
+    final canLeave = saved || _reader.progress?.obsolete == true;
     setState(() {
       _changing = false;
-      _canPop = saved;
+      _canPop = canLeave;
     });
-    if (saved) {
+    if (canLeave) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _beginLeaving();

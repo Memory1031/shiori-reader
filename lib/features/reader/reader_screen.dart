@@ -181,15 +181,22 @@ class _ReaderContentViewState extends State<ReaderContentView>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            progressSaved ? l.readerSettingsFailure : l.readerProgressUnsaved,
+            progressSaved
+                ? l.readerSettingsFailure
+                : widget.session?.progressStatus == ReaderProgressStatus.paused
+                ? l.readerRestoreReadFailed
+                : l.readerProgressUnsaved,
           ),
-          action: SnackBarAction(
-            label: l.retryAction,
-            onPressed: () {
-              _preferences.retry();
-              unawaited(widget.session?.retryProgress());
-            },
-          ),
+          action:
+              _preferences.unsaved || widget.session?.canRetryProgress == true
+              ? SnackBarAction(
+                  label: l.retryAction,
+                  onPressed: () {
+                    _preferences.retry();
+                    unawaited(widget.session?.retryProgress());
+                  },
+                )
+              : null,
         ),
       );
     }
@@ -259,6 +266,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   bool _settingsReady = false;
+  late int? _restoreAttempt = widget.session?.restoreAttempt;
   bool _hintVisible = false;
   String? _failedPresentation;
   ReaderActions get _actions => widget.actions;
@@ -282,6 +290,36 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void didUpdateWidget(ReaderContentView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final session = widget.session, attempt = session?.restoreAttempt;
+    if (attempt != _restoreAttempt) {
+      _restoreAttempt = attempt;
+      final content = widget.content;
+      final target =
+          widget.initialPosition ??
+          ReaderPosition(
+            contentRevision: content.contentRevision,
+            blockKey: content.blocks.first.blockKey,
+            blockIndex: 0,
+            blockFraction: 0,
+            chapterFraction: 0,
+          );
+      // A fast read retry may finish between frames without remounting the page.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            widget.session != session ||
+            session?.isClosed == true ||
+            session?.restoreAttempt != attempt ||
+            widget.content != content) {
+          return;
+        }
+        _position = target;
+        if (_usesPresentation && _announcedReady) {
+          _sample(target, target.chapterFraction == 1);
+        } else {
+          _paged.restore(target);
+        }
+      });
+    }
     if (!identical(
           oldWidget.logicalProgress?.index,
           widget.logicalProgress?.index,
@@ -762,13 +800,6 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   bool get _routeCurrent => _route?.isCurrent != false;
 
-  bool get _unsaved {
-    final session = widget.session;
-    return session?.progressFailure != null ||
-        session?.progress?.unsaved == true ||
-        session?.restoreFailure != null;
-  }
-
   /// Shared permission checks for text, completion, menus and shortcuts.
   bool _can(ReaderCommand command) {
     final text = widget.completion == null;
@@ -783,7 +814,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       ReaderCommand.prefetch => text && _actions.prefetch != null,
       ReaderCommand.details => _actions.details != null,
       ReaderCommand.previousLocation => _actions.previousLocation != null,
-      ReaderCommand.retrySave => _unsaved,
+      ReaderCommand.retrySave => widget.session?.canRetryProgress == true,
       ReaderCommand.retrySettings => _preferences.failure != null,
     };
   }
@@ -1861,25 +1892,29 @@ class _ReaderContentViewState extends State<ReaderContentView>
     final l = AppLocalizations.of(context);
     final label = Theme.of(context).textTheme.labelSmall ?? const TextStyle();
     final metrics = ReaderChromeMetrics.of(context);
+    final progress = _progressLabel(
+      l.readerChapterProgress,
+      style: label.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+      // Keep the status row's forced line box with CJK fallback fonts.
+      strut: StrutStyle.fromTextStyle(label, height: 1, forceStrutHeight: true),
+    );
     final running = ReaderRunningChrome(
       reserveReturnSpace: widget.quickReturn != null,
       metrics: metrics,
       margin: _margin,
       title: widget.runningTitle ?? widget.content.title,
       statusRow: ShioriCapabilities.of(context).immersiveSystemUi,
-      progress: _progressLabel(
-        l.readerChapterProgress,
-        style: label.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+      progress: switch (widget.session?.progressStatus) {
+        ReaderProgressStatus.unsaved => const ReaderProgressWarning(
+          paused: false,
         ),
-        // Same forced line box as the status row labels, so CJK fallback
-        // cannot shift it against them.
-        strut: StrutStyle.fromTextStyle(
-          label,
-          height: 1,
-          forceStrutHeight: true,
+        ReaderProgressStatus.paused => const ReaderProgressWarning(
+          paused: true,
         ),
-      ),
+        _ => progress,
+      },
     );
     final visibility = widget.quickReturn;
     if (visibility == null) return running;
@@ -1922,9 +1957,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
       (ReaderCommand.details, l.novelDetailsTitle),
       (
         ReaderCommand.retrySave,
-        widget.session?.restoreFailure != null
-            ? l.readerRestoreReadFailed
-            : l.readerProgressUnsaved,
+        widget.session?.progressStatus == ReaderProgressStatus.paused
+            ? l.readerRetryReadProgress
+            : l.readerRetrySaveProgress,
       ),
       (ReaderCommand.retrySettings, l.readerSettingsFailure),
       (ReaderCommand.toggleControls, l.hideReaderControls),

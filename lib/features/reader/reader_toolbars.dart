@@ -302,6 +302,58 @@ class ReaderRunningChrome extends StatelessWidget {
   }
 }
 
+/// A passive replacement for the running progress, within the same gutter.
+class ReaderProgressWarning extends StatelessWidget {
+  const ReaderProgressWarning({super.key, required this.paused});
+  final bool paused;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final text = paused
+        ? l.readerProgressSavingPaused
+        : l.readerProgressNotSaved;
+    final style = (Theme.of(context).textTheme.labelSmall ?? const TextStyle())
+        .copyWith(color: Theme.of(context).colorScheme.error);
+    return Semantics(
+      container: true,
+      label: text,
+      excludeSemantics: true,
+      child: Align(
+        alignment: AlignmentDirectional.centerEnd,
+        heightFactor: 1,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              size: MediaQuery.textScalerOf(context).scale(
+                (style.fontSize ?? ShioriSpace.medium) + ShioriSpace.tight / 2,
+              ),
+              color: style.color,
+            ),
+            const SizedBox(width: ShioriSpace.tight),
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: style,
+                strutStyle: StrutStyle.fromTextStyle(
+                  style,
+                  height: 1,
+                  forceStrutHeight: true,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Independent of the non-interactive running title and of page geometry.
 class ReaderLocationReturn extends StatelessWidget {
   const ReaderLocationReturn({

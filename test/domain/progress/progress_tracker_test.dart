@@ -313,6 +313,70 @@ void main() {
     },
   );
   test(
+    'recovery stays unsaved until the latest in-flight anchor is acknowledged',
+    () {
+      fakeAsync((clock) {
+        final library = Library()..fail = true;
+        final c = content();
+        final statuses = <bool>[];
+        late ProgressTracker t;
+        t = ProgressTracker(
+          library: library,
+          content: c,
+          snapshot: book,
+          ordinal: 0,
+          catalogRevision: 'catalog',
+          onStatus: () => statuses.add(t.unsaved),
+        );
+        t.sample(position(c, .2), completed: false);
+        t.flush();
+        clock.flushMicrotasks();
+        expect(statuses, [true]);
+        library.fail = false;
+        final first = library.gate = Completer<void>();
+        t.retry();
+        clock.flushMicrotasks();
+        expect(t.unsaved, isTrue);
+        t.sample(position(c, .8), completed: false);
+        final latest = library.gate = Completer<void>();
+        first.complete();
+        clock.flushMicrotasks();
+        expect(t.unsaved, isTrue);
+        expect(t.progressSaved, isFalse);
+        expect(statuses, [true]);
+        latest.complete();
+        clock.flushMicrotasks();
+        expect(t.progressSaved, isTrue);
+        expect(t.unsaved, isFalse);
+        expect(statuses, [true, false]);
+        t.close();
+        clock.flushMicrotasks();
+      });
+    },
+  );
+
+  test('normal coalescing and slow writes never report a failure', () {
+    fakeAsync((clock) {
+      final library = Library()..gate = Completer<void>();
+      final c = content(), t = tracker(library, content());
+      t.sample(position(c, .2), completed: false);
+      clock.elapse(const Duration(milliseconds: 299));
+      expect(t.unsaved, isFalse);
+      expect(library.writes, isEmpty);
+      clock.elapse(const Duration(milliseconds: 1));
+      expect(t.unsaved, isFalse);
+      t.sample(position(c, .6), completed: false);
+      expect(t.unsaved, isFalse);
+      library.gate!.complete();
+      clock.flushMicrotasks();
+      expect(t.progressSaved, isTrue);
+      expect(t.unsaved, isFalse);
+      t.close();
+      clock.flushMicrotasks();
+    });
+  });
+
+  test(
     'old chapter completing after a new generation cannot overwrite it or revive cleared history',
     () {
       fakeAsync((clock) {
@@ -330,6 +394,11 @@ void main() {
         gate.complete();
         clock.flushMicrotasks();
         expect(old.unsaved, isTrue);
+        expect(old.canRetry, isFalse);
+        final writes = library.writes.length;
+        old.retry();
+        clock.flushMicrotasks();
+        expect(library.writes.length, writes);
         library.inner
             .getProgress(book.key, cancellation: CancellationSource().token)
             .then(

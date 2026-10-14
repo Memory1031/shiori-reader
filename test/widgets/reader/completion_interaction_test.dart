@@ -808,12 +808,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.more_horiz));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Reading progress not saved. Tap to retry.'),
-      findsOneWidget,
-    );
+    expect(find.text('Retry saving progress'), findsOneWidget);
     h.library.fail = false;
-    await tester.tap(find.text('Reading progress not saved. Tap to retry.'));
+    await tester.tap(find.text('Retry saving progress'));
     await tester.pumpAndSettle();
     expect(h.view(tester).session!.progress!.unsaved, isFalse);
     h.settings.fail = true;

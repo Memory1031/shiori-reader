@@ -364,6 +364,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerReset => '恢复默认';
 
   @override
+  String get readerProgressNotSaved => '未保存';
+
+  @override
+  String get readerProgressSavingPaused => '保存暂停';
+
+  @override
+  String get readerRetrySaveProgress => '重试保存进度';
+
+  @override
+  String get readerRetryReadProgress => '重试读取进度';
+
+  @override
   String get readerProgressUnsaved => '阅读进度暂未保存，点按重试。';
 
   @override

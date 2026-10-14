@@ -361,6 +361,11 @@ void main() {
         mode: ReadMode.cacheFirst,
         cancellation: CancellationSource().token,
       );
+      await h.env.novels.loadDetail(
+        h.cache.novel(0),
+        mode: ReadMode.cacheFirst,
+        cancellation: CancellationSource().token,
+      );
       await h.pump();
       await h.expand(0);
       h.scroll.position.jumpTo(160);

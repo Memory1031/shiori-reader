@@ -11,6 +11,8 @@ enum ReaderStatus { loading, ready, error, cancelled }
 
 enum ReaderRestoreStatus { loading, positioning, ready, readFailed }
 
+enum ReaderProgressStatus { normal, unsaved, paused }
+
 /// One chapter session. Repositories are borrowed; requests belong to this scope.
 /// Ready content stays pinned until the reader explicitly opens another session.
 class ReaderController extends ScopedController {
@@ -84,6 +86,55 @@ class ReaderController extends ScopedController {
 
   AppFailure? progressFailure;
   AppFailure? restoreFailure;
+  bool _recoveringRestore = false;
+  ReaderProgressStatus _reportedProgressStatus = ReaderProgressStatus.normal;
+  ReaderProgressStatus get progressStatus {
+    if (!_progressActive || _bookRemoved || library == null) {
+      return ReaderProgressStatus.normal;
+    }
+    if (restoreFailure != null) return ReaderProgressStatus.paused;
+    if (progress?.progressSaved == true) return ReaderProgressStatus.normal;
+    if (progressFailure != null || progress?.unsaved == true) {
+      return ReaderProgressStatus.unsaved;
+    }
+    return _recoveringRestore
+        ? ReaderProgressStatus.paused
+        : ReaderProgressStatus.normal;
+  }
+
+  bool get canRetryProgress =>
+      !isClosed &&
+      !_bookRemoved &&
+      _progressActive &&
+      status == ReaderStatus.ready &&
+      progressStatus != ReaderProgressStatus.normal &&
+      (progress?.canRetry ?? true);
+
+  /// A read-only/removed session has nothing to submit; an accepted stable
+  /// sample requires a real acknowledgement, including after a restore failure.
+  bool get hasUnsavedProgress =>
+      !_bookRemoved &&
+      _progressActive &&
+      library != null &&
+      _sample != null &&
+      (progressStatus != ReaderProgressStatus.normal ||
+          progress?.progressSaved != true);
+
+  void _progressChanged() {
+    if (isClosed) return;
+    final recovered =
+        progress?.progressSaved == true &&
+        (progressFailure != null || _recoveringRestore);
+    if (progress?.progressSaved == true) {
+      progressFailure = null;
+      _recoveringRestore = false;
+    }
+    final current = progressStatus;
+    if (!recovered && current == _reportedProgressStatus) return;
+    _reportedProgressStatus = current;
+    update();
+  }
+
   ReaderPosition? initialPosition;
   String? pagePresentation;
   List<LocalContentLink> contentLinks = const [];
@@ -141,15 +192,15 @@ class ReaderController extends ScopedController {
     // Reflow may be pending; the queued sample is still the last stable anchor.
     progress?.restoring(false);
     await flushProgress();
-    return library == null ||
-        _sample == null ||
-        progress?.progressSaved == true;
+    return !hasUnsavedProgress;
   }
 
   Future<void> retryProgress() async {
+    if (isClosed || _bookRemoved || progress?.canRetry == false) return;
     if (restoreFailure != null) {
       // Explicit retry opens a fresh restore attempt. Never apply a late DB
       // result to a reader that the user has already been moving through.
+      _recoveringRestore = true;
       await load();
     } else if (progress != null) {
       await progress!.retry();
@@ -218,7 +269,6 @@ class ReaderController extends ScopedController {
       );
       if (detail.value.value.summary.key == chapter.novelKey &&
           chapters.isNotEmpty) {
-        progressFailure = null;
         final tracker = progress = ProgressTracker(
           library: library!,
           content: content!,
@@ -231,9 +281,7 @@ class ReaderController extends ScopedController {
           previous: startAtBeginning || initialBlockKey != null
               ? null
               : _savedProgress,
-          onStatus: () {
-            if (!isClosed) update();
-          },
+          onStatus: _progressChanged,
         );
         unawaited(tracker.start());
         tracker.restoring(_restoring);
@@ -262,11 +310,8 @@ class ReaderController extends ScopedController {
         metrics: bookMetrics,
         catalog: _catalogObservation,
         previous: startAtBeginning || initialBlockKey != null ? null : previous,
-        onStatus: () {
-          if (!isClosed) update();
-        },
+        onStatus: _progressChanged,
       );
-      progressFailure = null;
       unawaited(tracker.start());
       tracker.restoring(_restoring);
       if (_sample case final sample?) {

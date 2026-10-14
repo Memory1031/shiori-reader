@@ -800,6 +800,30 @@ abstract class AppLocalizations {
   /// **'Reset defaults'**
   String get readerReset;
 
+  /// No description provided for @readerProgressNotSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Not saved'**
+  String get readerProgressNotSaved;
+
+  /// No description provided for @readerProgressSavingPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get readerProgressSavingPaused;
+
+  /// No description provided for @readerRetrySaveProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry saving progress'**
+  String get readerRetrySaveProgress;
+
+  /// No description provided for @readerRetryReadProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry reading progress'**
+  String get readerRetryReadProgress;
+
   /// No description provided for @readerProgressUnsaved.
   ///
   /// In en, this message translates to:
