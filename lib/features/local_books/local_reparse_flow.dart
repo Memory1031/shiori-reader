@@ -8,6 +8,7 @@ import '../../domain/models/models.dart';
 import '../../domain/contracts/local_book_decoder.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/state_views.dart';
+import '../../shared/widgets/shiori_feedback.dart';
 import 'local_reparse_controller.dart';
 import '../bookshelf/book_selection_controller.dart';
 import '../bookshelf/book_batch_views.dart';
@@ -273,8 +274,10 @@ class LocalReparseFlow extends ChangeNotifier {
           ),
         );
       } else if (controller.succeeded > 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(reparseSuccessMessage(l, controller))),
+        ShioriFeedback.show(
+          context,
+          message: reparseSuccessMessage(l, controller),
+          kind: ShioriFeedbackKind.success,
         );
       }
       return controller.outcomes;

@@ -172,10 +172,10 @@ extension _BookReaderSearch on _BookReaderScreenState {
         !_invalidated &&
         result == ReaderSearchDestination.failed &&
         accepts()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).readerSearchFailed),
-        ),
+      ShioriFeedback.show(
+        context,
+        message: AppLocalizations.of(context).readerSearchFailed,
+        kind: ShioriFeedbackKind.error,
       );
     }
     return result;
@@ -393,10 +393,9 @@ extension _BookReaderSearch on _BookReaderScreenState {
 
   void _searchDocumentNotice() {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context).readerSearchDocument),
-      ),
+    ShioriFeedback.show(
+      context,
+      message: AppLocalizations.of(context).readerSearchDocument,
     );
   }
 

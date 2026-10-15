@@ -7,6 +7,7 @@ import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
 import '../../shared/widgets/state_views.dart';
+import '../../shared/widgets/shiori_feedback.dart';
 import '../cache/cache_screen.dart';
 import 'book_reader_screen.dart';
 
@@ -131,10 +132,10 @@ class _ReaderCacheScreenState extends State<ReaderCacheScreen>
 
   void _failure(AppFailure failure) {
     if (failure.isCancellation) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(failureMessage(AppLocalizations.of(context), failure)),
-      ),
+    ShioriFeedback.show(
+      context,
+      message: failureMessage(AppLocalizations.of(context), failure),
+      kind: ShioriFeedbackKind.error,
     );
   }
 

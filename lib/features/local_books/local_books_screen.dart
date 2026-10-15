@@ -17,6 +17,7 @@ import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/book_list_tile.dart';
 import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/state_views.dart';
+import '../../shared/widgets/shiori_feedback.dart';
 import '../bookshelf/library_controller.dart';
 import '../bookshelf/book_batch_actions.dart';
 import '../bookshelf/book_selection_controller.dart';
@@ -210,12 +211,12 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       _deleteFailure = failure;
     }
     if (result case Success(:final value)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            value.cleanupPending ? l.localCleanupPending : l.localDeleted,
-          ),
-        ),
+      ShioriFeedback.show(
+        context,
+        message: value.cleanupPending ? l.localCleanupPending : l.localDeleted,
+        kind: value.cleanupPending
+            ? ShioriFeedbackKind.info
+            : ShioriFeedbackKind.success,
       );
     }
     setState(() => _deleting = false);

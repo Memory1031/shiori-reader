@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/routes.dart';
@@ -11,6 +12,81 @@ import 'package:shiori/features/reader/viewport/paper_turn.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 
 void main() {
+  testWidgets(
+    'queued chapter retry cannot revive an older failed request',
+    (tester) async {
+      tester.view
+        ..physicalSize = const Size(1040, 780)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final env = FixtureEnvironment(scenario: FixtureScenario.multiVolume);
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+        await env.close();
+      });
+      await env.settings.save(
+        ReaderSettings(controlsHintSeen: true),
+        cancellation: CancellationSource().token,
+      );
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          routes: AppRoutes(
+            home: (_) => BookReaderScreen(
+              chapter: fixtureChapterKey(FixtureScenario.multiVolume),
+              repository: env.novels,
+              library: env.library,
+              settings: env.settings,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      ReaderContentView view() =>
+          tester.widget<ReaderContentView>(find.byType(ReaderContentView));
+      void fail() => env.source.controls.failNext(
+        AppFailure(
+          kind: FailureKind.network,
+          operation: Operation.chapter,
+          retryPolicy: RetryPolicy.manual,
+        ),
+      );
+      fail();
+      view().actions.navigateChapter!(1);
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(SnackBarAction, 'Retry'), findsOneWidget);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Volumes'));
+      await tester.pumpAndSettle();
+      final target = fixtureChapterKey(FixtureScenario.multiVolume, 2);
+      await tester.scrollUntilVisible(find.byKey(ValueKey(target)), 200);
+      fail();
+      await tester.tap(find.byKey(ValueKey(target)));
+      await tester.pumpAndSettle();
+      final reads = env.source.controls.calls[Operation.chapter];
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(
+        view().content.key,
+        fixtureChapterKey(FixtureScenario.multiVolume),
+      );
+      expect(env.source.controls.calls[Operation.chapter], reads);
+      expect(find.widgetWithText(SnackBarAction, 'Retry'), findsOneWidget);
+      await tester.tap(find.text('Retry'));
+      await tester.pumpAndSettle();
+      expect(
+        view().content.key,
+        fixtureChapterKey(FixtureScenario.multiVolume, 2),
+      );
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
   testWidgets(
     'chrome and progress sheet share numbered title and content fallback',
     (tester) async {

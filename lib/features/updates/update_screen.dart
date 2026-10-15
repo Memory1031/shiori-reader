@@ -11,6 +11,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
 import '../../shared/widgets/shiori_logo.dart';
 import '../../shared/widgets/desktop_content_frame.dart';
+import '../../shared/widgets/shiori_feedback.dart';
 import 'update_controller.dart';
 import 'release_notes_preview.dart';
 
@@ -48,8 +49,10 @@ class _UpdateScreenState extends State<UpdateScreen> {
     if (await widget.openPage(page) || !context.mounted) return;
     await Clipboard.setData(ClipboardData(text: page.toString()));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).updateLinkCopied)),
+      ShioriFeedback.show(
+        context,
+        message: AppLocalizations.of(context).updateLinkCopied,
+        kind: ShioriFeedbackKind.success,
       );
     }
   }
@@ -407,8 +410,10 @@ class _UpdateScreenState extends State<UpdateScreen> {
                         ),
                       );
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l.updateVersionCopied)),
+                        ShioriFeedback.show(
+                          context,
+                          message: l.updateVersionCopied,
+                          kind: ShioriFeedbackKind.success,
                         );
                       }
                     },

@@ -21,6 +21,7 @@ import 'viewport/page_turn.dart';
 import '../cache/prefetch_sheet.dart';
 import 'reader_cache_screen.dart';
 import '../../shared/source_image.dart';
+import '../../shared/widgets/shiori_feedback.dart';
 import 'reader_notes.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'reader_chrome.dart';
@@ -189,6 +190,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   final _quickReturn = ValueNotifier(false);
   Timer? _returnTimer;
   int _navigationGeneration = 0;
+  int _chapterFeedbackAttempt = 0;
   bool _routeWasCurrent = true, _auxiliaryReady = false;
 
   bool get _foreground =>
@@ -303,10 +305,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   void _linkUnavailable() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context).readerLinkUnavailable),
-      ),
+    ShioriFeedback.show(
+      context,
+      message: AppLocalizations.of(context).readerLinkUnavailable,
+      kind: ShioriFeedbackKind.error,
     );
   }
 
@@ -436,10 +438,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   void _preparationBlocked() {
     if (!mounted || _route?.isCurrent == false) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context).readerChapterLoadFailed),
-      ),
+    ShioriFeedback.show(
+      context,
+      message: AppLocalizations.of(context).readerChapterLoadFailed,
+      kind: ShioriFeedbackKind.error,
     );
   }
 
@@ -887,10 +889,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (widget.chapterFallback) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context).chapterFallback),
-            ),
+          ShioriFeedback.show(
+            context,
+            message: AppLocalizations.of(context).chapterFallback,
           );
         }
       });
@@ -1098,23 +1099,28 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           reader.progress?.obsolete == true) {
         return false;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            reader.progress?.obsolete == true
-                ? '${AppLocalizations.of(context).readerReadingProgress} · '
-                      '${AppLocalizations.of(context).readerProgressNotSaved}'
-                : reader.progressStatus == ReaderProgressStatus.paused
-                ? AppLocalizations.of(context).readerRestoreReadFailed
-                : AppLocalizations.of(context).readerProgressUnsaved,
-          ),
-          action: reader.canRetryProgress
-              ? SnackBarAction(
-                  label: AppLocalizations.of(context).retryAction,
-                  onPressed: _reader.retryProgress,
-                )
-              : null,
-        ),
+      ShioriFeedback.show(
+        context,
+        kind: ShioriFeedbackKind.error,
+        message: reader.progress?.obsolete == true
+            ? '${AppLocalizations.of(context).readerReadingProgress} · '
+                  '${AppLocalizations.of(context).readerProgressNotSaved}'
+            : reader.progressStatus == ReaderProgressStatus.paused
+            ? AppLocalizations.of(context).readerRestoreReadFailed
+            : AppLocalizations.of(context).readerProgressUnsaved,
+        actionLabel: reader.canRetryProgress
+            ? AppLocalizations.of(context).retryAction
+            : null,
+        onAction: reader.canRetryProgress
+            ? () {
+                if (mounted &&
+                    !_invalidated &&
+                    _reader == reader &&
+                    reader.canRetryProgress) {
+                  unawaited(reader.retryProgress());
+                }
+              }
+            : null,
       );
       return false;
     }
@@ -1143,6 +1149,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     bool fromStart = false,
     bool fromEnd = false,
   }) {
+    if (!passive) _chapterFeedbackAttempt++;
     final existing = _operation;
     if (existing != null &&
         _valid(existing) &&
@@ -1634,35 +1641,44 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     final intent = operation.locationIntent, returning = operation.returning;
     final navigationPosition = reader.navigationPosition;
     final failure = reader.failure;
+    final attempt = _chapterFeedbackAttempt, generation = _navigationGeneration;
+    final source = _reader;
     unawaited(_cancelChapter());
     final l = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(l.readerChapterLoadFailed),
-        action: failure?.retryPolicy == RetryPolicy.never
-            ? null
-            : SnackBarAction(
-                label: l.retryAction,
-                onPressed: () {
-                  if (failure?.kind == FailureKind.rateLimited &&
-                      (failure?.retryNotBefore == null ||
-                          DateTime.now().isBefore(failure!.retryNotBefore!))) {
-                    return;
-                  }
-                  _switch(
-                    target,
-                    blockKey: blockKey,
-                    blockOffset: blockOffset,
-                    fromStart: fromStart,
-                    fromEnd: fromEnd,
-                    pageTurn: pageTurn,
-                    intent: intent,
-                    returning: returning,
-                    navigationPosition: navigationPosition,
-                  );
-                },
-              ),
-      ),
+    ShioriFeedback.show(
+      context,
+      kind: ShioriFeedbackKind.error,
+      message: l.readerChapterLoadFailed,
+      actionLabel: failure?.retryPolicy == RetryPolicy.never
+          ? null
+          : l.retryAction,
+      onAction: failure?.retryPolicy == RetryPolicy.never
+          ? null
+          : () {
+              if (!mounted ||
+                  !_canNavigate ||
+                  _reader != source ||
+                  attempt != _chapterFeedbackAttempt ||
+                  generation != _navigationGeneration) {
+                return;
+              }
+              if (failure?.kind == FailureKind.rateLimited &&
+                  (failure?.retryNotBefore == null ||
+                      DateTime.now().isBefore(failure!.retryNotBefore!))) {
+                return;
+              }
+              _switch(
+                target,
+                blockKey: blockKey,
+                blockOffset: blockOffset,
+                fromStart: fromStart,
+                fromEnd: fromEnd,
+                pageTurn: pageTurn,
+                intent: intent,
+                returning: returning,
+                navigationPosition: navigationPosition,
+              );
+            },
     );
   }
 
@@ -1691,18 +1707,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   /// After a direct pop, persist the last samples and surface a failed save
   /// on the screen underneath instead of losing it silently.
   Future<void> _flushAfterPop() async {
-    final messenger = ScaffoldMessenger.maybeOf(context);
+    final feedback = Navigator.of(context, rootNavigator: true).context;
     final l = AppLocalizations.of(context);
     final reader = _reader;
-    if (!await reader.saveForExit()) {
-      messenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            reader.progressStatus == ReaderProgressStatus.paused
-                ? l.readerRestoreReadFailed
-                : l.readerProgressUnsaved,
-          ),
-        ),
+    if (!await reader.saveForExit() && feedback.mounted) {
+      ShioriFeedback.show(
+        feedback,
+        kind: ShioriFeedbackKind.error,
+        message: reader.progressStatus == ReaderProgressStatus.paused
+            ? l.readerRestoreReadFailed
+            : l.readerProgressUnsaved,
       );
     }
   }
@@ -2021,8 +2035,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
     if (widget.linkDepth >= 8) {
       search?.complete(ReaderSearchDestination.failed);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).readerLinkDepth)),
+      ShioriFeedback.show(
+        context,
+        message: AppLocalizations.of(context).readerLinkDepth,
+        kind: ShioriFeedbackKind.error,
       );
       return;
     }
@@ -2058,10 +2074,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         block != null &&
             !value.value.value.blocks.any((b) => b.blockKey == block)) {
       search?.complete(ReaderSearchDestination.failed);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).readerLinkUnavailable),
-        ),
+      ShioriFeedback.show(
+        context,
+        message: AppLocalizations.of(context).readerLinkUnavailable,
+        kind: ShioriFeedbackKind.error,
       );
       return;
     }

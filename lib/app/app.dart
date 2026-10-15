@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/controller_scope.dart';
 import '../shared/widgets/state_views.dart';
+import '../shared/widgets/shiori_feedback.dart';
 import 'app_controller.dart';
 import 'app_exit.dart';
 import 'routes.dart';
@@ -49,6 +50,7 @@ class ShioriApp extends StatefulWidget {
 }
 
 class _ShioriAppState extends State<ShioriApp> {
+  final _feedback = ShioriFeedbackObserver();
   final _readerFonts = ReaderFontRegistry();
   late final WindowCaptionController? _caption =
       Platform.isWindows || widget.captionSender != null
@@ -67,11 +69,12 @@ class _ShioriAppState extends State<ShioriApp> {
     create: widget.createController,
     builder: (context, controller) => MaterialApp(
       navigatorKey: widget.navigatorKey,
-      navigatorObservers: [?_caption],
+      navigatorObservers: [_feedback, ?_caption],
       scaffoldMessengerKey: widget.scaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       builder: (context, child) {
-        final app = widget.overlayBuilder?.call(context, child!) ?? child!;
+        final feedback = ShioriFeedbackHost(observer: _feedback, child: child!);
+        final app = widget.overlayBuilder?.call(context, feedback) ?? feedback;
         final page = _caption == null
             ? app
             : WindowCaptionSync(controller: _caption, child: app);

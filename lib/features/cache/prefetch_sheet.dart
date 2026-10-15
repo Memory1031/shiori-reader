@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../shared/widgets/shiori_sheet.dart';
+import '../../shared/widgets/shiori_feedback.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -56,10 +57,10 @@ class _PrefetchPanelState extends State<PrefetchPanel> {
     if (!mounted) return;
     setState(() => _saving = false);
     if (result is Failure<void>) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).prefetchSaveFailed),
-        ),
+      ShioriFeedback.show(
+        context,
+        message: AppLocalizations.of(context).prefetchSaveFailed,
+        kind: ShioriFeedbackKind.error,
       );
     }
   }

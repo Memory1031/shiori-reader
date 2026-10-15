@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared/widgets/shiori_feedback.dart';
 
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -75,14 +76,14 @@ Future<bool> removeShelfBook(
   }
   final removed = await controller.remove(book.key);
   if (removed && local && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          controller.localCleanupPending
-              ? strings.localCleanupPending
-              : strings.localDeleted,
-        ),
-      ),
+    ShioriFeedback.show(
+      context,
+      message: controller.localCleanupPending
+          ? strings.localCleanupPending
+          : strings.localDeleted,
+      kind: controller.localCleanupPending
+          ? ShioriFeedbackKind.info
+          : ShioriFeedbackKind.success,
     );
   }
   return removed;

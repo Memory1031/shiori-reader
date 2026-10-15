@@ -35,6 +35,7 @@ import 'reader_panel.dart';
 import 'reader_progress_panel.dart';
 import 'reader_sheet.dart';
 import '../../shared/widgets/shiori_sheet.dart' show shioriSheetRoute;
+import '../../shared/widgets/shiori_feedback.dart';
 import 'reader_search_controller.dart';
 import 'reader_search_panel.dart';
 import 'reader_search_highlight.dart';
@@ -197,26 +198,26 @@ class _ReaderContentViewState extends State<ReaderContentView>
     if (mounted && !saved) {
       _chrome.value = true;
       final l = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            progressSaved
-                ? l.readerSettingsFailure
-                : widget.session?.progressStatus == ReaderProgressStatus.paused
-                ? l.readerRestoreReadFailed
-                : l.readerProgressUnsaved,
-          ),
-          action:
-              _preferences.unsaved || widget.session?.canRetryProgress == true
-              ? SnackBarAction(
-                  label: l.retryAction,
-                  onPressed: () {
-                    _preferences.retry();
-                    unawaited(widget.session?.retryProgress());
-                  },
-                )
-              : null,
-        ),
+      final retry =
+          _preferences.unsaved || widget.session?.canRetryProgress == true;
+      ShioriFeedback.show(
+        context,
+        kind: ShioriFeedbackKind.error,
+        message: progressSaved
+            ? l.readerSettingsFailure
+            : widget.session?.progressStatus == ReaderProgressStatus.paused
+            ? l.readerRestoreReadFailed
+            : l.readerProgressUnsaved,
+        actionLabel: retry ? l.retryAction : null,
+        onAction: retry
+            ? () {
+                if (!mounted || !widget.active) return;
+                _preferences.retry();
+                if (widget.session?.canRetryProgress == true) {
+                  unawaited(widget.session?.retryProgress());
+                }
+              }
+            : null,
       );
     }
     return saved;
@@ -424,10 +425,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
     if (widget.active && widget.session?.usedFallback == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !widget.active) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).readerRestoreNearby),
-          ),
+        ShioriFeedback.show(
+          context,
+          message: AppLocalizations.of(context).readerRestoreNearby,
         );
       });
     }

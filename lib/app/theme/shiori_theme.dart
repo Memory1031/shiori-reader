@@ -79,6 +79,7 @@ abstract final class ShioriSpace {
 /// ([detailSide] or [detailSideWide] beside the rest, [detailGap] apart)
 /// from [detailColumns].
 abstract final class ShioriLayout {
+  static const feedback = 480.0;
   static const page = 840.0, list = 760.0, panel = 560.0;
   static const rail = 72.0, sidebar = 232.0, sidebarBreakpoint = 1200.0;
   static const shelfGrid = 1600.0, shelfList = 1200.0;
@@ -295,7 +296,7 @@ ThemeData shioriTheme(
     letterSpacing: 0,
     color: color ?? p.ink,
   );
-  return ThemeData(
+  final theme = ThemeData(
     useMaterial3: true,
     fontFamily: fontFamily,
     fontFamilyFallback: fontFamilyFallback,
@@ -319,6 +320,16 @@ ThemeData shioriTheme(
     highlightColor: press,
     splashColor: Colors.transparent,
     splashFactory: NoSplash.splashFactory,
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: p.surface,
+      actionTextColor: p.accent,
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ShioriShape.control),
+        side: BorderSide(color: p.separator, width: .5),
+      ),
+    ),
     dialogTheme: DialogThemeData(
       backgroundColor: p.surface,
       surfaceTintColor: Colors.transparent,
@@ -440,6 +451,11 @@ ThemeData shioriTheme(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(ShioriShape.control),
       ),
+    ),
+  );
+  return theme.copyWith(
+    snackBarTheme: theme.snackBarTheme.copyWith(
+      contentTextStyle: theme.textTheme.bodyMedium!.copyWith(color: p.ink),
     ),
   );
 }

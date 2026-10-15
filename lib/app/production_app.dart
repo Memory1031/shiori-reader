@@ -29,6 +29,7 @@ import '../features/home/reading_home.dart';
 import '../shared/app_logger.dart';
 import '../shared/source_image.dart';
 import '../shared/widgets/state_views.dart';
+import '../shared/widgets/shiori_feedback.dart';
 import 'app.dart';
 import 'app_controller.dart';
 import 'appearance_panel.dart';
@@ -258,6 +259,7 @@ class _ProductionAppState extends State<ProductionApp>
   }
 
   void _openUpdates() {
+    if (!mounted) return;
     final updates = _updates;
     if (updates == null) return;
     // Enter from the library after the reader's normal save/exit path completes.
@@ -265,10 +267,9 @@ class _ProductionAppState extends State<ProductionApp>
     if (_navigator.currentState?.canPop() == true || _imports?.busy == true) {
       final context = _navigator.currentContext;
       if (context != null) {
-        _messenger.currentState?.showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).updateReturnToLibrary),
-          ),
+        ShioriFeedback.show(
+          context,
+          message: AppLocalizations.of(context).updateReturnToLibrary,
         );
       }
       return;
@@ -299,11 +300,11 @@ class _ProductionAppState extends State<ProductionApp>
       final context = _navigator.currentContext;
       if (context == null) return;
       final l = AppLocalizations.of(context);
-      _messenger.currentState?.showSnackBar(
-        SnackBar(
-          content: Text(l.updateAvailable(candidate.release.tag)),
-          action: SnackBarAction(label: l.updateView, onPressed: _openUpdates),
-        ),
+      ShioriFeedback.show(
+        context,
+        message: l.updateAvailable(candidate.release.tag),
+        actionLabel: l.updateView,
+        onAction: _openUpdates,
       );
     });
     WidgetsBinding.instance.ensureVisualUpdate();

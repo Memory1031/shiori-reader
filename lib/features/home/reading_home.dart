@@ -14,6 +14,7 @@ import 'desktop_shell.dart';
 import 'home_navigation.dart';
 import '../../shared/widgets/shiori_logo.dart';
 import '../../shared/widgets/shiori_menu.dart';
+import '../../shared/widgets/shiori_feedback.dart';
 import '../bookshelf/library_controller.dart';
 import '../bookshelf/bookshelf_view.dart';
 import '../bookshelf/library_observer.dart';
@@ -386,8 +387,9 @@ class _ReadingHomeState extends State<ReadingHome> {
       return;
     }
     if (widget.sources.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).noSources)),
+      ShioriFeedback.show(
+        context,
+        message: AppLocalizations.of(context).noSources,
       );
       return;
     }

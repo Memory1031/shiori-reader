@@ -710,11 +710,19 @@ void main() {
       );
       expect(clipboard, h.opened.single.toString());
       expect(find.text(l.updateLinkCopied), findsOneWidget);
+      // Dismiss floating feedback before using the content underneath it.
+      await tester.drag(find.byType(SnackBar), const Offset(0, 100));
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
       await h.tap(find.text(l.updateCopyVersion));
       expect(
         clipboard,
         'Shiori 1.2.1\nRelease: v1.2.1\nBuild: 10\nPlatform: windows',
       );
+      expect(find.text(l.updateVersionCopied), findsOneWidget);
+      await tester.drag(find.byType(SnackBar), const Offset(0, 100));
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
       final workspace = h.workspace;
       await h.tap(find.text(l.updateLicenses));
       expect(find.byType(LicensePage), findsOneWidget);

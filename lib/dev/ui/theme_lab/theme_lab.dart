@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/widgets/shiori_feedback.dart';
 import '../../../app/theme/shiori_theme.dart';
 import '../../../domain/models/models.dart';
 import '../../../l10n/generated/app_localizations.dart';
@@ -235,10 +236,10 @@ String bookTitle(AppLocalizations l, int i, LabState state) =>
     state == LabState.longTitle
     ? l.labLongTitle
     : [l.labBook1, l.labBook2, l.labBook3, l.labBook4][i % 4];
-void previewAction(BuildContext context) =>
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context).labPreviewAction)),
-    );
+void previewAction(BuildContext context) => ShioriFeedback.show(
+  context,
+  message: AppLocalizations.of(context).labPreviewAction,
+);
 Widget? stateBody(BuildContext context, LabState state, VoidCallback retry) {
   final l = AppLocalizations.of(context);
   if (state == LabState.loading) {
