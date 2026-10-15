@@ -52,15 +52,17 @@ final class SearchController extends ScopedController {
       _state.nextCursor != null;
   void edit(String draft) {
     if (isClosed || draft == _state.draftKeyword) return;
+    final nextCursor = _request == null ? _state.nextCursor : null;
     _request?.cancel();
     _request = null;
-    _usedCursors.clear();
     _state = SearchState(
       draftKeyword: draft,
       submittedQuery: _state.submittedQuery,
       items: _state.items,
       status: _state.items.isEmpty ? SearchStatus.idle : SearchStatus.ready,
-      needsSubmission: true,
+      nextCursor: nextCursor,
+      needsSubmission:
+          nextCursor == null || draft.trim() != _state.submittedQuery,
     );
     update();
   }

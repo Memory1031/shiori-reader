@@ -84,18 +84,84 @@ void main() {
     expect(controller.state.submittedQuery, 'b');
   });
   test(
-    'retained results stay labeled and editing disables pagination even after edit back',
+    'editing back restores completed pages and the cursor without searching',
     () async {
-      controller.edit('a');
-      final work = controller.submit();
+      controller.edit('魔女');
+      var work = controller.submit();
       repository.calls.last.pending.complete(Success(page(['1'], next: 'p2')));
       await work;
-      controller.edit('b');
-      expect(controller.state.submittedQuery, 'a');
+      work = controller.loadMore();
+      repository.calls.last.pending.complete(Success(page(['2'], next: 'p3')));
+      await work;
+      controller.edit('魔女a');
+      expect(controller.state.submittedQuery, '魔女');
       expect(controller.state.needsSubmission, true);
-      controller.edit('a');
+      expect(controller.canLoadMore, false);
       await controller.loadMore();
-      expect(repository.calls.length, 1);
+      controller.edit('');
+      controller.edit(' 魔女 ');
+      expect(repository.calls.length, 2);
+      expect(controller.state.draftKeyword, ' 魔女 ');
+      expect(controller.state.needsSubmission, false);
+      expect(controller.state.items.map((item) => item.title), ['1', '2']);
+      expect(controller.canLoadMore, true);
+      work = controller.loadMore();
+      expect(repository.calls.last.query, '魔女');
+      expect(repository.calls.last.cursor, cursor('p3'));
+      repository.calls.last.pending.complete(Success(page(['3'])));
+      await work;
+      expect(controller.state.items.map((item) => item.title), ['1', '2', '3']);
+      expect(controller.canLoadMore, false);
+      controller.edit('魔女a');
+      controller.edit('魔女');
+      expect(controller.canLoadMore, false);
+    },
+  );
+  test('submitting a different query discards retained paging state', () async {
+    controller.edit('a');
+    var work = controller.submit();
+    repository.calls.last.pending.complete(Success(page(['1'], next: 'p2')));
+    await work;
+    work = controller.loadMore();
+    repository.calls.last.pending.complete(Success(page(['2'], next: 'p3')));
+    await work;
+    controller.edit('b');
+    work = controller.submit();
+    expect(repository.calls.last.query, 'b');
+    expect(repository.calls.last.cursor, isNull);
+    expect(controller.state.items, isEmpty);
+    expect(controller.state.nextCursor, isNull);
+    repository.calls.last.pending.complete(Success(page(['new'], next: 'p2')));
+    await work;
+    expect(controller.state.submittedQuery, 'b');
+    expect(controller.state.items.single.title, 'new');
+    expect(controller.canLoadMore, true);
+    controller.edit('a');
+    expect(controller.canLoadMore, false);
+    expect(controller.state.items.single.title, 'new');
+    expect(repository.calls.length, 3);
+  });
+  test(
+    'editing back preserves protection against previously used cursors',
+    () async {
+      controller.edit('a');
+      var work = controller.submit();
+      repository.calls.last.pending.complete(Success(page(['1'], next: 'p2')));
+      await work;
+      work = controller.loadMore();
+      repository.calls.last.pending.complete(Success(page(['2'], next: 'p3')));
+      await work;
+      controller.edit('b');
+      controller.edit('a');
+      work = controller.loadMore();
+      expect(repository.calls.length, 3);
+      repository.calls.last.pending.complete(Success(page(['3'], next: 'p2')));
+      await work;
+      expect(controller.state.items.map((item) => item.title), ['1', '2']);
+      expect(
+        controller.state.paginationFailure!.context,
+        FailureContext.repeatedPage,
+      );
       expect(controller.canLoadMore, false);
     },
   );
@@ -167,10 +233,17 @@ void main() {
     final more = controller.loadMore();
     controller.edit('b');
     expect(repository.calls.last.token.isCancelled, true);
+    controller.edit('a');
+    expect(controller.canLoadMore, false);
+    expect(controller.state.nextCursor, isNull);
     repository.calls.last.pending.complete(Success(page(['2'])));
     await more;
     expect(controller.state.items.length, 1);
     expect(controller.state.loadingMore, false);
+    controller.edit('b');
+    controller.edit('a');
+    await controller.loadMore();
+    expect(repository.calls.length, 2);
     expect(controller.canLoadMore, false);
   });
   test('empty/error/blank submission and non-paging source', () async {

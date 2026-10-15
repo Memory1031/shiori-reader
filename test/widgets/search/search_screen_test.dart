@@ -281,7 +281,7 @@ void main() {
   );
 
   testWidgets(
-    'edit labels retained query and disables paging; correct opaque key navigates',
+    'editing back restores paging without a request; opaque key still navigates',
     (tester) async {
       final repo = Repository();
       final result = page(['same/title', 'other:opaque'], next: 'next');
@@ -305,6 +305,22 @@ void main() {
       await tester.pump();
       expect(find.text('Results for “old”'), findsOneWidget);
       expect(more, findsNothing);
+      await tester.enterText(input, 'old');
+      await tester.pump();
+      expect(more, findsOneWidget);
+      expect(repo.calls.length, 1);
+      await tester.tap(more);
+      expect(repo.calls.last.query, 'old');
+      expect(repo.calls.last.cursor, result.nextCursor);
+      repo.calls.last.pending.complete(Success(page(['last'])));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('All results shown'),
+        200,
+        scrollable: resultScrollable,
+      );
+      expect(find.text('All results shown'), findsOneWidget);
+      await tester.ensureVisible(find.text('other:opaque'));
       await tester.tap(find.text('other:opaque'));
       await tester.pumpAndSettle();
       expect(selected, result.items.last.key);
@@ -312,7 +328,7 @@ void main() {
       Navigator.of(tester.element(find.text('destination'))).pop();
       await tester.pumpAndSettle();
       expect(find.text('Results for “old”'), findsOneWidget);
-      expect(repo.calls.length, 1);
+      expect(repo.calls.length, 2);
     },
   );
 
