@@ -95,9 +95,7 @@ final class ReaderRubyLayout {
     final width = math.max(body.width, note.width);
     canvas.save();
     canvas.scale(_fit(body, note));
-    note.paint(canvas, Offset((width - note.width) / 2, 0));
     final at = Offset((width - body.width) / 2, note.height);
-    body.paint(canvas, at);
     paintReaderGlyphRange(
       canvas,
       body,
@@ -106,6 +104,8 @@ final class ReaderRubyLayout {
       base.toPlainText(includeSemanticsLabels: false),
       sourceStart,
     );
+    note.paint(canvas, Offset((width - note.width) / 2, 0));
+    body.paint(canvas, at);
     canvas.restore();
   });
 }

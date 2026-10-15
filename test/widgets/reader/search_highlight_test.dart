@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -10,6 +11,7 @@ import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/reader_inline_stack.dart';
 import 'package:shiori/features/reader/reader_ruby.dart';
 import 'package:shiori/features/reader/reader_search_highlight.dart';
+import 'package:shiori/features/reader/reader_theme.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 import '../../data/local/epub_prose_semantics_test.dart' show paragraphs;
@@ -61,6 +63,205 @@ List<Rect> boxes(WidgetTester tester) => tester
     .toList();
 
 void main() {
+  for (final palette in ['paper', 'warm', 'night']) {
+    testWidgets(
+      'glyph backgrounds preserve ink and use the theme container on $palette',
+      (tester) async {
+        await fonts(tester);
+        final theme = readerTheme(
+          ReaderSettings(
+            paper: palette == 'warm' ? ReaderPaper.warm : ReaderPaper.paper,
+            themeMode: palette == 'night'
+                ? ReaderThemeMode.dark
+                : ReaderThemeMode.light,
+          ),
+          Brightness.light,
+        );
+        final content = ChapterContent(
+          key: key,
+          title: 'Paint order',
+          blocks: paragraphs(
+            '<p>H H</p><p><span style="color:#b53050">H H</span></p>'
+            '<p><ruby>H H<rt>reading</rt></ruby></p>'
+            '<p><span style="display:inline-block;text-align:center;line-height:1em;text-indent:0">H H<br/>L L</span></p>',
+          ),
+        );
+        expect(content.blocks, hasLength(4));
+        final active = ValueNotifier<LocalSearchBodyHit?>(null),
+            controller = PagedReaderController(),
+            boundary = GlobalKey();
+        addTearDown(active.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: Center(
+                child: RepaintBoundary(
+                  key: boundary,
+                  child: SizedBox(
+                    width: 400,
+                    height: 420,
+                    child: ColoredBox(
+                      color: theme.scaffoldBackgroundColor,
+                      child: ReaderSearchHighlightScope(
+                        active: active,
+                        content: content,
+                        child: PagedReaderViewport(
+                          content: content,
+                          controller: controller,
+                          textStyle: TextStyle(
+                            fontSize: 24,
+                            height: 1.6,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          turnStyle: PageTurnStyle.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final render =
+            boundary.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        Future<({ByteData bytes, int width, int height})> capture() async =>
+            (await tester.runAsync(() async {
+              final image = await render.toImage();
+              final data = (
+                bytes: (await image.toByteData(
+                  format: ui.ImageByteFormat.rawRgba,
+                ))!,
+                width: image.width,
+                height: image.height,
+              );
+              image.dispose();
+              return data;
+            }))!;
+        int rgba(Color color) {
+          final argb = color.toARGB32();
+          return ((argb & 0xffffff) << 8) | (argb >> 24);
+        }
+
+        final baseline = await capture(),
+            page = controller.inspectDisplayedPage()!.page,
+            position = controller.capture(),
+            generation = controller.layoutGeneration;
+        await screenshot(tester, boundary, '$palette-ink-unmarked');
+        final ruby = tester.widget<ReaderRuby>(find.byType(ReaderRuby)),
+            stack = tester.widget<ReaderInlineStack>(
+              find.byType(ReaderInlineStack),
+            );
+        final phases = [
+          ('body', hit(content, 0, 0, 2)),
+          ('authored-ink', hit(content, 1, 0, 2)),
+          (
+            'ruby-base',
+            hit(content, 2, ruby.sourceStart, ruby.sourceStart + 2),
+          ),
+          (
+            'stack-upper',
+            hit(content, 3, stack.sourceStart, stack.sourceStart + 2),
+          ),
+          (
+            'stack-lower',
+            hit(content, 3, stack.separator + 1, stack.separator + 3),
+          ),
+        ];
+        for (final (name, selected) in phases) {
+          active.value = selected;
+          await tester.pump();
+          final selectedRects = <Rect>[];
+          void add(RenderBox box, List<Rect> rects) => selectedRects.addAll(
+            rects.map(
+              (r) => MatrixUtils.transformRect(box.getTransformTo(render), r),
+            ),
+          );
+          if (name == 'ruby-base') {
+            add(
+              tester.renderObject(find.byType(ReaderRuby)),
+              ruby.layout.selectedBoxes(ruby.highlight, ruby.sourceStart),
+            );
+          } else if (name.startsWith('stack')) {
+            add(
+              tester.renderObject(find.byType(ReaderInlineStack)),
+              stack.layout.selectedBoxes(
+                stack.highlight,
+                stack.sourceStart,
+                stack.separator,
+              ),
+            );
+          } else {
+            for (final box in tester.renderObjectList<ReaderSearchTextRender>(
+              find.byType(ReaderPaintedSearchText),
+            )) {
+              add(box, box.selectedBoxes);
+            }
+          }
+          expect(selectedRects, isNotEmpty);
+          final marked = await capture(), ink = <int, int>{};
+          var backgroundPixels = 0;
+          for (var y = 0; y < baseline.height; y++) {
+            for (var x = 0; x < baseline.width; x++) {
+              final at = Offset(x + .5, y + .5),
+                  offset = (y * baseline.width + x) * 4;
+              final before = baseline.bytes.getUint32(offset),
+                  after = marked.bytes.getUint32(offset);
+              if (selectedRects.any((r) => r.contains(at))) {
+                if (after == rgba(theme.colorScheme.primaryContainer)) {
+                  backgroundPixels++;
+                }
+                if (before != rgba(theme.scaffoldBackgroundColor)) {
+                  ink.update(before, (n) => n + 1, ifAbsent: () => 1);
+                }
+              } else if (!selectedRects.any((r) => r.inflate(1).contains(at))) {
+                expect(
+                  after,
+                  before,
+                  reason: '$palette/$name paints outside the selected glyphs',
+                );
+              }
+            }
+          }
+          expect(
+            backgroundPixels,
+            greaterThan(0),
+            reason: '$palette/$name uses an opaque primaryContainer',
+          );
+          final foreground = ink.keys.reduce(
+            (a, b) => ink[a]! > ink[b]! ? a : b,
+          );
+          var preserved = 0;
+          for (var y = 0; y < baseline.height; y++) {
+            for (var x = 0; x < baseline.width; x++) {
+              final offset = (y * baseline.width + x) * 4;
+              if (selectedRects.any(
+                    (r) => r.contains(Offset(x + .5, y + .5)),
+                  ) &&
+                  baseline.bytes.getUint32(offset) == foreground) {
+                expect(
+                  marked.bytes.getUint32(offset),
+                  foreground,
+                  reason: '$palette/$name must paint the original ink last',
+                );
+                preserved++;
+              }
+            }
+          }
+          expect(preserved, greaterThan(0));
+          expect(controller.layoutGeneration, generation);
+          expect(controller.capture(), position);
+          expect(controller.inspectDisplayedPage()!.page, same(page));
+          await screenshot(tester, boundary, '$palette-$name-highlight');
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'actual pages, chunks, dual columns and reflow retain bounds and source identity',
     (tester) async {
@@ -368,7 +569,7 @@ void main() {
     },
   );
   testWidgets(
-    'active glyph overlay preserves inline image boxes and link activation',
+    'active glyph background preserves inline images, links and page swipes',
     (tester) async {
       final media = MediaRef(
         sourceId: key.novelKey.sourceId,
@@ -379,7 +580,7 @@ void main() {
         title: 'Linked glyphs',
         blocks: [
           ParagraphBlock(
-            text: '😀é 图\ufffc链接文字尾',
+            text: '😀é 图\ufffc链接文字尾${' more text' * 100}',
             inlineImages: [
               InlineImage(offset: 5, media: media, widthEm: 1, heightEm: 1),
             ],
@@ -457,6 +658,14 @@ void main() {
       );
       await tester.pump();
       expect(tapped, same(link));
+      final gesture = await tester.startGesture(
+        render.localToGlobal(render.selectedBoxes.first.center),
+      );
+      await gesture.moveBy(const Offset(-24, 0));
+      await gesture.moveBy(const Offset(-200, 0));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(controller.inspectDisplayedPage()!.page.start, isNot(page.start));
       expect(tester.takeException(), isNull);
     },
   );

@@ -91,8 +91,6 @@ final class ReaderInlineStackLayout {
     int sourceStart = 0,
     int separator = 0,
   }) => _withPainters((a, b) {
-    a.paint(canvas, geometry.upper.topLeft);
-    b.paint(canvas, geometry.lower.topLeft);
     paintReaderGlyphRange(
       canvas,
       a,
@@ -109,6 +107,8 @@ final class ReaderInlineStackLayout {
       lowerText,
       separator + 1,
     );
+    a.paint(canvas, geometry.upper.topLeft);
+    b.paint(canvas, geometry.lower.topLeft);
   });
 }
 

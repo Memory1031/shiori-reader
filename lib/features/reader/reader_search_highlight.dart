@@ -32,14 +32,12 @@ class ReaderGlyphHighlight {
     this.blockKey,
     this.blockIndex,
     this.color,
-    this.blend,
   );
   final ValueListenable<LocalSearchBodyHit?> active;
   final ChapterKey chapter;
   final String revision, blockKey;
   final int blockIndex;
   final Color color;
-  final BlendMode blend;
   static ReaderGlyphHighlight? of(
     BuildContext context,
     String? blockKey,
@@ -47,16 +45,14 @@ class ReaderGlyphHighlight {
   ) {
     final scope = ReaderSearchHighlightScope.of(context);
     if (scope == null || blockKey == null || blockIndex == null) return null;
-    final theme = Theme.of(context),
-        dark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
     return ReaderGlyphHighlight(
       scope.active,
       scope.content.key,
       scope.content.contentRevision,
       blockKey,
       blockIndex,
-      theme.colorScheme.primary.withValues(alpha: dark ? .3 : .24),
-      dark ? BlendMode.screen : BlendMode.multiply,
+      theme.colorScheme.primaryContainer,
     );
   }
 
@@ -91,9 +87,7 @@ class ReaderGlyphHighlight {
   }
 
   void paint(Canvas canvas, Iterable<Rect> boxes) {
-    final brush = Paint()
-      ..color = color
-      ..blendMode = blend;
+    final brush = Paint()..color = color;
     for (final rect in boxes) {
       canvas.drawRect(rect, brush);
     }
@@ -221,7 +215,6 @@ class ReaderSearchTextRender extends RenderProxyBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    super.paint(context, offset);
     context.canvas.save();
     context.canvas.clipRect(offset & size);
     configuration.highlight.paint(
@@ -229,6 +222,7 @@ class ReaderSearchTextRender extends RenderProxyBox {
       selectedBoxes.map((r) => r.shift(offset)),
     );
     context.canvas.restore();
+    super.paint(context, offset);
   }
 }
 
