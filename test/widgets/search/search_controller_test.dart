@@ -75,6 +75,9 @@ void main() {
     final old = controller.submit();
     controller.edit('b');
     expect(repository.calls.first.token.isCancelled, true);
+    controller.edit('a');
+    expect(controller.state.needsSubmission, true);
+    controller.edit('b');
     final current = controller.submit();
     repository.calls.last.pending.complete(Success(page(['new'])));
     await current;
@@ -114,7 +117,26 @@ void main() {
       expect(controller.canLoadMore, false);
       controller.edit('魔女a');
       controller.edit('魔女');
+      expect(controller.state.needsSubmission, false);
       expect(controller.canLoadMore, false);
+    },
+  );
+  test(
+    'editing back restores a completed single-page query without a cursor',
+    () async {
+      controller.edit('魔女');
+      final work = controller.submit();
+      repository.calls.last.pending.complete(Success(page(['1'])));
+      await work;
+      controller.edit('魔女a');
+      expect(controller.state.needsSubmission, true);
+      controller.edit('魔女');
+      expect(controller.state.needsSubmission, false);
+      expect(controller.state.status, SearchStatus.ready);
+      expect(controller.state.nextCursor, isNull);
+      expect(controller.canLoadMore, false);
+      expect(controller.state.items.single.title, '1');
+      expect(repository.calls.length, 1);
     },
   );
   test('submitting a different query discards retained paging state', () async {
@@ -222,6 +244,10 @@ void main() {
         );
         expect(controller.state.items.length, 1);
         expect(controller.canLoadMore, false);
+        controller.edit('b');
+        controller.edit('a');
+        expect(controller.state.needsSubmission, true);
+        expect(controller.canLoadMore, false);
       }
     },
   );
@@ -236,6 +262,7 @@ void main() {
     controller.edit('a');
     expect(controller.canLoadMore, false);
     expect(controller.state.nextCursor, isNull);
+    expect(controller.state.needsSubmission, true);
     repository.calls.last.pending.complete(Success(page(['2'])));
     await more;
     expect(controller.state.items.length, 1);
@@ -244,6 +271,7 @@ void main() {
     controller.edit('a');
     await controller.loadMore();
     expect(repository.calls.length, 2);
+    expect(controller.state.needsSubmission, true);
     expect(controller.canLoadMore, false);
   });
   test('empty/error/blank submission and non-paging source', () async {
@@ -252,6 +280,11 @@ void main() {
     repository.calls.last.pending.complete(Success(page([])));
     await work;
     expect(controller.state.status, SearchStatus.empty);
+    controller.edit('ab');
+    controller.edit('a');
+    expect(controller.state.needsSubmission, false);
+    expect(controller.state.status, SearchStatus.empty);
+    expect(repository.calls.length, 1);
     work = controller.submit();
     repository.calls.last.pending.complete(
       Failure(

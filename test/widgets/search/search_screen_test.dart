@@ -332,6 +332,34 @@ void main() {
     },
   );
 
+  testWidgets(
+    'completed single-page results clear the draft notice when restored',
+    (tester) async {
+      final repo = Repository();
+      await mount(tester, repo);
+      await tester.enterText(input, '魔女');
+      await tester.pump();
+      await tester.tap(submit);
+      repo.calls.last.pending.complete(Success(page(['one'])));
+      await tester.pumpAndSettle();
+      final notice = AppLocalizations.of(
+        tester.element(input),
+      ).searchDraftNotice;
+      expect(find.text('All results shown'), findsOneWidget);
+      await tester.enterText(input, '魔女a');
+      await tester.pump();
+      expect(find.text(notice), findsOneWidget);
+      expect(find.text('All results shown'), findsNothing);
+      await tester.enterText(input, '魔女');
+      await tester.pump();
+      expect(find.text(notice), findsNothing);
+      expect(find.text('All results shown'), findsOneWidget);
+      expect(find.text('one'), findsOneWidget);
+      expect(more, findsNothing);
+      expect(repo.calls.length, 1);
+    },
+  );
+
   for (final kind in [
     FailureKind.network,
     FailureKind.unsupported,

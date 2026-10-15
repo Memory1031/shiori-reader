@@ -42,6 +42,7 @@ final class SearchController extends ScopedController {
   SearchState _state = SearchState();
   SearchState get state => _state;
   CancellationSource? _request;
+  bool _canRestoreQuery = false;
   final _usedCursors = <SearchCursor>{};
   bool get canLoadMore =>
       !isClosed &&
@@ -53,16 +54,22 @@ final class SearchController extends ScopedController {
   void edit(String draft) {
     if (isClosed || draft == _state.draftKeyword) return;
     final nextCursor = _request == null ? _state.nextCursor : null;
+    if (_request != null) _canRestoreQuery = false;
     _request?.cancel();
     _request = null;
+    final needsSubmission =
+        !_canRestoreQuery || draft.trim() != _state.submittedQuery;
     _state = SearchState(
       draftKeyword: draft,
       submittedQuery: _state.submittedQuery,
       items: _state.items,
-      status: _state.items.isEmpty ? SearchStatus.idle : SearchStatus.ready,
+      status: _state.items.isNotEmpty
+          ? SearchStatus.ready
+          : needsSubmission
+          ? SearchStatus.idle
+          : SearchStatus.empty,
       nextCursor: nextCursor,
-      needsSubmission:
-          nextCursor == null || draft.trim() != _state.submittedQuery,
+      needsSubmission: needsSubmission,
     );
     update();
   }
@@ -76,6 +83,7 @@ final class SearchController extends ScopedController {
       return;
     }
     _request?.cancel();
+    _canRestoreQuery = false;
     _usedCursors.clear();
     if (query.isEmpty) {
       _request = null;
@@ -167,6 +175,7 @@ final class SearchController extends ScopedController {
           next != null && (next == cursor || _usedCursors.contains(next));
       final wrongSource = page.sourceId != sourceId;
       if (repeated || wrongSource) {
+        _canRestoreQuery = false;
         final failure = AppFailure(
           kind: FailureKind.parse,
           operation: Operation.search,
@@ -183,6 +192,7 @@ final class SearchController extends ScopedController {
           paginationFailure: cursor != null ? failure : null,
         );
       } else {
+        _canRestoreQuery = true;
         if (cursor != null) _usedCursors.add(cursor);
         final items = [..._state.items, ...page.items];
         _state = SearchState(
