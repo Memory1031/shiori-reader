@@ -7,8 +7,8 @@ void _worker(SendPort hello) {
   var blocks = <ProbeBlock>[];
   hello.send(commands.sendPort);
   commands.listen((dynamic message) {
-    final (String op, Object? data, SendPort reply) =
-        message as (String, Object?, SendPort);
+    final (String op, Object? data, SendPort reply, SendPort? started) =
+        message as (String, Object?, SendPort, SendPort?);
     if (op == 'load') {
       blocks = data as List<ProbeBlock>;
       reply.send(null);
@@ -21,6 +21,7 @@ void _worker(SendPort hello) {
     } else if (op == 'scan') {
       final (String query, List<ProbeBlock>? batch, int limit) =
           data as (String, List<ProbeBlock>?, int);
+      started?.send(null);
       final watch = Stopwatch()..start();
       final result = scan(batch ?? blocks, query, limit: limit);
       reply.send((result, watch.elapsedMicroseconds));
@@ -28,40 +29,98 @@ void _worker(SendPort hello) {
   });
 }
 
-/// One experimental session; kill waits for the worker's exit notification.
+final class ProbeWorkerStopped implements Exception {
+  const ProbeWorkerStopped({required this.cancelled, this.cause});
+  final bool cancelled;
+  final Object? cause;
+
+  @override
+  String toString() =>
+      cancelled ? 'Probe cancelled' : 'Probe worker exited: $cause';
+}
+
+/// One experimental session; stopping settles calls and waits for actual exit.
 final class ProbeWorker {
-  ProbeWorker._(this.isolate, this.commands, this.exits, this.exited);
+  ProbeWorker._(this.isolate, this._exits) {
+    _exits.listen((message) {
+      _stop(ProbeWorkerStopped(cancelled: false, cause: message));
+      if (message == null) {
+        _exited.complete();
+        _exits.close();
+      }
+    });
+  }
   final Isolate isolate;
-  final SendPort commands;
-  final ReceivePort exits;
-  final Future<dynamic> exited;
+  late final SendPort commands;
+  final ReceivePort _exits;
+  final _exited = Completer<void>();
+  final _pending = <ReceivePort, Completer<dynamic>>{};
+  ProbeWorkerStopped? _stopped;
+  Future<void>? _closing;
+  Future<void> get exited => _exited.future;
+  int get pendingCalls => _pending.length;
+
   static Future<ProbeWorker> start() async {
     final hello = ReceivePort(), exits = ReceivePort();
-    final exited = exits.first;
-    final isolate = await Isolate.spawn(
-      _worker,
-      hello.sendPort,
-      onExit: exits.sendPort,
-    );
-    final commands = await hello.first as SendPort;
-    hello.close();
-    return ProbeWorker._(isolate, commands, exits, exited);
+    ProbeWorker? worker;
+    try {
+      final isolate = await Isolate.spawn(
+        _worker,
+        hello.sendPort,
+        onExit: exits.sendPort,
+        onError: exits.sendPort,
+      );
+      worker = ProbeWorker._(isolate, exits);
+      worker.commands =
+          await Future.any([
+                hello.first,
+                worker.exited.then((_) => throw worker!._stopped!),
+              ])
+              as SendPort;
+      return worker;
+    } catch (_) {
+      if (worker != null) {
+        await worker.close();
+      } else {
+        exits.close();
+      }
+      rethrow;
+    } finally {
+      hello.close();
+    }
   }
 
-  Future<dynamic> call(String op, Object? data) async {
+  Future<dynamic> call(String op, Object? data, {SendPort? started}) async {
+    if (_stopped case final reason?) throw reason;
     final reply = ReceivePort();
-    commands.send((op, data, reply.sendPort));
+    final result = Completer<dynamic>();
+    _pending[reply] = result;
+    reply.listen(result.complete);
     try {
-      return await reply.first.timeout(const Duration(seconds: 60));
+      commands.send((op, data, reply.sendPort, started));
+      return await result.future.timeout(const Duration(seconds: 60));
     } finally {
+      _pending.remove(reply);
       reply.close();
     }
   }
 
-  Future<void> close() async {
+  void _stop(ProbeWorkerStopped reason) {
+    if (_stopped != null) return;
+    _stopped = reason;
+    for (final entry in _pending.entries) {
+      if (!entry.value.isCompleted) entry.value.completeError(reason);
+      entry.key.close();
+    }
+    _pending.clear();
+  }
+
+  Future<void> close() => _closing ??= _close();
+
+  Future<void> _close() async {
+    _stop(const ProbeWorkerStopped(cancelled: true));
     isolate.kill(priority: Isolate.immediate);
     await exited;
-    exits.close();
   }
 }
 

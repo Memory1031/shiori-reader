@@ -40,7 +40,7 @@ void main() {
         expect(hit.chapter.novelKey, book);
         expect(hit.revision, 'revision');
         expect(hit.blockKey, 'block');
-        expect(hit.snippet, contains('魔女'));
+        expect(hit.summarize(block(text)).match, '魔女');
       }
       expect(scan([block(text)], 'magic').hits.single.start, 6);
       expect(scan([block(text)], 'かな').hits.single.start, 15);
@@ -73,7 +73,41 @@ void main() {
     final actual = [for (final batch in parts) ...scan(batch, '边界命中').hits];
     expect(actual.map((h) => h.start), expected.hits.map((h) => h.start));
     expect(actual.map((h) => h.end), expected.hits.map((h) => h.end));
+    expect(
+      actual.map((h) => h.summarize(rows.single).text),
+      expected.hits.map((h) => h.summarize(rows.single).text),
+    );
   });
+
+  test(
+    'retained summaries use original context and identify each occurrence',
+    () {
+      for (final query in ['魔女', '😀e\u0301', 'magic']) {
+        final original = block('${'前😀e\u0301魔女 MAGIC 后' * 12}末尾');
+        final expected = scan([original], query).hits;
+        final actual = [
+          for (final batch in batches([original], query, maxUnits: 38))
+            ...scan(batch, query).hits,
+        ];
+        Object summary(ProbeHit hit) {
+          final s = hit.summarize(original);
+          return (hit.start, hit.end, s.before, s.match, s.after);
+        }
+
+        expect(actual.map(summary), expected.map(summary));
+        expect(actual, isNotEmpty);
+        expect(
+          actual.skip(3).map((h) => h.summarize(original).before.runes.length),
+          everyElement(24),
+        );
+        final slice = batches([original], query, maxUnits: 38).first.first;
+        expect(() => actual.first.summarize(slice), throwsArgumentError);
+      }
+      final original = block('😀山山山后');
+      final second = scan([original], '山').hits[1].summarize(original);
+      expect((second.before, second.match, second.after), ('😀山', '山', '山后'));
+    },
+  );
 
   test(
     'validated EPUB snapshot retains occurrences, order, auxiliary text and ruby bases',

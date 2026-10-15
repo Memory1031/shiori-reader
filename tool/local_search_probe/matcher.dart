@@ -45,7 +45,7 @@ List<ProbeBlock> snapshot(LocalBookContent book) {
 }
 
 final class ProbeHit {
-  ProbeHit(ProbeBlock block, this.start, this.end, this.snippet)
+  ProbeHit(ProbeBlock block, this.start, this.end)
     : chapter = block.chapter,
       revision = block.revision,
       blockKey = block.key,
@@ -56,7 +56,34 @@ final class ProbeHit {
 
   /// Half-open original-block Unicode code-point range.
   final int start, end;
-  final String snippet;
+
+  /// Resolve only retained hits against the full original block, never a batch.
+  ProbeSnippet summarize(ProbeBlock original) {
+    if (original.chapter != chapter ||
+        original.revision != revision ||
+        original.key != blockKey ||
+        original.index != blockIndex ||
+        original.sourceOffset != 0 ||
+        original.ownedUnits != null) {
+      throw ArgumentError('Summary requires the matching original block');
+    }
+    final from = _step(original.text, 0, start);
+    final to = _step(original.text, from, end - start);
+    if (start < 0 || end < start || _count(original.text, 0, to) != end) {
+      throw RangeError('Hit is outside the original block');
+    }
+    return ProbeSnippet(
+      original.text.substring(_step(original.text, from, -24), from),
+      original.text.substring(from, to),
+      original.text.substring(to, _step(original.text, to, 24)),
+    );
+  }
+}
+
+final class ProbeSnippet {
+  const ProbeSnippet(this.before, this.match, this.after);
+  final String before, match, after;
+  String get text => '$before$match$after';
 }
 
 final _asciiUpper = RegExp('[A-Z]');
@@ -132,10 +159,6 @@ int _step(String text, int index, int count) {
             block,
             block.sourceOffset + offset,
             block.sourceOffset + offset + _count(block.text, found, end),
-            block.text.substring(
-              _step(block.text, found, -24),
-              _step(block.text, end, 24),
-            ),
           ),
         );
         previous = found;
