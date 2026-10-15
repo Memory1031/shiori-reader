@@ -560,10 +560,17 @@ void main() {
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
-      final sheet = find.byType(BottomSheet);
-      expect(sheet, findsOneWidget);
+      final dialog = find.byType(Dialog);
+      expect(dialog, findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+      final surface = find
+          .descendant(of: dialog, matching: find.byType(Material))
+          .first;
+      expect(tester.getRect(surface).center, const Offset(640, 360));
+      await h.resize(460);
+      expect(tester.getRect(surface).center, const Offset(230, 360));
       final selected = find.descendant(
-        of: sheet,
+        of: dialog,
         matching: find.byWidgetPredicate((w) => w is ListTile && w.selected),
       );
       expect(selected, findsOneWidget);
@@ -582,11 +589,11 @@ void main() {
       await tester.pump();
       expect(
         FocusManager.instance.primaryFocus!.context!
-            .findAncestorWidgetOfExactType<BottomSheet>(),
+            .findAncestorWidgetOfExactType<Dialog>(),
         isNotNull,
       );
       final option = find.descendant(
-        of: sheet,
+        of: dialog,
         matching: find.text(
           value == UpdateChannel.beta ? l.updateBeta : l.updateStable,
         ),
@@ -595,16 +602,25 @@ void main() {
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
-      expect(sheet, findsNothing);
+      expect(dialog, findsNothing);
       expect(h.controller.preferences.channel, value);
       expect(h.repo.preferences.channel, value);
       expect(focus().hasFocus, isTrue);
+      await h.resize(1280);
     }
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
-    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.byType(Dialog), findsNothing);
+    expect(h.controller.preferences.channel, UpdateChannel.stable);
+    expect(focus().hasFocus, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+    expect(h.repo.preferences.channel, UpdateChannel.stable);
     expect(h.workspace, same(workspace));
     expect(h.navigation.section, HomeSection.updates);
     h.repo.checking = Completer<void>();
@@ -614,6 +630,55 @@ void main() {
     expect(h.repo.checks, 1);
     await h.close();
   }, variant: windows);
+
+  testWidgets(
+    'desktop channel choices stay reachable in a short large-text window',
+    (tester) async {
+      final h = UpdatesHarness(tester);
+      await h.controller.initialize();
+      await h.pump(width: 360, height: 320, scale: 1.8, shell: false);
+      await h.tap(channel);
+      final dialog = find.byType(Dialog);
+      expect(dialog, findsOneWidget);
+      final option = find.descendant(
+        of: dialog,
+        matching: find.text(h.l.updateBeta),
+      );
+      await tester.ensureVisible(option);
+      await tester.pumpAndSettle();
+      expect(option.hitTestable(), findsOneWidget);
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+      expect(h.repo.preferences.channel, UpdateChannel.beta);
+      expect(tester.takeException(), isNull);
+      await h.close();
+    },
+    variant: windows,
+  );
+
+  testWidgets(
+    'touch channel selector keeps its bottom sheet',
+    (tester) async {
+      final h = UpdatesHarness(tester);
+      await h.controller.initialize();
+      await h.pump(width: 390, height: 844, scale: 1.6, shell: false);
+      await h.tap(channel);
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.byType(Dialog), findsNothing);
+      expect(tester.getRect(find.byType(BottomSheet)).bottom, 844);
+      final option = find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text(h.l.updateBeta),
+      );
+      await tester.ensureVisible(option);
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+      expect(h.repo.preferences.channel, UpdateChannel.beta);
+      expect(tester.takeException(), isNull);
+      await h.close();
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
 
   testWidgets(
     'project link fallback, copy version and licenses use existing routes',

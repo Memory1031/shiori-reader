@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/routes.dart';
+import 'package:shiori/app/theme/shiori_theme.dart';
 import 'package:shiori/data/local/database/user_database.dart';
 import 'package:shiori/data/local/files/app_paths.dart';
 import 'package:shiori/data/local/managed_local_books.dart';
@@ -1182,6 +1183,17 @@ void main() {
     ),
   );
 
+  void expectCenteredImport(WidgetTester tester) {
+    final surface = find
+        .descendant(of: find.byType(Dialog), matching: find.byType(Material))
+        .first;
+    final rect = tester.getRect(surface);
+    final viewport = tester.view.physicalSize / tester.view.devicePixelRatio;
+    expect(rect.center.dx, closeTo(viewport.width / 2, 1));
+    expect(rect.center.dy, closeTo(viewport.height / 2, 1));
+    expect(rect.width, lessThanOrEqualTo(ShioriLayout.panel));
+  }
+
   testWidgets(
     'existing single book offers read-now for the stored identity and done',
     (tester) async {
@@ -1197,6 +1209,7 @@ void main() {
       controller.open();
       await tester.runAsync(() => controller.submit());
       await tester.pumpAndSettle();
+      expectCenteredImport(tester);
       expect(find.text('书籍已存在，未重复导入。'), findsOneWidget);
       expect(find.text('书籍已保存。'), findsNothing);
       expect(find.text('重试'), findsNothing);
@@ -1210,41 +1223,61 @@ void main() {
       expect(await tester.runAsync(committed), 1);
       expect(tester.takeException(), null);
     },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );
 
-  testWidgets('all-existing batch reports no new books at large English text', (
-    tester,
-  ) async {
-    tester.view
-      ..physicalSize = const Size(320, 844)
-      ..devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    source.receive(id: 'original');
-    await controller.start();
-    await tester.runAsync(() => controller.submit());
-    await controller.finish();
-    source.receive(id: 'a', name: 'One.txt');
-    source.receive(id: 'b', name: 'Two.txt');
-    await controller.refresh();
-    await pumpImportPanel(tester, locale: const Locale('en'), scale: 1.3);
-    controller.open();
-    await tester.runAsync(() => controller.submit());
-    await tester.pumpAndSettle();
-    expect(find.text('Import processing complete'), findsOneWidget);
-    expect(find.text('2 already exist. No books were added.'), findsOneWidget);
-    expect(find.text('Already exists; no duplicate created'), findsNWidgets(2));
-    expect(find.text('Read now'), findsNothing);
-    expect(find.text('Retry failed'), findsNothing);
-    expect(controller.createdCount, 0);
-    expect(controller.existingCount, 2);
-    expect(controller.succeededCount, 2);
-    await tester.tap(find.text('Done'));
-    await tester.pumpAndSettle();
-    expect(controller.items, isEmpty);
-    expect(source.inbox, isEmpty);
-    expect(parses, 1);
-    expect(tester.takeException(), null);
-  });
+  testWidgets(
+    'all-existing batch stays at the bottom on Android with large English text',
+    (tester) async {
+      tester.view
+        ..physicalSize = const Size(320, 844)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      source.receive(id: 'original');
+      await controller.start();
+      await tester.runAsync(() => controller.submit());
+      await controller.finish();
+      source.receive(id: 'a', name: 'One.txt');
+      source.receive(id: 'b', name: 'Two.txt');
+      await controller.refresh();
+      await pumpImportPanel(tester, locale: const Locale('en'), scale: 1.3);
+      controller.open();
+      await tester.runAsync(() => controller.submit());
+      await tester.pumpAndSettle();
+      final surface = find
+          .ancestor(
+            of: find.text('Import processing complete'),
+            matching: find.byType(Material),
+          )
+          .first;
+      expect(find.byType(Dialog), findsNothing);
+      expect(
+        tester.getRect(surface).bottom,
+        closeTo(844 - ShioriSpace.medium, 1),
+      );
+      expect(find.text('Import processing complete'), findsOneWidget);
+      expect(
+        find.text('2 already exist. No books were added.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Already exists; no duplicate created'),
+        findsNWidgets(2),
+      );
+      expect(find.text('Read now'), findsNothing);
+      expect(find.text('Retry failed'), findsNothing);
+      expect(controller.createdCount, 0);
+      expect(controller.existingCount, 2);
+      expect(controller.succeededCount, 2);
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      expect(controller.items, isEmpty);
+      expect(source.inbox, isEmpty);
+      expect(parses, 1);
+      expect(tester.takeException(), null);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
 
   testWidgets(
     'incoming banner confirmed discard releases receipts and preserves route at large Chinese text',
@@ -1428,6 +1461,14 @@ void main() {
             find.byKey(const ValueKey('import-dismiss-barrier')),
             findsOneWidget,
           );
+          expectCenteredImport(tester);
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+          expect(
+            FocusManager.instance.primaryFocus!.context!
+                .findAncestorWidgetOfExactType<Dialog>(),
+            isNotNull,
+          );
           for (final key in [
             LogicalKeyboardKey.pageDown,
             LogicalKeyboardKey.arrowRight,
@@ -1442,6 +1483,10 @@ void main() {
           source.events.add(const ImportSourceEvent(copiedBytes: 0));
           await tester.pump();
           expect(controller.busy, isTrue);
+          await tester.tapAt(const Offset(10, 10));
+          await tester.pump();
+          expect(await navigatorKey.currentState!.maybePop(), isTrue);
+          await tester.pump();
           await tester.sendKeyEvent(LogicalKeyboardKey.escape);
           await tester.pump();
           expect(controller.busy, isTrue);
@@ -1475,6 +1520,12 @@ void main() {
                 )
                 .focusNode,
           );
+          await tester.tap(find.text(l.importDiscardFiles));
+          await tester.pumpAndSettle();
+          await tester.tapAt(const Offset(10, 10));
+          await tester.pumpAndSettle();
+          expect(find.text(l.importKeepFiles), findsNothing);
+          expect(source.acked, isEmpty);
           await tester.sendKeyEvent(LogicalKeyboardKey.escape);
           await tester.pumpAndSettle();
           expect(
@@ -1484,6 +1535,24 @@ void main() {
           expect(source.acked, isEmpty);
           expect(controller.items, hasLength(1));
           expect(FocusManager.instance.primaryFocus, readerFocus);
+          controller.open();
+          controller.open();
+          await tester.pumpAndSettle();
+          expect(find.byType(Dialog), findsOneWidget);
+          expectCenteredImport(tester);
+          if (expanded) {
+            await tester.runAsync(controller.submit);
+            await tester.pumpAndSettle();
+            expectCenteredImport(tester);
+            await tester.tap(find.text(l.importDone));
+            await tester.pumpAndSettle();
+          } else {
+            await tester.tapAt(const Offset(10, 10));
+            await tester.pumpAndSettle();
+          }
+          expect(find.byType(Dialog), findsNothing);
+          expect(FocusManager.instance.primaryFocus, readerFocus);
+          expect(pages.capture(), position);
           await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
           await tester.pumpAndSettle();
           expect(
@@ -2032,31 +2101,51 @@ void main() {
       expect(tester.takeException(), null);
     });
 
-    testWidgets('64 items stay scrollable at Chinese text scale 1.6', (
-      tester,
-    ) async {
-      for (var i = 1; i <= 64; i++) {
-        source.receive(
-          id: 'r$i',
-          name: 'book$i.txt',
-          content: utf8.encode('Offline book number $i.'),
+    testWidgets(
+      'desktop batch stays centered and scrollable in narrow and short windows',
+      (tester) async {
+        tester.view
+          ..physicalSize = const Size(460, 600)
+          ..devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        for (var i = 1; i <= 64; i++) {
+          source.receive(
+            id: 'r$i',
+            name: 'book$i.txt',
+            content: utf8.encode('Offline book number $i.'),
+          );
+        }
+        await controller.start();
+        await pumpImportPanel(tester, scale: 1.6);
+        await tester.pumpAndSettle();
+        controller.open();
+        await tester.pumpAndSettle();
+        expectCenteredImport(tester);
+        expect(tester.takeException(), null);
+        expect(find.text('准备导入 64 本书'), findsOneWidget);
+        expect(find.text('导入全部'), findsOneWidget);
+        final actionPosition = tester.getRect(find.text('导入全部'));
+        await tester.scrollUntilVisible(
+          find.text('book64.txt'),
+          200,
+          scrollable: find.descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          ),
         );
-      }
-      await controller.start();
-      await pumpImportPanel(tester, scale: 1.6);
-      await tester.pumpAndSettle();
-      controller.open();
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), null);
-      expect(find.text('准备导入 64 本书'), findsOneWidget);
-      expect(find.text('导入全部'), findsOneWidget);
-      final actionPosition = tester.getRect(find.text('导入全部'));
-      await tester.scrollUntilVisible(find.text('book64.txt'), 200);
-      expect(find.text('book64.txt').hitTestable(), findsOneWidget);
-      expect(find.text('导入全部').hitTestable(), findsOneWidget);
-      expect(tester.getRect(find.text('导入全部')), actionPosition);
-      expect(tester.takeException(), null);
-    });
+        expect(find.text('book64.txt').hitTestable(), findsOneWidget);
+        expect(find.text('导入全部').hitTestable(), findsOneWidget);
+        expect(tester.getRect(find.text('导入全部')), actionPosition);
+        tester.view.physicalSize = const Size(320, 320);
+        await tester.pumpAndSettle();
+        expectCenteredImport(tester);
+        await tester.ensureVisible(find.text('导入全部'));
+        await tester.pumpAndSettle();
+        expect(find.text('导入全部').hitTestable(), findsOneWidget);
+        expect(tester.takeException(), null);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.windows),
+    );
 
     testWidgets('long filenames and long errors do not overflow', (
       tester,

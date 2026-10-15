@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
+import '../../shared/capabilities.dart';
 import 'package:flutter/services.dart';
 import '../../domain/contracts/import_source.dart';
 import '../../domain/contracts/local_book_decoder.dart';
@@ -272,6 +273,7 @@ class _ImportPanelState extends State<_ImportPanel> {
             Text(l.importDiscardMessage),
             const SizedBox(height: ShioriSpace.item),
             Wrap(
+              alignment: _actionAlignment(context),
               spacing: ShioriSpace.medium,
               runSpacing: ShioriSpace.small,
               children: [
@@ -314,6 +316,17 @@ class _ImportPanelState extends State<_ImportPanel> {
     builder: (context, _) {
       final c = widget.controller;
       final l = AppLocalizations.of(context);
+      final pointerFirst = ShioriCapabilities.of(context).pointerFirst;
+      final content = Padding(
+        padding: const EdgeInsets.all(ShioriSpace.page),
+        child: c.discarding
+            ? ShioriTaskProgressBar(semanticsLabel: l.loading)
+            : _discardIds != null
+            ? _discardConfirmation(c, l)
+            : c.panelOpen
+            ? _panel(context, c, l)
+            : _banner(context, c, l),
+      );
       return PopScope<void>(
         canPop: !c.busy && _discardIds == null,
         onPopInvokedWithResult: (_, _) => _dismiss(),
@@ -327,40 +340,45 @@ class _ImportPanelState extends State<_ImportPanel> {
             if (event is KeyDownEvent) _dismiss();
             return KeyEventResult.handled;
           },
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(ShioriSpace.medium),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
+          child: pointerFirst
+              ? Dialog(
+                  constraints: const BoxConstraints(
                     maxWidth: ShioriLayout.panel,
-                    maxHeight: MediaQuery.sizeOf(context).height * .7,
                   ),
-                  child: Material(
-                    elevation: 8,
-                    borderRadius: BorderRadius.circular(ShioriShape.sheet),
-                    color: Theme.of(context).colorScheme.surface,
-                    surfaceTintColor: Colors.transparent,
+                  child: SingleChildScrollView(child: content),
+                )
+              : Align(
+                  alignment: Alignment.bottomCenter,
+                  child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.all(ShioriSpace.page),
-                      child: c.discarding
-                          ? ShioriTaskProgressBar(semanticsLabel: l.loading)
-                          : _discardIds != null
-                          ? _discardConfirmation(c, l)
-                          : c.panelOpen
-                          ? _panel(context, c, l)
-                          : _banner(context, c, l),
+                      padding: const EdgeInsets.all(ShioriSpace.medium),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: ShioriLayout.panel,
+                          maxHeight: MediaQuery.sizeOf(context).height * .7,
+                        ),
+                        child: Material(
+                          elevation: 8,
+                          borderRadius: BorderRadius.circular(
+                            ShioriShape.sheet,
+                          ),
+                          color: Theme.of(context).colorScheme.surface,
+                          surfaceTintColor: Colors.transparent,
+                          child: content,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ),
         ),
       );
     },
   );
+
+  WrapAlignment _actionAlignment(BuildContext context) =>
+      ShioriCapabilities.of(context).pointerFirst
+      ? WrapAlignment.end
+      : WrapAlignment.start;
 
   Widget _banner(
     BuildContext context,
@@ -386,6 +404,7 @@ class _ImportPanelState extends State<_ImportPanel> {
       ],
       const SizedBox(height: ShioriSpace.medium),
       Wrap(
+        alignment: _actionAlignment(context),
         spacing: 12,
         children: [
           FilledButton(onPressed: c.open, child: Text(l.importReview)),
@@ -416,7 +435,12 @@ class _ImportPanelState extends State<_ImportPanel> {
       const SizedBox(height: ShioriSpace.small),
       ShioriTaskProgressBar(semanticsLabel: l.importReceiving),
       const SizedBox(height: ShioriSpace.item),
-      Align(alignment: Alignment.centerLeft, child: _stopButton(c, l)),
+      Align(
+        alignment: ShioriCapabilities.of(context).pointerFirst
+            ? Alignment.centerRight
+            : Alignment.centerLeft,
+        child: _stopButton(c, l),
+      ),
     ],
   );
 
@@ -437,6 +461,7 @@ class _ImportPanelState extends State<_ImportPanel> {
       if (!c.busy) const SizedBox(height: ShioriSpace.item),
       if (!c.busy)
         Wrap(
+          alignment: _actionAlignment(context),
           spacing: ShioriSpace.medium,
           runSpacing: ShioriSpace.small,
           children: [
@@ -504,6 +529,7 @@ class _ImportPanelState extends State<_ImportPanel> {
             Text(l.importEpubSupport),
           const SizedBox(height: ShioriSpace.item),
           Wrap(
+            alignment: _actionAlignment(context),
             spacing: 12,
             runSpacing: 8,
             children: [
@@ -629,12 +655,19 @@ class _ImportPanelState extends State<_ImportPanel> {
         ],
         const SizedBox(height: ShioriSpace.small),
         Flexible(
-          child: ListView.builder(
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            itemCount: total,
-            itemBuilder: (context, index) =>
-                _ImportItemTile(item: c.items[index], l: l),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: ShioriCapabilities.of(context).pointerFirst
+                  ? MediaQuery.sizeOf(context).height * .5
+                  : double.infinity,
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: total,
+              itemBuilder: (context, index) =>
+                  _ImportItemTile(item: c.items[index], l: l),
+            ),
           ),
         ),
         if (importing) ...[
@@ -650,6 +683,7 @@ class _ImportPanelState extends State<_ImportPanel> {
         ],
         const SizedBox(height: ShioriSpace.item),
         Wrap(
+          alignment: _actionAlignment(context),
           spacing: 12,
           runSpacing: 8,
           children: [
@@ -713,7 +747,12 @@ class _ImportPanelState extends State<_ImportPanel> {
             ),
           ],
           const SizedBox(height: ShioriSpace.item),
-          Align(alignment: Alignment.centerLeft, child: _stopButton(c, l)),
+          Align(
+            alignment: ShioriCapabilities.of(context).pointerFirst
+                ? Alignment.centerRight
+                : Alignment.centerLeft,
+            child: _stopButton(c, l),
+          ),
         ],
       ),
     );

@@ -56,61 +56,69 @@ class _UpdateScreenState extends State<UpdateScreen> {
 
   Future<void> _chooseChannel(BuildContext context) async {
     final l = AppLocalizations.of(context);
-    final value = await showShioriSheet<UpdateChannel>(
-      context,
-      builder: (context) => SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l.updateChooseChannel,
-                style: Theme.of(context).textTheme.titleLarge,
+    Widget options(BuildContext context) => Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final channel in UpdateChannel.values)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            selected: controller.preferences.channel == channel,
+            selectedTileColor: Colors.transparent,
+            leading: Icon(
+              controller.preferences.channel == channel
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_off,
+            ),
+            title: Text(
+              channel == UpdateChannel.stable ? l.updateStable : l.updateBeta,
+            ),
+            subtitle: Text(
+              channel == UpdateChannel.stable
+                  ? l.updateStableHint
+                  : l.updateBetaHint,
+            ),
+            onTap: () => Navigator.pop(context, channel),
+          ),
+        const SizedBox(height: ShioriSpace.medium),
+        Text(l.updateChannelHint, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+    final value = await (ShioriCapabilities.of(context).pointerFirst
+        ? showDialog<UpdateChannel>(
+            context: context,
+            builder: (context) => AlertDialog(
+              constraints: const BoxConstraints(maxWidth: ShioriLayout.panel),
+              scrollable: true,
+              title: Text(l.updateChooseChannel),
+              content: SizedBox(
+                width: ShioriLayout.panel,
+                child: options(context),
               ),
-              const SizedBox(height: ShioriSpace.item),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      for (final channel in UpdateChannel.values)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          selected: controller.preferences.channel == channel,
-                          selectedTileColor: Colors.transparent,
-                          leading: Icon(
-                            controller.preferences.channel == channel
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_off,
-                          ),
-                          title: Text(
-                            channel == UpdateChannel.stable
-                                ? l.updateStable
-                                : l.updateBeta,
-                          ),
-                          subtitle: Text(
-                            channel == UpdateChannel.stable
-                                ? l.updateStableHint
-                                : l.updateBetaHint,
-                          ),
-                          onTap: () => Navigator.pop(context, channel),
-                        ),
-                      const SizedBox(height: ShioriSpace.medium),
-                      Text(
-                        l.updateChannelHint,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
+            ),
+          )
+        : showShioriSheet<UpdateChannel>(
+            context,
+            builder: (context) => SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l.updateChooseChannel,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: ShioriSpace.item),
+                    Flexible(
+                      child: SingleChildScrollView(child: options(context)),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
+            ),
+          ));
     if (value != null && context.mounted && !controller.busy) {
       await controller.setChannel(value);
     }
