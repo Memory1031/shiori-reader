@@ -97,6 +97,11 @@ final class PageLayout {
   final Map<MediaRef, double> imageHeights;
   final double Function(ImageBlock)? imageExtent;
   int measuredChunks = 0;
+  // ChunkIndex already counted each immutable source block; deep seeks must
+  // not traverse a multi-million-character paragraph again for every page.
+  late final _blockLengths = <int, int>{
+    for (final chunk in index.chunks) chunk.blockIndex: chunk.total,
+  };
   late final Map<int, double> _tableWidths = () {
     final widths = <int, double>{};
     for (final block in index.content.blocks) {
@@ -386,7 +391,7 @@ final class PageLayout {
     if (block is ParagraphBlock &&
         block.linkDecoration != null &&
         blockOffset == 0 &&
-        text.runes.length == block.text.runes.length) {
+        text.runes.length == _blockLengths[blockIndex]) {
       final box = block.linkDecoration!.onBlock
           ? readerBlockBoxes(
               block,
@@ -513,7 +518,7 @@ final class PageLayout {
       }
       var count = 0;
       for (final line in flow.lines) {
-        final bottom = blockOffset + line.end == paragraph.text.runes.length
+        final bottom = blockOffset + line.end == _blockLengths[blockIndex]
             ? edges.bottom
             : 0.0;
         if (flow.heightThrough(line) + spacing + top + bottom >
@@ -524,7 +529,7 @@ final class PageLayout {
       }
       if (count == 0) return null;
       final selected = flow.take(count);
-      final bottom = blockOffset + selected.end == paragraph.text.runes.length
+      final bottom = blockOffset + selected.end == _blockLengths[blockIndex]
           ? edges.bottom
           : 0.0;
       return (
@@ -623,11 +628,7 @@ final class PageLayout {
         pageHeight: height,
         minimumContentHeight: boxContentHeight,
       );
-      final blockLength = switch (block) {
-        ParagraphBlock(:final text) ||
-        HeadingBlock(:final text) => text.runes.length,
-        _ => 0,
-      };
+      final blockLength = _blockLengths[blockIndex];
       final top = startsBlock ? edges.top : 0.0;
       final bottom = blockOffset + text.runes.length == blockLength
           ? edges.bottom
