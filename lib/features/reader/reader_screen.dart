@@ -1356,6 +1356,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
                               widget.completion!,
                             ),
                       child: SafeArea(
+                        maintainBottomViewPadding: true,
                         child: Stack(
                           fit: StackFit.expand,
                           // Toolbars paint into the safe-area insets.

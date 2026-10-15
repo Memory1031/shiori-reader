@@ -156,6 +156,7 @@ Future<ReturnReader> mount(
   Size size = const Size(400, 800),
   double scale = 1,
   bool dark = false,
+  ReaderPaper paper = ReaderPaper.paper,
   ReturnRepository Function(MemoryBooks)? repositoryFactory,
 }) async {
   tester.view
@@ -181,6 +182,7 @@ Future<ReturnReader> mount(
       controlsHintSeen: true,
       pageTurn: PageTurnStyle.none,
       themeMode: dark ? ReaderThemeMode.dark : ReaderThemeMode.light,
+      paper: paper,
     ),
     cancellation: CancellationSource().token,
   );
@@ -225,11 +227,12 @@ Future<void> toggle(WidgetTester tester) async {
 Future<void> snapshot(
   WidgetTester tester,
   ReturnReader reader,
-  String name,
-) async {
+  String name, {
+  bool pump = true,
+}) async {
   final output = Platform.environment['SHIORI_RETURN_SCREENSHOTS'];
   if (output == null) return;
-  await tester.pump();
+  if (pump) await tester.pump();
   await tester.runAsync(() async {
     final render =
         reader.boundary.currentContext!.findRenderObject()!

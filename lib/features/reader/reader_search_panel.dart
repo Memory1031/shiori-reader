@@ -35,6 +35,7 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
   final _scroll = ScrollController(keepScrollOffset: false);
   final _viewport = GlobalKey();
   final _rows = <int, GlobalKey>{};
+  final _placeholders = <int>{};
   Key _center = UniqueKey(), _listIdentity = UniqueKey();
   (double, TextScaler, TextStyle?)? _metrics;
   int _baseIndex = 0, _lastVisible = 0;
@@ -62,11 +63,21 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
     if (_generation != state.generation) {
       _generation = state.generation;
       _fill = 0;
+      _positioned = false;
+      _titles.clear();
     } else {
-      _saveAnchor();
+      final first = _saveAnchor()?.$1;
+      // Only replacing visible placeholders can change existing row heights.
+      if (first != null &&
+          _rows.keys.any(
+            (index) =>
+                index >= first &&
+                index <= _lastVisible &&
+                _placeholders.contains(index) != (state.hitAt(index) == null),
+          )) {
+        _positioned = false;
+      }
     }
-    // Rebuilt placeholders can have different heights from the actual results.
-    _positioned = false;
     setState(() {});
     _queueVisible();
   }
@@ -75,6 +86,7 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scroll.hasClients) return;
       _rows.removeWhere((_, key) => key.currentContext == null);
+      _placeholders.removeWhere((index) => !_rows.containsKey(index));
       final first = _saveAnchor()?.$1 ?? _baseIndex;
       if (state.loading || state.paused || state.error != null) return;
       for (var index = first; index <= _lastVisible; index++) {
@@ -140,6 +152,7 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
       _center = UniqueKey();
       _listIdentity = UniqueKey();
       _rows.clear();
+      _placeholders.clear();
       _restoring = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -151,10 +164,18 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
         _queueVisible();
       });
     }
-    Widget row(int index) => KeyedSubtree(
-      key: _rows.putIfAbsent(index, GlobalKey.new),
-      child: _result(context, index),
-    );
+    Widget row(int index) {
+      if (index < state.loadedCount && state.hitAt(index) == null) {
+        _placeholders.add(index);
+      } else {
+        _placeholders.remove(index);
+      }
+      return KeyedSubtree(
+        key: _rows.putIfAbsent(index, GlobalKey.new),
+        child: _result(context, index),
+      );
+    }
+
     // A centered pair of native slivers restores an absolute result anchor
     // without retaining heights or snippets for every previously visited row.
     return KeyedSubtree(

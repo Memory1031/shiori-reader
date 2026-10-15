@@ -1,16 +1,22 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/local/search/local_search_session.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/domain/local_chapter_progress.dart';
 import 'package:shiori/features/reader/reader_search_controller.dart';
 import 'package:shiori/features/reader/reader_search_highlight.dart';
 import 'package:shiori/features/reader/reader_search_panel.dart';
 import 'package:shiori/features/reader/reader_toolbars.dart';
+import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/app/theme/shiori_theme.dart';
+import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'link_return_test.dart' as f;
 import 'local_reading_test.dart' show MemoryBooks;
 
@@ -20,6 +26,15 @@ class ReaderSearchRepository extends f.ReturnRepository {
   final MemoryBooks store;
   final sessions = <LocalSearchSessionImpl>[];
   bool valid = true;
+  Completer<void>? queryGate;
+  bool logicalIndexAvailable = true;
+  @override
+  Future<Result<LocalChapterProgressIndex?>> loadLogicalChapters(
+    NovelKey key, {
+    required CancellationToken cancellation,
+  }) => logicalIndexAvailable
+      ? super.loadLogicalChapters(key, cancellation: cancellation)
+      : Future.value(const Success(null));
   ChapterKey? changingTarget;
   int targetLoads = 0, changeAfter = 3;
   @override
@@ -70,8 +85,43 @@ class ReaderSearchRepository extends f.ReturnRepository {
       },
     );
     sessions.add(session);
-    return Success(session);
+    return Success(
+      queryGate == null ? session : DelayedSearchSession(session, queryGate!),
+    );
   }
+}
+
+class DelayedSearchSession implements LocalSearchSession {
+  DelayedSearchSession(this.delegate, this.gate);
+  final LocalSearchSession delegate;
+  final Completer<void> gate;
+  @override
+  LocalSearchSnapshotId get snapshot => delegate.snapshot;
+  @override
+  bool get isValid => delegate.isValid;
+  @override
+  Future<Result<LocalSearchPage>> search(
+    String query, {
+    required CancellationToken cancellation,
+  }) async {
+    await gate.future;
+    return delegate.search(query, cancellation: cancellation);
+  }
+
+  @override
+  Future<Result<LocalSearchPage>> nextPage(
+    LocalSearchCursor cursor, {
+    required CancellationToken cancellation,
+  }) => delegate.nextPage(cursor, cancellation: cancellation);
+  @override
+  Future<Result<void>> validate(
+    LocalSearchSnapshotId snapshot, {
+    required CancellationToken cancellation,
+  }) => delegate.validate(snapshot, cancellation: cancellation);
+  @override
+  Future<void> cancel() => delegate.cancel();
+  @override
+  Future<void> close() => delegate.close();
 }
 
 ReaderSearchController search(f.ReturnReader reader, WidgetTester tester) =>
@@ -134,7 +184,12 @@ Future<void> fonts(WidgetTester tester) async {
     final cjk = File('/System/Library/Fonts/Supplemental/Arial Unicode.ttf');
     if (await cjk.exists()) {
       final bytes = await cjk.readAsBytes();
-      for (final family in ['Microsoft YaHei UI', 'Roboto']) {
+      for (final family in [
+        'Microsoft YaHei UI',
+        'Roboto',
+        'CupertinoSystemText',
+        'CupertinoSystemDisplay',
+      ]) {
         await (FontLoader(
           family,
         )..addFont(Future.value(ByteData.sublistView(bytes)))).load();
@@ -144,6 +199,184 @@ Future<void> fonts(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+    'search opening and delayed query retain the body in every intermediate frame',
+    (tester) async {
+      await fonts(tester);
+      final mobile = defaultTargetPlatform == TargetPlatform.iOS;
+      if (mobile) {
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+        tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+      }
+      final reader = await f.mount(
+        tester,
+        size: mobile ? const Size(400, 800) : const Size(1040, 780),
+        paper: ReaderPaper.warm,
+        repositoryFactory: ReaderSearchRepository.new,
+      );
+      final repository = reader.repository as ReaderSearchRepository;
+      final gate = repository.queryGate = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      final state = search(reader, tester);
+      if (mobile) {
+        unawaited(reader.view(tester).viewportController!.next());
+        await tester.pumpAndSettle();
+        expect(reader.position(tester).blockIndex, greaterThan(0));
+        await f.toggle(tester);
+      }
+      final view = tester.state(find.byType(ReaderContentView));
+      final viewport = tester.state(find.byType(PagedReaderViewport));
+      final controller = reader.view(tester).viewportController!;
+      final generation = controller.layoutGeneration;
+      final position = reader.position(tester);
+      final page = controller.inspectDisplayedPage()!.page;
+      final sample = reader.view(tester).session!.currentPosition;
+      final writes = reader.library.controls.calls[Operation.progressWrite];
+      Future<void> frameSnapshot(String name) =>
+          f.snapshot(tester, reader, name, pump: false);
+      if (mobile) {
+        await frameSnapshot('ios-second-page-before-search');
+      }
+      void unchanged() {
+        expect(tester.state(find.byType(ReaderContentView)), same(view));
+        expect(tester.state(find.byType(PagedReaderViewport)), same(viewport));
+        expect(controller.layoutGeneration, generation);
+        expect(controller.isRestoring, isFalse);
+        expect(controller.inspectDisplayedPage()!.page, same(page));
+        expect(reader.position(tester), position);
+        expect(reader.view(tester).session!.currentPosition, same(sample));
+        expect(reader.library.controls.calls[Operation.progressWrite], writes);
+        expect(
+          find.descendant(
+            of: find.byType(PagedReaderViewport),
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsNothing,
+        );
+      }
+
+      Future<List<int>> bodyPixels() async => (await tester.runAsync(() async {
+        final boundary =
+            reader.boundary.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        final image = await boundary.toImage(pixelRatio: 1);
+        final data = (await image.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        ))!;
+        final bytes = data.buffer.asUint8List();
+        final region = <int>[];
+        for (var y = 80; y < (mobile ? 100 : 650); y++) {
+          region.addAll(
+            bytes.sublist(
+              (y * image.width + (mobile ? 40 : 100)) * 4,
+              (y * image.width + (mobile ? 360 : 580)) * 4,
+            ),
+          );
+        }
+        image.dispose();
+        return region;
+      }))!;
+
+      if (mobile) {
+        await tester.tap(find.byKey(const ValueKey('reader-search-open')));
+      } else {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      }
+      await tester.pump();
+      final route = ModalRoute.of(
+        tester.element(find.byType(ReaderSearchPanel)),
+      )!;
+      var openingFrame = 0;
+      for (
+        var elapsed = Duration.zero;
+        elapsed <= route.transitionDuration;
+        elapsed += const Duration(milliseconds: 16)
+      ) {
+        await tester.pump(const Duration(milliseconds: 16));
+        unchanged();
+        if (mobile) {
+          await frameSnapshot(
+            'ios-opening-${(openingFrame++).toString().padLeft(2, '0')}',
+          );
+        }
+      }
+      final beforeKeyboard = await bodyPixels();
+      if (mobile) {
+        // A real keyboard consumes bottom padding, while viewPadding survives.
+        tester.view.padding = const FakeViewPadding(top: 24);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+        await tester.pump(const Duration(milliseconds: 16));
+        await frameSnapshot('ios-keyboard-first-frame');
+        unchanged();
+        expect(await bodyPixels(), beforeKeyboard);
+        await frameSnapshot('ios-keyboard-open');
+      }
+      final pixels = await bodyPixels();
+      await tester.enterText(
+        find.byKey(const ValueKey('reader-search-input')),
+        'later',
+      );
+      await tester.pump();
+      unchanged();
+      late Future<void> pending;
+      await tester.runAsync(() async {
+        pending = state.submit('later');
+      });
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(state.loading, isTrue);
+        unchanged();
+        expect(await bodyPixels(), pixels);
+        await frameSnapshot(
+          '${mobile ? 'mobile' : 'desktop'}-query-loading-${i.toString().padLeft(2, '0')}',
+        );
+      }
+      await tester.runAsync(() async {
+        gate.complete();
+        await pending;
+      });
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        unchanged();
+        expect(await bodyPixels(), pixels);
+      }
+      if (mobile) await frameSnapshot('ios-query-results');
+      if (mobile) {
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+        tester.view.viewInsets = const FakeViewPadding();
+        for (var i = 0; i < 3; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          unchanged();
+          expect(await bodyPixels(), pixels);
+        }
+      }
+      tester
+          .widget<ReaderSearchPanel>(find.byType(ReaderSearchPanel))
+          .onClose();
+      await tester.pumpAndSettle();
+      unchanged();
+      if (mobile) {
+        await frameSnapshot('ios-search-closed');
+        await tester.tap(find.byKey(const ValueKey('reader-search-open')));
+        await tester.pumpAndSettle();
+      } else {
+        await open(tester);
+      }
+      await select(tester, state, 0);
+      expect(state.selectedIndex, 0);
+      expect(reader.view(tester).content.key, state.hitAt(0)!.chapter);
+      expect(tester.takeException(), isNull);
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.windows,
+      TargetPlatform.iOS,
+    }),
+  );
+
   testWidgets(
     'compact result rows preserve their anchor across reopening, reflow and cache eviction',
     (tester) async {
@@ -168,6 +401,37 @@ void main() {
             find.byKey(const ValueKey('reader-search-results')),
           )
           .controller!;
+      scroll().jumpTo(scroll().position.maxScrollExtent / 2);
+      await tester.pumpAndSettle();
+      final resultList = find.byKey(const ValueKey('reader-search-results'));
+      final listElement = tester.element(resultList);
+      final scrollState = tester.state(
+        find.descendant(of: resultList, matching: find.byType(Scrollable)),
+      );
+      final middle = state.scrollPosition.floor();
+      final row = tester.element(
+        find.byKey(ValueKey('reader-search-result-$middle')),
+      );
+      final offset = scroll().offset;
+      for (final draft in ['f', 'fixture误', 'fixture']) {
+        await tester.enterText(
+          find.byKey(const ValueKey('reader-search-input')),
+          draft,
+        );
+        await tester.pump();
+        expect(tester.element(resultList), same(listElement));
+        expect(
+          tester.state(
+            find.descendant(of: resultList, matching: find.byType(Scrollable)),
+          ),
+          same(scrollState),
+        );
+        expect(
+          tester.element(find.byKey(ValueKey('reader-search-result-$middle'))),
+          same(row),
+        );
+        expect(scroll().offset, offset);
+      }
       Future<void> settleSearch() async {
         for (var i = 0; i < 200; i++) {
           await tester.runAsync(
@@ -214,6 +478,98 @@ void main() {
     },
     variant: const TargetPlatformVariant({TargetPlatform.windows}),
   );
+
+  for (final logicalIndexAvailable in [true, false]) {
+    testWidgets(
+      'result titles use the hit section within one EPUB document (logical index: $logicalIndexAvailable)',
+      (tester) async {
+        final reader = await f.mount(
+          tester,
+          size: const Size(1040, 780),
+          repositoryFactory: (store) =>
+              ReaderSearchRepository(store)
+                ..logicalIndexAvailable = logicalIndexAvailable,
+        );
+        await reader.link(tester, 'Same file');
+        await open(tester);
+        final state = search(reader, tester);
+        Future<String?> title(LocalSearchHit hit) => tester.runAsync<String?>(
+          () => tester
+              .widget<ReaderSearchPanel>(find.byType(ReaderSearchPanel))
+              .titleFor(hit, CancellationSource().token),
+        );
+        await submit(tester, state, 'a 0');
+        final before = List.generate(state.loadedCount, state.hitAt)
+            .whereType<LocalSearchHit>()
+            .firstWhere((h) => h.chapter == reader.key('a'));
+        expect(await title(before), 'a opening');
+        await submit(tester, state, 'later');
+        final after = List.generate(state.loadedCount, state.hitAt)
+            .whereType<LocalSearchHit>()
+            .firstWhere((h) => h.chapter == reader.key('a'));
+        expect(await title(after), 'a later');
+        expect(before.blockIndex, lessThan(after.blockIndex));
+        expect(tester.takeException(), isNull);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.windows}),
+    );
+  }
+
+  for (final palette in ['paper', 'warm', 'night']) {
+    testWidgets(
+      'search field follows reading palette $palette',
+      (tester) async {
+        await fonts(tester);
+        final reader = await f.mount(
+          tester,
+          size: const Size(1040, 780),
+          paper: palette == 'warm' ? ReaderPaper.warm : ReaderPaper.paper,
+          dark: palette == 'night',
+          repositoryFactory: ReaderSearchRepository.new,
+        );
+        await open(tester);
+        await submit(tester, search(reader, tester), 'later');
+        final input = tester.element(
+          find.byKey(const ValueKey('reader-search-input')),
+        );
+        final theme = Theme.of(input);
+        final fill = theme.inputDecorationTheme.fillColor!;
+        expect(
+          fill,
+          Color.lerp(
+            theme.scaffoldBackgroundColor,
+            theme.colorScheme.outlineVariant,
+            .22,
+          ),
+        );
+        for (final foreground in [
+          theme.colorScheme.onSurface,
+          theme.inputDecorationTheme.hintStyle!.color!,
+          theme.inputDecorationTheme.suffixIconColor!,
+        ]) {
+          final a = foreground.computeLuminance(), b = fill.computeLuminance();
+          expect(
+            (a > b ? (a + .05) / (b + .05) : (b + .05) / (a + .05)),
+            greaterThanOrEqualTo(4.5),
+          );
+        }
+        expect(
+          (theme.inputDecorationTheme.focusedBorder! as OutlineInputBorder)
+              .borderSide
+              .color,
+          theme.colorScheme.primary,
+        );
+        expect(theme.textTheme.bodyLarge!.color, theme.colorScheme.onSurface);
+        final appTheme = shioriTheme(theme.brightness);
+        if (palette == 'warm') {
+          expect(fill, isNot(appTheme.inputDecorationTheme.fillColor));
+        }
+        await f.snapshot(tester, reader, 'search-palette-$palette');
+        expect(tester.takeException(), isNull);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.windows}),
+    );
+  }
 
   testWidgets(
     'toolbar, explicit submit, same/main navigation and independent original link history',

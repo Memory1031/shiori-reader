@@ -28,6 +28,12 @@ ThemeData readerTheme(
     scaffoldBackgroundColor: paper,
     appBarTheme: base.appBarTheme.copyWith(backgroundColor: paper),
     colorScheme: base.colorScheme.copyWith(onSurfaceVariant: secondary),
+    inputDecorationTheme: base.inputDecorationTheme.copyWith(
+      fillColor: Color.lerp(paper, base.colorScheme.outlineVariant, .22),
+      hintStyle: base.textTheme.bodyMedium?.copyWith(color: secondary),
+      prefixIconColor: secondary,
+      suffixIconColor: secondary,
+    ),
     bottomSheetTheme: base.bottomSheetTheme.copyWith(
       backgroundColor: paper,
       surfaceTintColor: Colors.transparent,

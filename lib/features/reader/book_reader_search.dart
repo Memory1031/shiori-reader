@@ -50,24 +50,57 @@ extension _BookReaderSearch on _BookReaderScreenState {
     CancellationToken token,
   ) async {
     if (token.isCancelled || !mounted) return null;
-    final entries = _navigation[hit.chapter];
-    final named = entries?.where((e) => e.$2 <= hit.blockIndex).lastOrNull;
-    if (named != null) {
-      return localNavigationTitle(named.$1, AppLocalizations.of(context));
-    }
-    if (hit.chapter == _reader.chapter) return _chapterTitle(_reader);
-    final chapter = _catalog.loaded?.value.flatChapters
-        .where((c) => c.key == hit.chapter)
-        .firstOrNull;
-    if (chapter != null) return chapter.title;
-    final loaded = await widget.repository.loadChapter(
+    final section = _logicalIndex?.sectionAt(
       hit.chapter,
-      mode: ReadMode.cacheOnly,
-      cancellation: token,
+      ReaderPosition(
+        contentRevision: hit.contentRevision,
+        blockKey: hit.blockKey,
+        blockIndex: hit.blockIndex,
+        blockFraction: 0,
+        chapterFraction: 0,
+      ),
     );
-    return loaded is Success<LoadResult<ChapterContent>> && !token.isCancelled
-        ? loaded.value.value.title
-        : null;
+    if (section != null) {
+      return localNavigationTitle(section.entry, AppLocalizations.of(context));
+    }
+    var content = hit.chapter == _reader.chapter ? _reader.content : null;
+    if (content == null) {
+      final loaded = await widget.repository.loadChapter(
+        hit.chapter,
+        mode: ReadMode.cacheOnly,
+        cancellation: token,
+      );
+      if (!mounted || token.isCancelled) return null;
+      if (loaded is Success<LoadResult<ChapterContent>>) {
+        content = loaded.value.value;
+      }
+    }
+    if (content?.contentRevision == hit.contentRevision) {
+      LocalNavigationEntry? named;
+      var start = -1, depth = -1;
+      for (final (entry, level)
+          in _navigation[hit.chapter] ??
+              const <(LocalNavigationEntry, int)>[]) {
+        final block = entry.blockKey == null
+            ? 0
+            : content!.blocks.indexWhere((b) => b.blockKey == entry.blockKey);
+        if (block >= 0 &&
+            block <= hit.blockIndex &&
+            (block > start || block == start && level > depth)) {
+          named = entry;
+          start = block;
+          depth = level;
+        }
+      }
+      if (named != null) {
+        return localNavigationTitle(named, AppLocalizations.of(context));
+      }
+    }
+    return content?.title ??
+        _catalog.loaded?.value.flatChapters
+            .where((c) => c.key == hit.chapter)
+            .firstOrNull
+            ?.title;
   }
 
   int _searchOffset(LocalSearchHit hit) => switch (hit) {
