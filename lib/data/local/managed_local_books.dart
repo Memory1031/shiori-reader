@@ -917,6 +917,7 @@ class ManagedLocalBooks
       // unindexed orphan recovered on restart; never restore a deleted book.
       try {
         await _retireSearchSnapshot(key);
+        _invalidations.add(key);
         final directory = p.join(paths.localBooks.path, key.novelId);
         if (await FileSystemEntity.type(directory, followLinks: false) !=
             FileSystemEntityType.notFound) {

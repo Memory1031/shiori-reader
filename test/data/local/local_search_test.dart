@@ -403,7 +403,11 @@ void main() {
       );
       final other = await books.search(key);
       final pending = other.search('不存在', cancellation: token());
+      final deleted = books.store.invalidations.firstWhere(
+        (book) => book == key,
+      );
       ok(await books.store.deleteBook(key, cancellation: token()));
+      expect(await deleted.timeout(const Duration(seconds: 2)), key);
       await pending;
       expect(next.isValid, isFalse);
       expect(other.isValid, isFalse);
