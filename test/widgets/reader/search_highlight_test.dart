@@ -12,6 +12,7 @@ import 'package:shiori/features/reader/reader_inline_stack.dart';
 import 'package:shiori/features/reader/reader_ruby.dart';
 import 'package:shiori/features/reader/reader_search_highlight.dart';
 import 'package:shiori/features/reader/reader_theme.dart';
+import 'package:shiori/features/reader/reader_authored_colors.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 import '../../data/local/epub_prose_semantics_test.dart' show paragraphs;
@@ -65,7 +66,7 @@ List<Rect> boxes(WidgetTester tester) => tester
 void main() {
   for (final palette in ['paper', 'warm', 'night']) {
     testWidgets(
-      'glyph backgrounds preserve ink and use the theme container on $palette',
+      'glyph backgrounds preserve original ink and readable theme accent surfaces on $palette',
       (tester) async {
         await fonts(tester);
         final theme = readerTheme(
@@ -83,10 +84,12 @@ void main() {
           blocks: paragraphs(
             '<p>H H</p><p><span style="color:#b53050">H H</span></p>'
             '<p><ruby>H H<rt>reading</rt></ruby></p>'
-            '<p><span style="display:inline-block;text-align:center;line-height:1em;text-indent:0">H H<br/>L L</span></p>',
+            '<p><span style="display:inline-block;text-align:center;line-height:1em;text-indent:0">H H<br/>L L</span></p>'
+            '<p style="color:white;background-color:#333333">H H</p>'
+            '<p style="color:#202020;background-color:#f9f9f9">H H</p>',
           ),
         );
-        expect(content.blocks, hasLength(4));
+        expect(content.blocks, hasLength(6));
         final active = ValueNotifier<LocalSearchBodyHit?>(null),
             controller = PagedReaderController(),
             boundary = GlobalKey();
@@ -170,22 +173,42 @@ void main() {
             'stack-lower',
             hit(content, 3, stack.separator + 1, stack.separator + 3),
           ),
+          ('authored-light', hit(content, 4, 0, 2)),
+          ('authored-dark', hit(content, 5, 0, 2)),
         ];
         for (final (name, selected) in phases) {
           active.value = selected;
           await tester.pump();
           final selectedRects = <Rect>[];
+          final foregroundColors = <int>{};
+          void collectInk(InlineSpan span, [Color? inherited]) {
+            final color = span.style?.color ?? inherited;
+            if (span is TextSpan) {
+              if (span.text?.isNotEmpty == true && color != null) {
+                foregroundColors.add(rgba(color));
+              }
+              for (final child in span.children ?? const <InlineSpan>[]) {
+                collectInk(child, color);
+              }
+            }
+          }
+
+          var background = theme.colorScheme.primaryContainer;
           void add(RenderBox box, List<Rect> rects) => selectedRects.addAll(
             rects.map(
               (r) => MatrixUtils.transformRect(box.getTransformTo(render), r),
             ),
           );
           if (name == 'ruby-base') {
+            collectInk(ruby.layout.base);
             add(
               tester.renderObject(find.byType(ReaderRuby)),
               ruby.layout.selectedBoxes(ruby.highlight, ruby.sourceStart),
             );
           } else if (name.startsWith('stack')) {
+            collectInk(
+              name == 'stack-upper' ? stack.layout.upper : stack.layout.lower,
+            );
             add(
               tester.renderObject(find.byType(ReaderInlineStack)),
               stack.layout.selectedBoxes(
@@ -198,10 +221,26 @@ void main() {
             for (final box in tester.renderObjectList<ReaderSearchTextRender>(
               find.byType(ReaderPaintedSearchText),
             )) {
+              if (box.configuration.highlight.blockIndex ==
+                  selected.blockIndex) {
+                background = box.configuration.highlight.color;
+                final paragraph = tester.renderObject<RenderParagraph>(
+                  find
+                      .descendant(
+                        of: find.byWidget(box.configuration),
+                        matching: find.byType(RichText),
+                      )
+                      .last,
+                );
+                collectInk(paragraph.text);
+              }
               add(box, box.selectedBoxes);
             }
           }
           expect(selectedRects, isNotEmpty);
+          if (name == 'body') {
+            expect(background, theme.colorScheme.primaryContainer);
+          }
           final marked = await capture(), ink = <int, int>{};
           var backgroundPixels = 0;
           for (var y = 0; y < baseline.height; y++) {
@@ -211,10 +250,10 @@ void main() {
               final before = baseline.bytes.getUint32(offset),
                   after = marked.bytes.getUint32(offset);
               if (selectedRects.any((r) => r.contains(at))) {
-                if (after == rgba(theme.colorScheme.primaryContainer)) {
+                if (after == rgba(background)) {
                   backgroundPixels++;
                 }
-                if (before != rgba(theme.scaffoldBackgroundColor)) {
+                if (foregroundColors.contains(before)) {
                   ink.update(before, (n) => n + 1, ifAbsent: () => 1);
                 }
               } else if (!selectedRects.any((r) => r.inflate(1).contains(at))) {
@@ -229,11 +268,20 @@ void main() {
           expect(
             backgroundPixels,
             greaterThan(0),
-            reason: '$palette/$name uses an opaque primaryContainer',
+            reason: '$palette/$name uses an opaque theme accent surface',
           );
           final foreground = ink.keys.reduce(
             (a, b) => ink[a]! > ink[b]! ? a : b,
           );
+          if (name.startsWith('authored')) {
+            expect(
+              readerColorContrast(
+                Color((foreground >> 8) | ((foreground & 255) << 24)),
+                background,
+              ),
+              greaterThanOrEqualTo(4.5),
+            );
+          }
           var preserved = 0;
           for (var y = 0; y < baseline.height; y++) {
             for (var x = 0; x < baseline.width; x++) {

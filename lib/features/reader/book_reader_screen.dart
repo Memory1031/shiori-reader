@@ -13,6 +13,7 @@ import '../novel_detail/catalog_controller.dart';
 import 'reader_controller.dart';
 import 'reader_preferences.dart';
 import 'reader_loading_page.dart';
+import 'reader_location_transition.dart';
 import 'reader_theme.dart';
 import 'position/position_resolver.dart';
 import 'reader_screen.dart';
@@ -132,6 +133,7 @@ class BookReaderScreen extends StatefulWidget {
 class _BookReaderScreenState extends State<BookReaderScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   LocalBookUse? _routeUse;
+  int _locationRevision = 0;
   ReaderSearchController? _search;
   _ReturnAnchor? _searchAnchor;
   _SearchNavigation? _searchNavigation;
@@ -375,6 +377,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       _restoringLocation = true;
       _completion = null;
     });
+    final previousPage = viewport.inspectDisplayedPage()?.page;
     final restored = await viewport.restoreConfirmed(position, isCurrent: live);
     if (!mounted || source != _reader) return;
     setState(() {
@@ -382,6 +385,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       _restoringLocation = false;
       if (restored && live()) {
         _commitLocation(intent, origin, returning);
+        final page = viewport.inspectDisplayedPage()?.page;
+        if ((intent == _LocationIntent.search ||
+                intent == _LocationIntent.searchReturn) &&
+            _searchNavigation?.origin.chapter == source.chapter &&
+            previousPage != null &&
+            page != null &&
+            (page.start != previousPage.start ||
+                page.end != previousPage.end)) {
+          _locationRevision++;
+        }
       }
     });
   }
@@ -2524,7 +2537,21 @@ class _BookReaderScreenState extends State<BookReaderScreen>
               excluding: !active,
               child: ExcludeFocus(
                 excluding: !active,
-                child: _view(reader, active: active),
+                child: _search == null
+                    ? _view(reader, active: active)
+                    : ReaderLocationTransition(
+                        revision: _locationRevision,
+                        enabled:
+                            active &&
+                            !_changing &&
+                            _foreground &&
+                            !_invalidated &&
+                            _leavingInsets == null &&
+                            _preferences.value.pageTurn != PageTurnStyle.none &&
+                            !MediaQuery.disableAnimationsOf(context),
+                        paper: _paper,
+                        child: _view(reader, active: active),
+                      ),
               ),
             ),
             builder: (context, child) => Offstage(

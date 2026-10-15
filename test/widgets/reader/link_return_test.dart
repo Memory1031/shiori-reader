@@ -157,6 +157,8 @@ Future<ReturnReader> mount(
   double scale = 1,
   bool dark = false,
   ReaderPaper paper = ReaderPaper.paper,
+  PageTurnStyle pageTurn = PageTurnStyle.none,
+  bool reduceMotion = false,
   ReturnRepository Function(MemoryBooks)? repositoryFactory,
 }) async {
   tester.view
@@ -180,7 +182,7 @@ Future<ReturnReader> mount(
   await settings.save(
     ReaderSettings(
       controlsHintSeen: true,
-      pageTurn: PageTurnStyle.none,
+      pageTurn: pageTurn,
       themeMode: dark ? ReaderThemeMode.dark : ReaderThemeMode.light,
       paper: paper,
     ),
@@ -194,9 +196,10 @@ Future<ReturnReader> mount(
       child: ShioriApp(
         locale: Locale(language),
         overlayBuilder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(scale)),
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(scale),
+            disableAnimations: reduceMotion,
+          ),
           child: child,
         ),
         routes: AppRoutes(

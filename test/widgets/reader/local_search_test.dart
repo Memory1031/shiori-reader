@@ -15,6 +15,8 @@ import 'package:shiori/features/reader/reader_search_highlight.dart';
 import 'package:shiori/features/reader/reader_search_panel.dart';
 import 'package:shiori/features/reader/reader_toolbars.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/features/reader/reader_location_transition.dart';
+import 'package:shiori/features/reader/viewport/page_turn.dart';
 import 'package:shiori/app/theme/shiori_theme.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'link_return_test.dart' as f;
@@ -199,6 +201,257 @@ Future<void> fonts(WidgetTester tester) async {
 }
 
 void main() {
+  List<double> reveals(WidgetTester tester) => tester
+      .widgetList<Opacity>(
+        find.descendant(
+          of: find.byType(ReaderLocationTransition),
+          matching: find.byType(Opacity),
+        ),
+      )
+      .map((o) => o.opacity)
+      .toList();
+  Future<void> drive(
+    WidgetTester tester,
+    Future<void> work,
+    FutureOr<void> Function() inspect,
+  ) async {
+    var done = false;
+    Object? failure;
+    work.then(
+      (_) => done = true,
+      onError: (Object e) {
+        failure = e;
+        done = true;
+      },
+    );
+    for (var i = 0; i < 400 && !done; i++) {
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pump(const Duration(milliseconds: 16));
+      await inspect();
+    }
+    expect(done, isTrue);
+    await tester.pump();
+    await inspect();
+    if (failure != null) throw failure!;
+  }
+
+  Future<void> choose(
+    WidgetTester tester,
+    ReaderSearchController state,
+    int index,
+    FutureOr<void> Function() inspect,
+  ) async {
+    final panel = tester.widget<ReaderSearchPanel>(
+      find.byType(ReaderSearchPanel),
+    );
+    await drive(
+      tester,
+      state.select(
+        index,
+        accepts: panel.accepts,
+        closePanel: panel.closeForNavigation,
+      ),
+      inspect,
+    );
+  }
+
+  testWidgets(
+    'cross chapter search and return already use the configured page turn',
+    (tester) async {
+      await fonts(tester);
+      final reader = await f.mount(
+        tester,
+        size: const Size(1040, 780),
+        pageTurn: PageTurnStyle.slide,
+        repositoryFactory: ReaderSearchRepository.new,
+      );
+      final state = search(reader, tester), origin = reader.position(tester);
+      await open(tester);
+      await submit(tester, state, 'later');
+      final index = List.generate(
+        state.loadedCount,
+        (i) => i,
+      ).firstWhere((i) => state.hitAt(i)!.chapter == reader.key('b'));
+      var midframes = 0;
+      var phase = 'forward';
+      Future<void> inspect() async {
+        if (tester
+            .widgetList<PageTurnSlot>(find.byType(PageTurnSlot))
+            .any(
+              (s) => s.frame.style == PageTurnStyle.slide && s.frame.turning,
+            )) {
+          midframes++;
+          if (midframes == 5) {
+            await f.snapshot(
+              tester,
+              reader,
+              'cross-chapter-$phase-middle',
+              pump: false,
+            );
+          }
+        }
+        expect(reveals(tester).every((o) => o == 1), isTrue);
+      }
+
+      await choose(tester, state, index, inspect);
+      await tester.pumpAndSettle();
+      expect(midframes, greaterThan(0));
+      expect(reader.view(tester).content.key, reader.key('b'));
+      midframes = 0;
+      phase = 'return';
+      await drive(tester, state.returnToOrigin!(), inspect);
+      await tester.pumpAndSettle();
+      expect(midframes, greaterThan(0));
+      expect(reader.view(tester).content.key, reader.key('a'));
+      expect(reader.position(tester), origin);
+      expect(state.canReturn.value, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.windows}),
+  );
+
+  testWidgets(
+    'same chapter search reveals only changed pages and preserves the single A origin',
+    (tester) async {
+      await fonts(tester);
+      final reader = await f.mount(
+        tester,
+        size: const Size(1040, 780),
+        pageTurn: PageTurnStyle.slide,
+        paper: ReaderPaper.warm,
+        repositoryFactory: ReaderSearchRepository.new,
+      );
+      final state = search(reader, tester),
+          origin = reader.position(tester),
+          viewport = tester.state(find.byType(PagedReaderViewport));
+      await open(tester);
+      await submit(tester, state, 'later');
+      final b = List.generate(
+        state.loadedCount,
+        (i) => i,
+      ).firstWhere((i) => state.hitAt(i)!.chapter == reader.key('a'));
+      final c = List.generate(
+        state.loadedCount,
+        (i) => i,
+      ).firstWhere((i) => state.hitAt(i)!.chapter == reader.key('b'));
+      final repository = reader.repository as ReaderSearchRepository;
+      repository.blocked = reader.key('a');
+      final preparation = repository.wait = Completer<void>();
+      var preparationFrames = 0;
+      await choose(tester, state, b, () {
+        if (!preparation.isCompleted) {
+          expect(reader.position(tester), origin);
+          expect(state.canReturn.value, isFalse);
+          expect(reveals(tester).every((o) => o == 1), isTrue);
+          if (++preparationFrames == 4) preparation.complete();
+        }
+      });
+      repository.blocked = null;
+      repository.wait = null;
+      expect(preparationFrames, 4);
+      expect(reveals(tester).single, lessThan(1));
+      expect(tester.state(find.byType(PagedReaderViewport)), same(viewport));
+      final page = reader
+              .view(tester)
+              .viewportController!
+              .inspectDisplayedPage()!
+              .page,
+          generation = reader.view(tester).viewportController!.layoutGeneration;
+      await f.snapshot(
+        tester,
+        reader,
+        'same-chapter-reveal-start',
+        pump: false,
+      );
+      await tester.pump(const Duration(milliseconds: 64));
+      expect(reveals(tester).single, inExclusiveRange(.88, 1));
+      expect(
+        reader.view(tester).viewportController!.layoutGeneration,
+        generation,
+      );
+      expect(
+        reader.view(tester).viewportController!.inspectDisplayedPage()!.page,
+        same(page),
+      );
+      await f.snapshot(
+        tester,
+        reader,
+        'same-chapter-reveal-middle',
+        pump: false,
+      );
+      await tester.pumpAndSettle();
+      expect(reveals(tester).single, 1);
+      // The same hit stays on the displayed page and needs no surface reveal.
+      await open(tester);
+      await choose(
+        tester,
+        state,
+        b,
+        () => expect(reveals(tester).every((o) => o == 1), isTrue),
+      );
+      await tester.pumpAndSettle();
+      await drive(tester, state.returnToOrigin!(), () {});
+      expect(reveals(tester).single, lessThan(1));
+      await tester.pump(const Duration(milliseconds: 64));
+      await f.snapshot(
+        tester,
+        reader,
+        'same-chapter-return-middle',
+        pump: false,
+      );
+      await tester.pumpAndSettle();
+      expect(reader.position(tester), origin);
+      expect(state.highlight.value, isNull);
+      // A -> B -> C -> A consumes one origin, with no intermediate B return.
+      await open(tester);
+      await choose(tester, state, b, () {});
+      await tester.pumpAndSettle();
+      await open(tester);
+      await choose(tester, state, c, () {});
+      await tester.pumpAndSettle();
+      await drive(tester, state.returnToOrigin!(), () {});
+      await tester.pumpAndSettle();
+      expect(reader.view(tester).content.key, reader.key('a'));
+      expect(reader.position(tester), origin);
+      expect(state.canReturn.value, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.windows}),
+  );
+
+  for (final disabled in [
+    (PageTurnStyle.none, false),
+    (PageTurnStyle.slide, true),
+  ]) {
+    testWidgets(
+      'search position reveal respects animation settings $disabled',
+      (tester) async {
+        final reader = await f.mount(
+          tester,
+          size: const Size(1040, 780),
+          pageTurn: disabled.$1,
+          reduceMotion: disabled.$2,
+          repositoryFactory: ReaderSearchRepository.new,
+        );
+        final state = search(reader, tester), origin = reader.position(tester);
+        await open(tester);
+        await submit(tester, state, 'later');
+        final b = List.generate(
+          state.loadedCount,
+          (i) => i,
+        ).firstWhere((i) => state.hitAt(i)!.chapter == reader.key('a'));
+        void inspect() => expect(reveals(tester).every((o) => o == 1), isTrue);
+        await choose(tester, state, b, inspect);
+        await drive(tester, state.returnToOrigin!(), inspect);
+        await tester.pumpAndSettle();
+        expect(reader.position(tester), origin);
+        expect(state.canReturn.value, isFalse);
+        expect(tester.takeException(), isNull);
+      },
+      variant: const TargetPlatformVariant({TargetPlatform.windows}),
+    );
+  }
+
   testWidgets(
     'search opening and delayed query retain the body in every intermediate frame',
     (tester) async {
@@ -211,6 +464,7 @@ void main() {
       final reader = await f.mount(
         tester,
         size: mobile ? const Size(400, 800) : const Size(1040, 780),
+        pageTurn: PageTurnStyle.slide,
         paper: ReaderPaper.warm,
         repositoryFactory: ReaderSearchRepository.new,
       );
@@ -240,6 +494,7 @@ void main() {
         await frameSnapshot('ios-second-page-before-search');
       }
       void unchanged() {
+        expect(reveals(tester).every((o) => o == 1), isTrue);
         expect(tester.state(find.byType(ReaderContentView)), same(view));
         expect(tester.state(find.byType(PagedReaderViewport)), same(viewport));
         expect(controller.layoutGeneration, generation);
@@ -713,6 +968,7 @@ void main() {
     (tester) async {
       final reader = await f.mount(
         tester,
+        pageTurn: PageTurnStyle.slide,
         repositoryFactory: ReaderSearchRepository.new,
       );
       final state = search(reader, tester),
@@ -749,6 +1005,7 @@ void main() {
       expect(state.selectedIndex, isNull);
       expect(state.highlight.value, isNull);
       expect(state.navigating, isFalse);
+      expect(reveals(tester).every((o) => o == 1), isTrue);
       expect(tester.takeException(), isNull);
     },
     variant: const TargetPlatformVariant({TargetPlatform.windows}),

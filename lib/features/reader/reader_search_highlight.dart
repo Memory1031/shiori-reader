@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
+import 'reader_authored_colors.dart';
 
 /// The book owner changes only the notifier value; page metrics never depend on it.
 class ReaderSearchHighlightScope extends InheritedWidget {
@@ -31,18 +32,47 @@ class ReaderGlyphHighlight {
     this.revision,
     this.blockKey,
     this.blockIndex,
-    this.color,
+    this.container,
+    this.primary,
+    this.foregroundAt,
   );
   final ValueListenable<LocalSearchBodyHit?> active;
   final ChapterKey chapter;
   final String revision, blockKey;
   final int blockIndex;
-  final Color color;
+  final Color container, primary;
+  final Color Function(int) foregroundAt;
+  Color get color {
+    final ink = foregroundAt(active.value?.start ?? 0);
+    final surface =
+        readerColorContrast(ink, primary) > readerColorContrast(ink, container)
+        ? primary
+        : container;
+    if (readerColorContrast(ink, surface) >= 4.5) return surface;
+    // Preserve authored ink; adjust only the accent background's lightness.
+    final edge =
+        readerColorContrast(ink, Colors.black) >
+            readerColorContrast(ink, Colors.white)
+        ? Colors.black
+        : Colors.white;
+    var low = 0.0, high = 1.0;
+    for (var i = 0; i < 8; i++) {
+      final middle = (low + high) / 2;
+      if (readerColorContrast(ink, Color.lerp(surface, edge, middle)!) >= 4.5) {
+        high = middle;
+      } else {
+        low = middle;
+      }
+    }
+    return Color.lerp(surface, edge, high)!;
+  }
+
   static ReaderGlyphHighlight? of(
     BuildContext context,
     String? blockKey,
-    int? blockIndex,
-  ) {
+    int? blockIndex, {
+    Color Function(int)? foregroundAt,
+  }) {
     final scope = ReaderSearchHighlightScope.of(context);
     if (scope == null || blockKey == null || blockIndex == null) return null;
     final theme = Theme.of(context);
@@ -53,6 +83,8 @@ class ReaderGlyphHighlight {
       blockKey,
       blockIndex,
       theme.colorScheme.primaryContainer,
+      theme.colorScheme.primary,
+      foregroundAt ?? (_) => theme.colorScheme.onSurface,
     );
   }
 
