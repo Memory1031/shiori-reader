@@ -17,6 +17,7 @@ import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/reader_toolbars.dart';
 import 'package:shiori/features/reader/settings_panel.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
+import 'package:shiori/features/reader/viewport/paper_turn.dart';
 import 'package:shiori/shared/widgets/shiori_menu.dart';
 
 import '../../data/local/local_reading_test.dart' show ForbiddenOnline;
@@ -686,6 +687,9 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       b.failWrites(3);
+      // Commit the new page before leaving, rather than relying on a pending
+      // initial restore sample whose write may finish during the opening fade.
+      await tester.pump(PaperTurnMotion.duration);
       await key(tester, LogicalKeyboardKey.escape);
       expect(b.readers, findsNothing);
       expect(find.text(unsaved), findsOneWidget);

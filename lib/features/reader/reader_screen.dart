@@ -15,11 +15,11 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
 import '../../shared/local_navigation_title.dart';
 import '../../shared/widgets/shiori_menu.dart';
-import '../../shared/widgets/state_views.dart';
 import 'reader_controller.dart';
 import 'reader_completion_page.dart';
 import 'reader_completion_transition.dart';
 import 'reader_preferences.dart';
+import 'reader_loading_page.dart';
 import 'native_reader_settings_adapter.dart';
 import 'reader_theme.dart';
 import 'reading_progress_format.dart';
@@ -57,7 +57,7 @@ typedef _ProgressText = ({String? percent, bool document});
 typedef _ProgressEndpoint = ({Object scope, double fraction, bool document});
 
 /// The body never observes per-frame progress or Chrome visibility changes.
-/// Preferences are injected and scoped to this reading session.
+/// Preferences are injected; the composition root may share them across readers.
 class ReaderContentView extends StatefulWidget {
   const ReaderContentView({
     super.key,
@@ -299,6 +299,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _audio = ReaderAudioController(_audioFactory);
     _preferences = widget.preferences ?? ReaderPreferences(widget.settings);
     _settings = _preferences.value;
+    _settingsReady = _preferences.loaded;
     _preferences.addListener(_changed);
     _position = widget.initialPosition;
     _confirmedProgressText = _confirmedProgress;
@@ -412,7 +413,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   Future<void> _loadPreferences() async {
-    await (widget.preferencesReady ?? _preferences.load());
+    await (widget.preferencesReady ?? _preferences.ready);
     if (!mounted) return;
     setState(() {
       _settingsReady = true;
@@ -798,6 +799,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   bool _announcedReady = false;
+  late final _openingReady = ValueNotifier(
+    !widget.active || widget.completion != null,
+  );
   int _layoutEpoch = 0;
   void _layoutInvalidated() {
     _invalidateProgressPreview();
@@ -821,7 +825,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
       _announcedReady = true;
       final epoch = _layoutEpoch;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && epoch == _layoutEpoch) widget.onReady?.call();
+        if (mounted && epoch == _layoutEpoch) {
+          if (!_openingReady.value) {
+            _openingReady.value = true;
+            if (widget.active) _claimFocus();
+          }
+          widget.onReady?.call();
+        }
       });
       WidgetsBinding.instance.scheduleFrame();
     }
@@ -1193,6 +1203,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     if (widget.chrome == null) _chrome.dispose();
     _progressText.dispose();
     _readingPosition.dispose();
+    _openingReady.dispose();
     super.dispose();
   }
 
@@ -1246,7 +1257,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
           MediaQuery.platformBrightnessOf(context),
           accent: appAccentOf(context),
         ),
-        child: Builder(builder: _body),
+        child: ReaderFontGate(
+          content: widget.content,
+          repository: widget.images,
+          child: Builder(builder: _body),
+        ),
       ),
     );
     // Only this leaf rebuilds when the route changes; it hands back the same
@@ -1261,18 +1276,14 @@ class _ReaderContentViewState extends State<ReaderContentView>
           _dragSurface.currentState?.cancel();
           _cancelCompletion(immediate: true);
         }
-        return ReaderFontGate(
-          content: widget.content,
-          repository: widget.images,
-          child: page,
-        );
+        return page;
       },
     );
   }
 
   Widget _body(BuildContext context) {
     if (!_settingsReady) {
-      return const Scaffold(body: SafeArea(child: LoadingView()));
+      return const ReaderLoadingPage();
     }
     final look = (
       Theme.of(context).scaffoldBackgroundColor,
@@ -1292,7 +1303,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     );
     _margin = layout.horizontalMargin;
     final style = layout.bodyStyle;
-    return WindowCaptionScope(
+    final page = WindowCaptionScope(
       enabled:
           (widget.appearanceActive ?? widget.active) &&
           (widget.session == null ||
@@ -1393,6 +1404,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
         ),
       ),
     );
+    return ReaderOpeningTransition(ready: _openingReady, child: page);
   }
 
   Map<Type, Action<Intent>> _commandActions(BuildContext context) => {

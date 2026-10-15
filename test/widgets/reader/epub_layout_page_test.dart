@@ -508,6 +508,15 @@ void main() {
     },
   );
 
+  Future<void> pumpReaderHost(WidgetTester tester) async {
+    // The reader keeps animating while the native host waits for load-stop.
+    for (var i = 0; i < 100 && platform.views.isEmpty; i++) {
+      await tester.runAsync(() => Future<void>(() {}));
+      await tester.pump();
+    }
+    expect(platform.views, isNotEmpty);
+  }
+
   Future<void> settleSvgArtwork(WidgetTester tester, {int minHeads = 1}) async {
     // Engine image decodes complete outside the widget test's fake clock.
     for (var i = 0; i < 100 && platform.heads.length < minHeads; i++) {
@@ -1025,7 +1034,7 @@ void main() {
             ),
           ),
         );
-        await tester.pumpAndSettle();
+        await pumpReaderHost(tester);
         final native = platform.heads.single;
         native.finish();
         await tester.pumpAndSettle();
@@ -1159,7 +1168,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await pumpReaderHost(tester);
     await settleSvgArtwork(tester);
     expect(find.byType(EpubLayoutPage), findsOneWidget);
     final before = tester.widget<ReaderContentView>(
@@ -1259,7 +1268,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await pumpReaderHost(tester);
       final hotspot = find.byWidgetPredicate(
         (w) => w is Semantics && w.properties.label == 'Go 1',
       );
@@ -1378,7 +1387,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await pumpReaderHost(tester);
       platform.heads.single.finish();
       await tester.pumpAndSettle();
       expect(find.byType(ReaderCompletionPage), findsNothing);
@@ -1834,7 +1843,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await pumpReaderHost(tester);
       platform.heads.single.finish();
       await tester.pumpAndSettle();
       expect(ready, 1);
@@ -1921,12 +1930,12 @@ void main() {
             ),
           ),
         );
-        await tester.pumpAndSettle();
+        await pumpReaderHost(tester);
         if (os == 'windows') {
           await tester.runAsync(
             () => Future<void>.delayed(const Duration(milliseconds: 50)),
           );
-          await tester.pumpAndSettle();
+          await tester.pump();
           platform.views.single.finish();
         } else {
           platform.heads.single.finish();

@@ -207,7 +207,7 @@ void main() {
         );
         final h = DragReader(content: content);
         final images = PictureImages();
-        await h.open(tester, images: images);
+        await h.open(tester, images: images, settle: false);
         await decoded(tester);
         await tester.pumpAndSettle();
         final before = h.pages.capture();

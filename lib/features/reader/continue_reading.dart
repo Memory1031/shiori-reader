@@ -8,6 +8,9 @@ import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
 import '../novel_detail/catalog_view.dart';
 import 'book_reader_screen.dart';
+import 'reader_loading_page.dart';
+import 'reader_preferences.dart';
+import 'reader_theme.dart';
 
 class ContinueController extends ScopedController {
   ContinueController({
@@ -137,7 +140,7 @@ class ContinueController extends ScopedController {
   }
 }
 
-class ContinueReadingScreen extends StatelessWidget {
+class ContinueReadingScreen extends StatefulWidget {
   const ContinueReadingScreen({
     super.key,
     required this.novel,
@@ -145,6 +148,7 @@ class ContinueReadingScreen extends StatelessWidget {
     required this.library,
     this.images,
     this.settings,
+    this.preferences,
     this.onDetails,
     this.cache,
     this.onReturnToShelf,
@@ -154,67 +158,100 @@ class ContinueReadingScreen extends StatelessWidget {
   final LibraryRepository library;
   final ImageRepository? images;
   final SettingsStore? settings;
+  final ReaderPreferences? preferences;
   final Future<void> Function(BuildContext readerContext, NovelKey key)?
   onDetails;
   final CacheManagement? cache;
   final VoidCallback? onReturnToShelf;
+
   @override
-  Widget build(BuildContext context) => ControllerScope<ContinueController>(
-    key: ValueKey((novel, repository, library)),
-    create: () => ContinueController(
-      novel: novel,
-      repository: repository,
-      library: library,
+  State<ContinueReadingScreen> createState() => _ContinueReadingScreenState();
+}
+
+class _ContinueReadingScreenState extends State<ContinueReadingScreen> {
+  late final _preferences =
+      widget.preferences ?? ReaderPreferences(widget.settings);
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_preferences.ready);
+  }
+
+  @override
+  void dispose() {
+    if (widget.preferences == null) _preferences.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _preferences,
+    builder: (context, child) => Theme(
+      data: readerTheme(
+        _preferences.value,
+        MediaQuery.platformBrightnessOf(context),
+        accent: appAccentOf(context),
+      ),
+      child: child!,
     ),
-    builder: (context, controller) {
-      if (controller.chapter != null) {
-        return BookReaderScreen(
-          chapter: controller.chapter!,
-          repository: repository,
-          library: library,
-          images: images,
-          settings: settings,
-          chapterFallback: controller.usedFallback,
-          onDetails: onDetails,
-          cache: cache,
-          onReturnToShelf: onReturnToShelf,
-        );
-      }
-      final strings = AppLocalizations.of(context);
-      return Scaffold(
-        appBar: AppBar(title: Text(strings.detailContinue)),
-        body: SafeArea(
-          child: controller.loading
-              ? const LoadingView()
-              : controller.failure != null
-              ? FailureView(
-                  failure: controller.failure!,
-                  onRetry: controller.load,
-                )
-              : Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(strings.catalogEmpty),
-                      TextButton(
-                        onPressed: () async {
-                          final key = await openCatalog(
-                            context,
-                            novel: novel,
-                            repository: repository,
-                          );
-                          if (context.mounted && key != null) {
-                            controller.chapter = key;
-                            controller.update();
-                          }
-                        },
-                        child: Text(strings.catalogTitle),
-                      ),
-                    ],
+    child: ControllerScope<ContinueController>(
+      key: ValueKey((widget.novel, widget.repository, widget.library)),
+      create: () => ContinueController(
+        novel: widget.novel,
+        repository: widget.repository,
+        library: widget.library,
+      ),
+      builder: (context, controller) {
+        if (controller.chapter != null) {
+          return BookReaderScreen(
+            chapter: controller.chapter!,
+            repository: widget.repository,
+            library: widget.library,
+            images: widget.images,
+            settings: widget.settings,
+            preferences: _preferences,
+            chapterFallback: controller.usedFallback,
+            onDetails: widget.onDetails,
+            cache: widget.cache,
+            onReturnToShelf: widget.onReturnToShelf,
+          );
+        }
+        if (controller.loading) return const ReaderLoadingPage();
+        final strings = AppLocalizations.of(context);
+        return Scaffold(
+          appBar: AppBar(title: Text(strings.detailContinue)),
+          body: SafeArea(
+            child: controller.failure != null
+                ? FailureView(
+                    failure: controller.failure!,
+                    onRetry: controller.load,
+                  )
+                : Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(strings.catalogEmpty),
+                        TextButton(
+                          onPressed: () async {
+                            final key = await openCatalog(
+                              context,
+                              novel: widget.novel,
+                              repository: widget.repository,
+                            );
+                            if (context.mounted && key != null) {
+                              controller.chapter = key;
+                              controller.update();
+                            }
+                          },
+                          child: Text(strings.catalogTitle),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-        ),
-      );
-    },
+          ),
+        );
+      },
+    ),
   );
 }

@@ -50,6 +50,31 @@ class Store implements SettingsStore {
 
 void main() {
   test(
+    'ready shares the initial read and explicit reload can recover',
+    () async {
+      final store = FixtureSettingsStore();
+      store.controls.failNext(
+        AppFailure(
+          kind: FailureKind.database,
+          operation: Operation.settingsRead,
+        ),
+      );
+      final preferences = ReaderPreferences(store);
+      final first = preferences.ready;
+      expect(preferences.ready, same(first));
+      await first;
+      expect(preferences.loaded, isTrue);
+      expect(preferences.failure, isNotNull);
+      await preferences.ready;
+      expect(store.controls.calls[Operation.settingsRead], 1);
+      await preferences.load();
+      expect(preferences.failure, isNull);
+      expect(store.controls.calls[Operation.settingsRead], 2);
+      preferences.dispose();
+    },
+  );
+
+  test(
     'flush joins an in-flight write and drains the latest settings',
     () async {
       final store = Store()..saving = Completer<void>();

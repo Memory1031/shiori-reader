@@ -37,6 +37,7 @@ class _ReaderCacheScreenState extends State<ReaderCacheScreen>
       images: widget.reader.images,
       library: widget.reader.library,
       settings: widget.reader.settings,
+      preferences: widget.reader.preferences,
       cache: widget.reader.cache,
       onReturnToShelf: widget.reader.onReturnToShelf,
     ),

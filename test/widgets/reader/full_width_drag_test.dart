@@ -47,6 +47,7 @@ class DragReader {
     FakeViewPadding insets = const FakeViewPadding(),
     Offset offset = Offset.zero,
     book.Images? images,
+    bool settle = true,
   }) async {
     settings.value = ReaderSettings(
       controlsHintSeen: true,
@@ -89,7 +90,7 @@ class DragReader {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) await tester.pumpAndSettle();
     expect(pages.isRestoring, isFalse);
   }
 

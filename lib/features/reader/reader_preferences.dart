@@ -11,6 +11,11 @@ class ReaderPreferences extends ChangeNotifier {
   final SettingsStore? store;
   final _load = CancellationSource();
   ReaderSettings value = ReaderSettings();
+  bool _loaded = false;
+  bool get loaded => _loaded;
+  Future<void>? _initialLoad;
+  Future<void> get ready =>
+      loaded ? Future<void>.value() : _initialLoad ??= load();
   AppFailure? failure;
   Timer? _timer;
   ReaderSettings? _pending;
@@ -26,7 +31,9 @@ class ReaderPreferences extends ChangeNotifier {
   Future<void> load() async {
     final revision = _revision;
     final result = await store?.load(cancellation: _load.token);
-    if (_disposed || revision != _revision) return;
+    if (_disposed) return;
+    _loaded = true;
+    if (revision != _revision) return;
     if (result case Success<ReaderSettings>(value: final loaded)) {
       value = loaded.copyWith(mode: ReaderMode.paged);
       failure = null;

@@ -12,6 +12,7 @@ import '../../shared/widgets/state_views.dart';
 import '../novel_detail/catalog_controller.dart';
 import 'reader_controller.dart';
 import 'reader_preferences.dart';
+import 'reader_loading_page.dart';
 import 'reader_theme.dart';
 import 'position/position_resolver.dart';
 import 'reader_screen.dart';
@@ -40,6 +41,7 @@ class BookReaderScreen extends StatefulWidget {
     ImageRepository? images,
     LibraryRepository? library,
     SettingsStore? settings,
+    ReaderPreferences? preferences,
     CacheManagement? cache,
     VoidCallback? onReturnToShelf,
   }) => BookReaderScreen(
@@ -48,6 +50,7 @@ class BookReaderScreen extends StatefulWidget {
     images: images,
     library: library,
     settings: settings,
+    preferences: preferences,
     cache: cache,
     onReturnToShelf: onReturnToShelf,
     offline: true,
@@ -60,6 +63,7 @@ class BookReaderScreen extends StatefulWidget {
     this.images,
     this.library,
     this.settings,
+    this.preferences,
     this.chapterFallback = false,
     this.onDetails,
     this.cache,
@@ -83,6 +87,7 @@ class BookReaderScreen extends StatefulWidget {
   final ImageRepository? images;
   final LibraryRepository? library;
   final SettingsStore? settings;
+  final ReaderPreferences? preferences;
   final bool chapterFallback;
 
   /// Opens the book's details over the reader and completes when they
@@ -384,9 +389,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   ReaderController? _pending;
   _ChapterOperation? _operation;
   late final ReaderPreferences _preferences;
-  Future<void>? _preferencesLoading;
-  Future<void> get _preferencesReady =>
-      _preferencesLoading ??= _preferences.load();
+  Future<void> get _preferencesReady => _preferences.ready;
   ReaderPanelHandle<Object?>? _activePanel;
   bool _closingPanelForSwitch = false;
   late final ImageRepository? _candidateImages;
@@ -832,7 +835,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       vsync: this,
       duration: PaperTurnMotion.duration,
     );
-    _preferences = ReaderPreferences(widget.settings);
+    _preferences = widget.preferences ?? ReaderPreferences(widget.settings);
+    unawaited(_preferencesReady);
     _candidateImages = widget.images == null
         ? null
         : _ReaderImages(widget.images!, cacheOnly: () => true);
@@ -1010,7 +1014,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _removal?.cancel();
     _operation?.deadline?.cancel();
     _chapterTurn.dispose();
-    _preferences.dispose();
+    if (widget.preferences == null) {
+      _preferences.dispose();
+    } else {
+      unawaited(_preferences.flush());
+    }
     _titleRequest.cancel();
     if (!widget.offline) _cache?.prefetch?.leave();
     WidgetsBinding.instance.removeObserver(this);
@@ -2075,6 +2083,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         repository: widget.repository,
         images: widget.images,
         settings: widget.settings,
+        preferences: _preferences,
         initialBlockKey: block,
         initialBlockOffset: search != null && search.hit == null
             ? readerCharacterOffset(
@@ -2194,8 +2203,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
-  /// The contents panel opened from the failure page on desktop. It keeps
-  /// the app theme, as the page around it does.
+  /// The contents panel opened from the failure page on desktop.
   ReaderPanelHandle<VoidCallback>? _contentsPanel;
 
   Future<void> _contents() async {
@@ -2211,6 +2219,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     final panel = ReaderPanelHandle<VoidCallback>.open(
       this,
       placement: ReaderPanelPlacement.start,
+      themeChanges: _preferences,
+      theme: (context) => readerTheme(
+        _preferences.value,
+        MediaQuery.platformBrightnessOf(context),
+        accent: appAccentOf(context),
+      ),
       semanticLabel: layer.label,
       builder: (context, panel) => ReaderContentsPanel(
         layers: [layer],
@@ -2597,8 +2611,18 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   );
 
   @override
-  Widget build(BuildContext context) =>
-      WindowCaptionScope.appDefault(child: _buildPage(context));
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _preferences,
+    builder: (context, child) => Theme(
+      data: readerTheme(
+        _preferences.value,
+        MediaQuery.platformBrightnessOf(context),
+        accent: appAccentOf(context),
+      ),
+      child: child!,
+    ),
+    child: WindowCaptionScope.appDefault(child: Builder(builder: _buildPage)),
+  );
 
   Widget _buildPage(BuildContext context) {
     _route = ModalRoute.of(context);
@@ -2687,6 +2711,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                     ),
                 ],
               )
+            : _reader.status == ReaderStatus.loading
+            ? const ReaderLoadingPage()
             : Scaffold(
                 appBar: AppBar(
                   title: Text(AppLocalizations.of(context).readerTitle),
@@ -2700,9 +2726,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                   ],
                 ),
                 body: SafeArea(
-                  child: _reader.status == ReaderStatus.loading
-                      ? const LoadingView()
-                      : _reader.failure != null
+                  child: _reader.failure != null
                       ? FailureView(
                           failure: _reader.failure!,
                           onRetry: _reader.load,

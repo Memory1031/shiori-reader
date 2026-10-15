@@ -280,7 +280,7 @@ void main() {
   });
 
   testWidgets(
-    'loading and failure do not load reader preferences or borrow another reader',
+    'loading and failure prepare their own preferences without writing them',
     (tester) async {
       final h = Harness();
       final env = FixtureEnvironment(scenario: FixtureScenario.deletedChapter);
@@ -306,7 +306,7 @@ void main() {
       expect(find.byType(FailureView), findsOneWidget);
       expect(h.sent.last, appLook(Brightness.light));
       expect(store.writes, isEmpty);
-      expect(store.loads, 0);
+      expect(store.loads, 1);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
       await env.close();

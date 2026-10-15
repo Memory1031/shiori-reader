@@ -19,6 +19,7 @@ import '../bookshelf/bookshelf_view.dart';
 import '../bookshelf/library_observer.dart';
 import '../bookshelf/remove_shelf_book.dart';
 import '../reader/continue_reading.dart';
+import '../reader/reader_preferences.dart';
 import '../novel_detail/detail_screen.dart';
 import '../reader/book_reader_screen.dart';
 import '../cache/cache_screen.dart';
@@ -38,6 +39,7 @@ class ReadingHome extends StatefulWidget {
     this.images,
     this.cache,
     this.settings,
+    this.readerPreferences,
     this.onAppearance,
     this.onUpdates,
     this.onImport,
@@ -56,6 +58,7 @@ class ReadingHome extends StatefulWidget {
   final ImageRepository? images;
   final CacheManagement? cache;
   final SettingsStore? settings;
+  final ReaderPreferences? readerPreferences;
   final VoidCallback? onAppearance;
   final VoidCallback? onUpdates;
   final VoidCallback? onImport;
@@ -78,6 +81,8 @@ class ReadingHome extends StatefulWidget {
 }
 
 class _ReadingHomeState extends State<ReadingHome> {
+  late final _readerPreferences =
+      widget.readerPreferences ?? ReaderPreferences(widget.settings);
   late final LibraryController _library;
   late final BookBatchActions _shelfActions;
 
@@ -104,6 +109,7 @@ class _ReadingHomeState extends State<ReadingHome> {
   @override
   void initState() {
     super.initState();
+    unawaited(_readerPreferences.ready);
     _shelfGrid.addListener(_shelfLayoutChanged);
     _library =
         LibraryController(
@@ -177,6 +183,7 @@ class _ReadingHomeState extends State<ReadingHome> {
 
   @override
   void dispose() {
+    if (widget.readerPreferences == null) _readerPreferences.dispose();
     widget.importController?.removeListener(_importChanged);
     _navigation.removeListener(_navigate);
     _ownNavigation?.dispose();
@@ -212,6 +219,7 @@ class _ReadingHomeState extends State<ReadingHome> {
       library: widget.library,
       images: widget.images,
       settings: widget.settings,
+      preferences: _readerPreferences,
       onDetails: _readerDetails,
       cache: widget.cache,
       onReturnToShelf: _returnToShelf,
@@ -222,6 +230,7 @@ class _ReadingHomeState extends State<ReadingHome> {
       images: widget.images,
       library: widget.library,
       settings: widget.settings,
+      preferences: _readerPreferences,
       cache: widget.cache,
       onReturnToShelf: _returnToShelf,
     ),
@@ -266,6 +275,7 @@ class _ReadingHomeState extends State<ReadingHome> {
       images: widget.images,
       library: widget.library,
       settings: widget.settings,
+      preferences: _readerPreferences,
       onDetails: _readerDetails,
       cache: widget.cache,
       onReturnToShelf: _returnToShelf,

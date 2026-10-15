@@ -650,7 +650,7 @@ void main() {
     }
 
     testWidgets(
-      'failure page contents open as a side panel in the app theme',
+      'failure page contents open as a side panel in the reader theme',
       (tester) async {
         tester.view
           ..physicalSize = desktop
@@ -679,6 +679,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(FailureView), findsOneWidget);
         final app = Theme.of(tester.element(find.byType(FailureView)));
+        expect(app.brightness, Brightness.dark);
         final back = find.widgetWithText(TextButton, 'Back');
         await tester.tap(back);
         await tester.pumpAndSettle();
@@ -687,7 +688,7 @@ void main() {
         expect(inPanel(find.byType(ReaderContentsPanel)), findsOneWidget);
         expect(
           tester.widget<Material>(inPanel(find.byType(Material)).first).color,
-          app.scaffoldBackgroundColor,
+          app.colorScheme.surface,
         );
         expect(
           Theme.of(tester.element(find.byType(ReaderContentsPanel))).brightness,

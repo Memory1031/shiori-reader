@@ -9,6 +9,7 @@ import '../data/repositories/local_reading_repository.dart';
 import '../data/media/local_image_repository.dart';
 import '../domain/models/models.dart';
 import '../features/reader/continue_reading.dart';
+import '../features/reader/reader_preferences.dart';
 import '../features/import/import_controller.dart';
 import '../features/import/import_overlay.dart';
 import 'package:flutter/material.dart';
@@ -64,6 +65,7 @@ class _ProductionAppState extends State<ProductionApp>
   SourceServices? _services;
   AppSettingsStore? _appearance;
   SettingsStore? _reading;
+  ReaderPreferences? _readerPreferences;
   LocalLibraryRepository? _library;
   AppFailure? _failure;
   bool _opening = false;
@@ -141,6 +143,11 @@ class _ProductionAppState extends State<ProductionApp>
         paths: paths,
         logger: AppLogger(),
       );
+      _readerPreferences?.dispose();
+      final readerPreferences = _readerPreferences = ReaderPreferences(
+        _reading,
+      );
+      await readerPreferences.ready;
       final updates = await createUpdateController(
         paths,
         beforeInstall: () async {
@@ -188,6 +195,7 @@ class _ProductionAppState extends State<ProductionApp>
 
   @override
   void dispose() {
+    _readerPreferences?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _home.dispose();
     unawaited(_close());
@@ -316,6 +324,7 @@ class _ProductionAppState extends State<ProductionApp>
           library: _library!,
           images: _images,
           settings: _reading,
+          preferences: _readerPreferences,
           onReturnToShelf: () {
             _navigator.currentState?.popUntil((route) => route.isFirst);
             _home.returnToShelf();
@@ -372,6 +381,7 @@ class _ProductionAppState extends State<ProductionApp>
             images: _images!,
             cache: _services!.cacheManagement,
             settings: _reading,
+            readerPreferences: _readerPreferences,
             onAppearance: () => showAppAppearance(context, app),
             onUpdates: _openUpdates,
             navigation: _home,

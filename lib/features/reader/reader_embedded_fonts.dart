@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
-import '../../shared/widgets/state_views.dart';
+import 'reader_loading_page.dart';
 
 /// Application-owned registration budget. Flutter cannot unregister fonts;
 /// therefore registrations are content-addressed and never grow past this cap.
@@ -165,6 +165,6 @@ class _ReaderFontGateState extends State<ReaderFontGate> {
           builder: (context, snapshot) =>
               snapshot.connectionState == ConnectionState.done
               ? widget.child
-              : const Center(child: LoadingView()),
+              : const ReaderLoadingPage(),
         );
 }

@@ -26,6 +26,7 @@ ThemeData readerTheme(
       : base.colorScheme.onSurfaceVariant;
   return base.copyWith(
     scaffoldBackgroundColor: paper,
+    appBarTheme: base.appBarTheme.copyWith(backgroundColor: paper),
     colorScheme: base.colorScheme.copyWith(onSurfaceVariant: secondary),
     bottomSheetTheme: base.bottomSheetTheme.copyWith(
       backgroundColor: paper,
