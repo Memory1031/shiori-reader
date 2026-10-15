@@ -145,6 +145,77 @@ Future<void> fonts(WidgetTester tester) async {
 
 void main() {
   testWidgets(
+    'compact result rows preserve their anchor across reopening, reflow and cache eviction',
+    (tester) async {
+      final reader = await f.mount(
+        tester,
+        size: const Size(1040, 780),
+        repositoryFactory: ReaderSearchRepository.new,
+      );
+      final state = search(reader, tester);
+      await open(tester);
+      await submit(tester, state, 'later');
+      final first = find.byKey(const ValueKey('reader-search-result-0'));
+      final second = find.byKey(const ValueKey('reader-search-result-1'));
+      expect(tester.getSize(first).height, lessThan(100));
+      expect(
+        tester.getTopLeft(second).dy - tester.getBottomLeft(first).dy,
+        closeTo(0, .01),
+      );
+      await submit(tester, state, 'fixture');
+      ScrollController scroll() => tester
+          .widget<CustomScrollView>(
+            find.byKey(const ValueKey('reader-search-results')),
+          )
+          .controller!;
+      Future<void> settleSearch() async {
+        for (var i = 0; i < 200; i++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 2)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+          if (!state.loading) {
+            await tester.pump(const Duration(milliseconds: 100));
+            if (!state.loading && !tester.binding.hasScheduledFrame) return;
+          }
+        }
+        fail('Search did not settle');
+      }
+
+      for (var page = 0; state.canContinue && page < 20; page++) {
+        scroll().jumpTo(scroll().position.maxScrollExtent);
+        await tester.pump();
+        await settleSearch();
+        expect(state.retainedHits, lessThanOrEqualTo(256));
+      }
+      expect(state.totalMatches, greaterThan(256));
+      scroll().jumpTo(scroll().position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      final anchor = state.scrollPosition.floor();
+      expect(anchor, greaterThan(256));
+      final hit = state.hitAt(anchor);
+      tester
+          .widget<ReaderSearchPanel>(find.byType(ReaderSearchPanel))
+          .onClose();
+      await tester.pumpAndSettle();
+      await open(tester);
+      expect(state.scrollPosition.floor(), anchor);
+      expect(state.hitAt(anchor), hit);
+      tester.view.physicalSize = const Size(580, 780);
+      await tester.pumpAndSettle();
+      expect(state.scrollPosition.floor(), anchor);
+      scroll().jumpTo(scroll().position.minScrollExtent);
+      await tester.pump();
+      await settleSearch();
+      expect(state.scrollPosition.floor(), 0);
+      expect(state.hitAt(0), isNotNull);
+      expect(state.retainedHits, lessThanOrEqualTo(256));
+      expect(tester.takeException(), isNull);
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.windows}),
+  );
+
+  testWidgets(
     'toolbar, explicit submit, same/main navigation and independent original link history',
     (tester) async {
       await fonts(tester);

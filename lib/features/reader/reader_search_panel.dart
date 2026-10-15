@@ -32,16 +32,22 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
     traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
     directionalTraversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
   );
-  final _scroll = ScrollController();
+  final _scroll = ScrollController(keepScrollOffset: false);
+  final _viewport = GlobalKey();
+  final _rows = <int, GlobalKey>{};
+  Key _center = UniqueKey(), _listIdentity = UniqueKey();
+  (double, TextScaler, TextStyle?)? _metrics;
+  int _baseIndex = 0, _lastVisible = 0;
+  bool _restoring = false;
   final _titles = <(ChapterKey, int), Future<String?>>{};
   final _titleRequest = CancellationSource();
-  double _extent = 132;
   int _generation = -1, _fill = 0;
   bool _positioned = false;
   ReaderSearchController get state => widget.controller;
   @override
   void initState() {
     super.initState();
+    _generation = state.generation;
     state.addListener(_changed);
     state.focusRequest.addListener(_refocus);
     _scroll.addListener(_scrolled);
@@ -55,40 +61,133 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
     if (!mounted) return;
     if (_generation != state.generation) {
       _generation = state.generation;
-      _positioned = false;
       _fill = 0;
+    } else {
+      _saveAnchor();
     }
+    // Rebuilt placeholders can have different heights from the actual results.
+    _positioned = false;
     setState(() {});
     _queueVisible();
   }
 
   void _queueVisible() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted ||
-          !_scroll.hasClients ||
-          state.loading ||
-          state.paused ||
-          state.error != null) {
-        return;
+      if (!mounted || !_scroll.hasClients) return;
+      _rows.removeWhere((_, key) => key.currentContext == null);
+      final first = _saveAnchor()?.$1 ?? _baseIndex;
+      if (state.loading || state.paused || state.error != null) return;
+      for (var index = first; index <= _lastVisible; index++) {
+        if (index < state.loadedCount && state.hitAt(index) == null) {
+          unawaited(state.loadAt(index));
+          return;
+        }
       }
-      final first = (_scroll.offset / _extent).floor().clamp(
-        0,
-        state.loadedCount,
-      );
-      if (first < state.loadedCount && state.hitAt(first) == null) {
-        unawaited(state.loadAt(first));
-        return;
-      }
-      if (_scroll.position.extentAfter < _extent * 2 && state.canContinue) {
+      if (_scroll.position.extentAfter <
+              _scroll.position.viewportDimension / 2 &&
+          state.canContinue) {
         if (_scroll.position.maxScrollExtent == 0 && _fill++ >= 3) return;
         unawaited(state.loadAt(state.loadedCount));
       }
     });
   }
 
+  (int, double)? _saveAnchor() {
+    if (_restoring) return null;
+    final viewport = _viewport.currentContext?.findRenderObject();
+    if (viewport is! RenderBox || !viewport.hasSize) return null;
+    (int, double)? anchor;
+    _lastVisible = 0;
+    for (final entry in _rows.entries) {
+      if (entry.key >= state.loadedCount) continue;
+      final row = entry.value.currentContext?.findRenderObject();
+      if (row is! RenderBox ||
+          !row.attached ||
+          !row.hasSize ||
+          row.size.height == 0) {
+        continue;
+      }
+      final top = row.localToGlobal(Offset.zero, ancestor: viewport).dy;
+      if (top >= viewport.size.height || top + row.size.height <= 0) continue;
+      if (entry.key > _lastVisible) _lastVisible = entry.key;
+      if (anchor == null || entry.key < anchor.$1) {
+        anchor = (entry.key, (-top / row.size.height).clamp(0, .999999));
+      }
+    }
+    if (anchor != null) state.scrollPosition = anchor.$1 + anchor.$2;
+    return anchor;
+  }
+
   void _scrolled() {
-    state.scrollPosition = _scroll.offset / _extent;
     _queueVisible();
+  }
+
+  Widget _results(BuildContext context, BoxConstraints constraints) {
+    final metrics = (
+      constraints.maxWidth,
+      MediaQuery.textScalerOf(context),
+      Theme.of(context).textTheme.bodyMedium,
+    );
+    if (_metrics != metrics) {
+      if (_metrics != null) _saveAnchor();
+      _metrics = metrics;
+      _positioned = false;
+    }
+    if (!_positioned) {
+      _positioned = true;
+      _baseIndex = state.scrollPosition.floor().clamp(0, state.loadedCount);
+      final fraction = state.scrollPosition - _baseIndex;
+      _center = UniqueKey();
+      _listIdentity = UniqueKey();
+      _rows.clear();
+      _restoring = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final row = _rows[_baseIndex]?.currentContext?.findRenderObject();
+        if (_scroll.hasClients && row is RenderBox && row.hasSize) {
+          _scroll.jumpTo(row.size.height * fraction);
+        }
+        _restoring = false;
+        _queueVisible();
+      });
+    }
+    Widget row(int index) => KeyedSubtree(
+      key: _rows.putIfAbsent(index, GlobalKey.new),
+      child: _result(context, index),
+    );
+    // A centered pair of native slivers restores an absolute result anchor
+    // without retaining heights or snippets for every previously visited row.
+    return KeyedSubtree(
+      key: _listIdentity,
+      child: CustomScrollView(
+        key: const ValueKey('reader-search-results'),
+        controller: _scroll,
+        center: _center,
+        semanticChildCount: state.loadedCount,
+        slivers: [
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (_, index) => row(_baseIndex - index - 1),
+              childCount: _baseIndex,
+              addAutomaticKeepAlives: false,
+              semanticIndexCallback: (_, index) => _baseIndex - index - 1,
+            ),
+          ),
+          SliverList(
+            key: _center,
+            delegate: SliverChildBuilderDelegate(
+              (_, index) => row(_baseIndex + index),
+              childCount: state.loadedCount - _baseIndex + 1,
+              addAutomaticKeepAlives: false,
+              semanticIndexCallback: (_, index) =>
+                  _baseIndex + index < state.loadedCount
+                  ? _baseIndex + index
+                  : null,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -122,20 +221,6 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context), theme = Theme.of(context);
-    _extent = 132 * MediaQuery.textScalerOf(context).scale(14) / 14;
-    if (!_positioned) {
-      _positioned = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _scroll.hasClients) {
-          _scroll.jumpTo(
-            (state.scrollPosition * _extent).clamp(
-              0,
-              _scroll.position.maxScrollExtent,
-            ),
-          );
-        }
-      });
-    }
     String status = state.loading
         ? l.readerSearchLoading
         : state.error == ReaderSearchError.tooLong
@@ -278,147 +363,122 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
                       ),
                     ),
                   Expanded(
-                    child: ListView.builder(
-                      key: const ValueKey('reader-search-results'),
-                      controller: _scroll,
-                      itemExtent: _extent,
-                      itemCount: state.loadedCount + 1,
-                      itemBuilder: (context, index) {
-                        if (index == state.loadedCount) {
-                          return Center(
-                            child: state.loading
-                                ? const CircularProgressIndicator()
-                                : state.canContinue || state.error != null
-                                ? TextButton(
-                                    onPressed: () => state.error != null
-                                        ? unawaited(
-                                            state.submit(state.submitted),
-                                          )
-                                        : unawaited(
-                                            state.loadAt(
-                                              state.loadedCount,
-                                              resume: true,
-                                            ),
-                                          ),
-                                    child: Text(
-                                      state.paused
-                                          ? l.readerSearchResume
-                                          : state.error != null
-                                          ? l.readerSearchRetry
-                                          : l.loadMoreAction,
-                                    ),
-                                  )
-                                : state.submitted.isNotEmpty
-                                ? Text(
-                                    l.readerSearchEnd,
-                                    style: theme.textTheme.bodySmall,
-                                  )
-                                : const SizedBox.shrink(),
-                          );
-                        }
-                        final hit = state.hitAt(index);
-                        if (hit == null) {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (mounted && !state.paused) {
-                              unawaited(state.loadAt(index));
-                            }
-                          });
-                          return Center(
-                            child: TextButton(
-                              onPressed: () =>
-                                  unawaited(state.loadAt(index, resume: true)),
-                              child: Text(l.readerSearchRebuilding),
-                            ),
-                          );
-                        }
-                        return Semantics(
-                          selected: state.selectedIndex == index,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: ShioriSpace.small,
-                              vertical: ShioriSpace.tight,
-                            ),
-                            child: Material(
-                              color: state.selectedIndex == index
-                                  ? theme.colorScheme.primary.withValues(
-                                      alpha: .08,
-                                    )
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(
-                                ShioriShape.control,
-                              ),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(
-                                  ShioriShape.control,
-                                ),
-                                onTap: state.navigating
-                                    ? null
-                                    : () => unawaited(
-                                        state.select(
-                                          index,
-                                          accepts: widget.accepts,
-                                          closePanel: widget.closeForNavigation,
-                                        ),
-                                      ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(
-                                    ShioriSpace.medium,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      FutureBuilder<String?>(
-                                        future: _title(hit),
-                                        builder: (context, title) => Text(
-                                          title.data ?? l.readerLinkElsewhere,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: theme.textTheme.titleSmall,
-                                        ),
-                                      ),
-                                      if (hit is LocalSearchFootnoteHit)
-                                        Text(
-                                          l.readerSearchFootnote,
-                                          style: theme.textTheme.bodySmall,
-                                        ),
-                                      Expanded(
-                                        child: Text.rich(
-                                          TextSpan(
-                                            children: [
-                                              TextSpan(
-                                                text: hit.snippet.before,
-                                              ),
-                                              TextSpan(
-                                                text: hit.snippet.match,
-                                                style: TextStyle(
-                                                  backgroundColor: theme
-                                                      .colorScheme
-                                                      .primaryContainer,
-                                                  color: theme
-                                                      .colorScheme
-                                                      .onPrimaryContainer,
-                                                ),
-                                              ),
-                                              TextSpan(text: hit.snippet.after),
-                                            ],
-                                          ),
-                                          maxLines:
-                                              hit is LocalSearchFootnoteHit
-                                              ? 2
-                                              : 3,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                    child: SizedBox(
+                      key: _viewport,
+                      child: LayoutBuilder(builder: _results),
                     ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _result(BuildContext context, int index) {
+    final l = AppLocalizations.of(context), theme = Theme.of(context);
+    if (index == state.loadedCount) {
+      return SizedBox(
+        height: 64,
+        child: Center(
+          child: state.loading
+              ? const CircularProgressIndicator()
+              : state.canContinue || state.error != null
+              ? TextButton(
+                  onPressed: () => state.error != null
+                      ? unawaited(state.submit(state.submitted))
+                      : unawaited(
+                          state.loadAt(state.loadedCount, resume: true),
+                        ),
+                  child: Text(
+                    state.paused
+                        ? l.readerSearchResume
+                        : state.error != null
+                        ? l.readerSearchRetry
+                        : l.loadMoreAction,
+                  ),
+                )
+              : state.submitted.isNotEmpty
+              ? Text(l.readerSearchEnd, style: theme.textTheme.bodySmall)
+              : const SizedBox.shrink(),
+        ),
+      );
+    }
+    final hit = state.hitAt(index);
+    if (hit == null) {
+      return SizedBox(
+        height: 72,
+        child: Center(
+          child: TextButton(
+            onPressed: () => unawaited(state.loadAt(index, resume: true)),
+            child: Text(l.readerSearchRebuilding),
+          ),
+        ),
+      );
+    }
+    return Semantics(
+      key: ValueKey('reader-search-result-$index'),
+      selected: state.selectedIndex == index,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: ShioriSpace.small,
+          vertical: ShioriSpace.tight,
+        ),
+        child: Material(
+          color: state.selectedIndex == index
+              ? theme.colorScheme.primary.withValues(alpha: .08)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(ShioriShape.control),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(ShioriShape.control),
+            onTap: state.navigating
+                ? null
+                : () => unawaited(
+                    state.select(
+                      index,
+                      accepts: widget.accepts,
+                      closePanel: widget.closeForNavigation,
+                    ),
+                  ),
+            child: Padding(
+              padding: const EdgeInsets.all(ShioriSpace.medium),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FutureBuilder<String?>(
+                    future: _title(hit),
+                    builder: (context, title) => Text(
+                      title.data ?? l.readerLinkElsewhere,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                  ),
+                  if (hit is LocalSearchFootnoteHit)
+                    Text(
+                      l.readerSearchFootnote,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  const SizedBox(height: ShioriSpace.tight),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: hit.snippet.before),
+                        TextSpan(
+                          text: hit.snippet.match,
+                          style: TextStyle(
+                            backgroundColor: theme.colorScheme.primaryContainer,
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                        TextSpan(text: hit.snippet.after),
+                      ],
+                    ),
+                    maxLines: hit is LocalSearchFootnoteHit ? 2 : 3,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
