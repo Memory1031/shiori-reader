@@ -34,16 +34,15 @@ class ReaderGlyphHighlight {
     this.blockIndex,
     this.container,
     this.primary,
-    this.foregroundAt,
+    this.foreground,
   );
   final ValueListenable<LocalSearchBodyHit?> active;
   final ChapterKey chapter;
   final String revision, blockKey;
   final int blockIndex;
   final Color container, primary;
-  final Color Function(int) foregroundAt;
-  Color get color {
-    final ink = foregroundAt(active.value?.start ?? 0);
+  final Color foreground;
+  Color _backgroundFor(Color ink) {
     final surface =
         readerColorContrast(ink, primary) > readerColorContrast(ink, container)
         ? primary
@@ -55,24 +54,25 @@ class ReaderGlyphHighlight {
             readerColorContrast(ink, Colors.white)
         ? Colors.black
         : Colors.white;
+    Color shade(double amount) =>
+        Color(Color.lerp(surface, edge, amount)!.toARGB32());
     var low = 0.0, high = 1.0;
     for (var i = 0; i < 8; i++) {
       final middle = (low + high) / 2;
-      if (readerColorContrast(ink, Color.lerp(surface, edge, middle)!) >= 4.5) {
+      if (readerColorContrast(ink, shade(middle)) >= 4.5) {
         high = middle;
       } else {
         low = middle;
       }
     }
-    return Color.lerp(surface, edge, high)!;
+    return shade(high);
   }
 
   static ReaderGlyphHighlight? of(
     BuildContext context,
     String? blockKey,
-    int? blockIndex, {
-    Color Function(int)? foregroundAt,
-  }) {
+    int? blockIndex,
+  ) {
     final scope = ReaderSearchHighlightScope.of(context);
     if (scope == null || blockKey == null || blockIndex == null) return null;
     final theme = Theme.of(context);
@@ -84,7 +84,7 @@ class ReaderGlyphHighlight {
       blockIndex,
       theme.colorScheme.primaryContainer,
       theme.colorScheme.primary,
-      foregroundAt ?? (_) => theme.colorScheme.onSurface,
+      theme.colorScheme.onSurface,
     );
   }
 
@@ -118,10 +118,44 @@ class ReaderGlyphHighlight {
     );
   }
 
-  void paint(Canvas canvas, Iterable<Rect> boxes) {
-    final brush = Paint()..color = color;
-    for (final rect in boxes) {
-      canvas.drawRect(rect, brush);
+  Iterable<({Rect rect, Color color})> _styledBoxes(
+    InlineSpan text,
+    TextSelection selected,
+    List<TextBox> Function(TextSelection) boxesForSelection,
+  ) sync* {
+    var offset = 0;
+    Iterable<({Rect rect, Color color})> visit(
+      InlineSpan span,
+      Color ink,
+    ) sync* {
+      ink = span.style?.color ?? ink;
+      if (span is! TextSpan) {
+        offset++;
+        return;
+      }
+      final start = math.max(offset, selected.start);
+      offset += span.text?.length ?? 0;
+      final end = math.min(offset, selected.end);
+      if (end > start) {
+        final color = _backgroundFor(ink);
+        for (final box in boxesForSelection(
+          TextSelection(baseOffset: start, extentOffset: end),
+        )) {
+          yield (rect: box.toRect(), color: color);
+        }
+      }
+      for (final child in span.children ?? const <InlineSpan>[]) {
+        yield* visit(child, ink);
+      }
+    }
+
+    // Read the shaped spans, including inherited ink and link color overrides.
+    yield* visit(text, foreground);
+  }
+
+  void paint(Canvas canvas, Iterable<({Rect rect, Color color})> boxes) {
+    for (final box in boxes) {
+      canvas.drawRect(box.rect, Paint()..color = box.color);
     }
   }
 }
@@ -198,7 +232,9 @@ class ReaderSearchTextRender extends RenderProxyBox {
   }
 
   /// The same boxes used for painting, exposed as geometry for layout regression tests.
-  List<Rect> get selectedBoxes {
+  List<Rect> get selectedBoxes => [for (final box in _selectedBoxes) box.rect];
+
+  List<({Rect rect, Color color})> get _selectedBoxes {
     final c = configuration, runes = configuration.text.runes.toList();
     final hit = c.highlight.range(c.offset, runes.length);
     final paragraph = child == null ? null : _paragraph(child!);
@@ -229,7 +265,8 @@ class ReaderSearchTextRender extends RenderProxyBox {
     final plain = paragraph.text.toPlainText(includeSemanticsLabels: false);
     return [
       for (final part in pieces)
-        for (final box in paragraph.getBoxesForSelection(
+        for (final box in c.highlight._styledBoxes(
+          paragraph.text,
           expandReaderGlyphSelection(
             plain,
             TextSelection(
@@ -237,11 +274,15 @@ class ReaderSearchTextRender extends RenderProxyBox {
               extentOffset: display(part.$2),
             ),
           ),
+          paragraph.getBoxesForSelection,
         ))
-          MatrixUtils.transformRect(
-            paragraph.getTransformTo(this),
-            box.toRect(),
-          ).intersect(Offset.zero & size),
+          (
+            rect: MatrixUtils.transformRect(
+              paragraph.getTransformTo(this),
+              box.rect,
+            ).intersect(Offset.zero & size),
+            color: box.color,
+          ),
     ];
   }
 
@@ -251,7 +292,7 @@ class ReaderSearchTextRender extends RenderProxyBox {
     context.canvas.clipRect(offset & size);
     configuration.highlight.paint(
       context.canvas,
-      selectedBoxes.map((r) => r.shift(offset)),
+      _selectedBoxes.map((b) => (rect: b.rect.shift(offset), color: b.color)),
     );
     context.canvas.restore();
     super.paint(context, offset);
@@ -266,7 +307,14 @@ void paintReaderGlyphRange(
   String text,
   int sourceStart,
 ) {
-  mark?.paint(canvas, readerGlyphBoxes(painter, at, mark, text, sourceStart));
+  final selected = mark?.selection(text, sourceStart);
+  if (selected == null) return;
+  mark!.paint(
+    canvas,
+    mark
+        ._styledBoxes(painter.text!, selected, painter.getBoxesForSelection)
+        .map((b) => (rect: b.rect.shift(at), color: b.color)),
+  );
 }
 
 List<Rect> readerGlyphBoxes(

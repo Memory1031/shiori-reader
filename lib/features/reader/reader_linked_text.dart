@@ -397,15 +397,6 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
       context,
       widget.blockKey,
       widget.blockIndex,
-      foregroundAt: (offset) =>
-          readerAuthoredStyle(
-            displayStyle,
-            widget.inlineStyles,
-            offset,
-            resolveColor: foreground,
-            readerFontSize: widget.readerFontSize,
-          ).color ??
-          colors.ink,
     );
     final collapsed = <(int, int)>[];
     List<InlineSpan> segment(int start, int end, {VoidCallback? onTap}) =>

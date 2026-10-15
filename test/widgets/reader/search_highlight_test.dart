@@ -223,7 +223,6 @@ void main() {
             )) {
               if (box.configuration.highlight.blockIndex ==
                   selected.blockIndex) {
-                background = box.configuration.highlight.color;
                 final paragraph = tester.renderObject<RenderParagraph>(
                   find
                       .descendant(
@@ -233,13 +232,27 @@ void main() {
                       .last,
                 );
                 collectInk(paragraph.text);
+                final canvas = TestRecordingCanvas();
+                box.paint(TestRecordingPaintingContext(canvas), Offset.zero);
+                background =
+                    (canvas.invocations
+                                .firstWhere(
+                                  (c) => c.invocation.memberName == #drawRect,
+                                )
+                                .invocation
+                                .positionalArguments[1]
+                            as Paint)
+                        .color;
               }
               add(box, box.selectedBoxes);
             }
           }
           expect(selectedRects, isNotEmpty);
           if (name == 'body') {
-            expect(background, theme.colorScheme.primaryContainer);
+            expect(
+              background.toARGB32(),
+              theme.colorScheme.primaryContainer.toARGB32(),
+            );
           }
           final marked = await capture(), ink = <int, int>{};
           var backgroundPixels = 0;
@@ -309,6 +322,152 @@ void main() {
       },
     );
   }
+
+  testWidgets('one hit across authored inks keeps both readable without reflow', (
+    tester,
+  ) async {
+    await fonts(tester);
+    final theme = readerTheme(
+      ReaderSettings(themeMode: ReaderThemeMode.light),
+      Brightness.light,
+    );
+    final content = ChapterContent(
+      key: key,
+      title: 'Mixed ink',
+      blocks: paragraphs(
+        '<p style="color:white;background-color:#333333">A<span style="color:#a0b8a4">B</span></p>',
+      ),
+    );
+    final active = ValueNotifier<LocalSearchBodyHit?>(null),
+        controller = PagedReaderController(),
+        boundary = GlobalKey();
+    addTearDown(active.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: theme,
+        home: Scaffold(
+          body: Center(
+            child: RepaintBoundary(
+              key: boundary,
+              child: SizedBox(
+                width: 400,
+                height: 200,
+                child: ColoredBox(
+                  color: theme.scaffoldBackgroundColor,
+                  child: ReaderSearchHighlightScope(
+                    active: active,
+                    content: content,
+                    child: PagedReaderViewport(
+                      content: content,
+                      controller: controller,
+                      textStyle: TextStyle(
+                        fontSize: 36,
+                        height: 1.6,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      turnStyle: PageTurnStyle.none,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final render =
+        boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+    Future<ByteData> pixels() async => (await tester.runAsync(() async {
+      final image = await render.toImage();
+      final bytes = (await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!;
+      image.dispose();
+      return bytes;
+    }))!;
+    final before = await pixels(),
+        position = controller.capture(),
+        page = controller.inspectDisplayedPage()!.page,
+        generation = controller.layoutGeneration;
+    await screenshot(tester, boundary, 'mixed-ink-unmarked');
+    active.value = hit(content, 0, 0, 2);
+    await tester.pump();
+    final box = tester.renderObject<ReaderSearchTextRender>(
+      find.byType(ReaderPaintedSearchText),
+    );
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find
+          .descendant(
+            of: find.byType(ReaderPaintedSearchText),
+            matching: find.byType(RichText),
+          )
+          .last,
+    );
+    final canvas = TestRecordingCanvas();
+    box.paint(TestRecordingPaintingContext(canvas), Offset.zero);
+    final fills = canvas.invocations
+        .where((c) => c.invocation.memberName == #drawRect)
+        .map(
+          (c) => (
+            rect: c.invocation.positionalArguments[0] as Rect,
+            color: (c.invocation.positionalArguments[1] as Paint).color,
+          ),
+        )
+        .toList();
+    final start = paragraph.text
+        .toPlainText(includeSemanticsLabels: false)
+        .indexOf('AB');
+    expect(start, greaterThanOrEqualTo(0));
+    final after = await pixels();
+    for (final (index, ink) in [
+      Colors.white,
+      const Color(0xffa0b8a4),
+    ].indexed) {
+      final glyph = MatrixUtils.transformRect(
+        paragraph.getTransformTo(box),
+        paragraph
+            .getBoxesForSelection(
+              TextSelection(
+                baseOffset: start + index,
+                extentOffset: start + index + 1,
+              ),
+            )
+            .single
+            .toRect(),
+      );
+      final background = Color(
+        fills.lastWhere((f) => f.rect.contains(glyph.center)).color.toARGB32(),
+      );
+      expect(
+        readerColorContrast(ink, background),
+        greaterThanOrEqualTo(4.5),
+        reason: 'Each actual painted style run must remain readable',
+      );
+      final argb = ink.toARGB32(),
+          rgba = ((argb & 0xffffff) << 8) | (argb >> 24);
+      var preserved = 0;
+      for (var offset = 0; offset < before.lengthInBytes; offset += 4) {
+        if (before.getUint32(offset) == rgba) {
+          expect(
+            after.getUint32(offset),
+            rgba,
+            reason: 'Keep original authored ink',
+          );
+          preserved++;
+        }
+      }
+      expect(preserved, greaterThan(0));
+    }
+    expect(controller.layoutGeneration, generation);
+    expect(controller.capture(), position);
+    expect(controller.inspectDisplayedPage()!.page, same(page));
+    await screenshot(tester, boundary, 'mixed-ink-highlight');
+    active.value = null;
+    await tester.pump();
+    expect((await pixels()).buffer.asUint8List(), before.buffer.asUint8List());
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'actual pages, chunks, dual columns and reflow retain bounds and source identity',
