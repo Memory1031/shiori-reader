@@ -17,8 +17,12 @@ class ReaderTopBar extends StatelessWidget {
     required this.menu,
     required this.onMenu,
     this.returnToOrigin = false,
+    this.showSearch = false,
+    this.onSearch,
   });
   final String title;
+  final bool showSearch;
+  final VoidCallback? onSearch;
   final VoidCallback onLeave;
 
   /// A linked (auxiliary) reader returns to its origin instead of going back.
@@ -47,6 +51,13 @@ class ReaderTopBar extends StatelessWidget {
             ),
           ),
         ),
+        if (showSearch)
+          IconButton(
+            key: const ValueKey('reader-search-open'),
+            tooltip: l.readerSearchBook,
+            onPressed: onSearch,
+            icon: const Icon(Icons.search),
+          ),
         PopupMenuButton<ReaderCommand>(
           tooltip: l.moreActions,
           icon: const Icon(Icons.more_horiz),
@@ -361,7 +372,9 @@ class ReaderLocationReturn extends StatelessWidget {
     required this.visible,
     required this.onPressed,
     required this.metrics,
+    this.label,
   });
+  final String? label;
   final ReaderChromeMetrics metrics;
   final bool visible;
   final VoidCallback onPressed;
@@ -384,7 +397,9 @@ class ReaderLocationReturn extends StatelessWidget {
               height: height,
               child: IconButton(
                 key: const ValueKey('reader-location-return'),
-                tooltip: AppLocalizations.of(context).readerPreviousLocation,
+                tooltip:
+                    label ??
+                    AppLocalizations.of(context).readerPreviousLocation,
                 onPressed: onPressed,
                 style: IconButton.styleFrom(
                   // Match the running title's centre after its asymmetric gutters.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/models/models.dart';
 import 'reader_ruby.dart';
+import 'reader_search_highlight.dart';
 import 'reader_inline_stack.dart';
 
 /// Shared replacement geometry for pagination and painted rich text. Offsets
@@ -22,6 +23,8 @@ List<InlineSpan> readerInlineSpans({
   double maxWidth = double.infinity,
   VoidCallback? onRubyTap,
   Color Function(Color)? resolveColor,
+  ReaderGlyphHighlight? highlight,
+  void Function(int, int)? onCollapsed,
 }) {
   final runes = text.runes.toList();
   final end = offset + runes.length;
@@ -55,6 +58,12 @@ List<InlineSpan> readerInlineSpans({
     cuts.addAll([s.start, s.end]);
   }
   final ordered = cuts.toList()..sort();
+  for (final s in stacked.values) {
+    onCollapsed?.call(s.start, s.length);
+  }
+  for (final r in pairs.values) {
+    onCollapsed?.call(r.start, r.length);
+  }
   return [
     for (var i = 0; i + 1 < ordered.length; i++)
       if (stacked[ordered[i]] case final stack?)
@@ -63,6 +72,9 @@ List<InlineSpan> readerInlineSpans({
           baseline: TextBaseline.alphabetic,
           style: style,
           child: ReaderInlineStack(
+            highlight: highlight,
+            sourceStart: stack.start,
+            separator: stack.separator,
             layout: readerStackLayout(
               text: String.fromCharCodes(
                 runes.sublist(stack.start - offset, stack.end - offset),
@@ -92,6 +104,8 @@ List<InlineSpan> readerInlineSpans({
             behavior: HitTestBehavior.opaque,
             onTap: onRubyTap,
             child: ReaderRuby(
+              highlight: highlight,
+              sourceStart: pair.start,
               baseText: String.fromCharCodes(
                 runes.sublist(pair.start - offset, pair.end - offset),
               ),

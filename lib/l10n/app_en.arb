@@ -838,5 +838,47 @@
   "localAutoReparseWrite": "Waiting to retry: file read or write failed",
   "localAutoReparseInterrupted": "Waiting to retry: the previous update was interrupted",
   "localAutoReparseTimeout": "Waiting to retry: parsing timed out",
-  "localAutoReparseOther": "Automatic update failed; manual reparsing is available"
+  "localAutoReparseOther": "Automatic update failed; manual reparsing is available",
+  "readerSearchBook": "Search this book",
+  "readerSearchHint": "Enter a word or phrase",
+  "readerSearchSubmit": "Search",
+  "readerSearchLoading": "Searching…",
+  "readerSearchPaused": "Search paused. Available results are preserved.",
+  "readerSearchTooLong": "Search text is too long. Use up to 256 ordinary characters; some symbols use more space.",
+  "readerSearchInvalid": "Use another word or phrase.",
+  "readerSearchExpired": "The book changed or was removed. Search again.",
+  "readerSearchFailed": "Search did not finish. Search again.",
+  "readerSearchEmpty": "No matching text found.",
+  "readerSearchFound": "Found {count} matches so far",
+  "@readerSearchFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "readerSearchTotal": "{count} matches",
+  "@readerSearchTotal": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "readerSearchDraft": "Showing results for “{query}”",
+  "@readerSearchDraft": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "readerSearchResume": "Continue search",
+  "readerSearchRetry": "Search again",
+  "readerSearchEnd": "All results shown",
+  "readerSearchRebuilding": "Restore these results",
+  "readerSearchFootnote": "Note",
+  "readerSearchReturn": "Back to search start",
+  "readerSearchDocument": "Opened the document. Exact text positioning and highlighting are unavailable on this page.",
+  "readerSearchClear": "Clear search"
 }

@@ -34,6 +34,10 @@ import 'reader_contents_session.dart';
 import 'reader_panel.dart';
 import 'reader_progress_panel.dart';
 import 'reader_sheet.dart';
+import '../../shared/widgets/shiori_sheet.dart' show shioriSheetRoute;
+import 'reader_search_controller.dart';
+import 'reader_search_panel.dart';
+import 'reader_search_highlight.dart';
 import 'reader_toolbars.dart';
 import 'settings_panel.dart';
 import 'reader_margin.dart';
@@ -79,6 +83,10 @@ class ReaderContentView extends StatefulWidget {
     this.session,
     this.initialPosition,
     this.actions = const ReaderActions(),
+    this.search,
+    this.searchEnabled = true,
+    this.searchTitle,
+    this.onSearchOpen,
     this.articleContents = true,
     this.contentsSession,
     this.onPosition,
@@ -119,6 +127,11 @@ class ReaderContentView extends StatefulWidget {
   final ReaderPosition? initialPosition;
   final SettingsStore? settings;
   final ReaderActions actions;
+  final ReaderSearchController? search;
+  final VoidCallback? onSearchOpen;
+  final bool searchEnabled;
+  final Future<String?> Function(LocalSearchHit, CancellationToken)?
+  searchTitle;
 
   /// Whether headings recognised inside the article form their own layer.
   final bool articleContents;
@@ -368,6 +381,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       _dismissProgressPanel();
       _panel?.dismiss();
       _panel = null;
+      _retireSearchSheet();
     }
   }
 
@@ -501,6 +515,72 @@ class _ReaderContentViewState extends State<ReaderContentView>
         identical(widget.session, session) &&
         _interactive) {
       then();
+    }
+  }
+
+  void _retireSearchSheet() {
+    final sheet = _searchSheet;
+    _searchSheet = null;
+    if (sheet == null) return;
+    final navigator = sheet.navigator;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (navigator?.mounted == true && sheet.isActive) {
+        navigator!.removeRoute(sheet);
+      }
+    });
+  }
+
+  ModalBottomSheetRoute<void>? _searchSheet;
+  Future<void> _searchPanel(BuildContext context) async {
+    final state = widget.search;
+    if (state == null) return;
+    if (_panel?.isValid == true || _searchSheet?.isActive == true) {
+      state.focusRequest.value++;
+      return;
+    }
+    if (!_interactive) return;
+    widget.onSearchOpen?.call();
+    final source = widget.session;
+    if (_desktopPanels) {
+      final panel = _openPanel<void>(
+        ReaderPanelPlacement.end,
+        semanticLabel: AppLocalizations.of(context).readerSearchBook,
+        builder: (context, panel) => ReaderSearchPanel(
+          controller: state,
+          accepts: () => _owns(panel) && identical(source, widget.session),
+          onClose: panel.close,
+          closeForNavigation: () async {
+            panel.close();
+            await panel.completed;
+          },
+          titleFor: widget.searchTitle ?? (_, _) async => widget.content.title,
+        ),
+      );
+      if (panel != null) {
+        await panel.closed;
+        await state.panelClosed();
+      }
+    } else {
+      late ModalBottomSheetRoute<void> route;
+      route = shioriSheetRoute<void>(
+        context,
+        size: ReaderSheetSize.tall,
+        builder: (context) => ReaderSearchPanel(
+          controller: state,
+          accepts: () =>
+              mounted && route.isCurrent && identical(source, widget.session),
+          onClose: () => Navigator.of(context).pop(),
+          closeForNavigation: () async {
+            Navigator.of(context).pop();
+            await route.completed;
+          },
+          titleFor: widget.searchTitle ?? (_, _) async => widget.content.title,
+        ),
+      );
+      _searchSheet = route;
+      await Navigator.of(context, rootNavigator: true).push(route);
+      if (identical(_searchSheet, route)) _searchSheet = null;
+      await state.panelClosed();
     }
   }
 
@@ -830,6 +910,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       ReaderCommand.contents =>
         widget.articleContents || _actions.bookContents != null,
       ReaderCommand.settings => true,
+      ReaderCommand.search => widget.search != null && widget.searchEnabled,
       ReaderCommand.notes => text && _actions.links != null,
       ReaderCommand.prefetch => text && _actions.prefetch != null,
       ReaderCommand.details => _actions.details != null,
@@ -855,6 +936,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
         _requestProgress(context);
       case ReaderCommand.settings || ReaderCommand.retrySettings:
         unawaited(_settingsPanel(context));
+      case ReaderCommand.search:
+        unawaited(_searchPanel(context));
       case ReaderCommand.notes:
         _actions.links?.call(_PagePanels(this, context));
       case ReaderCommand.prefetch:
@@ -943,7 +1026,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
       (ReaderCommand.contents, l.catalogTitle),
       (ReaderCommand.progress, l.readerProgressLabel),
       (ReaderCommand.settings, l.readerSettings),
-      (ReaderCommand.previousLocation, l.readerPreviousLocation),
+      (
+        ReaderCommand.previousLocation,
+        _actions.previousLocationLabel ?? l.readerPreviousLocation,
+      ),
       (ReaderCommand.notes, l.readerLinks),
       (ReaderCommand.details, l.novelDetailsTitle),
       (
@@ -1091,6 +1177,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void dispose() {
     _removeExit?.call();
+    _retireSearchSheet();
     _audio.dispose();
     _panel?.dismiss();
     _panel = null;
@@ -1221,6 +1308,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
           fit: StackFit.expand,
           children: [
             Scaffold(
+              resizeToAvoidBottomInset: false,
               // Not modal: a key whose command stands aside, such as Space on
               // a focused button, goes on to the control's own handling.
               body: Shortcuts(
@@ -1582,7 +1670,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       );
     }
 
-    return ExcludeSemantics(
+    final viewport = ExcludeSemantics(
       excluding: widget.completion != null,
       child: PagedReaderViewport(
         hostedDrag: true,
@@ -1652,6 +1740,13 @@ class _ReaderContentViewState extends State<ReaderContentView>
         imageExtent: (block) => extent(block).height,
       ),
     );
+    return widget.search == null
+        ? viewport
+        : ReaderSearchHighlightScope(
+            active: widget.search!.highlight,
+            content: widget.content,
+            child: viewport,
+          );
   }
 
   LocalNavigationEntry? get _titleNavigationEntry {
@@ -1947,6 +2042,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
           child: ValueListenableBuilder<bool>(
             valueListenable: visibility,
             builder: (context, visible, _) => ReaderLocationReturn(
+              label: widget.actions.previousLocationLabel,
               metrics: metrics,
               visible:
                   visible &&
@@ -1971,7 +2067,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
   /// Overflow menu entries: what the bottom bar does not already offer.
   List<(ReaderCommand, String)> _menu(AppLocalizations l) => [
     for (final (command, label) in [
-      (ReaderCommand.previousLocation, l.readerPreviousLocation),
+      (
+        ReaderCommand.previousLocation,
+        _actions.previousLocationLabel ?? l.readerPreviousLocation,
+      ),
       (ReaderCommand.notes, l.readerLinks),
       (ReaderCommand.prefetch, l.prefetchTitle),
       (ReaderCommand.details, l.novelDetailsTitle),
@@ -1997,6 +2096,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
         top: ReaderTopBar(
           title: completion ? _bookTitle : _effectiveChapterTitle,
           returnToOrigin: widget.returnToOrigin,
+          showSearch: widget.search != null,
+          onSearch: _command(context, ReaderCommand.search),
           onLeave: () => _leave(context),
           menu: _menu(l),
           onMenu: (command) => _run(context, command),

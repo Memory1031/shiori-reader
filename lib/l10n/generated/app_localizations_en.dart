@@ -1717,4 +1717,77 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get localAutoReparseOther =>
       'Automatic update failed; manual reparsing is available';
+
+  @override
+  String get readerSearchBook => 'Search this book';
+
+  @override
+  String get readerSearchHint => 'Enter a word or phrase';
+
+  @override
+  String get readerSearchSubmit => 'Search';
+
+  @override
+  String get readerSearchLoading => 'Searching…';
+
+  @override
+  String get readerSearchPaused =>
+      'Search paused. Available results are preserved.';
+
+  @override
+  String get readerSearchTooLong =>
+      'Search text is too long. Use up to 256 ordinary characters; some symbols use more space.';
+
+  @override
+  String get readerSearchInvalid => 'Use another word or phrase.';
+
+  @override
+  String get readerSearchExpired =>
+      'The book changed or was removed. Search again.';
+
+  @override
+  String get readerSearchFailed => 'Search did not finish. Search again.';
+
+  @override
+  String get readerSearchEmpty => 'No matching text found.';
+
+  @override
+  String readerSearchFound(int count) {
+    return 'Found $count matches so far';
+  }
+
+  @override
+  String readerSearchTotal(int count) {
+    return '$count matches';
+  }
+
+  @override
+  String readerSearchDraft(String query) {
+    return 'Showing results for “$query”';
+  }
+
+  @override
+  String get readerSearchResume => 'Continue search';
+
+  @override
+  String get readerSearchRetry => 'Search again';
+
+  @override
+  String get readerSearchEnd => 'All results shown';
+
+  @override
+  String get readerSearchRebuilding => 'Restore these results';
+
+  @override
+  String get readerSearchFootnote => 'Note';
+
+  @override
+  String get readerSearchReturn => 'Back to search start';
+
+  @override
+  String get readerSearchDocument =>
+      'Opened the document. Exact text positioning and highlighting are unavailable on this page.';
+
+  @override
+  String get readerSearchClear => 'Clear search';
 }

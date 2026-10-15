@@ -1143,6 +1143,11 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                   2,
                             ),
                             child: ReaderLinkedText(
+                              blockKey: fragmentBlock(fragment).blockKey,
+                              blockIndex: _layout!
+                                  .index
+                                  .chunks[fragment.unit]
+                                  .blockIndex,
                               decoration: fragment.linkLayout == null
                                   ? null
                                   : (fragmentBlock(fragment) as ParagraphBlock)

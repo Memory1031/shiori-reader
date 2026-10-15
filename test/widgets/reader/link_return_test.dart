@@ -143,8 +143,10 @@ class ReturnReader {
     await tester.pumpAndSettle();
   }
 
-  ChapterKey key(String name) =>
-      book.chapters.firstWhere((c) => c.title == '$name opening').key;
+  ChapterKey key(String name) => [
+    ...book.chapters,
+    ...book.auxiliaryChapters,
+  ].firstWhere((c) => c.title == '$name opening').key;
 }
 
 Future<ReturnReader> mount(
@@ -154,13 +156,14 @@ Future<ReturnReader> mount(
   Size size = const Size(400, 800),
   double scale = 1,
   bool dark = false,
+  ReturnRepository Function(MemoryBooks)? repositoryFactory,
 }) async {
   tester.view
     ..physicalSize = size
     ..devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final book = returnBook();
-  final repository = ReturnRepository(
+  final repository = (repositoryFactory ?? ReturnRepository.new)(
     MemoryBooks(
       LocalBookRecord(
         content: book,

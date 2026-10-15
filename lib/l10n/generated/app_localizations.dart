@@ -2893,6 +2893,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automatic update failed; manual reparsing is available'**
   String get localAutoReparseOther;
+
+  /// No description provided for @readerSearchBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Search this book'**
+  String get readerSearchBook;
+
+  /// No description provided for @readerSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a word or phrase'**
+  String get readerSearchHint;
+
+  /// No description provided for @readerSearchSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get readerSearchSubmit;
+
+  /// No description provided for @readerSearchLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching…'**
+  String get readerSearchLoading;
+
+  /// No description provided for @readerSearchPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Search paused. Available results are preserved.'**
+  String get readerSearchPaused;
+
+  /// No description provided for @readerSearchTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Search text is too long. Use up to 256 ordinary characters; some symbols use more space.'**
+  String get readerSearchTooLong;
+
+  /// No description provided for @readerSearchInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use another word or phrase.'**
+  String get readerSearchInvalid;
+
+  /// No description provided for @readerSearchExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'The book changed or was removed. Search again.'**
+  String get readerSearchExpired;
+
+  /// No description provided for @readerSearchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Search did not finish. Search again.'**
+  String get readerSearchFailed;
+
+  /// No description provided for @readerSearchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching text found.'**
+  String get readerSearchEmpty;
+
+  /// No description provided for @readerSearchFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Found {count} matches so far'**
+  String readerSearchFound(int count);
+
+  /// No description provided for @readerSearchTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} matches'**
+  String readerSearchTotal(int count);
+
+  /// No description provided for @readerSearchDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing results for “{query}”'**
+  String readerSearchDraft(String query);
+
+  /// No description provided for @readerSearchResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue search'**
+  String get readerSearchResume;
+
+  /// No description provided for @readerSearchRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Search again'**
+  String get readerSearchRetry;
+
+  /// No description provided for @readerSearchEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'All results shown'**
+  String get readerSearchEnd;
+
+  /// No description provided for @readerSearchRebuilding.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore these results'**
+  String get readerSearchRebuilding;
+
+  /// No description provided for @readerSearchFootnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get readerSearchFootnote;
+
+  /// No description provided for @readerSearchReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to search start'**
+  String get readerSearchReturn;
+
+  /// No description provided for @readerSearchDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened the document. Exact text positioning and highlighting are unavailable on this page.'**
+  String get readerSearchDocument;
+
+  /// No description provided for @readerSearchClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get readerSearchClear;
 }
 
 class _AppLocalizationsDelegate

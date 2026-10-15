@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'reader_search_highlight.dart';
 
 /// Identical glyph layout for pagination placeholders and the painted ruby.
 /// The whole pair is one line-breaking unit; oversized pairs fit the line.
@@ -61,18 +63,63 @@ final class ReaderRubyLayout {
     ),
   );
 
-  void paint(Canvas canvas) => _withPainters((body, note) {
+  List<Rect> selectedBoxes(ReaderGlyphHighlight? highlight, int sourceStart) =>
+      _withPainters((body, note) {
+        final fit = _fit(body, note);
+        return readerGlyphBoxes(
+              body,
+              Offset(
+                (math.max(body.width, note.width) - body.width) / 2,
+                note.height,
+              ),
+              highlight,
+              base.toPlainText(includeSemanticsLabels: false),
+              sourceStart,
+            )
+            .map(
+              (r) => Rect.fromLTRB(
+                r.left * fit,
+                r.top * fit,
+                r.right * fit,
+                r.bottom * fit,
+              ),
+            )
+            .toList();
+      });
+
+  void paint(
+    Canvas canvas, {
+    ReaderGlyphHighlight? highlight,
+    int sourceStart = 0,
+  }) => _withPainters((body, note) {
     final width = math.max(body.width, note.width);
     canvas.save();
     canvas.scale(_fit(body, note));
     note.paint(canvas, Offset((width - note.width) / 2, 0));
-    body.paint(canvas, Offset((width - body.width) / 2, note.height));
+    final at = Offset((width - body.width) / 2, note.height);
+    body.paint(canvas, at);
+    paintReaderGlyphRange(
+      canvas,
+      body,
+      at,
+      highlight,
+      base.toPlainText(includeSemanticsLabels: false),
+      sourceStart,
+    );
     canvas.restore();
   });
 }
 
 class ReaderRuby extends StatelessWidget {
-  const ReaderRuby({super.key, required this.layout, required this.baseText});
+  const ReaderRuby({
+    super.key,
+    required this.layout,
+    required this.baseText,
+    this.highlight,
+    this.sourceStart = 0,
+  });
+  final ReaderGlyphHighlight? highlight;
+  final int sourceStart;
   final ReaderRubyLayout layout;
   final String baseText;
   @override
@@ -83,29 +130,66 @@ class ReaderRuby extends StatelessWidget {
     final factor = layout.scaler.scale(font) / font;
     return Semantics(
       label: '$baseText（${layout.annotation}）',
-      child: _RubyPaint(layout: layout, factor: factor),
+      child: _RubyPaint(
+        layout: layout,
+        factor: factor,
+        highlight: highlight,
+        sourceStart: sourceStart,
+      ),
     );
   }
 }
 
 class _RubyPaint extends LeafRenderObjectWidget {
-  const _RubyPaint({required this.layout, required this.factor});
+  const _RubyPaint({
+    required this.layout,
+    required this.factor,
+    this.highlight,
+    required this.sourceStart,
+  });
+  final ReaderGlyphHighlight? highlight;
+  final int sourceStart;
   final ReaderRubyLayout layout;
   final double factor;
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderRuby(layout, factor);
+      _RenderRuby(layout, factor, highlight, sourceStart);
   @override
   void updateRenderObject(BuildContext context, _RenderRuby renderObject) {
-    renderObject.update(layout, factor);
+    renderObject.update(layout, factor, highlight, sourceStart);
   }
 }
 
 class _RenderRuby extends RenderBox {
-  _RenderRuby(this.rubyLayout, this.factor);
+  _RenderRuby(this.rubyLayout, this.factor, this.highlight, this.sourceStart);
+  ReaderGlyphHighlight? highlight;
+  int sourceStart;
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    highlight?.active.addListener(markNeedsPaint);
+  }
+
+  @override
+  void detach() {
+    highlight?.active.removeListener(markNeedsPaint);
+    super.detach();
+  }
+
   ReaderRubyLayout rubyLayout;
   double factor;
-  void update(ReaderRubyLayout next, double scale) {
+  void update(
+    ReaderRubyLayout next,
+    double scale,
+    ReaderGlyphHighlight? mark,
+    int source,
+  ) {
+    if (attached && highlight?.active != mark?.active) {
+      highlight?.active.removeListener(markNeedsPaint);
+      mark?.active.addListener(markNeedsPaint);
+    }
+    highlight = mark;
+    sourceStart = source;
     rubyLayout = next;
     factor = scale;
     markNeedsLayout();
@@ -134,7 +218,7 @@ class _RenderRuby extends RenderBox {
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
     canvas.scale(1 / factor);
-    rubyLayout.paint(canvas);
+    rubyLayout.paint(canvas, highlight: highlight, sourceStart: sourceStart);
     canvas.restore();
   }
 }

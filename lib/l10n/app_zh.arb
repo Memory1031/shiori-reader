@@ -838,5 +838,47 @@
   "localAutoReparseWrite": "等待重试：文件读写失败",
   "localAutoReparseInterrupted": "等待重试：上次更新未正常完成",
   "localAutoReparseTimeout": "等待重试：解析超时",
-  "localAutoReparseOther": "自动更新失败，可手动重新解析"
+  "localAutoReparseOther": "自动更新失败，可手动重新解析",
+  "readerSearchBook": "搜索本书",
+  "readerSearchHint": "输入词句，提交后搜索",
+  "readerSearchSubmit": "搜索",
+  "readerSearchLoading": "正在搜索…",
+  "readerSearchPaused": "搜索已暂停，已找到的结果仍可查看。",
+  "readerSearchTooLong": "关键词过长，请缩短后重试。普通文字最多 256 个字符，部分符号占用更多长度。",
+  "readerSearchInvalid": "搜索词不可用，请换一个词句。",
+  "readerSearchExpired": "书籍已更新或移除，请重新搜索。",
+  "readerSearchFailed": "搜索未完成，请重新搜索。",
+  "readerSearchEmpty": "没有找到匹配的内容。",
+  "readerSearchFound": "已找到 {count} 处",
+  "@readerSearchFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "readerSearchTotal": "共 {count} 处",
+  "@readerSearchTotal": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "readerSearchDraft": "当前结果来自“{query}”",
+  "@readerSearchDraft": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "readerSearchResume": "继续查找",
+  "readerSearchRetry": "重新搜索",
+  "readerSearchEnd": "已显示全部结果",
+  "readerSearchRebuilding": "恢复此处结果",
+  "readerSearchFootnote": "注释",
+  "readerSearchReturn": "返回搜索前位置",
+  "readerSearchDocument": "已打开对应文档，此页暂不支持逐字定位和高亮。",
+  "readerSearchClear": "清空搜索"
 }

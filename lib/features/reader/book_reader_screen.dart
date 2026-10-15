@@ -27,6 +27,10 @@ import 'reader_contents_session.dart';
 import 'reader_panel.dart';
 import '../../domain/local_chapter_progress.dart';
 import 'reader_logical_progress.dart';
+import 'reader_search_controller.dart';
+import 'reader_linked_text.dart';
+
+part 'book_reader_search.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
 class BookReaderScreen extends StatefulWidget {
@@ -67,6 +71,12 @@ class BookReaderScreen extends StatefulWidget {
     this.onReturnToShelf,
     this.contentLinkObserver,
     this.onAuxiliaryReady,
+    this.search,
+    this.searchNavigation,
+    this.searchHit,
+    this.searchAccepts,
+    this.onSearchRejected,
+    this.initialLinkReturns = const [],
   });
   final ChapterKey chapter;
   final NovelRepository repository;
@@ -96,7 +106,20 @@ class BookReaderScreen extends StatefulWidget {
   final ValueChanged<LocalContentLink>? contentLinkObserver;
 
   /// A validated auxiliary route acknowledges its first displayed position.
-  final VoidCallback? onAuxiliaryReady;
+  final ValueChanged<bool>? onAuxiliaryReady;
+  final ReaderSearchController? search;
+  final Future<ReaderSearchDestination> Function(
+    LocalSearchHit,
+    bool Function(),
+    ChapterKey,
+    ReaderPosition,
+    List<(ChapterKey, ReaderPosition)>,
+  )?
+  searchNavigation;
+  final List<(ChapterKey, ReaderPosition)> initialLinkReturns;
+  final LocalSearchHit? searchHit;
+  final bool Function()? searchAccepts;
+  final VoidCallback? onSearchRejected;
   @override
   State<BookReaderScreen> createState() => _BookReaderScreenState();
 }
@@ -104,6 +127,14 @@ class BookReaderScreen extends StatefulWidget {
 class _BookReaderScreenState extends State<BookReaderScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   LocalBookUse? _routeUse;
+  ReaderSearchController? _search;
+  _ReturnAnchor? _searchAnchor;
+  _SearchNavigation? _searchNavigation;
+  StreamSubscription<NovelKey>? _searchChanges;
+  void _searchState(VoidCallback change) {
+    if (mounted) setState(change);
+  }
+
   final _disposed = Completer<void>();
   Future<void>? _routeOpening;
   Future<void> _openBook() async {
@@ -187,7 +218,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   void _showQuickReturn() {
     _hideQuickReturn();
-    if (_returnAnchors.isEmpty && widget.linkDepth == 0) return;
+    if (_returnAnchors.isEmpty &&
+        widget.linkDepth == 0 &&
+        _search?.canReturn.value != true) {
+      return;
+    }
     _quickReturn.value = true;
     _returnTimer = Timer(const Duration(seconds: 8), _hideQuickReturn);
   }
@@ -209,11 +244,28 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         (origin.chapter != destination.chapter ||
             origin.position != destination.position);
     switch (intent) {
+      case _LocationIntent.search:
+        final navigation = _searchNavigation;
+        if (navigation != null && navigation.accepts()) {
+          _searchAnchor ??= navigation.origin;
+          _search?.canReturn.value = true;
+          navigation.complete(
+            _reader.pagePresentation == null
+                ? ReaderSearchDestination.native
+                : ReaderSearchDestination.document,
+          );
+        }
+      case _LocationIntent.searchReturn:
+        _searchAnchor = null;
+        _search?.canReturn.value = false;
+        _search?.clearHighlight();
+        _searchNavigation?.complete(ReaderSearchDestination.native);
       case _LocationIntent.link:
         if (!moved) return;
         _returnAnchors.add(origin);
         if (_returnAnchors.length > 8) _returnAnchors.removeAt(0);
       case _LocationIntent.explicit:
+        _endSearchReturn();
         if (!moved) return;
         _contentsSession.invalidateBrowsing();
         _returnAnchors.clear();
@@ -223,6 +275,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         if (!identical(_returnAnchors.lastOrNull, returning)) return;
         _returnAnchors.removeLast();
       case _LocationIntent.sequential:
+        _search?.clearHighlight();
         _hideQuickReturn();
         return;
     }
@@ -322,7 +375,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     setState(() {
       _changing = false;
       _restoringLocation = false;
-      if (restored && live()) _commitLocation(intent, origin, returning);
+      if (restored && live()) {
+        _commitLocation(intent, origin, returning);
+      }
     });
   }
 
@@ -445,6 +500,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       identical(_pending, operation.target) &&
       operation.intent != _ChapterIntent.cancelling &&
       !_invalidated &&
+      (operation.search?.accepts() ?? true) &&
       _leavingInsets == null &&
       _route?.isCurrent != false &&
       identical(operation.basis, _readingSequence().$1);
@@ -487,6 +543,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       _hideQuickReturn();
       final padding = MediaQuery.paddingOf(context);
       setState(() => _leavingInsets = padding);
+    }
+    _searchNavigation?.complete(ReaderSearchDestination.failed);
+    if (widget.search == null) {
+      _endSearchReturn();
+      unawaited(_search?.close());
     }
     _restoreSystemUi();
   }
@@ -760,6 +821,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   void initState() {
     super.initState();
     _chrome.addListener(_chromeChanged);
+    _initSearch();
+    _returnAnchors.addAll(
+      widget.initialLinkReturns
+          .take(8)
+          .where((a) => a.$1.novelKey == widget.chapter.novelKey)
+          .map((a) => _ReturnAnchor(a.$1, a.$2)),
+    );
     _chapterTurn = AnimationController(
       vsync: this,
       duration: PaperTurnMotion.duration,
@@ -815,6 +883,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   void _invalidateBook(NovelKey key, {bool removed = false}) {
     if (!mounted || key != widget.chapter.novelKey || _invalidated) return;
     _navigationGeneration++;
+    _endSearchReturn();
+    unawaited(_search?.invalidate());
     _returnAnchors.clear();
     _contentsSession.dispose();
     _hideQuickReturn();
@@ -922,6 +992,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   @override
   void dispose() {
     _disposed.complete();
+    _searchNavigation?.complete(ReaderSearchDestination.failed);
+    _searchChanges?.cancel();
+    _search?.removeListener(_searchWorkChanged);
+    _activePanel?.dismiss();
+    _search?.canReturn.removeListener(_searchReturnChanged);
+    if (widget.search == null) _search?.dispose();
     _contentsSession.dispose();
     _contentsPanel?.dismiss();
     _contentsPanel = null;
@@ -955,6 +1031,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   Future<void> _releaseRouteUse() async {
     await _routeOpening;
     await _catalog.resourcesReleased;
+    if (widget.search == null) await _search?.close();
     await _routeUse?.release();
     _routeUse = null;
   }
@@ -963,6 +1040,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) {
+      unawaited(_search?.suspend());
+      _searchNavigation?.complete(ReaderSearchDestination.failed);
       _navigationGeneration++;
       _hideQuickReturn();
       _cancelChapter(immediate: true);
@@ -1188,8 +1267,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _LocationIntent intent = _LocationIntent.explicit,
     _ReturnAnchor? origin,
     _ReturnAnchor? returning,
+    _SearchNavigation? search,
   }) async {
     if (!mounted ||
+        search?.accepts() == false ||
         !_foreground ||
         _leavingInsets != null ||
         _viewports[_reader]?.isRestoring == true ||
@@ -1241,6 +1322,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       fromStart: fromStart,
       fromEnd: fromEnd,
     );
+    operation.search = search;
     operation.locationIntent = intent;
     operation.origin = origin ?? _captureAnchor();
     operation.returning = returning;
@@ -1286,13 +1368,38 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           mounted &&
           !_invalidated &&
           _route?.isCurrent != false) {
+        final hit = widget.searchHit;
+        if (widget.searchAccepts?.call() == false ||
+            hit != null &&
+                (!_validSearchHit(hit, reader.content!) ||
+                    reader.usedFallback)) {
+          widget.onSearchRejected?.call();
+          return;
+        }
         _auxiliaryReady = true;
-        widget.onAuxiliaryReady?.call();
+        widget.onAuxiliaryReady?.call(reader.pagePresentation != null);
+        if (widget.searchHit case final LocalSearchFootnoteHit note) {
+          unawaited(_openSearchNote(note));
+        }
+        if (widget.searchHit != null && reader.pagePresentation != null) {
+          _searchDocumentNotice();
+        }
         _showQuickReturn();
       }
       return;
     }
     if (!_valid(operation) || operation.target != reader) return;
+    if (operation.search case final search?
+        when search.hit == null &&
+            !_validAnchor(search.origin, reader.content!)) {
+      _rejectPending(reader);
+      return;
+    }
+    if (operation.search?.hit case final hit?
+        when !_validSearchHit(hit, reader.content!) || reader.usedFallback) {
+      _rejectPending(reader);
+      return;
+    }
     if (operation.returning case final anchor?
         when !_validAnchor(anchor, reader.content!)) {
       _rejectPending(reader, invalidLocation: true);
@@ -1421,6 +1528,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (!immediate && operation.cancellation != null) {
       return operation.cancellation!;
     }
+    operation.search?.complete(ReaderSearchDestination.failed);
     final phase = ++operation.cancelPhase;
     return operation.cancellation = _cancelOperation(
       operation,
@@ -1473,6 +1581,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }) {
     final operation = _operation;
     if (operation == null || !_valid(operation) || operation.target != reader) {
+      if (reader == _reader && !_auxiliaryReady) {
+        widget.onSearchRejected?.call();
+      }
       return;
     }
     if (reader.failure case final failure?
@@ -1881,9 +1992,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     String? block,
     int? blockOffset, {
     required _LocationIntent intent,
+    _SearchNavigation? search,
   }) async {
-    if (_openingLink) return;
+    if (_openingLink) {
+      search?.complete(ReaderSearchDestination.failed);
+      return;
+    }
     if (widget.linkDepth >= 8) {
+      search?.complete(ReaderSearchDestination.failed);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).readerLinkDepth)),
       );
@@ -1892,6 +2008,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     if (_invalidated ||
         target.novelKey != widget.chapter.novelKey ||
         widget.linkDepth >= 8) {
+      search?.complete(ReaderSearchDestination.failed);
       return;
     }
     // Validate before replacing any surface; failed targets leave origin intact.
@@ -1910,18 +2027,28 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     // A reader covered meanwhile, e.g. by another link's reader, opens none.
     if (!mounted ||
         !_canNavigate ||
+        search?.accepts() == false ||
         source != _reader ||
         generation != _navigationGeneration) {
+      search?.complete(ReaderSearchDestination.failed);
       return;
     }
     if (value is! Success<LoadResult<ChapterContent>> ||
         block != null &&
             !value.value.value.blocks.any((b) => b.blockKey == block)) {
+      search?.complete(ReaderSearchDestination.failed);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppLocalizations.of(context).readerLinkUnavailable),
         ),
       );
+      return;
+    }
+    final targetContent = value.value.value;
+    if (search != null &&
+        search.hit == null &&
+        !_validAnchor(search.origin, targetContent)) {
+      search.complete(ReaderSearchDestination.failed);
       return;
     }
     _cancelChapter(immediate: true);
@@ -1932,29 +2059,85 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       settings: const RouteSettings(name: '/local-link'),
       builder: (_) => BookReaderScreen(
         chapter: target,
+        search: _search,
+        searchNavigation: widget.searchNavigation ?? _navigateSearchFrom,
+        searchHit: search?.hit,
+        initialLinkReturns: search != null && search.hit == null
+            ? [
+                for (final anchor in search.origin.links)
+                  (anchor.chapter, anchor.position),
+              ]
+            : const [],
+        searchAccepts: search?.accepts,
+        onSearchRejected: search == null
+            ? null
+            : () => search.complete(ReaderSearchDestination.failed),
         repository: widget.repository,
         images: widget.images,
         settings: widget.settings,
         initialBlockKey: block,
-        initialBlockOffset: blockOffset,
+        initialBlockOffset: search != null && search.hit == null
+            ? readerCharacterOffset(
+                search.origin.position.blockFraction,
+                switch (targetContent.blocks[search
+                    .origin
+                    .position
+                    .blockIndex]) {
+                  ParagraphBlock(:final text) ||
+                  HeadingBlock(:final text) => text.runes.length,
+                  _ => 0,
+                },
+              )
+            : blockOffset,
         startAtBeginning: true,
         linkDepth: widget.linkDepth + 1,
         onReturnToShelf: widget.onReturnToShelf,
-        onAuxiliaryReady: () {
+        onAuxiliaryReady: (document) {
           if (!mounted ||
               _invalidated ||
               source != _reader ||
               !auxiliaryRoute.isCurrent) {
             return;
           }
+          if (search != null) {
+            if (!search.accepts()) {
+              search.complete(ReaderSearchDestination.failed);
+              return;
+            }
+            if (intent == _LocationIntent.search) {
+              _searchAnchor ??= search.origin;
+              _search?.canReturn.value = true;
+            } else if (intent == _LocationIntent.searchReturn) {
+              _searchAnchor = null;
+              _search?.canReturn.value = false;
+              _search?.clearHighlight();
+            }
+            search.complete(
+              document
+                  ? ReaderSearchDestination.document
+                  : ReaderSearchDestination.native,
+            );
+          }
           if (intent == _LocationIntent.explicit) {
+            _endSearchReturn();
             _contentsSession.invalidateBrowsing();
             setState(_returnAnchors.clear);
           }
         },
       ),
     );
-    await Navigator.of(context).push(auxiliaryRoute);
+    final navigator = Navigator.of(context);
+    if (search != null) {
+      search.cancelSurface = () {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (navigator.mounted && auxiliaryRoute.isActive) {
+            navigator.removeRoute(auxiliaryRoute);
+          }
+        });
+      };
+    }
+    await navigator.push(auxiliaryRoute);
+    search?.complete(ReaderSearchDestination.failed);
   }
 
   bool get _localNavigation =>
@@ -2160,7 +2343,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 unawaited(_followContentLink(link));
               }
             },
-      previousLocation: _returnAnchors.isEmpty
+      previousLocationLabel: _search?.canReturn.value == true
+          ? AppLocalizations.of(context).readerSearchReturn
+          : null,
+      previousLocation: _search?.canReturn.value == true
+          ? () {
+              unawaited(_search?.returnToOrigin?.call());
+            }
+          : _returnAnchors.isEmpty
           ? null
           : () {
               if (active && reader == _reader) unawaited(_returnLocation());
@@ -2168,6 +2358,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       navigatePosition: (position, accepts) =>
           _restorePosition(position, accepts: accepts),
       pageTurnCommitted: () {
+        _search?.clearHighlight();
         _navigationGeneration++;
         _hideQuickReturn();
       },
@@ -2205,6 +2396,17 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     return ReaderContentView(
       key: ValueKey(reader),
       content: reader.content!,
+      search: _search,
+      searchEnabled:
+          active &&
+          !_invalidated &&
+          !_changing &&
+          !_openingLink &&
+          _leavingInsets == null,
+      searchTitle: _searchTitle,
+      onSearchOpen: () {
+        _search?.navigate = _navigateSearchHit;
+      },
       logicalProgress:
           _local &&
               widget.repository is LocalLogicalChapterRepository &&
@@ -2557,12 +2759,20 @@ class _ReaderImages implements ImageRepository {
   );
 }
 
-enum _LocationIntent { link, sequential, explicit, returnLocation }
+enum _LocationIntent {
+  link,
+  sequential,
+  explicit,
+  returnLocation,
+  search,
+  searchReturn,
+}
 
 class _ReturnAnchor {
-  const _ReturnAnchor(this.chapter, this.position);
+  const _ReturnAnchor(this.chapter, this.position, [this.links = const []]);
   final ChapterKey chapter;
   final ReaderPosition position;
+  final List<_ReturnAnchor> links;
 }
 
 enum _ChapterIntent { none, dragging, confirmed, cancelling, settling }
@@ -2585,6 +2795,7 @@ class _ChapterOperation {
   bool passive;
   bool engaged = false;
   bool pageTurn = false;
+  _SearchNavigation? search;
   _LocationIntent locationIntent = _LocationIntent.sequential;
   _ReturnAnchor? origin, returning;
   bool ready = false, saved = false, visible = false;

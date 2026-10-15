@@ -9,43 +9,48 @@ import '../../shared/source_image.dart';
 import 'reader_inline_images.dart';
 import 'reader_authored_colors.dart';
 import 'reader_sheet.dart';
+import 'reader_search_highlight.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 
-Future<void> showReaderFootnote(BuildContext context, LocalContentLink note) =>
-    showReaderSheet<void>(
-      context,
-      builder: (context) {
-        final l = AppLocalizations.of(context);
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * .65,
+Future<void> showReaderFootnote(
+  BuildContext context,
+  LocalContentLink note, {
+  (int, int)? range,
+  ThemeData? theme,
+}) => showReaderSheet<void>(
+  context,
+  builder: (context) {
+    final l = AppLocalizations.of(context);
+    final panel = ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * .65,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            title: Text(l.readerFootnote(note.label)),
+            trailing: IconButton(
+              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.close),
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: Text(l.readerFootnote(note.label)),
-                trailing: IconButton(
-                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Builder(
+                builder: (context) => _noteText(context, note, range),
               ),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                  child: SelectableText(
-                    note.footnoteText ?? l.readerLinkUnavailable,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
+    return theme == null ? panel : Theme(data: theme, child: panel);
+  },
+);
 
 /// A single footnote for the desktop dialog: its number with a close
 /// control, then its text, selectable and scrolling past the dialog's
@@ -55,8 +60,10 @@ class ReaderFootnotePanel extends StatelessWidget {
     super.key,
     required this.note,
     required this.onClose,
+    this.range,
   });
   final LocalContentLink note;
+  final (int, int)? range;
   final VoidCallback onClose;
 
   @override
@@ -88,15 +95,42 @@ class ReaderFootnotePanel extends StatelessWidget {
         Flexible(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-            child: SelectableText(
-              note.footnoteText ?? l.readerLinkUnavailable,
-              style: theme.textTheme.bodyLarge,
-            ),
+            child: _noteText(context, note, range),
           ),
         ),
       ],
     );
   }
+}
+
+Widget _noteText(
+  BuildContext context,
+  LocalContentLink note,
+  (int, int)? range,
+) {
+  final text =
+      note.footnoteText ?? AppLocalizations.of(context).readerLinkUnavailable;
+  final style = Theme.of(context).textTheme.bodyLarge;
+  if (range == null || range.$1 < 0 || range.$2 > text.runes.length) {
+    return SelectableText(text, style: style);
+  }
+  final points = text.runes.toList();
+  return SelectableText.rich(
+    TextSpan(
+      style: style,
+      children: [
+        TextSpan(text: String.fromCharCodes(points.take(range.$1))),
+        TextSpan(
+          text: String.fromCharCodes(points.sublist(range.$1, range.$2)),
+          style: TextStyle(
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
+        ),
+        TextSpan(text: String.fromCharCodes(points.skip(range.$2))),
+      ],
+    ),
+  );
 }
 
 /// Uses identical glyphs and metrics to PageLayout; only marker color and
@@ -127,7 +161,11 @@ class ReaderLinkedText extends StatefulWidget {
     this.locale,
     this.textHeightBehavior,
     this.linkLabel = false,
+    this.blockKey,
+    this.blockIndex,
   });
+  final String? blockKey;
+  final int? blockIndex;
   final ParagraphFlow? flow;
   final String text, prefix;
   final List<InlineImage> inlineImages;
@@ -247,6 +285,8 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
                   child: Padding(
                     padding: layout.padding,
                     child: ReaderLinkedText(
+                      blockKey: widget.blockKey,
+                      blockIndex: widget.blockIndex,
                       text: widget.text,
                       prefix: '',
                       blockOffset: widget.blockOffset,
@@ -298,6 +338,8 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
                   top: piece.rect.top,
                   width: piece.width,
                   child: ReaderLinkedText(
+                    blockKey: widget.blockKey,
+                    blockIndex: widget.blockIndex,
                     text: String.fromCharCodes(
                       runes.sublist(piece.start, piece.end),
                     ).replaceFirst(RegExp(r'\n$'), ''),
@@ -350,8 +392,16 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
     );
     final runes = widget.text.runes.toList();
     final spans = <InlineSpan>[TextSpan(text: widget.prefix)];
+    final mark = ReaderGlyphHighlight.of(
+      context,
+      widget.blockKey,
+      widget.blockIndex,
+    );
+    final collapsed = <(int, int)>[];
     List<InlineSpan> segment(int start, int end, {VoidCallback? onTap}) =>
         readerInlineSpans(
+          highlight: mark,
+          onCollapsed: (start, length) => collapsed.add((start, length)),
           text: String.fromCharCodes(runes.sublist(start, end)),
           offset: widget.blockOffset + start,
           images: widget.inlineImages,
@@ -432,7 +482,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
       cursor = end;
     }
     spans.add(TextSpan(children: segment(cursor, runes.length)));
-    return Text.rich(
+    final text = Text.rich(
       TextSpan(children: spans),
       style: displayStyle,
       textAlign: widget.align,
@@ -440,5 +490,15 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
       locale: widget.locale,
       textHeightBehavior: widget.textHeightBehavior,
     );
+    return mark == null
+        ? text
+        : ReaderPaintedSearchText(
+            highlight: mark,
+            text: widget.text,
+            prefix: widget.prefix,
+            offset: widget.blockOffset,
+            collapsed: collapsed,
+            child: text,
+          );
   }
 }

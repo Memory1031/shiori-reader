@@ -11,6 +11,7 @@ enum ReaderCommand {
   contents,
   progress,
   settings,
+  search,
   notes,
   prefetch,
   details,
@@ -65,6 +66,13 @@ const readerShortcuts = <ShortcutActivator, Intent>{
 /// it once.
 const desktopReaderShortcuts = <ShortcutActivator, Intent>{
   ...readerShortcuts,
+  SingleActivator(
+    LogicalKeyboardKey.keyF,
+    control: true,
+    includeRepeats: false,
+  ): ReaderCommandIntent(
+    ReaderCommand.search,
+  ),
   SingleActivator(LogicalKeyboardKey.space): ReaderCommandIntent(
     ReaderCommand.nextPage,
     yieldsToControls: true,

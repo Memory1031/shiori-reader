@@ -28,6 +28,7 @@ class ReaderActions {
     this.previousLocation,
     this.navigatePosition,
     this.pageTurnCommitted,
+    this.previousLocationLabel,
   });
 
   /// Turn to the neighbouring chapter at a page boundary.
@@ -58,6 +59,7 @@ class ReaderActions {
   final void Function(ReaderPanels panels)? links;
   final ValueChanged<LocalContentLink>? contentLink;
   final VoidCallback? previousLocation, pageTurnCommitted;
+  final String? previousLocationLabel;
 
   /// Explicit position selection; the predicate stays bound to its page/panel.
   final Future<void> Function(ReaderPosition, bool Function())?

@@ -1552,4 +1552,73 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get localAutoReparseOther => '自动更新失败，可手动重新解析';
+
+  @override
+  String get readerSearchBook => '搜索本书';
+
+  @override
+  String get readerSearchHint => '输入词句，提交后搜索';
+
+  @override
+  String get readerSearchSubmit => '搜索';
+
+  @override
+  String get readerSearchLoading => '正在搜索…';
+
+  @override
+  String get readerSearchPaused => '搜索已暂停，已找到的结果仍可查看。';
+
+  @override
+  String get readerSearchTooLong => '关键词过长，请缩短后重试。普通文字最多 256 个字符，部分符号占用更多长度。';
+
+  @override
+  String get readerSearchInvalid => '搜索词不可用，请换一个词句。';
+
+  @override
+  String get readerSearchExpired => '书籍已更新或移除，请重新搜索。';
+
+  @override
+  String get readerSearchFailed => '搜索未完成，请重新搜索。';
+
+  @override
+  String get readerSearchEmpty => '没有找到匹配的内容。';
+
+  @override
+  String readerSearchFound(int count) {
+    return '已找到 $count 处';
+  }
+
+  @override
+  String readerSearchTotal(int count) {
+    return '共 $count 处';
+  }
+
+  @override
+  String readerSearchDraft(String query) {
+    return '当前结果来自“$query”';
+  }
+
+  @override
+  String get readerSearchResume => '继续查找';
+
+  @override
+  String get readerSearchRetry => '重新搜索';
+
+  @override
+  String get readerSearchEnd => '已显示全部结果';
+
+  @override
+  String get readerSearchRebuilding => '恢复此处结果';
+
+  @override
+  String get readerSearchFootnote => '注释';
+
+  @override
+  String get readerSearchReturn => '返回搜索前位置';
+
+  @override
+  String get readerSearchDocument => '已打开对应文档，此页暂不支持逐字定位和高亮。';
+
+  @override
+  String get readerSearchClear => '清空搜索';
 }
