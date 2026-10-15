@@ -10,3 +10,4 @@ export 'prefetch.dart';
 export 'local_books.dart';
 export 'local_content_links.dart';
 export 'audio.dart';
+export 'local_search.dart';

@@ -89,6 +89,12 @@ LocalNavigationRepository 返回嵌套目录与 ChapterKey / 可选 blockKey。�
 
 可选的 LocalLogicalChapterRepository 从同一已导入快照返回 Reader 专用的只读目录区段索引，包含主阅读顺序、完整块权重、内容版本与块身份；TXT 返回空。索引不改变 ChapterContent、ReaderPosition 或存储格式；逻辑显示与导航合同见[阅读器](reader.md#全书进度与阅读完成)。
 
+可选的 `LocalBookSearchRepository.openLocalSearch` 只接受本地书籍身份，从已校验、已发布的 EPUB/TXT 语义快照建立调用方拥有的单书会话，不读取原件或访问在线服务。`LocalBookUse` 存活期间明确 pin 已读取的快照，搜索可共享这一对象；最后使用许可及搜索会话释放后移除 pin，普通读取缓存仍仅保留最近一本。扫描不占用存储串行队列，也不写阅读进度。
+
+`LocalSearchSession.search` 替换并取消旧查询，`nextPage` 消费本会话当前查询的一次性游标；每页最多 64 项，工作文本批次最多 65,536 UTF-16 单元。关键词 trim 后接受 1–256 UTF-16 单元的合法 Unicode 普通子串，ASCII 大小写不敏感，不跨自然段，不搜索 Ruby 注音及图片占位符。游标表示仍有未扫描文本，允许末次返回空页；`totalMatches` 仅在扫描完成后提供，不设置全书命中总量上限。
+
+正文结果包含章节／块身份、原文码点范围及 `before/match/after` 摘要；脚注独立携带来源引用和注释内部范围，不将注释位置冒充正文 offset。结果绑定会话存活期间的书籍发布身份。使用结果前须调用 `validate` 复验发布信息及 manifest 元数据；删除、手动维护或自动发布均退役旧快照，包括语义 revision 不变的重新发布，失效返回 `cache/invalidContent`。字体重排不影响此身份。关闭会话或取消查询须等待 worker 退出和回复端口释放；取消结束等待中的 Future，关闭后不再保有搜索正文与续扫状态。
+
 CacheManagement 提供 inspect、按书 / 全部 clear 和可释放 pin；ReadingPrefetch 提供目标选择、开关、暂停 / 恢复与生命周期通知。预取不创建阅读进度。ImageRepository 持久化失败可返回 memoryOnly + persistenceFailure，清理不破坏活动 lease，但阻止旧响应回填。
 
 应用根先关闭预取，再关闭媒体 / 小说仓库与调度器，最后关闭数据库。ReaderPreferences 读取或更新时将旧 scroll 归一化为 paged，保留排版；读取不为了模式迁移主动覆盖存储。详见[阅读器](reader.md)、[缓存](architecture.md)与[数据库](architecture.md)。

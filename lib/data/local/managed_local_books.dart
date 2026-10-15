@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'search/local_search_session.dart';
 import '../../domain/reparse_position.dart';
 import '../repositories/library_repository.dart';
 import 'book_decoder.dart';
@@ -22,6 +24,7 @@ import 'epub/epub_parser.dart';
 
 part 'local_book_reparse.dart';
 part 'automatic_local_reparse.dart';
+part 'local_book_search.dart';
 
 /// Durable imported originals and normalized content. Never uses cache.db.
 /// Single owner, serialized operations; initialize/recover before exposure.
@@ -32,7 +35,8 @@ class ManagedLocalBooks
         LocalPagePresentationRepository,
         LocalBookLinkStore,
         LocalBookReparse,
-        LocalBookUsage {
+        LocalBookUsage,
+        LocalBookSearchRepository {
   ManagedLocalBooks._(this.paths, this.db);
   final AppPaths paths;
   final UserDatabase db;
@@ -177,6 +181,70 @@ class ManagedLocalBooks
     final use = _BookUse(this, key, _useSequence++);
     (_bookUses[key] ??= {}).add(use);
     return use;
+  }
+
+  final _searchRandom = Random.secure();
+  final _searchSnapshots = <NovelKey, _SearchSnapshot>{};
+  final _searchSessions = <LocalSearchSessionImpl, NovelKey>{};
+
+  @override
+  Future<Result<LocalSearchSession>> openLocalSearch(
+    NovelKey book, {
+    required CancellationToken cancellation,
+  }) async {
+    if (book.sourceId != LocalBookIdentity.sourceId) {
+      return Failure(
+        AppFailure(kind: FailureKind.unsupported, operation: Operation.search),
+      );
+    }
+    final result = await _run<LocalSearchSession?>(Operation.search, () async {
+      checkLocalCancellation(cancellation);
+      if (_closing != null) throw const LocalCancelled();
+      final row = await _bookRow(this, book);
+      if (row == null) return null;
+      if (row.read<int>('maintenance') != 0) throw const LocalCancelled();
+      final stored = await _readStored(book, token: cancellation);
+      checkLocalCancellation(cancellation);
+      if (_closing != null) throw const LocalCancelled();
+      if (stored == null) return null;
+      final snapshot = _searchSnapshots.putIfAbsent(
+        book,
+        () => _SearchSnapshot((
+          book,
+          stored.stamp.hash,
+          stored.stamp.modified,
+          stored.stamp.size,
+          stored,
+        ), LocalSearchSnapshotId(_searchIdentity())),
+      );
+      final identity = snapshot.id;
+      final stamp = snapshot.stamp;
+      late LocalSearchSessionImpl session;
+      session = LocalSearchSessionImpl(
+        content: stored.record.content,
+        snapshot: snapshot.id,
+        sessionId: _searchIdentity(),
+        check: (token) => _checkSearchSnapshot(book, identity, stamp, token),
+        release: () {
+          _searchSessions.remove(session);
+          _releaseSearchSnapshot(book);
+        },
+      );
+      _searchSessions[session] = book;
+      return session;
+    });
+    return switch (result) {
+      Success(:final value) =>
+        value == null
+            ? Failure(
+                AppFailure(
+                  kind: FailureKind.notFound,
+                  operation: Operation.search,
+                ),
+              )
+            : Success(value),
+      Failure(:final failure) => Failure(failure),
+    };
   }
 
   (NovelKey, String, DateTime, int, _StoredBook)? _readCache;
@@ -650,16 +718,19 @@ class ManagedLocalBooks
     final stat = await file.stat();
     final hash = row.read<String>('manifest_hash');
     final format = LocalBookFormat.values.byName(row.read<String>('format'));
-    final cached = _readCache;
+    final cached = _searchSnapshots[key]?.read ?? _readCache;
     if (cached != null &&
         cached.$1 == key &&
         cached.$2 == hash &&
         cached.$3 == stat.modified &&
         cached.$4 == stat.size &&
-        cached.$5.record.format == format) {
+        cached.$5.record.format == format &&
+        cached.$5.bundle == bundle) {
+      _pinReaderSnapshot(cached);
       return cached.$5;
     }
 
+    if (_searchSnapshots.containsKey(key)) await _retireSearchSnapshot(key);
     if (await file.length() > _manifestLimit(format)) {
       throw const _LimitExceeded();
     }
@@ -678,8 +749,16 @@ class ManagedLocalBooks
       presentationHash: decoded.presentationHash,
       svgHotspotsScanned: decoded.svgHotspotsScanned,
       bundle: bundle,
+      stamp: (
+        hash: hash,
+        modified: stat.modified,
+        size: stat.size,
+        bundle: bundle,
+        format: format,
+      ),
     );
     _readCache = (key, hash, stat.modified, stat.size, book);
+    _pinReaderSnapshot(_readCache!);
     return book;
   }
 
@@ -837,6 +916,7 @@ class ManagedLocalBooks
       // SQL is the visibility boundary. A failed filesystem cleanup is an
       // unindexed orphan recovered on restart; never restore a deleted book.
       try {
+        await _retireSearchSnapshot(key);
         final directory = p.join(paths.localBooks.path, key.novelId);
         if (await FileSystemEntity.type(directory, followLinks: false) !=
             FileSystemEntityType.notFound) {
@@ -977,6 +1057,7 @@ class ManagedLocalBooks
   Future<void> close() => _closing ??= _close();
 
   Future<void> _close() async {
+    await Future.wait(_searchSessions.keys.toList().map((s) => s.close()));
     await stopAutomaticReparse();
     await _manualIdle?.future;
     await Future.wait(
@@ -992,6 +1073,7 @@ class ManagedLocalBooks
     _presentations.clear();
     _svgLinksScanned.clear();
     _readCache = null;
+    _searchSnapshots.clear();
     _ownership?.close();
     _ownership = null;
   }
@@ -1107,6 +1189,7 @@ typedef _StoredBook = ({
   String? presentationHash,
   bool svgHotspotsScanned,
   String? bundle,
+  _BookStamp stamp,
 });
 
 /// Writes a parsed book's derived artifacts into [stage] and returns the

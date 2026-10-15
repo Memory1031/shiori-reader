@@ -31,10 +31,11 @@ Future<LocalReparseResult> _reparse(
       [key.novelId],
     );
   });
-  store._invalidations.add(key);
   _PreparedReparse? prepared;
   var notified = false;
   try {
+    await store._retireSearchSnapshot(key);
+    store._invalidations.add(key);
     prepared = await _prepareReparse(store, old, choose, encoding, token);
     final migration = await _migrate(
       old.content,
@@ -55,7 +56,7 @@ Future<LocalReparseResult> _reparse(
       await _publishReparse(store, key, prepared!, migration);
       checkLocalCancellation(token);
     });
-    store._reparseChanged(key);
+    await store._reparseChanged(key);
     notified = true;
     return LocalReparseResult(
       approximate: migration.approximate,
@@ -287,6 +288,7 @@ Future<void> _refreshUncertainPublication(
   NovelKey key,
   _PreparedReparse? prepared,
 ) async {
+  await store._retireSearchSnapshot(key);
   store._readCache = null;
   store._presentations.remove(key);
   store._svgLinksScanned.remove(key);

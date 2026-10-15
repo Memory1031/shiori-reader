@@ -15,7 +15,8 @@ class LocalReadingRepository
         LocalLogicalChapterRepository,
         LocalPagePresentationRepository,
         LocalBookInvalidation,
-        LocalContentLinkRepository {
+        LocalContentLinkRepository,
+        LocalBookSearchRepository {
   LocalReadingRepository({
     required this.local,
     required this.online,
@@ -69,6 +70,24 @@ class LocalReadingRepository
           cancellation: cancellation,
         )
       : Future.value();
+
+  @override
+  Future<Result<LocalSearchSession>> openLocalSearch(
+    NovelKey book, {
+    required CancellationToken cancellation,
+  }) => _local(book) && local is LocalBookSearchRepository
+      ? (local as LocalBookSearchRepository).openLocalSearch(
+          book,
+          cancellation: cancellation,
+        )
+      : Future.value(
+          Failure(
+            AppFailure(
+              kind: FailureKind.unsupported,
+              operation: Operation.search,
+            ),
+          ),
+        );
 
   final LocalBookStore local;
   @override

@@ -21,6 +21,7 @@ final class _BookUse implements LocalBookUse {
     final readers = store._bookUses[key]!;
     readers.remove(this);
     if (readers.isEmpty) store._bookUses.remove(key);
+    store._releaseSearchSnapshot(key);
     if (progressSaved == false) {
       final failure = store._unsafeProgress[key] ?? -1;
       if (id > failure) store._unsafeProgress[key] = id;
@@ -287,6 +288,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
       return false;
     }
     var stateChanged = false, skipped = false;
+    Future<void>? searchRetirement;
     final result = await _run(Operation.libraryWrite, () async {
       if (!_mayStartAutomatic ||
           _bookUses[key]?.isNotEmpty == true ||
@@ -356,7 +358,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
         }
         await _autoCheckpoint?.call('afterCommit');
         committed = true;
-        _reparseChanged(key);
+        searchRetirement = _reparseChanged(key);
         return true;
       } on _AutoStateChanged {
         stateChanged = true;
@@ -383,6 +385,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
         }
       }
     });
+    await searchRetirement;
     if (result case Failure(:final failure)) {
       if (failure.isCancellation) throw const LocalCancelled();
       throw StateError('Automatic publication failed: ${failure.kind.name}');
@@ -536,11 +539,13 @@ next_retry_at=excluded.next_retry_at, attempted_at=excluded.attempted_at
     }
   }
 
-  void _reparseChanged(NovelKey key) {
+  Future<void> _reparseChanged(NovelKey key) {
+    final retirement = _retireSearchSnapshot(key);
     _readCache = null;
     _presentations.remove(key);
     _svgLinksScanned.remove(key);
     _changes.add(key);
+    return retirement;
   }
 }
 
