@@ -19,7 +19,6 @@ Shiori 的独立原创展示小说。中文与完整英文版各七章，共用�
 - `artwork/art-direction.json`：统一人物设定、逐图场景提示、原图摘要、替代文本及插入位置。
 - `epub/styles/book.css`：简洁的流式排版样式。
 - `tools/`：打包、独立结构校验及 Shiori 组件验收入口。
-- `DELIVERY.md`：中文交付报告与验证边界。
 
 ## 重新生成 EPUB
 
