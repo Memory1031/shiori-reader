@@ -880,5 +880,18 @@
   "readerSearchFootnote": "注释",
   "readerSearchReturn": "返回搜索前位置",
   "readerSearchDocument": "已打开对应文档，此页暂不支持逐字定位和高亮。",
-  "readerSearchClear": "清空搜索"
+  "readerSearchClear": "清空搜索",
+  "readerBookmarkAdd": "添加书签",
+  "readerBookmarkRemove": "取消书签",
+  "readerBookmarks": "我的书签",
+  "bookmarkAdded": "已添加书签",
+  "bookmarkRemoved": "已取消书签",
+  "bookmarkEmpty": "还没有书签，可从阅读器菜单添加。",
+  "bookmarkDelete": "删除书签",
+  "bookmarkPositionUnavailable": "原位置已变化，无法可靠定位。书签已保留。",
+  "bookmarkUnsupported": "当前页面无法保存可靠的位置书签。",
+  "bookmarkLoadFailed": "无法读取书签，请关闭后重试。",
+  "bookmarkSaveFailed": "书签未能保存，请重试。",
+  "bookmarkOpenFailed": "暂时无法打开书签，请稍后重试。",
+  "bookmarkChanged": "书签状态已更新，请重试。"
 }

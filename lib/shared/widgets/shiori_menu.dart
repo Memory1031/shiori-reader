@@ -17,12 +17,14 @@ class ShioriMenuItem<T> extends PopupMenuEntry<T> {
     required this.label,
     this.icon,
     this.enabled = true,
+    this.disabledReason,
   });
 
   final T value;
   final String label;
   final IconData? icon;
   final bool enabled;
+  final String? disabledReason;
 
   /// The entry's height where a pointer is the primary input.
   static const compactHeight = 36.0;
@@ -46,7 +48,9 @@ class _ShioriMenuItemState<T> extends State<ShioriMenuItem<T>> {
   Widget build(BuildContext context) {
     final compact = ShioriCapabilities.of(context).pointerFirst;
     final icon = widget.icon;
-    final label = Text(widget.label);
+    final Widget label = !widget.enabled && widget.disabledReason != null
+        ? Tooltip(message: widget.disabledReason!, child: Text(widget.label))
+        : Text(widget.label);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: ShioriMenuItem.inset),
       // The item's ink lands on this clipped surface, concentric with the

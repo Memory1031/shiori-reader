@@ -30,6 +30,8 @@ import '../shared/app_logger.dart';
 import '../shared/source_image.dart';
 import '../shared/widgets/state_views.dart';
 import '../shared/widgets/shiori_feedback.dart';
+import '../shared/widgets/user_bookmark_scope.dart';
+import '../data/repositories/user_bookmark_repository.dart';
 import 'app.dart';
 import 'app_controller.dart';
 import 'appearance_panel.dart';
@@ -68,6 +70,7 @@ class _ProductionAppState extends State<ProductionApp>
   SettingsStore? _reading;
   ReaderPreferences? _readerPreferences;
   LocalLibraryRepository? _library;
+  LocalUserBookmarkRepository? _bookmarks;
   AppFailure? _failure;
   bool _opening = false;
   bool _storesClosed = false;
@@ -125,6 +128,7 @@ class _ProductionAppState extends State<ProductionApp>
         users: databases.users,
       );
       _library = LocalLibraryRepository(databases.users);
+      _bookmarks = LocalUserBookmarkRepository(databases.users);
       _novels = LocalReadingRepository(
         local: databases.localBooks,
         online: _services!.novels,
@@ -370,7 +374,10 @@ class _ProductionAppState extends State<ProductionApp>
                 ),
               ),
             );
-            return ImageExportScope(exporter: _imageExporter!, child: app);
+            return UserBookmarkScope(
+              repository: _bookmarks!,
+              child: ImageExportScope(exporter: _imageExporter!, child: app),
+            );
           },
           createController: () => AppController(settingsStore: _appearance),
           homeBuilder: (context, app) => ReadingHome(

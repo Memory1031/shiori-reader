@@ -474,7 +474,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(view(tester).content.key, key(1000));
       expect(session.online, same(old));
-      await tester.pump(const Duration(seconds: 5));
+      // Dismiss action feedback before using the controls underneath it.
+      expect(find.byType(SnackBar), findsOneWidget);
+      await tester.drag(find.byType(SnackBar), const Offset(0, 100));
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
       await open(tester);
       expect(position(tester).pixels, closeTo(offset, .01));
       reader.repository.data = catalog(groups: 3);

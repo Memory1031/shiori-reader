@@ -259,13 +259,17 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
       throw StateError('Unreadable progress');
     }
     final progress = (read as Success<ReadingProgress?>).value;
+    final bookmarks = await db.transaction(
+      () => LocalUserBookmarkRepository(db).snapshot(key),
+    );
     final migrationWatch = _autoWorkClock = Stopwatch()..start();
-    late final ReparsedPosition migration;
+    late final _ReparseMigration migration;
     try {
       migration = await _migrate(
         candidate.old.content,
         candidate.prepared.content,
         progress,
+        bookmarks,
         token,
       );
     } finally {
@@ -280,7 +284,7 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
       candidate.old.content,
       candidate.prepared.content,
       progress,
-      migration,
+      migration.reading,
     );
     if (!_mayStartAutomatic ||
         _bookUses[key]?.isNotEmpty == true ||
@@ -303,7 +307,9 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
         // No large file read, migration, cleanup or Worker under this permit.
         final row = await _bookRow(this, key);
         if (!_sameBaseline(row, candidate.baseline) ||
-            await _progressStamp(this, key) != stamp) {
+            await _progressStamp(this, key) != stamp ||
+            await LocalUserBookmarkRepository(db).revision(key) !=
+                bookmarks.revision) {
           stateChanged = true;
           return false;
         }
@@ -322,7 +328,9 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
         final resolved = await db.transaction(() async {
           final latest = await _bookRow(this, key);
           if (!_sameBaseline(latest, candidate.baseline) ||
-              await _progressStamp(this, key) != stamp) {
+              await _progressStamp(this, key) != stamp ||
+              await LocalUserBookmarkRepository(db).revision(key) !=
+                  bookmarks.revision) {
             throw const _AutoStateChanged();
           }
           final persisted = await LocalLibraryRepository(
@@ -360,6 +368,9 @@ r.last_read_at DESC, l.imported_at DESC, l.digest
         committed = true;
         searchRetirement = _reparseChanged(key);
         return true;
+      } on BookmarkChanged {
+        stateChanged = true;
+        return false;
       } on _AutoStateChanged {
         stateChanged = true;
         return false;

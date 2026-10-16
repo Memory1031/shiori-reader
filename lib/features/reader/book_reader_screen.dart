@@ -1,4 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
+import '../../domain/bookmark_position.dart';
+import '../../shared/widgets/user_bookmark_scope.dart';
+import 'reader_bookmarks.dart';
+import '../../shared/widgets/shiori_sheet.dart';
 import '../../app/window_caption.dart';
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
@@ -34,6 +39,7 @@ import 'reader_search_controller.dart';
 import 'reader_linked_text.dart';
 
 part 'book_reader_search.dart';
+part 'book_reader_bookmarks.dart';
 
 /// Owns one chapter session at a time; repositories outlive the route.
 class BookReaderScreen extends StatefulWidget {
@@ -64,6 +70,7 @@ class BookReaderScreen extends StatefulWidget {
     required this.repository,
     this.images,
     this.library,
+    this.bookmarks,
     this.settings,
     this.preferences,
     this.chapterFallback = false,
@@ -88,6 +95,7 @@ class BookReaderScreen extends StatefulWidget {
   final NovelRepository repository;
   final ImageRepository? images;
   final LibraryRepository? library;
+  final UserBookmarkRepository? bookmarks;
   final SettingsStore? settings;
   final ReaderPreferences? preferences;
   final bool chapterFallback;
@@ -190,6 +198,25 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   final _quickReturn = ValueNotifier(false);
   Timer? _returnTimer;
   int _navigationGeneration = 0;
+  UserBookmarkRepository? _bookmarkRepository;
+  StreamSubscription<Result<BookmarkSnapshot>>? _bookmarkSubscription;
+  BookmarkSnapshot? _bookmarkSnapshot;
+  final _bookmarkCancellation = CancellationSource();
+  ModalBottomSheetRoute<void>? _bookmarkSheet;
+  bool _bookmarkWorking = false;
+  void _receiveBookmarks(BookmarkSnapshot value) {
+    if (mounted) setState(() => _bookmarkSnapshot = value);
+  }
+
+  void _dismissBookmarks() {
+    final sheet = _bookmarkSheet, navigator = _bookmarkSheet?.navigator;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (navigator?.mounted == true && sheet?.isActive == true) {
+        navigator!.removeRoute(sheet!);
+      }
+    });
+  }
+
   int _chapterFeedbackAttempt = 0;
   bool _routeWasCurrent = true, _auxiliaryReady = false;
 
@@ -520,7 +547,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       !_invalidated &&
       (operation.search?.accepts() ?? true) &&
       _leavingInsets == null &&
-      _route?.isCurrent != false &&
+      (operation.owner?.call() ?? (_route?.isCurrent != false)) &&
       identical(operation.basis, _readingSequence().$1);
 
   late final AnimationController _chapterTurn;
@@ -905,6 +932,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     unawaited(_search?.invalidate());
     _returnAnchors.clear();
     _contentsSession.dispose();
+    _dismissBookmarks();
     _hideQuickReturn();
     _completionTurn?.invalidate();
     _cancelChapter(immediate: true);
@@ -926,6 +954,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     String? blockKey,
     int? blockOffset,
     ReaderPosition? navigationPosition,
+    UserBookmark? bookmark,
     bool fromStart = false,
     bool fromEnd = false,
     bool deferProgress = false,
@@ -937,6 +966,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           initialBlockKey: blockKey,
           initialBlockOffset: blockOffset,
           navigationPosition: navigationPosition,
+          bookmark: bookmark,
           startAtBeginning: fromStart,
           startAtEnd: fromEnd,
           deferProgress: deferProgress,
@@ -996,6 +1026,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _enterSystemUi();
+    _bindBookmarks();
   }
 
   void _enterSystemUi() {
@@ -1009,6 +1040,15 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   @override
   void dispose() {
+    _bookmarkSubscription?.cancel();
+    _bookmarkCancellation.cancel();
+    _dismissBookmarks();
+    if (_operation?.confirmation?.isCompleted == false) {
+      _operation!.confirmation!.complete((
+        committed: false,
+        reader: _operation!.target,
+      ));
+    }
     _disposed.complete();
     _searchNavigation?.complete(ReaderSearchDestination.failed);
     _searchChanges?.cancel();
@@ -1146,6 +1186,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     String? blockKey,
     int? blockOffset,
     ReaderPosition? navigationPosition,
+    UserBookmark? bookmark,
     bool fromStart = false,
     bool fromEnd = false,
   }) {
@@ -1158,6 +1199,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         existing.target.initialBlockKey == blockKey &&
         existing.target.initialBlockOffset == blockOffset &&
         existing.target.navigationPosition == navigationPosition &&
+        existing.target.bookmark == bookmark &&
         existing.target.startAtBeginning == fromStart &&
         existing.target.startAtEnd == fromEnd) {
       if (!passive && existing.passive) {
@@ -1186,6 +1228,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       blockKey: blockKey,
       blockOffset: blockOffset,
       navigationPosition: navigationPosition,
+      bookmark: bookmark,
       fromStart: fromStart,
       fromEnd: fromEnd,
     );
@@ -1289,6 +1332,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     String? blockKey,
     int? blockOffset,
     ReaderPosition? navigationPosition,
+    UserBookmark? bookmark,
     bool fromStart = false,
     bool fromEnd = false,
     bool pageTurn = false,
@@ -1296,6 +1340,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _ReturnAnchor? origin,
     _ReturnAnchor? returning,
     _SearchNavigation? search,
+    bool Function()? owner,
+    Completer<_ChapterConfirmation>? confirmation,
   }) async {
     if (!mounted ||
         search?.accepts() == false ||
@@ -1308,7 +1354,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
     _completionTurn?.invalidate();
     if (_closingPanelForSwitch) return;
-    if (_route?.isCurrent == false) {
+    if (_route?.isCurrent == false && owner?.call() != true) {
       final panel = _activePanel;
       if (panel == null || !panel.isValid || !panel.route.isCurrent) return;
       final source = _reader;
@@ -1347,9 +1393,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       blockKey: blockKey,
       blockOffset: blockOffset,
       navigationPosition: navigationPosition,
+      bookmark: bookmark,
       fromStart: fromStart,
       fromEnd: fromEnd,
     );
+    operation.owner = owner;
+    operation.confirmation = confirmation;
     operation.search = search;
     operation.locationIntent = intent;
     operation.origin = origin ?? _captureAnchor();
@@ -1430,6 +1479,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
     if (operation.returning case final anchor?
         when !_validAnchor(anchor, reader.content!)) {
+      _rejectPending(reader, invalidLocation: true);
+      return;
+    }
+    if (reader.bookmark != null && reader.bookmarkResolution?.located != true) {
       _rejectPending(reader, invalidLocation: true);
       return;
     }
@@ -1539,6 +1592,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       );
     }
     reader.activateProgress();
+    if (operation.confirmation?.isCompleted == false) {
+      operation.confirmation!.complete((committed: true, reader: reader));
+    }
     setState(
       () => _commitLocation(
         operation.locationIntent,
@@ -1555,6 +1611,12 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     // supersede it; an interrupted animation must never clean up its successor.
     if (!immediate && operation.cancellation != null) {
       return operation.cancellation!;
+    }
+    if (operation.confirmation?.isCompleted == false) {
+      operation.confirmation!.complete((
+        committed: false,
+        reader: operation.target,
+      ));
     }
     operation.search?.complete(ReaderSearchDestination.failed);
     final phase = ++operation.cancelPhase;
@@ -1631,6 +1693,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       final anchor = operation.returning!;
       unawaited(_cancelChapter());
       _discardReturn(anchor);
+      return;
+    }
+    if (reader.bookmark != null) {
+      unawaited(_cancelChapter(immediate: true));
       return;
     }
     final target = reader.chapter;
@@ -2373,6 +2439,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
 
     final actions = ReaderActions(
+      toggleBookmark: _bookmarkRepository == null
+          ? null
+          : () => unawaited(_toggleBookmark()),
+      // Auxiliary readers have no progress owner; return to the main reader first.
+      showBookmarks: _bookmarkRepository == null || widget.linkDepth > 0
+          ? null
+          : _showBookmarks,
+      bookmarked: _currentBookmark != null,
+      bookmarkSupported:
+          reader.pagePresentation == null && widget.linkDepth == 0,
       completionPrevious: () => setState(() => _completion = null),
       exitToShelf: () => _exit(toShelf: true),
       restart: order.isEmpty
@@ -2687,7 +2763,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         }
       });
     }
-    if (_route?.isCurrent == false && _operation != null) {
+    if (_route?.isCurrent == false &&
+        _operation != null &&
+        _operation!.owner?.call() != true) {
       final operation = _operation!;
       operation.intent = _ChapterIntent.cancelling;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2845,6 +2923,8 @@ class _ReturnAnchor {
 enum _ChapterIntent { none, dragging, confirmed, cancelling, settling }
 
 /// Identity is the operation token; every async continuation checks it.
+typedef _ChapterConfirmation = ({bool committed, ReaderController reader});
+
 class _ChapterOperation {
   _ChapterOperation(
     this.source,
@@ -2863,6 +2943,8 @@ class _ChapterOperation {
   bool engaged = false;
   bool pageTurn = false;
   _SearchNavigation? search;
+  bool Function()? owner;
+  Completer<_ChapterConfirmation>? confirmation;
   _LocationIntent locationIntent = _LocationIntent.sequential;
   _ReturnAnchor? origin, returning;
   bool ready = false, saved = false, visible = false;

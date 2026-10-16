@@ -28,6 +28,17 @@ ThemeData readerTheme(
     scaffoldBackgroundColor: paper,
     appBarTheme: base.appBarTheme.copyWith(backgroundColor: paper),
     colorScheme: base.colorScheme.copyWith(onSurfaceVariant: secondary),
+    popupMenuTheme: base.popupMenuTheme.copyWith(
+      color: Color.lerp(paper, base.colorScheme.surface, .35),
+      surfaceTintColor: Colors.transparent,
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => base.textTheme.bodyMedium!.copyWith(
+          color: states.contains(WidgetState.disabled)
+              ? secondary.withValues(alpha: .5)
+              : base.colorScheme.onSurface,
+        ),
+      ),
+    ),
     inputDecorationTheme: base.inputDecorationTheme.copyWith(
       fillColor: Color.lerp(paper, base.colorScheme.outlineVariant, .22),
       hintStyle: base.textTheme.bodyMedium?.copyWith(color: secondary),

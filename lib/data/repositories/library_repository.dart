@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'user_bookmark_repository.dart';
 import '../../domain/catalog_observation.dart';
 import 'package:drift/drift.dart';
 import '../../domain/contracts/contracts.dart';
@@ -44,8 +45,8 @@ class LocalLibraryRepository implements LibraryRepository, LibraryBookRemoval {
   Future<bool> _owned(NovelKey key) async =>
       (await db
               .customSelect(
-                'SELECT 1 FROM bookshelf WHERE $_where UNION ALL SELECT 1 FROM reading_progress WHERE $_where LIMIT 1',
-                variables: [..._key(key), ..._key(key)],
+                'SELECT 1 FROM bookshelf WHERE $_where UNION ALL SELECT 1 FROM reading_progress WHERE $_where UNION ALL SELECT 1 FROM user_bookmarks WHERE $_where LIMIT 1',
+                variables: [..._key(key), ..._key(key), ..._key(key)],
               )
               .get())
           .isNotEmpty;
@@ -367,6 +368,7 @@ class LocalLibraryRepository implements LibraryRepository, LibraryBookRemoval {
             )
             .getSingleOrNull();
         final removed = row == null ? null : _book(row);
+        await LocalUserBookmarkRepository(db).clear(key);
         await _advance(key);
         await db.customUpdate(
           'UPDATE progress_sessions SET removal_generation=removal_generation+1 WHERE $_where',

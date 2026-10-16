@@ -4104,6 +4104,852 @@ class LocalReparseAttemptsCompanion
   }
 }
 
+class BookmarkVersions extends Table
+    with TableInfo<BookmarkVersions, BookmarkVersion> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  BookmarkVersions(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _novelIdMeta = const VerificationMeta(
+    'novelId',
+  );
+  late final GeneratedColumn<String> novelId = GeneratedColumn<String>(
+    'novel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  late final GeneratedColumn<int> revision = GeneratedColumn<int>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (revision >= 1)',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [sourceId, novelId, revision];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'bookmark_versions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BookmarkVersion> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('novel_id')) {
+      context.handle(
+        _novelIdMeta,
+        novelId.isAcceptableOrUnknown(data['novel_id']!, _novelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_novelIdMeta);
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_revisionMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {sourceId, novelId};
+  @override
+  BookmarkVersion map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BookmarkVersion(
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      novelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}novel_id'],
+      )!,
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision'],
+      )!,
+    );
+  }
+
+  @override
+  BookmarkVersions createAlias(String alias) {
+    return BookmarkVersions(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'PRIMARY KEY(source_id, novel_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class BookmarkVersion extends DataClass implements Insertable<BookmarkVersion> {
+  final String sourceId;
+  final String novelId;
+  final int revision;
+  const BookmarkVersion({
+    required this.sourceId,
+    required this.novelId,
+    required this.revision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['source_id'] = Variable<String>(sourceId);
+    map['novel_id'] = Variable<String>(novelId);
+    map['revision'] = Variable<int>(revision);
+    return map;
+  }
+
+  BookmarkVersionsCompanion toCompanion(bool nullToAbsent) {
+    return BookmarkVersionsCompanion(
+      sourceId: Value(sourceId),
+      novelId: Value(novelId),
+      revision: Value(revision),
+    );
+  }
+
+  factory BookmarkVersion.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BookmarkVersion(
+      sourceId: serializer.fromJson<String>(json['source_id']),
+      novelId: serializer.fromJson<String>(json['novel_id']),
+      revision: serializer.fromJson<int>(json['revision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'source_id': serializer.toJson<String>(sourceId),
+      'novel_id': serializer.toJson<String>(novelId),
+      'revision': serializer.toJson<int>(revision),
+    };
+  }
+
+  BookmarkVersion copyWith({
+    String? sourceId,
+    String? novelId,
+    int? revision,
+  }) => BookmarkVersion(
+    sourceId: sourceId ?? this.sourceId,
+    novelId: novelId ?? this.novelId,
+    revision: revision ?? this.revision,
+  );
+  BookmarkVersion copyWithCompanion(BookmarkVersionsCompanion data) {
+    return BookmarkVersion(
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      novelId: data.novelId.present ? data.novelId.value : this.novelId,
+      revision: data.revision.present ? data.revision.value : this.revision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookmarkVersion(')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('revision: $revision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(sourceId, novelId, revision);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BookmarkVersion &&
+          other.sourceId == this.sourceId &&
+          other.novelId == this.novelId &&
+          other.revision == this.revision);
+}
+
+class BookmarkVersionsCompanion extends UpdateCompanion<BookmarkVersion> {
+  final Value<String> sourceId;
+  final Value<String> novelId;
+  final Value<int> revision;
+  final Value<int> rowid;
+  const BookmarkVersionsCompanion({
+    this.sourceId = const Value.absent(),
+    this.novelId = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BookmarkVersionsCompanion.insert({
+    required String sourceId,
+    required String novelId,
+    required int revision,
+    this.rowid = const Value.absent(),
+  }) : sourceId = Value(sourceId),
+       novelId = Value(novelId),
+       revision = Value(revision);
+  static Insertable<BookmarkVersion> custom({
+    Expression<String>? sourceId,
+    Expression<String>? novelId,
+    Expression<int>? revision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (sourceId != null) 'source_id': sourceId,
+      if (novelId != null) 'novel_id': novelId,
+      if (revision != null) 'revision': revision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BookmarkVersionsCompanion copyWith({
+    Value<String>? sourceId,
+    Value<String>? novelId,
+    Value<int>? revision,
+    Value<int>? rowid,
+  }) {
+    return BookmarkVersionsCompanion(
+      sourceId: sourceId ?? this.sourceId,
+      novelId: novelId ?? this.novelId,
+      revision: revision ?? this.revision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (novelId.present) {
+      map['novel_id'] = Variable<String>(novelId.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<int>(revision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BookmarkVersionsCompanion(')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('revision: $revision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class UserBookmarks extends Table with TableInfo<UserBookmarks, UserBookmark> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  UserBookmarks(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _novelIdMeta = const VerificationMeta(
+    'novelId',
+  );
+  late final GeneratedColumn<String> novelId = GeneratedColumn<String>(
+    'novel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _chapterIdMeta = const VerificationMeta(
+    'chapterId',
+  );
+  late final GeneratedColumn<String> chapterId = GeneratedColumn<String>(
+    'chapter_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _anchorJsonMeta = const VerificationMeta(
+    'anchorJson',
+  );
+  late final GeneratedColumn<String> anchorJson = GeneratedColumn<String>(
+    'anchor_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _chapterTitleMeta = const VerificationMeta(
+    'chapterTitle',
+  );
+  late final GeneratedColumn<String> chapterTitle = GeneratedColumn<String>(
+    'chapter_title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (version >= 1)',
+  );
+  static const VerificationMeta _locationMeta = const VerificationMeta(
+    'location',
+  );
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (location IN (\'exact\', \'migrated\', \'inexact\', \'unavailable\'))',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    sourceId,
+    novelId,
+    chapterId,
+    anchorJson,
+    chapterTitle,
+    createdAt,
+    version,
+    location,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'user_bookmarks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<UserBookmark> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('novel_id')) {
+      context.handle(
+        _novelIdMeta,
+        novelId.isAcceptableOrUnknown(data['novel_id']!, _novelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_novelIdMeta);
+    }
+    if (data.containsKey('chapter_id')) {
+      context.handle(
+        _chapterIdMeta,
+        chapterId.isAcceptableOrUnknown(data['chapter_id']!, _chapterIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_chapterIdMeta);
+    }
+    if (data.containsKey('anchor_json')) {
+      context.handle(
+        _anchorJsonMeta,
+        anchorJson.isAcceptableOrUnknown(data['anchor_json']!, _anchorJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_anchorJsonMeta);
+    }
+    if (data.containsKey('chapter_title')) {
+      context.handle(
+        _chapterTitleMeta,
+        chapterTitle.isAcceptableOrUnknown(
+          data['chapter_title']!,
+          _chapterTitleMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_chapterTitleMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_versionMeta);
+    }
+    if (data.containsKey('location')) {
+      context.handle(
+        _locationMeta,
+        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_locationMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  UserBookmark map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return UserBookmark(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      novelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}novel_id'],
+      )!,
+      chapterId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chapter_id'],
+      )!,
+      anchorJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}anchor_json'],
+      )!,
+      chapterTitle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chapter_title'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      )!,
+    );
+  }
+
+  @override
+  UserBookmarks createAlias(String alias) {
+    return UserBookmarks(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class UserBookmark extends DataClass implements Insertable<UserBookmark> {
+  final String id;
+  final String sourceId;
+  final String novelId;
+  final String chapterId;
+  final String anchorJson;
+  final String chapterTitle;
+  final int createdAt;
+  final int version;
+  final String location;
+  const UserBookmark({
+    required this.id,
+    required this.sourceId,
+    required this.novelId,
+    required this.chapterId,
+    required this.anchorJson,
+    required this.chapterTitle,
+    required this.createdAt,
+    required this.version,
+    required this.location,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['source_id'] = Variable<String>(sourceId);
+    map['novel_id'] = Variable<String>(novelId);
+    map['chapter_id'] = Variable<String>(chapterId);
+    map['anchor_json'] = Variable<String>(anchorJson);
+    map['chapter_title'] = Variable<String>(chapterTitle);
+    map['created_at'] = Variable<int>(createdAt);
+    map['version'] = Variable<int>(version);
+    map['location'] = Variable<String>(location);
+    return map;
+  }
+
+  UserBookmarksCompanion toCompanion(bool nullToAbsent) {
+    return UserBookmarksCompanion(
+      id: Value(id),
+      sourceId: Value(sourceId),
+      novelId: Value(novelId),
+      chapterId: Value(chapterId),
+      anchorJson: Value(anchorJson),
+      chapterTitle: Value(chapterTitle),
+      createdAt: Value(createdAt),
+      version: Value(version),
+      location: Value(location),
+    );
+  }
+
+  factory UserBookmark.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return UserBookmark(
+      id: serializer.fromJson<String>(json['id']),
+      sourceId: serializer.fromJson<String>(json['source_id']),
+      novelId: serializer.fromJson<String>(json['novel_id']),
+      chapterId: serializer.fromJson<String>(json['chapter_id']),
+      anchorJson: serializer.fromJson<String>(json['anchor_json']),
+      chapterTitle: serializer.fromJson<String>(json['chapter_title']),
+      createdAt: serializer.fromJson<int>(json['created_at']),
+      version: serializer.fromJson<int>(json['version']),
+      location: serializer.fromJson<String>(json['location']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'source_id': serializer.toJson<String>(sourceId),
+      'novel_id': serializer.toJson<String>(novelId),
+      'chapter_id': serializer.toJson<String>(chapterId),
+      'anchor_json': serializer.toJson<String>(anchorJson),
+      'chapter_title': serializer.toJson<String>(chapterTitle),
+      'created_at': serializer.toJson<int>(createdAt),
+      'version': serializer.toJson<int>(version),
+      'location': serializer.toJson<String>(location),
+    };
+  }
+
+  UserBookmark copyWith({
+    String? id,
+    String? sourceId,
+    String? novelId,
+    String? chapterId,
+    String? anchorJson,
+    String? chapterTitle,
+    int? createdAt,
+    int? version,
+    String? location,
+  }) => UserBookmark(
+    id: id ?? this.id,
+    sourceId: sourceId ?? this.sourceId,
+    novelId: novelId ?? this.novelId,
+    chapterId: chapterId ?? this.chapterId,
+    anchorJson: anchorJson ?? this.anchorJson,
+    chapterTitle: chapterTitle ?? this.chapterTitle,
+    createdAt: createdAt ?? this.createdAt,
+    version: version ?? this.version,
+    location: location ?? this.location,
+  );
+  UserBookmark copyWithCompanion(UserBookmarksCompanion data) {
+    return UserBookmark(
+      id: data.id.present ? data.id.value : this.id,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      novelId: data.novelId.present ? data.novelId.value : this.novelId,
+      chapterId: data.chapterId.present ? data.chapterId.value : this.chapterId,
+      anchorJson: data.anchorJson.present
+          ? data.anchorJson.value
+          : this.anchorJson,
+      chapterTitle: data.chapterTitle.present
+          ? data.chapterTitle.value
+          : this.chapterTitle,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      version: data.version.present ? data.version.value : this.version,
+      location: data.location.present ? data.location.value : this.location,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UserBookmark(')
+          ..write('id: $id, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('chapterId: $chapterId, ')
+          ..write('anchorJson: $anchorJson, ')
+          ..write('chapterTitle: $chapterTitle, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('version: $version, ')
+          ..write('location: $location')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    sourceId,
+    novelId,
+    chapterId,
+    anchorJson,
+    chapterTitle,
+    createdAt,
+    version,
+    location,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is UserBookmark &&
+          other.id == this.id &&
+          other.sourceId == this.sourceId &&
+          other.novelId == this.novelId &&
+          other.chapterId == this.chapterId &&
+          other.anchorJson == this.anchorJson &&
+          other.chapterTitle == this.chapterTitle &&
+          other.createdAt == this.createdAt &&
+          other.version == this.version &&
+          other.location == this.location);
+}
+
+class UserBookmarksCompanion extends UpdateCompanion<UserBookmark> {
+  final Value<String> id;
+  final Value<String> sourceId;
+  final Value<String> novelId;
+  final Value<String> chapterId;
+  final Value<String> anchorJson;
+  final Value<String> chapterTitle;
+  final Value<int> createdAt;
+  final Value<int> version;
+  final Value<String> location;
+  final Value<int> rowid;
+  const UserBookmarksCompanion({
+    this.id = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.novelId = const Value.absent(),
+    this.chapterId = const Value.absent(),
+    this.anchorJson = const Value.absent(),
+    this.chapterTitle = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.version = const Value.absent(),
+    this.location = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  UserBookmarksCompanion.insert({
+    required String id,
+    required String sourceId,
+    required String novelId,
+    required String chapterId,
+    required String anchorJson,
+    required String chapterTitle,
+    required int createdAt,
+    required int version,
+    required String location,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sourceId = Value(sourceId),
+       novelId = Value(novelId),
+       chapterId = Value(chapterId),
+       anchorJson = Value(anchorJson),
+       chapterTitle = Value(chapterTitle),
+       createdAt = Value(createdAt),
+       version = Value(version),
+       location = Value(location);
+  static Insertable<UserBookmark> custom({
+    Expression<String>? id,
+    Expression<String>? sourceId,
+    Expression<String>? novelId,
+    Expression<String>? chapterId,
+    Expression<String>? anchorJson,
+    Expression<String>? chapterTitle,
+    Expression<int>? createdAt,
+    Expression<int>? version,
+    Expression<String>? location,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sourceId != null) 'source_id': sourceId,
+      if (novelId != null) 'novel_id': novelId,
+      if (chapterId != null) 'chapter_id': chapterId,
+      if (anchorJson != null) 'anchor_json': anchorJson,
+      if (chapterTitle != null) 'chapter_title': chapterTitle,
+      if (createdAt != null) 'created_at': createdAt,
+      if (version != null) 'version': version,
+      if (location != null) 'location': location,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  UserBookmarksCompanion copyWith({
+    Value<String>? id,
+    Value<String>? sourceId,
+    Value<String>? novelId,
+    Value<String>? chapterId,
+    Value<String>? anchorJson,
+    Value<String>? chapterTitle,
+    Value<int>? createdAt,
+    Value<int>? version,
+    Value<String>? location,
+    Value<int>? rowid,
+  }) {
+    return UserBookmarksCompanion(
+      id: id ?? this.id,
+      sourceId: sourceId ?? this.sourceId,
+      novelId: novelId ?? this.novelId,
+      chapterId: chapterId ?? this.chapterId,
+      anchorJson: anchorJson ?? this.anchorJson,
+      chapterTitle: chapterTitle ?? this.chapterTitle,
+      createdAt: createdAt ?? this.createdAt,
+      version: version ?? this.version,
+      location: location ?? this.location,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (novelId.present) {
+      map['novel_id'] = Variable<String>(novelId.value);
+    }
+    if (chapterId.present) {
+      map['chapter_id'] = Variable<String>(chapterId.value);
+    }
+    if (anchorJson.present) {
+      map['anchor_json'] = Variable<String>(anchorJson.value);
+    }
+    if (chapterTitle.present) {
+      map['chapter_title'] = Variable<String>(chapterTitle.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UserBookmarksCompanion(')
+          ..write('id: $id, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('chapterId: $chapterId, ')
+          ..write('anchorJson: $anchorJson, ')
+          ..write('chapterTitle: $chapterTitle, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('version: $version, ')
+          ..write('location: $location, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$UserDatabase extends GeneratedDatabase {
   _$UserDatabase(QueryExecutor e) : super(e);
   $UserDatabaseManager get managers => $UserDatabaseManager(this);
@@ -4127,6 +4973,12 @@ abstract class _$UserDatabase extends GeneratedDatabase {
   late final LocalReparseAttempts localReparseAttempts = LocalReparseAttempts(
     this,
   );
+  late final BookmarkVersions bookmarkVersions = BookmarkVersions(this);
+  late final UserBookmarks userBookmarks = UserBookmarks(this);
+  late final Index bookmarksBook = Index(
+    'bookmarks_book',
+    'CREATE INDEX bookmarks_book ON user_bookmarks (source_id, novel_id, created_at DESC)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4143,6 +4995,9 @@ abstract class _$UserDatabase extends GeneratedDatabase {
     localChapterRevisions,
     progressCatalogs,
     localReparseAttempts,
+    bookmarkVersions,
+    userBookmarks,
+    bookmarksBook,
   ];
 }
 
@@ -6253,6 +7108,448 @@ typedef $LocalReparseAttemptsProcessedTableManager =
       LocalReparseAttempt,
       PrefetchHooks Function()
     >;
+typedef $BookmarkVersionsCreateCompanionBuilder =
+    BookmarkVersionsCompanion Function({
+      required String sourceId,
+      required String novelId,
+      required int revision,
+      Value<int> rowid,
+    });
+typedef $BookmarkVersionsUpdateCompanionBuilder =
+    BookmarkVersionsCompanion Function({
+      Value<String> sourceId,
+      Value<String> novelId,
+      Value<int> revision,
+      Value<int> rowid,
+    });
+
+class $BookmarkVersionsFilterComposer
+    extends Composer<_$UserDatabase, BookmarkVersions> {
+  $BookmarkVersionsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $BookmarkVersionsOrderingComposer
+    extends Composer<_$UserDatabase, BookmarkVersions> {
+  $BookmarkVersionsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $BookmarkVersionsAnnotationComposer
+    extends Composer<_$UserDatabase, BookmarkVersions> {
+  $BookmarkVersionsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get novelId =>
+      $composableBuilder(column: $table.novelId, builder: (column) => column);
+
+  GeneratedColumn<int> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+}
+
+class $BookmarkVersionsTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          BookmarkVersions,
+          BookmarkVersion,
+          $BookmarkVersionsFilterComposer,
+          $BookmarkVersionsOrderingComposer,
+          $BookmarkVersionsAnnotationComposer,
+          $BookmarkVersionsCreateCompanionBuilder,
+          $BookmarkVersionsUpdateCompanionBuilder,
+          (
+            BookmarkVersion,
+            BaseReferences<_$UserDatabase, BookmarkVersions, BookmarkVersion>,
+          ),
+          BookmarkVersion,
+          PrefetchHooks Function()
+        > {
+  $BookmarkVersionsTableManager(_$UserDatabase db, BookmarkVersions table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $BookmarkVersionsFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $BookmarkVersionsOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $BookmarkVersionsAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> sourceId = const Value.absent(),
+                Value<String> novelId = const Value.absent(),
+                Value<int> revision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BookmarkVersionsCompanion(
+                sourceId: sourceId,
+                novelId: novelId,
+                revision: revision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String sourceId,
+                required String novelId,
+                required int revision,
+                Value<int> rowid = const Value.absent(),
+              }) => BookmarkVersionsCompanion.insert(
+                sourceId: sourceId,
+                novelId: novelId,
+                revision: revision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $BookmarkVersionsProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      BookmarkVersions,
+      BookmarkVersion,
+      $BookmarkVersionsFilterComposer,
+      $BookmarkVersionsOrderingComposer,
+      $BookmarkVersionsAnnotationComposer,
+      $BookmarkVersionsCreateCompanionBuilder,
+      $BookmarkVersionsUpdateCompanionBuilder,
+      (
+        BookmarkVersion,
+        BaseReferences<_$UserDatabase, BookmarkVersions, BookmarkVersion>,
+      ),
+      BookmarkVersion,
+      PrefetchHooks Function()
+    >;
+typedef $UserBookmarksCreateCompanionBuilder =
+    UserBookmarksCompanion Function({
+      required String id,
+      required String sourceId,
+      required String novelId,
+      required String chapterId,
+      required String anchorJson,
+      required String chapterTitle,
+      required int createdAt,
+      required int version,
+      required String location,
+      Value<int> rowid,
+    });
+typedef $UserBookmarksUpdateCompanionBuilder =
+    UserBookmarksCompanion Function({
+      Value<String> id,
+      Value<String> sourceId,
+      Value<String> novelId,
+      Value<String> chapterId,
+      Value<String> anchorJson,
+      Value<String> chapterTitle,
+      Value<int> createdAt,
+      Value<int> version,
+      Value<String> location,
+      Value<int> rowid,
+    });
+
+class $UserBookmarksFilterComposer
+    extends Composer<_$UserDatabase, UserBookmarks> {
+  $UserBookmarksFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chapterId => $composableBuilder(
+    column: $table.chapterId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get anchorJson => $composableBuilder(
+    column: $table.anchorJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chapterTitle => $composableBuilder(
+    column: $table.chapterTitle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $UserBookmarksOrderingComposer
+    extends Composer<_$UserDatabase, UserBookmarks> {
+  $UserBookmarksOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chapterId => $composableBuilder(
+    column: $table.chapterId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get anchorJson => $composableBuilder(
+    column: $table.anchorJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chapterTitle => $composableBuilder(
+    column: $table.chapterTitle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $UserBookmarksAnnotationComposer
+    extends Composer<_$UserDatabase, UserBookmarks> {
+  $UserBookmarksAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get novelId =>
+      $composableBuilder(column: $table.novelId, builder: (column) => column);
+
+  GeneratedColumn<String> get chapterId =>
+      $composableBuilder(column: $table.chapterId, builder: (column) => column);
+
+  GeneratedColumn<String> get anchorJson => $composableBuilder(
+    column: $table.anchorJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get chapterTitle => $composableBuilder(
+    column: $table.chapterTitle,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
+}
+
+class $UserBookmarksTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          UserBookmarks,
+          UserBookmark,
+          $UserBookmarksFilterComposer,
+          $UserBookmarksOrderingComposer,
+          $UserBookmarksAnnotationComposer,
+          $UserBookmarksCreateCompanionBuilder,
+          $UserBookmarksUpdateCompanionBuilder,
+          (
+            UserBookmark,
+            BaseReferences<_$UserDatabase, UserBookmarks, UserBookmark>,
+          ),
+          UserBookmark,
+          PrefetchHooks Function()
+        > {
+  $UserBookmarksTableManager(_$UserDatabase db, UserBookmarks table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $UserBookmarksFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $UserBookmarksOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $UserBookmarksAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> novelId = const Value.absent(),
+                Value<String> chapterId = const Value.absent(),
+                Value<String> anchorJson = const Value.absent(),
+                Value<String> chapterTitle = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> location = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => UserBookmarksCompanion(
+                id: id,
+                sourceId: sourceId,
+                novelId: novelId,
+                chapterId: chapterId,
+                anchorJson: anchorJson,
+                chapterTitle: chapterTitle,
+                createdAt: createdAt,
+                version: version,
+                location: location,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String sourceId,
+                required String novelId,
+                required String chapterId,
+                required String anchorJson,
+                required String chapterTitle,
+                required int createdAt,
+                required int version,
+                required String location,
+                Value<int> rowid = const Value.absent(),
+              }) => UserBookmarksCompanion.insert(
+                id: id,
+                sourceId: sourceId,
+                novelId: novelId,
+                chapterId: chapterId,
+                anchorJson: anchorJson,
+                chapterTitle: chapterTitle,
+                createdAt: createdAt,
+                version: version,
+                location: location,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $UserBookmarksProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      UserBookmarks,
+      UserBookmark,
+      $UserBookmarksFilterComposer,
+      $UserBookmarksOrderingComposer,
+      $UserBookmarksAnnotationComposer,
+      $UserBookmarksCreateCompanionBuilder,
+      $UserBookmarksUpdateCompanionBuilder,
+      (
+        UserBookmark,
+        BaseReferences<_$UserDatabase, UserBookmarks, UserBookmark>,
+      ),
+      UserBookmark,
+      PrefetchHooks Function()
+    >;
 
 class $UserDatabaseManager {
   final _$UserDatabase _db;
@@ -6275,4 +7572,8 @@ class $UserDatabaseManager {
       $ProgressCatalogsTableManager(_db, _db.progressCatalogs);
   $LocalReparseAttemptsTableManager get localReparseAttempts =>
       $LocalReparseAttemptsTableManager(_db, _db.localReparseAttempts);
+  $BookmarkVersionsTableManager get bookmarkVersions =>
+      $BookmarkVersionsTableManager(_db, _db.bookmarkVersions);
+  $UserBookmarksTableManager get userBookmarks =>
+      $UserBookmarksTableManager(_db, _db.userBookmarks);
 }

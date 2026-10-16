@@ -880,5 +880,18 @@
   "readerSearchFootnote": "Note",
   "readerSearchReturn": "Back to search start",
   "readerSearchDocument": "Opened the document. Exact text positioning and highlighting are unavailable on this page.",
-  "readerSearchClear": "Clear search"
+  "readerSearchClear": "Clear search",
+  "readerBookmarkAdd": "Add bookmark",
+  "readerBookmarkRemove": "Remove bookmark",
+  "readerBookmarks": "My bookmarks",
+  "bookmarkAdded": "Bookmark added",
+  "bookmarkRemoved": "Bookmark removed",
+  "bookmarkEmpty": "No bookmarks yet. Add one from the reader menu.",
+  "bookmarkDelete": "Delete bookmark",
+  "bookmarkPositionUnavailable": "The original position has changed and cannot be located reliably. The bookmark is kept.",
+  "bookmarkUnsupported": "A reliable position bookmark is unavailable on this page.",
+  "bookmarkLoadFailed": "Could not load bookmarks. Close and try again.",
+  "bookmarkSaveFailed": "Could not save the bookmark. Please try again.",
+  "bookmarkOpenFailed": "Could not open this bookmark. Please try again later.",
+  "bookmarkChanged": "Bookmarks have changed. Please try again."
 }

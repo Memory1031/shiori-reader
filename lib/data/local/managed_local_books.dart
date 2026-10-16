@@ -4,6 +4,8 @@ import 'dart:io';
 import 'dart:math';
 import 'search/local_search_session.dart';
 import '../../domain/reparse_position.dart';
+import '../../domain/bookmark_position.dart';
+import '../repositories/user_bookmark_repository.dart';
 import '../repositories/library_repository.dart';
 import 'book_decoder.dart';
 
@@ -880,6 +882,7 @@ class ManagedLocalBooks
       if (_readCache?.$1 == key) _readCache = null;
       await db.transaction(() async {
         final variables = [Variable(key.sourceId.value), Variable(key.novelId)];
+        await LocalUserBookmarkRepository(db).clear(key);
         // Retain a generation tombstone even across a later re-import.
         await db.customUpdate(
           'INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES(?,?,1,-1) ON CONFLICT(source_id,novel_id) DO UPDATE SET generation=generation+1,sequence=-1',

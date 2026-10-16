@@ -1,3 +1,4 @@
+import '../../domain/bookmark_position.dart';
 import 'dart:async';
 import '../../domain/catalog_observation.dart';
 import 'position/progress_tracker.dart';
@@ -26,6 +27,7 @@ class ReaderController extends ScopedController {
     this.initialBlockKey,
     this.initialBlockOffset,
     this.navigationPosition,
+    this.bookmark,
     this.startAtBeginning = false,
     this.startAtEnd = false,
     bool deferProgress = false,
@@ -47,6 +49,8 @@ class ReaderController extends ScopedController {
   final String? initialBlockKey;
   final int? initialBlockOffset;
   final ReaderPosition? navigationPosition;
+  final UserBookmark? bookmark;
+  BookmarkResolution? bookmarkResolution;
   final bool startAtBeginning;
   final bool startAtEnd;
   final void Function(int)? onPosition;
@@ -527,6 +531,15 @@ class ReaderController extends ScopedController {
               final resolved = resolveReaderPosition(content!, requested);
               initialPosition = resolved.position;
               usedFallback = resolved.usedFallback;
+            }
+            if (bookmark case final b?) {
+              bookmarkResolution = pagePresentation != null
+                  ? const BookmarkResolution(BookmarkLocation.unavailable)
+                  : BookmarkPositionIndex([
+                      content!,
+                    ]).resolve(b.chapter, b.anchor);
+              initialPosition = bookmarkResolution!.anchor?.position;
+              usedFallback = !bookmarkResolution!.located;
             }
             restoreStatus = ReaderRestoreStatus.positioning;
           }

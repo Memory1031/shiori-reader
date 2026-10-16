@@ -1790,4 +1790,48 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerSearchClear => 'Clear search';
+
+  @override
+  String get readerBookmarkAdd => 'Add bookmark';
+
+  @override
+  String get readerBookmarkRemove => 'Remove bookmark';
+
+  @override
+  String get readerBookmarks => 'My bookmarks';
+
+  @override
+  String get bookmarkAdded => 'Bookmark added';
+
+  @override
+  String get bookmarkRemoved => 'Bookmark removed';
+
+  @override
+  String get bookmarkEmpty => 'No bookmarks yet. Add one from the reader menu.';
+
+  @override
+  String get bookmarkDelete => 'Delete bookmark';
+
+  @override
+  String get bookmarkPositionUnavailable =>
+      'The original position has changed and cannot be located reliably. The bookmark is kept.';
+
+  @override
+  String get bookmarkUnsupported =>
+      'A reliable position bookmark is unavailable on this page.';
+
+  @override
+  String get bookmarkLoadFailed =>
+      'Could not load bookmarks. Close and try again.';
+
+  @override
+  String get bookmarkSaveFailed =>
+      'Could not save the bookmark. Please try again.';
+
+  @override
+  String get bookmarkOpenFailed =>
+      'Could not open this bookmark. Please try again later.';
+
+  @override
+  String get bookmarkChanged => 'Bookmarks have changed. Please try again.';
 }

@@ -1,5 +1,7 @@
 import 'package:drift/drift.dart' show Variable;
 import 'dart:async';
+import 'package:shiori/data/repositories/user_bookmark_repository.dart';
+import 'package:shiori/domain/bookmark_position.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -71,6 +73,70 @@ void main() {
       ),
     ),
   ).book;
+  test(
+    'manual reparse atomically preserves multiple bookmarks and deletion tombstone',
+    () async {
+      final original = await add(
+        '第一章\nA uniquely identifiable paragraph for the first bookmark.\nAnother uniquely identifiable paragraph for the second bookmark.',
+      );
+      final key = original.content.detail.summary.key,
+          c = original.content.chapters.first;
+      final bookmarks = LocalUserBookmarkRepository(db);
+      var snapshot = await bookmarks.snapshot(key);
+      for (var i = 0; i < 2; i++) {
+        final p = fixtures
+            .progress(original.content, index: i + 1, fraction: 0)
+            .position;
+        final b = UserBookmark(
+          id: 'mark-$i',
+          chapter: c.key,
+          anchor: BookmarkPositionIndex([c]).capture(c.key, p)!,
+          chapterTitle: c.title,
+          createdAt: DateTime.utc(2026),
+        );
+        expect(
+          ok(
+            await bookmarks.saveBookmark(
+              b,
+              revision: snapshot.revision,
+              cancellation: token(),
+            ),
+          ),
+          isTrue,
+        );
+        snapshot = await bookmarks.snapshot(key);
+      }
+      ok(
+        await store.reparseBook(
+          key,
+          chooseEncoding: (_) async => TxtEncoding.utf8,
+          cancellation: token(),
+        ),
+      );
+      final after = await bookmarks.snapshot(key);
+      expect(after.bookmarks.length, 2);
+      expect(after.bookmarks.every((b) => b.located && b.version == 2), isTrue);
+      expect(after.revision, greaterThan(snapshot.revision));
+      final stale = after;
+      ok(await store.deleteBook(key, cancellation: token()));
+      expect((await bookmarks.snapshot(key)).bookmarks, isEmpty);
+      final imported = await add(
+        '第一章\nA uniquely identifiable paragraph for the first bookmark.\nAnother uniquely identifiable paragraph for the second bookmark.',
+      );
+      expect(imported.content.detail.summary.key, key);
+      expect(
+        ok(
+          await bookmarks.saveBookmark(
+            stale.bookmarks.first,
+            revision: stale.revision,
+            cancellation: token(),
+          ),
+        ),
+        isFalse,
+      );
+      expect((await bookmarks.snapshot(key)).bookmarks, isEmpty);
+    },
+  );
   test(
     'hanging metadata reparse preserves exact legacy offsets after reopening',
     () async {

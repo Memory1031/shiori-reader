@@ -8,7 +8,7 @@ final class ReparsedPosition {
   final bool approximate;
 }
 
-String? _text(ContentBlock b) => switch (b) {
+String? migrationText(ContentBlock b) => switch (b) {
   ParagraphBlock(:final text) => text,
   HeadingBlock(:final text) => text,
   _ => null,
@@ -134,18 +134,20 @@ ReparsedPosition migrateLocalPosition(
     // Earlier imports appended ruby as full-width parentheses. Only migrate
     // when reconstructing the entire old block proves a unique exact match;
     // never remove arbitrary parenthetical text from user content.
-    if (block.inlineRuby.isEmpty && oldCount == 1 && _text(block) != null) {
+    if (block.inlineRuby.isEmpty &&
+        oldCount == 1 &&
+        migrationText(block) != null) {
       final rubyMatches = <(ChapterContent, int, double, bool)>[];
       for (final c in same == null ? next.chapters : [same]) {
         for (var i = 0; i < c.blocks.length; i++) {
           final target = c.blocks[i];
-          final base = _text(target);
+          final base = migrationText(target);
           if (target.inlineRuby.isEmpty || base == null) continue;
           final units = base.runes.toList();
           final expanded = StringBuffer();
           var last = 0, added = 0;
-          final oldOffset = (pos.blockFraction * _text(block)!.runes.length)
-              .round();
+          final oldOffset =
+              (pos.blockFraction * migrationText(block)!.runes.length).round();
           var mapped = oldOffset;
           var inAnnotation = false;
           for (final ruby in target.inlineRuby) {
@@ -166,7 +168,7 @@ ReparsedPosition migrateLocalPosition(
             last = ruby.end;
           }
           expanded.write(String.fromCharCodes(units.skip(last)));
-          if (expanded.toString() == _text(block)) {
+          if (expanded.toString() == migrationText(block)) {
             rubyMatches.add((
               c,
               i,
@@ -183,7 +185,7 @@ ReparsedPosition migrateLocalPosition(
     }
     // Bounded character context tolerates split/merged paragraphs. Only text
     // windows of <=3 adjacent blocks, <=16384 scalars each, are considered.
-    final text = _text(block);
+    final text = migrationText(block);
     if (text != null && text.runes.length <= 16384) {
       final units = text.runes.toList();
       final offset = (pos.blockFraction * units.length).round().clamp(
@@ -201,7 +203,7 @@ ReparsedPosition migrateLocalPosition(
             final buffer = StringBuffer();
             var total = 0;
             for (var j = start; j < c.blocks.length && j < start + 3; j++) {
-              final t = _text(c.blocks[j]);
+              final t = migrationText(c.blocks[j]);
               if (t == null || t.length > 32768) break;
               final count = t.runes.length;
               if (total + count > 16384) break;

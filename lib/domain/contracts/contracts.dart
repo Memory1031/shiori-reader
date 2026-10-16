@@ -11,3 +11,4 @@ export 'local_books.dart';
 export 'local_content_links.dart';
 export 'audio.dart';
 export 'local_search.dart';
+export 'user_bookmarks.dart';

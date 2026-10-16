@@ -16,11 +16,13 @@ class ReaderTopBar extends StatelessWidget {
     required this.onLeave,
     required this.menu,
     required this.onMenu,
+    this.disabledCommands = const {},
     this.returnToOrigin = false,
     this.showSearch = false,
     this.onSearch,
   });
   final String title;
+  final Set<ReaderCommand> disabledCommands;
   final bool showSearch;
   final VoidCallback? onSearch;
   final VoidCallback onLeave;
@@ -64,7 +66,14 @@ class ReaderTopBar extends StatelessWidget {
           onSelected: onMenu,
           itemBuilder: (_) => [
             for (final (action, label) in menu)
-              ShioriMenuItem(value: action, label: label),
+              ShioriMenuItem(
+                value: action,
+                label: label,
+                enabled: !disabledCommands.contains(action),
+                disabledReason: action == ReaderCommand.toggleBookmark
+                    ? l.bookmarkUnsupported
+                    : null,
+              ),
           ],
         ),
       ],

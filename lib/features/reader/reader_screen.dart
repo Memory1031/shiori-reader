@@ -914,6 +914,8 @@ class _ReaderContentViewState extends State<ReaderContentView>
   bool _can(ReaderCommand command) {
     final text = widget.completion == null;
     return switch (command) {
+      ReaderCommand.toggleBookmark => text && _actions.toggleBookmark != null,
+      ReaderCommand.bookmarks => _actions.showBookmarks != null,
       ReaderCommand.previousPage => text || _actions.completionPrevious != null,
       ReaderCommand.nextPage || ReaderCommand.progress => text,
       ReaderCommand.toggleControls => true,
@@ -934,6 +936,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
   void _run(BuildContext context, ReaderCommand command) {
     if (!_interactive || !_can(command)) return;
     switch (command) {
+      case ReaderCommand.toggleBookmark:
+        _actions.toggleBookmark?.call();
+      case ReaderCommand.bookmarks:
+        _actions.showBookmarks?.call(context);
       case ReaderCommand.previousPage:
         _turnPage(false);
       case ReaderCommand.nextPage:
@@ -1040,6 +1046,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
         ReaderCommand.previousLocation,
         _actions.previousLocationLabel ?? l.readerPreviousLocation,
       ),
+      (
+        ReaderCommand.toggleBookmark,
+        _actions.bookmarked ? l.readerBookmarkRemove : l.readerBookmarkAdd,
+      ),
+      (ReaderCommand.bookmarks, l.readerBookmarks),
       (ReaderCommand.notes, l.readerLinks),
       (ReaderCommand.details, l.novelDetailsTitle),
       (
@@ -1072,7 +1083,16 @@ class _ReaderContentViewState extends State<ReaderContentView>
       ),
       items: [
         for (final (command, label) in entries)
-          ShioriMenuItem(value: command, label: label),
+          ShioriMenuItem(
+            value: command,
+            label: label,
+            enabled:
+                command != ReaderCommand.toggleBookmark ||
+                _actions.bookmarkSupported,
+            disabledReason: command == ReaderCommand.toggleBookmark
+                ? AppLocalizations.of(context).bookmarkUnsupported
+                : null,
+          ),
       ],
     );
     if (command == null ||
@@ -2084,6 +2104,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
         ReaderCommand.previousLocation,
         _actions.previousLocationLabel ?? l.readerPreviousLocation,
       ),
+      (
+        ReaderCommand.toggleBookmark,
+        _actions.bookmarked ? l.readerBookmarkRemove : l.readerBookmarkAdd,
+      ),
+      (ReaderCommand.bookmarks, l.readerBookmarks),
       (ReaderCommand.notes, l.readerLinks),
       (ReaderCommand.prefetch, l.prefetchTitle),
       (ReaderCommand.details, l.novelDetailsTitle),
@@ -2108,6 +2133,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
         insets: _pageInsets,
         top: ReaderTopBar(
           title: completion ? _bookTitle : _effectiveChapterTitle,
+          disabledCommands: _actions.bookmarkSupported
+              ? const {}
+              : const {ReaderCommand.toggleBookmark},
           returnToOrigin: widget.returnToOrigin,
           showSearch: widget.search != null,
           onSearch: _command(context, ReaderCommand.search),

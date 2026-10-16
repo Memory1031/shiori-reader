@@ -5,6 +5,8 @@ import 'package:flutter/widgets.dart';
 /// button, the overflow or context menu, or a keyboard shortcut. Each input
 /// runs the command through the same availability check and handler.
 enum ReaderCommand {
+  toggleBookmark,
+  bookmarks,
   previousPage,
   nextPage,
   toggleControls,

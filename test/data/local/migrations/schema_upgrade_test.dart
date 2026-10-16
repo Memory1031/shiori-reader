@@ -165,12 +165,12 @@ void main() {
             .data
             .values
             .single,
-        8,
+        9,
       );
       await retry.close();
     },
   );
-  for (final version in [1, 2, 3, 4, 5, 6, 7]) {
+  for (final version in [1, 2, 3, 4, 5, 6, 7, 8]) {
     test(
       'retained user v$version snapshot upgrades and preserves every old field',
       () async {
@@ -183,7 +183,7 @@ void main() {
               .data
               .values
               .single,
-          8,
+          9,
         );
         final library = LocalLibraryRepository(db);
         final shelf =
@@ -202,12 +202,19 @@ void main() {
         expect(progress.position.blockFraction, .25);
         expect(progress.snapshot, shelf.single.snapshot);
         expect(progress.bookProgress, isNull);
+        expect(
+          (await db.customSelect('PRAGMA index_list(user_bookmarks)').get())
+              .map((row) => row.read<String>('name')),
+          contains('bookmarks_book'),
+        );
         await db.close();
         final after = rows(file);
         for (final name in before.keys) {
           if (name == 'progress_sessions') {
             for (final row in (after[name] as List)) {
-              expect((row as Map).remove('removal_generation'), 0);
+              if (version < 8) {
+                expect((row as Map).remove('removal_generation'), 0);
+              }
             }
           }
           if (name == 'reading_progress' && version < 5) {

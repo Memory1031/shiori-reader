@@ -22,13 +22,13 @@ class UserDatabase extends _$UserDatabase {
   }
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
     // Never silently recreate user or cache files on an unknown version.
     onUpgrade: (m, from, to) async {
-      if (from < 1 || from > 7 || to != 8) {
+      if (from < 1 || from > 8 || to != 9) {
         throw StateError('Unsupported database version');
       }
       await transaction(() async {
@@ -58,9 +58,14 @@ class UserDatabase extends _$UserDatabase {
         }
         if (from < 6) await m.createTable(progressCatalogs);
         if (from < 7) await m.createTable(localReparseAttempts);
-        await customStatement(
-          'ALTER TABLE progress_sessions ADD COLUMN removal_generation INTEGER NOT NULL DEFAULT 0 CHECK(removal_generation >= 0)',
-        );
+        if (from < 8) {
+          await customStatement(
+            'ALTER TABLE progress_sessions ADD COLUMN removal_generation INTEGER NOT NULL DEFAULT 0 CHECK(removal_generation >= 0)',
+          );
+        }
+        await m.createTable(bookmarkVersions);
+        await m.createTable(userBookmarks);
+        await m.createIndex(bookmarksBook);
         await repairOnlineOwnership();
         await _checkIntegrity();
         // Commit DDL and the version together; Drift's subsequent assignment
@@ -83,7 +88,8 @@ class UserDatabase extends _$UserDatabase {
       await customStatement(
         'DELETE FROM $table WHERE source_id<>? '
         'AND NOT EXISTS(SELECT 1 FROM bookshelf b WHERE b.source_id=$table.source_id AND b.novel_id=$table.novel_id) '
-        'AND NOT EXISTS(SELECT 1 FROM reading_progress r WHERE r.source_id=$table.source_id AND r.novel_id=$table.novel_id)',
+        'AND NOT EXISTS(SELECT 1 FROM reading_progress r WHERE r.source_id=$table.source_id AND r.novel_id=$table.novel_id) '
+        'AND NOT EXISTS(SELECT 1 FROM user_bookmarks u WHERE u.source_id=$table.source_id AND u.novel_id=$table.novel_id)',
         ['local'],
       );
     }

@@ -12,6 +12,10 @@ import 'reader_panel.dart';
 @immutable
 class ReaderActions {
   const ReaderActions({
+    this.toggleBookmark,
+    this.showBookmarks,
+    this.bookmarked = false,
+    this.bookmarkSupported = true,
     this.previousChapter,
     this.nextChapter,
     this.navigateChapter,
@@ -30,6 +34,10 @@ class ReaderActions {
     this.pageTurnCommitted,
     this.previousLocationLabel,
   });
+
+  final VoidCallback? toggleBookmark;
+  final void Function(BuildContext)? showBookmarks;
+  final bool bookmarked, bookmarkSupported;
 
   /// Turn to the neighbouring chapter at a page boundary.
   final VoidCallback? previousChapter, nextChapter;

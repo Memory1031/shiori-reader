@@ -13,6 +13,7 @@ Future<LocalReparseResult> _reparse(
   final db = store.db;
   final library = LocalLibraryRepository(db);
   ReadingProgress? progress;
+  late BookmarkSnapshot bookmarks;
   String? stamp;
   String? previousBundle;
   await db.transaction(() async {
@@ -26,6 +27,7 @@ Future<LocalReparseResult> _reparse(
     }
     progress = (read as Success<ReadingProgress?>).value;
     stamp = await _progressStamp(store, key);
+    bookmarks = await LocalUserBookmarkRepository(db).snapshot(key);
     await db.customStatement(
       'UPDATE local_books SET maintenance=1 WHERE digest=?',
       [key.novelId],
@@ -41,6 +43,7 @@ Future<LocalReparseResult> _reparse(
       old.content,
       prepared.content,
       progress,
+      bookmarks,
       token,
     );
     checkLocalCancellation(token);
@@ -205,9 +208,12 @@ Future<void> _publishReparse(
   ManagedLocalBooks store,
   NovelKey key,
   _PreparedReparse prepared,
-  ReparsedPosition migration,
+  _ReparseMigration migration,
 ) async {
   final db = store.db;
+  await LocalUserBookmarkRepository(
+    db,
+  ).replace(key, migration.before, migration.bookmarks);
   final content = prepared.content;
   final vars = [Variable(key.sourceId.value), Variable(key.novelId)];
   await db.customUpdate(
@@ -307,9 +313,30 @@ class _OriginalCorrupt extends FormatException {
   const _OriginalCorrupt() : super('Original checksum');
 }
 
-Future<ReparsedPosition> _migrate(
+final class _ReparseMigration {
+  const _ReparseMigration(this.reading, this.before, this.bookmarks);
+  final ReparsedPosition reading;
+  final BookmarkSnapshot before;
+  final List<UserBookmark> bookmarks;
+  ReadingProgress? get progress => reading.progress;
+  bool get approximate => reading.approximate;
+}
+
+Future<_ReparseMigration> _migrate(
   LocalBookContent old,
   LocalBookContent next,
   ReadingProgress? progress,
+  BookmarkSnapshot bookmarks,
   CancellationToken token,
-) => runParserWorker(() => migrateLocalPosition(old, next, progress), token);
+) => runParserWorker(
+  () => _ReparseMigration(
+    migrateLocalPosition(old, next, progress),
+    bookmarks,
+    migrateBookmarks(
+      [...old.chapters, ...old.auxiliaryChapters],
+      [...next.chapters, ...next.auxiliaryChapters],
+      bookmarks.bookmarks,
+    ),
+  ),
+  token,
+);

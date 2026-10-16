@@ -3019,6 +3019,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear search'**
   String get readerSearchClear;
+
+  /// No description provided for @readerBookmarkAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add bookmark'**
+  String get readerBookmarkAdd;
+
+  /// No description provided for @readerBookmarkRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove bookmark'**
+  String get readerBookmarkRemove;
+
+  /// No description provided for @readerBookmarks.
+  ///
+  /// In en, this message translates to:
+  /// **'My bookmarks'**
+  String get readerBookmarks;
+
+  /// No description provided for @bookmarkAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark added'**
+  String get bookmarkAdded;
+
+  /// No description provided for @bookmarkRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark removed'**
+  String get bookmarkRemoved;
+
+  /// No description provided for @bookmarkEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No bookmarks yet. Add one from the reader menu.'**
+  String get bookmarkEmpty;
+
+  /// No description provided for @bookmarkDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete bookmark'**
+  String get bookmarkDelete;
+
+  /// No description provided for @bookmarkPositionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The original position has changed and cannot be located reliably. The bookmark is kept.'**
+  String get bookmarkPositionUnavailable;
+
+  /// No description provided for @bookmarkUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'A reliable position bookmark is unavailable on this page.'**
+  String get bookmarkUnsupported;
+
+  /// No description provided for @bookmarkLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load bookmarks. Close and try again.'**
+  String get bookmarkLoadFailed;
+
+  /// No description provided for @bookmarkSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the bookmark. Please try again.'**
+  String get bookmarkSaveFailed;
+
+  /// No description provided for @bookmarkOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open this bookmark. Please try again later.'**
+  String get bookmarkOpenFailed;
+
+  /// No description provided for @bookmarkChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmarks have changed. Please try again.'**
+  String get bookmarkChanged;
 }
 
 class _AppLocalizationsDelegate

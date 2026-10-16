@@ -113,7 +113,7 @@ Presentation 依赖领域契约，通过显式注入获得服务。应用根拥�
 
 | 位置 | Schema | 内容 |
 | --- | --- | --- |
-| `users/users.sqlite` | v8 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions、progress_catalogs、local_reparse_attempts |
+| `users/users.sqlite` | v9 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions、progress_catalogs、local_reparse_attempts、user_bookmarks、bookmark_versions |
 | `disposable/cache.sqlite` | v2 | novel_cache、catalog_cache、chapter_cache、image_cache、image_owners |
 | 平台 preferences | 独立 codec | readerSettings v3、appSettings v2 |
 | `users/update-preferences.json` | v1 | 更新渠道、自动检查开关、检查时间与限流期限 |
@@ -142,7 +142,7 @@ preferences 使用独立 JSON key，Store 串行写入，读取等待已排队�
 
 ### 迁移与生成
 
-保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 / v5 / v6 / v7 / v8 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
+保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 / v5 / v6 / v7 / v8 / v9 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
 
 v8 升级一次性将有有效进度而无书架的在线作品无损补入书架，保留原位置及已有收藏时间；仅有目录或预取选择、没有书架和进度的孤立记录清理，保留会话代次保护，不联网，也不在每次启动重复扫描。
 

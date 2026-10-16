@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:shiori/data/repositories/user_bookmark_repository.dart';
+import 'package:shiori/domain/bookmark_position.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
@@ -271,6 +273,90 @@ void main() {
           .map((r) => r.data)
           .toList();
 
+  test(
+    'automatic publication retains an unlocatable bookmark without blocking the book',
+    () async {
+      final (old, next) = await approximateFixture(
+        '第一章\nUnique contemporary content long enough for a bookmark.',
+      );
+      final key = old.content.detail.summary.key,
+          c = old.content.chapters.first;
+      ok(await library.clearHistory(key, cancellation: token()));
+      final bookmarks = LocalUserBookmarkRepository(db),
+          p = f.progress(old.content, fraction: 0).position;
+      ok(
+        await bookmarks.saveBookmark(
+          UserBookmark(
+            id: 'legacy',
+            chapter: c.key,
+            anchor: BookmarkPositionIndex([c]).capture(c.key, p)!,
+            chapterTitle: c.title,
+            createdAt: DateTime.utc(2026),
+          ),
+          revision: 0,
+          cancellation: token(),
+        ),
+      );
+      await start();
+      await idle();
+      final current = ok(await store.read(key, cancellation: token()))!;
+      expect(current.content.chapters, next.content.chapters);
+      final b = (await bookmarks.snapshot(key)).bookmarks.single;
+      expect(b.located, isFalse);
+      expect(b.anchor.position.contentRevision, p.contentRevision);
+      expect(b.anchor.position.blockKey, p.blockKey);
+      expect(b.anchor.position.blockFraction, p.blockFraction);
+      expect(b.anchor.position.pixelOffset, isNull);
+      expect(b.version, 2);
+      expect(ok(await library.getProgress(key, cancellation: token())), isNull);
+    },
+  );
+  test(
+    'automatic migration rechecks a bookmark deletion before publishing',
+    () async {
+      final book = await add(
+        '第一章\nUnique stable bookmark content long enough for reliable matching.',
+      );
+      final key = book.content.detail.summary.key,
+          c = book.content.chapters.first;
+      final bookmarks = LocalUserBookmarkRepository(db),
+          p = f.progress(book.content, fraction: 0).position;
+      ok(
+        await bookmarks.saveBookmark(
+          UserBookmark(
+            id: 'remove-me',
+            chapter: c.key,
+            anchor: BookmarkPositionIndex([c]).capture(c.key, p)!,
+            chapterTitle: c.title,
+            createdAt: DateTime.utc(2026),
+          ),
+          revision: 0,
+          cancellation: token(),
+        ),
+      );
+      var removed = false;
+      await start(
+        checkpoint: (phase) async {
+          if (phase == 'migration' && !removed) {
+            removed = true;
+            ok(
+              await bookmarks.deleteBookmark(
+                (await bookmarks.snapshot(key)).bookmarks.single,
+                cancellation: token(),
+              ),
+            );
+          }
+        },
+      );
+      await idle();
+      expect(removed, isTrue);
+      expect((await bookmarks.snapshot(key)).bookmarks, isEmpty);
+      expect(
+        ok(await store.read(key, cancellation: token()))!.content.chapters,
+        book.content.chapters,
+      );
+    },
+  );
   for (final failSave in [false, true]) {
     testWidgets(
       failSave

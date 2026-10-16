@@ -78,3 +78,18 @@ CREATE TABLE local_reparse_attempts (
  next_retry_at INTEGER,
  attempted_at INTEGER NOT NULL
 );
+
+-- Retained mutation stamp prevents late work from restoring deleted bookmarks.
+CREATE TABLE bookmark_versions (
+ source_id TEXT NOT NULL, novel_id TEXT NOT NULL,
+ revision INTEGER NOT NULL CHECK(revision >= 1),
+ PRIMARY KEY(source_id, novel_id)
+);
+CREATE TABLE user_bookmarks (
+ id TEXT NOT NULL PRIMARY KEY,
+ source_id TEXT NOT NULL, novel_id TEXT NOT NULL, chapter_id TEXT NOT NULL,
+ anchor_json TEXT NOT NULL, chapter_title TEXT NOT NULL,
+ created_at INTEGER NOT NULL, version INTEGER NOT NULL CHECK(version >= 1),
+ location TEXT NOT NULL CHECK(location IN ('exact','migrated','inexact','unavailable'))
+);
+CREATE INDEX bookmarks_book ON user_bookmarks(source_id, novel_id, created_at DESC);

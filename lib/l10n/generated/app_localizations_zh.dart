@@ -1621,4 +1621,43 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerSearchClear => '清空搜索';
+
+  @override
+  String get readerBookmarkAdd => '添加书签';
+
+  @override
+  String get readerBookmarkRemove => '取消书签';
+
+  @override
+  String get readerBookmarks => '我的书签';
+
+  @override
+  String get bookmarkAdded => '已添加书签';
+
+  @override
+  String get bookmarkRemoved => '已取消书签';
+
+  @override
+  String get bookmarkEmpty => '还没有书签，可从阅读器菜单添加。';
+
+  @override
+  String get bookmarkDelete => '删除书签';
+
+  @override
+  String get bookmarkPositionUnavailable => '原位置已变化，无法可靠定位。书签已保留。';
+
+  @override
+  String get bookmarkUnsupported => '当前页面无法保存可靠的位置书签。';
+
+  @override
+  String get bookmarkLoadFailed => '无法读取书签，请关闭后重试。';
+
+  @override
+  String get bookmarkSaveFailed => '书签未能保存，请重试。';
+
+  @override
+  String get bookmarkOpenFailed => '暂时无法打开书签，请稍后重试。';
+
+  @override
+  String get bookmarkChanged => '书签状态已更新，请重试。';
 }
