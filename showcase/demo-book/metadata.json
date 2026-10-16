@@ -1,0 +1,19 @@
+{
+  "identifier": "urn:uuid:b1867d54-19ee-4a87-a1dd-f66af32996e3",
+  "title": {"zh-CN": "蓝色借书卡的最后一栏", "en": "The Last Line on the Blue Library Card"},
+  "creator": {"zh-CN": "Shiori 原创示例创作组", "en": "Shiori Original Showcase Project"},
+  "publisher": "Shiori Reader",
+  "modified": "2026-10-16T00:00:00Z",
+  "description": {"zh-CN": "海边的旧书店即将搬迁。一张在休息日留下记录的蓝色借书卡，让七濑澪与藤原律重新读起上一代人的夏天，也学着为自己的去留签名。", "en": "As a seaside bookshop prepares to move, an old blue library card leads Mio Nanase and Ritsu Fujiwara through an unfinished summer—and toward decisions they must make for themselves."},
+  "rights": {"zh-CN": "AI 辅助创作的 Shiori 原创示例内容。小说与插图未授予独立开放许可；仓库代码的 MIT 许可不自动适用于这些素材。", "en": "AI-assisted original showcase content for Shiori. No separate open license is granted for the story or artwork; the repository's code MIT license does not automatically apply to these materials."},
+  "chapters": [
+    {"id": "chapter-01", "zh": "星期三的借书人", "en": "The Wednesday Borrower"},
+    {"id": "chapter-02", "zh": "十六点四十不靠站", "en": "No Bus at Four Forty"},
+    {"id": "chapter-03", "zh": "纸背面的两种雨", "en": "Two Kinds of Rain"},
+    {"id": "chapter-04", "zh": "不要替我说遗憾", "en": "Don't Call It My Regret"},
+    {"id": "chapter-05", "zh": "那一栏不是欠条", "en": "A Line, Not a Debt"},
+    {"id": "chapter-06", "zh": "雨不会替我们开口", "en": "The Rain Won't Speak for Us"},
+    {"id": "chapter-07", "zh": "给下一位借阅人", "en": "For the Next Borrower"}
+  ],
+  "search_terms": {"zh-CN": ["蓝色借书卡", "潮待亭"], "en": ["blue library card", "Shiomachi Pavilion"]}
+}

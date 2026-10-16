@@ -1,0 +1,15 @@
+html { color-scheme: light dark; }
+body { margin: 0 5%; }
+h1 { margin: 2em 0 1.6em; text-align: center; font-size: 1.4em; }
+p { margin: 0 0 0.85em; text-indent: 2em; }
+p.dialogue, p.center, p.note { text-indent: 0; }
+p.center { text-align: center; }
+p.note { font-size: 0.9em; }
+figure { margin: 1.5em 0; text-align: center; }
+img { max-width: 100%; height: auto; }
+.cover { margin: 0; text-align: center; }
+.cover img { display: block; margin: 0 auto; }
+.titlepage { margin: 4em 0 2em; }
+nav ol { padding-left: 1.5em; }
+nav li { margin-bottom: 0.7em; }
+a { text-decoration: underline; }

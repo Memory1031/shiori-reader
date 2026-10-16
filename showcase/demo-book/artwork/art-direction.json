@@ -1,0 +1,83 @@
+{
+  "style": "原创日系萌系轻小说插画；清晰轻盈的手绘线条、简洁平涂、少量两级赛璐璐阴影，象牙白、粉蓝、藏蓝与浅薄荷配色。大而有神的眼睛与细小表情动作，避免厚涂、写实光影、磨皮、塑料高光和3D质感。所有封面与彩插均以女主为最主要视觉主体，不模仿指定画师或现有角色。",
+  "heroine": "七濑澪，17岁高二女生，身高约150厘米，娇小纤细的自然体型，黑色及腰长直发、齐刘海，右鬓两枚平行奶白细发夹（正面画面左侧），深棕色大眼睛，清秀可爱的脸与轻微红晕，表情灵动。固定服装为不透的白色短袖水手服、双白线藏蓝领、藏蓝小领结、及膝藏蓝百褶裙、白色短袜、深棕乐福鞋、米白帆布挎包。自然视角、日常动作，不突出胸部或任何身体部位，不使用暴露服装或性化构图。",
+  "narrator": "藤原律，17岁高二男生，身形清瘦，黑色微乱短发，灰蓝短袖衬衫与深色长裤；仅作次要配角，不取代女主中心。",
+  "images": [
+    {
+      "id": "cover",
+      "orientation": "portrait 2:3",
+      "scene": "女主位于画面左侧，站在海边旧书店门口手持蓝色借书卡回头微笑；右侧书店与顶部天空留出日文竖排主标题空间。人物为主要主体，无字原图。",
+      "source": "cover/cover-master.png",
+      "sha256": "799dee874089dc3a911cd3a21611605fb97a8d88a2ffc8d14556956d6cdb553c",
+      "alt": {
+        "zh": "七濑澪手持蓝色借书卡，在雨后的海边书店门口回头微笑。",
+        "en": "Mio Nanase turns with a blue library card outside the seaside bookshop after rain."
+      }
+    },
+    {
+      "id": "illustration-01",
+      "chapter": 1,
+      "orientation": "portrait 2:3",
+      "scene": "女主在旧书店柜台前俯身递出蓝色借书卡，微歪头，像在认真盘问又忍不住笑；男主只露柜台边的肩与手。",
+      "source": "illustrations/illustration-01-master.png",
+      "sha256": "1d94f9a3c5594cf9a3f7dd2e449d51e7ede0667634b34e2fbd1eed97277c8b4a",
+      "alt": {
+        "zh": "澪俯身越过书店柜台，带着笑意递出那张旧借书卡。",
+        "en": "Mio leans across the bookshop counter to offer the old blue card, smiling inquisitively."
+      },
+      "after": {
+        "zh": "她从透明文件袋里抽出",
+        "en": "She drew a piece of blue card"
+      }
+    },
+    {
+      "id": "illustration-02",
+      "chapter": 4,
+      "orientation": "portrait 2:3",
+      "scene": "下雨的书店窗边，女主独坐，手机屏幕朝下，手中有涂改的稿纸；神情懊恼而认真，窗外雨水，室内暖灯，不夸张流泪。",
+      "source": "illustrations/illustration-02-master.png",
+      "sha256": "73479f19d72143e6a58f6b3870c567bb6bef9adde5249a57811fdae28a73d500",
+      "alt": {
+        "zh": "雨天窗边，澪面对划去开场白的稿纸，托腮重新思考。",
+        "en": "By the rainy window, Mio rests her cheek on one hand and reconsiders her crossed-out draft."
+      },
+      "after": {
+        "zh": "她坐在昨天修书的桌旁",
+        "en": "She settled at yesterday's repair table"
+      }
+    },
+    {
+      "id": "illustration-03",
+      "chapter": 7,
+      "orientation": "portrait 2:3",
+      "scene": "新书店开门的清晨，身穿夏季水手服的黑长直女主站在矮木桌旁刚签好新的蓝色借书卡，抬头向画面外的男主露出明亮笑容，身后有待装满的书架。",
+      "source": "illustrations/illustration-03-master.png",
+      "sha256": "58d92586d270f5ddf2c8a424487cf0b25bc407bb0f0ba270d7f5304f7994a4f4",
+      "alt": {
+        "zh": "新书店开门的清晨，澪在蓝色借书卡上签好名字，抬头微笑。",
+        "en": "On the new shop’s opening morning, Mio smiles after signing her new blue library card."
+      },
+      "after": {
+        "zh": "七濑握笔的时候",
+        "en": "Nanase swept her long hair"
+      }
+    }
+  ],
+  "generation": {
+    "tool": "ImageGen",
+    "master_policy": "无字 PNG 原图原样保留；后三图参考新封面初稿保持角色与服装一致，封面另经 ImageGen 左移人物调整构图。标题在构建时用独立字体排版。"
+  },
+  "coverTypography": {
+    "title": "青い貸出カードの最後の空欄",
+    "columns": [
+      "青い貸出カードの",
+      "最後の空欄"
+    ],
+    "direction": "vertical-rl",
+    "font": "fonts/MochiyPopOne-Regular.ttf",
+    "fontFamily": "Mochiy Pop One",
+    "fontSource": "https://github.com/google/fonts/tree/main/ofl/mochiypopone",
+    "fontLicense": "SIL Open Font License 1.1; see fonts/OFL.txt",
+    "note": "仅在封面光栅图上排字，日文长音符经竖排字形替换，不在 EPUB 嵌入字体。中英文版共用日文主标题封面，不添加语种标签。"
+  }
+}

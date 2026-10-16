@@ -1,0 +1,17 @@
+{
+  "pillow": "12.3.0",
+  "coverFontFile": "MochiyPopOne-Regular.ttf",
+  "coverFontSha256": "9e009430e1316c271a5f34759c6b65fc343c4e806f193042528887e7235a92c6",
+  "fontIndex": 0,
+  "raqm": "0.10.5",
+  "harfbuzz": "14.2.1",
+  "freetype": "2.14.3",
+  "zipTimestamp": [
+    2026,
+    10,
+    16,
+    0,
+    0,
+    0
+  ]
+}
