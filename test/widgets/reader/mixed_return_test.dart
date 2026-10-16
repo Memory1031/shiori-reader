@@ -10,6 +10,8 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/reader_bookmarks.dart';
 import 'package:shiori/features/reader/reader_commands.dart';
+import 'package:shiori/features/reader/reader_location_transition.dart';
+import 'package:shiori/features/reader/viewport/page_turn.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'local_search_test.dart' as s;
 import 'link_return_test.dart' as f;
@@ -18,7 +20,12 @@ class MixedReader {
   MixedReader(this.reader, this.bookmarks);
   final f.ReturnReader reader;
   final LocalUserBookmarkRepository bookmarks;
-  Future<void> lookup(WidgetTester t, String chapter, {int block = 0}) async {
+  Future<void> lookup(
+    WidgetTester t,
+    String chapter, {
+    int block = 0,
+    Future<void> Function()? afterTap,
+  }) async {
     final id = block == 0 ? chapter : "$chapter-$block";
     final c = reader.book.chapters.firstWhere(
       (c) => c.key == reader.key(chapter),
@@ -57,6 +64,7 @@ class MixedReader {
     );
     await t.pumpAndSettle();
     await t.tap(find.byKey(ValueKey('bookmark-$id')));
+    await afterTap?.call();
     await t.pumpAndSettle();
     expect(find.byType(ReaderBookmarksPanel), findsNothing);
     expect(reader.view(t).content.key, c.key);
@@ -77,16 +85,24 @@ class MixedReader {
   }
 }
 
-Future<MixedReader> mount(WidgetTester t, {double scale = 1}) async {
+Future<MixedReader> mount(
+  WidgetTester t, {
+  double scale = 1,
+  bool searchable = true,
+  PageTurnStyle pageTurn = PageTurnStyle.none,
+  bool reduceMotion = false,
+}) async {
   await s.fonts(t);
   final db = UserDatabase(NativeDatabase.memory());
   addTearDown(db.close);
   final repo = LocalUserBookmarkRepository(db);
   final reader = await f.mount(
     t,
-    repositoryFactory: s.ReaderSearchRepository.new,
+    repositoryFactory: searchable ? s.ReaderSearchRepository.new : null,
     bookmarks: repo,
     scale: scale,
+    pageTurn: pageTurn,
+    reduceMotion: reduceMotion,
   );
   await t.runAsync(
     () => db.customStatement(
@@ -102,7 +118,180 @@ Future<void> drive(WidgetTester tester, Future<void> navigation) async {
   await navigation;
 }
 
+bool revealing(WidgetTester t) => t
+    .widgetList<Opacity>(
+      find.descendant(
+        of: find.byType(ReaderLocationTransition),
+        matching: find.byType(Opacity),
+      ),
+    )
+    .any((w) => w.opacity < 1);
+
 void main() {
+  testWidgets('bookmark chapter turns and body link animations are preserved', (
+    t,
+  ) async {
+    final m = await mount(t, searchable: false, pageTurn: PageTurnStyle.slide),
+        r = m.reader;
+    final origin = r.position(t);
+    Future<void> frames({required bool chapterTurn}) async {
+      var sawMotion = false;
+      for (var i = 0; i < 80; i++) {
+        await t.runAsync(() => Future<void>.delayed(Duration.zero));
+        await t.pump(const Duration(milliseconds: 16));
+        final turning = t
+            .widgetList<PageTurnSlot>(find.byType(PageTurnSlot))
+            .any(
+              (w) => w.frame.style == PageTurnStyle.slide && w.frame.turning,
+            );
+        if (chapterTurn) {
+          expect(
+            revealing(t),
+            isFalse,
+            reason: 'Do not add a second chapter transition',
+          );
+        }
+        sawMotion |= chapterTurn ? turning : revealing(t);
+      }
+      expect(sawMotion, isTrue);
+    }
+
+    await m.lookup(t, 'b', afterTap: () => frames(chapterTurn: true));
+    r.view(t).actions.previousLocation!();
+    await frames(chapterTurn: true);
+    expect(r.position(t), origin);
+    r.follow(t, 'Same file');
+    await frames(chapterTurn: false);
+    r.view(t).actions.previousLocation!();
+    await frames(chapterTurn: false);
+    expect(r.position(t), origin);
+    r.follow(t, 'B');
+    await frames(chapterTurn: true);
+    expect(r.view(t).content.key, r.key('b'));
+    await t.pumpWidget(const SizedBox());
+    await t.pumpAndSettle();
+  });
+
+  testWidgets(
+    'backgrounding during bookmark dismissal cancels the late reveal',
+    (t) async {
+      final m = await mount(
+            t,
+            searchable: false,
+            pageTurn: PageTurnStyle.slide,
+          ),
+          r = m.reader;
+      await m.lookup(
+        t,
+        'a',
+        block: 10,
+        afterTap: () async {
+          final sheet = ModalRoute.of<void>(
+            t.element(find.byType(ReaderBookmarksPanel)),
+          )!;
+          for (
+            var i = 0;
+            i < 80 && sheet.animation!.status != AnimationStatus.reverse;
+            i++
+          ) {
+            await t.runAsync(() => Future<void>.delayed(Duration.zero));
+            await t.pump(const Duration(milliseconds: 16));
+          }
+          expect(sheet.animation!.status, AnimationStatus.reverse);
+          expect(r.position(t).blockIndex, 10);
+          t.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+          t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+          for (var i = 0; i < 40; i++) {
+            await t.pump(const Duration(milliseconds: 16));
+            expect(revealing(t), isFalse);
+          }
+        },
+      );
+      expect(r.view(t).actions.previousLocation, isNotNull);
+      await t.pumpWidget(const SizedBox());
+      await t.pumpAndSettle();
+    },
+  );
+
+  for (final config in [
+    (false, PageTurnStyle.slide, false),
+    (true, PageTurnStyle.slide, false),
+    (false, PageTurnStyle.none, false),
+    (false, PageTurnStyle.slide, true),
+  ]) {
+    testWidgets('bookmark position reveal survives panel dismissal $config', (
+      t,
+    ) async {
+      final m = await mount(
+            t,
+            searchable: config.$1,
+            pageTurn: config.$2,
+            reduceMotion: config.$3,
+          ),
+          r = m.reader;
+      final origin = r.position(t);
+      final animated = config.$2 != PageTurnStyle.none && !config.$3;
+      var phase = 'forward';
+      Future<bool> frames({ModalRoute<void>? sheet}) async {
+        var closed = sheet == null, sawReveal = false;
+        sheet?.completed.then((_) => closed = true);
+        for (var i = 0; i < 80; i++) {
+          await t.runAsync(() => Future<void>.delayed(Duration.zero));
+          await t.pump(const Duration(milliseconds: 16));
+          if (revealing(t)) {
+            expect(
+              closed,
+              isTrue,
+              reason: 'Reveal must remain visible after dismissal',
+            );
+            if (!sawReveal) {
+              await f.snapshot(
+                t,
+                r,
+                'bookmark-reveal-$phase-middle-$config',
+                pump: false,
+              );
+            }
+            sawReveal = true;
+          }
+        }
+        return sawReveal;
+      }
+
+      await f.snapshot(t, r, 'bookmark-reveal-before-$config');
+      await m.lookup(
+        t,
+        'a',
+        block: 10,
+        afterTap: () async {
+          final sheet = ModalRoute.of<void>(
+            t.element(find.byType(ReaderBookmarksPanel)),
+          )!;
+          expect(await frames(sheet: sheet), animated);
+        },
+      );
+      expect(r.position(t).blockIndex, 10);
+      phase = 'return';
+      r.view(t).actions.previousLocation!();
+      expect(await frames(), animated);
+      expect(r.position(t), origin);
+      expect(r.view(t).actions.previousLocation, isNull);
+      // Reopening and selecting the same page must not play another reveal.
+      await m.lookup(t, 'a', block: 10);
+      await m.lookup(
+        t,
+        'a',
+        block: 10,
+        afterTap: () async {
+          expect(await frames(), isFalse);
+        },
+      );
+      await f.snapshot(t, r, 'bookmark-reveal-settled-$config');
+      await t.pumpWidget(const SizedBox());
+      await t.pumpAndSettle();
+    });
+  }
+
   testWidgets(
     'bookmark data refresh failure does not undo confirmed navigation or its origin',
     (t) async {

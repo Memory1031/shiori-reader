@@ -365,7 +365,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     final previousPage = viewport.inspectDisplayedPage()?.page;
     final restored = await viewport.restoreConfirmed(position, isCurrent: live);
     if (!mounted || source != _reader) return false;
-    var confirmed = false;
+    var confirmed = false, reveal = false;
     setState(() {
       _changing = false;
       _restoringLocation = false;
@@ -374,18 +374,44 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         confirmed = true;
         _commitLocation(intent, origin, returning, ticket);
         final page = viewport.inspectDisplayedPage()?.page;
-        if ((intent == _LocationIntent.search ||
-                returning?.kind == ReaderReturnKind.search) &&
-            origin!.chapter == source.chapter &&
-            previousPage != null &&
+        if (previousPage != null &&
             page != null &&
             (page.start != previousPage.start ||
                 page.end != previousPage.end)) {
-          _locationRevision++;
+          reveal = true;
         }
       }
     });
+    if (reveal) {
+      unawaited(
+        _revealRestoredLocation(
+          source,
+          generation,
+          intent == _LocationIntent.bookmark ? _bookmarkSheet : null,
+        ),
+      );
+    }
     return confirmed;
+  }
+
+  Future<void> _revealRestoredLocation(
+    ReaderController source,
+    int generation,
+    ModalBottomSheetRoute<void>? sheet,
+  ) async {
+    // The confirmed bookmark closes its sheet before revealing the target.
+    if (sheet != null) await sheet.completed;
+    if (mounted &&
+        !_invalidated &&
+        !_changing &&
+        _foreground &&
+        _reader == source &&
+        !source.isClosed &&
+        generation == _navigationGeneration &&
+        _leavingInsets == null &&
+        _route?.isCurrent == true) {
+      setState(() => _locationRevision++);
+    }
   }
 
   ReaderController? _pending;
@@ -2588,21 +2614,19 @@ class _BookReaderScreenState extends State<BookReaderScreen>
               excluding: !active,
               child: ExcludeFocus(
                 excluding: !active,
-                child: _search == null
-                    ? _view(reader, active: active)
-                    : ReaderLocationTransition(
-                        revision: _locationRevision,
-                        enabled:
-                            active &&
-                            !_changing &&
-                            _foreground &&
-                            !_invalidated &&
-                            _leavingInsets == null &&
-                            _preferences.value.pageTurn != PageTurnStyle.none &&
-                            !MediaQuery.disableAnimationsOf(context),
-                        paper: _paper,
-                        child: _view(reader, active: active),
-                      ),
+                child: ReaderLocationTransition(
+                  revision: _locationRevision,
+                  enabled:
+                      active &&
+                      !_changing &&
+                      _foreground &&
+                      !_invalidated &&
+                      _leavingInsets == null &&
+                      _preferences.value.pageTurn != PageTurnStyle.none &&
+                      !MediaQuery.disableAnimationsOf(context),
+                  paper: _paper,
+                  child: _view(reader, active: active),
+                ),
               ),
             ),
             builder: (context, child) => Offstage(
