@@ -17,31 +17,31 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="brand-group">
-                                <rect key="frame" x="116.5" y="291.4" width="160" height="184"/>
+                                <rect key="frame" x="92.5" y="256.5" width="208" height="208"/>
                                 <subviews>
                                     <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" image="ShioriLaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="brand-logo">
-                                        <rect key="frame" x="16" y="0.0" width="128" height="128"/>
+                                        <rect key="frame" x="40" y="40" width="128" height="128"/>
                                         <constraints>
                                             <constraint firstAttribute="width" constant="128" id="logo-width"/>
                                             <constraint firstAttribute="height" constant="128" id="logo-height"/>
                                         </constraints>
                                     </imageView>
-                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="Shiori" textAlignment="center" translatesAutoresizingMaskIntoConstraints="NO" id="brand-name">
-                                        <rect key="frame" x="0.0" y="152" width="160" height="32"/>
-                                        <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="22"/>
-                                        <color key="textColor" name="ShioriLaunchInk"/>
-                                        <nil key="highlightedColor"/>
-                                    </label>
+                                    <!-- Static overlay rounds the logo without launch-screen runtime attributes. -->
+                                    <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" image="ShioriLaunchFrame" translatesAutoresizingMaskIntoConstraints="NO" id="brand-frame">
+                                        <rect key="frame" x="0.0" y="0.0" width="208" height="208"/>
+                                        <constraints>
+                                            <constraint firstAttribute="width" constant="208" id="frame-width"/>
+                                            <constraint firstAttribute="height" constant="208" id="frame-height"/>
+                                        </constraints>
+                                    </imageView>
                                 </subviews>
                                 <constraints>
-                                    <constraint firstAttribute="width" constant="160" id="group-width"/>
-                                    <constraint firstAttribute="height" constant="184" id="group-height"/>
+                                    <constraint firstAttribute="width" constant="208" id="group-width"/>
+                                    <constraint firstAttribute="height" constant="208" id="group-height"/>
+                                    <constraint firstItem="brand-frame" firstAttribute="centerX" secondItem="brand-group" secondAttribute="centerX" id="frame-center"/>
+                                    <constraint firstItem="brand-frame" firstAttribute="top" secondItem="brand-group" secondAttribute="top" id="frame-top"/>
                                     <constraint firstItem="brand-logo" firstAttribute="centerX" secondItem="brand-group" secondAttribute="centerX" id="logo-center"/>
-                                    <constraint firstItem="brand-logo" firstAttribute="top" secondItem="brand-group" secondAttribute="top" id="logo-top"/>
-                                    <constraint firstItem="brand-name" firstAttribute="top" secondItem="brand-logo" secondAttribute="bottom" constant="24" id="name-top"/>
-                                    <constraint firstItem="brand-name" firstAttribute="leading" secondItem="brand-group" secondAttribute="leading" id="name-leading"/>
-                                    <constraint firstAttribute="trailing" secondItem="brand-name" secondAttribute="trailing" id="name-trailing"/>
-                                    <constraint firstAttribute="bottom" secondItem="brand-name" secondAttribute="bottom" id="name-bottom"/>
+                                    <constraint firstItem="brand-logo" firstAttribute="centerY" secondItem="brand-frame" secondAttribute="centerY" id="logo-center-y"/>
                                 </constraints>
                             </view>
                         </subviews>
@@ -49,7 +49,8 @@
                         <color key="backgroundColor" name="ShioriLaunchPaper"/>
                         <constraints>
                             <constraint firstItem="brand-group" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="group-center-x"/>
-                            <constraint firstItem="brand-group" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" multiplier="0.9" id="group-center-y"/>
+                            <!-- Keep the logo aligned with Flutter LaunchView's first frame. -->
+                            <constraint firstItem="brand-group" firstAttribute="centerY" secondItem="launch-safe-area" secondAttribute="centerY" constant="-74" id="group-center-y"/>
                         </constraints>
                     </view>
                 </viewController>
@@ -59,11 +60,9 @@
     </scenes>
     <resources>
         <image name="ShioriLaunchLogo" width="1254" height="1254"/>
+        <image name="ShioriLaunchFrame" width="208" height="208"/>
         <namedColor name="ShioriLaunchPaper">
             <color red="0.980392" green="0.972549" blue="0.956863" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-        </namedColor>
-        <namedColor name="ShioriLaunchInk">
-            <color red="0.188235" green="0.176471" blue="0.172549" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>
     </resources>
 </document>

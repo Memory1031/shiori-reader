@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="208" height="208" viewBox="0 0 208 208">
+  <path fill="#FAF8F4" fill-rule="evenodd" d="M0 0H208V208H0Z M64 40H144A24 24 0 0 1 168 64V144A24 24 0 0 1 144 168H64A24 24 0 0 1 40 144V64A24 24 0 0 1 64 40Z"/>
+  <path fill="#FFFCF8" fill-rule="evenodd" d="M64 34H144A30 30 0 0 1 174 64V144A30 30 0 0 1 144 174H64A30 30 0 0 1 34 144V64A30 30 0 0 1 64 34Z M64 40H144A24 24 0 0 1 168 64V144A24 24 0 0 1 144 168H64A24 24 0 0 1 40 144V64A24 24 0 0 1 64 40Z"/>
+  <rect x="34.5" y="34.5" width="139" height="139" rx="30" fill="none" stroke="#DED8D5" stroke-opacity="0.5"/>
+</svg>

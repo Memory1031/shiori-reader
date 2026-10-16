@@ -18,20 +18,35 @@ void PaintLaunchView(HWND window, HDC dc) {
                L"AppsUseLightTheme", RRF_RT_REG_DWORD, nullptr, &light, &size);
   // Same paper/ink palette as the shared Flutter theme.
   const COLORREF paper = light ? RGB(250, 248, 244) : RGB(27, 24, 28);
-  const COLORREF ink = light ? RGB(48, 44, 43) : RGB(238, 231, 235);
   const auto background = CreateSolidBrush(paper);
   FillRect(dc, &bounds, background);
   DeleteObject(background);
 
   const double dpi_scale = GetDpiForWindow(window) / 96.0;
-  // Keep the brand group inside very small windows, preserving its proportions.
+  // Keep the logo inside very small windows, preserving its proportions.
   const double scale = std::max(0.1, std::min({
-      dpi_scale, (bounds.right - bounds.left) / 192.0,
-      (bounds.bottom - bounds.top) / 248.0}));
+      dpi_scale, (bounds.right - bounds.left) / 240.0,
+      (bounds.bottom - bounds.top) / 356.0}));
   const int logo_size = static_cast<int>(128 * scale);
-  const int group_height = static_cast<int>(192 * scale);
   const int left = (bounds.right - logo_size) / 2;
-  const int top = (bounds.bottom - group_height) / 2;
+  // Keep the logo aligned with Flutter's LaunchView, including its text below.
+  const int top = (bounds.bottom - static_cast<int>(356 * scale)) / 2;
+  const int frame_left = (bounds.right - static_cast<int>(208 * scale)) / 2;
+  const auto surface = CreateSolidBrush(light ? RGB(255, 252, 248) : RGB(37, 33, 38));
+  const auto line = CreatePen(PS_SOLID, 1,
+      light ? RGB(236, 234, 231) : RGB(53, 49, 55));
+  const auto old_brush = SelectObject(dc, surface);
+  const auto old_pen = SelectObject(dc, line);
+  RoundRect(dc, frame_left + static_cast<int>(34 * scale),
+            top + static_cast<int>(34 * scale),
+            frame_left + static_cast<int>(174 * scale),
+            top + static_cast<int>(174 * scale),
+            static_cast<int>(60 * scale), static_cast<int>(60 * scale));
+  SelectObject(dc, old_brush);
+  SelectObject(dc, old_pen);
+  DeleteObject(surface);
+  DeleteObject(line);
+  const int logo_top = top + static_cast<int>(40 * scale);
   // Load the existing high-resolution brand icon, not the small titlebar icon.
   const auto icon = static_cast<HICON>(LoadImageW(
       GetModuleHandle(nullptr), MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON,
@@ -39,27 +54,14 @@ void PaintLaunchView(HWND window, HDC dc) {
   if (icon) {
     const int saved = SaveDC(dc);
     const int corner = static_cast<int>(48 * scale);
-    const auto clip = CreateRoundRectRgn(left, top, left + logo_size,
-                                        top + logo_size, corner, corner);
+    const auto clip = CreateRoundRectRgn(left, logo_top, left + logo_size,
+                                        logo_top + logo_size, corner, corner);
     SelectClipRgn(dc, clip);
-    DrawIconEx(dc, left, top, icon, logo_size, logo_size, 0, nullptr, DI_NORMAL);
+    DrawIconEx(dc, left, logo_top, icon, logo_size, logo_size, 0, nullptr, DI_NORMAL);
     RestoreDC(dc, saved);
     DeleteObject(clip);
     DestroyIcon(icon);
   }
-
-  const auto font = CreateFontW(
-      -static_cast<int>(32 * scale), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-      DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-      CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-  const auto old_font = SelectObject(dc, font);
-  SetBkMode(dc, TRANSPARENT);
-  SetTextColor(dc, ink);
-  RECT title = {0, top + static_cast<LONG>(152 * scale), bounds.right,
-                top + group_height};
-  DrawTextW(dc, L"Shiori", -1, &title, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-  SelectObject(dc, old_font);
-  DeleteObject(font);
 }
 
 LRESULT CALLBACK LaunchWindowProc(HWND window, UINT message, WPARAM wparam,

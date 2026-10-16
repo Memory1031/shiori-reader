@@ -14,4 +14,4 @@ Android 的 `@mipmap/ic_launcher` 和 iOS 的 `AppIcon` 使用从该原图缩放
 
 Android 启动屏专用高清副本为 `android/app/src/main/res/drawable-nodpi/shiori_launch_logo.png`，直接复制本目录原图，不从 mipmap 桌面缩略图派生。更新 Logo 时也须同步该副本；Flutter 加载页直接读取本目录原图。
 
-- iOS 原生启动 Logo 使用 `ios/Runner/Assets.xcassets/ShioriLaunchLogo.imageset/shiori-logo.png`，为品牌原图的完整复制；更新品牌原图时同步此文件。布局由 `LaunchScreen.storyboard` 的 128pt aspect-fit 约束负责，不使用 AppIcon 裁切图。深浅背景 / 字标颜色分别在 ShioriLaunchPaper / ShioriLaunchInk colorset 中维护。
+- iOS 原生启动 Logo 使用 `ios/Runner/Assets.xcassets/ShioriLaunchLogo.imageset/shiori-logo.png`，为品牌原图的完整复制；更新品牌原图时同步此文件。布局由 `LaunchScreen.storyboard` 的 128pt aspect-fit 约束负责，不使用 AppIcon 裁切图。深浅背景颜色在 ShioriLaunchPaper colorset 中维护，静态圆角与底托在 ShioriLaunchFrame imageset 中维护。

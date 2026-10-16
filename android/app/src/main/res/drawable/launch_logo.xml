@@ -9,15 +9,23 @@
         </shape>
     </item>
     <item>
-        <inset android:insetLeft="30.555556%" android:insetRight="30.555556%"
-            android:insetTop="23.611111%" android:insetBottom="37.5%">
+        <inset android:insetLeft="27.777778%" android:insetRight="27.777778%"
+            android:insetTop="27.777778%" android:insetBottom="27.777778%">
             <bitmap android:src="@drawable/shiori_launch_logo"
                 android:gravity="fill" android:filter="true" />
         </inset>
     </item>
     <item>
-        <inset android:insetLeft="38.888889%" android:insetRight="38.888889%"
-            android:insetTop="68.402778%" android:insetBottom="21.875%"
-            android:drawable="@drawable/launch_wordmark" />
+        <!-- Paper outside the rounded cutout masks the bitmap's square corners. -->
+        <vector android:width="288dp" android:height="288dp"
+            android:viewportWidth="288" android:viewportHeight="288">
+            <path android:fillColor="@color/launch_paper" android:fillType="evenOdd"
+                android:pathData="M0,0H288V288H0Z M104,80H184A24,24 0,0 1,208 104V184A24,24 0,0 1,184 208H104A24,24 0,0 1,80 184V104A24,24 0,0 1,104 80Z" />
+            <path android:fillColor="@color/launch_surface" android:fillType="evenOdd"
+                android:pathData="M104,74H184A30,30 0,0 1,214 104V184A30,30 0,0 1,184 214H104A30,30 0,0 1,74 184V104A30,30 0,0 1,104 74Z M104,80H184A24,24 0,0 1,208 104V184A24,24 0,0 1,184 208H104A24,24 0,0 1,80 184V104A24,24 0,0 1,104 80Z" />
+            <path android:fillColor="@android:color/transparent"
+                android:strokeColor="@color/launch_line" android:strokeWidth="0.5"
+                android:pathData="M104,74H184A30,30 0,0 1,214 104V184A30,30 0,0 1,184 214H104A30,30 0,0 1,74 184V104A30,30 0,0 1,104 74Z" />
+        </vector>
     </item>
 </layer-list>

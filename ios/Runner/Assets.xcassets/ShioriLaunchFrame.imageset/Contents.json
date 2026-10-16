@@ -1,0 +1,11 @@
+{
+  "images": [
+    { "idiom": "universal", "filename": "frame-light.svg" },
+    {
+      "idiom": "universal",
+      "filename": "frame-dark.svg",
+      "appearances": [{ "appearance": "luminosity", "value": "dark" }]
+    }
+  ],
+  "info": { "author": "xcode", "version": 1 }
+}
