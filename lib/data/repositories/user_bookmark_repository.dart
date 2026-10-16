@@ -95,10 +95,11 @@ final class LocalUserBookmarkRepository implements UserBookmarkRepository {
   }
 
   Future<int> _update(UserBookmark b, int previous) => db.customUpdate(
-    'UPDATE user_bookmarks SET chapter_id=?,anchor_json=?,location=?,version=? WHERE id=? AND $_where AND version=?',
+    'UPDATE user_bookmarks SET chapter_id=?,anchor_json=?,chapter_title=?,location=?,version=? WHERE id=? AND $_where AND version=?',
     variables: [
       Variable(b.chapter.chapterId),
       Variable(jsonEncode(b.anchor.toJson())),
+      Variable(b.chapterTitle),
       Variable(b.location.name),
       Variable(b.version),
       Variable(b.id),

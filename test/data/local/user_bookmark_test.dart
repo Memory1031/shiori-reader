@@ -36,6 +36,47 @@ UserBookmark bookmark(String id, {NovelKey? book}) {
 
 void main() {
   test(
+    'trusted chapter migration persists the target title after reopening',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'shiori-bookmark-title-',
+      );
+      addTearDown(() => root.delete(recursive: true));
+      final file = File('${root.path}/users.sqlite');
+      var db = UserDatabase(NativeDatabase(file));
+      addTearDown(() => db.close());
+      var repo = LocalUserBookmarkRepository(db);
+      final b = bookmark('1'), token = CancellationSource().token;
+      await repo.saveBookmark(b, revision: 0, cancellation: token);
+      final before = await repo.snapshot(key);
+      final target = ChapterContent(
+        key: ChapterKey(novelKey: key, chapterId: 'moved'),
+        title: 'Current target chapter',
+        blocks: [
+          ParagraphBlock(
+            text: 'A sufficiently unique paragraph for bookmark 1',
+          ),
+        ],
+      );
+      final original = ChapterContent(
+        key: b.chapter,
+        title: b.chapterTitle,
+        blocks: target.blocks,
+      );
+      final migrated = migrateBookmarks([original], [target], before.bookmarks);
+      await db.transaction(() => repo.replace(key, before, migrated));
+      await db.close();
+      db = UserDatabase(NativeDatabase(file));
+      repo = LocalUserBookmarkRepository(db);
+      final restored = (await repo.snapshot(key)).bookmarks.single;
+      expect(restored.chapter, target.key);
+      expect(restored.chapterTitle, target.title);
+      expect(restored.location, BookmarkLocation.migrated);
+      expect(restored.id, b.id);
+      await db.close();
+    },
+  );
+  test(
     'multiple bookmarks isolate books, survive reopen and history clearing',
     () async {
       final root = await Directory.systemTemp.createTemp('shiori-bookmark-');

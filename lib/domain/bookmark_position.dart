@@ -42,9 +42,30 @@ final class BookmarkPositionIndex {
       p.blockIndex < c.blocks.length &&
       c.blocks[p.blockIndex].blockKey == p.blockKey;
 
-  BookmarkAnchor? capture(ChapterKey chapter, ReaderPosition p) {
+  ReaderPosition? normalize(ChapterKey chapter, ReaderPosition p) {
     final c = chapters[chapter];
     if (c == null || !valid(c, p)) return null;
+    final length = migrationText(c.blocks[p.blockIndex])?.runes.length ?? 0;
+    final fraction = length == 0
+        ? p.blockFraction
+        : _offset(p.blockFraction, length) / length;
+    return ReaderPosition(
+      contentRevision: c.contentRevision,
+      blockKey: p.blockKey,
+      blockIndex: p.blockIndex,
+      blockFraction: fraction,
+      chapterFraction: ReaderPosition.fractionFor(
+        blockIndex: p.blockIndex,
+        blockFraction: fraction,
+        blockCount: c.blocks.length,
+      ),
+    );
+  }
+
+  BookmarkAnchor? capture(ChapterKey chapter, ReaderPosition position) {
+    final p = normalize(chapter, position);
+    if (p == null) return null;
+    final c = chapters[chapter]!;
     final block = c.blocks[p.blockIndex],
         text = migrationText(c.blocks[p.blockIndex]);
     var quote = '', offset = 0;
@@ -72,22 +93,8 @@ final class BookmarkPositionIndex {
                   .length ==
               1;
     }
-    final length = text?.runes.length ?? 0;
-    final fraction = length == 0
-        ? p.blockFraction
-        : _offset(p.blockFraction, length) / length;
     return BookmarkAnchor(
-      position: ReaderPosition(
-        contentRevision: c.contentRevision,
-        blockKey: block.blockKey,
-        blockIndex: p.blockIndex,
-        blockFraction: fraction,
-        chapterFraction: ReaderPosition.fractionFor(
-          blockIndex: p.blockIndex,
-          blockFraction: fraction,
-          blockCount: c.blocks.length,
-        ),
-      ),
+      position: p,
       quote: quote,
       quoteOffset: offset,
       unique: unique,
@@ -214,6 +221,7 @@ List<UserBookmark> migrateBookmarks(
           r.chapter ?? b.chapter,
           r.anchor ?? b.anchor,
           r.location,
+          chapterTitle: r.located ? next.chapters[r.chapter]?.title : null,
         );
       }(),
   ];

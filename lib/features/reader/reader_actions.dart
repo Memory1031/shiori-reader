@@ -14,7 +14,7 @@ class ReaderActions {
   const ReaderActions({
     this.toggleBookmark,
     this.showBookmarks,
-    this.bookmarked = false,
+    this.isBookmarked,
     this.bookmarkSupported = true,
     this.previousChapter,
     this.nextChapter,
@@ -37,7 +37,8 @@ class ReaderActions {
 
   final VoidCallback? toggleBookmark;
   final void Function(BuildContext)? showBookmarks;
-  final bool bookmarked, bookmarkSupported;
+  final bool Function()? isBookmarked;
+  final bool bookmarkSupported;
 
   /// Turn to the neighbouring chapter at a page boundary.
   final VoidCallback? previousChapter, nextChapter;

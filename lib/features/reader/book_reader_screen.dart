@@ -2446,7 +2446,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       showBookmarks: _bookmarkRepository == null || widget.linkDepth > 0
           ? null
           : _showBookmarks,
-      bookmarked: _currentBookmark != null,
+      isBookmarked: () => _currentBookmark != null,
       bookmarkSupported:
           reader.pagePresentation == null && widget.linkDepth == 0,
       completionPrevious: () => setState(() => _completion = null),

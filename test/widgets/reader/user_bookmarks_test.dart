@@ -15,6 +15,7 @@ import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/reader_commands.dart';
 import 'package:shiori/features/reader/reader_bookmarks.dart';
 import 'package:shiori/features/reader/reader_contents.dart';
+import 'package:shiori/features/reader/reader_toolbars.dart';
 import 'local_search_test.dart' show fonts;
 import '../shiori_feedback_test.dart' show feedbackScreenshot;
 
@@ -66,11 +67,15 @@ class Harness {
     await t.pumpAndSettle();
   }
 
-  Future<void> menu(WidgetTester t, String label) async {
+  Future<void> openMenu(WidgetTester t) async {
     view(t).chrome!.value = true;
     await t.pumpAndSettle();
     await t.tap(find.byType(PopupMenuButton<ReaderCommand>));
     await t.pumpAndSettle();
+  }
+
+  Future<void> menu(WidgetTester t, String label) async {
+    await openMenu(t);
     await t.tap(find.text(label));
     await t.pumpAndSettle();
   }
@@ -117,6 +122,77 @@ class Harness {
 }
 
 void main() {
+  testWidgets(
+    'page turns refresh bookmark labels and toggle the displayed anchor',
+    (t) async {
+      final h = Harness();
+      await h.pump(t);
+      await h.menu(t, 'Add bookmark');
+      final first = (await h.snapshot(t)).bookmarks.single;
+      await h.openMenu(t);
+      expect(find.text('Remove bookmark'), findsOneWidget);
+      await t.tapAt(const Offset(10, 10));
+      await t.pumpAndSettle();
+      final viewport = h.view(t).viewportController!;
+      final layout = viewport.layoutGeneration;
+      viewport.next();
+      await t.pumpAndSettle();
+      expect(viewport.layoutGeneration, layout);
+      expect(
+        viewport.capture()!.blockKey,
+        isNot(first.anchor.position.blockKey),
+      );
+      await h.openMenu(t);
+      expect(find.text('Add bookmark'), findsOneWidget);
+      expect(find.text('Remove bookmark'), findsNothing);
+      await feedbackScreenshot(t, h.boundary, 'bookmark-unmarked-page');
+      await t.tap(find.text('Add bookmark'));
+      await t.pumpAndSettle();
+      expect((await h.snapshot(t)).bookmarks, hasLength(2));
+      await h.menu(t, 'Remove bookmark');
+      expect((await h.snapshot(t)).bookmarks.single.id, first.id);
+      viewport.previous();
+      await t.pumpAndSettle();
+      await h.menu(t, 'Remove bookmark');
+      expect((await h.snapshot(t)).bookmarks, isEmpty);
+      await t.pumpWidget(const SizedBox());
+      await t.pumpAndSettle();
+    },
+  );
+  testWidgets(
+    'progress scrubber noncanonical fractions can be added and cancelled',
+    (t) async {
+      final h = Harness();
+      await h.pump(t);
+      h.view(t).chrome!.value = true;
+      await t.pumpAndSettle();
+      t.widget<ReaderBottomBar>(find.byType(ReaderBottomBar)).onProgress!();
+      await t.pumpAndSettle();
+      // The scrubber can select between code points, unlike normal page starts.
+      t.widget<Slider>(find.byType(Slider)).onChangeEnd!(
+        (1 + .51) / h.view(t).content.blocks.length,
+      );
+      await t.pumpAndSettle();
+      await t.tapAt(const Offset(10, 10));
+      await t.pumpAndSettle();
+      final raw = h.view(t).viewportController!.capture()!;
+      expect(raw.blockFraction, closeTo(.51, 1e-7));
+      await h.menu(t, 'Add bookmark');
+      final saved = (await h.snapshot(t)).bookmarks.single.anchor.position;
+      expect(saved.blockFraction, isNot(raw.blockFraction));
+      await h.openMenu(t);
+      expect(find.text('Remove bookmark'), findsOneWidget);
+      expect(find.text('Add bookmark'), findsNothing);
+      await feedbackScreenshot(t, h.boundary, 'bookmark-scrubber-saved');
+      await t.tap(find.text('Remove bookmark'));
+      await t.pumpAndSettle();
+      expect((await h.snapshot(t)).bookmarks, isEmpty);
+      await h.menu(t, 'Add bookmark');
+      expect((await h.snapshot(t)).bookmarks, hasLength(1));
+      await t.pumpWidget(const SizedBox());
+      await t.pumpAndSettle();
+    },
+  );
   testWidgets(
     'auxiliary reader disables capture and leaves bookmark navigation to its owner',
     (t) async {

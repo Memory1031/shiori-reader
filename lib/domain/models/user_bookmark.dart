@@ -76,12 +76,13 @@ final class UserBookmark {
   UserBookmark resolved(
     ChapterKey target,
     BookmarkAnchor next,
-    BookmarkLocation state,
-  ) => UserBookmark(
+    BookmarkLocation state, {
+    String? chapterTitle,
+  }) => UserBookmark(
     id: id,
     chapter: target,
     anchor: next,
-    chapterTitle: chapterTitle,
+    chapterTitle: chapterTitle ?? this.chapterTitle,
     createdAt: createdAt,
     version: version + 1,
     location: state,

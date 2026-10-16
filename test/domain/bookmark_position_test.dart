@@ -42,6 +42,23 @@ void main() {
     expect(r.anchor!.position, b.anchor.position);
     expect(r.anchor!.quote.runes.length, lessThanOrEqualTo(64));
     expect(r.anchor!.position.pixelOffset, isNull);
+    final odd = ChapterContent(
+      key: c.key,
+      title: 'Odd code-point length',
+      blocks: [ParagraphBlock(text: '😀' * 51)],
+    );
+    final raw = ReaderPosition(
+      contentRevision: odd.contentRevision,
+      blockKey: odd.blocks.single.blockKey,
+      blockIndex: 0,
+      blockFraction: .5,
+      chapterFraction: .5,
+    );
+    final index = BookmarkPositionIndex([odd]);
+    final normalized = index.normalize(odd.key, raw)!;
+    expect(normalized.blockFraction, 26 / 51);
+    expect(index.capture(odd.key, raw)!.position, normalized);
+    expect(index.normalize(odd.key, normalized), normalized);
     final image = ChapterContent(
       key: c.key,
       title: 'Image',
@@ -126,6 +143,10 @@ void main() {
         expect(migrated.location, BookmarkLocation.migrated);
         expect(migrated.anchor.quote, contains(text.substring(20, 30)));
         expect(migrated.id, b.id);
+        expect(
+          migrated.chapterTitle,
+          next.chapters.firstWhere((c) => c.key == migrated.chapter).title,
+        );
       }
     },
   );

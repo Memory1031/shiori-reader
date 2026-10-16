@@ -20,18 +20,23 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
 
   UserBookmark? get _currentBookmark {
     final p = _viewports[_reader]?.capture() ?? _reader.currentPosition;
-    if (p == null) return null;
-    return _bookmarkSnapshot?.bookmarks
-        .where(
-          (b) =>
-              b.chapter == _reader.chapter &&
-              b.located &&
-              b.anchor.position.contentRevision == p.contentRevision &&
-              b.anchor.position.blockKey == p.blockKey &&
-              (b.anchor.position.blockFraction - p.blockFraction).abs() < 1e-7,
-        )
-        .firstOrNull;
+    final content = _reader.content;
+    if (p == null || content == null) return null;
+    final normalized = BookmarkPositionIndex([
+      content,
+    ]).normalize(_reader.chapter, p);
+    return normalized == null ? null : _bookmarkAt(_reader.chapter, normalized);
   }
+
+  UserBookmark? _bookmarkAt(ChapterKey chapter, ReaderPosition position) =>
+      _bookmarkSnapshot?.bookmarks
+          .where(
+            (b) =>
+                b.chapter == chapter &&
+                b.located &&
+                b.anchor.position == position,
+          )
+          .firstOrNull;
 
   Future<void> _toggleBookmark() async {
     final repository = _bookmarkRepository, snapshot = _bookmarkSnapshot;
@@ -56,7 +61,6 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
       ShioriFeedback.show(context, message: l.bookmarkUnsupported);
       return;
     }
-    final existing = _currentBookmark;
     final anchor = BookmarkPositionIndex([
       content,
     ]).capture(reader.chapter, position.position);
@@ -64,6 +68,7 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
       ShioriFeedback.show(context, message: l.bookmarkUnsupported);
       return;
     }
+    final existing = _bookmarkAt(reader.chapter, anchor.position);
     _bookmarkWorking = true;
     try {
       final random = math.Random.secure();
@@ -153,6 +158,7 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
       return BookmarkOpenResult.failed;
     }
     BookmarkResolution? resolution;
+    String? chapterTitle;
     var opened = false;
     if (b.chapter == source.chapter) {
       resolution = source.pagePresentation != null
@@ -160,6 +166,7 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
           : BookmarkPositionIndex([
               source.content!,
             ]).resolve(b.chapter, b.anchor);
+      chapterTitle = source.content?.title;
       if (resolution.located) {
         await _restorePosition(resolution.anchor!.position, accepts: accepts);
         opened =
@@ -185,6 +192,7 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
       final target = confirmed.reader;
       opened = confirmed.committed;
       resolution = target.bookmarkResolution;
+      chapterTitle = target.content?.title;
       if (!opened && resolution == null) {
         if (target.failure?.kind != FailureKind.notFound) {
           return BookmarkOpenResult.failed;
@@ -202,6 +210,7 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
           resolution.chapter ?? b.chapter,
           resolution.anchor ?? b.anchor,
           resolution.location,
+          chapterTitle: resolution.located ? chapterTitle : null,
         ),
         revision: snapshot.revision,
         cancellation: _bookmarkCancellation.token,

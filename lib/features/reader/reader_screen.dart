@@ -1048,7 +1048,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
       ),
       (
         ReaderCommand.toggleBookmark,
-        _actions.bookmarked ? l.readerBookmarkRemove : l.readerBookmarkAdd,
+        _actions.isBookmarked?.call() == true
+            ? l.readerBookmarkRemove
+            : l.readerBookmarkAdd,
       ),
       (ReaderCommand.bookmarks, l.readerBookmarks),
       (ReaderCommand.notes, l.readerLinks),
@@ -2106,7 +2108,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
       ),
       (
         ReaderCommand.toggleBookmark,
-        _actions.bookmarked ? l.readerBookmarkRemove : l.readerBookmarkAdd,
+        _actions.isBookmarked?.call() == true
+            ? l.readerBookmarkRemove
+            : l.readerBookmarkAdd,
       ),
       (ReaderCommand.bookmarks, l.readerBookmarks),
       (ReaderCommand.notes, l.readerLinks),
