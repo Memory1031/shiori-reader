@@ -2,7 +2,7 @@
   <img src="assets/branding/shiori-chibi-logo-v1.png" alt="Shiori Logo" width="112" />
   <h1>Shiori</h1>
   <p>把喜欢的故事，留在手边。</p>
-  <p>面向 Android、iOS、Windows 与 macOS 的开源轻小说阅读器 · 本地 EPUB / TXT · 支持 LightNovel.fun 在线阅读 · 中文 / English</p>
+  <p>开源轻小说阅读器 · 本地 EPUB / TXT</p>
   <p><strong><a href="https://memory1031.github.io/shiori-reader/zh-cn/">访问官方中文网站</a> · <a href="https://memory1031.github.io/shiori-reader/en/">English website</a></strong></p>
   <p><a href="https://memory1031.github.io/shiori-reader/zh-cn/download/">选择平台下载</a> · <a href="https://github.com/Memory1031/shiori-reader/releases/latest">GitHub Releases</a></p>
   <p>
