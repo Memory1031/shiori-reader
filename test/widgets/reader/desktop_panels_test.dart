@@ -28,7 +28,9 @@ final windows = TargetPlatformVariant.only(TargetPlatform.windows);
 final panel = find.byKey(const ValueKey('reader-panel'));
 
 /// The desktop tooltip names the shortcut.
-const settingsTip = 'Reading settings (Ctrl+,)';
+String get settingsTip => defaultTargetPlatform == TargetPlatform.macOS
+    ? 'Reading settings (⌘,)'
+    : 'Reading settings (Ctrl+,)';
 
 Finder inPanel(Finder finder) => find.descendant(of: panel, matching: finder);
 
@@ -302,36 +304,39 @@ void main() {
       'the page underneath leaves the semantics tree while a panel is open',
       (tester) async {
         final semantics = tester.ensureSemantics();
-        await pumpReader(tester);
-        // Searched in the live semantics tree, where blocked nodes drop out.
-        final dismiss = find.semantics.byLabel('Dismiss');
-        // Flutter keeps the barrier out of semantics on Windows and Linux;
-        // there Esc and the panels' own controls close them.
-        final barrierNode = defaultTargetPlatform == TargetPlatform.macOS;
-        for (final (control, hidden) in [
-          (find.byTooltip(settingsTip), 'Desktop panels'),
-          (find.text('Chapter 0%'), 'Reading settings'),
-        ]) {
-          final page = find.semantics.byLabel(RegExp(hidden));
-          expect(page, findsWidgets);
-          expect(dismiss, findsNothing);
-          await open(tester, control);
-          final route = ModalRoute.of(tester.element(panel))!;
-          expect(route.barrierLabel, 'Dismiss');
-          expect(page, findsNothing);
-          if (barrierNode) {
-            expect(dismiss, findsOneWidget);
-            tester.semantics.tap(dismiss);
-          } else {
+        try {
+          await pumpReader(tester);
+          // Searched in the live semantics tree, where blocked nodes drop out.
+          final dismiss = find.semantics.byLabel('Dismiss');
+          // Flutter keeps the barrier out of semantics on Windows and Linux;
+          // there Esc and the panels' own controls close them.
+          final barrierNode = defaultTargetPlatform == TargetPlatform.macOS;
+          for (final (control, hidden) in [
+            (find.byTooltip(settingsTip), 'Desktop panels'),
+            (find.text('Chapter 0%'), 'Reading settings'),
+          ]) {
+            final page = find.semantics.byLabel(RegExp(hidden));
+            expect(page, findsWidgets);
             expect(dismiss, findsNothing);
-            await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+            await open(tester, control);
+            final route = ModalRoute.of(tester.element(panel))!;
+            expect(route.barrierLabel, 'Dismiss');
+            expect(page, findsNothing);
+            if (barrierNode) {
+              expect(dismiss, findsOneWidget);
+              tester.semantics.tap(dismiss);
+            } else {
+              expect(dismiss, findsNothing);
+              await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+            }
+            await tester.pumpAndSettle();
+            expect(panel, findsNothing);
+            expect(page, findsWidgets);
+            expect(dismiss, findsNothing);
           }
-          await tester.pumpAndSettle();
-          expect(panel, findsNothing);
-          expect(page, findsWidgets);
-          expect(dismiss, findsNothing);
+        } finally {
+          semantics.dispose();
         }
-        semantics.dispose();
       },
       variant: const TargetPlatformVariant({
         TargetPlatform.windows,

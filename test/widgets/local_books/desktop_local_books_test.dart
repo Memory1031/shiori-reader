@@ -524,6 +524,7 @@ void main() {
       'wide $platform retains mobile controls and primary position',
       (tester) async {
         final h = LocalHarness(tester);
+        addTearDown(h.close);
         await h.pump();
         expect(find.byType(DesktopPageToolbar), findsNothing);
         expect(find.byType(AppBar), findsOneWidget);
@@ -531,12 +532,13 @@ void main() {
           find.byKey(ValueKey(('local-book-actions', h.store.books.first.key))),
           findsOneWidget,
         );
-        final scaffold = tester.element(find.byType(Scaffold).first);
+        final scaffold = tester.element(
+          find.descendant(of: h.page, matching: find.byType(Scaffold)),
+        );
         expect(
           PrimaryScrollController.of(scaffold).positions,
           contains(h.scroll.position),
         );
-        await h.close();
       },
       variant: TargetPlatformVariant.only(platform),
     );
