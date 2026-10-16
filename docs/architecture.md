@@ -45,8 +45,6 @@ ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion�
 
 字号、屏宽、DPR、主题、pixelOffset、layoutKey、临时渲染切片都不进入正文摘要或正文序列化。一个极长 Paragraph 始终一个语义块，presentation 可临时切片但不能回写 Domain。
 
-测试中的固定向量由 .NET `SHA256.HashData` 对手写精确 UTF-8 JSON 独立计算，包含 paragraph 语义、重复块 0/1、image、chapter 和 catalog。`tool/domain_example.dart` 在两个实际 Dart 子进程中输出完全一致，Windows 的输入/输出编码显式指定 UTF-8。
-
 ### 阅读位置与设置
 
 ReaderPosition 的 blockIndex 非负，blockFraction / chapterFraction 必须有限且位于 0..1；NaN / Infinity / 越界直接拒绝，不静默改写错误进度。fractionFor 依 `(blockIndex + blockFraction) / blockCount` 计算，检查 index 属于本章；空内容仅允许 0/0 起点。文本 fraction 按 Unicode code point 偏移定义，UTF-16 布局索引转换留 presentation。构造位置时尚无正文实例，不假装已验证 blockKey 在某章内存在；实际恢复由阅读器处理。
