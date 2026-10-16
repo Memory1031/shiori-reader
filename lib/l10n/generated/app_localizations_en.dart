@@ -1834,4 +1834,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookmarkChanged => 'Bookmarks have changed. Please try again.';
+
+  @override
+  String get readerBookmarkReturn => 'Back to before bookmark navigation';
 }

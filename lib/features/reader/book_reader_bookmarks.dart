@@ -40,7 +40,12 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
 
   Future<void> _toggleBookmark() async {
     final repository = _bookmarkRepository, snapshot = _bookmarkSnapshot;
-    if (_bookmarkWorking || repository == null) return;
+    if (_bookmarkWorking ||
+        _returns.returning ||
+        _search?.navigating == true ||
+        repository == null) {
+      return;
+    }
     if (snapshot == null) {
       ShioriFeedback.show(
         context,
@@ -141,6 +146,8 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
         _changing) {
       return BookmarkOpenResult.failed;
     }
+    final origin = _captureAnchor(), ticket = _returns.history.version;
+    if (origin == null || _returns.returning) return BookmarkOpenResult.failed;
     final read = await repository.readBookmarks(
       b.chapter.novelKey,
       cancellation: _bookmarkCancellation.token,
@@ -168,18 +175,21 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
             ]).resolve(b.chapter, b.anchor);
       chapterTitle = source.content?.title;
       if (resolution.located) {
-        await _restorePosition(resolution.anchor!.position, accepts: accepts);
-        opened =
-            accepts() &&
-            mounted &&
-            _reader == source &&
-            _reader.currentPosition == resolution.anchor!.position;
+        opened = await _restorePosition(
+          resolution.anchor!.position,
+          accepts: accepts,
+          intent: _LocationIntent.bookmark,
+          origin: origin,
+          returnTicket: ticket,
+        );
       }
     } else {
       final confirmation = Completer<_ChapterConfirmation>();
       await _switch(
         b.chapter,
         bookmark: b,
+        intent: _LocationIntent.bookmark,
+        origin: origin,
         fromStart: true,
         owner: accepts,
         confirmation: confirmation,
@@ -201,7 +211,7 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
       }
     }
     if (!mounted || !accepts() || _invalidated || resolution == null) {
-      return BookmarkOpenResult.failed;
+      return opened ? BookmarkOpenResult.opened : BookmarkOpenResult.failed;
     }
     // No upsert: a concurrent deletion or publication must win over this result.
     if (resolution.location != BookmarkLocation.exact || !b.located) {

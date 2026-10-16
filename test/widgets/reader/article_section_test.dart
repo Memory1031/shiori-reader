@@ -439,7 +439,10 @@ void main() {
       source.actions.nextChapter!();
       await tester.pumpAndSettle();
       expect(browsing.view(tester).content.key, body.key);
-      await tester.pump(const Duration(seconds: 5));
+      expect(find.byType(SnackBar), findsOneWidget);
+      await tester.drag(find.byType(SnackBar), const Offset(0, 100));
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
       await browsing.open(tester);
       expect(browsing.visibleRow(tester).key, anchor.key);
       await browsing.close(tester);

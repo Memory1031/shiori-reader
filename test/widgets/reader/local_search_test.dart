@@ -15,6 +15,7 @@ import 'package:shiori/features/reader/reader_search_highlight.dart';
 import 'package:shiori/features/reader/reader_search_panel.dart';
 import 'package:shiori/features/reader/reader_toolbars.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_location_transition.dart';
 import 'package:shiori/features/reader/viewport/page_turn.dart';
 import 'package:shiori/app/theme/shiori_theme.dart';
@@ -201,6 +202,97 @@ Future<void> fonts(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+    'covered search validation never retires an unrelated route or commits history',
+    (t) async {
+      final r = await f.mount(t, repositoryFactory: ReaderSearchRepository.new),
+          state = search(r, t);
+      final a = r.position(t);
+      r.view(t).chrome!.value = true;
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('reader-search-open')));
+      await t.pumpAndSettle();
+      await submit(t, state, 'later');
+      final hit = List.generate(
+        state.loadedCount,
+        (i) => i,
+      ).firstWhere((i) => state.hitAt(i)!.chapter == r.key('b'));
+      final gate = Completer<void>(), entered = Completer<void>();
+      addTearDown(() {
+        if (!gate.isCompleted) gate.complete();
+      });
+      r.repository
+        ..blocked = r.key('b')
+        ..wait = gate
+        ..entered = entered;
+      await select(t, state, hit);
+      expect(entered.isCompleted, isTrue);
+      final navigator = Navigator.of(t.element(find.byType(BookReaderScreen)));
+      unawaited(
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Unrelated cover')),
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+      gate.complete();
+      await t.pumpAndSettle();
+      expect(find.text('Unrelated cover'), findsOneWidget);
+      expect(state.canReturn.value, isFalse);
+      navigator.pop();
+      await t.pumpAndSettle();
+      expect(r.position(t), a);
+      expect(r.view(t).actions.previousLocation, isNull);
+    },
+  );
+
+  testWidgets(
+    'auxiliary reader in main content keeps its scope through search and mixed returns',
+    (t) async {
+      final r = await f.mount(t, repositoryFactory: ReaderSearchRepository.new);
+      final a = r.position(t);
+      await r.link(t, 'Auxiliary');
+      final note = r.position(t), noteKey = r.view(t).content.key;
+      await r.link(t, 'B');
+      final b = r.position(t);
+      expect(r.view(t).session!.library, isNull);
+      final state = search(r, t);
+      r.view(t).chrome!.value = true;
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('reader-search-open')));
+      await t.pumpAndSettle();
+      await submit(t, state, 'later');
+      final index = List.generate(
+        state.loadedCount,
+        (i) => i,
+      ).firstWhere((i) => state.hitAt(i)!.chapter == r.key('c'));
+      await select(t, state, index);
+      expect(r.view(t).session!.library, isNotNull);
+      await r.back(t);
+      expect(r.view(t).content.key, r.key('b'));
+      expect(r.position(t), b);
+      expect(r.view(t).session!.library, isNull);
+      await r.back(t);
+      expect(r.view(t).content.key, noteKey);
+      expect(r.position(t), note);
+      r.repository
+        ..blocked = r.key('a')
+        ..fail = true;
+      await r.back(t);
+      expect(r.view(t).content.key, noteKey);
+      expect(r.position(t), note);
+      expect(r.view(t).actions.previousLocation, isNotNull);
+      r.repository.fail = false;
+      await r.back(t);
+      expect(r.view(t).content.key, r.key('a'));
+      expect(r.position(t), a);
+      expect(r.view(t).session!.library, isNotNull);
+      expect(r.view(t).actions.previousLocation, isNull);
+      expect(find.byType(BookReaderScreen), findsOneWidget);
+    },
+  );
+
   List<double> reveals(WidgetTester tester) => tester
       .widgetList<Opacity>(
         find.descendant(
@@ -1048,6 +1140,9 @@ void main() {
         tester,
         repositoryFactory: ReaderSearchRepository.new,
       );
+      final mainOrigin = reader.position(tester);
+      await reader.link(tester, 'B');
+      final parentOrigin = reader.position(tester);
       await reader.link(tester, 'Auxiliary');
       final linkOrigin = reader.position(tester);
       await reader.link(tester, 'Same file');
@@ -1069,6 +1164,12 @@ void main() {
       await reader.back(tester);
       expect(reader.view(tester).content.key, chapter);
       expect(reader.position(tester), linkOrigin);
+      await reader.back(tester);
+      expect(reader.view(tester).content.key, reader.key('b'));
+      expect(reader.position(tester), parentOrigin);
+      await reader.back(tester);
+      expect(reader.position(tester), mainOrigin);
+      expect(reader.view(tester).actions.previousLocation, isNull);
       expect(tester.takeException(), isNull);
     },
     variant: const TargetPlatformVariant({TargetPlatform.windows}),

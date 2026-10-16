@@ -1,4 +1,7 @@
 import 'package:drift/native.dart';
+import 'package:shiori/data/local/database/cache_database.dart';
+import 'package:shiori/data/repositories/novel_repository.dart';
+import 'package:shiori/data/sources/source_registry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,6 +34,7 @@ class Harness {
     WidgetTester t, {
     int depth = 0,
     Size size = const Size(390, 844),
+    NovelRepository? repository,
   }) async {
     t.view
       ..physicalSize = size
@@ -48,6 +52,27 @@ class Harness {
       ReaderSettings(controlsHintSeen: true, paper: ReaderPaper.warm),
       cancellation: CancellationSource().token,
     );
+    if (repository != null) {
+      await t.runAsync(
+        () => Future.wait([
+          repository.loadChapter(
+            fixtureChapterKey(FixtureScenario.multiVolume),
+            mode: ReadMode.cacheFirst,
+            cancellation: CancellationSource().token,
+          ),
+          repository.loadDetail(
+            fixtureNovelKey(FixtureScenario.multiVolume),
+            mode: ReadMode.cacheFirst,
+            cancellation: CancellationSource().token,
+          ),
+          repository.loadCatalog(
+            fixtureNovelKey(FixtureScenario.multiVolume),
+            mode: ReadMode.cacheFirst,
+            cancellation: CancellationSource().token,
+          ),
+        ]),
+      );
+    }
     await t.pumpWidget(
       RepaintBoundary(
         key: boundary,
@@ -55,7 +80,7 @@ class Harness {
           locale: const Locale('en'),
           homeBuilder: (context, _) => BookReaderScreen(
             chapter: fixtureChapterKey(FixtureScenario.multiVolume),
-            repository: env.novels,
+            repository: repository ?? env.novels,
             library: env.library,
             bookmarks: bookmarks,
             linkDepth: depth,
@@ -65,6 +90,20 @@ class Harness {
       ),
     );
     await t.pumpAndSettle();
+  }
+
+  Future<void> settleRepository(WidgetTester t) async {
+    // Native SQLite completes on the real loop; wait for an active confirmed surface.
+    for (var i = 0; i < 100; i++) {
+      await t.runAsync(() => Future<void>.delayed(Duration.zero));
+      await t.pumpAndSettle();
+      if (t
+          .widgetList<ReaderContentView>(find.byType(ReaderContentView))
+          .any((v) => v.active)) {
+        return;
+      }
+    }
+    fail('The repository navigation did not settle');
   }
 
   Future<void> openMenu(WidgetTester t) async {
@@ -122,6 +161,130 @@ class Harness {
 }
 
 void main() {
+  testWidgets(
+    'online bookmark return survives cache eviction and a transient network failure',
+    (t) async {
+      final h = Harness(), cache = CacheDatabase(NativeDatabase.memory());
+      final novels = createNovelRepository(
+        sources: SourceRegistry([h.env.source]),
+        cache: cache,
+      );
+      addTearDown(() async {
+        await novels.close();
+        await cache.close();
+      });
+      await h.pump(t, repository: novels);
+      final a = h.view(t).viewportController!.capture()!,
+          first = h.view(t).content.key;
+      final loaded = await t.runAsync(
+        () => novels.loadChapter(
+          fixtureChapterKey(FixtureScenario.multiVolume, 1),
+          mode: ReadMode.cacheFirst,
+          cancellation: CancellationSource().token,
+        ),
+      );
+      await h.seed(
+        t,
+        (loaded as Success<LoadResult<ChapterContent>>).value.value,
+        'b',
+      );
+      await h.menu(t, 'My bookmarks');
+      await t.tap(find.byKey(const ValueKey('bookmark-b')));
+      await h.settleRepository(t);
+      final b = h.view(t).content.key;
+      expect(b, isNot(first));
+      expect(
+        find.byKey(const ValueKey('reader-location-return')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(
+        h.view(t).actions.previousLocationLabel,
+        'Back to before bookmark navigation',
+      );
+      await t.runAsync(
+        () => cache.customStatement('DELETE FROM chapter_cache'),
+      );
+      h.env.source.controls.failNext(
+        AppFailure(
+          kind: FailureKind.network,
+          operation: Operation.chapter,
+          retryPolicy: RetryPolicy.manual,
+        ),
+      );
+      h.view(t).actions.previousLocation!();
+      await h.settleRepository(t);
+      expect(h.view(t).content.key, b);
+      expect(h.view(t).actions.previousLocation, isNotNull);
+      h.view(t).actions.previousLocation!();
+      await h.settleRepository(t);
+      expect(h.view(t).content.key, first);
+      expect(h.view(t).viewportController!.capture(), a);
+      expect(h.view(t).actions.previousLocation, isNull);
+      await h.view(t).session!.flushProgress();
+      final saved = await h.env.library.getProgress(
+        first.novelKey,
+        cancellation: CancellationSource().token,
+      );
+      expect((saved as Success<ReadingProgress?>).value!.chapterKey, first);
+      await t.pumpWidget(const SizedBox());
+      await t.pumpAndSettle();
+    },
+  );
+  for (final invalid in ['revision', 'chapter']) {
+    testWidgets(
+      'online return rejects confirmed $invalid identity loss without guessing',
+      (t) async {
+        final h = Harness(), cache = CacheDatabase(NativeDatabase.memory());
+        final novels = createNovelRepository(
+          sources: SourceRegistry([h.env.source]),
+          cache: cache,
+        );
+        addTearDown(() async {
+          await novels.close();
+          await cache.close();
+        });
+        await h.pump(t, repository: novels);
+        final loaded = await t.runAsync(
+          () => novels.loadChapter(
+            fixtureChapterKey(FixtureScenario.multiVolume, 1),
+            mode: ReadMode.cacheFirst,
+            cancellation: CancellationSource().token,
+          ),
+        );
+        await h.seed(
+          t,
+          (loaded as Success<LoadResult<ChapterContent>>).value.value,
+          'b',
+        );
+        await h.menu(t, 'My bookmarks');
+        await t.tap(find.byKey(const ValueKey('bookmark-b')));
+        await h.settleRepository(t);
+        final b = h.view(t).content.key;
+        await t.runAsync(
+          () => cache.customStatement('DELETE FROM chapter_cache'),
+        );
+        if (invalid == 'revision') {
+          h.env.source.controls.revision = 1;
+        } else {
+          h.env.source.controls.chapterDeleted = true;
+        }
+        h.view(t).actions.previousLocation!();
+        await h.settleRepository(t);
+        expect(h.view(t).content.key, b);
+        expect(h.view(t).actions.previousLocation, isNull);
+        expect((await h.snapshot(t)).bookmarks.single.id, 'b');
+        expect(
+          find.text(
+            'Link unavailable. Only valid documents and anchors within this book can be opened.',
+          ),
+          findsOneWidget,
+        );
+        await t.pumpWidget(const SizedBox());
+        await t.pumpAndSettle();
+      },
+    );
+  }
+
   testWidgets(
     'page turns refresh bookmark labels and toggle the displayed anchor',
     (t) async {

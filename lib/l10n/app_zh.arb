@@ -893,5 +893,6 @@
   "bookmarkLoadFailed": "无法读取书签，请关闭后重试。",
   "bookmarkSaveFailed": "书签未能保存，请重试。",
   "bookmarkOpenFailed": "暂时无法打开书签，请稍后重试。",
-  "bookmarkChanged": "书签状态已更新，请重试。"
+  "bookmarkChanged": "书签状态已更新，请重试。",
+  "readerBookmarkReturn": "返回书签跳转前位置"
 }

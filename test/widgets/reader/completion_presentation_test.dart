@@ -62,6 +62,7 @@ void main() {
                   textScaler: TextScaler.linear(scale),
                   alwaysUse24HourFormat: true,
                   padding: const EdgeInsets.only(top: 24, bottom: 20),
+                  viewPadding: const EdgeInsets.only(top: 24, bottom: 20),
                 ),
                 child: ValueListenableBuilder<BookTerminalState?>(
                   valueListenable: completion,

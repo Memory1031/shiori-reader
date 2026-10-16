@@ -58,7 +58,8 @@ class DragReader {
           ? size
           : Size(size.width + offset.dx + 80, size.height + offset.dy + 80)
       ..devicePixelRatio = 1
-      ..padding = insets;
+      ..padding = insets
+      ..viewPadding = insets;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ShioriApp(

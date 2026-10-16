@@ -66,7 +66,7 @@ class ReturnRepository extends LocalReadingRepository
     sync: true,
   );
   ChapterKey? blocked;
-  Completer<void>? wait;
+  Completer<void>? wait, entered;
   bool fail = false, changedRevision = false;
   @override
   Stream<NovelKey> get invalidations => invalidationsController.stream;
@@ -77,6 +77,7 @@ class ReturnRepository extends LocalReadingRepository
     required CancellationToken cancellation,
   }) async {
     if (key == blocked) {
+      if (entered?.isCompleted == false) entered!.complete();
       await wait?.future;
       if (fail) {
         return Failure(
@@ -160,6 +161,7 @@ Future<ReturnReader> mount(
   PageTurnStyle pageTurn = PageTurnStyle.none,
   bool reduceMotion = false,
   ReturnRepository Function(MemoryBooks)? repositoryFactory,
+  UserBookmarkRepository? bookmarks,
 }) async {
   tester.view
     ..physicalSize = size
@@ -207,6 +209,7 @@ Future<ReturnReader> mount(
             chapter: reader.key(initial),
             repository: repository,
             library: library,
+            bookmarks: bookmarks,
             settings: settings,
             startAtBeginning: true,
           ),
@@ -707,7 +710,7 @@ void main() {
   );
 
   testWidgets(
-    'auxiliary reader returns through its own anchors then parent; parent stack and history survive',
+    'auxiliary reader shares the chain and returns through internal then parent anchors',
     (tester) async {
       final reader = await mount(tester);
       await reader.link(tester, 'B');
@@ -727,7 +730,8 @@ void main() {
         reader.view(tester).content.key,
         reader.book.auxiliaryChapters.single.key,
       );
-      expect(reader.view(tester).actions.previousLocation, isNull);
+      // The shared top now names the parent origin; the same entry drives both controls.
+      expect(reader.view(tester).actions.previousLocation, isNotNull);
       await tester.tap(quickButton);
       await tester.pumpAndSettle();
       expect(reader.view(tester).session, same(parent.session));

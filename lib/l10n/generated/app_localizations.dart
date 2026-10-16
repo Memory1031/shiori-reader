@@ -3097,6 +3097,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Bookmarks have changed. Please try again.'**
   String get bookmarkChanged;
+
+  /// No description provided for @readerBookmarkReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to before bookmark navigation'**
+  String get readerBookmarkReturn;
 }
 
 class _AppLocalizationsDelegate

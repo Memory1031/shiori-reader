@@ -1660,4 +1660,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bookmarkChanged => '书签状态已更新，请重试。';
+
+  @override
+  String get readerBookmarkReturn => '返回书签跳转前位置';
 }

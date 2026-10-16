@@ -893,5 +893,6 @@
   "bookmarkLoadFailed": "Could not load bookmarks. Close and try again.",
   "bookmarkSaveFailed": "Could not save the bookmark. Please try again.",
   "bookmarkOpenFailed": "Could not open this bookmark. Please try again later.",
-  "bookmarkChanged": "Bookmarks have changed. Please try again."
+  "bookmarkChanged": "Bookmarks have changed. Please try again.",
+  "readerBookmarkReturn": "Back to before bookmark navigation"
 }
