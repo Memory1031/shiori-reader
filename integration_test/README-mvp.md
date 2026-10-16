@@ -1,6 +1,8 @@
-# 离线 MVP 真机回归
+# 离线 MVP 设备探针
 
 `mvp_test.dart` 是显式 Profile 入口。组合真实 LightNovelSource、Repository、Drift 双库、持久图片层、ReadingHome 与 Reader；HTTP adapter 只返回自制 JSON / HTML / PNG，绝不委托 socket adapter。生产 main 不引用此入口。
+
+该入口仍通过旧 `ReaderViewport` 采样当前位置，当前生产阅读器已使用 `PagedReaderViewport`；冷恢复脚本依赖该采样，不能直接用于当前分页阅读器验收。需先修复探针的视口观测，再执行下列设备流程。
 
 沿用 `docs/development.md` 的本机 JDK / SDK 设置：
 

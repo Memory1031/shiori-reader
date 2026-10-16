@@ -41,9 +41,9 @@
 
 ChapterContent 统一重新分配 occurrence，不信任调用方手填值。不同语义块的插入不改变既有块键；在同样内容的重复块之前插入另一个相同块会改变后续 occurrence，这是规则的明确限制。blockKey 只在章节内使用；纯文本内容完全相同的不同章节可以得到相同摘要，业务定位始终同时使用 ChapterKey。
 
-ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion、块类型、blockKey、occurrence 和 contentRevision。JSON 返回的是独立容器，改动它不会修改值对象。存储 envelope 的 parserVersion、cache codec version、抓取时间不进入 Domain 摘要；其他模型由存储层 codec 负责。ReaderSettings 当前为 schemaVersion=3；读取 v1 / v2 保留原数值与阅读明暗，v1 补 paged，旧版统一补 paper=paper、controlsHintSeen=false。未知版本仍拒绝。
+ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion、块类型、blockKey、occurrence 和 contentRevision。JSON 返回的是独立容器，改动它不会修改值对象。存储 envelope 的 parserVersion、cache codec version、抓取时间不进入 Domain 摘要；其他模型由存储层 codec 负责。ReaderSettings 当前为 schemaVersion=4；读取 v1 / v2 / v3 保留有效排版与阅读明暗，v1 补 paged，v1 / v2 补 paper=paper、controlsHintSeen=false，v1–v3 补 pageTurn=curl。未知版本仍拒绝。
 
-字号、屏宽、DPR、主题、pixelOffset、layoutKey、临时渲染切片都不进入正文摘要或序列化。一个极长 Paragraph 始终一个语义块，presentation 可临时切片但不能回写 Domain。
+字号、屏宽、DPR、主题、pixelOffset、layoutKey、临时渲染切片都不进入正文摘要或正文序列化。一个极长 Paragraph 始终一个语义块，presentation 可临时切片但不能回写 Domain。
 
 测试中的固定向量由 .NET `SHA256.HashData` 对手写精确 UTF-8 JSON 独立计算，包含 paragraph 语义、重复块 0/1、image、chapter 和 catalog。`tool/domain_example.dart` 在两个实际 Dart 子进程中输出完全一致，Windows 的输入/输出编码显式指定 UTF-8。
 
@@ -51,7 +51,7 @@ ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion�
 
 ReaderPosition 的 blockIndex 非负，blockFraction / chapterFraction 必须有限且位于 0..1；NaN / Infinity / 越界直接拒绝，不静默改写错误进度。fractionFor 依 `(blockIndex + blockFraction) / blockCount` 计算，检查 index 属于本章；空内容仅允许 0/0 起点。文本 fraction 按 Unicode code point 偏移定义，UTF-16 布局索引转换留 presentation。构造位置时尚无正文实例，不假装已验证 blockKey 在某章内存在；实际恢复由阅读器处理。
 
-像素提示必须同时包含合法 pixelOffset 和 layoutKey，仅用于同布局提示，不能替代语义位置。ReaderSettings 当前 schemaVersion=3，默认字号 20、行高 1.6、段间距 20、左右边距 40；有效历史排版保留，未知版本拒绝。ReaderMode.scroll 只保留兼容解码，生产偏好层归一化为 paged，详见[阅读器](reader.md)。
+像素提示必须同时包含合法 pixelOffset 和 layoutKey，仅用于同布局提示，不能替代语义位置。ReaderSettings 当前 schemaVersion=4，默认字号 20、行高 1.6、段间距 20、左右边距 30；有效历史排版保留，未知版本拒绝。ReaderMode.scroll 只保留兼容解码，生产偏好层归一化为 paged，详见[阅读器](reader.md)。
 
 AppSettings 独立 schemaVersion=3，包含 system / light / dark、teal / blueGrey / warmBrown / softPink 和书架网格／列表偏好；旧 v1 补默认青绿，v1 / v2 缺少布局时默认网格，不借用阅读主题。应用设置加载完成后才首次展示书架，布局随应用设置持久化。ReaderPaper 表示阅读纸色，controlsHintSeen 记录提示已确认；恢复默认保留该提示状态。所有值模型不含 Flutter Color 或语言文案。
 
@@ -115,7 +115,7 @@ Presentation 依赖领域契约，通过显式注入获得服务。应用根拥�
 | --- | --- | --- |
 | `users/users.sqlite` | v9 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions、progress_catalogs、local_reparse_attempts、user_bookmarks、bookmark_versions |
 | `disposable/cache.sqlite` | v2 | novel_cache、catalog_cache、chapter_cache、image_cache、image_owners |
-| 平台 preferences | 独立 codec | readerSettings v3、appSettings v2 |
+| 平台 preferences | 独立 codec | readerSettings v4、appSettings v3 |
 | `users/update-preferences.json` | v1 | 更新渠道、自动检查开关、检查时间与限流期限 |
 | `disposable/updates/` | 独立更新记录 | 发布列表 ETag 缓存、已签名清单与更新下载；未完成下载在恢复时清理 |
 | `users/books/` | manifest v1 | 本地书托管原件、语义正文索引与媒体 |
@@ -126,7 +126,7 @@ LocalDatabases.open 顺序打开用户库和缓存库，各用 NativeDatabase.cr
 
 ### 事务与 codec
 
-Library 写入由事务串行执行；重复收藏保留首次 addedAt。正式在线阅读首次有效进度保存与自动入架在同一事务完成，复用进度中的书籍摘要，不额外请求详情；普通搜索、详情及目录浏览不建立长期用户记录。通用 removeFromBookshelf 仍只删除书架记录；产品在线移出经确认后通过 removeOnlineBook 原子清理书架、进度、持久目录及预取选择。书架按最近阅读时间（无历史时 addedAt）降序，平局按 Source / Novel 键排序。watch 返回初始及后续不可变快照。
+Library 写入由事务串行执行；重复收藏保留首次 addedAt。正式在线阅读首次有效进度保存与自动入架在同一事务完成，复用进度中的书籍摘要，不额外请求详情；普通搜索、详情及目录浏览不建立长期用户记录。通用 removeFromBookshelf 仍只删除书架记录；产品在线移出经确认后通过 removeOnlineBook 原子清理书架、进度、书签、持久目录及预取选择。书架按最近阅读时间（无历史时 addedAt）降序，平局按 Source / Novel 键排序。watch 返回初始及后续不可变快照。
 
 beginProgressSession 原子递增 generation 并重置 sequence；saveProgress 只接受当前 generation 和严格递增 sequence，旧写返回 false。clearHistory 推进 generation 并保留会话保护行，防止晚响应恢复已清历史。在线移出同时推进写入代次和独立的 removal_generation，后者由目录观测及预取任务核对，随事务回滚；成功通知使旧 Reader 失效。后续明确打开的新阅读会话允许重新入架。提交前取消可回滚，提交后返回真实结果。
 
@@ -194,9 +194,9 @@ v4 仅添加活动 bundle、解析版本、维护标记及章节版本索引，�
 
 ### 清理与竞态
 
-缓存管理页按书或全部清理需要确认；书架 / 详情中在线书移出须确认清除缓存和阅读进度，先清该书缓存，再原子清理用户库，无撤销；本地书经确认后走托管文件完整删除流程，见[本地导入](local-import.md)。清理推进 generation、停止旧预取，晚响应不得回填已清数据；已有活动 lease 在关闭前仍可读取，新读取看到 cache miss。按书清理保留其他书共享的资源。
+缓存管理页按书或全部清理需要确认；书架 / 详情中在线书移出须确认清除缓存、阅读进度和书签，先清该书缓存，再原子清理用户库，无撤销；本地书经确认后走托管文件完整删除流程，见[本地导入](local-import.md)。清理推进 generation、停止旧预取，晚响应不得回填已清数据；已有活动 lease 在关闭前仍可读取，新读取看到 cache miss。按书清理保留其他书共享的资源。
 
-本地导入走独立文件层，清在线缓存不会删除原件、书架、进度或设置。离线列表必须同时校验外层 codec 与内部数据，不兼容记录不能列为可读。
+本地导入走独立文件层，清在线缓存不会删除原件、书架、进度、书签或设置。离线列表必须同时校验外层 codec 与内部数据，不兼容记录不能列为可读。
 
 
 ## 请求预算与诊断

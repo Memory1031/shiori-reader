@@ -1,6 +1,6 @@
 # Android Profile 探针
 
-仅显式入口，不被生产 main 引用。使用真实 ProductionApp / ReaderScreen / Viewport / SQLite / 图片持久层，合成内容与平台无关；只有存储根目录通过 ProductionApp 的可选参数注入。
+仅显式入口，不被生产 main 引用。使用 ProductionApp、SQLite 与图片持久层；正文滚动场景挂载开发用 ReaderScreen / ReaderViewport，不代表生产分页或当前翻页性能。合成内容与平台无关；只有存储根目录通过 ProductionApp 的可选参数注入。
 
 运行前连接已授权的 ARM64 Android 手机，并准备可恢复的生产 APK。沿用 `docs/development.md` 的 JDK / Flutter 镜像设置：
 
