@@ -3,6 +3,8 @@
   <h1>Shiori</h1>
   <p>把喜欢的故事，留在手边。</p>
   <p>面向 Android、iOS、Windows 与 macOS 的开源轻小说阅读器 · 本地 EPUB / TXT · 支持 LightNovel.fun 在线阅读 · 中文 / English</p>
+  <p><strong><a href="https://memory1031.github.io/shiori-reader/zh-cn/">访问官方中文网站</a> · <a href="https://memory1031.github.io/shiori-reader/en/">English website</a></strong></p>
+  <p><a href="https://memory1031.github.io/shiori-reader/zh-cn/download/">选择平台下载</a> · <a href="https://github.com/Memory1031/shiori-reader/releases/latest">GitHub Releases</a></p>
   <p>
     <a href="#功能亮点">功能</a> ·
     <a href="#截图">截图</a> ·
@@ -34,29 +36,25 @@ Shiori 是一款以**本地阅读为核心**的开源轻小说阅读器，支持
 
 ## 截图
 
-以下为已有版本的界面示例，菜单和功能可能与新版本略有不同。图中书籍由用户自行导入，应用不附带这些作品。
+以下为 v1.4.0 正式版真实界面，展示原创演示小说《蓝色借书卡的最后一栏》。应用不附带第三方小说。更多阅读、搜索与书签展示见[官网](https://memory1031.github.io/shiori-reader/zh-cn/#experience)。
 
 ### Windows 桌面端
 
-**桌面书架**
-
-![Windows 桌面书架](assets/screenshots/desktop-shelf.png)
-
 **宽屏双页阅读：插图与正文配对**
 
-![Windows 双页阅读器](assets/screenshots/desktop-reader.png)
+![Shiori v1.4.0 Windows 插图与正文双页阅读](assets/screenshots/v1.4.0/desktop/zh/reader-illustration-desktop-zh.png)
 
-**小说详情与目录**
+**本地全文搜索**
 
-![Windows 小说详情](assets/screenshots/desktop-detail.png)
+![Shiori v1.4.0 Windows 本地全文搜索与上下文](assets/screenshots/v1.4.0/desktop/zh/reader-search-desktop-zh.png)
 
 ### Android 移动端
 
 书架与续读、单页阅读：
 
 <p>
-  <img src="assets/screenshots/mobile-shelf.png" alt="既有版本的 Android 书架与续读" width="300" />
-  <img src="assets/screenshots/mobile-reader.png" alt="既有版本的 Android 单页阅读器" width="300" />
+  <img src="assets/screenshots/v1.4.0/mobile/zh/bookshelf-mobile-zh.png" alt="Shiori v1.4.0 Android 书架与续读" width="260" />
+  <img src="assets/screenshots/v1.4.0/mobile/en/reader-mobile-en.png" alt="Shiori v1.4.0 Android 英文单页阅读界面" width="260" />
 </p>
 
 ## 安装

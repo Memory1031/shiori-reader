@@ -1,0 +1,74 @@
+name: Website
+
+on:
+  push:
+    branches: [develop]
+    paths: &website-paths
+      - 'website/**'
+      - '.github/workflows/pages.yml'
+      - 'assets/branding/shiori-chibi-logo-v1.png'
+      - 'assets/screenshots/v1.4.0/desktop/zh/reader-double-page-desktop-zh.png'
+      - 'assets/screenshots/v1.4.0/desktop/zh/reader-illustration-desktop-zh.png'
+      - 'assets/screenshots/v1.4.0/desktop/zh/reader-search-desktop-zh.png'
+      - 'assets/screenshots/v1.4.0/desktop/zh/bookshelf-grid-desktop-zh.png'
+      - 'assets/screenshots/v1.4.0/mobile/zh/reader-mobile-zh.png'
+      - 'assets/screenshots/v1.4.0/mobile/zh/reader-bookmarks-mobile-zh.png'
+      - 'assets/screenshots/v1.4.0/mobile/zh/bookshelf-mobile-zh.png'
+      - 'assets/screenshots/v1.4.0/mobile/en/reader-mobile-en.png'
+      - 'assets/screenshots/v1.4.0/mobile/en/bookshelf-mobile-en.png'
+      - 'showcase/demo-book/dist/cover-zh.jpg'
+      - 'showcase/demo-book/dist/cover-en.jpg'
+  pull_request:
+    paths: *website-paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ASTRO_TELEMETRY_DISABLED: '1'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.23.3'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - name: Upload static site
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: website/dist
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

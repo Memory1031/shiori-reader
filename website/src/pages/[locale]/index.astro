@@ -1,0 +1,11 @@
+---
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import Hero from '../../components/Hero.astro';
+import FeatureShowcase from '../../components/FeatureShowcase.astro';
+import PlatformDownload from '../../components/PlatformDownload.astro';
+import FAQ from '../../components/FAQ.astro';
+import { locales } from '../../lib/paths';
+export const getStaticPaths = () => locales.map(locale => ({ params: { locale }, props: { locale } }));
+const { locale } = Astro.props;
+---
+<SiteLayout locale={locale}><Hero locale={locale} /><FeatureShowcase locale={locale} /><PlatformDownload locale={locale} /><FAQ locale={locale} /></SiteLayout>

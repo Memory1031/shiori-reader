@@ -1,0 +1,19 @@
+---
+import ProductImage from './ProductImage.astro';
+import { copy } from '../i18n/copy';
+import { route, type Locale } from '../lib/paths';
+interface Props { locale: Locale; }
+const { locale } = Astro.props, t = copy[locale], lang = locale === 'en' ? 'en' : 'zh';
+---
+<section class="hero wrap" aria-labelledby="hero-title">
+  <div class="hero-intro">
+    <h1 id="hero-title">{t.hero[0]}<br />{t.hero[1]}</h1>
+    <div class="hero-copy"><p class="lead">{t.intro}</p><div class="actions"><a class="button primary" href={route(locale, 'download')}>{t.download}<span aria-hidden="true">↓</span></a><a class="text-link" href="#experience">{t.explore}</a></div><p class="fine">{t.openSource}</p></div>
+  </div>
+  <div class="hero-stage">
+    <figure class="hero-desktop"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i><span>Shiori</span></div><ProductImage name="illustration" alt={t.reading.alt[1]!} eager sizes="(max-width: 760px) 92vw, 1000px" /><figcaption>{t.desktopCaption}</figcaption></figure>
+    <figure class="hero-cover"><ProductImage name={`cover-${lang}`} alt={locale === 'en' ? 'Cover of The Last Line on the Blue Library Card, the original demo novel' : '原创演示小说《蓝色借书卡的最后一栏》封面'} eager sizes="(max-width: 760px) 100px, 170px" /></figure>
+    <figure class="hero-phone phone"><ProductImage name={`reader-${lang}`} alt={t.mobileCaption} eager sizes="(max-width: 760px) 120px, 180px" /></figure>
+  </div>
+  <p class="hero-note fine">{t.screenshotNote}</p>
+</section>

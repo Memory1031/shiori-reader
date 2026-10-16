@@ -1,0 +1,46 @@
+---
+import { copy } from '../i18n/copy';
+import { route, media, repository, type Locale } from '../lib/paths';
+interface Props { locale: Locale; page?: string; }
+const { locale, page = '' } = Astro.props;
+const t = copy[locale], other = locale === 'en' ? 'zh-cn' : 'en';
+---
+<a class="skip" href="#main">{t.skip}</a>
+<header class="site-header">
+  <div class="header-inner wrap">
+    <a class="brand" href={route(locale)} aria-label="Shiori"><img src={media('logo-128.webp')} width="42" height="42" alt="" /><span>Shiori</span></a>
+    <button class="menu-toggle" aria-expanded="false" aria-controls="site-nav" data-menu>{t.menu}<span aria-hidden="true">☰</span></button>
+    <nav id="site-nav" aria-label={locale === 'en' ? 'Main navigation' : '主导航'}>
+      <a href={`${route(locale)}#experience`}>{t.nav[0]}</a>
+      <a href={route(locale, 'download')} aria-current={page === 'download' ? 'page' : undefined}>{t.nav[1]}</a>
+      <a href={`${route(locale)}#faq`}>{t.nav[2]}</a>
+      <a href={route(other, page)} lang={other} hreflang={other} class="language">{locale === 'en' ? '简体中文' : 'English'}</a>
+      <a href={repository} class="github">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+  </div>
+</header>
+<script>
+  const button = document.querySelector<HTMLButtonElement>('[data-menu]');
+  const nav = document.querySelector<HTMLElement>('#site-nav');
+  if (button && nav) {
+    document.documentElement.classList.add('js');
+    const close = (focus = false) => {
+      button.setAttribute('aria-expanded', 'false');
+      if (focus) button.focus();
+    };
+    button.addEventListener('click', () => button.setAttribute('aria-expanded', String(button.getAttribute('aria-expanded') !== 'true')));
+    nav.addEventListener('click', event => { if ((event.target as HTMLElement).closest('a')) close(); });
+    document.addEventListener('keydown', event => {
+      if (button.getAttribute('aria-expanded') !== 'true') return;
+      if (event.key === 'Escape') { close(true); event.preventDefault(); }
+      if (event.key === 'Tab' && matchMedia('(max-width: 760px)').matches) {
+        const links = Array.from(nav.querySelectorAll<HTMLAnchorElement>('a'));
+        if (event.shiftKey && document.activeElement === button) { links.at(-1)?.focus(); event.preventDefault(); }
+        else if (!event.shiftKey && document.activeElement === links.at(-1)) { button.focus(); event.preventDefault(); }
+      }
+    });
+    document.addEventListener('click', event => { if (!(event.target as HTMLElement).closest('.site-header')) close(); });
+    document.addEventListener('focusin', event => { if (!(event.target as HTMLElement).closest('.site-header')) close(); });
+    matchMedia('(max-width: 760px)').addEventListener('change', () => close());
+  }
+</script>

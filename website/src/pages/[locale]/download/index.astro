@@ -1,0 +1,8 @@
+---
+import SiteLayout from '../../../layouts/SiteLayout.astro';
+import PlatformDownload from '../../../components/PlatformDownload.astro';
+import { locales } from '../../../lib/paths';
+export const getStaticPaths = () => locales.map(locale => ({ params: { locale }, props: { locale } }));
+const { locale } = Astro.props;
+---
+<SiteLayout locale={locale} page="download"><PlatformDownload locale={locale} full /></SiteLayout>

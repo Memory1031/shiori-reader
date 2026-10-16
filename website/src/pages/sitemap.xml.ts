@@ -1,0 +1,3 @@
+import type { APIRoute } from 'astro';
+import { locales, route } from '../lib/paths';
+export const GET: APIRoute = () => new Response(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">${['', 'download'].flatMap(page => locales.map(locale => `<url><loc>https://memory1031.github.io${route(locale, page)}</loc>${locales.map(alt => `<xhtml:link rel="alternate" hreflang="${alt === 'zh-cn' ? 'zh-CN' : alt}" href="https://memory1031.github.io${route(alt, page)}"/>`).join('')}</url>`)).join('')}</urlset>`, { headers: { 'Content-Type': 'application/xml' } });

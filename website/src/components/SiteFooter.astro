@@ -1,0 +1,17 @@
+---
+import { copy } from '../i18n/copy';
+import { route, repository, type Locale } from '../lib/paths';
+interface Props { locale: Locale; page?: string; }
+const { locale, page = '' } = Astro.props, t = copy[locale];
+---
+<footer class="site-footer wrap">
+  <div><a class="wordmark" href={route(locale)}>Shiori</a><p>{t.footer.line}</p></div>
+  <nav aria-label={locale === 'en' ? 'Project links' : '项目链接'}>
+    <a href={repository}>GitHub</a><a href={`${repository}/releases/latest`}>Releases</a>
+    <a href={`${repository}/issues`}>{t.footer.issues}</a>
+    <a href={`${repository}/blob/develop/LICENSE`}>{t.footer.license}</a>
+    <a href={`${route(locale)}#privacy`}>{t.footer.privacy}</a>
+    <a href={route(locale === 'en' ? 'zh-cn' : 'en', page)} lang={locale === 'en' ? 'zh-CN' : 'en'}>{locale === 'en' ? '简体中文' : 'English'}</a>
+  </nav>
+  <p class="fine">{t.footer.credits}</p>
+</footer>

@@ -1,0 +1,43 @@
+---
+import ProductImage from './ProductImage.astro';
+import { copy } from '../i18n/copy';
+import { media, type Locale } from '../lib/paths';
+import { bookmarkArtwork } from '../data/showcase';
+interface Props { locale: Locale; }
+const { locale } = Astro.props, t = copy[locale], lang = locale === 'en' ? 'en' : 'zh';
+const artwork = bookmarkArtwork[locale];
+---
+<section id="experience" class="section wrap reading">
+  <div class="section-heading"><p class="section-label">{t.reading.label}</p><h2>{t.reading.title}</h2><p class="lead">{t.reading.body}</p></div>
+  <div class="reading-points">{t.reading.points.map(point => <div><h3>{point.title}</h3><p>{point.body}</p></div>)}</div>
+  <div class="gallery" data-gallery>
+    <div class="gallery-controls" role="group" aria-label={locale === 'en' ? 'Reading screenshots' : '阅读截图'}>{t.reading.tabs.map((label, i) => <button type="button" data-show={i} aria-pressed={i === 0 ? 'true' : 'false'}>{label}</button>)}</div>
+    <figure data-slide="0"><ProductImage name="double" alt={t.reading.alt[0]!} /><figcaption>{t.desktopCaption} · <a href={media('double-2000.webp')}>{t.enlarge}</a></figcaption></figure>
+    <figure data-slide="1"><ProductImage name="illustration" alt={t.reading.alt[1]!} /><figcaption>{t.desktopCaption} · <a href={media('illustration-2000.webp')}>{t.enlarge}</a></figcaption></figure>
+  </div>
+</section>
+<section class="search-section section" id="search"><div class="wrap">
+  <div class="feature-heading"><div><p class="section-label">{t.search.label}</p><h2>{t.search.title}</h2></div><div><p class="lead">{t.search.body}</p><p class="shortcut">{t.search.shortcut}</p><p class="fine">{t.search.note}</p></div></div>
+  <figure class="wide-image"><ProductImage name="search" alt={t.search.alt} /><figcaption>{t.search.caption} · <a href={media('search-2000.webp')}>{t.enlarge}</a></figcaption></figure>
+</div></section>
+<section class:list={['section wrap bookmarks', { 'text-bookmarks': !artwork }]} id="bookmarks">
+  <div class="bookmark-copy"><p class="section-label">{t.bookmarks.label}</p><h2>{t.bookmarks.title}</h2><p class="lead">{t.bookmarks.body}</p><ul class="quiet-list">{t.bookmarks.items.map(item => <li>{item}</li>)}</ul></div>
+  {artwork ? <figure class="bookmark-image phone"><ProductImage name={artwork} alt={t.bookmarks.alt} sizes="(max-width: 760px) 250px, 300px" /><figcaption>{t.bookmarks.caption}</figcaption></figure> : <div class="bookmark-prose"><svg viewBox="0 0 40 60" width="40" height="60" aria-hidden="true"><path d="M5 2h30v52L20 43 5 54Z" fill="none" stroke="currentColor" stroke-width="2" /></svg><p>{t.bookmarks.textOnly}</p><span>{t.bookmarks.textOnlyBody}</span></div>}
+</section>
+<section class="library-section section" id="library"><div class="wrap">
+  <div class="feature-heading"><div><p class="section-label">{t.library.label}</p><h2>{t.library.title}</h2></div><div><p class="lead">{t.library.body}</p><p>{t.library.second}</p></div></div>
+  <figure class="wide-image"><ProductImage name="shelf" alt={t.library.alt} /><figcaption>{t.library.caption} · <a href={media('shelf-2000.webp')}>{t.enlarge}</a></figcaption></figure><p class="fine">{t.library.note}</p>
+</div></section>
+<section class="section wrap platform-story"><div><h2>{t.platforms.title}</h2><p class="lead">{t.platforms.body}</p><ul class="platform-names"><li>Windows</li><li>macOS</li><li>Android</li><li>iOS / iPadOS</li></ul><p class="fine">{t.platforms.note}</p></div><div class="platform-phones"><figure class="phone"><ProductImage name={`shelf-${lang}`} alt={t.platforms.shelfAlt} sizes="(max-width: 760px) 40vw, 220px" /></figure><figure class="phone"><ProductImage name={`reader-${lang}`} alt={t.mobileCaption} sizes="(max-width: 760px) 40vw, 220px" /></figure></div></section>
+<script>
+  document.querySelectorAll<HTMLElement>('[data-gallery]').forEach(gallery => {
+    const slides = gallery.querySelectorAll<HTMLElement>('[data-slide]');
+    const buttons = gallery.querySelectorAll<HTMLButtonElement>('[data-show]');
+    const show = (index: number) => {
+      slides.forEach((slide, i) => slide.hidden = i !== index);
+      buttons.forEach((button, i) => button.setAttribute('aria-pressed', String(i === index)));
+    };
+    show(0); gallery.classList.add('interactive');
+    buttons.forEach((button, i) => button.addEventListener('click', () => show(i)));
+  });
+</script>

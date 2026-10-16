@@ -1,0 +1,11 @@
+---
+import dimensions from '../../public/media/dimensions.json';
+import { media } from '../lib/paths';
+interface Props { name: keyof typeof dimensions; alt: string; sizes?: string; eager?: boolean; class?: string; }
+const { name, alt, sizes = '(max-width: 760px) 92vw, 1100px', eager = false, class: className } = Astro.props;
+const asset = dimensions[name];
+---
+<img src={media(`${name}-${asset.widths.at(-1)}.webp`)}
+  srcset={asset.widths.map(w => `${media(`${name}-${w}.webp`)} ${w}w`).join(', ')}
+  sizes={sizes} width={asset.width} height={asset.height} alt={alt} class={className}
+  loading={eager ? 'eager' : 'lazy'} fetchpriority={eager ? 'high' : 'auto'} decoding="async" />
