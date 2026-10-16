@@ -1,24 +1,18 @@
 <div align="center">
-  <img src="assets/branding/shiori-chibi-logo-v1.png" alt="Shiori Logo" width="112" />
+  <img src="assets/branding/shiori-chibi-logo-v1.png" alt="Shiori" width="96" />
   <h1>Shiori</h1>
-  <p>把喜欢的故事，留在手边。</p>
-  <p>开源轻小说阅读器 · 本地 EPUB / TXT</p>
-  <p><strong><a href="https://memory1031.github.io/shiori-reader/zh-cn/">访问官方中文网站</a> · <a href="https://memory1031.github.io/shiori-reader/en/">English website</a></strong></p>
-  <p><a href="https://memory1031.github.io/shiori-reader/zh-cn/download/">选择平台下载</a> · <a href="https://github.com/Memory1031/shiori-reader/releases/latest">GitHub Releases</a></p>
+  <p><strong>把喜欢的故事，留在手边。</strong></p>
+  <p>开源轻小说阅读器 · EPUB / TXT · Android / iOS / Windows / macOS</p>
   <p>
-    <a href="#功能亮点">功能</a> ·
-    <a href="#截图">截图</a> ·
-    <a href="#安装">安装</a> ·
-    <a href="#快速开始">使用</a> ·
-    <a href="docs/development.md">开发文档</a>
+    <a href="https://memory1031.github.io/shiori-reader/zh-cn/"><strong>官方网站</strong></a>
+    · <a href="https://memory1031.github.io/shiori-reader/zh-cn/download/">下载 Shiori</a>
+    · <a href="https://memory1031.github.io/shiori-reader/en/">English</a>
   </p>
 </div>
 
 ---
 
-Shiori 是一款以**本地阅读为核心**的开源轻小说阅读器，支持 Android、iOS、Windows 和 macOS。
-
-导入 EPUB 或 TXT，按自己喜欢的方式排版和翻页。借助全文搜索与书签，随时回顾故事中的细节；临时跳转到其他位置后，也能返回原处继续阅读。
+以**本地阅读为核心**，导入自己的 EPUB 或 TXT，按喜欢的方式排版和翻页。借助全文搜索与书签回顾故事中的细节，查看其他位置后，也能返回原处继续阅读。
 
 除了本地书籍，Shiori 还支持通过 [LightNovel.fun](https://www.lightnovel.fun/) 搜索和阅读在线轻小说。书架、阅读进度、书签和阅读偏好保存在本地，本地阅读无需注册账号或联网。
 
