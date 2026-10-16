@@ -1,7 +1,9 @@
 import json
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import plistlib
+import selectors
 import shutil
 import stat
 import subprocess
@@ -35,6 +37,22 @@ class MacOSUpdateTest(unittest.TestCase):
             (root / 'macos/Updater').symlink_to(Path(__file__).resolve().parent.parent / 'macos/Updater')
             cls.helper = root / 'shiori-updater'
             build(root, cls.helper, ['arm64', 'x86_64'], testing=True)
+            probe = root / 'LeaseProbe.swift'
+            probe.write_text('''import Foundation
+import Darwin
+@main struct Probe {
+  static func main() {
+    do {
+      let fd = try acquireInstallationLease(URL(fileURLWithPath:CommandLine.arguments[1]))
+      print("leased"); fflush(stdout)
+      _ = readLine(); close(fd)
+    } catch let error as POSIXError where error.code == .EWOULDBLOCK { exit(73) }
+    catch { exit(74) }
+  }
+}
+''')
+            cls.launcher = root / 'launch-probe'
+            subprocess.run(['xcrun', 'swiftc', '-parse-as-library', '-module-cache-path', str(root / 'swift-cache'), str(probe), str(Path(__file__).resolve().parent.parent / 'macos/Runner/InstallationLease.swift'), '-o', str(cls.launcher)], check=True)
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='shiori-macos-update-')
@@ -105,6 +123,27 @@ class MacOSUpdateTest(unittest.TestCase):
         finally:
             if parent.poll() is None: parent.kill(); parent.wait()
 
+    @contextmanager
+    def paused_update(self, stage):
+        self.prepare()
+        parent = subprocess.Popen(['/bin/sleep', '15'])
+        gate = self.root / 'commit-gate'
+        process = subprocess.Popen([str(self.helper), 'run', str(self.install), str(parent.pid)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env={**os.environ, 'SHIORI_UPDATE_PAUSE':stage, 'SHIORI_UPDATE_GATE':str(gate)})
+        def wait_for(path):
+            deadline = time.monotonic() + 10
+            while not path.exists() and process.poll() is None and time.monotonic() < deadline:
+                time.sleep(.01)
+            self.assertTrue(path.exists(), f'Updater did not reach {stage}')
+        try:
+            wait_for(self.workspace / 'started.json')
+            parent.terminate(); parent.wait(timeout=5)
+            wait_for(Path(str(gate) + '.ready'))
+            yield process, Path(str(gate) + '.release')
+        finally:
+            if parent.poll() is None: parent.kill(); parent.wait()
+            if process.poll() is None: process.kill()
+            process.communicate(timeout=5)
+
     def test_separate_manifest_and_bundle_validation(self):
         manifest, signature = self.signed()
         value = json.loads(manifest.read_text())
@@ -138,6 +177,39 @@ class MacOSUpdateTest(unittest.TestCase):
         result = self.call('run', '999999', env={**os.environ, 'SHIORI_UPDATE_OTHER_INSTANCE':'1'}, success=False)
         self.assertIn('instances', result.stderr)
         self.assertFalse((self.workspace / 'transaction.json').exists())
+        self.run_update(env={**os.environ, 'SHIORI_UPDATE_LATE_INSTANCE':'1'}, success=False)
+        self.assertFalse((self.workspace / 'transaction.json').exists())
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
+    def test_reader_started_after_parent_exit_prevents_replacement(self):
+        with self.paused_update('before-commit') as (update, release):
+            reader = subprocess.Popen([str(self.launcher), str(self.install)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            try:
+                with selectors.DefaultSelector() as selector:
+                    selector.register(reader.stdout, selectors.EVENT_READ)
+                    self.assertTrue(selector.select(timeout=5))
+                self.assertEqual(reader.stdout.readline().strip(), 'leased')
+                release.touch()
+                stdout, stderr = update.communicate(timeout=10)
+                self.assertNotEqual(update.returncode, 0, stdout + stderr)
+                self.assertIn('instances', stderr)
+                self.assertEqual(plistlib.loads((self.install / 'Contents/Info.plist').read_bytes())['CFBundleVersion'], '19')
+                self.assertFalse((self.workspace / 'transaction.json').exists())
+                self.assertIsNone(reader.poll())
+            finally:
+                reader.communicate(input='\n', timeout=5)
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
+    def test_commit_blocks_new_startup_until_bundle_exchange_finishes(self):
+        with self.paused_update('committing') as (update, release):
+            reader = subprocess.run([str(self.launcher), str(self.install)], input='', capture_output=True, text=True, timeout=5)
+            self.assertEqual(reader.returncode, 73)
+            release.touch()
+            stdout, stderr = update.communicate(timeout=10)
+            self.assertEqual(update.returncode, 0, stdout + stderr)
+            self.assertEqual(plistlib.loads((self.install / 'Contents/Info.plist').read_bytes())['CFBundleVersion'], '20')
+        reader = subprocess.run([str(self.launcher), str(self.install)], input='', capture_output=True, text=True, timeout=5)
+        self.assertEqual(reader.returncode, 0, reader.stderr)
 
     @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
     def test_upgrade_reextracts_staging_and_preserves_user_data(self):

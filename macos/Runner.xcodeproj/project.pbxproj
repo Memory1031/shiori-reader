@@ -28,6 +28,7 @@
 		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
 		4787EAE8BF24EB9C74E574DA /* MacServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90595B8E6AE58B2230E85784 /* MacServices.swift */; };
+		F26D57B3D290E332336EC9E1 /* InstallationLease.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC9A6F9C71EE8BC6CEAAAC0 /* InstallationLease.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -55,6 +56,7 @@
 
 /* Begin PBXFileReference section */
 		079CEB3747022B4912604BE9 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		1BC9A6F9C71EE8BC6CEAAAC0 /* InstallationLease.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InstallationLease.swift; sourceTree = "<group>"; };
 		333000ED22D3DE5D00554162 /* Warnings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Warnings.xcconfig; sourceTree = "<group>"; };
 		335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GeneratedPluginRegistrant.swift; sourceTree = "<group>"; };
 		33CC10ED2044A3C60003C045 /* Shiori.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shiori.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -151,6 +153,7 @@
 				33CC11242044D66E0003C045 /* Resources */,
 				33BA886A226E78AF003329D5 /* Configs */,
 				90595B8E6AE58B2230E85784 /* MacServices.swift */,
+				1BC9A6F9C71EE8BC6CEAAAC0 /* InstallationLease.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -370,6 +373,7 @@
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 				4787EAE8BF24EB9C74E574DA /* MacServices.swift in Sources */,
+				F26D57B3D290E332336EC9E1 /* InstallationLease.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

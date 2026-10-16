@@ -9,6 +9,7 @@
 #include <set>
 #include <vector>
 #include <stdexcept>
+#include <cerrno>
 #include "UpdateTrust.h"
 
 static NSFileManager *fm;
@@ -157,7 +158,31 @@ static void checkBundle(NSString *bundle, NSDictionary *manifest) {
 static void checkpoint(const char *stage) {
 #ifdef SHIORI_UPDATER_TESTING
   if (getenv("SHIORI_UPDATE_STOP") && !strcmp(getenv("SHIORI_UPDATE_STOP"), stage)) _exit(99);
+  const char *paused = getenv("SHIORI_UPDATE_PAUSE"), *gate = getenv("SHIORI_UPDATE_GATE");
+  if (paused && gate && !strcmp(paused, stage)) {
+    writeJSON([@(gate) stringByAppendingString:@".ready"], @{});
+    NSString *release = [@(gate) stringByAppendingString:@".release"];
+    int waited = 0; while (!exists(release) && waited++ < 1000) usleep(10000);
+    require(exists(release), "busy");
+  }
 #endif
+}
+static void checkInstances(pid_t allowed) {
+#ifndef SHIORI_UPDATER_TESTING
+  for (NSRunningApplication *app in [NSRunningApplication runningApplicationsWithBundleIdentifier:@"dev.shiori.reader"])
+    if (app.processIdentifier != allowed)
+      require(kill(app.processIdentifier, 0) != 0 && errno == ESRCH, "instances");
+#else
+  require(!getenv("SHIORI_UPDATE_OTHER_INSTANCE") && (allowed != 0 || !getenv("SHIORI_UPDATE_LATE_INSTANCE")), "instances");
+#endif
+}
+static int lockCommit(const char *parent) {
+  int fd = open(parent, O_RDONLY | O_CLOEXEC | O_NOFOLLOW); require(fd >= 0, "location");
+  if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+    int code = errno; close(fd);
+    require(false, code == EWOULDBLOCK ? "instances" : "location");
+  }
+  return fd;
 }
 int main(int argc, const char **argv) {
  @autoreleasepool {
@@ -188,7 +213,10 @@ int main(int argc, const char **argv) {
     if ([mode isEqual:@"recover"]) {
       if (!exists(transaction)) { puts("idle"); return 0; }
       NSDictionary *record = json([NSData dataWithContentsOfFile:transaction]);
-      if (!exists(install) && exists(backup)) { move(backup, install); removeOwned(transaction); puts("failed"); return 0; }
+      if (!exists(install) && exists(backup)) {
+        int lease = lockCommit(parentPath); checkInstances(0);
+        move(backup, install); removeOwned(transaction); close(lease); puts("failed"); return 0;
+      }
       NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:join(install, @"Contents/Info.plist")];
       if ([info[@"CFBundleVersion"] longLongValue] == [record[@"build"] longLongValue]) {
         if (exists(backup)) removeOwned(backup); removeOwned(transaction); if (exists(payload)) removeOwned(payload); puts("installed"); return 0;
@@ -209,12 +237,7 @@ int main(int argc, const char **argv) {
     }
     require([mode isEqual:@"run"] && argc == 4);
     pid_t parent = atoi(argv[3]); require(parent > 1);
-#ifndef SHIORI_UPDATER_TESTING
-    for (NSRunningApplication *app in [NSRunningApplication runningApplicationsWithBundleIdentifier:@"dev.shiori.reader"])
-      require(app.processIdentifier == parent, "instances");
-#else
-    require(!getenv("SHIORI_UPDATE_OTHER_INSTANCE"), "instances");
-#endif
+    checkInstances(parent);
     NSDictionary *manifest = verified(workspace, trust); checkBundle(next, manifest);
     // Parent waits for this handshake before closing its stores and exiting.
     writeJSON(join(workspace, @"started.json"), @{@"pid":@(getpid()), @"parent":@(parent)});
@@ -222,12 +245,16 @@ int main(int argc, const char **argv) {
     require(kill(parent, 0) != 0, "busy");
     // Re-extract the signed archive at commit, rejecting staging tampering.
     removeOwned(payload); verified(workspace, trust); extract(join(workspace, @"package.zip"), payload); checkBundle(next, manifest);
+    checkpoint("before-commit");
+    int lease = lockCommit(parentPath); checkpoint("committing"); checkInstances(0);
     writeJSON(transaction, @{@"build":manifest[@"build"]}); checkpoint("planned");
     // Same-volume exchange always leaves a complete bundle at the app path.
     require(renameatx_np(AT_FDCWD, install.fileSystemRepresentation, AT_FDCWD, next.fileSystemRepresentation, RENAME_SWAP) == 0, "storage");
     checkpoint("swapped");
     move(next, backup); checkpoint("backed-up");
     checkpoint("replaced");
+    // A relaunched app can acquire its lifetime lease only after the swap.
+    close(lease);
     NSTask *launch = [NSTask new]; launch.executableURL = [NSURL fileURLWithPath:@"/usr/bin/open"];
     launch.arguments = @[@"-n",install]; NSError *error = nil;
 #ifdef SHIORI_UPDATER_TESTING
@@ -236,8 +263,9 @@ int main(int argc, const char **argv) {
     bool opened = [launch launchAndReturnError:&error]; if (opened) { [launch waitUntilExit]; opened = launch.terminationStatus == 0; }
 #endif
     if (!opened) {
+      lease = lockCommit(parentPath); checkInstances(0);
       require(renameatx_np(AT_FDCWD, install.fileSystemRepresentation, AT_FDCWD, backup.fileSystemRepresentation, RENAME_SWAP) == 0, "storage");
-      removeOwned(backup); removeOwned(transaction); throw std::runtime_error("installation");
+      removeOwned(backup); removeOwned(transaction); close(lease); throw std::runtime_error("installation");
     }
     puts("installed"); return 0;
   } catch (const std::exception &e) { fprintf(stderr, "%s\n",e.what()); return 1; }

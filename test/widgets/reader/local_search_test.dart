@@ -203,6 +203,43 @@ Future<void> fonts(WidgetTester tester) async {
 
 void main() {
   testWidgets(
+    'desktop search shortcut refocuses the modal input after tabbing away',
+    (t) async {
+      await f.mount(t, repositoryFactory: ReaderSearchRepository.new);
+      final modifier = defaultTargetPlatform == TargetPlatform.macOS
+          ? LogicalKeyboardKey.metaLeft
+          : LogicalKeyboardKey.controlLeft;
+      Future<void> shortcut() async {
+        await t.sendKeyDownEvent(modifier);
+        await t.sendKeyEvent(LogicalKeyboardKey.keyF);
+        await t.sendKeyUpEvent(modifier);
+        await t.pumpAndSettle();
+      }
+
+      await shortcut();
+      expect(find.byType(ReaderSearchPanel), findsOneWidget);
+      final input = t.widget<TextField>(
+        find.byKey(const ValueKey('reader-search-input')),
+      );
+      expect(input.focusNode!.hasFocus, isTrue);
+      await t.enterText(
+        find.byKey(const ValueKey('reader-search-input')),
+        'draft keyword',
+      );
+      await t.sendKeyEvent(LogicalKeyboardKey.tab);
+      await t.pumpAndSettle();
+      expect(input.focusNode!.hasFocus, isFalse);
+      await shortcut();
+      expect(input.focusNode!.hasFocus, isTrue);
+      expect(input.controller!.text, 'draft keyword');
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.macOS,
+      TargetPlatform.windows,
+    }),
+  );
+
+  testWidgets(
     'covered search validation never retires an unrelated route or commits history',
     (t) async {
       final r = await f.mount(t, repositoryFactory: ReaderSearchRepository.new),

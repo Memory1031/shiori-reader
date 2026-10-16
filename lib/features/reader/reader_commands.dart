@@ -127,14 +127,20 @@ Map<ShortcutActivator, Intent> desktopReaderShortcutsFor(
     : {
         for (final entry in desktopReaderShortcuts.entries)
           if (entry.key case SingleActivator key)
-            SingleActivator(
-              key.trigger,
-              control: false,
-              meta: key.control || key.meta,
-              shift: key.shift,
-              alt: key.alt,
-              includeRepeats: key.includeRepeats,
-            ): entry.value,
+            readerShortcutFor(platform, key): entry.value,
       };
+
+SingleActivator readerShortcutFor(
+  TargetPlatform platform,
+  SingleActivator key,
+) => platform == TargetPlatform.macOS
+    ? SingleActivator(
+        key.trigger,
+        meta: key.control || key.meta,
+        shift: key.shift,
+        alt: key.alt,
+        includeRepeats: key.includeRepeats,
+      )
+    : key;
 String readerShortcutLabel(TargetPlatform platform, String label) =>
     platform == TargetPlatform.macOS ? label.replaceAll('Ctrl+', '⌘') : label;

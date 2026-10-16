@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'reader_commands.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -264,133 +265,125 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
     return FocusScope(
       node: _scope,
       autofocus: true,
-      child: Shortcuts(
-        shortcuts: {
-          const SingleActivator(LogicalKeyboardKey.keyF, control: true):
-              const ActivateIntent(),
+      child: CallbackShortcuts(
+        bindings: {
+          readerShortcutFor(
+            theme.platform,
+            const SingleActivator(LogicalKeyboardKey.keyF, control: true),
+          ): _refocus,
         },
-        child: Actions(
-          actions: {
-            ActivateIntent: CallbackAction<ActivateIntent>(
-              onInvoke: (_) {
-                _refocus();
-                return null;
-              },
-            ),
-          },
-          child: Focus(
-            onKeyEvent: (_, event) {
-              if (event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.escape) {
-                if (!_input.value.composing.isValid ||
-                    _input.value.composing.isCollapsed) {
-                  widget.onClose();
-                }
-                return KeyEventResult.handled;
+        child: Focus(
+          onKeyEvent: (_, event) {
+            if (event is KeyDownEvent &&
+                event.logicalKey == LogicalKeyboardKey.escape) {
+              if (!_input.value.composing.isValid ||
+                  _input.value.composing.isCollapsed) {
+                widget.onClose();
               }
-              return KeyEventResult.ignored;
-            },
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.viewInsetsOf(context).bottom,
-              ),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      ShioriSpace.page,
-                      ShioriSpace.small,
-                      ShioriSpace.small,
-                      0,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            l.readerSearchBook,
-                            style: theme.textTheme.titleMedium,
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: MaterialLocalizations.of(
-                            context,
-                          ).closeButtonTooltip,
-                          onPressed: widget.onClose,
-                          icon: const Icon(Icons.close),
-                        ),
-                      ],
-                    ),
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    ShioriSpace.page,
+                    ShioriSpace.small,
+                    ShioriSpace.small,
+                    0,
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: ShioriSpace.page,
-                      vertical: ShioriSpace.small,
-                    ),
-                    child: TextField(
-                      key: const ValueKey('reader-search-input'),
-                      controller: _input,
-                      focusNode: _focus,
-                      autofocus: true,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (_) => _submit(),
-                      onChanged: state.edit,
-                      decoration: InputDecoration(
-                        hintText: l.readerSearchHint,
-                        suffixIcon: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_input.text.isNotEmpty)
-                              IconButton(
-                                tooltip: l.readerSearchClear,
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  _input.clear();
-                                  unawaited(state.clear());
-                                  _refocus();
-                                },
-                              ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l.readerSearchBook,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: MaterialLocalizations.of(
+                          context,
+                        ).closeButtonTooltip,
+                        onPressed: widget.onClose,
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ShioriSpace.page,
+                    vertical: ShioriSpace.small,
+                  ),
+                  child: TextField(
+                    key: const ValueKey('reader-search-input'),
+                    controller: _input,
+                    focusNode: _focus,
+                    autofocus: true,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) => _submit(),
+                    onChanged: state.edit,
+                    decoration: InputDecoration(
+                      hintText: l.readerSearchHint,
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_input.text.isNotEmpty)
                             IconButton(
-                              tooltip: l.readerSearchSubmit,
-                              onPressed: _submit,
-                              icon: const Icon(Icons.search),
+                              tooltip: l.readerSearchClear,
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _input.clear();
+                                unawaited(state.clear());
+                                _refocus();
+                              },
                             ),
-                          ],
-                        ),
+                          IconButton(
+                            tooltip: l.readerSearchSubmit,
+                            onPressed: _submit,
+                            icon: const Icon(Icons.search),
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ShioriSpace.page,
+                  ),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      status,
+                      key: const ValueKey('reader-search-status'),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ),
+                if (state.draft.trim() != state.submitted &&
+                    state.submitted.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: ShioriSpace.page,
                     ),
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: Text(
-                        status,
-                        key: const ValueKey('reader-search-status'),
-                        style: theme.textTheme.bodySmall,
-                      ),
+                    child: Text(
+                      l.readerSearchDraft(state.submitted),
+                      style: theme.textTheme.bodySmall,
                     ),
                   ),
-                  if (state.draft.trim() != state.submitted &&
-                      state.submitted.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: ShioriSpace.page,
-                      ),
-                      child: Text(
-                        l.readerSearchDraft(state.submitted),
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  Expanded(
-                    child: SizedBox(
-                      key: _viewport,
-                      child: LayoutBuilder(builder: _results),
-                    ),
+                Expanded(
+                  child: SizedBox(
+                    key: _viewport,
+                    child: LayoutBuilder(builder: _results),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
