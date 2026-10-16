@@ -115,21 +115,41 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
 
   Future<void> _showBookmarks(BuildContext source) async {
     final repository = _bookmarkRepository;
-    if (repository == null || _bookmarkSheet?.isActive == true || !mounted) {
+    if (repository == null || _bookmarkRoute?.isActive == true || !mounted) {
       return;
     }
-    final route = _bookmarkSheet = shioriSheetRoute<void>(
-      source,
-      size: ShioriSheetSize.tall,
-      builder: (context) => ReaderBookmarksPanel(
-        book: widget.chapter.novelKey,
-        repository: repository,
-        onOpen: _openBookmark,
-      ),
+    final desktop = ShioriCapabilities.of(source).pointerFirst;
+    final accent = appAccentOf(source);
+    Widget panel(BuildContext context) => ReaderBookmarksPanel(
+      book: widget.chapter.novelKey,
+      repository: repository,
+      onOpen: _openBookmark,
+      closeButton: desktop,
     );
+    final route = _bookmarkRoute = desktop
+        ? ReaderPanelRoute<void>(
+            placement: ReaderPanelPlacement.start,
+            semanticLabel: AppLocalizations.of(source).readerBookmarks,
+            barrierLabel: MaterialLocalizations.of(
+              source,
+            ).modalBarrierDismissLabel,
+            duration: ShioriMotion.of(source, ReaderPanelRoute.motion),
+            themeChanges: _preferences,
+            theme: (context) => readerTheme(
+              _preferences.value,
+              MediaQuery.platformBrightnessOf(context),
+              accent: accent,
+            ),
+            builder: panel,
+          )
+        : shioriSheetRoute<void>(
+            source,
+            size: ShioriSheetSize.tall,
+            builder: panel,
+          );
     await Navigator.of(source, rootNavigator: true).push(route);
     if (!mounted) return;
-    if (identical(_bookmarkSheet, route)) _bookmarkSheet = null;
+    if (identical(_bookmarkRoute, route)) _bookmarkRoute = null;
     if (_operation?.owner != null) await _cancelChapter(immediate: true);
   }
 

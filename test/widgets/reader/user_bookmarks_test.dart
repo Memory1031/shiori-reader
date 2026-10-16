@@ -17,6 +17,7 @@ import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/reader_commands.dart';
 import 'package:shiori/features/reader/reader_bookmarks.dart';
+import 'package:shiori/features/reader/reader_panel.dart';
 import 'package:shiori/features/reader/reader_contents.dart';
 import 'package:shiori/features/reader/reader_toolbars.dart';
 import 'local_search_test.dart' show fonts;
@@ -427,7 +428,7 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.android),
   );
   testWidgets(
-    'same and cross chapter jumps commit before sheet closes, list does not fetch',
+    'desktop bookmarks share reader panels and commit jumps before closing',
     (t) async {
       final h = Harness();
       await h.pump(t, size: const Size(1040, 780));
@@ -441,7 +442,31 @@ void main() {
       final calls = h.env.source.controls.calls[Operation.chapter];
       await h.menu(t, 'My bookmarks');
       expect(h.env.source.controls.calls[Operation.chapter], calls);
+      final route = ModalRoute.of(t.element(find.byType(ReaderBookmarksPanel)));
+      expect(route, isA<ReaderPanelRoute<void>>());
+      expect(
+        (route! as ReaderPanelRoute<void>).placement,
+        ReaderPanelPlacement.start,
+      );
+      expect(find.byType(BottomSheet), findsNothing);
+      final position = h.view(t).viewportController!.capture();
+      await t.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await t.pumpAndSettle();
+      expect(h.view(t).viewportController!.capture(), position);
       await feedbackScreenshot(t, h.boundary, 'bookmarks-desktop');
+      await t.tap(find.byTooltip('Close'));
+      await t.pumpAndSettle();
+      expect(find.byType(ReaderBookmarksPanel), findsNothing);
+      await h.menu(t, 'My bookmarks');
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pumpAndSettle();
+      expect(find.byType(ReaderBookmarksPanel), findsNothing);
+      await h.menu(t, 'My bookmarks');
+      t.view.physicalSize = const Size(480, 540);
+      await t.pumpAndSettle();
+      expect(find.byTooltip('Close').hitTestable(), findsOneWidget);
+      expect(find.byTooltip('Delete bookmark').hitTestable(), findsNWidgets(2));
+      await feedbackScreenshot(t, h.boundary, 'bookmarks-desktop-narrow');
       await t.tap(find.byKey(const ValueKey('bookmark-second')));
       await t.pumpAndSettle();
       expect(find.byType(ReaderBookmarksPanel), findsNothing);
@@ -509,7 +534,7 @@ void main() {
     },
   );
   testWidgets(
-    'book removal closes its bookmark sheet and retires an in-flight jump',
+    'book removal closes bookmarks and retires an in-flight jump',
     (t) async {
       final h = Harness();
       await h.pump(t);
@@ -536,6 +561,10 @@ void main() {
       await t.pumpWidget(const SizedBox());
       await t.pumpAndSettle();
     },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.windows,
+    }),
   );
   testWidgets(
     'network failure keeps current page and bookmarks, cancellation cannot commit late',
@@ -582,6 +611,9 @@ void main() {
       await t.pumpWidget(const SizedBox());
       await t.pumpAndSettle();
     },
-    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    variant: TargetPlatformVariant({
+      TargetPlatform.iOS,
+      TargetPlatform.windows,
+    }),
   );
 }

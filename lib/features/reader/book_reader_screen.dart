@@ -202,17 +202,17 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   StreamSubscription<Result<BookmarkSnapshot>>? _bookmarkSubscription;
   BookmarkSnapshot? _bookmarkSnapshot;
   final _bookmarkCancellation = CancellationSource();
-  ModalBottomSheetRoute<void>? _bookmarkSheet;
+  ModalRoute<void>? _bookmarkRoute;
   bool _bookmarkWorking = false;
   void _receiveBookmarks(BookmarkSnapshot value) {
     if (mounted) setState(() => _bookmarkSnapshot = value);
   }
 
   void _dismissBookmarks() {
-    final sheet = _bookmarkSheet, navigator = _bookmarkSheet?.navigator;
+    final route = _bookmarkRoute, navigator = _bookmarkRoute?.navigator;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (navigator?.mounted == true && sheet?.isActive == true) {
-        navigator!.removeRoute(sheet!);
+      if (navigator?.mounted == true && route?.isActive == true) {
+        navigator!.removeRoute(route!);
       }
     });
   }
@@ -387,7 +387,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         _revealRestoredLocation(
           source,
           generation,
-          intent == _LocationIntent.bookmark ? _bookmarkSheet : null,
+          intent == _LocationIntent.bookmark ? _bookmarkRoute : null,
         ),
       );
     }
@@ -397,10 +397,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   Future<void> _revealRestoredLocation(
     ReaderController source,
     int generation,
-    ModalBottomSheetRoute<void>? sheet,
+    ModalRoute<void>? route,
   ) async {
-    // The confirmed bookmark closes its sheet before revealing the target.
-    if (sheet != null) await sheet.completed;
+    // The confirmed bookmark closes its panel before revealing the target.
+    if (route != null) await route.completed;
     if (mounted &&
         !_invalidated &&
         !_changing &&

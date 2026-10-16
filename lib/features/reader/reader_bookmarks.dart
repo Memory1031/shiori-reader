@@ -13,8 +13,10 @@ class ReaderBookmarksPanel extends StatefulWidget {
     required this.book,
     required this.repository,
     required this.onOpen,
+    this.closeButton = false,
   });
   final NovelKey book;
+  final bool closeButton;
   final UserBookmarkRepository repository;
   final Future<BookmarkOpenResult> Function(UserBookmark, bool Function())
   onOpen;
@@ -117,13 +119,28 @@ class _ReaderBookmarksPanelState extends State<ReaderBookmarksPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
             ShioriSpace.page,
-            0,
-            ShioriSpace.page,
+            widget.closeButton ? ShioriSpace.small : 0,
+            widget.closeButton ? ShioriSpace.small : ShioriSpace.page,
             ShioriSpace.medium,
           ),
-          child: Text(l.readerBookmarks, style: theme.textTheme.titleLarge),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l.readerBookmarks,
+                  style: theme.textTheme.titleLarge,
+                ),
+              ),
+              if (widget.closeButton)
+                IconButton(
+                  tooltip: localizations.closeButtonTooltip,
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+            ],
+          ),
         ),
         if (_working) const LinearProgressIndicator(),
         if (_error case final error?)
