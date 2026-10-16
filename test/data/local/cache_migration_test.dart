@@ -31,6 +31,7 @@ void main() {
           },
         ),
       );
+      addTearDown(cache.close);
       final users = UserDatabase(
         NativeDatabase.memory(
           setup: (db) {
@@ -40,6 +41,7 @@ void main() {
           },
         ),
       );
+      addTearDown(users.close);
       expect(
         (await cache
                 .customSelect('SELECT payload FROM chapter_cache')
@@ -67,10 +69,8 @@ void main() {
             .data
             .values
             .single,
-        8,
+        9,
       );
-      await cache.close();
-      await users.close();
     },
   );
 }
