@@ -653,6 +653,7 @@ class _ReadingHomeState extends State<ReadingHome> {
               ],
             ),
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             ?_environment(context),

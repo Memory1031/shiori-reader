@@ -109,6 +109,65 @@ class VisualHarness extends LocalHarness {
 
 void main() {
   testWidgets(
+    'phone shelf reaches the screen edge and keeps end items and actions safe',
+    (tester) async {
+      await loadFonts(tester);
+      tester.view.padding = const FakeViewPadding(top: 59, bottom: 34);
+      final h = VisualHarness(tester, GlobalKey(), count: 18);
+      addTearDown(h.close);
+      await h.seedShelf();
+      await h.pump(width: 390, height: 844, shell: true, lang: 'zh');
+      h.navigation.select(HomeSection.shelf);
+      await tester.pumpAndSettle();
+      final shelf = tester.widget<BookshelfView>(find.byType(BookshelfView));
+      final lastKey = shelf.controller.sorted.last.snapshot.key;
+      final last = find.byKey(ValueKey(lastKey));
+      Finder scrollable() => find.descendant(
+        of: find.byType(BookshelfView),
+        matching: find.byType(Scrollable),
+      );
+      Future<void> end() async {
+        await tester.scrollUntilVisible(last, 350, scrollable: scrollable());
+        final state = tester.state<ScrollableState>(scrollable());
+        state.position.jumpTo(state.position.maxScrollExtent);
+        await tester.pumpAndSettle();
+      }
+
+      await h.shot('shelf-safe-grid-start');
+      expect(tester.getRect(scrollable()).bottom, 844);
+      for (final grid in [true, false]) {
+        shelf.layout!.value = grid;
+        await tester.pumpAndSettle();
+        expect(tester.getRect(scrollable()).bottom, 844);
+        await end();
+        expect(tester.getRect(last).bottom, lessThanOrEqualTo(844 - 34));
+        await h.shot('shelf-safe-${grid ? 'grid' : 'list'}-end');
+      }
+
+      await tester.tap(find.byTooltip(h.l.moreActions).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(h.l.bookMultiSelect));
+      await tester.pumpAndSettle();
+      final bar = find.byType(BookSelectionBottomBar);
+      expect(tester.getRect(bar).bottom, 844);
+      expect(tester.getRect(scrollable()).bottom, tester.getRect(bar).top);
+      await end();
+      expect(
+        tester.getRect(last).bottom,
+        lessThanOrEqualTo(tester.getRect(bar).top),
+      );
+      await tester.tap(last);
+      await tester.pumpAndSettle();
+      expect(shelf.batchActions!.selection.selected, contains(lastKey));
+      final reparse = find.byKey(const ValueKey('book-selection-reparse'));
+      expect(tester.getRect(reparse).bottom, lessThanOrEqualTo(844 - 34));
+      await h.shot('shelf-safe-selection-end');
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
+  testWidgets(
     'phone real home preserves app bar height and book geometry in selection',
     (tester) async {
       await loadFonts(tester);

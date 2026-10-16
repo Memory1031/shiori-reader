@@ -386,6 +386,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     final strings = AppLocalizations.of(context);
     final books = controller.sorted;
     final theme = Theme.of(context);
+    final bottomInset = _selecting ? 0.0 : MediaQuery.paddingOf(context).bottom;
     return LayoutBuilder(
       builder: (context, bounds) {
         final scale = MediaQuery.textScalerOf(context).scale(15) / 15;
@@ -631,7 +632,7 @@ class _BookshelfViewState extends State<BookshelfView> {
               SliverFillRemaining(hasScrollBody: false, child: _empty(strings))
             else if (_grid)
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                padding: EdgeInsets.fromLTRB(16, 4, 16, 16 + bottomInset),
                 sliver: SliverGrid.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
@@ -651,9 +652,12 @@ class _BookshelfViewState extends State<BookshelfView> {
                 ),
               )
             else
-              SliverList.builder(
-                itemCount: books.length,
-                itemBuilder: (_, i) => item(i),
+              SliverPadding(
+                padding: EdgeInsets.only(bottom: bottomInset),
+                sliver: SliverList.builder(
+                  itemCount: books.length,
+                  itemBuilder: (_, i) => item(i),
+                ),
               ),
           ],
         );
