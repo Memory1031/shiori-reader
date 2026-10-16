@@ -1,7 +1,8 @@
 ---
 import { copy } from '../i18n/copy';
+import GitHubIcon from './GitHubIcon.astro';
 import { platforms } from '../lib/releases';
-import { latestRelease, repository, type Locale } from '../lib/paths';
+import { latestRelease, repository, route, type Locale } from '../lib/paths';
 interface Props { locale: Locale; full?: boolean; }
 const { locale, full = false } = Astro.props, t = copy[locale].downloads;
 const names = { android: 'Android', windows: 'Windows', macos: 'macOS', ios: 'iOS / iPadOS' };
@@ -17,17 +18,19 @@ const icons = { android: 'M6 10h12v9H6zM8 6l-2-3m10 3 2-3M6 8a6 6 0 0 1 12 0M3 1
       <div id="package-panel" class="package-panel" role="tabpanel" aria-labelledby="tab-android" tabindex="0">
         <div class="package-summary"><div><p class="release-state" data-status role="status" aria-live="polite">{t.initial}</p><h3 data-platform-name>Android</h3><p data-requirements>{t.requirements.android}</p></div><span class="package-version" data-version></span></div>
         <dl class="package-meta" data-meta hidden><div><dt>{t.date}</dt><dd data-date></dd></div><div><dt>{t.size}</dt><dd data-size></dd></div></dl>
-        <div class="package-actions"><a class="button primary" data-package hidden>{t.action}<span aria-hidden="true">↓</span></a><a class="text-link" href={latestRelease}>{t.fallback}<span aria-hidden="true">↗</span></a><button class="text-link" type="button" data-retry hidden>{t.retry}</button></div>
+        <div class="package-actions"><a class="button primary" data-package hidden>{t.action}<span aria-hidden="true">↓</span></a><a class="text-link" href={latestRelease}><GitHubIcon />{t.fallback}</a><button class="text-link" type="button" data-retry hidden>{t.retry}</button></div>
+        {!full && <div class="install-summary"><p data-install-note>{t.quickInstall.android}</p><a class="text-link" data-install-guide href={`${route(locale, 'download')}#install-android`}>{t.guide} <span aria-hidden="true">↗</span></a></div>}
         <p class="fine">{t.apiNote}</p><noscript><p>{t.nojs}</p></noscript>
       </div>
     </div>
-    <div class="installation"><h2>{t.installTitle}</h2><div class="install-grid">{platforms.map(platform => <article id={`install-${platform}`}><h3>{names[platform]}<span>{t.requirements[platform]}</span></h3><ol>{t.install[platform].map(step => <li>{step}</li>)}</ol></article>)}</div><p class="fine">{t.update} <a href={`${repository}/releases`}>{t.all} ↗</a></p></div>
+    {full && <div class="installation"><h2>{t.installTitle}</h2><div class="install-grid">{platforms.map(platform => <article id={`install-${platform}`}><h3>{names[platform]}<span>{t.requirements[platform]}</span></h3><ol>{t.install[platform].map(step => <li>{step}</li>)}</ol></article>)}</div><p class="fine">{t.update} <a href={`${repository}/releases`}>{t.all} ↗</a></p></div>}
   </div>
 </section>
 <script>
   import { copy } from '../i18n/copy';
   import { loadRelease, ReleaseError, platforms, type Platform, type Release, type ErrorKind } from '../lib/releases';
   import type { Locale } from '../lib/paths';
+  import { route } from '../lib/paths';
   const names = { android: 'Android', windows: 'Windows', macos: 'macOS', ios: 'iOS / iPadOS' };
   document.querySelectorAll<HTMLElement>('[data-download]').forEach(root => {
     const locale = root.dataset.locale as Locale, t = copy[locale].downloads;
@@ -43,6 +46,10 @@ const icons = { android: 'M6 10h12v9H6zM8 6l-2-3m10 3 2-3M6 8a6 6 0 0 1 12 0M3 1
       get('#package-panel').setAttribute('aria-labelledby', `tab-${selected}`);
       get('[data-platform-name]').textContent = names[selected];
       get('[data-requirements]').textContent = t.requirements[selected];
+      const note = root.querySelector<HTMLElement>('[data-install-note]');
+      const guide = root.querySelector<HTMLAnchorElement>('[data-install-guide]');
+      if (note) note.textContent = t.quickInstall[selected];
+      if (guide) guide.href = `${route(locale, 'download')}#install-${selected}`;
       get('[data-version]').textContent = release?.tag ?? '';
       const asset = release?.downloads[selected];
       get('[data-status]').textContent = failure ? t.errors[failure] : release ? asset ? t.ready : t.missing : t.loading;

@@ -13,7 +13,8 @@ const { locale } = Astro.props, t = copy[locale], lang = locale === 'en' ? 'en' 
   <div class="hero-stage">
     <figure class="hero-desktop"><div class="window-bar" aria-hidden="true"><i></i><i></i><i></i><span>Shiori</span></div><ProductImage name="illustration" alt={t.reading.alt[1]!} eager sizes="(max-width: 760px) 92vw, 1000px" /><figcaption>{t.desktopCaption}</figcaption></figure>
     <figure class="hero-cover"><ProductImage name={`cover-${lang}`} alt={locale === 'en' ? 'Cover of The Last Line on the Blue Library Card, the original demo novel' : '原创演示小说《蓝色借书卡的最后一栏》封面'} eager sizes="(max-width: 760px) 100px, 170px" /></figure>
-    <figure class="hero-phone phone"><ProductImage name={`reader-${lang}`} alt={t.mobileCaption} eager sizes="(max-width: 760px) 120px, 180px" /></figure>
+    <figure class="hero-phone phone"><ProductImage name={`reader-${lang}`} alt={t.mobileCaption} eager sizes="(max-width: 760px) 250px, 180px" /></figure>
   </div>
+  <p class="hero-mobile-label fine">{t.mobileCaption}<br />{t.desktopCaption}</p>
   <p class="hero-note fine">{t.screenshotNote}</p>
 </section>

@@ -31,6 +31,15 @@ try {
     assert.ok(metrics.content <= width, `${locale}/${type} overflows at ${width}: ${metrics.content}`);
     assert.equal(metrics.broken, 0);
     assert.equal(await page.locator('h1').count(), 1);
+    assert.equal(await page.locator('.install-grid article').count(), type ? 4 : 0);
+    assert.equal(await page.locator('[data-install-note]').count(), type ? 0 : 1);
+    assert.equal(await page.locator('a.icon-link').count(), 2);
+    for (const icon of await page.locator('a.icon-link').all()) {
+      assert.equal(await icon.getAttribute('aria-label'), locale === 'en' ? 'GitHub repository' : 'GitHub 仓库');
+      assert.equal((await icon.innerText()).trim(), '');
+      assert.equal(await icon.locator('svg').count(), 1);
+    }
+    if (!type && width === 390) assert.ok(await page.locator('.hero-phone').evaluate(node => node.getBoundingClientRect().width > 220), 'Mobile phone should be the primary visual');
     assert.equal(await page.locator('.language').getAttribute('href'), `/shiori-reader/${locale === 'en' ? 'zh-cn' : 'en'}/${type}`);
     const label = `${locale}-${type ? 'download' : 'home'}-${width}`;
     await page.screenshot({ path: `${output}/${label}.png`, fullPage: false });
@@ -55,14 +64,17 @@ try {
   await page.keyboard.press('Escape');
   assert.equal(await menu.getAttribute('aria-expanded'), 'false');
   assert.ok(await menu.evaluate(node => node === document.activeElement));
-  await page.locator('summary').first().focus();
+  await page.locator('#faq summary').first().focus();
   await page.keyboard.press('Enter');
-  assert.equal(await page.locator('details').first().getAttribute('open'), '');
+  assert.equal(await page.locator('#faq details').first().getAttribute('open'), '');
+  await page.locator('.reading-gallery > summary').click();
   await page.locator('[data-show="1"]').click();
   assert.equal(await page.locator('[data-slide="1"]').isVisible(), true);
   await page.screenshot({ path: `${output}/en-mobile-gallery.png`, fullPage: true });
   const panel = page.locator('[data-download]');
   await panel.locator('[data-platform="ios"]').click();
+  assert.ok((await panel.locator('[data-install-note]').innerText()).includes('unsigned'));
+  assert.ok((await panel.locator('[data-install-guide]').getAttribute('href')).endsWith('/en/download/#install-ios'));
   assert.ok((await panel.locator('[data-package]').getAttribute('href')).endsWith('-ios-arm64-unsigned.ipa'));
   await page.keyboard.press('Home');
   assert.equal(await panel.locator('[data-platform="android"]').getAttribute('aria-selected'), 'true');
@@ -70,6 +82,30 @@ try {
   assert.equal(await panel.locator('[data-platform="ios"]').getAttribute('aria-selected'), 'true');
   await page.evaluate(() => document.documentElement.style.fontSize = '200%');
   await page.screenshot({ path: `${output}/en-mobile-large-text.png`, fullPage: true });
+  // Critical navigation must work while the deferred bundle is still unavailable.
+  const slow = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  await slow.route(api, route => route.fulfill({ json: releaseFixture() }));
+  const firstPaint = await slow.newPage();
+  const waitingScripts = [];
+  await firstPaint.route('**/_astro/*.js', route => new Promise(resolve => {
+    waitingScripts.push(async () => { await route.continue(); resolve(); });
+  }));
+  await firstPaint.goto(`${base}zh-cn/`, { waitUntil: 'commit' });
+  await firstPaint.locator('[data-slide="1"]').waitFor({ state: 'attached' });
+  await firstPaint.locator('link[rel="stylesheet"]').first().evaluate(link => link.sheet ? undefined : new Promise(resolve => link.addEventListener('load', resolve, { once: true })));
+  assert.equal(await firstPaint.locator('#site-nav').isVisible(), false);
+  assert.equal(await firstPaint.locator('[data-slide="1"]').isVisible(), false);
+  const beforeGallery = await firstPaint.locator('[data-gallery]').boundingBox();
+  await firstPaint.locator('[data-menu]').click();
+  assert.equal(await firstPaint.locator('#site-nav').isVisible(), true);
+  await firstPaint.keyboard.press('Escape');
+  assert.equal(await firstPaint.locator('#site-nav').isVisible(), false);
+  await firstPaint.screenshot({ path: `${output}/mobile-before-bundle.png` });
+  await Promise.all(waitingScripts.map(resume => resume()));
+  await firstPaint.locator('.gallery.interactive').waitFor();
+  const afterGallery = await firstPaint.locator('[data-gallery]').boundingBox();
+  assert.ok(Math.abs(beforeGallery.height - afterGallery.height) <= 1, 'Gallery jumps when the bundle initializes');
+  await slow.close();
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '200% text overflow');
   await page.screenshot({ path: `${output}/en-mobile-large-text.png`, fullPage: true });
   // Selecting a platform while a request is pending must use the latest selection.
@@ -96,7 +132,7 @@ try {
     await p.goto(`${base}en/download/`);
     await p.locator('[data-download][aria-busy="false"]').waitFor();
     assert.equal(await p.locator('[data-package]').isVisible(), false);
-    assert.equal(await p.getByRole('link', { name: 'Open GitHub Releases' }).isVisible(), true);
+    assert.equal(await p.getByRole('link', { name: 'Release downloads' }).isVisible(), true);
     if (kind !== 'missing') assert.equal(await p.locator('[data-retry]').isVisible(), true);
     if (kind === 'rate') {
       await p.screenshot({ path: `${output}/download-rate-limit.png`, fullPage: true });
@@ -115,6 +151,9 @@ try {
     assert.ok(await plain.locator('a[href$="/releases/latest"]').count() >= 1);
     assert.equal(await plain.locator('.language').isVisible(), true);
   }
+  await plain.goto(`${base}zh-cn/`);
+  assert.equal(await plain.locator('#site-nav').isVisible(), true);
+  assert.equal(await plain.locator('[data-slide="1"]').isVisible(), true);
   await plain.goto(base);
   assert.equal(await plain.getByRole('link', { name: '进入中文官网' }).isVisible(), true);
   assert.equal(await plain.getByRole('link', { name: 'Continue in English' }).isVisible(), true);

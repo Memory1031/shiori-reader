@@ -14,6 +14,7 @@ const image = new URL(media(`share-${locale === 'en' ? 'en' : 'zh'}.jpg`), Astro
 <html lang={locale === 'en' ? 'en' : 'zh-CN'}>
   <head>
     <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline>document.documentElement.classList.add('js');</script>
     <meta name="theme-color" content="#faf8f4" /><title>{title}</title>
     <meta name="description" content={t.description} /><link rel="canonical" href={canonical} />
     <link rel="alternate" hreflang="zh-CN" href={new URL(route('zh-cn', page), Astro.site)} />
