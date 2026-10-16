@@ -5,11 +5,11 @@
 | 事件 | 工作流与行为 |
 | --- | --- |
 | PR、推送 main / develop、手动 CI | [ci.yml](../.github/workflows/ci.yml)：质量检查 |
-| 推送 `v*` tag | [release.yml](../.github/workflows/release.yml)：并行构建签名 APK、Windows ZIP 与 macOS 通用包，三者通过后统一创建 / 更新 GitHub Release |
+| 推送 `v*` tag | [release.yml](../.github/workflows/release.yml)：并行构建签名 APK、Windows ZIP、macOS 通用包与 iOS 未签名 IPA，四者通过后统一创建 / 更新 GitHub Release |
 
 日常 CI 负责质量检查，tag 工作流负责应用构建与发布。
 
-正式标签为 `vX.Y.Z`，beta 标签为 `vX.Y.Z-beta.N`。各平台共用版本预检：标签基础版本与 pubspec 的 `X.Y.Z` 一致，包内使用 `X.Y.Z+build`；每个版本的 beta 序号从 1 开始，内部构建号独立递增。beta 的 APK / ZIP / DMG 标记为 GitHub 预发布，Latest 保持正式发布；iOS 上传 TestFlight。准备与发布命令见[发布操作](release/README.md)。
+正式标签为 `vX.Y.Z`，beta 标签为 `vX.Y.Z-beta.N`。各平台共用版本预检：标签基础版本与 pubspec 的 `X.Y.Z` 一致，包内使用 `X.Y.Z+build`；每个版本的 beta 序号从 1 开始，内部构建号独立递增。beta 的 APK / ZIP / DMG / IPA 标记为 GitHub 预发布，Latest 保持正式发布。准备与发布命令见[发布操作](release/README.md)。
 
 ## 质量检查
 
@@ -29,7 +29,7 @@ Windows 构建 job 仅在 tag 发布工作流运行，使用 `windows-2022` / Vi
 
 `tool/package_windows.ps1` 查找 Visual Studio 2022 的 x64 VC++ 运行库，调用标准库脚本 `tool/release_windows.py` 打包。脚本核对 tag / pubspec、EXE 的 x64 架构、产品身份、版本与非 Debug 标志，验证必需 DLL / AOT / 资源文件，保留完整 data 目录及许可声明。ZIP 根目录直接包含 `shiori.exe`；不带 PDB 或包含构建机路径的 native_assets.json。
 
-Windows 产物为 `shiori-reader-<tag>-windows-x64.zip`、`SHA256SUMS-windows-x64.txt` 和 `release-info-windows-x64.json`（版本、commit、摘要及未签名状态），与 Android 文件名分开。tag 构建产物保留 14 天；`publish` job 等待 Android / Windows / macOS 构建成功，下载当前运行的三个 artifact、核对三份 SHA-256 后统一上传同一 GitHub Release。只有该 job 获得 Release 写权限。任一构建或校验失败，都不进入发布。
+Windows 产物为 `shiori-reader-<tag>-windows-x64.zip`、`SHA256SUMS-windows-x64.txt` 和 `release-info-windows-x64.json`（版本、commit、摘要及未签名状态），与 Android 文件名分开。tag 构建产物保留 14 天；`publish` job 等待 Android / Windows / macOS / iOS unsigned 构建成功，下载当前运行的四个 artifact、核对四份 SHA-256 后统一上传同一 GitHub Release。只有该 job 获得 Release 写权限。任一构建或校验失败，都不进入发布。
 
 本地可在正式入口 Release 构建后调用 `tool/package_windows.ps1 -Tag <tag> -Commit <完整提交 SHA>` 验包。Windows 使用方式与分发边界见[发布说明](release/README.md)。
 
@@ -43,7 +43,7 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 
 已知校验错误输出受控原因（版本、证书、工具），不会输出工具参数、原始 stderr 或签名秘密；未知异常仍使用通用提示。
 
-按用户约定，tag 发布直接并行进入 `android-release`、`windows-release` 与 `macos-release`，不查询或等待 CI、不重复执行格式 / 分析 / UT。develop 日常 CI 保持独立；master 仅作为发布中间分支，不因推送触发 CI 或 Release。发布脚本优先快进 master，保留最终提交与标签的可追溯性。Android 构建仍保留工具预检、版本一致性、签名和 APK 校验；失败时不上传 Release。签名需要四个仓库 Actions secrets：
+按用户约定，tag 发布直接并行进入 `android-release`、`windows-release`、`macos-release` 与 `ios-unsigned`，不查询或等待 CI、不重复执行格式 / 分析 / UT。develop 日常 CI 保持独立；master 仅作为发布中间分支，不因推送触发 CI 或 Release。发布脚本优先快进 master，保留最终提交与标签的可追溯性。Android 构建仍保留工具预检、版本一致性、签名和 APK 校验；失败时不上传 Release。签名需要四个仓库 Actions secrets：
 
 | Secret | 内容 |
 | --- | --- |
@@ -71,6 +71,14 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 产物先保存为 14 天的 Actions artifact。发布 job 签署更新清单、核对历史构建号和已有资产摘要，通过草稿完成上传后再公开 Release；重跑只补齐内容一致的缺失附件。beta 标签标为 prerelease，Latest 指向正式版本。更新签名配置见[发布操作](release/README.md#更新清单签名配置)。
 
 参考：[apksigner](https://developer.android.com/tools/apksigner)、[GitHub job 权限](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)。
+
+## iOS 未签名 IPA
+
+`release.yml` 的 `ios-unsigned` job 使用 `macos-15`、明确选择 Xcode 26.3 和固定 Flutter；严格安装锁定依赖，校验 tag / pubspec 后，以 `lib/main.dart` 执行 `flutter build ios --release --no-codesign --no-pub`。不读取 Apple Secrets、不调用签名准备脚本，也不修改官方 Team、Bundle ID 或 ShareExtension 配置。
+
+`tool/release_ios.py package` 在临时副本中处理完整 Runner.app，清除实际代码签名与主应用 / 扩展残留的嵌入描述文件；保留 Framework、资源和 ShareExtension，拒绝其他签名材料、符号文件和异常路径。打包后与发布前均校验 arm64 真机 Mach-O、未加密及未签名状态、主应用 / 扩展身份和版本、嵌入依赖及 Flutter 必需资源。输出 IPA、`SHA256SUMS-ios-arm64.txt` 与 `release-info-ios-arm64.json`，由统一发布脚本验证摘要及身份后纳入附件白名单，沿用草稿上传、相同附件幂等补齐及禁止覆盖规则。
+
+四端产物齐备后才公开 GitHub Release，未签名 iOS 构建或校验失败也会阻止本次 GitHub 发布；现有独立的 `ios-release.yml` 签名上传流程不依赖这些 job。IPA 不进入自动更新清单，不增加应用内签名、下载安装或第三方签名工具集成。安装与权限边界见[未签名 IPA 使用](release/README.md#ios-未签名-ipa)。
 
 ## iOS TestFlight 发布
 

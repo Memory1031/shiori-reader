@@ -42,7 +42,7 @@ struct ImportReceiptSummary {
   let pendingCount: Int
 }
 
-/// Bounded app-group inbox. A session owns flock across all provider callbacks;
+/// Bounded durable inbox. A session owns flock across all provider callbacks;
 /// working -> batches/batch-<sequence> publishes one immutable receive batch.
 final class ImportInbox {
   let root: URL
@@ -51,14 +51,16 @@ final class ImportInbox {
   private static let receiptBytes: Int64 = 64 * 1024
 
   convenience init() throws {
+    guard let directory = try Self.sharedDirectory() else { throw ImportIssue.storage }
+    try self.init(directory: directory)
+  }
+
+  static func sharedDirectory() throws -> URL? {
     guard let group = Bundle.main.object(forInfoDictionaryKey: "ShioriImportGroup") as? String,
-      let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)
+      !group.isEmpty
     else { throw ImportIssue.storage }
-    try self.init(directory: container.appendingPathComponent("ImportInbox", isDirectory: true))
-    var url = root
-    var values = URLResourceValues()
-    values.isExcludedFromBackup = true
-    try url.setResourceValues(values)
+    return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)?
+      .appendingPathComponent("ImportInbox", isDirectory: true)
   }
 
   // Tests own an isolated directory and small limits; app defaults never change.
@@ -71,6 +73,10 @@ final class ImportInbox {
     root = directory.standardizedFileURL.resolvingSymlinksInPath()
     self.limits = limits
     try requireDirectory(root)
+    var url = root
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = true
+    try url.setResourceValues(values)
   }
 
   private struct Receipt {

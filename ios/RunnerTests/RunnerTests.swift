@@ -4,6 +4,137 @@ import XCTest
 
 @testable import Runner
 
+final class AppImportInboxesTests: XCTestCase {
+  private var directory: URL!
+  private var shared: URL { directory.appendingPathComponent("shared") }
+  private var local: URL { directory.appendingPathComponent("private") }
+  private let fm = FileManager.default
+  private var available = true
+  private func receiver() -> AppImportInboxes {
+    AppImportInboxes(sharedDirectory: { self.available ? self.shared : nil },
+                     privateDirectory: { self.local })
+  }
+  override func setUpWithError() throws {
+    directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+    available = true
+  }
+  override func tearDownWithError() throws { try fm.removeItem(at: directory) }
+  private func input(_ name: String) throws -> URL {
+    let url = directory.appendingPathComponent(name)
+    try Data("fixture".utf8).write(to: url)
+    return url
+  }
+  private func receive(_ name: String) throws {
+    try receiver().receive([input(name)], cancellation: ImportCancellation()) { _ in }
+  }
+  private func inbox(_ url: URL) throws -> ImportInbox { try ImportInbox(directory: url) }
+
+  func testSharedAvailableAndUnavailableUseTheirOwnInbox() throws {
+    try receive("shared.epub")
+    XCTAssertEqual(try inbox(shared).pending().count, 1)
+    XCTAssertTrue(try inbox(local).pending().isEmpty)
+    available = false
+    try receive("local.txt")
+    XCTAssertEqual(try receiver().pending().map { $0["name"] as! String }, ["local.txt"])
+    XCTAssertEqual(try inbox(shared).pending().count, 1)
+    available = true
+    XCTAssertEqual(try receiver().pending().map { $0["name"] as! String }, ["local.txt", "shared.epub"])
+  }
+
+  func testRestoredPermissionRetainsPrivateReceiptAndAcknowledgesOnlyItsSource() throws {
+    available = false
+    try receive("private.txt")
+    let first = try receiver().pending()[0]
+    available = true
+    try receive("shared.txt")
+    // Force equal raw IDs across stores: the qualified identities must remain distinct.
+    let sharedItem = try inbox(shared).pending()[0]
+    let metadata = URL(fileURLWithPath: sharedItem["path"] as! String)
+      .deletingLastPathComponent().appendingPathComponent("receipt.json")
+    var value = try JSONSerialization.jsonObject(with: Data(contentsOf: metadata)) as! [String: Any]
+    value["id"] = String((first["id"] as! String).dropFirst(8))
+    try JSONSerialization.data(withJSONObject: value).write(to: metadata)
+    let both = try receiver().pending()
+    XCTAssertEqual(Set(both.map { $0["id"] as! String }).count, 2)
+    XCTAssertEqual(both[0]["id"] as? String, first["id"] as? String)
+    XCTAssertEqual(both[0]["path"] as? String, first["path"] as? String)
+    try receiver().acknowledge(first["id"] as! String)
+    try receiver().acknowledge(first["id"] as! String)
+    XCTAssertTrue(try inbox(local).pending().isEmpty)
+    XCTAssertEqual(try inbox(shared).pending().count, 1)
+    available = false
+    XCTAssertThrowsError(try receiver().acknowledge(both[1]["id"] as! String))
+    available = true
+    XCTAssertEqual(try receiver().pending().count, 1)
+    try receiver().acknowledge(both[1]["id"] as! String)
+    XCTAssertTrue(try receiver().pending().isEmpty)
+  }
+
+  func testCancelRepeatedScanAndRestartRecoveryPreservePublishedFiles() throws {
+    available = false
+    try receive("saved.txt")
+    let original = try receiver().pending()
+    let token = ImportCancellation()
+    token.cancel()
+    XCTAssertThrowsError(try receiver().receive([input("cancelled.txt")], cancellation: token) { _ in }) {
+      XCTAssertEqual($0 as? ImportIssue, .cancelled)
+    }
+    let working = local.appendingPathComponent("working")
+    try fm.createDirectory(at: working, withIntermediateDirectories: false)
+    try Data([1]).write(to: working.appendingPathComponent("unfinished"))
+    for _ in 0..<2 {
+      XCTAssertEqual(try receiver().pending()[0]["id"] as? String, original[0]["id"] as? String)
+      XCTAssertEqual(try receiver().pending()[0]["path"] as? String, original[0]["path"] as? String)
+    }
+    XCTAssertFalse(fm.fileExists(atPath: working.path))
+    XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: original[0]["path"] as! String)), Data("fixture".utf8))
+  }
+
+  func testSharedBusyCorruptionAndStorageErrorsNeverFallBack() throws {
+    try receive("saved.txt")
+    let held = try inbox(shared).beginBatch(expectedCount: 1, cancellation: ImportCancellation())
+    XCTAssertThrowsError(try receive("busy.txt")) { XCTAssertEqual($0 as? ImportIssue, .busy) }
+    try held.abort()
+    let receipt = try inbox(shared).pending()[0]
+    let payload = URL(fileURLWithPath: receipt["path"] as! String)
+    try Data().write(to: payload)
+    XCTAssertThrowsError(try receiver().pending()) { XCTAssertEqual($0 as? ImportIssue, .storage) }
+    XCTAssertThrowsError(try receive("corrupt.txt")) { XCTAssertEqual($0 as? ImportIssue, .storage) }
+    XCTAssertTrue(try inbox(local).pending().isEmpty)
+    let bad = directory.appendingPathComponent("file-not-directory")
+    try Data([1]).write(to: bad)
+    let broken = AppImportInboxes(sharedDirectory: { bad }, privateDirectory: { self.local })
+    XCTAssertThrowsError(try broken.receive([input("storage.txt")], cancellation: ImportCancellation()) { _ in }) {
+      XCTAssertEqual($0 as? ImportIssue, .storage)
+    }
+    let configurationError = AppImportInboxes(sharedDirectory: { throw ImportIssue.storage },
+                                             privateDirectory: { XCTFail("Must not fall back"); return self.local })
+    XCTAssertThrowsError(try configurationError.receive([input("config.txt")], cancellation: ImportCancellation()) { _ in })
+    XCTAssertTrue(try inbox(local).pending().isEmpty)
+  }
+
+  func testPrivateDamageIsNotHiddenAfterSharedPermissionReturns() throws {
+    available = false
+    try receive("private.txt")
+    let receipt = try receiver().pending()[0]
+    try Data().write(to: URL(fileURLWithPath: receipt["path"] as! String))
+    available = true
+    XCTAssertThrowsError(try receiver().pending()) { XCTAssertEqual($0 as? ImportIssue, .storage) }
+  }
+
+  func testLegacyUnqualifiedAcknowledgementStillTargetsSharedOnly() throws {
+    try receive("shared.txt")
+    let rawID = try inbox(shared).pending()[0]["id"] as! String
+    available = false
+    try receive("private.txt")
+    available = true
+    try receiver().acknowledge(rawID)
+    XCTAssertTrue(try inbox(shared).pending().isEmpty)
+    XCTAssertEqual(try inbox(local).pending().count, 1)
+  }
+}
+
 final class RunnerTests: XCTestCase {
   private var directory: URL!
   private var inbox: ImportInbox!

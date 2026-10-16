@@ -33,7 +33,7 @@ Windows PowerShell 设置 `$env:PUB_HOSTED_URL = 'https://pub.flutter-io.cn'`，
 
 Windows 拉取固定提交的 WebView Git 依赖需要 Git 支持长路径；可用 `git config --global core.longpaths true` 启用，以完整检出包含多个平台的仓库。
 
-iOS 安装依赖后在 `ios` 目录执行 `pod install`，打开 `ios/Runner.xcworkspace`。不要打开单独的 `.xcodeproj` 来构建 CocoaPods 工程。选择实际设备，给 Runner 和 ShareExtension 配置自己的 Team、匹配的 App Group 与唯一 Bundle ID；不要借用公司 Team。签名及个人安装边界见[发布说明](release/README.md)。
+iOS 安装依赖后在 `ios` 目录执行 `pod install`，打开 `ios/Runner.xcworkspace`。不要打开单独的 `.xcodeproj` 来构建 CocoaPods 工程。选择实际设备，使用自己的 Team 与唯一 Bundle ID；完整分享导入还要求 Runner 和 ShareExtension 获得同一 App Group 授权，`SHIORI_IMPORT_GROUP` 同步配置其 entitlements 与 Info.plist。主应用在取不到共享容器时使用私有 Inbox；这不能解决签名错误导致的安装失败。不要借用公司 Team。GitHub 未签名 IPA、签名及个人安装边界见[发布说明](release/README.md#ios-未签名-ipa)。
 
 macOS 使用 `fvm flutter run -d macos --target lib/main.dart`，或 `fvm flutter build macos --release --no-pub --target lib/main.dart`；Xcode 打开 `macos/Runner.xcworkspace`。构建不需要 Apple Team，分发打包会对应用及嵌套代码做 ad-hoc 签名，不能替代 Apple 开发者签名或公证。重新构建同一应用目录前先退出已运行实例，避免运行中的原生库被替换。
 
@@ -69,6 +69,8 @@ fvm flutter test --no-pub test/data/sources/lightnovel/session_test.dart test/wi
 修改独立 Source 调查工具时，在其目录运行对应的 `fvm dart test` 和离线 `fvm dart bin/source_probe.dart`。
 
 macOS 更新与打包改动另运行 `python3 -m unittest discover -s tool -p 'test_release_macos.py'`；原生验签、替换和 ad-hoc 签名用例需要 macOS / Xcode。签名清单的公开测试向量可用 `python3 tool/generate_update_test_vectors.py --macos` 独立生成，私钥不保留。
+
+iOS 未签名 IPA 打包与发布改动运行 `python3 -m unittest discover -s tool -p 'test_release_ios.py'` 和 `python3 -m unittest discover -s tool -p 'test_update_manifest.py'`。导入协议与双 Inbox 回归在 Xcode 的 `RunnerTests` 中执行；扩展界面与生命周期测试使用 `tool/ios_import_probe/` 的原生宿主。模拟器测试不代替自签工具和真实设备安装验证。
 
 完整项目离线回归只在[测试规范](testing.md#按风险安排执行范围)规定的阶段收尾、发布候选、大范围测试基建／核心架构调整，或用户明确要求时执行：
 

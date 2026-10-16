@@ -12,6 +12,7 @@ final class ImportBridge: NSObject, FlutterStreamHandler, UIDocumentPickerDelega
   private var cancellation = ImportCancellation()
   private var copying = false
   private var deferredError: String?
+  private let inboxes = AppImportInboxes()
   init(messenger: FlutterBinaryMessenger, host: UIViewController) {
     super.init()
     self.host = host
@@ -53,7 +54,7 @@ final class ImportBridge: NSObject, FlutterStreamHandler, UIDocumentPickerDelega
       pickerRequest = request
       worker.async {
         var issue: ImportIssue?
-        do { if try !ImportInbox().pending().isEmpty { issue = .busy } }
+        do { if try !self.inboxes.pending().isEmpty { issue = .busy } }
         catch { issue = (error as? ImportIssue) ?? .storage }
         DispatchQueue.main.async {
           guard self.pickerRequest == request else { return }
@@ -86,12 +87,11 @@ final class ImportBridge: NSObject, FlutterStreamHandler, UIDocumentPickerDelega
     case "pending", "ack":
       worker.async {
         do {
-          let inbox = try ImportInbox()
           let value: Any?
           if call.method == "pending" {
-            value = try inbox.pending()
+            value = try self.inboxes.pending()
           } else {
-            try inbox.acknowledge((call.arguments as? [String: Any])?["id"] as? String ?? "")
+            try self.inboxes.acknowledge((call.arguments as? [String: Any])?["id"] as? String ?? "")
             value = nil
           }
           DispatchQueue.main.async { result(value) }
@@ -157,7 +157,7 @@ final class ImportBridge: NSObject, FlutterStreamHandler, UIDocumentPickerDelega
     worker.async {
       var issue: String?
       do {
-        try ImportInbox().stage(urls, cancellation: token) { count in
+        try self.inboxes.receive(urls, cancellation: token) { count in
           DispatchQueue.main.async { self.sink?(["bytes": count]) }
         }
       } catch { issue = (error as? ImportIssue)?.rawValue ?? "unreadable" }
@@ -171,5 +171,63 @@ final class ImportBridge: NSObject, FlutterStreamHandler, UIDocumentPickerDelega
         self.sink?(["done": true])
       }
     }
+  }
+}
+
+/// Runner alone may fall back; the extension must retain the shared-only inbox.
+final class AppImportInboxes {
+  private let sharedDirectory: () throws -> URL?
+  private let privateDirectory: () throws -> URL
+  private let limits: ImportLimits
+
+  init(sharedDirectory: @escaping () throws -> URL? = ImportInbox.sharedDirectory,
+       privateDirectory: @escaping () throws -> URL = {
+         try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
+                                     appropriateFor: nil, create: true)
+           .appendingPathComponent("ImportInbox", isDirectory: true)
+       }, limits: ImportLimits = .production) {
+    self.sharedDirectory = sharedDirectory
+    self.privateDirectory = privateDirectory
+    self.limits = limits
+  }
+
+  func pending() throws -> [[String: Any]] {
+    let shared = try sharedDirectory()
+    // A fixed order and source-qualified IDs survive restarts and permission changes.
+    var result = try receipts(at: privateDirectory(), source: "private")
+    if let shared = shared { result += try receipts(at: shared, source: "shared") }
+    return result
+  }
+
+  private func receipts(at directory: URL, source: String) throws -> [[String: Any]] {
+    try ImportInbox(directory: directory, limits: limits).pending().map { receipt in
+      var value = receipt
+      value["id"] = source + ":" + (receipt["id"] as! String)
+      return value
+    }
+  }
+
+  func receive(_ urls: [URL], cancellation: ImportCancellation,
+               progress: (Int64) -> Void) throws {
+    do {
+      let directory = try sharedDirectory() ?? privateDirectory()
+      try ImportInbox(directory: directory, limits: limits)
+        .stage(urls, cancellation: cancellation, progress: progress)
+    } catch { throw (error as? ImportIssue) ?? ImportIssue.storage }
+  }
+
+  func acknowledge(_ id: String) throws {
+    let directory: URL
+    let rawID: String
+    if id.hasPrefix("private:") {
+      directory = try privateDirectory()
+      rawID = String(id.dropFirst(8))
+    } else {
+      guard let shared = try sharedDirectory() else { throw ImportIssue.storage }
+      directory = shared
+      // Legacy unqualified receipts belonged to the shared inbox only.
+      rawID = id.hasPrefix("shared:") ? String(id.dropFirst(7)) : id
+    }
+    try ImportInbox(directory: directory, limits: limits).acknowledge(rawID)
   }
 }

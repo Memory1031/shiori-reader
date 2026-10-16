@@ -1,7 +1,7 @@
 name: Release
 
 # 正式发布工作流：仅在推送 v* 标签时触发。日常质量检查由 ci.yml 负责，
-# Android、Windows 与 macOS 并行构建后统一发布；完整检查由 develop CI 独立执行。
+# Android、Windows、macOS 与未签名 iOS 并行构建后统一发布；现有独立签名上传流程保持原样。
 # 对外公开分发前需完成 docs/release/dependencies.md 中的渠道 / 许可核对。
 on:
   push:
@@ -183,9 +183,43 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  ios-unsigned:
+    name: iOS arm64 unsigned IPA
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: 选择固定 Xcode
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: 校验版本并安装固定依赖
+        run: |
+          python3 tool/release_android.py version
+          flutter pub get --enforce-lockfile
+          git diff --exit-code -- pubspec.lock
+      - name: 构建未签名 iOS 真机 Release
+        run: flutter build ios --release --no-codesign --no-pub --target lib/main.dart
+      - name: 校验并打包完整 IPA
+        run: python3 tool/release_ios.py package
+      - name: 保存未签名 iOS 产物
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ios-unsigned-${{ github.ref_name }}
+          path: build/ios-release-assets/
+          if-no-files-found: error
+          retention-days: 14
+
   publish:
-    name: 发布 Android、Windows 与 macOS 产物
-    needs: [android-release, windows-release, macos-release]
+    name: 发布四端产物
+    needs: [android-release, windows-release, macos-release, ios-unsigned]
     concurrency:
       group: shiori-release-publish
       cancel-in-progress: false
@@ -213,12 +247,18 @@ jobs:
           name: macos-release-${{ github.ref_name }}
           path: build/release-assets/
 
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ios-unsigned-${{ github.ref_name }}
+          path: build/release-assets/
+
       - name: 核对合并后的产物校验和
         run: |
           cd build/release-assets
           sha256sum --check SHA256SUMS.txt
           sha256sum --check SHA256SUMS-windows-x64.txt
           sha256sum --check SHA256SUMS-macos-universal.txt
+          sha256sum --check SHA256SUMS-ios-arm64.txt
 
       - name: 生成并签署更新清单
         env:

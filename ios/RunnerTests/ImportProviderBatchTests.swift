@@ -112,6 +112,18 @@ final class ImportProviderBatchTests: XCTestCase {
     XCTAssertEqual(try run([p]).get().names.count, 1)
     XCTAssertEqual(p.requestedTypes, [ImportProviderSelection.epub])
   }
+  func testUnavailableSharedInboxFailsWithoutLoadingOrReportingSuccess() throws {
+    let p = try provider("shared.txt")
+    let done = expectation(description: "shared container unavailable")
+    let batch = ImportProviderBatch(makeInbox: { throw ImportIssue.storage })
+    batch.start([p], progress: { _, _ in XCTFail("Must not receive without shared storage") }, completion: {
+      self.issue(.storage, $0)
+      done.fulfill()
+    })
+    wait(for: [done], timeout: 5)
+    XCTAssertEqual(p.loadCount, 0)
+    XCTAssertTrue(try inbox.pending().isEmpty)
+  }
   func testUnsupportedLaterProviderRejectsWholeBatchBeforeLoad() throws {
     let first = try provider("first.txt")
     let second = FileProviderDouble()

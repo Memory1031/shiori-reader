@@ -28,7 +28,7 @@ Android 与 iOS 通过各自系统入口接收文件；DesktopImportSource 使�
 
 ### 公共收件箱协议
 
-Android / iOS 移动端收件箱子结构相同（Android 位于 `noBackupFilesDir/import-inbox/`，iOS 位于共享 App Group 的 `ImportInbox/`）：
+Android / iOS 移动端收件箱子结构相同（Android 位于 `noBackupFilesDir/import-inbox/`，iOS 目录选择见下方 [iOS](#ios)）：
 
 ```text
 import-inbox/
@@ -82,7 +82,11 @@ ack（确认消费回执）通过元数据定位匹配 ID，在锁内将该 item
 
 ### iOS
 
-Runner 与 ShareExtension 必须使用同一 App Group 配置（`SHIORI_IMPORT_GROUP`）及兼容签名，共用其下的 `ImportInbox/` 实现公共协议。两个进程间的接收 session 从开始到发布或回滚持续持有跨进程 flock，已有待处理文件不等于忙碌。
+Runner 与 ShareExtension 使用官方默认 App Group `group.dev.shiori.reader.import`，可通过 `SHIORI_IMPORT_GROUP` 构建设置覆盖；两个 target 的 entitlements 与 Info.plist 必须与签名授权一致。共享容器可取得时，两者共用其下的 `ImportInbox/`；只有容器无法取得时，Runner 的选择器和系统直接打开接收才使用自身 Application Support 下的 `ImportInbox/`。共享目录初始化、存储、锁或回执错误继续报错，不切换目录。ShareExtension 始终只使用共享容器，不可用时明确失败。
+
+Runner 按私有、共享的固定顺序发现两处可访问的待处理回执，各自保留原批次顺序、额度、锁和恢复协议，不搬移或合并文件。回执 ID 附带来源，ACK 只消费对应目录；旧的无来源 ID 仅指向共享目录。恢复 App Group 权限后仍显示先前私有回执及扩展新接收的共享回执；失去权限时，共享文件原位保留，重新获得同一容器访问权后继续处理。两处回执不是跨签名身份的数据迁移保证，卸载或更改 Bundle ID 可能失去原容器。
+
+接收 session 从开始到发布或回滚持续持有对应目录的 flock，共享目录使用跨进程锁；已有待处理文件不等于忙碌。
 
 - UIDocumentPicker 多选：按 security-scoped resource 读取，经 NSFileCoordinator 协调；Runner 在复制前验证全部 URL 元数据。
 - ShareExtension：先验证全部附件数量与类型，优先选择 EPUB，再严格串行加载 NSItemProvider；provider 提供的临时 URL 只在各自 callback 内有效，必须在 callback 返回前完成复制。

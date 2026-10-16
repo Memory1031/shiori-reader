@@ -90,6 +90,19 @@ final class ShareViewTests: XCTestCase {
     if case .failed(.storage) = controller.state {} else { XCTFail("Cleanup failure hidden") }
     XCTAssertTrue(action(controller.view)!.isEnabled)
   }
+  func testMissingSharedContainerShowsFailureWithoutSuccess() {
+    let receiver = ReceiverDouble()
+    let controller = ShareViewController()
+    controller.makeReceiver = { receiver }
+    controller.inputProviders = []
+    controller.loadViewIfNeeded()
+    controller.viewDidAppear(false)
+    receiver.completion?(.failure(.storage))
+    drain()
+    if case .failed(.storage) = controller.state {} else { XCTFail("Shared storage failure hidden") }
+    XCTAssertFalse(labels(controller.view).contains { $0.text?.contains("已收下") == true })
+    XCTAssertTrue(action(controller.view)!.isEnabled)
+  }
   func testNativePreviewStatesAndSmallLargeTypeLayout() {
     let summary = ImportReceiptSummary(names: ["合成书籍第一卷.epub", "Synthetic Second Volume.epub", "合成短文.txt"], pendingCount: 7)
     let scenes: [(String, ShareViewController.State, UIUserInterfaceStyle)] = [

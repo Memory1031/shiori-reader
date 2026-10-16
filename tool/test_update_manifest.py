@@ -5,6 +5,8 @@ import zipfile
 from pathlib import Path
 
 from publish_assets import publish, validate_history
+from release_ios import package as package_ios
+from test_release_ios import fixture_app
 from release_android import ReleaseCheckError
 from update_manifest import (
     ALGORITHM,
@@ -219,6 +221,8 @@ class UpdateManifestTest(unittest.TestCase):
         )
         for name in ["SHA256SUMS.txt", "SHA256SUMS-windows-x64.txt"]:
             (self.assets / name).write_text("synthetic sums")
+        ios = fixture_app(self.root, self.expected)
+        package_ios(self.root, ios, self.assets, self.tag, self.commit)
         calls = []
 
         def run(*args):
@@ -250,6 +254,38 @@ class UpdateManifestTest(unittest.TestCase):
 
         publish(self.root, self.assets, self.tag, self.commit, self.key, rerun)
         self.assertFalse(any(args[:2] == ("release", "upload") for args in calls))
+        # A rerun with a missing remote IPA uploads only that file, preserving all others.
+        ipa = next(p for p in self.assets.iterdir() if p.suffix == '.ipa')
+        release['assets'] = [asset for asset in release['assets'] if asset['name'] != ipa.name]
+        calls.clear()
+        publish(self.root, self.assets, self.tag, self.commit, self.key, rerun)
+        upload = next(args for args in calls if args[:2] == ('release', 'upload'))
+        self.assertEqual(upload[-1], str(ipa))
+        self.assertEqual(len(upload), 6)
+        release['assets'].append({'name': ipa.name, 'size': ipa.stat().st_size, 'digest': 'sha256:' + '0' * 64})
+        calls.clear()
+        with self.assertRaises(ReleaseCheckError):
+            publish(self.root, self.assets, self.tag, self.commit, self.key, rerun)
+        self.assertFalse(any(args[0] == 'release' for args in calls))
+        release['assets'][-1]['digest'] = 'sha256:' + sha(ipa)
+        # Incomplete iOS artifacts must fail before creating or changing a release.
+        checksums = self.assets / 'SHA256SUMS-ios-arm64.txt'
+        original_sums = checksums.read_bytes()
+        checksums.unlink()
+        calls.clear()
+        with self.assertRaises(OSError):
+            publish(self.root, self.assets, self.tag, self.commit, self.key, rerun)
+        self.assertEqual(calls, [])
+        checksums.write_bytes(original_sums)
+        calls.clear()
+        def upload_failure(*args):
+            calls.append(args)
+            if args[:2] == ('release', 'upload'):
+                raise ReleaseCheckError('simulated interrupted upload')
+            return b'[[]]' if args[0] == 'api' else b''
+        with self.assertRaises(ReleaseCheckError):
+            publish(self.root, self.assets, self.tag, self.commit, self.key, upload_failure)
+        self.assertFalse(any(args[:2] == ('release', 'edit') for args in calls))
         (self.assets / "update-manifest.sig").write_bytes(b"0" * 384)
         calls.clear()
         with self.assertRaises(ReleaseCheckError):

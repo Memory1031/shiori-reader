@@ -9,6 +9,7 @@ from pathlib import Path
 
 from release_android import ReleaseCheckError
 from update_manifest import create_manifest, read_json, sha, verify_signature
+from release_ios import verify_assets as verify_ios_assets
 
 REPOSITORY = "Memory1031/shiori-reader"
 
@@ -102,6 +103,7 @@ def publish(root, assets, tag, commit, key, run=gh):
             "release-info-macos-universal.json", "SHA256SUMS-macos-universal.txt",
             "update-manifest-macos.json", "update-manifest-macos.sig",
         }
+    names |= verify_ios_assets(root, assets, tag, commit)
     files = {path.name: path for path in assets.iterdir() if path.is_file()}
     if set(files) != names or any(path.is_symlink() for path in files.values()):
         raise ReleaseCheckError("Unexpected or missing publish assets")

@@ -51,10 +51,11 @@ void main() {
           'v*') {
     throw StateError('Release workflow must be tag-triggered only');
   }
-  if (releaseJobs.length != 4 ||
+  if (releaseJobs.length != 5 ||
       !releaseJobs.containsKey('android-release') ||
       !releaseJobs.containsKey('windows-release') ||
       !releaseJobs.containsKey('macos-release') ||
+      !releaseJobs.containsKey('ios-unsigned') ||
       !releaseJobs.containsKey('publish') ||
       releaseJobs['android-release']['needs'] != null ||
       releaseJobs['windows-release']['needs'] != null ||
@@ -62,8 +63,9 @@ void main() {
         'android-release',
         'windows-release',
         'macos-release',
+        'ios-unsigned',
       }).isNotEmpty ||
-      (releaseJobs['publish']['needs'] as YamlList).length != 3) {
+      (releaseJobs['publish']['needs'] as YamlList).length != 4) {
     throw StateError(
       'Release needs parallel builders and one dependent publisher',
     );
@@ -190,6 +192,44 @@ void main() {
     }
   }
   final publisher = releaseJobs['publish'] as YamlMap;
+  final unsigned = releaseJobs['ios-unsigned'] as YamlMap;
+  final unsignedSteps = unsigned['steps'] as YamlList;
+  final unsignedCommands = unsignedSteps
+      .map((s) => s['run']?.toString() ?? '')
+      .join('\n');
+  if (unsigned['runs-on'] != 'macos-15' || unsigned['needs'] != null) {
+    throw StateError('Unsigned iOS must build independently on a macOS runner');
+  }
+  for (final required in [
+    '/Applications/Xcode_26.3.app/Contents/Developer',
+    'flutter pub get --enforce-lockfile',
+    'git diff --exit-code -- pubspec.lock',
+    'release_android.py version',
+    'flutter build ios --release --no-codesign --no-pub --target lib/main.dart',
+    'release_ios.py package',
+  ]) {
+    if (!unsignedCommands.contains(required)) {
+      throw StateError('Missing unsigned iOS release step: $required');
+    }
+  }
+  if (unsigned.toString().contains('secrets.') ||
+      unsignedCommands.contains('ios_release_signing.py') ||
+      unsignedCommands.contains('update_manifest.py identity') ||
+      unsignedCommands.contains('altool') ||
+      unsignedCommands.contains('-exportArchive')) {
+    throw StateError(
+      'Unsigned iOS must not use signing, private uploads or updater identity',
+    );
+  }
+  final unsignedUpload = unsignedSteps.last as YamlMap;
+  if (unsignedUpload['with']?['name'] !=
+          r'ios-unsigned-${{ github.ref_name }}' ||
+      unsignedUpload['with']?['path'] != 'build/ios-release-assets/' ||
+      unsignedUpload['with']?['if-no-files-found'] != 'error') {
+    throw StateError(
+      'Unsigned iOS must retain its verified current-run artifact',
+    );
+  }
   if (publisher['concurrency']?['group'] != 'shiori-release-publish' ||
       publisher['concurrency']?['cancel-in-progress'] != false) {
     throw StateError(
@@ -204,11 +244,12 @@ void main() {
         ),
       )
       .toList();
-  if (downloads.length != 3 ||
+  if (downloads.length != 4 ||
       downloads.map((step) => step['with']['name']).toSet().difference({
         r'android-release-${{ github.ref_name }}',
         r'windows-release-${{ github.ref_name }}',
         r'macos-release-${{ github.ref_name }}',
+        r'ios-unsigned-${{ github.ref_name }}',
       }).isNotEmpty ||
       downloads.any(
         (step) =>
@@ -218,7 +259,7 @@ void main() {
       publisher['permissions']['contents'] != 'write' ||
       release['permissions']['contents'] != 'read') {
     throw StateError(
-      'Only publisher may write releases using both current-run artifacts',
+      'Only publisher may write releases using all current-run artifacts',
     );
   }
   int publisherIndex(String command) => publisherSteps.indexWhere(
@@ -232,9 +273,10 @@ void main() {
           publisherIndex('update_manifest.py manifest') ||
       publisherIndex('sha256sum --check SHA256SUMS-macos-universal.txt') !=
           sums ||
+      publisherIndex('sha256sum --check SHA256SUMS-ios-arm64.txt') != sums ||
       publisherIndex('publish_assets.py') <=
           publisherIndex('update_manifest.py manifest')) {
-    throw StateError('Both artifact checksums must pass before publishing');
+    throw StateError('All platform checksums must pass before publishing');
   }
   final updateSigning =
       publisherSteps[publisherIndex('update_manifest.py manifest')]['env']
@@ -251,6 +293,7 @@ void main() {
     'android-release',
     'windows-release',
     'macos-release',
+    'ios-unsigned',
   ]) {
     if (releaseJobs[builder]['permissions']?['contents'] == 'write') {
       throw StateError('Build jobs must not have release write permissions');
