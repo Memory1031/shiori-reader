@@ -194,7 +194,7 @@ extension _BookReaderSearch on _BookReaderScreenState {
             ticket == _returns.history.version) &&
         accepts();
     if (!live()) return ReaderSearchDestination.failed;
-    // Validate the actual stored target before retiring an auxiliary source.
+    // Validate before preparing a target; keep the auxiliary source until commit.
     final loaded = await widget.repository.loadChapter(
       hit.chapter,
       mode: ReadMode.cacheOnly,
@@ -210,15 +210,18 @@ extension _BookReaderSearch on _BookReaderScreenState {
         originSurface?._route?.isCurrent != true) {
       return ReaderSearchDestination.failed;
     }
-    final retiredAuxiliary = _route?.isCurrent == false;
-    if (retiredAuxiliary) {
-      _retireAbove(this);
-      await WidgetsBinding.instance.endOfFrame;
-      if (!live() || _route?.isCurrent != true) {
-        return ReaderSearchDestination.failed;
-      }
+    final source = originSurface!._reader;
+    final generation = originSurface._navigationGeneration;
+    bool ownsSource() =>
+        live() &&
+        originSurface.mounted &&
+        originSurface._route?.isCurrent == true &&
+        originSurface._reader == source &&
+        originSurface._navigationGeneration == generation;
+    final owner = originSurface == this ? null : ownsSource;
+    if (!_canNavigate && owner?.call() != true) {
+      return ReaderSearchDestination.failed;
     }
-    if (!_canNavigate) return ReaderSearchDestination.failed;
     final navigation = _SearchNavigation(hit, origin, live);
     _searchNavigation = pending = navigation;
     try {
@@ -235,7 +238,7 @@ extension _BookReaderSearch on _BookReaderScreenState {
           await _restorePosition(
             _searchPosition(hit, _reader.content!),
             intent: _LocationIntent.search,
-            accepts: live,
+            accepts: owner ?? live,
             origin: navigation.origin,
           );
         }
@@ -256,6 +259,7 @@ extension _BookReaderSearch on _BookReaderScreenState {
           intent: _LocationIntent.search,
           origin: navigation.origin,
           search: navigation,
+          owner: owner,
         );
         if (_operation?.search != navigation &&
             !navigation.result.isCompleted) {
@@ -269,14 +273,18 @@ extension _BookReaderSearch on _BookReaderScreenState {
             _searchOffset(hit),
             intent: _LocationIntent.search,
             search: navigation,
+            owner: owner,
           ),
         );
       }
       final result = await navigation.result.future;
       if (!live()) return ReaderSearchDestination.failed;
-      if (result == ReaderSearchDestination.failed && retiredAuxiliary) {
-        await _cancelChapter(immediate: true);
-        await _recoverSearchSource(navigation.origin, live);
+      if (result != ReaderSearchDestination.failed && originSurface != this) {
+        if (identical(navigation.destinationScope, _returnScope)) {
+          if (ownsSource()) _retireAbove(this);
+        } else if (navigation.destinationScope case final scope?) {
+          _retireOtherAuxiliaries(scope);
+        }
       }
       if (result == ReaderSearchDestination.document) _searchDocumentNotice();
       if (result != ReaderSearchDestination.failed &&
@@ -288,35 +296,6 @@ extension _BookReaderSearch on _BookReaderScreenState {
       return result;
     } finally {
       if (identical(_searchNavigation, navigation)) _searchNavigation = null;
-    }
-  }
-
-  Future<void> _recoverSearchSource(
-    _ReturnAnchor origin,
-    bool Function() accepts,
-  ) async {
-    if (!mounted || _invalidated || !accepts()) return;
-    final viewport = _viewports[_reader], position = _reader.currentPosition;
-    if (viewport?.isRestoring == true && position != null) {
-      await viewport!.restoreConfirmed(position, isCurrent: accepts);
-    }
-    if (!_canNavigate || !accepts()) return;
-    final recovery = _SearchNavigation(null, origin, accepts);
-    _searchNavigation = recovery;
-    try {
-      unawaited(
-        _openAuxiliary(
-          origin.chapter,
-          origin.position.blockKey,
-          null,
-          intent: _LocationIntent.sequential,
-          search: recovery,
-          scope: origin.scope,
-        ),
-      );
-      await recovery.result.future;
-    } finally {
-      if (identical(_searchNavigation, recovery)) _searchNavigation = null;
     }
   }
 
@@ -371,6 +350,7 @@ class _SearchNavigation {
   final _ReturnAnchor origin;
   final bool Function() accepts;
   final result = Completer<ReaderSearchDestination>();
+  Object? destinationScope;
   VoidCallback? cancelSurface;
   void complete(ReaderSearchDestination destination) {
     if (result.isCompleted) return;

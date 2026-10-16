@@ -1435,10 +1435,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           !_invalidated &&
           _route?.isCurrent != false) {
         final hit = widget.searchHit;
+        final requested = reader.navigationPosition;
         if (widget.searchAccepts?.call() == false ||
             hit != null &&
                 (!_validSearchHit(hit, reader.content!) ||
-                    reader.usedFallback)) {
+                    reader.usedFallback) ||
+            requested != null &&
+                reader.pagePresentation == null &&
+                (requested.contentRevision != reader.content?.contentRevision ||
+                    reader.usedFallback ||
+                    reader.currentPosition != requested)) {
           widget.onSearchRejected?.call();
           return;
         }
@@ -1541,6 +1547,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         curve: _chapterFrame.curve,
         reduced:
             !_animateChapter ||
+            !TickerMode.of(context) ||
             _turnStyle == PageTurnStyle.none ||
             MediaQuery.disableAnimationsOf(context),
       );
@@ -1632,6 +1639,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           target: 0,
           curve: _chapterFrame.curve,
           reduced:
+              !TickerMode.of(context) ||
               _turnStyle == PageTurnStyle.none ||
               MediaQuery.disableAnimationsOf(context),
         );
@@ -2159,6 +2167,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _hideQuickReturn();
     final surface = scope ?? Object();
     ReaderReturnEntry? boundary;
+    var confirmed = false;
     late final Route<void> auxiliaryRoute;
     auxiliaryRoute = platformPageRoute<void>(
       context,
@@ -2194,7 +2203,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
               search?.complete(ReaderSearchDestination.failed);
               return;
             }
-            final destination = _returns.surfaces[surface]?._captureAnchor();
+            final destinationSurface = _returns.surfaces[surface];
+            final destination = destinationSurface?._captureAnchor();
+            if (restore != null &&
+                destinationSurface?._reader.pagePresentation == null &&
+                (destination == null ||
+                    !restore.sameLocation(destination) ||
+                    destinationSurface!._reader.usedFallback)) {
+              search?.complete(ReaderSearchDestination.failed);
+              return;
+            }
             final previousTop = _returns.history.top;
             _commitReturnLocation(
               intent,
@@ -2203,6 +2221,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
               returning,
               ticket,
             );
+            confirmed = true;
             if (intent != _LocationIntent.returnLocation &&
                 !identical(previousTop, _returns.history.top)) {
               boundary = _returns.history.top;
@@ -2228,7 +2247,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
     await navigator.push(auxiliaryRoute);
     search?.complete(ReaderSearchDestination.failed);
-    if (!_returns.retired.remove(surface) && mounted && !_invalidated) {
+    final retired = _returns.retired.remove(surface);
+    if (confirmed && !retired && mounted && !_invalidated) {
       _returns.history.closeScope(surface, _captureAnchor(), boundary);
       _returns.changed();
     }

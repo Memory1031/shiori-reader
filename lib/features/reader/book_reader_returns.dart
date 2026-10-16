@@ -89,13 +89,15 @@ extension _BookReaderReturns on _BookReaderScreenState {
       }
     }
     if (intent != _LocationIntent.search) _search?.clearHighlight();
-    if (intent == _LocationIntent.search &&
-        identical(destination?.scope, _returnScope)) {
-      _searchNavigation?.complete(
-        _reader.pagePresentation == null
-            ? ReaderSearchDestination.native
-            : ReaderSearchDestination.document,
-      );
+    if (intent == _LocationIntent.search) {
+      _searchNavigation?.destinationScope = destination?.scope;
+      if (identical(destination?.scope, _returnScope)) {
+        _searchNavigation?.complete(
+          _reader.pagePresentation == null
+              ? ReaderSearchDestination.native
+              : ReaderSearchDestination.document,
+        );
+      }
     }
     if (intent == _LocationIntent.returnLocation) {
       _searchNavigation?.complete(ReaderSearchDestination.native);
@@ -138,6 +140,17 @@ extension _BookReaderReturns on _BookReaderScreenState {
     Navigator.of(context).popUntil((r) => identical(r, target._route));
   }
 
+  void _retireOtherAuxiliaries(Object destinationScope) {
+    for (final surface in _returns.surfaces.values.toList()) {
+      if (surface != this &&
+          !identical(surface._returnScope, destinationScope) &&
+          surface._route?.isActive == true) {
+        _returns.retired.add(surface._returnScope);
+        surface._route!.navigator!.removeRoute(surface._route!);
+      }
+    }
+  }
+
   Future<void> _returnFrom(
     _BookReaderScreenState source,
     ReaderReturnEntry entry,
@@ -176,14 +189,7 @@ extension _BookReaderReturns on _BookReaderScreenState {
     } else {
       // A retired document was rebuilt above the old surfaces. Remove only
       // those old routes after the replacement has confirmed its position.
-      for (final surface in _returns.surfaces.values.toList()) {
-        if (surface != this &&
-            !identical(surface._returnScope, entry.origin.scope) &&
-            surface._route?.isActive == true) {
-          _returns.retired.add(surface._returnScope);
-          surface._route!.navigator!.removeRoute(surface._route!);
-        }
-      }
+      _retireOtherAuxiliaries(entry.origin.scope);
     }
   }
 
