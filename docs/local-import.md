@@ -24,7 +24,7 @@
 
 ## 平台接收
 
-Android 与 iOS 通过各自系统入口接收文件；DesktopImportSource 使用 Dart 与 file_selector 接收桌面选择，Windows 还支持将一个或多个 TXT / EPUB 文件拖入应用窗口。桌面拖放与文件选择共用待确认批次，已有批次未处理完时不接收新批次。各适配器均先保存 durable inbox 副本，再提供待确认回执；平台差异体现在入口、授权模型和目录位置。
+Android 与 iOS 通过各自系统入口接收文件；DesktopImportSource 使用 Dart 与 file_selector 接收桌面选择，Windows / macOS 还支持将一个或多个 TXT / EPUB 文件拖入应用窗口，macOS 支持 Finder「打开方式」和 ⌘O。桌面拖放与文件选择共用待确认批次，已有批次未处理完时不接收新批次。各适配器均先保存 durable inbox 副本，再提供待确认回执；平台差异体现在入口、授权模型和目录位置。
 
 ### 公共收件箱协议
 
@@ -93,7 +93,7 @@ Runner 与 ShareExtension 必须使用同一 App Group 配置（`SHIORI_IMPORT_G
 
 ### DesktopImportSource
 
-桌面适配器共用于 Windows / macOS，由调用方注入环境隔离的 `AppPaths.importInbox`（`users/import-inbox/`）并负责关闭。选择器支持 TXT / EPUB 多选；原始路径仅用于接收时读取，不进入领域模型或持久回执。macOS sandbox 需要 `com.apple.security.files.user-selected.read-only` entitlement。
+桌面适配器共用于 Windows / macOS，由调用方注入环境隔离的 `AppPaths.importInbox`（`users/import-inbox/`）并负责关闭。选择器支持 TXT / EPUB 多选；原始路径仅用于接收时读取，不进入领域模型或持久回执。macOS GitHub 分发构建未启用 App Sandbox，不使用移动端 App Group 收件箱。
 
 桌面保持 `working → pending` 的单批协议，已有 pending 时拒绝追加。接收沿用移动端的单次批量与大小上限、按 order 恢复、整批暂存后原子发布及按 ID ack；文件内容和回执在发布前 flush。每个进程对同一 inbox 只持有一个适配器，实例内请求串行执行，文件锁用于进程间协调；关闭只取消未发布的接收，保留待确认批次。恢复只回收 working、ack 墓碑和空 pending，损坏的已发布批次报告 storage 并保留文件。此实现不承诺目录 fsync 或物理断电恢复，也不读取移动端 legacy 单文件 inbox。
 
@@ -140,7 +140,7 @@ WHATWG 编码映射与许可保留在工程，生成工具位于 `tool/encoding/
 - 仅允许安全元素和样式，移除脚本、表单与 iframe，使用严格 CSP 禁止作者脚本与外部请求。文字链接页只允许宿主执行固定 DOM 点击查询，以免链接点击同时触发 Reader 翻页或工具栏。
 - 普通文字链接保留作者排版，以不透明标识关联已解析的书内目标；点击交由 Shiori 执行，WebView 取消导航。原始 href 不进入 WebView，不可用目标沿用 Reader 的提示。旧书需重新解析获取文字链接标识；纯图片目录不会自动生成热区。
 - 含单张包内位图、定位文字和基础矩形的受限 SVG 短页可保留视觉布局；作者用 `<a>` 包住的矩形热点经校验后交由 Reader 执行书内跳转，原始 href 不进入 WebView。复杂 SVG 仍退回原生正文。
-- Android / iOS / Windows 共用 `flutter_inappwebview` 呈现封装；初始化、页面加载失败或超时后切回该章的原生语义正文。Windows 在首次使用时检查 WebView2 Runtime，浏览器数据写入环境隔离的应用可写目录。
+- Android / iOS / Windows / macOS 共用 `flutter_inappwebview` 呈现封装；初始化、页面加载失败或超时后切回该章的原生语义正文。Windows 在首次使用时检查 WebView2 Runtime，浏览器数据写入环境隔离的应用可写目录；macOS 使用系统 WKWebView。
 - 本地图片、字体内嵌；字体单项上限 8MiB、单文档生成 HTML 上限 16MiB。
 - 导入与重解析共用同一写入路径：特殊页呈现（包括「没有特殊页」的空结果）与 manifest 一起发布，hash 进入受校验 manifest；同一次呈现解析找到的 SVG 热点并入链接侧表，读取时不再解析原件。呈现超出自身限额时不保存呈现，书籍照常以原生正文导入。未保存呈现的旧导入仍可从原件校验后派生与已发布正文 revision 一致的特殊页，结果只进内存、不回写；不会替换语义正文。派生缓存有界。
 - 通过 `LocalPagePresentationRepository` 提供可选呈现，与 `LocalNavigationRepository` 的目录能力分开；标准阅读进度继续使用本地章节身份。

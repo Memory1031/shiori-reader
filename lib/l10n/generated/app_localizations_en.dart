@@ -1401,6 +1401,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateRestartInstall => 'Restart to update';
 
   @override
+  String get updateInstallFailedMacOS =>
+      'The update did not finish. Retry, or download the complete app from GitHub and replace Shiori. Reading data is stored separately.';
+
+  @override
+  String get updateInstallLocationMacOS =>
+      'Updates are unavailable at this location. Quit Shiori, move the complete app to a writable Applications folder (such as ~/Applications), then open it again.';
+
+  @override
   String get updateInstallHintWindows =>
       'The package is verified. Shiori will close, replace its program files and start again; your library, reading position and settings will be kept.';
 

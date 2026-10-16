@@ -1,0 +1,22 @@
+platform :osx, '12.0'
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+project 'Runner', {'Debug' => :debug, 'Profile' => :release, 'Release' => :release}
+def flutter_root
+  path = File.expand_path(File.join('Flutter', 'ephemeral', 'Flutter-Generated.xcconfig'), __dir__)
+  File.foreach(path) do |line|
+    match = line.match(/FLUTTER_ROOT\=(.*)/)
+    return match[1].strip if match
+  end
+  raise "FLUTTER_ROOT missing; run the pinned Flutter tool first"
+end
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+flutter_macos_podfile_setup
+target 'Runner' do
+  use_frameworks!
+  flutter_install_all_macos_pods File.dirname(File.realpath(__FILE__))
+end
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_macos_build_settings(target)
+  end
+end

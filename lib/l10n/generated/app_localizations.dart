@@ -2444,6 +2444,18 @@ abstract class AppLocalizations {
   /// **'Restart to update'**
   String get updateRestartInstall;
 
+  /// No description provided for @updateInstallFailedMacOS.
+  ///
+  /// In en, this message translates to:
+  /// **'The update did not finish. Retry, or download the complete app from GitHub and replace Shiori. Reading data is stored separately.'**
+  String get updateInstallFailedMacOS;
+
+  /// No description provided for @updateInstallLocationMacOS.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates are unavailable at this location. Quit Shiori, move the complete app to a writable Applications folder (such as ~/Applications), then open it again.'**
+  String get updateInstallLocationMacOS;
+
   /// No description provided for @updateInstallHintWindows.
   ///
   /// In en, this message translates to:

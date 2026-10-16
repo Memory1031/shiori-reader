@@ -32,8 +32,7 @@ class ShioriCapabilities {
   final TargetPlatform platform;
 
   /// Pages slide horizontally and support the interactive edge-swipe back.
-  bool get cupertinoNavigation =>
-      platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
+  bool get cupertinoNavigation => platform == TargetPlatform.iOS;
 
   /// Touch is the primary input; tap zones and immersive reading apply.
   bool get touchFirst =>
@@ -49,7 +48,8 @@ class ShioriCapabilities {
   bool get explicitUiTypeface => platform == TargetPlatform.windows;
 
   /// Installing an update exits the app while an updater replaces files.
-  bool get updateRestartsApp => platform == TargetPlatform.windows;
+  bool get updateRestartsApp =>
+      platform == TargetPlatform.windows || platform == TargetPlatform.macOS;
 }
 
 /// Full-screen page route following the platform's navigation convention.

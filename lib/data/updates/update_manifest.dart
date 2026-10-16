@@ -135,6 +135,7 @@ final class UpdateManifest {
     Uint8List signature,
     UpdatePublicKey trustedKey, {
     required String expectedTag,
+    bool macOS = false,
   }) {
     if (!trustedKey.verify(bytes, signature)) {
       throw const FormatException('Invalid update manifest signature');
@@ -152,11 +153,17 @@ final class UpdateManifest {
     for (final item in json['assets'] as List<dynamic>) {
       final asset = item as Map<String, dynamic>;
       final platform = asset['platform'] as String;
-      if (!['android', 'windows-x64'].contains(platform) ||
+      if (!(macOS ? ['macos-universal'] : ['android', 'windows-x64']).contains(
+            platform,
+          ) ||
           !platforms.add(platform)) {
         throw const FormatException('Invalid update platform');
       }
-      final suffix = platform == 'android' ? 'android.apk' : 'windows-x64.zip';
+      final suffix = macOS
+          ? 'macos-universal.zip'
+          : platform == 'android'
+          ? 'android.apk'
+          : 'windows-x64.zip';
       final name = asset['name'] as String;
       final minimum = asset['minimumSystem'] as String;
       if (name != 'shiori-reader-${identity.tag}-$suffix' || minimum.isEmpty) {
@@ -169,6 +176,11 @@ final class UpdateManifest {
       int? protocol;
       if (platform == 'android') {
         certificate = _digest(asset['certificateSha256']);
+      } else if (macOS) {
+        protocol = asset['updaterProtocol'] as int;
+        if (protocol != 1) {
+          throw const FormatException('Unsupported macOS updater protocol');
+        }
       } else {
         protocol = asset['updaterProtocol'] as int;
         final entries = asset['files'] as List<dynamic>;
@@ -217,7 +229,7 @@ final class UpdateManifest {
         ),
       );
     }
-    if (platforms.length != 2) {
+    if (platforms.length != (macOS ? 1 : 2)) {
       throw const FormatException('Incomplete platform assets');
     }
     return UpdateManifest._(identity, assets);

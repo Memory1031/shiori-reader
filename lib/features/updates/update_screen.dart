@@ -347,11 +347,17 @@ class _UpdateScreenState extends State<UpdateScreen> {
                           UpdateProblem.cancelled => l.updateCancelled,
                           UpdateProblem.installation =>
                             ShioriCapabilities.of(context).updateRestartsApp
-                                ? l.updateInstallFailedWindows
+                                ? Theme.of(context).platform ==
+                                          TargetPlatform.macOS
+                                      ? l.updateInstallFailedMacOS
+                                      : l.updateInstallFailedWindows
                                 : l.updateInstallFailed,
                           UpdateProblem.busy => l.updateInstallBusy,
                           UpdateProblem.instances => l.updateInstallInstances,
-                          UpdateProblem.location => l.updateInstallLocation,
+                          UpdateProblem.location =>
+                            Theme.of(context).platform == TargetPlatform.macOS
+                                ? l.updateInstallLocationMacOS
+                                : l.updateInstallLocation,
                           UpdateProblem.workspaceConflict =>
                             l.updateWorkspaceConflict,
                         }, style: TextStyle(color: theme.colorScheme.error)),
@@ -456,7 +462,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
     final l = AppLocalizations.of(context);
     final c = controller;
     final theme = Theme.of(context);
-    // Windows replaces files after the app exits, then starts it again.
+    // Desktop updates replace the app after exit, then start it again.
     final windows = ShioriCapabilities.of(context).updateRestartsApp;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -596,7 +602,9 @@ class _UpdateScreenState extends State<UpdateScreen> {
                   if (c.installState == UpdateInstallState.failed) ...[
                     Text(
                       windows
-                          ? l.updateInstallFailedWindows
+                          ? Theme.of(context).platform == TargetPlatform.macOS
+                                ? l.updateInstallFailedMacOS
+                                : l.updateInstallFailedWindows
                           : l.updateInstallFailed,
                     ),
                     const SizedBox(height: ShioriSpace.medium),

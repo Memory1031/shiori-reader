@@ -1346,7 +1346,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
               // a focused button, goes on to the control's own handling.
               body: Shortcuts(
                 shortcuts: _desktopPanels
-                    ? desktopReaderShortcuts
+                    ? desktopReaderShortcutsFor(Theme.of(context).platform)
                     : readerShortcuts,
                 child: Actions(
                   actions: _commandActions(context),

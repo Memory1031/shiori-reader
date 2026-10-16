@@ -2,7 +2,7 @@
   <img src="assets/branding/shiori-chibi-logo-v1.png" alt="Shiori Logo" width="112" />
   <h1>Shiori</h1>
   <p>把喜欢的故事，留在手边。</p>
-  <p>面向 Android、iOS 与 Windows 的开源轻小说阅读器 · 本地 EPUB / TXT · 支持 LightNovel.fun 在线阅读 · 中文 / English</p>
+  <p>面向 Android、iOS、Windows 与 macOS 的开源轻小说阅读器 · 本地 EPUB / TXT · 支持 LightNovel.fun 在线阅读 · 中文 / English</p>
   <p>
     <a href="#功能亮点">功能</a> ·
     <a href="#截图">截图</a> ·
@@ -14,7 +14,7 @@
 
 ---
 
-Shiori 是一款以**本地阅读为核心**的开源轻小说阅读器，支持 Android、iOS 和 Windows。
+Shiori 是一款以**本地阅读为核心**的开源轻小说阅读器，支持 Android、iOS、Windows 和 macOS。
 
 导入 EPUB 或 TXT，按自己喜欢的方式排版和翻页。借助全文搜索与书签，随时回顾故事中的细节；临时跳转到其他位置后，也能返回原处继续阅读。
 
@@ -29,7 +29,7 @@ Shiori 是一款以**本地阅读为核心**的开源轻小说阅读器，支持
 - **搜索与书签** — 在本地书中搜索文字，回顾前后文；为本地或在线书籍保存多处书签，随时重读喜欢的段落。
 - **返回原处** — 查看书签、搜索结果或书内链接后，返回原来的阅读位置，继续刚才的故事。
 - **随时续读** — 书架可切换网格或列表，记住阅读位置，下次打开接着读。
-- **桌面阅读** — Windows 支持拖入文件、键盘和滚轮翻页，宽屏阅读时也能欣赏插图与正文并排的效果。
+- **桌面阅读** — Windows 与 macOS 支持拖入文件、键盘和滚轮翻页，宽屏阅读时也能欣赏插图与正文并排的效果。
 - **在线阅读** — 通过 [LightNovel.fun](https://www.lightnovel.fun/) 找书、查看分卷目录并阅读；已缓存的内容可离线阅读，缓存也可按需清理。
 
 ## 截图
@@ -66,10 +66,11 @@ Shiori 是一款以**本地阅读为核心**的开源轻小说阅读器，支持
 | Android 7.0+ | 从[下载页面](https://github.com/Memory1031/shiori-reader/releases)获取 APK，安装到手机。 |
 | iOS 15.0+ | 当前通过 macOS / Xcode 使用自己的开发者签名安装，配置见[开发说明](docs/development.md)。 |
 | Windows x64 | 在[下载页面](https://github.com/Memory1031/shiori-reader/releases)获取 Windows 压缩包，完整解压后运行 `shiori.exe`。当前为未签名便携包；部分特殊版式 EPUB 页面需要 WebView2 运行环境。 |
+| macOS 12.0+ | 从[下载页面](https://github.com/Memory1031/shiori-reader/releases)获取 macOS DMG，将 Shiori 拖入「应用程序」或其他可写目录；同一安装包支持 Apple Silicon 和 Intel。未使用 Apple 开发者签名或公证，首次打开可能需要在系统「隐私与安全性」中确认。 |
 
 Android 覆盖安装需要签名一致；从 Debug 包切换到正式签名包前，请先保全数据。版本、签名与分发方式见[发布说明](docs/release/README.md)。
 
-从本仓库发布的 Android / Windows 安装包可在「关于与更新」检查更新；iOS 安装与 TestFlight 分发方式见发布说明。Windows 压缩包应完整解压到可写目录，不要只复制 EXE。
+从本仓库发布的 Android / Windows / macOS 安装包可在「关于与更新」检查更新；iOS 安装与 TestFlight 分发方式见发布说明。Windows 压缩包应完整解压到可写目录，不要只复制 EXE；macOS 请先将应用复制到可写目录，再使用应用内更新，不要直接在 DMG 中运行。
 
 ## 快速开始
 
@@ -87,7 +88,7 @@ Android 覆盖安装需要签名一致；从 Debug 包切换到正式签名包�
 
 ### 桌面操作
 
-桌面端通过导航栏切换页面，使用「导入书籍」按钮或拖入文件添加本地书；书籍右键 / 更多菜单提供详情等操作，键盘可用 Menu 键或 Shift+F10 打开菜单。阅读时按 F2 显示 / 隐藏工具栏，Ctrl+F 搜索本地书正文。
+桌面端通过导航栏切换页面，使用「导入书籍」按钮或拖入文件添加本地书；书籍右键 / 更多菜单提供详情等操作，键盘可用 Menu 键或 Shift+F10 打开菜单。阅读时按 F2 显示 / 隐藏工具栏，Ctrl+F 搜索本地书正文（macOS 使用 ⌘F，部分键盘需按 Fn+F2）。macOS 也可通过系统「打开方式」接收文件，或按 ⌘O 选择书籍。
 
 ### 数据清理
 

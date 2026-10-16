@@ -64,7 +64,7 @@ dart tool/publish_release.dart vX.Y.Z --publish
 
 第一条只预览；第二条用于已获授权的正式发布。要求工作区干净、develop 与 origin/develop 一致、标签不存在、标签版本与 pubspec 一致，且 ShareExtension 版本继承结构完整。脚本优先快进 master，核对合并后的 pubspec、iOS 工程及扩展 xcconfig 与已验证的 develop 一致，再创建附注标签并原子推送 master / tag，成功后回到 develop。
 
-master 仅是发布中间分支。tag 同时触发 Android 签名 APK、Windows x64 ZIP 与 iOS 签名 / TestFlight 上传；APK 和 ZIP 均构建成功后统一发布到 GitHub Release，不等待日常 CI，也不重复 UT / analyze。CI 绿色不能替代本地测试记录。
+master 仅是发布中间分支。tag 同时触发 Android 签名 APK、Windows x64 ZIP、macOS 通用包与 iOS 签名 / TestFlight 上传；Android、Windows、macOS 均构建成功后统一发布到 GitHub Release，不等待日常 CI，也不重复 UT / analyze。CI 绿色不能替代本地测试记录。
 
 GitHub Release 优先读取 `docs/release/notes/<tag>.md`，缺失时自动生成。新 Release 先建立草稿，资产完整上传后公开；重跑核对已有附件的大小与摘要，只补齐缺失附件，内容变化需分配新的构建号和标签。手动编辑过的正文需在 GitHub 单独更新。
 
@@ -82,7 +82,7 @@ Android 使用系统 `PackageInstaller` 确认覆盖安装；Android 8+ 需授�
 
 ## 更新清单签名配置
 
-Android / Windows 的 tag 构建将发布身份与更新公钥写入 `assets/release/build-info.json`。发布 job 核对两端包内身份、生成 `update-manifest.json` 并签署原始字节，另附二进制 `update-manifest.sig`。签名协议为 RSA-3072 / PKCS#1 v1.5 / SHA-256，公钥指数为 65537，Windows 使用系统 CNG 验签。
+Android / Windows / macOS 的 tag 构建将发布身份与更新公钥写入 `assets/release/build-info.json`。发布 job 核对包内身份；Android / Windows 继续使用 `update-manifest.json` 与 `update-manifest.sig`，macOS 使用独立的 `update-manifest-macos.json` 与 `.sig`，避免改变既有客户端协议。签名协议为 RSA-3072 / PKCS#1 v1.5 / SHA-256，公钥指数为 65537；Windows 使用系统 CNG，macOS 使用系统 Security 验签。macOS 辅助更新程序在编译时嵌入同一发布身份和公钥。
 
 在安全的本地目录通过 OpenSSL 生成一次独立更新密钥：
 
@@ -105,6 +105,7 @@ GitHub Actions 需要以下仓库配置：
 
 - Android：核对 Actions、APK、SHA256SUMS、release-info、版本与签名，验证覆盖安装保留数据。
 - Windows：核对 ZIP、SHA256SUMS-windows-x64、release-info-windows-x64 与 EXE 版本，解压后启动、正常关闭并检查升级保留数据。
+- macOS：核对 DMG、完整应用 ZIP、SHA256SUMS-macos-universal、release-info-macos-universal 与独立签名清单；分别验证 Apple Silicon / Intel 的首次安装、退出和更新后数据保留。构建与 ad-hoc 签名校验不代替目标系统运行验收。
 - iOS：核对上传、App Store Connect 处理和 TestFlight 分发，再验证设备安装。构建成功不代表测试者已可安装。
 - 在发布操作反馈中说明实际结果和未测项。脚本成功仅表示 Git 推送成功。
 
@@ -115,3 +116,9 @@ GitHub Actions 需要以下仓库配置：
 下载 `shiori-reader-<tag>-windows-x64.zip`，可用 PowerShell `Get-FileHash -Algorithm SHA256 <ZIP 路径>` 与随包发布的 `SHA256SUMS-windows-x64.txt` 对照。完整解压到可写目录后运行 `shiori.exe`，不要只复制 EXE 或在压缩包内启动。包内包含 Flutter / 插件 DLL、资源、VC++ 运行库及许可文件；WebView2 Runtime 由系统提供，未安装时原版式 EPUB 页面会提示运行环境不可用。
 
 当前提供未签名的 x64 ZIP，不包含安装器或 Windows ARM64 构建。应用内更新下载 ZIP 并按签名清单校验后，在安装目录旁的 `<安装目录>.update` 暂存；应用关闭后由包内 `shiori-updater.exe` 原位替换程序文件并重新启动，失败时回滚到原版本。自动更新要求本地磁盘上的可写目录且没有其他 Shiori 窗口；无法自动更新时，关闭应用后将新版完整解压到独立目录。书架、阅读进度与设置使用应用数据目录，两种方式都不会清除。正式发布前仍需核对依赖许可及目标系统运行表现。
+
+## macOS DMG 与更新
+
+最低 macOS 12.0，单个通用包包含 arm64 / x86_64。GitHub Release 提供 `shiori-reader-<tag>-macos-universal.dmg`，将完整 Shiori.app 拖入「应用程序」或其他当前用户可写目录后运行；不能在 DMG 中原位更新。构建与分发均不使用 Apple Developer ID、Apple 签名证书、公证或 App Store；打包脚本对嵌套代码及应用整体做 ad-hoc 签名，DMG 不签名。下载后仍可能受 Gatekeeper 限制，用户需自行决定是否通过系统「隐私与安全性」允许打开，不要求关闭系统安全保护。
+
+自动更新使用同一 Release 的 `shiori-reader-<tag>-macos-universal.zip`，必须保留整个应用包、Framework 链接、可执行权限和 Flutter 许可资源。`tool/release_macos.py package` 校验通用架构、生成 DMG / ZIP、元数据和 `SHA256SUMS-macos-universal.txt`；发布 job 用现有更新密钥签署独立 macOS 清单，不需要新增 Apple Secrets。安装交接与恢复边界见[更新合同](../contracts.md#应用更新)。只读目录、其他运行实例或系统隔离导致更新不可用时，关闭应用后手动替换完整应用；用户数据保存在应用支持目录，不在 `.app` 中。

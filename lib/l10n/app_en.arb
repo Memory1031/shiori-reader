@@ -669,6 +669,8 @@
   "updateInstallCancelled": "Installation cancelled. The downloaded package is kept for retry.",
   "updateInstallFailed": "The system could not complete installation. Check free space and installation permission, then retry.",
   "updateRestartInstall": "Restart to update",
+  "updateInstallFailedMacOS": "The update did not finish. Retry, or download the complete app from GitHub and replace Shiori. Reading data is stored separately.",
+  "updateInstallLocationMacOS": "Updates are unavailable at this location. Quit Shiori, move the complete app to a writable Applications folder (such as ~/Applications), then open it again.",
   "updateInstallHintWindows": "The package is verified. Shiori will close, replace its program files and start again; your library, reading position and settings will be kept.",
   "updateRestarting": "Closing Shiori to install the update. It will start again when installation finishes.",
   "updateInstallFailedWindows": "The update could not be completed. Retry, or download the full Windows ZIP from the release page and extract it again. Your library and reading data are stored separately and are not affected.",

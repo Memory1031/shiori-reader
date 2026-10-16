@@ -3,6 +3,7 @@
 import base64
 import copy
 import json
+import sys
 from pathlib import Path
 
 from test_update_manifest import UpdateManifestTest
@@ -10,6 +11,25 @@ from update_manifest import encoded, sign_manifest
 
 
 def main():
+    if sys.argv[1:] == ['--macos']:
+        from test_release_macos import MacOSUpdateTest
+        MacOSUpdateTest.setUpClass()
+        case = MacOSUpdateTest()
+        try:
+            case.setUp()
+            original = json.loads(case.signed()[0].read_bytes())
+            variants = {}
+            for name in ['valid', 'wrongProtocol', 'wrongPlatform']:
+                value = copy.deepcopy(original)
+                if name == 'wrongProtocol': value['assets'][0]['updaterProtocol'] = 2
+                if name == 'wrongPlatform': value['assets'][0]['platform'] = 'windows-x64'
+                raw = encoded(value)
+                variants[name] = dict(manifest=base64.b64encode(raw).decode(), signature=base64.b64encode(sign_manifest(raw, case.secret, case.key)).decode())
+            Path('test/fixtures/updates/macos.json').write_bytes(encoded(dict(publicKey=case.key, cases=variants)))
+        finally:
+            case.doCleanups()
+            MacOSUpdateTest.doClassCleanups()
+        return
     UpdateManifestTest.setUpClass()
     case = UpdateManifestTest()
     try:

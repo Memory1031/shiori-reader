@@ -169,7 +169,7 @@ rail 变为带文字的侧栏；`list` 760 限制单列内容宽度，`panel` 56
 ## 平台与响应式
 
 - 手机触摸优先：48 触控尺寸、底部操作栏、SafeArea，左右边距 `page`。
-- Windows 鼠标键盘优先：hover 反馈、键盘焦点、右键菜单、Esc 返回，菜单和行可以更紧凑。
+- Windows / macOS 鼠标键盘优先：hover 反馈、键盘焦点、右键菜单、Esc 返回，菜单和行可以更紧凑；macOS 使用 Command 组合键。
   桌面页面框架与工具栏使用 `DesktopContentFrame`、`DesktopPageToolbar`，
   布局规则见[架构与数据规则](architecture.md#桌面工作区)。
 - 跨越断点时保留滚动位置、焦点和业务状态；工具栏动作换行而不挤压标题。

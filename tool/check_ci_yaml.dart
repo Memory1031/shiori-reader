@@ -51,17 +51,19 @@ void main() {
           'v*') {
     throw StateError('Release workflow must be tag-triggered only');
   }
-  if (releaseJobs.length != 3 ||
+  if (releaseJobs.length != 4 ||
       !releaseJobs.containsKey('android-release') ||
       !releaseJobs.containsKey('windows-release') ||
+      !releaseJobs.containsKey('macos-release') ||
       !releaseJobs.containsKey('publish') ||
       releaseJobs['android-release']['needs'] != null ||
       releaseJobs['windows-release']['needs'] != null ||
       (releaseJobs['publish']['needs'] as YamlList).toSet().difference({
         'android-release',
         'windows-release',
+        'macos-release',
       }).isNotEmpty ||
-      (releaseJobs['publish']['needs'] as YamlList).length != 2) {
+      (releaseJobs['publish']['needs'] as YamlList).length != 3) {
     throw StateError(
       'Release needs parallel builders and one dependent publisher',
     );
@@ -173,6 +175,20 @@ void main() {
       'Windows release must check version, lock, build and package before upload',
     );
   }
+  final mac = releaseJobs['macos-release'] as YamlMap;
+  final macCommands = (mac['steps'] as YamlList)
+      .map((s) => s['run']?.toString() ?? '')
+      .join('\n');
+  for (final required in [
+    'flutter pub get --enforce-lockfile',
+    'update_manifest.py identity',
+    'flutter build macos --release --no-pub --target lib/main.dart',
+    'release_macos.py package',
+  ]) {
+    if (!macCommands.contains(required)) {
+      throw StateError('Missing macOS release step: $required');
+    }
+  }
   final publisher = releaseJobs['publish'] as YamlMap;
   if (publisher['concurrency']?['group'] != 'shiori-release-publish' ||
       publisher['concurrency']?['cancel-in-progress'] != false) {
@@ -188,10 +204,11 @@ void main() {
         ),
       )
       .toList();
-  if (downloads.length != 2 ||
+  if (downloads.length != 3 ||
       downloads.map((step) => step['with']['name']).toSet().difference({
         r'android-release-${{ github.ref_name }}',
         r'windows-release-${{ github.ref_name }}',
+        r'macos-release-${{ github.ref_name }}',
       }).isNotEmpty ||
       downloads.any(
         (step) =>
@@ -211,6 +228,10 @@ void main() {
   if (sums <= publisherSteps.indexOf(downloads.last) ||
       publisherIndex('sha256sum --check SHA256SUMS-windows-x64.txt') != sums ||
       publisherIndex('update_manifest.py manifest') <= sums ||
+      publisherIndex('release_macos.py manifest') !=
+          publisherIndex('update_manifest.py manifest') ||
+      publisherIndex('sha256sum --check SHA256SUMS-macos-universal.txt') !=
+          sums ||
       publisherIndex('publish_assets.py') <=
           publisherIndex('update_manifest.py manifest')) {
     throw StateError('Both artifact checksums must pass before publishing');
@@ -226,7 +247,11 @@ void main() {
       'Update signing needs private key and matching bundled public key',
     );
   }
-  for (final builder in ['android-release', 'windows-release']) {
+  for (final builder in [
+    'android-release',
+    'windows-release',
+    'macos-release',
+  ]) {
     if (releaseJobs[builder]['permissions']?['contents'] == 'write') {
       throw StateError('Build jobs must not have release write permissions');
     }
@@ -434,7 +459,7 @@ void main() {
   }
   stdout.writeln(
     'Workflow YAML parsed; quality-only CI, tag-only releases '
-    '(Android + Windows + iOS), tag-gated uploads, SHA-pinned actions, no persisted '
+    '(Android + Windows + macOS + iOS), tag-gated uploads, SHA-pinned actions, no persisted '
     'checkout credentials and working directories verified.',
   );
 }

@@ -15,7 +15,10 @@ ImportSource createImportSource(AppPaths paths, {String? operatingSystem}) =>
         inbox: paths.importInbox,
         droppedFiles: windowsDroppedFiles(),
       ),
-      'macos' => DesktopImportSource(inbox: paths.importInbox),
+      'macos' => DesktopImportSource(
+        inbox: paths.importInbox,
+        droppedFiles: windowsDroppedFiles(),
+      ),
       final platform => throw UnsupportedError(
         'Import is unavailable on $platform',
       ),

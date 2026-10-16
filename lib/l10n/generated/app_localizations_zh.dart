@@ -1260,6 +1260,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateRestartInstall => '重启并更新';
 
   @override
+  String get updateInstallFailedMacOS =>
+      '更新未能完成。请重试，或从 GitHub 下载完整应用后替换原来的 Shiori；阅读数据单独保存。';
+
+  @override
+  String get updateInstallLocationMacOS =>
+      '当前位置无法自动更新。请先退出 Shiori，将完整应用移到用户可写的应用程序文件夹（例如 ~/Applications），再重新打开。';
+
+  @override
   String get updateInstallHintWindows =>
       '安装包已校验。Shiori 将关闭、替换程序文件后重新启动；书架、阅读位置和设置会保留。';
 

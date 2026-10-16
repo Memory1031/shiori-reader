@@ -10,6 +10,7 @@ import '../data/updates/update_manifest.dart';
 import '../data/updates/update_storage.dart';
 import '../data/updates/update_installer.dart';
 import '../data/updates/windows_update_installer.dart';
+import '../data/updates/macos_update_installer.dart';
 import '../domain/contracts/app_updates.dart';
 import '../features/updates/update_controller.dart';
 
@@ -28,7 +29,7 @@ Future<UpdateController> createUpdateController(
     final info = await _channel.invokeMapMethod<String, dynamic>('info');
     version = info!['version'] as String;
     build = info['build'] as int;
-    if (Platform.isAndroid || Platform.isWindows) {
+    if (Platform.isAndroid || Platform.isWindows || Platform.isMacOS) {
       bundled = BundledRelease.fromJson(
         jsonDecode(
               await rootBundle.loadString('assets/release/build-info.json'),
@@ -57,11 +58,17 @@ Future<UpdateController> createUpdateController(
         availability: availability,
         release: bundled?.identity,
       ),
-      platform: Platform.isWindows ? 'windows-x64' : 'android',
+      platform: Platform.isMacOS
+          ? 'macos-universal'
+          : Platform.isWindows
+          ? 'windows-x64'
+          : 'android',
       installer: Platform.isAndroid
           ? const AndroidUpdateInstaller()
           : Platform.isWindows
           ? WindowsUpdateInstaller.system(prepareExit: prepareExit)
+          : Platform.isMacOS
+          ? MacOSUpdateInstaller(prepareExit: prepareExit)
           : null,
       key: bundled?.publicKey,
       http: DioUpdateHttp(),

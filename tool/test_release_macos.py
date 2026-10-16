@@ -1,0 +1,191 @@
+import json
+import os
+from pathlib import Path
+import plistlib
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+import zipfile
+
+from update_manifest import encoded, identity, key_from_private, openssl, sha, sign_manifest
+from release_macos import BUNDLE_IDENTITY, create_manifest, verify_archive, sign_locally
+from release_android import ReleaseCheckError
+from build_macos_helper import build
+
+
+class MacOSUpdateTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.keys = tempfile.TemporaryDirectory(prefix='shiori-mac-test-key-')
+        cls.addClassCleanup(cls.keys.cleanup)
+        key = Path(cls.keys.name) / 'key.pem'
+        key.write_bytes(openssl('genpkey', '-algorithm', 'RSA', '-pkeyopt', 'rsa_keygen_bits:3072'))
+        cls.secret, cls.key = key.read_bytes(), key_from_private(key)
+        cls.old = identity('version: 1.3.1+19', 'v1.3.1', 'a' * 40)
+        cls.new = identity('version: 1.3.2+20', 'v1.3.2', 'b' * 40)
+        if sys.platform == 'darwin':
+            root = Path(cls.keys.name)
+            (root / 'assets/release').mkdir(parents=True)
+            (root / 'assets/release/build-info.json').write_bytes(encoded(dict(schemaVersion=1, identity=cls.old, publicKey=cls.key)))
+            (root / 'macos').mkdir()
+            (root / 'macos/Updater').symlink_to(Path(__file__).resolve().parent.parent / 'macos/Updater')
+            cls.helper = root / 'shiori-updater'
+            build(root, cls.helper, ['arm64', 'x86_64'], testing=True)
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='shiori-macos-update-')
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name).resolve()
+        (self.root / 'pubspec.yaml').write_text('version: 1.3.2+20\n')
+        self.assets = self.root / 'assets'; self.assets.mkdir()
+        self.package = self.assets / 'shiori-reader-v1.3.2-macos-universal.zip'
+        self.install = self.root / 'Shiori.app'
+        self.workspace = Path(str(self.install) + '.update')
+        self.make_bundle(self.install, self.old)
+        self.bundle = self.root / 'payload/Shiori.app'
+        self.make_bundle(self.bundle, self.new)
+        self.archive()
+
+    def make_bundle(self, path, release):
+        (path / 'Contents/MacOS').mkdir(parents=True)
+        (path / 'Contents/Info.plist').write_bytes(plistlib.dumps(dict(CFBundleIdentifier='dev.shiori.reader', CFBundleShortVersionString=release['version'], CFBundleVersion=str(release['build']))))
+        for name in ['Shiori', 'shiori-updater']:
+            p = path / 'Contents/MacOS' / name
+            p.write_text('#!/bin/sh\nexit 0\n'); p.chmod(0o755)
+        info = path / BUNDLE_IDENTITY.removeprefix('Shiori.app/').replace('/App.framework/Resources/', '/App.framework/Versions/A/Resources/')
+        info.parent.mkdir(parents=True)
+        info.write_bytes(encoded(dict(schemaVersion=1, identity=release, publicKey=self.key)))
+        (path / 'Contents/Frameworks/App.framework/Resources').symlink_to('Versions/A/Resources')
+        (path / 'Contents/Frameworks/current').symlink_to('App.framework')
+
+    def archive(self, extra=None):
+        with zipfile.ZipFile(self.package, 'w') as z:
+            for path in self.bundle.rglob('*'):
+                name = str(path.relative_to(self.bundle.parent))
+                if path.is_symlink():
+                    entry = zipfile.ZipInfo(name); entry.create_system = 3
+                    entry.external_attr = (stat.S_IFLNK | 0o777) << 16
+                    z.writestr(entry, os.readlink(path))
+                elif path.is_file(): z.write(path, name)
+            if extra: extra(z)
+        metadata = dict(tag='v1.3.2', commit='b'*40, versionName='1.3.2', versionCode=20, platform='macos-universal', archive=self.package.name, sha256=sha(self.package))
+        (self.assets / 'release-info-macos-universal.json').write_bytes(encoded(metadata))
+
+    def signed(self):
+        raw = create_manifest(self.root, self.assets, 'v1.3.2', 'b'*40, self.key)
+        manifest, signature = self.root / 'manifest.json', self.root / 'manifest.sig'
+        manifest.write_bytes(raw); signature.write_bytes(sign_manifest(raw, self.secret, self.key))
+        return manifest, signature
+
+    def call(self, mode, *args, env=None, success=True):
+        p = subprocess.run([str(self.helper), mode, str(self.install), *map(str,args)], env=env, capture_output=True, text=True, timeout=20)
+        self.assertEqual(p.returncode == 0, success, p.stdout + p.stderr)
+        return p
+
+    def prepare(self):
+        manifest, signature = self.signed()
+        self.call('prepare', self.package, manifest, signature)
+
+    def run_update(self, env=None, success=True):
+        parent = subprocess.Popen(['/bin/sleep', '15'])
+        try:
+            process = subprocess.Popen([str(self.helper), 'run', str(self.install), str(parent.pid)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+            deadline = time.monotonic() + 10
+            while not (self.workspace / 'started.json').exists() and process.poll() is None and time.monotonic() < deadline:
+                time.sleep(.02)
+            self.assertTrue((self.workspace / 'started.json').exists())
+            parent.terminate(); parent.wait(timeout=5)
+            stdout, stderr = process.communicate(timeout=15)
+            self.assertEqual(process.returncode == 0, success, stdout + stderr)
+            return process.returncode
+        finally:
+            if parent.poll() is None: parent.kill(); parent.wait()
+
+    def test_separate_manifest_and_bundle_validation(self):
+        manifest, signature = self.signed()
+        value = json.loads(manifest.read_text())
+        self.assertEqual([a['platform'] for a in value['assets']], ['macos-universal'])
+        self.assertEqual(value['assets'][0]['minimumSystem'], '12.0')
+        self.assertEqual(signature.stat().st_size, 384)
+
+    def test_reject_traversal_and_link_writes(self):
+        for name in ['../outside', 'Shiori.app/../outside', 'Shiori.app/Contents/Frameworks/current/outside']:
+            with self.subTest(name=name):
+                self.archive(lambda z: z.writestr(name, 'bad'))
+                with self.assertRaises(ReleaseCheckError):
+                    verify_archive(self.package, self.new, self.key)
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS signing')
+    def test_ad_hoc_signs_nested_helper_and_complete_bundle(self):
+        shutil.rmtree(self.install / 'Contents/Frameworks')
+        for name in ['Shiori', 'shiori-updater']:
+            shutil.copy2(self.helper, self.install / 'Contents/MacOS' / name)
+        info = self.install / 'Contents/Info.plist'
+        info.write_bytes(plistlib.dumps(dict(CFBundleIdentifier='dev.shiori.reader', CFBundleExecutable='Shiori', CFBundlePackageType='APPL')))
+        sign_locally(self.install)
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
+    def test_refuses_bad_signature_and_other_running_instance(self):
+        manifest, signature = self.signed()
+        signature.write_bytes(b'0' * 384)
+        result = self.call('prepare', self.package, manifest, signature, success=False)
+        self.assertIn('verification', result.stderr)
+        self.prepare()
+        result = self.call('run', '999999', env={**os.environ, 'SHIORI_UPDATE_OTHER_INSTANCE':'1'}, success=False)
+        self.assertIn('instances', result.stderr)
+        self.assertFalse((self.workspace / 'transaction.json').exists())
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
+    def test_upgrade_reextracts_staging_and_preserves_user_data(self):
+        data = self.root / 'reading.sqlite'; data.write_text('user-owned data')
+        self.prepare()
+        (self.workspace / 'payload/Shiori.app/Contents/MacOS/Shiori').write_text('tampered staging')
+        self.run_update()
+        self.assertEqual(self.call('recover').stdout.strip(), 'installed')
+        self.assertEqual(data.read_text(), 'user-owned data')
+        self.assertEqual((self.install / 'Contents/MacOS/Shiori').read_text(), '#!/bin/sh\nexit 0\n')
+        self.assertTrue((self.install / 'Contents/Frameworks/current').is_symlink())
+        self.assertFalse((self.workspace / 'previous.app').exists())
+        self.assertEqual(self.call('recover').stdout.strip(), 'idle')
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
+    def test_rejects_tampering_before_any_replacement(self):
+        self.prepare()
+        with (self.workspace / 'package.zip').open('ab') as f: f.write(b'x')
+        result = self.call('run', '999999', success=False)
+        self.assertIn('verification', result.stderr)
+        self.assertFalse((self.workspace / 'previous.app').exists())
+        self.assertTrue(self.install.exists())
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
+    def test_launch_failure_restores_original_bundle(self):
+        self.prepare()
+        self.run_update(env={**os.environ, 'SHIORI_UPDATE_LAUNCH_FAIL':'1'}, success=False)
+        info = plistlib.loads((self.install / 'Contents/Info.plist').read_bytes())
+        self.assertEqual(info['CFBundleVersion'], '19')
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
+    def test_interrupted_replacement_recovers_at_each_commit_boundary(self):
+        for stage, expected in [('planned','19'), ('swapped','20'), ('backed-up','20'), ('replaced','20')]:
+            with self.subTest(stage=stage):
+                if self.workspace.exists(): shutil.rmtree(self.workspace)
+                if self.install.exists(): shutil.rmtree(self.install)
+                self.make_bundle(self.install, self.old)
+                self.prepare()
+                self.run_update(env={**os.environ,'SHIORI_UPDATE_STOP':stage},success=False)
+                self.call('recover')
+                info = plistlib.loads((self.install / 'Contents/Info.plist').read_bytes())
+                self.assertEqual(info['CFBundleVersion'], expected)
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
+    def test_refuses_foreign_workspace(self):
+        self.workspace.mkdir(); note = self.workspace / 'personal.txt'; note.write_text('keep')
+        self.assertIn('workspaceConflict', self.call('recover',success=False).stderr)
+        self.assertEqual(note.read_text(), 'keep')
+
+
+if __name__ == '__main__': unittest.main()

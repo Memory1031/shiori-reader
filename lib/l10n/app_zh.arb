@@ -669,6 +669,8 @@
   "updateInstallCancelled": "已取消安装，下载包已保留，可以重试。",
   "updateInstallFailed": "系统未能完成安装。请检查可用空间和安装权限后重试。",
   "updateRestartInstall": "重启并更新",
+  "updateInstallFailedMacOS": "更新未能完成。请重试，或从 GitHub 下载完整应用后替换原来的 Shiori；阅读数据单独保存。",
+  "updateInstallLocationMacOS": "当前位置无法自动更新。请先退出 Shiori，将完整应用移到用户可写的应用程序文件夹（例如 ~/Applications），再重新打开。",
   "updateInstallHintWindows": "安装包已校验。Shiori 将关闭、替换程序文件后重新启动；书架、阅读位置和设置会保留。",
   "updateRestarting": "正在关闭 Shiori 以安装更新，安装完成后会自动重新启动。",
   "updateInstallFailedWindows": "更新未能完成。请重试，或从发布页下载完整的 Windows ZIP 重新解压。书架和阅读数据单独保存，不受影响。",

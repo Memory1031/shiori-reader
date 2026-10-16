@@ -5,11 +5,11 @@
 | 事件 | 工作流与行为 |
 | --- | --- |
 | PR、推送 main / develop、手动 CI | [ci.yml](../.github/workflows/ci.yml)：质量检查 |
-| 推送 `v*` tag | [release.yml](../.github/workflows/release.yml)：并行构建签名 APK 与 Windows ZIP，二者通过后统一创建 / 更新 GitHub Release |
+| 推送 `v*` tag | [release.yml](../.github/workflows/release.yml)：并行构建签名 APK、Windows ZIP 与 macOS 通用包，三者通过后统一创建 / 更新 GitHub Release |
 
 日常 CI 负责质量检查，tag 工作流负责应用构建与发布。
 
-正式标签为 `vX.Y.Z`，beta 标签为 `vX.Y.Z-beta.N`。三端共用版本预检：标签基础版本与 pubspec 的 `X.Y.Z` 一致，包内使用 `X.Y.Z+build`；每个版本的 beta 序号从 1 开始，内部构建号独立递增。beta 的 APK / ZIP 标记为 GitHub 预发布，Latest 保持正式发布；iOS 上传 TestFlight。准备与发布命令见[发布操作](release/README.md)。
+正式标签为 `vX.Y.Z`，beta 标签为 `vX.Y.Z-beta.N`。各平台共用版本预检：标签基础版本与 pubspec 的 `X.Y.Z` 一致，包内使用 `X.Y.Z+build`；每个版本的 beta 序号从 1 开始，内部构建号独立递增。beta 的 APK / ZIP / DMG 标记为 GitHub 预发布，Latest 保持正式发布；iOS 上传 TestFlight。准备与发布命令见[发布操作](release/README.md)。
 
 ## 质量检查
 
@@ -29,9 +29,13 @@ Windows 构建 job 仅在 tag 发布工作流运行，使用 `windows-2022` / Vi
 
 `tool/package_windows.ps1` 查找 Visual Studio 2022 的 x64 VC++ 运行库，调用标准库脚本 `tool/release_windows.py` 打包。脚本核对 tag / pubspec、EXE 的 x64 架构、产品身份、版本与非 Debug 标志，验证必需 DLL / AOT / 资源文件，保留完整 data 目录及许可声明。ZIP 根目录直接包含 `shiori.exe`；不带 PDB 或包含构建机路径的 native_assets.json。
 
-Windows 产物为 `shiori-reader-<tag>-windows-x64.zip`、`SHA256SUMS-windows-x64.txt` 和 `release-info-windows-x64.json`（版本、commit、摘要及未签名状态），与 Android 文件名分开。tag 构建产物保留 14 天；`publish` job 等待两个平台构建成功，下载当前运行的两个 artifact、核对两份 SHA-256 后统一上传同一 GitHub Release。只有该 job 获得 Release 写权限。任一构建或校验失败，都不进入发布。
+Windows 产物为 `shiori-reader-<tag>-windows-x64.zip`、`SHA256SUMS-windows-x64.txt` 和 `release-info-windows-x64.json`（版本、commit、摘要及未签名状态），与 Android 文件名分开。tag 构建产物保留 14 天；`publish` job 等待 Android / Windows / macOS 构建成功，下载当前运行的三个 artifact、核对三份 SHA-256 后统一上传同一 GitHub Release。只有该 job 获得 Release 写权限。任一构建或校验失败，都不进入发布。
 
 本地可在正式入口 Release 构建后调用 `tool/package_windows.ps1 -Tag <tag> -Commit <完整提交 SHA>` 验包。Windows 使用方式与分发边界见[发布说明](release/README.md)。
+
+## macOS tag 构建
+
+`macos-release` 使用 `macos-15` 与相同固定 Flutter / 严格锁文件，入口为 `lib/main.dart`；生成发布身份后编译 arm64 / x86_64 通用应用及内置更新辅助程序。打包只做 ad-hoc 签名，无 Apple Team、证书、公证或上架操作。输出 DMG、完整应用 ZIP、元数据与独立摘要文件；发布 job 另外生成并签署 macOS 更新清单，保留原 Android / Windows 清单格式。Actions 不启动应用，不验证 Gatekeeper、窗口交互或真实机器更新；这些属于原生运行验收。
 
 ## Android tag 发布
 
@@ -39,7 +43,7 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 
 已知校验错误输出受控原因（版本、证书、工具），不会输出工具参数、原始 stderr 或签名秘密；未知异常仍使用通用提示。
 
-按用户约定，tag 发布直接并行进入 `android-release` 与 `windows-release`，不查询或等待 CI、不重复执行格式 / 分析 / UT。develop 日常 CI 保持独立；master 仅作为发布中间分支，不因推送触发 CI 或 Release。发布脚本优先快进 master，保留最终提交与标签的可追溯性。Android 构建仍保留工具预检、版本一致性、签名和 APK 校验；失败时不上传 Release。签名需要四个仓库 Actions secrets：
+按用户约定，tag 发布直接并行进入 `android-release`、`windows-release` 与 `macos-release`，不查询或等待 CI、不重复执行格式 / 分析 / UT。develop 日常 CI 保持独立；master 仅作为发布中间分支，不因推送触发 CI 或 Release。发布脚本优先快进 master，保留最终提交与标签的可追溯性。Android 构建仍保留工具预检、版本一致性、签名和 APK 校验；失败时不上传 Release。签名需要四个仓库 Actions secrets：
 
 | Secret | 内容 |
 | --- | --- |

@@ -120,8 +120,12 @@ class ReaderBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final grouped = ShioriCapabilities.of(context).pointerFirst;
-    String tip(String action, String shortcut) =>
-        grouped ? l.readerShortcutTooltip(action, shortcut) : action;
+    String tip(String action, String shortcut) => grouped
+        ? l.readerShortcutTooltip(
+            action,
+            readerShortcutLabel(Theme.of(context).platform, shortcut),
+          )
+        : action;
     final contents = Tooltip(
       message: tip(contentsTooltip, ReaderShortcutLabels.contents),
       child: TextButton.icon(

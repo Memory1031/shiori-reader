@@ -89,6 +89,19 @@ def publish(root, assets, tag, commit, key, run=gh):
         "update-manifest.json",
         "update-manifest.sig",
     }
+    if (assets / "release-info-macos-universal.json").exists():
+        from release_macos import create_manifest as create_macos_manifest
+        mac_raw = (assets / "update-manifest-macos.json").read_bytes()
+        verify_signature(mac_raw, (assets / "update-manifest-macos.sig").read_bytes(), key)
+        if mac_raw != create_macos_manifest(root, assets, tag, commit, key):
+            raise ReleaseCheckError("Signed macOS manifest differs from prepared assets")
+        mac_manifest = read_json(mac_raw)
+        if mac_manifest.get("installer"):
+            names.add(mac_manifest["installer"]["name"])
+        names |= {item["name"] for item in mac_manifest["assets"]} | {
+            "release-info-macos-universal.json", "SHA256SUMS-macos-universal.txt",
+            "update-manifest-macos.json", "update-manifest-macos.sig",
+        }
     files = {path.name: path for path in assets.iterdir() if path.is_file()}
     if set(files) != names or any(path.is_symlink() for path in files.values()):
         raise ReleaseCheckError("Unexpected or missing publish assets")

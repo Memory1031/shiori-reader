@@ -36,6 +36,11 @@ final class GithubUpdateRepository implements AppUpdateRepository {
   final UpdateHttp http;
   final UpdateStorage storage;
   final UpdateInstaller? installer;
+  bool get _macOS => platform == 'macos-universal';
+  String get _manifestName =>
+      _macOS ? 'update-manifest-macos.json' : 'update-manifest.json';
+  String get _signatureName =>
+      _macOS ? 'update-manifest-macos.sig' : 'update-manifest.sig';
   @override
   bool get supportsInstallation => installer != null;
   @override
@@ -124,6 +129,7 @@ final class GithubUpdateRepository implements AppUpdateRepository {
       sig,
       key!,
       expectedTag: tag,
+      macOS: _macOS,
     );
     final asset = manifest.assets.singleWhere(
       (asset) => asset.platform == platform,
@@ -232,8 +238,8 @@ final class GithubUpdateRepository implements AppUpdateRepository {
         }
         // Legacy releases cannot disprove a signed upgrade, but also cannot
         // establish that this channel is up to date.
-        if (!assets.containsKey('update-manifest.json') ||
-            !assets.containsKey('update-manifest.sig')) {
+        if (!assets.containsKey(_manifestName) ||
+            !assets.containsKey(_signatureName)) {
           incompleteRelease = true;
           continue;
         }
@@ -253,15 +259,15 @@ final class GithubUpdateRepository implements AppUpdateRepository {
           }
         }
 
-        assetReady('update-manifest.json', maxUpdateManifestBytes);
-        assetReady('update-manifest.sig', 384, exact: 384);
+        assetReady(_manifestName, maxUpdateManifestBytes);
+        assetReady(_signatureName, 384, exact: 384);
         final raw = await http.read(
-          releaseAsset(tag, 'update-manifest.json'),
+          releaseAsset(tag, _manifestName),
           token,
           limit: maxUpdateManifestBytes,
         );
         final sig = await http.read(
-          releaseAsset(tag, 'update-manifest.sig'),
+          releaseAsset(tag, _signatureName),
           token,
           limit: 384,
         );

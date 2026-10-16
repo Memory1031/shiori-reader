@@ -268,6 +268,29 @@ class Book {
 }
 
 void main() {
+  test('macOS uses Command while other desktop bindings retain Control', () {
+    for (final platform in [TargetPlatform.macOS, TargetPlatform.windows]) {
+      final find = desktopReaderShortcutsFor(platform).keys
+          .whereType<SingleActivator>()
+          .singleWhere((key) => key.trigger == LogicalKeyboardKey.keyF);
+      expect(find.meta, platform == TargetPlatform.macOS);
+      expect(find.control, platform != TargetPlatform.macOS);
+    }
+  });
+
+  testWidgets(
+    'macOS Command opens the existing reader settings panel',
+    (tester) async {
+      await pumpReader(tester);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.comma);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pumpAndSettle();
+      expect(settingsPanel, findsOneWidget);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
   group('one command, every input', () {
     testWidgets('buttons, shortcuts and the context menu open the same '
         'panels, and the tooltips name the shortcuts', (tester) async {

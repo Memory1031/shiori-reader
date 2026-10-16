@@ -1,0 +1,3 @@
+PRODUCT_NAME = Shiori
+PRODUCT_BUNDLE_IDENTIFIER = dev.shiori.reader
+PRODUCT_COPYRIGHT = Copyright © Shiori contributors

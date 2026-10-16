@@ -118,3 +118,23 @@ abstract final class ReaderShortcutLabels {
   static const progress = 'Ctrl+G';
   static const settings = 'Ctrl+,';
 }
+
+/// Preserve existing Ctrl bindings on other platforms; macOS uses Command.
+Map<ShortcutActivator, Intent> desktopReaderShortcutsFor(
+  TargetPlatform platform,
+) => platform != TargetPlatform.macOS
+    ? desktopReaderShortcuts
+    : {
+        for (final entry in desktopReaderShortcuts.entries)
+          if (entry.key case SingleActivator key)
+            SingleActivator(
+              key.trigger,
+              control: false,
+              meta: key.control || key.meta,
+              shift: key.shift,
+              alt: key.alt,
+              includeRepeats: key.includeRepeats,
+            ): entry.value,
+      };
+String readerShortcutLabel(TargetPlatform platform, String label) =>
+    platform == TargetPlatform.macOS ? label.replaceAll('Ctrl+', '⌘') : label;

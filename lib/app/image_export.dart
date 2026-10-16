@@ -10,7 +10,7 @@ ImageExporter createImageExporter(AppPaths paths) => ImageExportOperation(
   stagingRoot: () async => Directory(
     p.join((await getTemporaryDirectory()).path, 'shiori-image-export'),
   ),
-  destination: Platform.isWindows
+  destination: Platform.isWindows || Platform.isMacOS
       ? FileImageExportDestination(
           protectedRoots: [paths.root.parent, paths.temporary.parent],
         )
