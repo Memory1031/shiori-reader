@@ -10,7 +10,7 @@ class MainFlutterWindow: NSWindow {
     contentViewController = controller
     setFrame(frame, display:true)
     minSize = NSSize(width:620,height:520)
-    setContentSize(NSSize(width:1100,height:780))
+    setContentSize(NSSize(width:1280,height:900))
     if !setFrameUsingName(savedFrameName) { center() }
     _ = setFrameAutosaveName(savedFrameName)
     fitToVisibleScreen()

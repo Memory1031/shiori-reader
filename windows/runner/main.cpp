@@ -34,7 +34,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   FlutterWindow window(project);
   Win32Window::Point origin(0, 0);
-  Win32Window::Size size(1100, 800);
+  Win32Window::Size size(1280, 900);
   if (!window.Create(L"Shiori", origin, size, true)) {
     return EXIT_FAILURE;
   }

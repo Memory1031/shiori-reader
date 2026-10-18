@@ -40,7 +40,7 @@ class Window : public Win32Window {
  public:
   explicit Window(const std::wstring& key) : Win32Window(key) {}
   void Open() {
-    Check(Create(L"Shiori window placement test", Point(0, 0), Size(1100, 800), true),
+    Check(Create(L"Shiori window placement test", Point(0, 0), Size(1280, 900), true),
           "Cannot create native test window");
     Pump();
   }
@@ -82,9 +82,9 @@ void Lifecycle(const std::wstring& key) {
     const auto dpi = FlutterDesktopGetDpiForHWND(first.GetHandle());
     const auto work = Work(first.GetHandle());
     const auto frame = Bounds(first.GetHandle());
-    Check(frame.right - frame.left == std::min<LONG>(MulDiv(1100, dpi, 96), work.right - work.left) &&
-          frame.bottom - frame.top == std::min<LONG>(MulDiv(800, dpi, 96), work.bottom - work.top),
-          "Default window must be 1100x800 logical outer pixels, fitted to work area");
+    Check(frame.right - frame.left == std::min<LONG>(MulDiv(1280, dpi, 96), work.right - work.left) &&
+          frame.bottom - frame.top == std::min<LONG>(MulDiv(900, dpi, 96), work.bottom - work.top),
+          "Default window must be 1280x900 logical outer pixels, fitted to work area");
     Check(frame.left == work.left + (work.right - work.left - (frame.right - frame.left)) / 2 &&
           frame.top == work.top + (work.bottom - work.top - (frame.bottom - frame.top)) / 2,
           "First launch must be centered in the usable screen area");
