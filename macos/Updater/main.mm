@@ -226,6 +226,32 @@ static int lockCommit(const char *parent) {
   }
   return fd;
 }
+static bool entryExists(NSString *path) {
+  struct stat st;
+  if (lstat(path.fileSystemRepresentation, &st) == 0) return true;
+  require(errno == ENOENT, "storage"); return false;
+}
+
+// Retire an idle, entirely owned v1 workspace, without accepting a v1 manifest
+// or launching a legacy executable. The shared flock excludes old helpers.
+static void retireLegacyWorkspace(NSString *workspace, NSString *install) {
+  struct stat installed;
+  require(lstat(install.fileSystemRepresentation, &installed) == 0 && S_ISDIR(installed.st_mode), "workspaceConflict");
+  for (NSString *name in @[@"transaction.json", @"previous.app"])
+    require(!entryExists(join(workspace, name)), "workspaceConflict");
+  NSArray *disposable = @[@"package.zip", @"manifest.json", @"manifest.sig", @"payload", @"started.json", @"handoff"];
+  NSArray *names = [fm contentsOfDirectoryAtPath:workspace error:nullptr]; require(names, "storage");
+  for (NSString *name in names) {
+    require([disposable containsObject:name] || [@[@"owner.json", @"lock"] containsObject:name], "workspaceConflict");
+    NSString *path = join(workspace, name); struct stat st;
+    require(lstat(path.fileSystemRepresentation, &st) == 0 && st.st_uid == getuid(), "workspaceConflict");
+    if ([name isEqual:@"payload"]) {
+      require(S_ISDIR(st.st_mode), "workspaceConflict"); validateTree(path);
+    } else require(S_ISREG(st.st_mode) && st.st_nlink == 1, "workspaceConflict");
+  }
+  for (NSString *name in disposable) if (entryExists(join(workspace, name))) removeOwned(join(workspace, name));
+  writeJSON(join(workspace, @"owner.json"), @{@"installation":install, @"format":@"ShioriMacUpdate/2"});
+}
 int main(int argc, const char **argv) {
  @autoreleasepool {
   fm = NSFileManager.defaultManager;
@@ -240,16 +266,21 @@ int main(int argc, const char **argv) {
       ![install hasPrefix:@"/Volumes/"] && ![install containsString:@"/AppTranslocation/"] &&
       access(install.stringByDeletingLastPathComponent.fileSystemRepresentation, W_OK) == 0, "location");
     NSString *workspace = [install stringByAppendingString:@".update"], *marker = join(workspace, @"owner.json");
-    bool owned = exists(marker) && [json([NSData dataWithContentsOfFile:marker])[@"installation"] isEqual:install] && [json([NSData dataWithContentsOfFile:marker])[@"format"] isEqual:@"ShioriMacUpdate/2"];
-    require(!exists(workspace) || owned, "workspaceConflict");
-    if (!exists(workspace)) {
+    if (!entryExists(workspace)) {
       if ([mode isEqual:@"recover"]) { puts("idle"); return 0; }
       require([fm createDirectoryAtPath:workspace withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@0700} error:nullptr], "storage");
       writeJSON(marker, @{@"installation":install, @"format":@"ShioriMacUpdate/2"});
     }
-    struct stat st; require(lstat(workspace.fileSystemRepresentation, &st) == 0 && S_ISDIR(st.st_mode) && st.st_uid == getuid(), "workspaceConflict");
+    struct stat st; require(lstat(workspace.fileSystemRepresentation, &st) == 0 && S_ISDIR(st.st_mode) && st.st_uid == getuid() && !(st.st_mode & 0022), "workspaceConflict");
+    require(lstat(marker.fileSystemRepresentation, &st) == 0 && S_ISREG(st.st_mode) && st.st_uid == getuid() && st.st_nlink == 1 && st.st_size <= 4096, "workspaceConflict");
+    NSDictionary *owner = json([NSData dataWithContentsOfFile:marker]);
+    bool legacy = [owner[@"format"] isEqual:@"ShioriMacUpdate/1"];
+    require(owner.count == 2 && [owner[@"installation"] isEqual:install] &&
+      (legacy || [owner[@"format"] isEqual:@"ShioriMacUpdate/2"]), "workspaceConflict");
     lock = open(join(workspace, @"lock").fileSystemRepresentation, O_RDWR|O_CREAT|O_NOFOLLOW, 0600);
-    require(lock >= 0 && flock(lock, LOCK_EX|LOCK_NB) == 0, "busy");
+    require(lock >= 0 && fstat(lock, &st) == 0 && S_ISREG(st.st_mode) && st.st_uid == getuid() && st.st_nlink == 1, "workspaceConflict");
+    require(flock(lock, LOCK_EX|LOCK_NB) == 0, "busy");
+    if (legacy) retireLegacyWorkspace(workspace, install);
     NSString *backup = join(workspace, @"previous.app"), *payload = join(workspace, @"payload"), *next = join(payload, @"Shiori.app"), *transaction = join(workspace, @"transaction.json");
     NSDictionary *trust = json([NSData dataWithBytes:SHIORI_UPDATE_TRUST length:strlen(SHIORI_UPDATE_TRUST)]);
     cleanMount(workspace);

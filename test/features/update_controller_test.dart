@@ -19,6 +19,22 @@ void main() {
     controller.dispose();
   });
   test(
+    'download restore failure does not skip installation recovery',
+    () async {
+      repository.supportsInstallation = true;
+      repository.restoreFailure = const UpdateIssue(UpdateProblem.verification);
+      repository.installState = UpdateInstallState.failed;
+      await controller.initialize();
+      expect(controller.initialized, isTrue);
+      expect(controller.installState, UpdateInstallState.failed);
+      expect(controller.issue?.problem, UpdateProblem.verification);
+      expect(controller.phase, UpdatePhase.idle);
+      repository.restoreFailure = null;
+      await controller.check();
+      expect(repository.checks, 1);
+    },
+  );
+  test(
     'permission return does not auto-install; cancellation can retry without downloading',
     () async {
       repository.supportsInstallation = true;

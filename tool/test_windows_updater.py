@@ -250,6 +250,44 @@ class UpdaterTest(unittest.TestCase):
         self.addCleanup(target.chmod, stat.S_IREAD | stat.S_IWRITE)
         self.assertEqual(self.check(), 31)
 
+    def retire(self):
+        return subprocess.run([str(self.install / 'shiori-updater.exe'), 'retire',
+            str(self.workspace), str(self.install)], env=ENVIRONMENT, timeout=15).returncode
+
+    def test_idle_legacy_workspace_retired_without_executing_legacy_helper(self):
+        marker = self.workspace / 'shiori-update-workspace'
+        marker.write_text('ShioriUpdateWorkspace/1\n', newline='')
+        (self.workspace / 'shiori-updater.exe').write_bytes(b'not executable legacy helper')
+        self.assertEqual(self.retire(), 21)
+        self.assertEqual(marker.read_bytes(), b'ShioriUpdateWorkspace/2\n')
+        self.assertEqual((self.workspace / 'shiori-update-closed').read_bytes(), b'ShioriUpdateClosed/2\n21\n')
+
+    def test_legacy_transaction_or_foreign_files_are_retained(self):
+        marker = self.workspace / 'shiori-update-workspace'
+        marker.write_text('ShioriUpdateWorkspace/1\n', newline='')
+        for name, expected in [('plan.bin',2), ('backup/old.exe',2), ('personal.txt',32)]:
+            path = self.workspace / name
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(b'keep')
+            before = tree(self.workspace)
+            self.assertEqual(self.retire(), expected)
+            self.assertEqual(tree(self.workspace), before)
+            path.unlink()
+            if name.startswith('backup/'): path.parent.rmdir()
+
+    def test_active_updater_blocks_legacy_retirement(self):
+        marker = self.workspace / 'shiori-update-workspace'
+        marker.write_text('ShioriUpdateWorkspace/1\n', newline='')
+        update = self.apply(parent_seconds=3, wait=False)
+        log = self.workspace / 'updater.log'
+        deadline = time.monotonic() + 10
+        while (not log.exists() or 'waiting' not in log.read_text('utf-8')) and time.monotonic() < deadline:
+            time.sleep(.01)
+        self.assertEqual(self.retire(), 20)
+        self.assertEqual(marker.read_bytes(), b'ShioriUpdateWorkspace/1\n')
+        self.assertEqual(update.wait(timeout=60), 0)
+        self.launched(2)
+
     def test_other_instance_blocks_update(self):
         ready, stop = Event(), Event()
         self.addCleanup(ready.close)

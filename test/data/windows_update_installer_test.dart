@@ -37,7 +37,12 @@ void main() {
         installation: installation,
         processId: 4242,
         runUpdater: (executable, arguments) async {
-          expect(executable, '${workspace.path}/shiori-updater.exe');
+          expect(
+            executable,
+            arguments.first == 'retire'
+                ? '${installation.path}/shiori-updater.exe'
+                : '${workspace.path}/shiori-updater.exe',
+          );
           expect(File(executable).existsSync(), isTrue);
           runs.add(arguments);
           return code(arguments.first);
@@ -189,6 +194,44 @@ void main() {
   });
 
   group('status', () {
+    test('idle legacy workspace is retired by the installed helper', () async {
+      workspace.createSync();
+      marker().writeAsStringSync('ShioriUpdateWorkspace/1\n');
+      File(
+        '${workspace.path}/shiori-updater.exe',
+      ).writeAsStringSync('old helper must not run');
+      code = (mode) {
+        expect(mode, 'retire');
+        marker().writeAsStringSync(ownership);
+        closeWorkspace(WindowsUpdaterCode.none);
+        return WindowsUpdaterCode.none;
+      };
+      expect(await installer().status(), UpdateInstallState.idle);
+      expect(runs.single, ['retire', workspace.path, installation.path]);
+      expect(workspace.existsSync(), isFalse);
+    });
+    for (final result in [
+      WindowsUpdaterCode.busy,
+      WindowsUpdaterCode.recoveryRequired,
+      WindowsUpdaterCode.invalid,
+    ]) {
+      test('legacy workspace refusal $result preserves its files', () async {
+        workspace.createSync();
+        marker().writeAsStringSync('ShioriUpdateWorkspace/1\n');
+        File('${workspace.path}/plan.bin').writeAsStringSync('old transaction');
+        final before = contents(workspace);
+        code = (_) => result;
+        if (result == WindowsUpdaterCode.busy) {
+          expect(await installer().status(), UpdateInstallState.installing);
+        } else {
+          await expectLater(
+            installer().status(),
+            problem(UpdateProblem.workspaceConflict),
+          );
+        }
+        expect(contents(workspace), before);
+      });
+    }
     test('nothing staged is idle without running the updater', () async {
       expect(await installer().status(), UpdateInstallState.idle);
       ownWorkspace();

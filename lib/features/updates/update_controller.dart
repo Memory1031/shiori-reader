@@ -81,9 +81,12 @@ class UpdateController extends ChangeNotifier {
   Future<void> initialize() => _run((token) async {
     preferences = await repository.loadPreferences();
     initialized = true;
-    candidate = await repository.restore(preferences.channel, token);
-    phase = candidate == null ? UpdatePhase.idle : UpdatePhase.downloaded;
-    if (canInstall) _installedState(await repository.installationStatus());
+    try {
+      candidate = await repository.restore(preferences.channel, token);
+      phase = candidate == null ? UpdatePhase.idle : UpdatePhase.downloaded;
+    } finally {
+      if (canInstall) _installedState(await repository.installationStatus());
+    }
   });
 
   void _installedState(UpdateInstallState value) {

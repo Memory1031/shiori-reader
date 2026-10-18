@@ -585,6 +585,56 @@ int Recovered(Status status) {
   return kRecoveryRequired;
 }
 
+// One-way disposal of idle v1 staging, using the installed v2 helper under the
+// same mutex as old updaters. Never execute the helper left in that workspace.
+int RetireLegacyWorkspace(const fs::path& workspace, const fs::path& install) {
+  InstallLock lock(install);
+  NoReparse(install); NoReparse(workspace);
+  const auto marker = workspace / L"shiori-update-workspace";
+  NoReparse(marker);
+  if (ReadBytes(marker, 128, kInvalid) != "ShioriUpdateWorkspace/1\n") return kInvalid;
+  for (const auto* name : {L"plan.bin", L"backup", L"setup.pending", L"state"}) {
+    if (GetFileAttributesW((workspace / name).c_str()) != INVALID_FILE_ATTRIBUTES) return kRecoveryRequired;
+  }
+  const std::set<std::wstring> names = {L"shiori-update-workspace", L"shiori-update-workspace.tmp", L"shiori-update-closed",
+      L"shiori-update-closed.tmp", L"shiori-updater.exe", L"update-manifest.json", L"update-manifest.sig",
+      L"payload", L"updater.log", L"result", L"result.tmp"};
+  size_t count = 0;
+  for (const auto& entry : fs::directory_iterator(workspace)) {
+    if (!names.count(entry.path().filename().wstring())) return kInvalid;
+    NoReparse(entry.path());
+    if (entry.path().filename() == L"payload") {
+      if (!entry.is_directory()) return kInvalid;
+      for (const auto& child : fs::recursive_directory_iterator(entry.path())) {
+        if (++count > 20000) return kInvalid;
+        NoReparse(child.path());
+        if (!child.is_directory() && !child.is_regular_file()) return kInvalid;
+      }
+    } else if (!entry.is_regular_file() || fs::hard_link_count(entry.path()) != 1) return kInvalid;
+  }
+  const auto closed = workspace / L"shiori-update-closed";
+  if (fs::exists(closed)) {
+    const auto raw = ReadBytes(closed, 128, kInvalid);
+    bool known = raw == "ShioriUpdateClosed/2\n21\n";
+    for (int code : {kInstalled, kRolledBack, kLaunchFailed, kNone, kError, kFailed, kTimeout,
+                     kInstances, kStorage, kInvalid, kUnsupported}) {
+      if (raw == "ShioriUpdateClosed/1\n" + std::to_string(code) + "\n") known = true;
+    }
+    if (!known) return kInvalid;
+  }
+  const auto write = [](const fs::path& path, const char* bytes) {
+    const auto temp = fs::path(path.wstring() + L".tmp");
+    { std::ofstream output(temp, std::ios::binary | std::ios::trunc);
+      output << bytes; output.flush();
+      if (!output.good()) throw Failure{kStorage, "Cannot retire legacy workspace"}; }
+    if (!MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+      throw Failure{kStorage, "Cannot retire legacy workspace"};
+  };
+  write(closed, "ShioriUpdateClosed/2\n21\n");
+  write(marker, "ShioriUpdateWorkspace/2\n");
+  return kNone;
+}
+
 int RecoverMode(const fs::path& workspace, const fs::path& install) {
   InstallLock lock(install);
   if (fs::exists(workspace / L"setup.pending")) {
@@ -643,6 +693,7 @@ int Run(int argc, wchar_t** argv) {
   const fs::path workspace = fs::path(argv[2]).lexically_normal();
   const fs::path install = fs::path(argv[3]).lexically_normal();
   CheckPaths(workspace, install);
+  if (mode == L"retire" && argc == 4) return RetireLegacyWorkspace(workspace, install);
   workspace_for_log = workspace;
   if (mode == L"check" && argc == 5) {
     wchar_t* end = nullptr;

@@ -266,5 +266,46 @@ import Darwin
         self.assertIn('workspaceConflict', self.call('recover',success=False).stderr)
         self.assertEqual(note.read_text(), 'keep')
 
+    def legacy_workspace(self):
+        self.workspace.mkdir()
+        marker = self.workspace / 'owner.json'
+        marker.write_bytes(encoded(dict(format='ShioriMacUpdate/1', installation=str(self.install))))
+        return marker
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
+    def test_idle_legacy_workspace_allows_the_next_dmg_upgrade(self):
+        marker = self.legacy_workspace()
+        (self.workspace / 'package.zip').write_bytes(b'retired package')
+        (self.workspace / 'handoff').write_bytes(b'legacy helper must not run')
+        self.assertEqual(self.call('recover').stdout.strip(), 'idle')
+        self.assertEqual(json.loads(marker.read_bytes())['format'], 'ShioriMacUpdate/2')
+        self.assertFalse((self.workspace / 'package.zip').exists())
+        self.prepare(); self.run_update()
+        self.assertEqual(self.call('recover').stdout.strip(), 'installed')
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
+    def test_legacy_transactions_and_unknown_files_are_preserved(self):
+        marker = self.legacy_workspace(); original = marker.read_bytes()
+        for name in ['transaction.json', 'previous.app', 'personal.txt']:
+            path = self.workspace / name; path.write_bytes(b'keep')
+            self.assertIn('workspaceConflict', self.call('recover', success=False).stderr)
+            self.assertEqual(marker.read_bytes(), original)
+            self.assertEqual(path.read_bytes(), b'keep')
+            path.unlink()
+        outside = self.root / 'personal'; outside.write_text('keep outside')
+        link = self.workspace / 'package.zip'; link.symlink_to(outside)
+        self.assertIn('workspaceConflict', self.call('recover', success=False).stderr)
+        self.assertTrue(link.is_symlink()); self.assertEqual(outside.read_text(), 'keep outside')
+
+    @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
+    def test_active_legacy_workspace_is_not_migrated(self):
+        import fcntl
+        marker = self.legacy_workspace(); original = marker.read_bytes()
+        with (self.workspace / 'lock').open('w') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertIn('busy', self.call('recover', success=False).stderr)
+            self.assertEqual(marker.read_bytes(), original)
+        self.assertEqual(self.call('recover').stdout.strip(), 'idle')
+
 
 if __name__ == '__main__': unittest.main()

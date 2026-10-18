@@ -1287,7 +1287,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get updateWorkspaceConflict =>
-      '安装文件夹旁的“<安装文件夹名>.update”文件夹不是 Shiori 创建的。为保护其中的文件，更新已停止。请移走或重命名该文件夹后重试。';
+      '无法安全使用安装位置旁的“.update”文件夹，更新已停止。若其中有旧版未完成的更新或备份，请先完成恢复；也可退出 Shiori，保留并移走该文件夹后手动安装完整新版。不要直接删除其中的文件。';
 
   @override
   String get updateInstallBusy => '请等待当前操作完成后再安装更新。';

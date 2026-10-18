@@ -90,14 +90,14 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
       entry.path.substring(workspace.path.length + 1);
   bool _isMarker(FileSystemEntity entry) => _name(entry) == _markerName;
 
-  Future<bool> _owned() async {
+  Future<bool> _owned([String ownership = _ownership]) async {
     try {
       return await FileSystemEntity.type(workspace.path, followLinks: false) ==
               FileSystemEntityType.directory &&
           await FileSystemEntity.type(_marker.path, followLinks: false) ==
               FileSystemEntityType.file &&
-          await _marker.length() == _ownership.length &&
-          await _marker.readAsString() == _ownership;
+          await _marker.length() == ownership.length &&
+          await _marker.readAsString() == ownership;
     } on FileSystemException {
       return false;
     }
@@ -262,8 +262,27 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
       return UpdateInstallState.idle;
     }
     if (!await _owned()) {
-      if (await _removeEmpty()) return UpdateInstallState.idle;
-      throw const UpdateIssue(UpdateProblem.workspaceConflict);
+      if (await _owned('ShioriUpdateWorkspace/1\n')) {
+        final installed = File('${installation.path}/shiori-updater.exe');
+        if (await FileSystemEntity.type(installed.path, followLinks: false) !=
+            FileSystemEntityType.file) {
+          throw const UpdateIssue(UpdateProblem.location);
+        }
+        final code = await runUpdater(installed.path, [
+          'retire',
+          workspace.path,
+          installation.path,
+        ]);
+        if (code == WindowsUpdaterCode.busy) {
+          return UpdateInstallState.installing;
+        }
+        if (code != WindowsUpdaterCode.none || !await _owned()) {
+          throw const UpdateIssue(UpdateProblem.workspaceConflict);
+        }
+      } else {
+        if (await _removeEmpty()) return UpdateInstallState.idle;
+        throw const UpdateIssue(UpdateProblem.workspaceConflict);
+      }
     }
     // A finished transaction whose cleanup was interrupted: whatever is left,
     // plan.bin and backup included, is no longer needed by the updater.

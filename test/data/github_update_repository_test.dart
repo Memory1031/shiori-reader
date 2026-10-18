@@ -160,6 +160,90 @@ void main() {
     await upgraded.close();
   });
   test(
+    'retired download cache is discarded without touching preferences',
+    () async {
+      final target = (await repo.check(UpdateChannel.beta, token()))!;
+      await repo.download(target, token(), (_) {});
+      final record =
+          jsonDecode(await storage.file('download.json').readAsString())
+              as Map<String, dynamic>;
+      record['schema'] = 1;
+      record.remove('platform');
+      await UpdateStorage.writeJson(storage.file('download.json'), record);
+      await storage
+          .file('package.part')
+          .writeAsString('unfinished old download');
+      await storage.file('unrelated').writeAsString('keep');
+      const preferences = UpdatePreferences(
+        channel: UpdateChannel.beta,
+        automatic: false,
+      );
+      await repo.savePreferences(preferences);
+      expect(await repo.restore(UpdateChannel.beta, token()), isNull);
+      expect(await repo.loadPreferences(), preferences);
+      for (final name in ['download.json', 'package.part', 'package.bin']) {
+        expect(await storage.file(name).exists(), isFalse);
+      }
+      expect(await storage.file('unrelated').readAsString(), 'keep');
+      expect(
+        (await repo.check(UpdateChannel.beta, token()))?.release,
+        target.release,
+      );
+    },
+  );
+  for (final record in [
+    '{"schema":1}',
+    '{"schema":999}',
+    'broken JSON',
+    '{"schema":1,"tag":"v1.4.0","notes":"","manifest":"bad","signature":"bad"}',
+  ]) {
+    test('unknown or damaged cache is retained: $record', () async {
+      await storage.prepare();
+      await storage.file('download.json').writeAsString(record);
+      await storage.file('package.bin').writeAsString('keep package');
+      await storage.file('package.part').writeAsString('keep partial');
+      await expectLater(
+        repo.restore(UpdateChannel.beta, token()),
+        throwsA(issue(UpdateProblem.verification)),
+      );
+      expect(await storage.file('download.json').readAsString(), record);
+      expect(await storage.file('package.bin').readAsString(), 'keep package');
+      expect(await storage.file('package.part').readAsString(), 'keep partial');
+    });
+  }
+  for (final damage in ['duplicate schema', 'signature', 'tag']) {
+    test(
+      'recognizable but damaged legacy cache is retained: $damage',
+      () async {
+        final target = (await repo.check(UpdateChannel.beta, token()))!;
+        await repo.download(target, token(), (_) {});
+        final record =
+            jsonDecode(await storage.file('download.json').readAsString())
+                as Map<String, dynamic>;
+        record['schema'] = 1;
+        record.remove('platform');
+        if (damage == 'signature') {
+          record['signature'] = base64Encode(List.filled(384, 0));
+        }
+        if (damage == 'tag') record['tag'] = 'v9.9.9';
+        var text = jsonEncode(record);
+        if (damage == 'duplicate schema') {
+          text = text.replaceFirst('{', '{"schema":999,');
+        }
+        await storage.file('download.json').writeAsString(text);
+        await expectLater(
+          repo.restore(UpdateChannel.beta, token()),
+          throwsA(issue(UpdateProblem.verification)),
+        );
+        expect(await storage.file('download.json').readAsString(), text);
+        expect(
+          await storage.file('package.bin').readAsBytes(),
+          fixture.package('windows-x64-portable'),
+        );
+      },
+    );
+  }
+  test(
     'nine signed releases retain the highest verified upgrade within budget',
     () async {
       http.releases = [

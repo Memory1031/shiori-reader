@@ -2489,7 +2489,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateWorkspaceConflict.
   ///
   /// In en, this message translates to:
-  /// **'A folder named “<Shiori folder name>.update” next to the Shiori folder was not created by Shiori. The update stopped to protect its files. Move or rename that folder, then retry.'**
+  /// **'The .update folder beside Shiori cannot be used safely. If it contains an unfinished update or backup, complete recovery first. Alternatively, quit Shiori, keep and move that folder aside, then manually install the complete new version. Do not delete its contents.'**
   String get updateWorkspaceConflict;
 
   /// No description provided for @updateInstallBusy.

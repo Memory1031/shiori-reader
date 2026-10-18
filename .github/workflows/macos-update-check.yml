@@ -1,0 +1,45 @@
+name: macOS Update Check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-update-check-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: 3.38.10
+  PUB_HOSTED_URL: https://pub.flutter-io.cn
+
+jobs:
+  native-update:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Native migration, DMG and recovery regressions
+        run: python3 -m unittest discover -s tool -p test_release_macos.py -v
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Install locked dependencies
+        run: |
+          flutter pub get --enforce-lockfile
+          git diff --exit-code -- pubspec.lock
+      - name: Real application DMG to DMG upgrade
+        run: python3 tool/test_macos_update_runtime.py
+      - name: Retain diagnostics only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: macos-update-check
+          path: .tooling/evidence/macos-update-check/
+          if-no-files-found: ignore
+          retention-days: 7

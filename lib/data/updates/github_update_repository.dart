@@ -344,15 +344,62 @@ final class GithubUpdateRepository implements AppUpdateRepository {
     if (installed.availability != UpdateAvailability.enabled) return null;
     await storage.prepare();
     final part = storage.file('package.part');
-    if (await part.exists()) await part.delete();
-    final json = await UpdateStorage.readJson(storage.file('download.json'));
-    if (json == null || !await storage.file('package.bin').exists()) {
+    final metadata = storage.file('download.json');
+    final Object? json;
+    if (await metadata.exists()) {
+      if (await metadata.length() > maxUpdateEnvelopeBytes) {
+        throw const FormatException('Oversized update record');
+      }
+      json = decodeUpdateJson(await metadata.readAsBytes());
+    } else {
+      json = null;
+    }
+    if (json == null) {
+      if (await part.exists()) await part.delete();
       return null;
     }
     final record = json as Map<String, dynamic>;
+    if (record['schema'] == 1) {
+      // Recognize the retired cache record, never its installation protocol.
+      // Malformed or unknown records remain available for diagnosis.
+      const fields = {'schema', 'tag', 'notes', 'manifest', 'signature'};
+      if (record.length != fields.length ||
+          !fields.every(record.containsKey) ||
+          record['tag'] is! String ||
+          !RegExp(
+            r'^v\d+\.\d+\.\d+(?:-beta\.[1-9]\d*)?$',
+          ).hasMatch(record['tag'] as String) ||
+          record['notes'] is! String ||
+          record['manifest'] is! String ||
+          record['signature'] is! String) {
+        throw const UpdateIssue(UpdateProblem.verification);
+      }
+      final raw = base64Decode(record['manifest'] as String);
+      final signature = base64Decode(record['signature'] as String);
+      if (raw.isEmpty ||
+          raw.length > maxUpdateManifestBytes ||
+          key?.verify(raw, signature) != true) {
+        throw const UpdateIssue(UpdateProblem.verification);
+      }
+      final retired = decodeUpdateJson(raw);
+      if (![1, 2].contains(retired['schemaVersion']) ||
+          retired['applicationId'] != updateApplicationId ||
+          retired['tag'] != record['tag']) {
+        throw const UpdateIssue(UpdateProblem.verification);
+      }
+      checkUpdateCancellation(token);
+      for (final name in ['package.part', 'package.bin', 'download.json']) {
+        final file = storage.file(name);
+        if (await file.exists()) await file.delete();
+      }
+      _selected = null;
+      return null;
+    }
     if (record['schema'] != 2 || record['platform'] != platform) {
       throw const UpdateIssue(UpdateProblem.verification);
     }
+    if (await part.exists()) await part.delete();
+    if (!await storage.file('package.bin').exists()) return null;
     final value = _verify(
       record['tag'] as String,
       record['notes'] as String,
