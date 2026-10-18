@@ -210,11 +210,16 @@ exit(app.isFinishedLaunching ? 0 : 1)
         run('codesign', '--verify', '--deep', '--strict', install)
         assert snapshot() == before
         assert hashlib.sha256(sentinel.read_bytes()).hexdigest() == expected_sentinel
-        assert subprocess.check_output([str(helper), 'recover', str(install)]).strip() == b'installed'
-        assert not (workspace / 'volume').exists() and not (workspace / 'previous.app').exists()
+        # Normal app startup can consume the completed transaction before this
+        # external probe; both states require a clean, usable installation.
+        recovery = subprocess.check_output([str(helper), 'recover', str(install)]).strip()
+        assert recovery in (b'installed', b'idle'), recovery
+        assert all(not (workspace / name).exists() for name in
+            ['volume', 'previous.app', 'transaction.json', 'payload'])
         (output / 'result.json').write_bytes(encoded(dict(fromBuild=releases[0][0]['build'], toBuild=release['build'],
             architecture=os.uname().machine, legacyWorkspaceMigrated=True, signedDmgUpgrade=True,
-            applicationRelaunched=True, databaseRowsPreserved=True, userFilePreserved=True, mountCleaned=True)))
+            applicationRelaunched=True, databaseRowsPreserved=True, userFilePreserved=True,
+            mountCleaned=True, recoveryState=recovery.decode())))
     except BaseException:
         diagnostics(find() or old_pid)
         raise
