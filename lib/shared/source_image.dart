@@ -97,7 +97,7 @@ class _DecodeOwner extends InheritedWidget {
 class _DecodedCache {
   _DecodedCache(this.maxEntries, this.maxBytes);
   final int maxEntries, maxBytes;
-  final _entries = <(Object, int, bool), DecodedSourceImage>{};
+  final _entries = <(Object, int, PaperImageMode?), DecodedSourceImage>{};
   int _bytes = 0;
   bool _closed = false;
   Future<void> _tail = Future.value();
@@ -105,7 +105,7 @@ class _DecodedCache {
     MediaData data,
     int width,
     MediaRef ref,
-    bool paper,
+    PaperImageMode? paper,
   ) {
     final result = _tail.then((_) => _decode(data, width, ref, paper));
     _tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
@@ -116,7 +116,7 @@ class _DecodedCache {
     MediaData data,
     int width,
     MediaRef ref,
-    bool paper,
+    PaperImageMode? paper,
   ) async {
     if (_closed) throw StateError('Decode scope closed');
     // Keys must change whenever the bytes can: persisted paths are content
@@ -174,14 +174,21 @@ class _DecodedCache {
 Future<DecodedSourceImage> _decodeForDisplay(
   MediaData data,
   int width,
-  bool paper,
+  PaperImageMode? paper,
 ) async {
   final original = await decodeSourceImage(data, width);
-  return paper ? _paperDisplay(original) : original;
+  return paper == null ? original : _paperDisplay(original, paper);
 }
 
-Future<DecodedSourceImage> _paperDisplay(DecodedSourceImage original) async {
-  final mask = await paperDiagramMask(original.image);
+Future<DecodedSourceImage> _paperDisplay(
+  DecodedSourceImage original,
+  PaperImageMode mode,
+) async {
+  final mask = await paperDiagramMask(
+    original.image,
+    mode: mode,
+    intrinsicSize: original.intrinsicSize,
+  );
   if (mask == null) return original;
   original.image.dispose();
   return DecodedSourceImage(mask, original.intrinsicSize, isPaperMask: true);
@@ -244,6 +251,7 @@ class SourceImage extends StatefulWidget {
     this.decoder = decodeSourceImage,
     this.decodeScale = 1,
     this.paperInk,
+    this.paperMode = PaperImageMode.diagram,
     this.fit = BoxFit.contain,
   }) : assert(decodeScale > 0 && decodeScale <= 4);
   final MediaRef media;
@@ -257,6 +265,7 @@ class SourceImage extends StatefulWidget {
 
   /// Reader-only opt-in. Null preserves original pixels (covers and preview).
   final Color? paperInk;
+  final PaperImageMode paperMode;
   final BoxFit fit;
   @override
   State<SourceImage> createState() => _SourceImageState();
@@ -282,7 +291,8 @@ class _SourceImageState extends State<SourceImage> {
     if (oldWidget.media != widget.media ||
         oldWidget.repository != widget.repository ||
         oldWidget.decoder != widget.decoder ||
-        (oldWidget.paperInk == null) != (widget.paperInk == null)) {
+        (oldWidget.paperInk == null ? null : oldWidget.paperMode) !=
+            (widget.paperInk == null ? null : widget.paperMode)) {
       _generation++;
       _request?.cancel();
       _release();
@@ -318,7 +328,7 @@ class _SourceImageState extends State<SourceImage> {
     _request?.cancel();
     final request = _request = CancellationSource();
     final generation = ++_generation;
-    final paper = widget.paperInk != null;
+    final paper = widget.paperInk == null ? null : widget.paperMode;
     final decoder = widget.decoder;
     _loadingDelay?.cancel();
     _showLoading = false;
@@ -348,8 +358,8 @@ class _SourceImageState extends State<SourceImage> {
       var decoded = await (decoder == decodeSourceImage && shared != null
           ? shared.decode(pendingLease.data, width, widget.media, paper)
           : decoder(pendingLease.data, width));
-      if (paper && !(decoder == decodeSourceImage && shared != null)) {
-        decoded = await _paperDisplay(decoded);
+      if (paper != null && !(decoder == decodeSourceImage && shared != null)) {
+        decoded = await _paperDisplay(decoded, paper);
       }
       pendingImage = decoded.image;
       if (!_current(generation)) return;

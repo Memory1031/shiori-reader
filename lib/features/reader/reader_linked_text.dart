@@ -6,6 +6,7 @@ import 'viewport/reader_box.dart';
 import '../../domain/models/models.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../shared/source_image.dart';
+import '../../shared/paper_diagram.dart';
 import 'reader_inline_images.dart';
 import 'reader_authored_colors.dart';
 import 'reader_sheet.dart';
@@ -429,6 +430,13 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
             child: widget.images == null
                 ? const SizedBox.shrink()
                 : SourceImage(
+                    paperMode: PaperImageMode.ornament,
+                    paperInk:
+                        image.media.sourceId == LocalBookIdentity.sourceId &&
+                            widget.authoredBackground == null &&
+                            !widget.hasBackgroundImage
+                        ? foreground(Colors.black)
+                        : null,
                     fit: image.stretch ? BoxFit.fill : BoxFit.contain,
                     media: image.media,
                     repository: widget.images!,

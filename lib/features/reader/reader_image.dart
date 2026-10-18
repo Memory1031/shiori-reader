@@ -6,6 +6,7 @@ import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../shared/source_image.dart';
+import '../../shared/paper_diagram.dart';
 import 'reader_authored_colors.dart';
 import '../../l10n/generated/app_localizations.dart';
 import 'viewport/reader_box.dart';
@@ -189,12 +190,22 @@ class ReaderImage extends StatelessWidget {
                   width: geometry?.size.width,
                   height: geometry?.size.height,
                   child: SourceImage(
+                    paperMode:
+                        block.sizing?.role == ImageRole.flow &&
+                            block.box?.backgroundColor == null &&
+                            block.box?.backgroundImage == null &&
+                            block.layout?.backgroundColor == null &&
+                            block.layout?.backgroundImage == null
+                        ? PaperImageMode.body
+                        : PaperImageMode.diagram,
                     fit: geometry?.fit ?? BoxFit.contain,
                     media: block.media,
                     repository: repository,
-                    paperInk: ReaderAuthoredColors(
-                      Theme.of(context),
-                    ).resolve(Colors.black, ReaderColorRole.foreground),
+                    paperInk: block.sizing?.role == ImageRole.page
+                        ? null
+                        : ReaderAuthoredColors(
+                            Theme.of(context),
+                          ).resolve(Colors.black, ReaderColorRole.foreground),
                     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                     semanticLabel: block.alt,
                     onIntrinsicSize: (size) {

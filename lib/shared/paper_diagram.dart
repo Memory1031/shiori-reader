@@ -1,11 +1,33 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'dart:typed_data';
+
+/// Body blocks retain diagram support; inline ornaments use only the compact
+/// classifier so a large illustration cannot qualify through inline sizing.
+enum PaperImageMode { diagram, body, ornament }
+
+/// A second, bounded candidate path, never a global small-image override.
+const paperOrnamentMaxSide = 128.0;
 
 /// Optional, theme-independent ink mask, made only from the bounded thumbnail.
 /// The caller owns the returned image. Null means preserve the original.
-Future<ui.Image?> paperDiagramMask(ui.Image source) async {
+Future<ui.Image?> paperDiagramMask(
+  ui.Image source, {
+  PaperImageMode mode = PaperImageMode.diagram,
+  ui.Size? intrinsicSize,
+}) async {
   final count = source.width * source.height;
   if (count < 64 || count > 4000000) return null;
+  final compact =
+      intrinsicSize != null &&
+      intrinsicSize.width >= 8 &&
+      intrinsicSize.height >= 8 &&
+      intrinsicSize.longestSide <= paperOrnamentMaxSide &&
+      source.width >= 8 &&
+      source.height >= 8 &&
+      source.width <= paperOrnamentMaxSide &&
+      source.height <= paperOrnamentMaxSide;
+  if (mode == PaperImageMode.ornament && !compact) return null;
   ui.ImmutableBuffer? buffer;
   ui.ImageDescriptor? descriptor;
   ui.Codec? codec;
@@ -22,13 +44,17 @@ Future<ui.Image?> paperDiagramMask(ui.Image source) async {
         colored = 0,
         broadTone = 0,
         colorArea = 0,
-        broadInk = 0;
+        broadInk = 0,
+        black = 0;
+    var neutral = true;
     for (var p = 0; p < count; p++) {
       final at = p * 4;
       // Transparency already works on paper; never reinterpret alpha as ink.
       if (rgba[at + 3] != 255) return null;
       final low = math.min(rgba[at], math.min(rgba[at + 1], rgba[at + 2]));
       final high = math.max(rgba[at], math.max(rgba[at + 1], rgba[at + 2]));
+      neutral &= high - low <= 8;
+      if (high <= 32) black++;
       if (high - low > 24) {
         colored++;
         var nearWhite = false, nearInk = false;
@@ -93,14 +119,28 @@ Future<ui.Image?> paperDiagramMask(ui.Image source) async {
     }
     // Intentionally conservative: neutral paper, visible strokes, little
     // continuous tone. Slight palette quantization at edges remains acceptable.
-    if (white < count * .72 ||
-        dark < count * .0005 ||
-        colored > count * .02 ||
-        colorArea > count * .0012 ||
-        colorArea > colored * .08 ||
-        middle > count * .20 ||
-        broadTone > count * .002 ||
-        broadInk > count * .005) {
+    final diagram =
+        mode != PaperImageMode.ornament &&
+        !(white < count * .72 ||
+            dark < count * .0005 ||
+            colored > count * .02 ||
+            colorArea > count * .0012 ||
+            colorArea > colored * .08 ||
+            middle > count * .20 ||
+            broadTone > count * .002 ||
+            broadInk > count * .005);
+    final ornament =
+        !diagram &&
+        mode != PaperImageMode.diagram &&
+        compact &&
+        neutral &&
+        white >= count * .72 &&
+        dark >= count * .005 &&
+        black >= dark * .85 &&
+        middle <= count * .10 &&
+        broadTone == 0 &&
+        _outsidePaper(rgba, source.width, source.height);
+    if (!diagram && !ornament) {
       return null;
     }
     for (var at = 0; at < rgba.length; at += 4) {
@@ -126,4 +166,41 @@ Future<ui.Image?> paperDiagramMask(ui.Image source) async {
     descriptor?.dispose();
     buffer?.dispose();
   }
+}
+
+// An ornament must have a white rim and no enclosed white shapes. Only the
+// small candidate path pays for this bounded flood fill; diagrams are unchanged.
+bool _outsidePaper(Uint8List rgba, int width, int height) {
+  bool paper(int p) =>
+      rgba[p * 4] >= 242 && rgba[p * 4 + 1] >= 242 && rgba[p * 4 + 2] >= 242;
+  final visited = Uint8List(width * height);
+  final queue = <int>[];
+  void add(int p) {
+    if (visited[p] == 0 && paper(p)) {
+      visited[p] = 1;
+      queue.add(p);
+    }
+  }
+
+  for (var x = 0; x < width; x++) {
+    if (!paper(x) || !paper((height - 1) * width + x)) return false;
+    add(x);
+    add((height - 1) * width + x);
+  }
+  for (var y = 0; y < height; y++) {
+    if (!paper(y * width) || !paper(y * width + width - 1)) return false;
+    add(y * width);
+    add(y * width + width - 1);
+  }
+  for (var at = 0; at < queue.length; at++) {
+    final p = queue[at], x = p % width, y = p ~/ width;
+    if (x > 0) add(p - 1);
+    if (x + 1 < width) add(p + 1);
+    if (y > 0) add(p - width);
+    if (y + 1 < height) add(p + width);
+  }
+  for (var p = 0; p < visited.length; p++) {
+    if (paper(p) && visited[p] == 0) return false;
+  }
+  return true;
 }
