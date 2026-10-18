@@ -114,7 +114,7 @@ class UpdaterTest(unittest.TestCase):
             for name, data in sorted(tree(self.payload).items())
         ]
         manifest = {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "algorithm": "rsa3072-pkcs1-sha256",
             "applicationId": "dev.shiori.reader",
             "tag": f"v1.0.0-beta.{build}",
@@ -126,11 +126,11 @@ class UpdaterTest(unittest.TestCase):
             "assets": [
                 {"platform": "android", "name": "a.apk", "size": 1, "sha256": "0" * 64},
                 {
-                    "platform": "windows-x64",
-                    "name": "w.zip",
+                    "platform": "windows-x64-portable",
+                    "name": f"shiori-reader-v1.0.0-beta.{build}-windows-x64.zip",
                     "size": 1,
                     "sha256": "0" * 64,
-                    "updaterProtocol": 1,
+                    "updaterProtocol": 2,
                     "minimumSystem": "10.0.17763",
                     "files": files,
                 },
@@ -220,7 +220,7 @@ class UpdaterTest(unittest.TestCase):
         self.assertEqual(self.check(), 32)
 
     def test_rejects_unsupported_protocol(self):
-        self.sign(edit=lambda m: m["assets"][1].update(updaterProtocol=2))
+        self.sign(edit=lambda m: m["assets"][1].update(updaterProtocol=1))
         self.assertEqual(self.check(), 32)
 
     def test_rejects_program_list_that_differs_from_manifest(self):

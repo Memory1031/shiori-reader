@@ -1,7 +1,7 @@
 #import <AppKit/AppKit.h>
 #import <Security/Security.h>
 #import <CommonCrypto/CommonDigest.h>
-#include "archive_api.h"
+#include <sys/mount.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <signal.h>
@@ -51,6 +51,7 @@ static std::vector<uint8_t> der(uint8_t tag, const std::vector<uint8_t>& data) {
   out.insert(out.end(), data.begin(), data.end()); return out;
 }
 static void verifySignature(NSData *data, NSData *signature, NSDictionary *trust) {
+  require(data && data.length > 0 && data.length <= 4 * 1024 * 1024);
   NSString *hex = trust[@"publicKey"][@"modulus"]; require(hex.length == 768 && signature.length == 384);
   std::vector<uint8_t> modulus{0};
   for (NSUInteger i = 0; i < hex.length; i += 2) {
@@ -71,80 +72,121 @@ static bool safePath(NSString *path) {
   for (NSString *part in path.pathComponents) if ([part isEqual:@".."] || [part isEqual:@"."]) return false;
   return true;
 }
-static void extract(NSString *zip, NSString *root) {
-  require([fm createDirectoryAtPath:root withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@0700} error:nullptr], "storage");
-  archive *a = archive_read_new(); archive_read_support_format_zip(a); archive_read_support_filter_all(a);
-  require(archive_read_open_filename(a, zip.fileSystemRepresentation, 65536) == ARCHIVE_OK);
-  std::set<std::string> seen; std::vector<std::pair<NSString *, NSString *>> links; int count = 0; int64_t total = 0;
-  archive_entry *e; int status;
+static void checkpoint(const char *stage);
+
+static NSData *systemTool(NSString *workspace, NSString *program, NSArray<NSString *> *arguments) {
+  NSString *output = join(workspace, @"tool-output.plist");
+  int fd = open(output.fileSystemRepresentation, O_WRONLY|O_CREAT|O_TRUNC|O_NOFOLLOW, 0600);
+  require(fd >= 0, "storage");
+  NSFileHandle *handle = [[NSFileHandle alloc] initWithFileDescriptor:fd closeOnDealloc:YES];
+  NSTask *task = [NSTask new]; task.executableURL = [NSURL fileURLWithPath:program];
+  task.arguments = arguments; task.standardOutput = handle; task.standardError = NSFileHandle.fileHandleWithNullDevice;
+  require([task launchAndReturnError:nullptr], "installation");
+  int waited = 0; while (task.running && waited++ < 600) usleep(100000);
+  if (task.running) {
+    [task terminate]; waited = 0; while (task.running && waited++ < 50) usleep(100000);
+    if (task.running) kill(task.processIdentifier, SIGKILL);
+  }
+  [task waitUntilExit]; [handle closeFile];
+  require(task.terminationStatus == 0, "installation");
+  require([[fm attributesOfItemAtPath:output error:nullptr][NSFileSize] unsignedLongLongValue] <= 65536);
+  return [NSData dataWithContentsOfFile:output];
+}
+
+// Only the fixed mountpoint in our owned workspace can be detached, including
+// after a helper crash. Never trust a device or path read from the DMG/journal.
+static void cleanMount(NSString *workspace) {
+  NSString *mount = join(workspace, @"volume");
+  struct stat st;
+  if (lstat(mount.fileSystemRepresentation, &st) != 0) { require(errno == ENOENT, "storage"); return; }
+  require(S_ISDIR(st.st_mode), "workspaceConflict");
+  struct statfs *mounts; int count = getmntinfo(&mounts, MNT_NOWAIT);
+  require(count > 0, "storage");
+  bool mounted = false;
+  for (int i = 0; i < count; i++) {
+    if (strcmp(mounts[i].f_mntonname, mount.fileSystemRepresentation)) continue;
+    require((mounts[i].f_flags & MNT_RDONLY) && !strncmp(mounts[i].f_mntfromname, "/dev/disk", 9), "workspaceConflict");
+    mounted = true; break;
+  }
+  if (mounted) systemTool(workspace, @"/usr/bin/hdiutil", @[@"detach", mount]);
+  else require(st.st_uid == getuid(), "workspaceConflict");
+  require(rmdir(mount.fileSystemRepresentation) == 0 || errno == ENOENT, "storage");
+}
+
+static void validateTree(NSString *bundle) {
+  struct stat root; require(lstat(bundle.fileSystemRepresentation, &root) == 0 && S_ISDIR(root.st_mode));
+  char base[PATH_MAX]; require(realpath(bundle.fileSystemRepresentation, base));
+  std::string prefix = std::string(base) + "/";
+  NSDirectoryEnumerator *entries = [fm enumeratorAtPath:bundle];
+  int count = 0; int64_t total = 0;
+  for (NSString *relative in entries) {
+    require(++count <= 20000 && safePath(relative));
+    NSString *path = join(bundle, relative); struct stat st;
+    require(lstat(path.fileSystemRepresentation, &st) == 0 && !(st.st_mode & 07000));
+    if (S_ISLNK(st.st_mode)) {
+      NSString *target = [fm destinationOfSymbolicLinkAtPath:path error:nullptr];
+      char resolved[PATH_MAX]; require(target && !target.isAbsolutePath && realpath(path.fileSystemRepresentation, resolved));
+      require(std::string(resolved).rfind(prefix, 0) == 0);
+      [entries skipDescendants];
+    } else if (S_ISREG(st.st_mode)) {
+      require(st.st_nlink == 1 && st.st_size >= 0 && (total += st.st_size) <= 2LL * 1024 * 1024 * 1024);
+    } else require(S_ISDIR(st.st_mode));
+  }
+}
+
+static void extract(NSString *dmg, NSString *root) {
+  NSString *workspace = root.stringByDeletingLastPathComponent, *mount = join(workspace, @"volume");
+  cleanMount(workspace);
+  require([fm createDirectoryAtPath:mount withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@0700} error:nullptr], "storage");
   try {
-    while ((status = archive_read_next_header(a, &e)) == ARCHIVE_OK) {
-      NSString *name = [NSString stringWithUTF8String:archive_entry_pathname(e)];
-      require(safePath(name) && ([name isEqual:@"Shiori.app"] || [name hasPrefix:@"Shiori.app/"]));
-      require(++count <= 20000 && seen.insert(name.UTF8String).second);
-      require(!archive_entry_hardlink(e)); NSString *out = join(root, name);
-      const auto type = archive_entry_filetype(e);
-      if (type == AE_IFLNK) {
-        NSString *target = [NSString stringWithUTF8String:archive_entry_symlink(e)];
-        require(target && !target.isAbsolutePath);
-        NSString *resolved = [[name.stringByDeletingLastPathComponent stringByAppendingPathComponent:target] stringByStandardizingPath];
-        require([resolved hasPrefix:@"Shiori.app/"]); links.push_back({out, target}); continue;
-      }
-      require(type == AE_IFDIR || type == AE_IFREG);
-      require([fm createDirectoryAtPath:out.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nullptr], "storage");
-      if (type == AE_IFDIR) {
-        require([fm createDirectoryAtPath:out withIntermediateDirectories:YES attributes:nil error:nullptr], "storage"); continue;
-      }
-      int64_t size = archive_entry_size(e); require(size >= 0 && (total += size) <= 2LL * 1024 * 1024 * 1024);
-      int fd = open(out.fileSystemRepresentation, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600); require(fd >= 0, "storage");
-      char buffer[65536]; ssize_t n; int64_t written = 0; bool ok = true;
-      while ((n = archive_read_data(a, buffer, sizeof(buffer))) > 0) {
-        written += n; if (written > size) { ok = false; break; }
-        ssize_t offset = 0; while (offset < n) { ssize_t w = write(fd, buffer + offset, n - offset); if (w <= 0) {ok = false; break;} offset += w; }
-        if (!ok) break;
-      }
-      ok = ok && n == 0 && written == size && fchmod(fd, archive_entry_perm(e) & 0755) == 0 && fsync(fd) == 0;
-      close(fd); require(ok, "storage");
-    }
-    require(status == ARCHIVE_EOF);
-    // Links are created last, so archive entries cannot write through them.
-    for (auto &link : links) {
-      require([fm createDirectoryAtPath:link.first.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nullptr], "storage");
-      require([fm createSymbolicLinkAtPath:link.first withDestinationPath:link.second error:nullptr]);
-    }
-    NSString *bundle = join(root, @"Shiori.app");
-    char base[PATH_MAX]; require(realpath(bundle.fileSystemRepresentation, base));
-    std::string prefix = std::string(base) + "/";
-    for (auto &link : links) {
-      char target[PATH_MAX]; require(realpath(link.first.fileSystemRepresentation, target));
-      require(std::string(target).rfind(prefix, 0) == 0);
-    }
-  } catch (...) { archive_read_free(a); throw; }
-  archive_read_free(a);
+    NSData *output = systemTool(workspace, @"/usr/bin/hdiutil", @[@"attach", @"-readonly", @"-nobrowse", @"-noautoopen", @"-mountpoint", mount, @"-plist", dmg]);
+    NSDictionary *plist = [NSPropertyListSerialization propertyListWithData:output options:NSPropertyListImmutable format:nullptr error:nullptr];
+    bool found = false;
+    for (NSDictionary *entity in plist[@"system-entities"]) if ([entity[@"mount-point"] isEqual:mount]) found = true;
+    require(found); checkpoint("mounted");
+    NSString *bundle = join(mount, @"Shiori.app"); validateTree(bundle);
+    require([fm createDirectoryAtPath:root withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@0700} error:nullptr], "storage");
+    systemTool(workspace, @"/usr/bin/ditto", @[@"--norsrc", @"--noqtn", bundle, join(root, @"Shiori.app")]);
+    validateTree(join(root, @"Shiori.app"));
+  } catch (...) { cleanMount(workspace); throw; }
+  cleanMount(workspace);
 }
 static NSDictionary *verified(NSString *workspace, NSDictionary *trust) {
   NSData *raw = [NSData dataWithContentsOfFile:join(workspace, @"manifest.json")];
   verifySignature(raw, [NSData dataWithContentsOfFile:join(workspace, @"manifest.sig")], trust);
   NSDictionary *m = json(raw), *identity = trust[@"identity"];
-  require([m[@"schemaVersion"] isEqual:@1] && [m[@"applicationId"] isEqual:@"dev.shiori.reader"] &&
+  require([m[@"schemaVersion"] isEqual:@2] && [m[@"applicationId"] isEqual:@"dev.shiori.reader"] &&
     [m[@"keyId"] isEqual:trust[@"publicKey"][@"keyId"]] &&
     [m[@"algorithm"] isEqual:@"rsa3072-pkcs1-sha256"]);
   require([m[@"build"] longLongValue] > [identity[@"build"] longLongValue] &&
     [m[@"version"] compare:identity[@"version"] options:NSNumericSearch] != NSOrderedAscending);
-  NSArray *assets = m[@"assets"]; require([assets isKindOfClass:NSArray.class] && assets.count == 1);
-  NSDictionary *asset = assets[0];
-  require([asset[@"platform"] isEqual:@"macos-universal"] && [asset[@"updaterProtocol"] isEqual:@1]);
-  require([asset[@"name"] isEqual:[NSString stringWithFormat:@"shiori-reader-%@-macos-universal.zip", m[@"tag"]]]);
+  NSArray *assets = m[@"assets"]; require([assets isKindOfClass:NSArray.class] && assets.count == 4);
+  NSDictionary *asset = nil; NSMutableSet *platforms = [NSMutableSet set];
+  for (NSDictionary *item in assets) {
+    NSString *platform = item[@"platform"];
+    require([@[@"android", @"windows-x64-portable", @"windows-x64-setup", @"macos-universal"] containsObject:platform] && ![platforms containsObject:platform]);
+    [platforms addObject:platform];
+    if ([platform isEqual:@"macos-universal"]) asset = item;
+  }
+  require(asset && [asset[@"updaterProtocol"] isEqual:@2]);
+  require([asset[@"name"] isEqual:[NSString stringWithFormat:@"shiori-reader-%@-macos-universal.dmg", m[@"tag"]]]);
   NSOperatingSystemVersion os = NSProcessInfo.processInfo.operatingSystemVersion;
   NSString *currentOS = [NSString stringWithFormat:@"%ld.%ld.%ld", os.majorVersion, os.minorVersion, os.patchVersion];
   require([asset[@"minimumSystem"] isKindOfClass:NSString.class] && [currentOS compare:asset[@"minimumSystem"] options:NSNumericSearch] != NSOrderedAscending, "location");
   long long size = [asset[@"size"] longLongValue]; require(size > 0 && size <= 2LL * 1024 * 1024 * 1024);
-  NSString *package = join(workspace, @"package.zip");
+  NSString *package = join(workspace, @"package.dmg");
   require([[fm attributesOfItemAtPath:package error:nullptr][NSFileSize] longLongValue] == size &&
     [digest(package) isEqual:asset[@"sha256"]]);
   return m;
 }
 static void checkBundle(NSString *bundle, NSDictionary *manifest) {
+  validateTree(bundle);
+#ifndef SHIORI_UPDATER_TESTING
+  SecStaticCodeRef code = nullptr;
+  require(SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:bundle], kSecCSDefaultFlags, &code) == errSecSuccess);
+  OSStatus signature = SecStaticCodeCheckValidity(code, kSecCSStrictValidate | kSecCSCheckNestedCode | kSecCSCheckAllArchitectures, nullptr);
+  CFRelease(code); require(signature == errSecSuccess);
+#endif
   NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:join(bundle, @"Contents/Info.plist")];
   require([info[@"CFBundleIdentifier"] isEqual:@"dev.shiori.reader"] &&
     [info[@"CFBundleShortVersionString"] isEqual:manifest[@"version"]] &&
@@ -198,18 +240,19 @@ int main(int argc, const char **argv) {
       ![install hasPrefix:@"/Volumes/"] && ![install containsString:@"/AppTranslocation/"] &&
       access(install.stringByDeletingLastPathComponent.fileSystemRepresentation, W_OK) == 0, "location");
     NSString *workspace = [install stringByAppendingString:@".update"], *marker = join(workspace, @"owner.json");
-    bool owned = exists(marker) && [json([NSData dataWithContentsOfFile:marker])[@"installation"] isEqual:install] && [json([NSData dataWithContentsOfFile:marker])[@"format"] isEqual:@"ShioriMacUpdate/1"];
+    bool owned = exists(marker) && [json([NSData dataWithContentsOfFile:marker])[@"installation"] isEqual:install] && [json([NSData dataWithContentsOfFile:marker])[@"format"] isEqual:@"ShioriMacUpdate/2"];
     require(!exists(workspace) || owned, "workspaceConflict");
     if (!exists(workspace)) {
       if ([mode isEqual:@"recover"]) { puts("idle"); return 0; }
       require([fm createDirectoryAtPath:workspace withIntermediateDirectories:NO attributes:@{NSFilePosixPermissions:@0700} error:nullptr], "storage");
-      writeJSON(marker, @{@"installation":install, @"format":@"ShioriMacUpdate/1"});
+      writeJSON(marker, @{@"installation":install, @"format":@"ShioriMacUpdate/2"});
     }
     struct stat st; require(lstat(workspace.fileSystemRepresentation, &st) == 0 && S_ISDIR(st.st_mode) && st.st_uid == getuid(), "workspaceConflict");
     lock = open(join(workspace, @"lock").fileSystemRepresentation, O_RDWR|O_CREAT|O_NOFOLLOW, 0600);
     require(lock >= 0 && flock(lock, LOCK_EX|LOCK_NB) == 0, "busy");
     NSString *backup = join(workspace, @"previous.app"), *payload = join(workspace, @"payload"), *next = join(payload, @"Shiori.app"), *transaction = join(workspace, @"transaction.json");
     NSDictionary *trust = json([NSData dataWithBytes:SHIORI_UPDATE_TRUST length:strlen(SHIORI_UPDATE_TRUST)]);
+    cleanMount(workspace);
     if ([mode isEqual:@"recover"]) {
       if (!exists(transaction)) { puts("idle"); return 0; }
       NSDictionary *record = json([NSData dataWithContentsOfFile:transaction]);
@@ -229,10 +272,10 @@ int main(int argc, const char **argv) {
     if ([mode isEqual:@"prepare"]) {
       require(argc == 6);
       struct stat installed; require(lstat(install.fileSystemRepresentation, &installed) == 0 && S_ISDIR(installed.st_mode), "location");
-      for (NSString *name in @[@"package.zip", @"manifest.json", @"manifest.sig", @"payload"]) if (exists(join(workspace,name))) removeOwned(join(workspace,name));
-      for (int i = 0; i < 3; i++) require([fm copyItemAtPath:@(argv[i+3]) toPath:join(workspace, @[@"package.zip", @"manifest.json", @"manifest.sig"][i]) error:nullptr], "storage");
+      for (NSString *name in @[@"package.dmg", @"manifest.json", @"manifest.sig", @"payload"]) if (exists(join(workspace,name))) removeOwned(join(workspace,name));
+      for (int i = 0; i < 3; i++) require([fm copyItemAtPath:@(argv[i+3]) toPath:join(workspace, @[@"package.dmg", @"manifest.json", @"manifest.sig"][i]) error:nullptr], "storage");
       NSDictionary *manifest = verified(workspace, trust);
-      extract(join(workspace, @"package.zip"), payload); checkBundle(next, manifest);
+      extract(join(workspace, @"package.dmg"), payload); checkBundle(next, manifest);
       puts("idle"); return 0;
     }
     require([mode isEqual:@"run"] && argc == 4);
@@ -243,8 +286,8 @@ int main(int argc, const char **argv) {
     writeJSON(join(workspace, @"started.json"), @{@"pid":@(getpid()), @"parent":@(parent)});
     int waited = 0; while (kill(parent, 0) == 0 && waited++ < 600) usleep(100000);
     require(kill(parent, 0) != 0, "busy");
-    // Re-extract the signed archive at commit, rejecting staging tampering.
-    removeOwned(payload); verified(workspace, trust); extract(join(workspace, @"package.zip"), payload); checkBundle(next, manifest);
+    // Re-mount and copy the signed disk image at commit, rejecting staging tampering.
+    removeOwned(payload); verified(workspace, trust); extract(join(workspace, @"package.dmg"), payload); checkBundle(next, manifest);
     checkpoint("before-commit");
     int lease = lockCommit(parentPath); checkpoint("committing"); checkInstances(0);
     writeJSON(transaction, @{@"build":manifest[@"build"]}); checkpoint("planned");

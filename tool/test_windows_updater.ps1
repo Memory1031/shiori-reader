@@ -19,7 +19,7 @@ try {
   $flags = '/nologo /std:c++17 /EHsc /W4 /WX /MT /utf-8 /DUNICODE /D_UNICODE /DNOMINMAX'
   $commands = @('@echo off', ('call "{0}" >nul' -f $vcvars),
     'if errorlevel 1 exit /b %errorlevel%',
-    ('cl {0} /FI"{1}" /Fe:shiori-updater.exe {2} bcrypt.lib user32.lib shell32.lib' -f
+    ('cl {0} /FI"{1}" /Fe:shiori-updater.exe {2} bcrypt.lib user32.lib shell32.lib advapi32.lib' -f
       $flags, (Join-Path $output 'updater_test_key.h'), $sources),
     'if errorlevel 1 exit /b %errorlevel%',
     ('cl {0} /DFIXTURE_VERSION=1 /Fe:old-app.exe "{1}"' -f $flags, $fixture),

@@ -19,6 +19,7 @@
 #include "manifest_signature.h"
 #include "release_manifest.h"
 #include "update_transaction.h"
+#include "installation_mode.h"
 
 #ifndef SHIORI_UPDATE_MODULUS
 #error SHIORI_UPDATE_MODULUS must be defined (empty for development builds)
@@ -200,6 +201,7 @@ std::set<std::string> ReadList(const fs::path& path, int code) {
 // Binds the expanded payload to the signed manifest and describes the files
 // currently installed, so Apply only ever replaces what this release shipped.
 PreparedUpdate Prepare(const fs::path& workspace, const fs::path& install) {
+  if (InstallationMode(install) != "portable") throw Failure{kInvalid, "Not a portable installation"};
   const auto trusted = Modulus();
   if (trusted.empty()) throw Failure{kUnsupported, "Development build has no update key"};
   const auto manifest = ReadBytes(workspace / L"update-manifest.json", kMaxManifest, kInvalid);
@@ -342,8 +344,140 @@ void Relaunch(const fs::path& install) {
   if (!started) Notify(kLaunchMessage);
 }
 
+void NoReparse(const fs::path& path) {
+  for (auto part = path; !part.empty(); part = part.parent_path()) {
+    const auto attributes = GetFileAttributesW(part.c_str());
+    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+      throw Failure{kUnsupported, "Missing or linked installation path"};
+    }
+    if (part == part.root_path()) break;
+  }
+}
+
+WindowsRelease SetupRelease(const fs::path& workspace) {
+  const auto manifest = ReadBytes(workspace / L"update-manifest.json", kMaxManifest, kInvalid);
+  const auto signature = ReadBytes(workspace / L"update-manifest.sig", kSignatureBytes, kInvalid);
+  if (!shiori::VerifyManifestSignature(std::vector<uint8_t>(manifest.begin(), manifest.end()),
+      std::vector<uint8_t>(signature.begin(), signature.end()), Modulus())) {
+    throw Failure{kInvalid, "Invalid setup manifest signature"};
+  }
+  const auto release = ReadWindowsRelease(manifest, "windows-x64-setup");
+  const auto package = workspace / L"package.exe";
+  NoReparse(package);
+  if (release.build <= SHIORI_UPDATE_BUILD || fs::file_size(package) != release.size ||
+      FileSha256(package) != release.sha256) throw Failure{kInvalid, "Invalid setup package"};
+  return release;
+}
+
+void SetupPreflight(const fs::path& workspace, const fs::path& install, DWORD app) {
+  if (InstallationMode(install) != "setup") throw Failure{kInvalid, "Installation registration does not match"};
+  NoReparse(install);
+  NoReparse(workspace);
+  const auto release = SetupRelease(workspace);
+  const auto manifest = ReadBytes(workspace / L"update-manifest.json", kMaxManifest, kInvalid);
+  const auto portable = ReadWindowsRelease(manifest);
+  uint64_t bytes = release.size;
+  for (const auto& file : portable.files) bytes += file.size;
+  for (const auto& file : ReadList(install / L"program-files.txt", kInvalid)) {
+    const auto path = install / fs::u8path(file);
+    if (!fs::exists(path)) continue;
+    NoReparse(path);
+    bytes += fs::file_size(path);
+    if (GetFileAttributesW(path.c_str()) & FILE_ATTRIBUTE_READONLY) throw Failure{kStorage, "Read-only program file"};
+    Handle replaceable(CreateFileW(path.c_str(), DELETE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL, nullptr));
+    if (replaceable.get() == INVALID_HANDLE_VALUE) throw Failure{kStorage, "Program file is in use"};
+  }
+  if (GetDriveTypeW(install.root_path().c_str()) != DRIVE_FIXED) throw Failure{kUnsupported, "Not a local fixed drive"};
+  ULARGE_INTEGER free{};
+  if (!GetDiskFreeSpaceExW(install.c_str(), &free, nullptr, nullptr) || free.QuadPart <= bytes + 1024 * 1024) {
+    throw Failure{kStorage, "Insufficient setup space"};
+  }
+  const auto probe = install / (L".shiori-update-probe-" + std::to_wstring(GetCurrentProcessId()));
+  Handle file(CreateFileW(probe.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW,
+      FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, nullptr));
+  if (file.get() == INVALID_HANDLE_VALUE) throw Failure{kStorage, "Installation is not writable"};
+  if (OtherInstance(install, app)) throw Failure{kInstances, "Another Shiori window is running"};
+}
+
+bool SetupComplete(const fs::path& workspace, const fs::path& install) {
+  if (InstallationMode(install) != "setup") return false;
+  SetupRelease(workspace);
+  const auto manifest = ReadBytes(workspace / L"update-manifest.json", kMaxManifest, kInvalid);
+  for (const auto& file : ReadWindowsRelease(manifest).files) {
+    ValidateRelativePath(file.path);
+    const auto path = install / fs::u8path(file.path);
+    if (!fs::is_regular_file(path)) return false;
+    NoReparse(path);
+    if (fs::file_size(path) != file.size || FileSha256(path) != file.sha256) return false;
+  }
+  return true;
+}
+
+bool SetupRunning(const fs::path& workspace) {
+  Handle snapshot(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0));
+  if (snapshot.get() == INVALID_HANDLE_VALUE) throw Failure{kError, "Cannot enumerate installer processes"};
+  PROCESSENTRY32W entry{}; entry.dwSize = sizeof(entry);
+  if (!Process32FirstW(snapshot.get(), &entry)) return false;
+  do {
+    Handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, entry.th32ProcessID));
+    if (!process.get()) continue;
+    std::wstring image(32768, L'\0'); DWORD size = static_cast<DWORD>(image.size());
+    if (QueryFullProcessImageNameW(process.get(), 0, image.data(), &size)) {
+      image.resize(size);
+      if (Same(image, (workspace / L"package.exe").wstring())) return true;
+    }
+  } while (Process32NextW(snapshot.get(), &entry));
+  return false;
+}
+
+int InstallSetup(const fs::path& workspace, const fs::path& install) {
+  SetupPreflight(workspace, install, 0);
+  const auto package = workspace / L"package.exe";
+  // Inno owns file rollback and its uninstall inventory; never use the portable
+  // replacement engine on an installed copy. All paths are locally derived.
+  std::wstring command = L"\"" + package.wstring() + L"\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART "
+      L"/NOCLOSEAPPLICATIONS /NORESTARTAPPLICATIONS /CURRENTUSER /SHIORIUPDATE=1 /DIR=\"" + install.wstring() + L"\"";
+  {
+    std::ofstream pending(workspace / L"setup.pending", std::ios::binary | std::ios::trunc);
+    pending << "ShioriSetupUpdate/2\n";
+    if (!pending.good()) throw Failure{kStorage, "Cannot persist setup recovery state"};
+  }
+  STARTUPINFOW startup{}; startup.cb = sizeof(startup);
+  PROCESS_INFORMATION process{};
+  if (!CreateProcessW(package.c_str(), command.data(), nullptr, nullptr, FALSE, 0,
+      nullptr, workspace.c_str(), &startup, &process)) {
+    fs::remove(workspace / L"setup.pending");
+    throw Failure{kFailed, "Cannot start verified installer"};
+  }
+  Handle running(process.hProcess); Handle thread(process.hThread);
+  Log("started verified Setup installer");
+  if (WaitForSingleObject(running.get(), INFINITE) != WAIT_OBJECT_0) return kRecoveryRequired;
+  DWORD result = 1;
+  GetExitCodeProcess(running.get(), &result);
+  if (result != 0) {
+    // An installer can fail after overwriting existing files. Do not launch an
+    // unverified mixture; preserve the package and recovery state for repair.
+    WriteResult(workspace, kRecoveryRequired, "Installer failed: rerun the verified Setup EXE manually");
+    return kRecoveryRequired;
+  }
+  if (!SetupComplete(workspace, install)) {
+    WriteResult(workspace, kRecoveryRequired, "Installer finished without the expected program files");
+    return kRecoveryRequired;
+  }
+  fs::remove(workspace / L"setup.pending");
+  WriteResult(workspace, kInstalled, "Setup upgrade complete");
+  Relaunch(install);
+  return kInstalled;
+}
+
 int CheckMode(const fs::path& workspace, const fs::path& install, DWORD app) {
   InstallLock lock(install);
+  if (InstallationMode(install) == "setup") {
+    SetupPreflight(workspace, install, app);
+    return kInstalled;
+  }
   Preflight(Prepare(workspace, install), app);
   return kInstalled;
 }
@@ -392,13 +526,22 @@ int ApplyMode(const fs::path& workspace, const fs::path& install, const wchar_t*
   }
   PreparedUpdate task;
   try {
+    if (InstallationMode(install) == "setup") return InstallSetup(workspace, install);
     task = Prepare(workspace, install);
     Preflight(task, 0);
   } catch (const Failure& failure) {
+    if (fs::exists(workspace / L"setup.pending")) {
+      WriteResult(workspace, kRecoveryRequired, failure.message);
+      return kRecoveryRequired;
+    }
     WriteResult(workspace, failure.code, failure.message);
     Relaunch(install);
     return failure.code;
   } catch (const std::exception& error) {
+    if (fs::exists(workspace / L"setup.pending")) {
+      WriteResult(workspace, kRecoveryRequired, error.what());
+      return kRecoveryRequired;
+    }
     WriteResult(workspace, kError, error.what());
     Relaunch(install);
     return kError;
@@ -444,6 +587,16 @@ int Recovered(Status status) {
 
 int RecoverMode(const fs::path& workspace, const fs::path& install) {
   InstallLock lock(install);
+  if (fs::exists(workspace / L"setup.pending")) {
+    if (SetupRunning(workspace)) return kBusy;
+    if (SetupComplete(workspace, install)) {
+      fs::remove(workspace / L"setup.pending");
+      WriteResult(workspace, kInstalled, "Recovered completed Setup upgrade");
+      return kInstalled;
+    }
+    WriteResult(workspace, kRecoveryRequired, "Interrupted installer: rerun the verified Setup EXE manually");
+    return kRecoveryRequired;
+  }
   const auto plan = workspace / L"plan.bin";
   if (GetFileAttributesW(plan.c_str()) == INVALID_FILE_ATTRIBUTES) {
     // Refusals before any transaction leave only their result behind.

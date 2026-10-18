@@ -1,7 +1,6 @@
 """Build a checked Windows x64 ZIP; never create a tag or publish a release."""
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,6 +8,7 @@ import re
 import struct
 import subprocess
 import sys
+import tempfile
 import zipfile
 
 from release_android import ReleaseCheckError, version
@@ -23,7 +23,7 @@ RUNTIME = (
 CRT = ('msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')
 # The updater runs from the workspace, away from the bundled CRT DLLs, so it may
 # import only system DLLs present on every supported Windows.
-UPDATER_IMPORTS = frozenset({'kernel32.dll', 'user32.dll', 'shell32.dll', 'bcrypt.dll'})
+UPDATER_IMPORTS = frozenset({'kernel32.dll', 'user32.dll', 'shell32.dll', 'bcrypt.dll', 'advapi32.dll'})
 # Versions match the locked Windows WebView fork's native CMake dependencies.
 NATIVE_PACKAGES = Path('build/windows/x64/packages/flutter_inappwebview_windows/1.0.231216.1-1.0.2792.45-3.11.2')
 NATIVE_NOTICES = ('Microsoft.Web.WebView2/LICENSE.txt', 'Microsoft.Web.WebView2/NOTICE.txt',
@@ -112,7 +112,7 @@ def verify_updater(bundle):
         raise ReleaseCheckError('Windows updater does not embed the bundled update key')
 
 
-def package(root, bundle, crt, output, tag, commit, metadata_reader=exe_metadata):
+def package(root, bundle, crt, output, tag, commit, metadata_reader=exe_metadata, compiler=None):
     name, number = version((root / 'pubspec.yaml').read_text(encoding='utf-8'), tag)
     if not re.fullmatch(r'[0-9a-fA-F]{40}', commit):
         raise ReleaseCheckError('A full source commit SHA is required')
@@ -147,9 +147,13 @@ def package(root, bundle, crt, output, tag, commit, metadata_reader=exe_metadata
         include(root / NATIVE_PACKAGES / notice, 'licenses/' + notice)
     include(root / 'tool/licenses/nlohmann-json-3.11.2-LICENSE.MIT',
             'licenses/nlohmann-json-3.11.2-LICENSE.MIT')
+    include(root / 'tool/licenses/Inno-Setup-LICENSE.txt', 'licenses/Inno-Setup-LICENSE.txt')
     output.mkdir(parents=True, exist_ok=True)
     listing = ''.join(relative + '\n' for relative in sorted([*files, PROGRAM_FILES]))
     archive = output / f'shiori-reader-{tag}-windows-x64.zip'
+    setup = output / f'shiori-reader-{tag}-windows-x64-setup.exe'
+    if archive.exists() or setup.exists():
+        raise ReleaseCheckError('Refusing to replace an existing release asset')
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as zipped:
         for relative, path in sorted(files.items()):
             zipped.write(path, relative)
@@ -157,15 +161,23 @@ def package(root, bundle, crt, output, tag, commit, metadata_reader=exe_metadata
     with zipfile.ZipFile(archive) as zipped:
         if zipped.testzip() is not None:
             raise ReleaseCheckError('Windows ZIP integrity check failed')
-    with archive.open('rb') as binary:
-        digest = hashlib.file_digest(binary, 'sha256').hexdigest()
-    (output / 'SHA256SUMS-windows-x64.txt').write_text(
-        f'{digest}  {archive.name}\n', encoding='ascii')
-    (output / 'release-info-windows-x64.json').write_text(json.dumps({
-        'tag': tag, 'commit': commit, 'versionName': name, 'versionCode': int(number),
-        'platform': 'windows-x64', 'archive': archive.name, 'sha256': digest,
-        'signed': False,
-    }, indent=2) + '\n', encoding='utf-8')
+    if compiler is None:
+        raise ReleaseCheckError('Pinned Inno Setup compiler is required')
+    with tempfile.TemporaryDirectory(prefix='shiori-setup-') as temporary:
+        payload = Path(temporary)
+        with zipfile.ZipFile(archive) as zipped:
+            zipped.extractall(payload)  # This archive was created above from checked local files.
+        subprocess.run([str(compiler), '/Qp', f'/DPayload={payload}', f'/DOutput={output}',
+            f'/DFilename={setup.stem}', f'/DVersion={tag[1:]}',
+            f'/DFileVersion={name.split("-")[0]}.{number}',
+            f'/DIcon={root / "windows/runner/resources/app_icon.ico"}',
+            str(root / 'windows/installer/shiori.iss')], check=True)
+    if not setup.is_file() or setup.stat().st_size == 0:
+        raise ReleaseCheckError('Inno Setup did not produce an installer')
+    from update_manifest import identity
+    from release_receipt import write_receipt
+    expected = identity((root / 'pubspec.yaml').read_text(encoding='utf-8'), tag, commit)
+    write_receipt(output, 'windows-x64', expected, [archive, setup])
     return archive
 
 
@@ -176,9 +188,10 @@ def main():
     parser.add_argument('--bundle', type=Path, default=Path('build/windows/x64/runner/Release'))
     parser.add_argument('--crt-dir', type=Path, required=True)
     parser.add_argument('--output', type=Path, default=Path('build/windows-release-assets'))
+    parser.add_argument('--compiler', type=Path, required=True)
     args = parser.parse_args()
-    archive = package(Path.cwd(), args.bundle, args.crt_dir, args.output, args.tag, args.commit)
-    print('Windows ZIP verified: ' + archive.name)
+    archive = package(Path.cwd(), args.bundle, args.crt_dir, args.output, args.tag, args.commit, compiler=args.compiler)
+    print('Windows ZIP and Setup verified: ' + archive.name)
 
 
 if __name__ == '__main__':

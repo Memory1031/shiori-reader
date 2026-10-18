@@ -3,7 +3,6 @@
 import argparse
 import base64
 import hashlib
-import json
 import os
 from pathlib import Path
 import re
@@ -126,12 +125,10 @@ def verify_apk(root, tag):
     output.mkdir(parents=True, exist_ok=True)
     target = output / f"shiori-reader-{tag}-android.apk"
     shutil.copyfile(apk, target)
-    digest = hashlib.sha256(target.read_bytes()).hexdigest()
-    (output / "SHA256SUMS.txt").write_text(f"{digest}  {target.name}\n", encoding="ascii")
-    metadata = {"tag": tag, "commit": os.environ["GITHUB_SHA"], "versionName": name,
-                "versionCode": int(number), "applicationId": "dev.shiori.reader",
-                "apk": target.name, "sha256": digest, "certificateSha256": certificate_hash}
-    (output / "release-info.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    from update_manifest import identity
+    from release_receipt import write_receipt
+    expected = identity((root / "pubspec.yaml").read_text(encoding="utf-8"), tag, os.environ["GITHUB_SHA"])
+    write_receipt(output, "android", expected, [target], certificateSha256=certificate_hash)
 
 
 def main():

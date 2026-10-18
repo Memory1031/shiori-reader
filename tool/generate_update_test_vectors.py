@@ -7,29 +7,10 @@ import sys
 from pathlib import Path
 
 from test_update_manifest import UpdateManifestTest
-from update_manifest import encoded, sign_manifest
+from update_manifest import encoded, sign_manifest, envelope
 
 
 def main():
-    if sys.argv[1:] == ['--macos']:
-        from test_release_macos import MacOSUpdateTest
-        MacOSUpdateTest.setUpClass()
-        case = MacOSUpdateTest()
-        try:
-            case.setUp()
-            original = json.loads(case.signed()[0].read_bytes())
-            variants = {}
-            for name in ['valid', 'wrongProtocol', 'wrongPlatform']:
-                value = copy.deepcopy(original)
-                if name == 'wrongProtocol': value['assets'][0]['updaterProtocol'] = 2
-                if name == 'wrongPlatform': value['assets'][0]['platform'] = 'windows-x64'
-                raw = encoded(value)
-                variants[name] = dict(manifest=base64.b64encode(raw).decode(), signature=base64.b64encode(sign_manifest(raw, case.secret, case.key)).decode())
-            Path('test/fixtures/updates/macos.json').write_bytes(encoded(dict(publicKey=case.key, cases=variants)))
-        finally:
-            case.doCleanups()
-            MacOSUpdateTest.doClassCleanups()
-        return
     UpdateManifestTest.setUpClass()
     case = UpdateManifestTest()
     try:
@@ -41,10 +22,12 @@ def main():
             value = copy.deepcopy(original)
             edit(value)
             raw = encoded(value)
+            signature = sign_manifest(raw, case.secret, case.key)
             variants[name] = {
+                "envelope": base64.b64encode(envelope(raw, signature)).decode(),
                 "manifest": base64.b64encode(raw).decode(),
                 "signature": base64.b64encode(
-                    sign_manifest(raw, case.secret, case.key)
+                    signature
                 ).decode(),
             }
 
@@ -58,19 +41,26 @@ def main():
                     asset["name"] = asset["name"].replace("1.2.1-beta.1", tag[1:])
 
             add(f"beta{number}", history)
-        add("wrongSchema", lambda value: value.update(schemaVersion=2))
+        add("wrongSchema", lambda value: value.update(schemaVersion=1))
         add("wrongChannel", lambda value: value.update(channel="stable"))
         add("wrongApp", lambda value: value.update(applicationId="other.app"))
         add("missingAsset", lambda value: value["assets"].pop())
         add("duplicateAsset", lambda value: value["assets"].append(value["assets"][0]))
+        add("wrongPlatform", lambda value: value["assets"][3].update(platform="macos-arm64"))
+        add("wrongMacProtocol", lambda value: value["assets"][3].update(updaterProtocol=1))
+        add("wrongSetupProtocol", lambda value: value["assets"][2].update(updaterProtocol=1))
+        add("wrongMacName", lambda value: value["assets"][3].update(name="shiori-reader-v1.2.1-beta.1-macos-universal.zip"))
         add("wrongDigest", lambda value: value["assets"][0].update(sha256="bad"))
         add("wrongSize", lambda value: value["assets"][0].update(size=-1))
         add(
             "traversal",
             lambda value: value["assets"][1]["files"][0].update(path="../outside"),
         )
-        add("wrongProtocol", lambda value: value["assets"][1].update(updaterProtocol=2))
+        add("wrongProtocol", lambda value: value["assets"][1].update(updaterProtocol=1))
         add("missingRuntime", lambda value: value["assets"][1]["files"].pop())
+        raw = encoded(original).replace(b'"schemaVersion":2', b'"schemaVersion":2,"schemaVersion":2')
+        signature = sign_manifest(raw, case.secret, case.key)
+        variants['duplicateField'] = dict(manifest=base64.b64encode(raw).decode(), signature=base64.b64encode(signature).decode(), envelope=base64.b64encode(envelope(raw, signature)).decode())
         destination = Path("test/fixtures/updates/vectors.json")
         destination.parent.mkdir(parents=True, exist_ok=True)
         packages = {

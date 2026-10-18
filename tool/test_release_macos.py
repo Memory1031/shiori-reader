@@ -14,7 +14,8 @@ import unittest
 import zipfile
 
 from update_manifest import encoded, identity, key_from_private, openssl, sha, sign_manifest
-from release_macos import BUNDLE_IDENTITY, create_manifest, verify_archive, sign_locally
+from release_macos import BUNDLE_IDENTITY, verify_bundle, sign_locally
+from release_receipt import file_record
 from release_android import ReleaseCheckError
 from build_macos_helper import build
 
@@ -60,7 +61,7 @@ import Darwin
         self.root = Path(self.temporary.name).resolve()
         (self.root / 'pubspec.yaml').write_text('version: 1.3.2+20\n')
         self.assets = self.root / 'assets'; self.assets.mkdir()
-        self.package = self.assets / 'shiori-reader-v1.3.2-macos-universal.zip'
+        self.package = self.assets / 'shiori-reader-v1.3.2-macos-universal.dmg'
         self.install = self.root / 'Shiori.app'
         self.workspace = Path(str(self.install) + '.update')
         self.make_bundle(self.install, self.old)
@@ -77,24 +78,23 @@ import Darwin
         info = path / BUNDLE_IDENTITY.removeprefix('Shiori.app/').replace('/App.framework/Resources/', '/App.framework/Versions/A/Resources/')
         info.parent.mkdir(parents=True)
         info.write_bytes(encoded(dict(schemaVersion=1, identity=release, publicKey=self.key)))
-        (path / 'Contents/Frameworks/App.framework/Resources').symlink_to('Versions/A/Resources')
-        (path / 'Contents/Frameworks/current').symlink_to('App.framework')
+        (path / 'Contents/Frameworks/App.framework/Resources').symlink_to(Path('Versions/A/Resources'), target_is_directory=True)
+        (path / 'Contents/Frameworks/current').symlink_to('App.framework', target_is_directory=True)
 
-    def archive(self, extra=None):
-        with zipfile.ZipFile(self.package, 'w') as z:
-            for path in self.bundle.rglob('*'):
-                name = str(path.relative_to(self.bundle.parent))
-                if path.is_symlink():
-                    entry = zipfile.ZipInfo(name); entry.create_system = 3
-                    entry.external_attr = (stat.S_IFLNK | 0o777) << 16
-                    z.writestr(entry, os.readlink(path))
-                elif path.is_file(): z.write(path, name)
-            if extra: extra(z)
-        metadata = dict(tag='v1.3.2', commit='b'*40, versionName='1.3.2', versionCode=20, platform='macos-universal', archive=self.package.name, sha256=sha(self.package))
-        (self.assets / 'release-info-macos-universal.json').write_bytes(encoded(metadata))
+    def archive(self):
+        self.package.unlink(missing_ok=True)
+        if sys.platform == 'darwin':
+            subprocess.run(['hdiutil', 'create', '-volname', 'Shiori fixture', '-srcfolder',
+                            str(self.bundle.parent), '-format', 'UDZO', str(self.package)], check=True, capture_output=True)
+        else:
+            self.package.write_bytes(b'synthetic DMG; never mounted outside macOS')
 
     def signed(self):
-        raw = create_manifest(self.root, self.assets, 'v1.3.2', 'b'*40, self.key)
+        assets = [dict(platform=platform, name=f'shiori-reader-v1.3.2-{suffix}', size=1, sha256='0'*64,
+                       minimumSystem='24' if platform == 'android' else '10.0.17763', updaterProtocol=2)
+                  for platform, suffix in [('android', 'android.apk'), ('windows-x64-portable', 'windows-x64.zip'), ('windows-x64-setup', 'windows-x64-setup.exe')]]
+        assets.append(dict(platform='macos-universal', **file_record(self.package), minimumSystem='12.0', updaterProtocol=2))
+        raw = encoded(dict(schemaVersion=2, algorithm='rsa3072-pkcs1-sha256', keyId=self.key['keyId'], **self.new, assets=assets))
         manifest, signature = self.root / 'manifest.json', self.root / 'manifest.sig'
         manifest.write_bytes(raw); signature.write_bytes(sign_manifest(raw, self.secret, self.key))
         return manifest, signature
@@ -144,19 +144,25 @@ import Darwin
             if process.poll() is None: process.kill()
             process.communicate(timeout=5)
 
-    def test_separate_manifest_and_bundle_validation(self):
+    def test_unified_manifest_selects_dmg_and_preserves_exact_signature(self):
         manifest, signature = self.signed()
         value = json.loads(manifest.read_text())
-        self.assertEqual([a['platform'] for a in value['assets']], ['macos-universal'])
-        self.assertEqual(value['assets'][0]['minimumSystem'], '12.0')
+        self.assertEqual(value['schemaVersion'], 2)
+        self.assertEqual(len(value['assets']), 4)
+        self.assertEqual(value['assets'][-1]['name'], self.package.name)
+        self.assertEqual(value['assets'][-1]['minimumSystem'], '12.0')
         self.assertEqual(signature.stat().st_size, 384)
 
-    def test_reject_traversal_and_link_writes(self):
-        for name in ['../outside', 'Shiori.app/../outside', 'Shiori.app/Contents/Frameworks/current/outside']:
-            with self.subTest(name=name):
-                self.archive(lambda z: z.writestr(name, 'bad'))
-                with self.assertRaises(ReleaseCheckError):
-                    verify_archive(self.package, self.new, self.key)
+    def test_reject_escaping_bundle_links_and_identity(self):
+        link = self.bundle / 'Contents/escape'
+        link.symlink_to('../../outside')
+        with self.assertRaises(ReleaseCheckError):
+            verify_bundle(self.bundle, self.new, self.key)
+        link.unlink()
+        identity_path = self.bundle / BUNDLE_IDENTITY.removeprefix('Shiori.app/').replace('/App.framework/Resources/', '/App.framework/Versions/A/Resources/')
+        identity_path.write_bytes(encoded(dict(schemaVersion=1, development=True)))
+        with self.assertRaises(ReleaseCheckError):
+            verify_bundle(self.bundle, self.new, self.key)
 
     @unittest.skipUnless(sys.platform == 'darwin', 'native macOS signing')
     def test_ad_hoc_signs_nested_helper_and_complete_bundle(self):
@@ -227,7 +233,7 @@ import Darwin
     @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
     def test_rejects_tampering_before_any_replacement(self):
         self.prepare()
-        with (self.workspace / 'package.zip').open('ab') as f: f.write(b'x')
+        with (self.workspace / 'package.dmg').open('ab') as f: f.write(b'x')
         result = self.call('run', '999999', success=False)
         self.assertIn('verification', result.stderr)
         self.assertFalse((self.workspace / 'previous.app').exists())
@@ -242,7 +248,7 @@ import Darwin
 
     @unittest.skipUnless(sys.platform == 'darwin', 'native macOS updater')
     def test_interrupted_replacement_recovers_at_each_commit_boundary(self):
-        for stage, expected in [('planned','19'), ('swapped','20'), ('backed-up','20'), ('replaced','20')]:
+        for stage, expected in [('mounted','19'), ('planned','19'), ('swapped','20'), ('backed-up','20'), ('replaced','20')]:
             with self.subTest(stage=stage):
                 if self.workspace.exists(): shutil.rmtree(self.workspace)
                 if self.install.exists(): shutil.rmtree(self.install)
@@ -250,6 +256,7 @@ import Darwin
                 self.prepare()
                 self.run_update(env={**os.environ,'SHIORI_UPDATE_STOP':stage},success=False)
                 self.call('recover')
+                self.assertFalse((self.workspace / 'volume').exists())
                 info = plistlib.loads((self.install / 'Contents/Info.plist').read_bytes())
                 self.assertEqual(info['CFBundleVersion'], expected)
 

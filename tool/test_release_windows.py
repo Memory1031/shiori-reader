@@ -5,6 +5,7 @@ import struct
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import patch
 
 from release_windows import (BUILD_INFO, CRT, RUNTIME, NATIVE_PACKAGES, NATIVE_NOTICES,
                              PROGRAM_FILES, ReleaseCheckError, package)
@@ -42,7 +43,7 @@ class WindowsReleaseTest(unittest.TestCase):
         (self.root / 'LICENSE').write_text('Synthetic license')
         for directory, paths in [(self.bundle, RUNTIME), (self.crt, CRT),
                                  (self.root / NATIVE_PACKAGES, NATIVE_NOTICES),
-                                 (self.root, ['tool/licenses/nlohmann-json-3.11.2-LICENSE.MIT'])]:
+                                 (self.root, ['tool/licenses/nlohmann-json-3.11.2-LICENSE.MIT', 'tool/licenses/Inno-Setup-LICENSE.txt'])]:
             for relative in paths:
                 path = directory / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -60,8 +61,19 @@ class WindowsReleaseTest(unittest.TestCase):
                              FileBuildPart=0, FilePrivatePart=9, IsDebug=False)
 
     def package(self, **kwargs):
-        return package(self.root, self.bundle, self.crt, self.output,
-                       kwargs.get('tag', 'v1.2.0'), 'a' * 40, lambda _: self.metadata)
+        def compile_setup(command, **options):
+            self.assertTrue(str(command[0]).endswith('ISCC.exe'))
+            output = Path(next(p.removeprefix('/DOutput=') for p in command if p.startswith('/DOutput=')))
+            name = next(p.removeprefix('/DFilename=') for p in command if p.startswith('/DFilename='))
+            payload = Path(next(p.removeprefix('/DPayload=') for p in command if p.startswith('/DPayload=')))
+            self.assertTrue((payload / 'shiori-updater.exe').is_file())
+            self.assertTrue((payload / 'data/flutter_assets/NOTICES.Z').is_file())
+            self.assertFalse((payload / '.shiori-install').exists())
+            (output / (name + '.exe')).write_bytes(b'MZ synthetic setup')
+        with patch('release_windows.subprocess.run', side_effect=compile_setup):
+            return package(self.root, self.bundle, self.crt, self.output,
+                           kwargs.get('tag', 'v1.2.0'), 'a' * 40, lambda _: self.metadata,
+                           compiler=Path('pinned/ISCC.exe'))
 
     def test_zip_layout_hash_and_platform_metadata(self):
         (self.bundle / 'shiori.pdb').write_bytes(b'debug symbols')
@@ -73,13 +85,11 @@ class WindowsReleaseTest(unittest.TestCase):
             self.assertNotIn('native_assets.json', zipped.namelist())
             self.assertTrue(all('licenses/' + notice in zipped.namelist() for notice in NATIVE_NOTICES))
             self.assertTrue(all(not name.startswith('Release/') for name in zipped.namelist()))
-        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-        self.assertEqual((self.output / 'SHA256SUMS-windows-x64.txt').read_text(),
-                         f'{digest}  {archive.name}\n')
-        metadata = json.loads((self.output / 'release-info-windows-x64.json').read_text())
-        self.assertEqual(metadata['sha256'], digest)
-        self.assertFalse(metadata['signed'])
-        self.assertFalse((self.output / 'SHA256SUMS.txt').exists())
+        receipt = json.loads((self.output / 'receipts/windows-x64.json').read_text())
+        self.assertEqual(receipt['identity']['tag'], 'v1.2.0')
+        self.assertEqual(receipt['packages'][0]['sha256'], hashlib.sha256(archive.read_bytes()).hexdigest())
+        self.assertEqual(len(receipt['packages']), 2)
+        self.assertFalse(any(p.name.startswith(('SHA256SUMS', 'release-info')) for p in self.output.iterdir()))
 
     def test_program_file_list_names_every_entry_including_itself(self):
         with zipfile.ZipFile(self.package()) as zipped:
@@ -129,11 +139,10 @@ class WindowsReleaseTest(unittest.TestCase):
     def test_beta_archive_preserves_numeric_executable_version(self):
         archive = self.package(tag='v1.2.0-beta.1')
         self.assertEqual(archive.name, 'shiori-reader-v1.2.0-beta.1-windows-x64.zip')
-        metadata = json.loads((self.output / 'release-info-windows-x64.json').read_text())
+        metadata = json.loads((self.output / 'receipts/windows-x64.json').read_text())['identity']
         self.assertEqual(metadata['tag'], 'v1.2.0-beta.1')
-        self.assertEqual(metadata['versionName'], '1.2.0')
-        self.assertEqual(str(metadata['versionCode']), '9')
-        self.assertIn(archive.name, (self.output / 'SHA256SUMS-windows-x64.txt').read_text())
+        self.assertEqual(metadata['version'], '1.2.0')
+        self.assertEqual(metadata['build'], 9)
         with self.assertRaises(ReleaseCheckError):
             self.package(tag='v1.2.1-beta.1')
 

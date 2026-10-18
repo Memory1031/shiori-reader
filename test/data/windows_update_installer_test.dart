@@ -19,7 +19,9 @@ void main() {
     fixtures.key,
     expectedTag: fixtures.manifest['tag'] as String,
   );
-  final asset = manifest.assets.singleWhere((a) => a.platform == 'windows-x64');
+  final asset = manifest.assets.singleWhere(
+    (a) => a.platform == 'windows-x64-portable',
+  );
   final signed = {for (final file in asset.files) file.path: file.size};
   late Directory root;
   late Directory installation;
@@ -54,7 +56,7 @@ void main() {
         },
       );
 
-  const ownership = 'ShioriUpdateWorkspace/1\n';
+  const ownership = 'ShioriUpdateWorkspace/2\n';
   File marker() => File('${workspace.path}/shiori-update-workspace');
 
   void ownWorkspace() {
@@ -70,7 +72,7 @@ void main() {
 
   File closed() => File('${workspace.path}/shiori-update-closed');
   void closeWorkspace(int result) =>
-      closed().writeAsStringSync('ShioriUpdateClosed/1\n$result\n');
+      closed().writeAsStringSync('ShioriUpdateClosed/2\n$result\n');
 
   /// A committed transaction as the updater leaves it before cleanup.
   void stageFinished() {
@@ -115,7 +117,7 @@ void main() {
       '${installation.path}/shiori-updater.exe',
     ).writeAsStringSync('installed updater');
     package = File('${root.path}/package.zip')
-      ..writeAsBytesSync(fixtures.package('windows-x64'));
+      ..writeAsBytesSync(fixtures.package('windows-x64-portable'));
     runs = [];
     events = [];
     code = (_) => WindowsUpdaterCode.installed;
@@ -346,11 +348,11 @@ void main() {
     });
 
     for (final (name, record) in [
-      ('an unfinished code', 'ShioriUpdateClosed/1\n2\n'),
-      ('a malformed record', 'ShioriUpdateClosed/1\ninstalled\n'),
+      ('an unfinished code', 'ShioriUpdateClosed/2\n2\n'),
+      ('a malformed record', 'ShioriUpdateClosed/2\ninstalled\n'),
       ('a foreign record', 'done'),
-      ('an unknown code', 'ShioriUpdateClosed/1\n99\n'),
-      ('only the header', 'ShioriUpdateClosed/1\n'),
+      ('an unknown code', 'ShioriUpdateClosed/2\n99\n'),
+      ('only the header', 'ShioriUpdateClosed/2\n'),
     ]) {
       test('$name does not end the transaction', () async {
         stageFinished();
@@ -364,7 +366,7 @@ void main() {
 
     test('a truncated record leaves recovery to the updater', () async {
       stageFinished();
-      closed().writeAsStringSync('ShioriUpdateClosed/1\n');
+      closed().writeAsStringSync('ShioriUpdateClosed/2\n');
       expect(await installer().status(), UpdateInstallState.installed);
       expect(runs.single.first, 'recover');
       expect(workspace.existsSync(), isFalse);
@@ -486,6 +488,29 @@ void main() {
   });
 
   group('install', () {
+    test('Setup handoff stages the EXE without ZIP extraction', () async {
+      final setup = manifest.assets.singleWhere(
+        (a) => a.platform == 'windows-x64-setup',
+      );
+      package.writeAsBytesSync(fixtures.package('windows-x64-setup'));
+      expect(
+        await installer().install(
+          package,
+          manifest.identity,
+          setup,
+          manifestBytes,
+          signature,
+        ),
+        UpdateInstallState.installing,
+      );
+      expect(
+        File('${workspace.path}/package.exe').readAsBytesSync(),
+        fixtures.package('windows-x64-setup'),
+      );
+      expect(Directory('${workspace.path}/payload').existsSync(), isFalse);
+      expect(events, ['start', 'prepare', 'exit']);
+    });
+
     Future<UpdateInstallState> run(WindowsUpdateInstaller target) => target
         .install(package, manifest.identity, asset, manifestBytes, signature);
 

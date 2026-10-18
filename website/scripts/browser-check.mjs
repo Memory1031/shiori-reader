@@ -11,18 +11,19 @@ await mkdir(output, { recursive: true });
 const channel = process.env.WEBSITE_BROWSER ?? (process.platform === 'win32' ? 'chrome' : undefined);
 const browser = await chromium.launch({ channel, headless: true });
 const api = 'https://api.github.com/repos/Memory1031/shiori-reader/releases/latest';
+const release = releaseFixture();
 const results = [];
 const problems = [];
 try {
   const context = await browser.newContext({ reducedMotion: 'reduce' });
-  await context.route(api, route => route.fulfill({ json: releaseFixture() }));
+  await context.route(api, route => route.fulfill({ json: release }));
   const page = await context.newPage();
   page.on('pageerror', error => problems.push(error.message));
   page.on('response', response => { if (response.url().startsWith(base) && response.status() >= 400) problems.push(`${response.status()}: ${response.url()}`); });
   for (const locale of ['zh-cn', 'en']) for (const type of ['', 'download/']) for (const width of [360, 390, 430, 768, 1280, 1440, 1920]) {
     await page.setViewportSize({ width, height: width < 768 ? 844 : 1000 });
     await page.goto(`${base}${locale}/${type}`);
-    await page.locator('[data-version]').filter({ hasText: 'v1.4.0' }).waitFor();
+    await page.locator('[data-version]').filter({ hasText: release.tag_name }).waitFor();
     await page.evaluate(async () => {
       await document.fonts.ready;
       await Promise.all(Array.from(document.images).map(image => { image.loading = 'eager'; return image.decode(); }));
@@ -53,6 +54,18 @@ try {
       }
     }
     results.push({ locale, page: type || 'home', width, ...metrics });
+  }
+  for (const locale of ['zh-cn', 'en']) for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(base + locale + '/download/');
+    await page.locator('[data-platform="windows"]').click();
+    const primary = page.locator('[data-package]'), portable = page.locator('[data-portable]');
+    await primary.waitFor({ state: 'visible' });
+    assert.ok((await primary.getAttribute('href')).endsWith('-windows-x64-setup.exe'));
+    assert.ok((await portable.getAttribute('href')).endsWith('-windows-x64.zip'));
+    assert.equal(await portable.isVisible(), true);
+    assert.ok((await primary.innerText()).includes(locale === 'en' ? 'recommended' : '推荐'));
+    await page.locator('[data-download]').screenshot({ path: output + '/' + locale + '-windows-download-' + width + '.png' });
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${base}en/`);
@@ -110,13 +123,14 @@ try {
   await page.screenshot({ path: `${output}/en-mobile-large-text.png`, fullPage: true });
   // Selecting a platform while a request is pending must use the latest selection.
   const delayed = await browser.newContext();
+  const nextRelease = releaseFixture('v0.0.1');
   let respond;
-  await delayed.route(api, route => new Promise(resolve => { respond = async () => { await route.fulfill({ json: releaseFixture('v1.5.0') }); resolve(); }; }));
+  await delayed.route(api, route => new Promise(resolve => { respond = async () => { await route.fulfill({ json: nextRelease }); resolve(); }; }));
   const waiting = await delayed.newPage();
   await waiting.goto(`${base}en/download/`);
   await waiting.locator('[data-platform="ios"]').click();
   await respond();
-  await waiting.locator('[data-version]').filter({ hasText: 'v1.5.0' }).waitFor();
+  await waiting.locator('[data-version]').filter({ hasText: nextRelease.tag_name }).waitFor();
   assert.ok((await waiting.locator('[data-package]').getAttribute('href')).endsWith('-ios-arm64-unsigned.ipa'));
   await delayed.close();
   for (const kind of ['missing', 'rate', 'server', 'notfound', 'invalid', 'network', 'timeout']) {
@@ -139,7 +153,7 @@ try {
       await ctx.unroute(api);
       await ctx.route(api, route => route.fulfill({ json: releaseFixture() }));
       await p.locator('[data-retry]').click();
-      await p.locator('[data-version]').filter({ hasText: 'v1.4.0' }).waitFor();
+      await p.locator('[data-version]').filter({ hasText: release.tag_name }).waitFor();
       assert.equal(await p.locator('[data-package]').isVisible(), true);
     }
     await ctx.close();

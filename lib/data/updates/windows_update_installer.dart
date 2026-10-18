@@ -76,10 +76,10 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
   bool _handedOff = false;
 
   static const _markerName = 'shiori-update-workspace';
-  static const _ownership = 'ShioriUpdateWorkspace/1\n';
+  static const _ownership = 'ShioriUpdateWorkspace/2\n';
   static const _closedName = 'shiori-update-closed';
-  static const _closedFormat = 'ShioriUpdateClosed/1\n';
-  static final _closedRecord = RegExp(r'^ShioriUpdateClosed/1\n(\d{1,3})\n$');
+  static const _closedFormat = 'ShioriUpdateClosed/2\n';
+  static final _closedRecord = RegExp(r'^ShioriUpdateClosed/2\n(\d{1,3})\n$');
 
   File get _updater => File('${workspace.path}/shiori-updater.exe');
   File get _marker => File('${workspace.path}/$_markerName');
@@ -106,6 +106,7 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
   /// A transaction record means the updater may still need these files.
   Future<bool> _transaction() async =>
       await File('${workspace.path}/plan.bin').exists() ||
+      await File('${workspace.path}/setup.pending').exists() ||
       await Directory('${workspace.path}/backup').exists();
 
   /// Records that the transaction is over, published atomically. Returns
@@ -316,14 +317,20 @@ final class WindowsUpdateInstaller implements UpdateInstaller {
       throw const UpdateIssue(UpdateProblem.storage);
     }
     try {
-      final payload = Directory('${workspace.path}/payload');
-      await payload.create(recursive: true);
-      final files = {for (final file in asset.files) file.path: file.size};
-      final packagePath = package.path;
-      final payloadPath = payload.path;
-      await Isolate.run(
-        () => extractWindowsUpdate(packagePath, payloadPath, files),
-      );
+      if (asset.platform == 'windows-x64-setup') {
+        await package.copy('${workspace.path}/package.exe');
+      } else if (asset.platform == 'windows-x64-portable') {
+        final payload = Directory('${workspace.path}/payload');
+        await payload.create(recursive: true);
+        final files = {for (final file in asset.files) file.path: file.size};
+        final packagePath = package.path;
+        final payloadPath = payload.path;
+        await Isolate.run(
+          () => extractWindowsUpdate(packagePath, payloadPath, files),
+        );
+      } else {
+        throw const UpdateIssue(UpdateProblem.verification);
+      }
       await File(
         '${workspace.path}/update-manifest.json',
       ).writeAsBytes(manifest, flush: true);

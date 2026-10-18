@@ -240,23 +240,33 @@ bool Sha256(const std::string& value) {
 }
 }  // namespace
 
-WindowsRelease ReadWindowsRelease(const std::string& manifest) {
+WindowsRelease ReadWindowsRelease(const std::string& manifest, const std::string& variant) {
   Require(!manifest.empty() && manifest.size() <= kMaxManifest, "Invalid manifest size");
   const auto root = Parser(manifest).Document();
-  Require(Number(root, "schemaVersion") == 1 &&
+  Require(Number(root, "schemaVersion") == 2 &&
               Text(root, "algorithm") == "rsa3072-pkcs1-sha256" &&
               Text(root, "applicationId") == "dev.shiori.reader",
           "Unsupported update manifest");
-  WindowsRelease release{Text(root, "tag"), Number(root, "build"), {}};
+  WindowsRelease release{Text(root, "tag"), Number(root, "build"), {}, "", 0, ""};
   Require(release.build > 0, "Invalid release build");
   const Value* asset = nullptr;
   for (const auto& item : Field(root, "assets", Value::Kind::array).items) {
-    if (Text(item, "platform") != "windows-x64") continue;
+    if (Text(item, "platform") != variant) continue;
     Require(asset == nullptr, "Duplicate Windows asset");
     asset = &item;
   }
   Require(asset != nullptr, "Missing Windows asset");
-  Require(Number(*asset, "updaterProtocol") == 1, "Unsupported updater protocol");
+  Require(variant == "windows-x64-portable" || variant == "windows-x64-setup", "Unsupported Windows variant");
+  Require(Number(*asset, "updaterProtocol") == 2, "Unsupported updater protocol");
+  release.name = Text(*asset, "name");
+  const auto package_size = Number(*asset, "size");
+  Require(package_size > 0 && static_cast<uint64_t>(package_size) <= kMaxBytes, "Invalid package size");
+  release.size = static_cast<uint64_t>(package_size);
+  release.sha256 = Text(*asset, "sha256");
+  Require(Sha256(release.sha256), "Invalid package SHA-256");
+  Require(release.name == "shiori-reader-" + release.tag +
+      (variant == "windows-x64-setup" ? "-windows-x64-setup.exe" : "-windows-x64.zip"), "Unexpected Windows package name");
+  if (variant == "windows-x64-setup") return release;
   uint64_t total = 0;
   for (const auto& item : Field(*asset, "files", Value::Kind::array).items) {
     const auto size = Number(item, "size");

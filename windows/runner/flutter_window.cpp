@@ -10,8 +10,17 @@
 #include "flutter/generated_plugin_registrant.h"
 #include "launch_view.h"
 #include "utils.h"
+#include "../update/installation_mode.h"
 
 namespace {
+
+std::string CurrentInstallationMode() {
+  std::wstring executable(32768, L'\0');
+  const DWORD length = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
+  if (!length || length >= executable.size()) return "invalid";
+  executable.resize(length);
+  return shiori::update::InstallationMode(std::filesystem::path(executable).parent_path());
+}
 
 // Starts the updater copy staged in <install>.update, handing it a waitable
 // handle to this process so it replaces files only after the app has exited.
@@ -118,7 +127,9 @@ bool FlutterWindow::OnCreate() {
           std::to_string(FLUTTER_VERSION_MINOR) + "." + std::to_string(FLUTTER_VERSION_PATCH);
       result->Success(flutter::EncodableValue(flutter::EncodableMap{
           {flutter::EncodableValue("version"), flutter::EncodableValue(version)},
-          {flutter::EncodableValue("build"), flutter::EncodableValue(FLUTTER_VERSION_BUILD)}}));
+            {flutter::EncodableValue("build"), flutter::EncodableValue(FLUTTER_VERSION_BUILD)},
+            {flutter::EncodableValue("installationMode"), flutter::EncodableValue(
+                CurrentInstallationMode())}}));
     } else if (call.method_name() == "availableStorage") {
       const auto* path = call.arguments() ? std::get_if<std::string>(call.arguments()) : nullptr;
       if (!path || path->empty() || path->find('\0') != std::string::npos) {

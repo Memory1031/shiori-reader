@@ -265,18 +265,15 @@ void main() {
   int publisherIndex(String command) => publisherSteps.indexWhere(
     (step) => (step['run']?.toString() ?? '').contains(command),
   );
-  final sums = publisherIndex('sha256sum --check SHA256SUMS.txt');
-  if (sums <= publisherSteps.indexOf(downloads.last) ||
-      publisherIndex('sha256sum --check SHA256SUMS-windows-x64.txt') != sums ||
-      publisherIndex('update_manifest.py manifest') <= sums ||
-      publisherIndex('release_macos.py manifest') !=
-          publisherIndex('update_manifest.py manifest') ||
-      publisherIndex('sha256sum --check SHA256SUMS-macos-universal.txt') !=
-          sums ||
-      publisherIndex('sha256sum --check SHA256SUMS-ios-arm64.txt') != sums ||
+  if (publisherIndex('update_manifest.py manifest') <=
+          publisherSteps.indexOf(downloads.last) ||
+      publisherIndex('release_macos.py manifest') != -1 ||
+      publisherIndex('SHA256SUMS') != -1 ||
       publisherIndex('publish_assets.py') <=
           publisherIndex('update_manifest.py manifest')) {
-    throw StateError('All platform checksums must pass before publishing');
+    throw StateError(
+      'Unified signing must verify all current-run receipts before publishing',
+    );
   }
   final updateSigning =
       publisherSteps[publisherIndex('update_manifest.py manifest')]['env']

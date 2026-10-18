@@ -1,7 +1,7 @@
 export const platforms = ['android', 'windows', 'macos', 'ios'] as const;
 export type Platform = typeof platforms[number];
 export type Download = { name: string; url: string; size: number };
-export type Release = { tag: string; date: string; url: string; downloads: Partial<Record<Platform, Download>> };
+export type Release = { tag: string; date: string; url: string; downloads: Partial<Record<Platform | 'windowsPortable', Download>> };
 export type ErrorKind = 'network' | 'timeout' | 'rate' | 'notfound' | 'server' | 'invalid';
 export class ReleaseError extends Error {
   readonly kind: ErrorKind;
@@ -9,8 +9,8 @@ export class ReleaseError extends Error {
 }
 export const endpoint = 'https://api.github.com/repos/Memory1031/shiori-reader/releases/latest';
 const origin = 'https://github.com/Memory1031/shiori-reader/releases';
-const suffix: Record<Platform, string> = {
-  android: 'android.apk', windows: 'windows-x64.zip', macos: 'macos-universal.dmg', ios: 'ios-arm64-unsigned.ipa',
+const suffix = {
+  android: 'android.apk', windows: 'windows-x64-setup.exe', windowsPortable: 'windows-x64.zip', macos: 'macos-universal.dmg', ios: 'ios-arm64-unsigned.ipa',
 };
 const object = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -26,7 +26,7 @@ export function parseRelease(input: unknown): Release {
   const downloads: Release['downloads'] = {};
   for (const asset of input.assets) {
     if (!object(asset) || typeof asset.name !== 'string') return invalid();
-    for (const platform of platforms) {
+    for (const platform of Object.keys(suffix) as (keyof typeof suffix)[]) {
       const name = `shiori-reader-${tag}-${suffix[platform]}`;
       if (asset.name !== name) continue;
       if (downloads[platform] || asset.browser_download_url !== `${origin}/download/${tag}/${name}` ||

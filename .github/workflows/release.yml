@@ -88,7 +88,7 @@ jobs:
           retention-days: 14
 
   windows-release:
-    name: Windows x64 ZIP
+    name: Windows x64 Setup / ZIP
     runs-on: windows-2022
     timeout-minutes: 30
     defaults:
@@ -136,7 +136,7 @@ jobs:
       - name: 构建 Windows Release
         run: flutter build windows --release --no-pub --target lib/main.dart
 
-      - name: 校验并打包 Windows ZIP
+      - name: 校验并打包 Windows Setup 与 ZIP
         run: ./tool/package_windows.ps1
 
       - name: 保存已验证 Windows 产物
@@ -148,7 +148,7 @@ jobs:
           retention-days: 14
 
   macos-release:
-    name: macOS universal DMG / ZIP
+    name: macOS universal DMG
     runs-on: macos-15
     timeout-minutes: 40
     steps:
@@ -252,21 +252,11 @@ jobs:
           name: ios-unsigned-${{ github.ref_name }}
           path: build/release-assets/
 
-      - name: 核对合并后的产物校验和
-        run: |
-          cd build/release-assets
-          sha256sum --check SHA256SUMS.txt
-          sha256sum --check SHA256SUMS-windows-x64.txt
-          sha256sum --check SHA256SUMS-macos-universal.txt
-          sha256sum --check SHA256SUMS-ios-arm64.txt
-
-      - name: 生成并签署更新清单
+      - name: 核对跨 Job 回执并签署统一更新清单
         env:
           UPDATE_PUBLIC_KEY_JSON: ${{ vars.UPDATE_PUBLIC_KEY_JSON }}
           UPDATE_SIGNING_KEY_PEM_B64: ${{ secrets.UPDATE_SIGNING_KEY_PEM_B64 }}
-        run: |
-          python3 tool/update_manifest.py manifest
-          python3 tool/release_macos.py manifest
+        run: python3 tool/update_manifest.py manifest
 
       - name: 校验发布历史并发布完整产物
         env:

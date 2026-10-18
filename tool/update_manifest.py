@@ -13,12 +13,22 @@ import zipfile
 from pathlib import Path
 
 from release_android import ReleaseCheckError, version
+from release_receipt import file_record
 
 ALGORITHM = "rsa3072-pkcs1-sha256"
 APPLICATION_ID = "dev.shiori.reader"
 MAX_SIZE = 2 * 1024 * 1024 * 1024
 MAX_MANIFEST = 4 * 1024 * 1024
 IDENTITY_ASSET = "assets/release/build-info.json"
+ENVELOPE_NAME = "shiori-update.json"
+MAX_ENVELOPE = 6 * 1024 * 1024
+PACKAGE_SUFFIXES = {
+    "android": "android.apk",
+    "windows-x64-portable": "windows-x64.zip",
+    "windows-x64-setup": "windows-x64-setup.exe",
+    "macos-universal": "macos-universal.dmg",
+    "ios-arm64": "ios-arm64-unsigned.ipa",
+}
 
 
 def openssl(*args, input_bytes=None):
@@ -166,36 +176,23 @@ def create_manifest(root, assets, tag, commit, key):
         (root / "pubspec.yaml").read_text(encoding="utf-8"), tag, commit
     )
     key = public_key(key)
-    result = dict(
-        schemaVersion=1, algorithm=ALGORITHM, keyId=key["keyId"], **expected, assets=[]
-    )
-    for platform, suffix, metadata_name in [
-        ("android", "android.apk", "release-info.json"),
-        ("windows-x64", "windows-x64.zip", "release-info-windows-x64.json"),
-    ]:
-        metadata = read_json((assets / metadata_name).read_bytes())
-        name = f"shiori-reader-{tag}-{suffix}"
-        path = assets / name
-        if (
-            metadata["tag"] != tag
-            or metadata["commit"] != commit
-            or metadata["versionName"] != expected["version"]
-            or metadata["versionCode"] != expected["build"]
-            or metadata.get("apk" if platform == "android" else "archive") != name
-            or path.is_symlink()
-            or not 0 < path.stat().st_size <= MAX_SIZE
-            or metadata["sha256"] != sha(path)
-        ):
-            raise ReleaseCheckError("Update asset metadata mismatch")
-        asset = {
-            "platform": platform,
-            "name": name,
-            "size": path.stat().st_size,
-            "sha256": metadata["sha256"],
-        }
+    result = dict(schemaVersion=2, algorithm=ALGORITHM, keyId=key["keyId"],
+                  **expected, assets=[])
+    receipts = {}
+    for platform in ("android", "windows-x64", "macos-universal", "ios-arm64"):
+        receipt = read_json((assets / "receipts" / f"{platform}.json").read_bytes())
+        variants = [p for p in PACKAGE_SUFFIXES if p.startswith("windows-")] if platform == "windows-x64" else [platform]
+        packages = [file_record(assets / f"shiori-reader-{tag}-{PACKAGE_SUFFIXES[p]}") for p in variants]
+        if (receipt.get("schemaVersion") != 1 or receipt.get("identity") != expected
+                or receipt.get("platform") != platform or receipt.get("packages") != packages):
+            raise ReleaseCheckError("Cross-job release receipt mismatch")
+        receipts[platform] = receipt
+    for platform, suffix in PACKAGE_SUFFIXES.items():
+        path = assets / f"shiori-reader-{tag}-{suffix}"
+        asset = dict(platform=platform, **file_record(path))
         if platform == "android":
-            certificate = metadata["certificateSha256"]
-            if metadata["applicationId"] != APPLICATION_ID or not re.fullmatch(
+            certificate = receipts[platform]["certificateSha256"]
+            if not re.fullmatch(
                 "[0-9a-f]{64}", certificate
             ):
                 raise ReleaseCheckError("Android package identity mismatch")
@@ -205,19 +202,54 @@ def create_manifest(root, assets, tag, commit, key):
                     raise ReleaseCheckError("Build identity too large")
                 check_bundled(apk.read(bundled), expected, key)
             asset.update(minimumSystem="24", certificateSha256=certificate)
-        else:
-            if metadata["platform"] != "windows-x64":
-                raise ReleaseCheckError("Windows platform identity mismatch")
+        elif platform == "windows-x64-portable":
             asset.update(
                 minimumSystem="10.0.17763",
-                updaterProtocol=1,
+                updaterProtocol=2,
                 files=windows_files(path, expected, key),
             )
+        elif platform == "windows-x64-setup":
+            asset.update(minimumSystem="10.0.17763", updaterProtocol=2)
+        elif platform == "macos-universal":
+            asset.update(minimumSystem="12.0", updaterProtocol=2)
+        else:
+            from release_ios import verify_archive
+            verify_archive(path, expected)
+            # IPA is verified for publication, but cannot be installed in-app.
+            continue
         result["assets"].append(asset)
     raw = encoded(result)
     if len(raw) > MAX_MANIFEST:
         raise ReleaseCheckError("Update manifest too large")
     return raw
+
+
+def envelope(raw, signature):
+    return encoded(dict(schemaVersion=2, manifest=base64.b64encode(raw).decode("ascii"),
+                        signature=base64.b64encode(signature).decode("ascii")))
+
+
+def read_envelope(data, key, expected_tag=None):
+    if not 0 < len(data) <= MAX_ENVELOPE:
+        raise ReleaseCheckError("Invalid update envelope size")
+    value = read_json(data)
+    if set(value) != {"schemaVersion", "manifest", "signature"} or value["schemaVersion"] != 2:
+        raise ReleaseCheckError("Unsupported update envelope")
+    raw = base64.b64decode(value["manifest"], validate=True)
+    signature = base64.b64decode(value["signature"], validate=True)
+    verify_signature(raw, signature, key)
+    manifest = read_json(raw)
+    if (manifest.get("schemaVersion") != 2 or manifest.get("keyId") != key["keyId"]
+            or manifest.get("algorithm") != ALGORITHM
+            or manifest.get("applicationId") != APPLICATION_ID
+            or (expected_tag is not None and manifest.get("tag") != expected_tag)):
+        raise ReleaseCheckError("Update manifest identity mismatch")
+    # Identity validation also binds channel and version to the tag.
+    expected = identity(f'version: {manifest["version"]}+{manifest["build"]}',
+                        manifest["tag"], manifest["commit"])
+    if any(manifest.get(k) != v for k, v in expected.items()):
+        raise ReleaseCheckError("Invalid signed release identity")
+    return raw, signature, manifest
 
 
 def sign_manifest(raw, private_pem, key):
@@ -314,8 +346,7 @@ def main():
         if not secret:
             raise ReleaseCheckError("Missing UPDATE_SIGNING_KEY_PEM_B64")
         signature = sign_manifest(raw, secret, key)
-        (args.assets / "update-manifest.json").write_bytes(raw)
-        (args.assets / "update-manifest.sig").write_bytes(signature)
+        (args.assets / ENVELOPE_NAME).write_bytes(envelope(raw, signature))
 
 
 if __name__ == "__main__":

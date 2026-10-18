@@ -36,11 +36,6 @@ final class GithubUpdateRepository implements AppUpdateRepository {
   final UpdateHttp http;
   final UpdateStorage storage;
   final UpdateInstaller? installer;
-  bool get _macOS => platform == 'macos-universal';
-  String get _manifestName =>
-      _macOS ? 'update-manifest-macos.json' : 'update-manifest.json';
-  String get _signatureName =>
-      _macOS ? 'update-manifest-macos.sig' : 'update-manifest.sig';
   @override
   bool get supportsInstallation => installer != null;
   @override
@@ -129,7 +124,6 @@ final class GithubUpdateRepository implements AppUpdateRepository {
       sig,
       key!,
       expectedTag: tag,
-      macOS: _macOS,
     );
     final asset = manifest.assets.singleWhere(
       (asset) => asset.platform == platform,
@@ -172,7 +166,6 @@ final class GithubUpdateRepository implements AppUpdateRepository {
     final verified = <_VerifiedUpdate>[];
     var inspected = 0;
     var complete = false;
-    var incompleteRelease = false;
     scan:
     for (var page = 1; page <= 3; page++) {
       checkUpdateCancellation(token);
@@ -236,11 +229,19 @@ final class GithubUpdateRepository implements AppUpdateRepository {
           }
           assets[name] = asset;
         }
-        // Legacy releases cannot disprove a signed upgrade, but also cannot
-        // establish that this channel is up to date.
-        if (!assets.containsKey(_manifestName) ||
-            !assets.containsKey(_signatureName)) {
-          incompleteRelease = true;
+        if (!assets.containsKey(updateEnvelopeName)) {
+          // Only the retired protocol (through v1.4.0) is silently skipped.
+          // A future release missing its envelope is an incomplete publication.
+          final legacy = RegExp(
+            r'^v(\d+)\.(\d+)\.(\d+)(?:-beta\.[1-9]\d*)?$',
+          ).firstMatch(tag)!;
+          final major = int.parse(legacy[1]!);
+          final minor = int.parse(legacy[2]!);
+          final patch = int.parse(legacy[3]!);
+          if (major > 1 ||
+              (major == 1 && (minor > 4 || (minor == 4 && patch > 0)))) {
+            throw const UpdateIssue(UpdateProblem.incomplete);
+          }
           continue;
         }
         if (++inspected > 8) break scan;
@@ -259,29 +260,26 @@ final class GithubUpdateRepository implements AppUpdateRepository {
           }
         }
 
-        assetReady(_manifestName, maxUpdateManifestBytes);
-        assetReady(_signatureName, 384, exact: 384);
+        assetReady(updateEnvelopeName, maxUpdateEnvelopeBytes);
         final raw = await http.read(
-          releaseAsset(tag, _manifestName),
+          releaseAsset(tag, updateEnvelopeName),
           token,
-          limit: maxUpdateManifestBytes,
+          limit: maxUpdateEnvelopeBytes,
         );
-        final sig = await http.read(
-          releaseAsset(tag, _signatureName),
-          token,
-          limit: 384,
+        final envelope = SignedUpdateEnvelope.verify(
+          raw.bytes,
+          key!,
+          expectedTag: tag,
         );
         final candidate = _verify(
           tag,
           (release['body'] as String?) ?? '',
-          raw.bytes,
-          sig.bytes,
+          envelope.bytes,
+          envelope.signature,
         );
-        assetReady(
-          candidate.asset.name,
-          candidate.asset.size,
-          exact: candidate.asset.size,
-        );
+        for (final asset in envelope.manifest.assets) {
+          assetReady(asset.name, asset.size, exact: asset.size);
+        }
         if (_eligible(candidate, channel)) verified.add(candidate);
       }
       if (list.length < 20) {
@@ -306,7 +304,7 @@ final class GithubUpdateRepository implements AppUpdateRepository {
     }
     checkUpdateCancellation(token);
     if (verified.isEmpty) {
-      if (!complete || incompleteRelease) {
+      if (!complete) {
         throw const UpdateIssue(UpdateProblem.incomplete);
       }
       return null;
@@ -352,7 +350,7 @@ final class GithubUpdateRepository implements AppUpdateRepository {
       return null;
     }
     final record = json as Map<String, dynamic>;
-    if (record['schema'] != 1) {
+    if (record['schema'] != 2 || record['platform'] != platform) {
       throw const UpdateIssue(UpdateProblem.verification);
     }
     final value = _verify(
@@ -387,7 +385,8 @@ final class GithubUpdateRepository implements AppUpdateRepository {
     final completed = storage.file('package.bin');
     if (await completed.exists()) await completed.delete();
     await UpdateStorage.writeJson(storage.file('download.json'), {
-      'schema': 1,
+      'schema': 2,
+      'platform': platform,
       'tag': candidate.release.tag,
       'notes': candidate.notes,
       'manifest': base64Encode(value.manifest),
@@ -404,6 +403,9 @@ final class GithubUpdateRepository implements AppUpdateRepository {
         limit: value.asset.size,
         chunk: (bytes) async {
           checkUpdateCancellation(token);
+          if (!identical(_selected, value)) {
+            throw const UpdateIssue(UpdateProblem.verification);
+          }
           received += bytes.length;
           if (received > value.asset.size) {
             throw const UpdateIssue(UpdateProblem.verification);
@@ -418,6 +420,9 @@ final class GithubUpdateRepository implements AppUpdateRepository {
       checkUpdateCancellation(token);
       onVerifying?.call();
       await _verifyPackage(part, value, token);
+      if (!identical(_selected, value)) {
+        throw const UpdateIssue(UpdateProblem.verification);
+      }
       await part.rename(completed.path);
     } finally {
       await output?.close();

@@ -3,11 +3,11 @@ import test from 'node:test';
 import { fetchRelease, parseRelease, ReleaseError, type ErrorKind } from '../src/lib/releases.ts';
 import { releaseFixture } from './fixtures.ts';
 
-for (const tag of ['v1.4.0', 'v1.4.1', 'v2.12.34']) {
-  test(`accepts four exact official packages for ${tag}`, () => {
+for (const tag of ['v0.0.1', 'v2.12.34', 'v10.20.30']) {
+  test(`accepts five exact official packages for ${tag}`, () => {
     const result = parseRelease(releaseFixture(tag));
     assert.equal(result.tag, tag);
-    assert.deepEqual(Object.keys(result.downloads), ['android', 'windows', 'macos', 'ios']);
+    assert.deepEqual(Object.keys(result.downloads), ['android', 'windows', 'windowsPortable', 'macos', 'ios']);
     assert.ok(result.downloads.ios?.url.endsWith('-ios-arm64-unsigned.ipa'));
   });
 }
@@ -19,7 +19,7 @@ test('missing platform and unrelated checksum/update assets do not become downlo
   }
   const result = parseRelease(input);
   assert.equal(result.downloads.android, undefined);
-  assert.equal(Object.keys(result.downloads).length, 3);
+  assert.equal(Object.keys(result.downloads).length, 4);
 });
 test('release without installers produces an empty download selection', () => {
   const input = releaseFixture(); input.assets = [];
@@ -35,7 +35,7 @@ const invalidCases: [string, (data: Record<string, unknown>) => void][] = [
   ['duplicate expected file', d => { const a = d.assets as unknown[]; a.push(a[0]); }],
   ['unexpected host', d => { (d.assets as Record<string, unknown>[])[0]!.browser_download_url = 'https://evil.example/installer.apk'; }],
   ['query on installer URL', d => { const a = (d.assets as Record<string, unknown>[])[0]!; a.browser_download_url += '?next=evil'; }],
-  ['wrong release in installer URL', d => { const a = (d.assets as Record<string, unknown>[])[0]!; a.browser_download_url = String(a.browser_download_url).replace('/download/v1.4.0/', '/download/v1.3.9/'); }],
+  ['wrong release in installer URL', d => { const a = (d.assets as Record<string, unknown>[])[0]!; a.browser_download_url = String(a.browser_download_url).replace('/download/' + String(d.tag_name) + '/', '/download/v99.99.99/'); }],
   ['zero file size', d => { (d.assets as Record<string, unknown>[])[0]!.size = 0; }],
 ];
 for (const [label, mutate] of invalidCases) test(`rejects ${label}`, () => {
@@ -68,5 +68,13 @@ test('fetches the official endpoint without credentials', async () => {
     assert.equal(new Headers(options?.headers).has('Authorization'), false);
     return Response.json(releaseFixture());
   }) as typeof fetch;
-  assert.equal((await fetchRelease(mock)).tag, 'v1.4.0');
+  assert.equal((await fetchRelease(mock)).tag, releaseFixture().tag_name);
+});
+
+test('legacy ZIP remains available without guessing a missing Setup EXE URL', () => {
+  const input = releaseFixture();
+  input.assets = input.assets.filter(a => !a.name.endsWith('-setup.exe'));
+  const result = parseRelease(input);
+  assert.equal(result.downloads.windows, undefined);
+  assert.ok(result.downloads.windowsPortable?.url.endsWith('-windows-x64.zip'));
 });

@@ -23,12 +23,19 @@ Future<UpdateController> createUpdateController(
 }) async {
   var version = '—';
   var build = 0;
+  var windowsMode = 'portable';
   BundledRelease? bundled;
   var availability = UpdateAvailability.invalidIdentity;
   try {
     final info = await _channel.invokeMapMethod<String, dynamic>('info');
     version = info!['version'] as String;
     build = info['build'] as int;
+    if (Platform.isWindows) {
+      windowsMode = info['installationMode'] as String;
+      if (windowsMode != 'portable' && windowsMode != 'setup') {
+        throw const FormatException('Invalid Windows installation identity');
+      }
+    }
     if (Platform.isAndroid || Platform.isWindows || Platform.isMacOS) {
       bundled = BundledRelease.fromJson(
         jsonDecode(
@@ -61,7 +68,7 @@ Future<UpdateController> createUpdateController(
       platform: Platform.isMacOS
           ? 'macos-universal'
           : Platform.isWindows
-          ? 'windows-x64'
+          ? 'windows-x64-$windowsMode'
           : 'android',
       installer: Platform.isAndroid
           ? const AndroidUpdateInstaller()

@@ -37,4 +37,4 @@ target_compile_definitions(shiori-updater PRIVATE NOMINMAX
 set_property(TARGET shiori-updater PROPERTY MSVC_RUNTIME_LIBRARY
   "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 target_link_options(shiori-updater PRIVATE "/MANIFESTUAC:level='asInvoker' uiAccess='false'")
-target_link_libraries(shiori-updater PRIVATE bcrypt user32 shell32)
+target_link_libraries(shiori-updater PRIVATE bcrypt user32 shell32 advapi32)

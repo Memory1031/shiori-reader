@@ -16,7 +16,7 @@ def build(root, output, architectures, testing=False):
     command = ['xcrun', 'clang++', '-std=c++17', '-fobjc-arc', '-Wno-deprecated-declarations',
                '-mmacosx-version-min=12.0', '-I', str(header.parent),
                str(root / 'macos/Updater/main.mm'), '-o', str(output),
-               '-framework', 'AppKit', '-framework', 'Security', '-larchive']
+               '-framework', 'AppKit', '-framework', 'Security']
     for arch in architectures:
         command += ['-arch', arch]
     if testing:

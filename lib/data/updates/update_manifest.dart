@@ -12,6 +12,69 @@ import '../../domain/models/release_identity.dart';
 const updateApplicationId = 'dev.shiori.reader';
 const updateSignatureAlgorithm = 'rsa3072-pkcs1-sha256';
 const maxUpdateManifestBytes = 4 * 1024 * 1024;
+const maxUpdateEnvelopeBytes = 6 * 1024 * 1024;
+const updateEnvelopeName = 'shiori-update.json';
+
+/// Reject ambiguous JSON rather than allowing different native parsers to
+/// interpret repeated keys differently. jsonDecode validates the full grammar.
+Map<String, dynamic> decodeUpdateJson(Uint8List bytes) {
+  final source = utf8.decode(bytes);
+  final scopes = <Set<String>?>[];
+  final tokens = RegExp(r'"(?:[^"\\]|\\.)*"|[{}\[\]:,]|[^\s{}\[\]:,]+');
+  for (final token in tokens.allMatches(source)) {
+    final value = token.group(0)!;
+    if (value == '{' || value == '[') {
+      if (scopes.length >= 64) throw const FormatException('JSON too deep');
+      scopes.add(value == '{' ? <String>{} : null);
+    } else if (value == '}' || value == ']') {
+      if (scopes.isEmpty) throw const FormatException('Unbalanced JSON');
+      scopes.removeLast();
+    } else if (value.startsWith('"') &&
+        scopes.isNotEmpty &&
+        scopes.last != null) {
+      var next = token.end;
+      while (next < source.length && ' \t\r\n'.contains(source[next])) {
+        next++;
+      }
+      if (next < source.length &&
+          source[next] == ':' &&
+          !scopes.last!.add(jsonDecode(value) as String)) {
+        throw const FormatException('Duplicate JSON field');
+      }
+    }
+  }
+  return jsonDecode(source) as Map<String, dynamic>;
+}
+
+final class SignedUpdateEnvelope {
+  SignedUpdateEnvelope._(this.bytes, this.signature, this.manifest);
+  final Uint8List bytes;
+  final Uint8List signature;
+  final UpdateManifest manifest;
+
+  static SignedUpdateEnvelope verify(
+    Uint8List envelope,
+    UpdatePublicKey key, {
+    required String expectedTag,
+  }) {
+    if (envelope.isEmpty || envelope.length > maxUpdateEnvelopeBytes) {
+      throw const FormatException('Invalid update envelope size');
+    }
+    final json = decodeUpdateJson(envelope);
+    if (json.length != 3 || json['schemaVersion'] != 2) {
+      throw const FormatException('Unsupported update envelope');
+    }
+    final bytes = base64Decode(json['manifest'] as String);
+    final signature = base64Decode(json['signature'] as String);
+    final manifest = UpdateManifest.verifyAndRead(
+      bytes,
+      signature,
+      key,
+      expectedTag: expectedTag,
+    );
+    return SignedUpdateEnvelope._(bytes, signature, manifest);
+  }
+}
 
 /// Trust is supplied by the installed app, never by a downloaded manifest.
 final class UpdatePublicKey {
@@ -135,14 +198,13 @@ final class UpdateManifest {
     Uint8List signature,
     UpdatePublicKey trustedKey, {
     required String expectedTag,
-    bool macOS = false,
   }) {
     if (!trustedKey.verify(bytes, signature)) {
       throw const FormatException('Invalid update manifest signature');
     }
-    final json = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+    final json = decodeUpdateJson(bytes);
     final identity = _identity(json);
-    if (json['schemaVersion'] != 1 ||
+    if (json['schemaVersion'] != 2 ||
         json['keyId'] != trustedKey.keyId ||
         json['algorithm'] != updateSignatureAlgorithm ||
         identity.tag != expectedTag) {
@@ -153,17 +215,16 @@ final class UpdateManifest {
     for (final item in json['assets'] as List<dynamic>) {
       final asset = item as Map<String, dynamic>;
       final platform = asset['platform'] as String;
-      if (!(macOS ? ['macos-universal'] : ['android', 'windows-x64']).contains(
-            platform,
-          ) ||
-          !platforms.add(platform)) {
+      const suffixes = {
+        'android': 'android.apk',
+        'windows-x64-portable': 'windows-x64.zip',
+        'windows-x64-setup': 'windows-x64-setup.exe',
+        'macos-universal': 'macos-universal.dmg',
+      };
+      if (!suffixes.containsKey(platform) || !platforms.add(platform)) {
         throw const FormatException('Invalid update platform');
       }
-      final suffix = macOS
-          ? 'macos-universal.zip'
-          : platform == 'android'
-          ? 'android.apk'
-          : 'windows-x64.zip';
+      final suffix = suffixes[platform]!;
       final name = asset['name'] as String;
       final minimum = asset['minimumSystem'] as String;
       if (name != 'shiori-reader-${identity.tag}-$suffix' || minimum.isEmpty) {
@@ -176,15 +237,15 @@ final class UpdateManifest {
       int? protocol;
       if (platform == 'android') {
         certificate = _digest(asset['certificateSha256']);
-      } else if (macOS) {
+      } else if (platform != 'windows-x64-portable') {
         protocol = asset['updaterProtocol'] as int;
-        if (protocol != 1) {
-          throw const FormatException('Unsupported macOS updater protocol');
+        if (protocol != 2) {
+          throw const FormatException('Unsupported updater protocol');
         }
       } else {
         protocol = asset['updaterProtocol'] as int;
         final entries = asset['files'] as List<dynamic>;
-        if (protocol != 1 || entries.isEmpty || entries.length > 10000) {
+        if (protocol != 2 || entries.isEmpty || entries.length > 10000) {
           throw const FormatException(
             'Unsupported updater protocol or file count',
           );
@@ -229,7 +290,7 @@ final class UpdateManifest {
         ),
       );
     }
-    if (platforms.length != (macOS ? 1 : 2)) {
+    if (platforms.length != 4) {
       throw const FormatException('Incomplete platform assets');
     }
     return UpdateManifest._(identity, assets);

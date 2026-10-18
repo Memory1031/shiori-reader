@@ -51,7 +51,7 @@ dart tool/publish_release.dart v1.2.1-beta.1
 dart tool/publish_release.dart v1.2.1-beta.1 --publish
 ```
 
-beta 附注标签直接指向已同步的 develop 提交。Android APK、Windows ZIP、macOS DMG / ZIP 与未签名 iOS IPA 进入 GitHub 预发布，Latest 指向正式发布。可在 `docs/release/notes/<beta-tag>.md` 提供说明，缺失时由 GitHub 自动生成。
+beta 附注标签直接指向已同步的 develop 提交。Android APK、Windows Setup / ZIP、macOS DMG 与未签名 iOS IPA 进入 GitHub 预发布，Latest 指向正式发布。可在 `docs/release/notes/<beta-tag>.md` 提供说明，缺失时由 GitHub 自动生成。
 
 ## 2. 提交和发布
 
@@ -64,7 +64,7 @@ dart tool/publish_release.dart vX.Y.Z --publish
 
 第一条只预览；第二条用于已获授权的正式发布。要求工作区干净、develop 与 origin/develop 一致、标签不存在、标签版本与 pubspec 一致，且 ShareExtension 版本继承结构完整。脚本优先快进 master，核对合并后的 pubspec、iOS 工程及扩展 xcconfig 与已验证的 develop 一致，再创建附注标签并原子推送 master / tag，成功后回到 develop。
 
-master 仅是发布中间分支。tag 同时触发 Android 签名 APK、Windows x64 ZIP、macOS 通用包与 iOS 未签名 IPA；四项均构建并校验成功后统一发布到 GitHub Release，不等待日常 CI，也不重复 UT / analyze。CI 绿色不能替代本地测试记录。
+master 仅是发布中间分支。tag 同时触发 Android 签名 APK、Windows x64 Setup / ZIP、macOS 通用 DMG与 iOS 未签名 IPA；四项均构建并校验成功后统一发布到 GitHub Release，不等待日常 CI，也不重复 UT / analyze。CI 绿色不能替代本地测试记录。
 
 GitHub Release 优先读取 `docs/release/notes/<tag>.md`，缺失时自动生成。新 Release 先建立草稿，资产完整上传后公开；重跑核对已有附件的大小与摘要，只补齐缺失附件，内容变化需分配新的构建号和标签。手动编辑过的正文需在 GitHub 单独更新。
 
@@ -76,13 +76,17 @@ Stable 只选择正式 Release，Beta 同时允许测试版与正式版。候选
 
 客户端从本仓库 GitHub Releases 有界读取发布列表，不能仅使用 latest 接口发现 Beta。先验签清单原始字节，再接受平台资产；SHA-256 校验下载完整性，不替代清单签名或 Android 安装签名。扫描未穷尽且没有可靠候选时报告检查不完整，不误报最新版。下载绑定官方仓库的指定 Release / asset，限制重定向与资源大小。更新说明使用受限原生 Markdown 预览，不执行 HTML、加载图片或响应文内链接；完整说明通过独立发布页入口打开。
 
-Android 使用系统 `PackageInstaller` 确认覆盖安装；Android 8+ 需授权当前来源安装应用，授权后重新发起安装。iOS 不在应用内下载或覆盖安装 IPA；未签名 IPA 用户自行获取新版并重新签名安装。Windows 流程见下方 [ZIP 使用](#windows-zip-使用)。
+Android 使用系统 `PackageInstaller` 确认覆盖安装；Android 8+ 需授权当前来源安装应用，授权后重新发起安装。iOS 不在应用内下载或覆盖安装 IPA；未签名 IPA 用户自行获取新版并重新签名安装。Windows 流程见下方 [Windows 安装与更新](#windows-安装与更新)。
 
 设备验证入口包括 [Android 安装 runner](../../android/app/src/androidTest/kotlin/dev/shiori/reader/UpdateInstallSmokeRunner.kt) 和[进程恢复脚本](../../tool/test_android_update_recovery.py)。runner 需显式指定 mode；恢复脚本的 `--require-retained` 要求 session 真正跨进程保留。同进程清理不代替进程死亡验证，本地安装测试不代替真实发布源升级或用户数据保留验证。
 
 ## 更新清单签名配置
 
-Android / Windows / macOS 的 tag 构建将发布身份与更新公钥写入 `assets/release/build-info.json`。发布 job 核对包内身份；Android / Windows 继续使用 `update-manifest.json` 与 `update-manifest.sig`，macOS 使用独立的 `update-manifest-macos.json` 与 `.sig`，避免改变既有客户端协议。签名协议为 RSA-3072 / PKCS#1 v1.5 / SHA-256，公钥指数为 65537；Windows 使用系统 CNG，macOS 使用系统 Security 验签。macOS 辅助更新程序在编译时嵌入同一发布身份和公钥。
+Android / Windows / macOS 的 tag 构建将发布身份与更新公钥写入 `assets/release/build-info.json`。唯一公开更新文件为 `shiori-update.json`：`schemaVersion: 2` 的 Envelope 包含 Base64 编码的原始 Manifest 和签名。签名协议为 RSA-3072 / PKCS#1 v1.5 / SHA-256，指数 65537；必须先对原始字节验签，再解析发布身份、目标变体、大小和 SHA-256。Windows 使用系统 CNG，macOS 使用系统 Security。
+
+统一清单包含 Android APK 的证书身份、Windows 便携 ZIP 的逐文件清单、Windows Setup EXE 和 macOS DMG；原生安装器再次验证同一原始清单与实际包。内部 `receipts/` 只用于跨构建 Job 核对身份和产物字节，不上传 Release。公开附件仅有 APK、Windows Setup EXE、Windows ZIP、macOS DMG、未签名 IPA 和 `shiori-update.json`，不再附带独立签名、校验 TXT 或平台元数据。
+
+新协议从 v1.4.1 起使用；v1.4.0 用户需手动安装一次。客户端跳过退役协议的旧 Release；未来版本缺失新清单或必要资产时报告检查不完整。发布历史以验签后的新清单检查构建号，仅发布工具允许读取截至构建号 20 的旧 `release-info.json`，客户端不实现旧协议双读。
 
 在安全的本地目录通过 OpenSSL 生成一次独立更新密钥：
 
@@ -103,33 +107,39 @@ GitHub Actions 需要以下仓库配置：
 
 ## 3. 验收
 
-- Android：核对 Actions、APK、SHA256SUMS、release-info、版本与签名，验证覆盖安装保留数据。
-- Windows：核对 ZIP、SHA256SUMS-windows-x64、release-info-windows-x64 与 EXE 版本，解压后启动、正常关闭并检查升级保留数据。
-- macOS：核对 DMG、完整应用 ZIP、SHA256SUMS-macos-universal、release-info-macos-universal 与独立签名清单；分别验证 Apple Silicon / Intel 的首次安装、退出和更新后数据保留。构建与 ad-hoc 签名校验不代替目标系统运行验收。
+- Android：核对 APK、统一签名清单、版本与安装证书，验证覆盖安装保留数据。
+- Windows：核对 Setup / ZIP 与统一签名清单；分别验证首次运行、升级与数据保留，安装版额外核对快捷方式、卸载注册和增删程序文件后的卸载。
+- macOS：核对 DMG 与统一签名清单，检查只读挂载、Bundle 复制、卸载映像和中断恢复；分别验证 Apple Silicon / Intel 的首次安装、退出和更新后数据保留。构建与 ad-hoc 签名校验不代替目标系统运行验收。
 - iOS 未签名 IPA：核对 Payload、arm64 真机平台、主应用 / 扩展版本及摘要，确认无签名材料；真实重签、安装、无 App Group 导入和正确授权的扩展分享分别验证，结构检查不代表设备可用。
 - iOS 签名构建：核对现有独立流程的上传、处理和分发，再验证设备安装。构建成功不代表已可安装。
 - 在发布操作反馈中说明实际结果和未测项。脚本成功仅表示 Git 推送成功。
 
 失败先核对远端 refs 与工作流。冲突时不打标签；网络失败可能已被远端接收，不直接重建或覆盖标签。不要通过卸载或换签名解决升级问题。
 
-## Windows ZIP 使用
+## Windows 安装与更新
 
-下载 `shiori-reader-<tag>-windows-x64.zip`，可用 PowerShell `Get-FileHash -Algorithm SHA256 <ZIP 路径>` 与随包发布的 `SHA256SUMS-windows-x64.txt` 对照。完整解压到可写目录后运行 `shiori.exe`，不要只复制 EXE 或在压缩包内启动。包内包含 Flutter / 插件 DLL、资源、VC++ 运行库及许可文件；WebView2 Runtime 由系统提供，未安装时原版式 EPUB 页面会提示运行环境不可用。
+推荐下载 `shiori-reader-<tag>-windows-x64-setup.exe`，以当前用户权限安装，默认目录为 `%LOCALAPPDATA%\Programs\Shiori`，无需管理员权限。安装器使用固定版本 Inno Setup，提供开始菜单快捷方式、可选桌面图标和系统卸载入口；重复安装在原位置升级。安装与卸载仅管理程序文件，不删除单独存放的书库、进度、书签或偏好。未提供 Authenticode 签名，仍可能出现 SmartScreen 提示。
 
-当前提供未签名的 x64 ZIP，不包含安装器或 Windows ARM64 构建。应用内更新下载 ZIP 并按签名清单校验后，在安装目录旁的 `<安装目录>.update` 暂存；应用关闭后由包内 `shiori-updater.exe` 原位替换程序文件并重新启动，失败时回滚到原版本。自动更新要求本地磁盘上的可写目录且没有其他 Shiori 窗口；无法自动更新时，关闭应用后将新版完整解压到独立目录。书架、阅读进度与设置使用应用数据目录，两种方式都不会清除。正式发布前仍需核对依赖许可及目标系统运行表现。
+便携版 `shiori-reader-<tag>-windows-x64.zip` 应完整解压到独立可写目录后运行 `shiori.exe`，不创建卸载注册或快捷方式。两种包均包含 Flutter / 插件 DLL、资源、VC++ 运行库与许可；WebView2 Runtime 由系统提供，不随安装器联网安装。
+
+安装版通过本地安装标记与当前用户卸载注册共同识别，自动更新下载签名清单指定的 Setup EXE；原生辅助程序重新验签、核对包摘要，等待正常退出后运行安装器，由 Inno 同步维护卸载文件清单、快捷方式和注册信息。便携版继续通过已签名 ZIP 的受控文件清单执行事务替换、备份和恢复，不转换为安装版。两种模式可在不同目录并存。
+
+自动更新需要本地磁盘上的可写安装目录且没有其他运行实例，暂存位于 `<安装目录>.update`。安装器中断时保留更新包和恢复状态；若无法确认程序文件完整，需重跑已验证的 Setup 或手动安装完整新版。便携版无法恢复时重新解压完整 ZIP。更新程序不接管用户数据库、书籍或缓存。
 
 ## macOS DMG 与更新
 
 最低 macOS 12.0，单个通用包包含 arm64 / x86_64。GitHub Release 提供 `shiori-reader-<tag>-macos-universal.dmg`，将完整 Shiori.app 拖入「应用程序」或其他当前用户可写目录后运行；不能在 DMG 中原位更新。构建与分发均不使用 Apple Developer ID、Apple 签名证书、公证或 App Store；打包脚本对嵌套代码及应用整体做 ad-hoc 签名，DMG 不签名。下载后仍可能受 Gatekeeper 限制，用户需自行决定是否通过系统「隐私与安全性」允许打开，不要求关闭系统安全保护。
 
-自动更新使用同一 Release 的 `shiori-reader-<tag>-macos-universal.zip`，必须保留整个应用包、Framework 链接、可执行权限和 Flutter 许可资源。`tool/release_macos.py package` 校验通用架构、生成 DMG / ZIP、元数据和 `SHA256SUMS-macos-universal.txt`；发布 job 用现有更新密钥签署独立 macOS 清单，不需要新增 Apple Secrets。安装交接与恢复边界见[更新合同](../contracts.md#应用更新)。只读目录、其他运行实例或系统隔离导致更新不可用时，关闭应用后手动替换完整应用；用户数据保存在应用支持目录，不在 `.app` 中。
+首次安装和自动更新使用同一个 `shiori-reader-<tag>-macos-universal.dmg`，不发布 macOS ZIP。`tool/release_macos.py package` 验证通用架构、代码封装和包内身份后生成 DMG，并只读挂载复验实际产物。辅助程序再次核对统一清单与 DMG 摘要，通过系统 `hdiutil` 只读挂载，检查 Bundle、符号链接、大小和代码签名后复制到同卷暂存区，卸载映像，再执行原子替换。正常失败及中断后的恢复均清理本更新工作区的挂载点。不可从挂载映像直接运行更新后的应用。
+
+安装交接与恢复边界见[更新合同](../contracts.md#应用更新)。只读目录、其他实例或系统隔离导致更新不可用时，关闭应用后手动替换完整应用；用户数据保存在应用支持目录，不在 `.app` 中。
 
 ## iOS 未签名 IPA
 
-GitHub Release 提供 `shiori-reader-<tag>-ios-arm64-unsigned.ipa`、`SHA256SUMS-ios-arm64.txt` 和 `release-info-ios-arm64.json`，适用于 iOS / iPadOS 15.0+ 真机。IPA 包含完整主应用、Flutter 资源及 ShareExtension，没有可直接安装的开发者签名或描述文件，不能直接在 iPhone 上安装。用户自行选择签名方式、承担安装配置并处理后续更新；不承诺所有自签工具兼容。
+GitHub Release 提供 `shiori-reader-<tag>-ios-arm64-unsigned.ipa`，适用于 iOS / iPadOS 15.0+ 真机。IPA 包含完整主应用、Flutter 资源及 ShareExtension，没有可直接安装的开发者签名或描述文件，不能直接在 iPhone 上安装。用户自行选择签名方式、承担安装配置并处理后续更新；不承诺所有自签工具兼容。
 
 主应用成功安装后，即使 App Group 不可用，也能通过应用内选择 EPUB / TXT 或系统直接打开文件导入。系统分享扩展需要主应用及扩展的签名、描述文件与 `SHIORI_IMPORT_GROUP` 指向同一个获授权的共享容器；没有共享权限时明确接收失败。私有 Inbox 降级不能修复签名或扩展权限错误造成的安装失败，也不会让扩展访问主应用私有目录。收件箱切换与未处理文件保留见[导入规则](../local-import.md#ios)。
 
-可用 SHA-256 与随包校验文件核对原始 IPA；重新签名会改变文件摘要。更改 Bundle ID、卸载应用或更换签名方式可能影响原有容器及数据，操作前先保全，不以卸载作为升级步骤。
+GitHub 附件摘要用于核对原始 IPA；重新签名会改变文件摘要。更改 Bundle ID、卸载应用或更换签名方式可能影响原有容器及数据，操作前先保全，不以卸载作为升级步骤。
 
 未签名 IPA 与其他三端产物在同一草稿验证并上传后统一公开，任何必需构建或校验失败都会阻止该次 GitHub Release；现有独立签名上传流程不受此依赖影响。IPA 不进入 Android、Windows 或 macOS 更新清单，不提供应用内自签、覆盖安装或自签更新源。

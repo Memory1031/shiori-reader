@@ -158,7 +158,9 @@ Apple 平台的原生依赖由 CocoaPods 解析，`flutter_inappwebview` 还依�
 
 `dbus` 与 `upower` 采用 MPL-2.0（文件级 copyleft），仅由 `battery_plus` 的 Linux 实现引入；当前不发布 Linux 版本。若将来发布 Linux 产物，须随附其许可声明并说明未修改源码的获取位置；修改这些文件则须按 MPL-2.0 公开修改后的文件。
 
-Windows ZIP 保留 Flutter 的 `data/flutter_assets/NOTICES.Z` 与根 LICENSE，并在 `licenses/` 附带 NuGet 的 WebView2 LICENSE / NOTICE、WIL LICENSE 和 nlohmann.json 3.11.2 的官方 MIT 许可原文。原生依赖升级时需同步打包脚本中的版本目录与许可文件。
+Windows Setup / ZIP 保留 Flutter 的 `data/flutter_assets/NOTICES.Z` 与根 LICENSE，并在 `licenses/` 附带 NuGet 的 WebView2 LICENSE / NOTICE、WIL LICENSE 和 nlohmann.json 3.11.2 的官方 MIT 许可原文。原生依赖升级时需同步打包脚本中的版本目录与许可文件。
+
+Windows 安装器使用 [Inno Setup 6.7.3](https://github.com/jrsoftware/issrc/releases/tag/is-6_7_3)，编译工具与下载摘要固定在 `tool/inno_setup.ps1`。许可允许使用和分发，安装器保留 Inno 原有版权及网站信息；原文随程序放在 `licenses/Inno-Setup-LICENSE.txt`。该许可不授予 Windows Authenticode 信任。
 
 本文件是 Dart 锁定依赖文本快照，未宣称原生/产物许可全部审查通过。分发范围与其他素材边界见[发布说明](README.md)。
 

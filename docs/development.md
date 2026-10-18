@@ -68,7 +68,7 @@ fvm flutter test --no-pub test/data/sources/lightnovel/session_test.dart test/wi
 
 修改独立 Source 调查工具时，在其目录运行对应的 `fvm dart test` 和离线 `fvm dart bin/source_probe.dart`。
 
-macOS 更新与打包改动另运行 `python3 -m unittest discover -s tool -p 'test_release_macos.py'`；原生验签、替换和 ad-hoc 签名用例需要 macOS / Xcode。签名清单的公开测试向量可用 `python3 tool/generate_update_test_vectors.py --macos` 独立生成，私钥不保留。
+macOS 更新与打包改动另运行 `python3 -m unittest discover -s tool -p 'test_release_macos.py'`；原生验签、替换和 ad-hoc 签名用例需要 macOS / Xcode。统一签名清单的公开测试向量可用 `python3 tool/generate_update_test_vectors.py` 生成，私钥不保留。Windows 安装器回归使用 `tool/test_windows_setup.py`，需显式提供已编译更新器与固定 Inno 编译器；已有安装注册时不会覆盖。
 
 iOS 未签名 IPA 打包与发布改动运行 `python3 -m unittest discover -s tool -p 'test_release_ios.py'` 和 `python3 -m unittest discover -s tool -p 'test_update_manifest.py'`。导入协议与双 Inbox 回归在 Xcode 的 `RunnerTests` 中执行；扩展界面与生命周期测试使用 `tool/ios_import_probe/` 的原生宿主。模拟器测试不代替自签工具和真实设备安装验证。
 

@@ -10,5 +10,6 @@ $crt = Get-ChildItem -LiteralPath (Join-Path $vs 'VC/Redist/MSVC') -Directory |
     Where-Object { Test-Path -LiteralPath $_ -PathType Container } |
     Select-Object -First 1
 if (!$crt) { throw 'Visual C++ x64 redistributable DLL directory not found' }
-python tool/release_windows.py --tag $Tag --commit $Commit --crt-dir $crt
+$compiler = & "$PSScriptRoot/inno_setup.ps1"
+python tool/release_windows.py --tag $Tag --commit $Commit --crt-dir $crt --compiler $compiler
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

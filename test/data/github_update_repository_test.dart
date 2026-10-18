@@ -24,7 +24,7 @@ void main() {
   Matcher issue(UpdateProblem problem) =>
       isA<UpdateIssue>().having((e) => e.problem, 'problem', problem);
   GithubUpdateRepository repository({
-    String platform = 'windows-x64',
+    String platform = 'windows-x64-portable',
     InstalledUpdateApp? installed,
     UpdateInstaller? installer,
   }) => GithubUpdateRepository(
@@ -72,7 +72,10 @@ void main() {
           verifications++;
           expect(streamReturned, isTrue);
           final part = storage.file('package.part');
-          expect(part.readAsBytesSync(), fixture.package('windows-x64'));
+          expect(
+            part.readAsBytesSync(),
+            fixture.package('windows-x64-portable'),
+          );
           expect(storage.file('package.bin').existsSync(), isFalse);
           // Windows rejects renaming a file still held by RandomAccessFile.
           final moved = part.renameSync(storage.file('closed.part').path);
@@ -167,8 +170,13 @@ void main() {
       }
       final target = await repo.check(UpdateChannel.beta, token());
       expect(target?.release.tag, 'v1.2.1-beta.9');
-      expect(http.reads.where((uri) => uri.path.endsWith('.sig')).length, 8);
-      expect(http.reads.length, 17);
+      expect(
+        http.reads
+            .where((uri) => uri.path.endsWith('shiori-update.json'))
+            .length,
+        8,
+      );
+      expect(http.reads.length, 9);
       await repo.download(target!, token(), (_) {});
     },
   );
@@ -230,7 +238,12 @@ void main() {
     },
   );
 
-  for (final platform in ['windows-x64', 'android']) {
+  for (final platform in [
+    'windows-x64-portable',
+    'windows-x64-setup',
+    'android',
+    'macos-universal',
+  ]) {
     test(
       '$platform downloaded package survives restart and is reverified',
       () async {

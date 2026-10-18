@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import plistlib
 import stat
@@ -6,10 +7,27 @@ import struct
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import patch
 
 from release_android import ReleaseCheckError
-from release_ios import CHECKSUMS, METADATA, PREFIX, macho, package, verify_archive, verify_assets
+from release_ios import PREFIX, MACH_MAGIC, macho, package as package_release, verify_archive, verify_assets
 from update_manifest import encoded, identity
+
+
+def package(*args):
+    # Windows has no POSIX executable bits. Encode synthetic Mach-O fixture
+    # permissions explicitly; production validation and packaging stay strict.
+    original = zipfile.ZipInfo.from_file
+    def entry(filename, *values, **options):
+        info = original(filename, *values, **options)
+        if os.name == 'nt' and Path(filename).is_file():
+            with open(filename, 'rb') as source:
+                if source.read(4) in MACH_MAGIC:
+                    info.external_attr = (stat.S_IFREG | 0o755) << 16
+        return info
+    with patch.object(zipfile.ZipInfo, 'from_file', side_effect=entry):
+        return package_release(*args)
+
 
 
 def device_code(platform=2, cpu=0x100000c, signed=False, encrypted=False, libraries=()):
@@ -77,12 +95,12 @@ class IOSReleaseTest(unittest.TestCase):
     def test_complete_package_metadata_and_device_architecture(self):
         self.package()
         self.assertEqual(verify_assets(self.root, self.assets, self.tag, self.commit),
-                         {self.archive.name, METADATA, CHECKSUMS})
+                         {self.archive.name})
         with zipfile.ZipFile(self.archive) as archive:
             self.assertIn(PREFIX + 'PlugIns/ShareExtension.appex/ShareExtension', archive.namelist())
             self.assertIn(PREFIX + 'Frameworks/Flutter.framework/Flutter', archive.namelist())
         # The release identity is metadata only: this channel does not create an updater manifest.
-        self.assertEqual(set(p.name for p in self.assets.iterdir()), {self.archive.name, METADATA, CHECKSUMS})
+        self.assertEqual(set(p.name for p in self.assets.iterdir()), {self.archive.name, 'receipts'})
 
     def test_device_only_unencrypted_unsigned_code(self):
         for options in [dict(platform=7), dict(platform=1), dict(cpu=0x1000007),
@@ -154,18 +172,17 @@ class IOSReleaseTest(unittest.TestCase):
         with self.assertRaises(ReleaseCheckError):
             verify_archive(self.archive, self.expected)
 
-    def test_metadata_digest_commit_and_checksum_are_bound(self):
+    def test_receipt_identity_and_package_hash_are_bound(self):
         self.package()
-        metadata = self.assets / METADATA
-        original = metadata.read_bytes()
+        receipt = self.assets / 'receipts/ios-arm64.json'
+        original = receipt.read_bytes()
         value = json.loads(original)
-        for field, replacement in [('commit', 'b' * 40), ('versionCode', 12), ('tag', 'v1.2.2'),
-                                   ('sha256', '0' * 64), ('signed', True)]:
-            metadata.write_bytes(encoded({**value, field: replacement}))
-            with self.subTest(field=field), self.assertRaises(ReleaseCheckError):
+        for identity in [{**self.expected, 'build': 12}, {**self.expected, 'commit': 'b'*40}]:
+            receipt.write_bytes(encoded({**value, 'identity': identity}))
+            with self.assertRaises(ReleaseCheckError):
                 verify_assets(self.root, self.assets, self.tag, self.commit)
-        metadata.write_bytes(original)
-        (self.assets / CHECKSUMS).write_text('bad checksum\n')
+        receipt.write_bytes(original)
+        self.archive.write_bytes(self.archive.read_bytes() + b'tampered')
         with self.assertRaises(ReleaseCheckError):
             verify_assets(self.root, self.assets, self.tag, self.commit)
 

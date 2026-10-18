@@ -12,11 +12,9 @@ import tempfile
 import zipfile
 
 from release_android import ReleaseCheckError
-from update_manifest import APPLICATION_ID, encoded, identity, read_json, sha
+from update_manifest import APPLICATION_ID, identity, read_json
 
 PREFIX = 'Payload/Runner.app/'
-METADATA = 'release-info-ios-arm64.json'
-CHECKSUMS = 'SHA256SUMS-ios-arm64.txt'
 MACH_MAGIC = {b'\xcf\xfa\xed\xfe', b'\xca\xfe\xba\xbe', b'\xca\xfe\xba\xbf'}
 
 
@@ -149,24 +147,21 @@ def verify_archive(path, expected):
 
 
 def verify_assets(root, assets, tag, commit):
-    expected = identity((root / 'pubspec.yaml').read_text(), tag, commit)
+    from release_receipt import file_record
+    expected = identity((root / 'pubspec.yaml').read_text(encoding='utf-8'), tag, commit)
     name = f'shiori-reader-{tag}-ios-arm64-unsigned.ipa'
     path = assets / name
     if path.is_symlink() or not 0 < path.stat().st_size <= 2 * 1024**3:
         raise ReleaseCheckError('Invalid iOS release archive')
-    metadata = dict(tag=tag, commit=commit, versionName=expected['version'], versionCode=expected['build'],
-                    platform='ios-arm64', archive=name, sha256=sha(path), signed=False, minimumSystem='15.0')
-    value = read_json((assets / METADATA).read_bytes())
-    if value != metadata or value.get('signed') is not False:
+    value = read_json((assets / 'receipts/ios-arm64.json').read_bytes())
+    if value != dict(schemaVersion=1, identity=expected, platform='ios-arm64', packages=[file_record(path)]):
         raise ReleaseCheckError('iOS release metadata mismatch')
-    if (assets / CHECKSUMS).read_text() != f'{metadata["sha256"]}  {name}\n':
-        raise ReleaseCheckError('iOS release checksum mismatch')
     verify_archive(path, expected)
-    return {name, METADATA, CHECKSUMS}
+    return {name}
 
 
 def package(root, app, assets, tag, commit):
-    expected = identity((root / 'pubspec.yaml').read_text(), tag, commit)
+    expected = identity((root / 'pubspec.yaml').read_text(encoding='utf-8'), tag, commit)
     if app.name != 'Runner.app' or not app.is_dir() or app.is_symlink():
         raise ReleaseCheckError('Expected complete Runner.app')
     assets.mkdir(parents=True, exist_ok=True)
@@ -201,10 +196,8 @@ def package(root, app, assets, tag, commit):
                 if path.is_file():
                     archive.write(path, path.relative_to(temporary).as_posix())
     verify_archive(assets / name, expected)
-    digest = sha(assets / name)
-    (assets / METADATA).write_bytes(encoded(dict(tag=tag, commit=commit, versionName=expected['version'],
-        versionCode=expected['build'], platform='ios-arm64', archive=name, sha256=digest, signed=False, minimumSystem='15.0')))
-    (assets / CHECKSUMS).write_text(f'{digest}  {name}\n')
+    from release_receipt import write_receipt
+    write_receipt(assets, 'ios-arm64', expected, [assets / name])
     verify_assets(root, assets, tag, commit)
 
 

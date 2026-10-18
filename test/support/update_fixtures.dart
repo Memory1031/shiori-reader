@@ -48,8 +48,7 @@ final class UpdateFixtures {
       'prerelease': true,
       'body': 'Notes <b>stay plain text</b>',
       'assets': [
-        asset('update-manifest.json', bytes('manifest', name: name).length),
-        asset('update-manifest.sig', 384),
+        asset(updateEnvelopeName, bytes('envelope', name: name).length),
         for (final entry in manifest['assets'] as List<dynamic>)
           asset(entry['name'] as String, entry['size'] as int),
       ],
@@ -103,7 +102,7 @@ class FixtureUpdateHttp implements UpdateHttp {
     }
     return UpdateReply(
       fixtures.bytes(
-        uri.path.endsWith('.sig') ? 'signature' : 'manifest',
+        'envelope',
         name: badCase ?? casesByTag[uri.pathSegments[4]] ?? 'valid',
       ),
       {},
@@ -118,7 +117,13 @@ class FixtureUpdateHttp implements UpdateHttp {
     required Future<void> Function(List<int>) chunk,
   }) async {
     final bytes = fixtures.package(
-      uri.path.endsWith('.apk') ? 'android' : 'windows-x64',
+      uri.path.endsWith('.apk')
+          ? 'android'
+          : uri.path.endsWith('.exe')
+          ? 'windows-x64-setup'
+          : uri.path.endsWith('.dmg')
+          ? 'macos-universal'
+          : 'windows-x64-portable',
     );
     if (tamper) bytes[0] ^= 1;
     await chunk(bytes.sublist(0, 12));

@@ -40,7 +40,9 @@ void main() {
       await installer.install(
         File('/fixture/package.zip'),
         manifest.identity,
-        manifest.assets.first,
+        manifest.assets.singleWhere(
+          (asset) => asset.platform == 'macos-universal',
+        ),
         fixtures.bytes('manifest'),
         fixtures.bytes('signature'),
       );
@@ -67,7 +69,9 @@ void main() {
         installer.install(
           File('/fixture/package.zip'),
           manifest.identity,
-          manifest.assets.first,
+          manifest.assets.singleWhere(
+            (asset) => asset.platform == 'macos-universal',
+          ),
           fixtures.bytes('manifest'),
           fixtures.bytes('signature'),
         ),

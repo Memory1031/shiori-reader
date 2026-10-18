@@ -18,7 +18,7 @@ const icons = { android: 'M6 10h12v9H6zM8 6l-2-3m10 3 2-3M6 8a6 6 0 0 1 12 0M3 1
       <div id="package-panel" class="package-panel" role="tabpanel" aria-labelledby="tab-android" tabindex="0">
         <div class="package-summary"><div><p class="release-state" data-status role="status" aria-live="polite">{t.initial}</p><h3 data-platform-name>Android</h3><p data-requirements>{t.requirements.android}</p></div><span class="package-version" data-version></span></div>
         <dl class="package-meta" data-meta hidden><div><dt>{t.date}</dt><dd data-date></dd></div><div><dt>{t.size}</dt><dd data-size></dd></div></dl>
-        <div class="package-actions"><a class="button primary" data-package hidden>{t.action}<span aria-hidden="true">↓</span></a><a class="text-link" href={latestRelease}><GitHubIcon />{t.fallback}</a><button class="text-link" type="button" data-retry hidden>{t.retry}</button></div>
+        <div class="package-actions"><a class="button primary" data-package hidden>{t.action}<span aria-hidden="true">↓</span></a><a class="text-link" data-portable hidden>{t.portableAction}</a><a class="text-link" href={latestRelease}><GitHubIcon />{t.fallback}</a><button class="text-link" type="button" data-retry hidden>{t.retry}</button></div>
         {!full && <div class="install-summary"><p data-install-note>{t.quickInstall.android}</p><a class="text-link" data-install-guide href={`${route(locale, 'download')}#install-android`}>{t.guide} <span aria-hidden="true">↗</span></a></div>}
         <p class="fine">{t.apiNote}</p><noscript><p>{t.nojs}</p></noscript>
       </div>
@@ -51,13 +51,19 @@ const icons = { android: 'M6 10h12v9H6zM8 6l-2-3m10 3 2-3M6 8a6 6 0 0 1 12 0M3 1
       if (note) note.textContent = t.quickInstall[selected];
       if (guide) guide.href = `${route(locale, 'download')}#install-${selected}`;
       get('[data-version]').textContent = release?.tag ?? '';
-      const asset = release?.downloads[selected];
+      const setup = selected === 'windows' ? release?.downloads.windows : undefined;
+      const portable = selected === 'windows' ? release?.downloads.windowsPortable : undefined;
+      const asset = release?.downloads[selected] ?? portable;
       get('[data-status]').textContent = failure ? t.errors[failure] : release ? asset ? t.ready : t.missing : t.loading;
       get('[data-retry]').hidden = !failure;
       const link = get<HTMLAnchorElement>('[data-package]');
       link.hidden = !asset;
       link.removeAttribute('href');
-      if (asset) { link.href = asset.url; link.textContent = `${selected === 'ios' ? t.iosAction : t.action} ↓`; }
+      if (asset) { link.href = asset.url; link.textContent = `${selected === 'ios' ? t.iosAction : selected === 'windows' ? setup ? t.setupAction : t.portableAction : t.action} ↓`; }
+      const portableLink = get<HTMLAnchorElement>('[data-portable]');
+      portableLink.hidden = !setup || !portable;
+      portableLink.removeAttribute('href');
+      if (setup && portable) { portableLink.href = portable.url; portableLink.textContent = `${t.portableAction} · ${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(portable.size / 1_000_000)} MB ↓`; }
       get('[data-meta]').hidden = !asset;
       get('[data-date]').textContent = release ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(release.date)) : '';
       get('[data-size]').textContent = asset ? `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(asset.size / 1_000_000)} MB` : '';

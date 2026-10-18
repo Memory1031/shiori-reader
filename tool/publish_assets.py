@@ -8,8 +8,8 @@ import subprocess
 from pathlib import Path
 
 from release_android import ReleaseCheckError
-from update_manifest import create_manifest, read_json, sha, verify_signature
-from release_ios import verify_assets as verify_ios_assets
+from update_manifest import (create_manifest, read_json, sha, read_envelope,
+                             ENVELOPE_NAME, MAX_ENVELOPE, PACKAGE_SUFFIXES)
 
 REPOSITORY = "Memory1031/shiori-reader"
 
@@ -32,36 +32,42 @@ def asset_bytes(asset, run=gh):
     )
 
 
-def validate_history(manifest, releases, files, run=gh):
+def validate_history(manifest, releases, files, run=gh, key=None):
     current = None
     for release in releases:
         if release["tag_name"] == manifest["tag"]:
+            if current is not None:
+                raise ReleaseCheckError("Duplicate release tag")
             current = release
             continue
         if release["draft"]:
             continue
-        metadata = next(
-            (
-                asset
-                for asset in release["assets"]
-                if asset["name"] == "release-info.json"
-            ),
-            None,
-        )
-        if metadata is None or metadata["size"] > 65536:
-            raise ReleaseCheckError("Cannot establish published build history")
-        previous = read_json(asset_bytes(metadata, run))
-        number = previous.get("versionCode")
+        matching = [a for a in release["assets"] if a["name"] == ENVELOPE_NAME]
+        if matching:
+            if len(matching) != 1 or not 0 < matching[0]["size"] <= MAX_ENVELOPE or key is None:
+                raise ReleaseCheckError("Invalid published update envelope")
+            _, _, previous = read_envelope(asset_bytes(matching[0], run), key, release["tag_name"])
+            number = previous.get("build")
+        else:
+            # Bounded publisher-only transition: the retired protocol ended at build 20.
+            metadata = [a for a in release["assets"] if a["name"] == "release-info.json"]
+            if len(metadata) != 1 or not 0 < metadata[0]["size"] <= 65536:
+                raise ReleaseCheckError("Cannot establish published build history")
+            number = read_json(asset_bytes(metadata[0], run)).get("versionCode")
+            if type(number) is not int or not 0 < number <= 20:
+                raise ReleaseCheckError("Legacy history exceeds the retired protocol")
         if type(number) is not int or number >= manifest["build"]:
             raise ReleaseCheckError(
                 "Build must be greater than every previously published build"
             )
     missing = dict(files)
     if current:
+        seen = set()
         for asset in current["assets"]:
             name = asset["name"]
-            if name not in files:
+            if name not in files or name in seen:
                 raise ReleaseCheckError("Existing release contains unexpected assets")
+            seen.add(name)
             path = files[name]
             digest = asset.get("digest")
             if not digest:
@@ -75,43 +81,21 @@ def validate_history(manifest, releases, files, run=gh):
 
 
 def publish(root, assets, tag, commit, key, run=gh):
-    raw = (assets / "update-manifest.json").read_bytes()
-    verify_signature(raw, (assets / "update-manifest.sig").read_bytes(), key)
+    raw, _, manifest = read_envelope((assets / ENVELOPE_NAME).read_bytes(), key, tag)
     if raw != create_manifest(root, assets, tag, commit, key):
         raise ReleaseCheckError("Signed manifest differs from prepared assets")
-    manifest = read_json(raw)
     if manifest["tag"] != tag or manifest["commit"] != commit:
         raise ReleaseCheckError("Publish identity mismatch")
-    names = {item["name"] for item in manifest["assets"]} | {
-        "release-info.json",
-        "release-info-windows-x64.json",
-        "SHA256SUMS.txt",
-        "SHA256SUMS-windows-x64.txt",
-        "update-manifest.json",
-        "update-manifest.sig",
-    }
-    if (assets / "release-info-macos-universal.json").exists():
-        from release_macos import create_manifest as create_macos_manifest
-        mac_raw = (assets / "update-manifest-macos.json").read_bytes()
-        verify_signature(mac_raw, (assets / "update-manifest-macos.sig").read_bytes(), key)
-        if mac_raw != create_macos_manifest(root, assets, tag, commit, key):
-            raise ReleaseCheckError("Signed macOS manifest differs from prepared assets")
-        mac_manifest = read_json(mac_raw)
-        if mac_manifest.get("installer"):
-            names.add(mac_manifest["installer"]["name"])
-        names |= {item["name"] for item in mac_manifest["assets"]} | {
-            "release-info-macos-universal.json", "SHA256SUMS-macos-universal.txt",
-            "update-manifest-macos.json", "update-manifest-macos.sig",
-        }
-    names |= verify_ios_assets(root, assets, tag, commit)
+    names = {f"shiori-reader-{tag}-{suffix}" for suffix in PACKAGE_SUFFIXES.values()} | {ENVELOPE_NAME}
     files = {path.name: path for path in assets.iterdir() if path.is_file()}
-    if set(files) != names or any(path.is_symlink() for path in files.values()):
+    if (set(files) != names or any(path.is_symlink() for path in assets.iterdir())
+            or any(path.is_dir() and path.name != "receipts" for path in assets.iterdir())):
         raise ReleaseCheckError("Unexpected or missing publish assets")
     pages = json.loads(
         run("api", "--paginate", "--slurp", f"repos/{REPOSITORY}/releases?per_page=100")
     )
     releases = [release for page in pages for release in page]
-    current, missing = validate_history(manifest, releases, files, run)
+    current, missing = validate_history(manifest, releases, files, run, key)
     if current is None:
         notes = root / "docs/release/notes" / f"{tag}.md"
         run(

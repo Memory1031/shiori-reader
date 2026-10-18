@@ -53,14 +53,14 @@
 | --- | --- |
 | Android 7.0+ | 从[下载页面](https://github.com/Memory1031/shiori-reader/releases)获取 APK，安装到手机。 |
 | iOS 15.0+ | 可通过 Xcode 自行构建安装，或从[下载页面](https://github.com/Memory1031/shiori-reader/releases)获取未签名 IPA，自行签名后安装。IPA 不能直接在 iPhone 上安装，配置见[发布说明](docs/release/README.md#ios-未签名-ipa)。 |
-| Windows x64 | 在[下载页面](https://github.com/Memory1031/shiori-reader/releases)获取 Windows 压缩包，完整解压后运行 `shiori.exe`。当前为未签名便携包；部分特殊版式 EPUB 页面需要 WebView2 运行环境。 |
+| Windows x64 | 在[下载页面](https://github.com/Memory1031/shiori-reader/releases)获取安装版 EXE（推荐，当前用户安装与正常卸载），或完整解压便携 ZIP 后运行 `shiori.exe`。包未经 Windows 代码签名，可能出现 SmartScreen 提示；部分特殊版式 EPUB 页面需要 WebView2 运行环境。 |
 | macOS 12.0+ | 从[下载页面](https://github.com/Memory1031/shiori-reader/releases)获取 macOS DMG，将 Shiori 拖入「应用程序」或其他可写目录；同一安装包支持 Apple Silicon 和 Intel。未使用 Apple 开发者签名或公证，首次打开可能需要在系统「隐私与安全性」中确认。 |
 
 Android 覆盖安装需要签名一致；从 Debug 包切换到正式签名包前，请先保全数据。版本、签名与分发方式见[发布说明](docs/release/README.md)。
 
 iOS 未签名 IPA 不含可直接使用的开发者签名，签名与后续更新由用户自行处理。应用内 EPUB / TXT 导入不依赖 App Group 授权；系统分享扩展则需要匹配的签名与 App Group。更改 Bundle ID、卸载或更换签名方式可能影响原有数据，请先保全。
 
-从本仓库发布的 Android / Windows / macOS 安装包可在「关于与更新」检查更新。Windows 压缩包应完整解压到可写目录，不要只复制 EXE；macOS 请先将应用复制到可写目录，再使用应用内更新，不要直接在 DMG 中运行。
+从本仓库发布的 Android / Windows / macOS 安装包可在「关于与更新」检查更新。Windows 安装版与便携版均支持后续应用内更新；便携 ZIP 应完整解压到可写目录，不要只复制 EXE；macOS 请先将应用复制到可写目录，再使用应用内更新，不要直接在 DMG 中运行。v1.4.0 使用旧更新协议，升级至 v1.4.1 需手动安装一次。
 
 ## 快速开始
 

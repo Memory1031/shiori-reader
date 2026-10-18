@@ -24,11 +24,23 @@ void main() {
       key,
       expectedTag: 'v1.2.1-beta.1',
     );
+    final envelope = SignedUpdateEnvelope.verify(
+      bytes('valid', 'envelope'),
+      key,
+      expectedTag: 'v1.2.1-beta.1',
+    );
+    expect(envelope.bytes, bytes('valid', 'manifest'));
+    expect(envelope.manifest.assets.map((a) => a.platform), [
+      'android',
+      'windows-x64-portable',
+      'windows-x64-setup',
+      'macos-universal',
+    ]);
     expect(manifest.identity.build, 11);
     expect(manifest.identity.channel, UpdateChannel.beta);
-    expect(manifest.assets.length, 2);
+    expect(manifest.assets.length, 4);
     expect(() => manifest.assets.clear(), throwsUnsupportedError);
-    expect(() => manifest.assets.last.files.clear(), throwsUnsupportedError);
+    expect(() => manifest.assets[1].files.clear(), throwsUnsupportedError);
   });
 
   for (var number = 2; number <= 10; number++) {
