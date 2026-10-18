@@ -840,21 +840,21 @@ final class PageLayout {
               index.content.blocks.length == 1);
 
   ReaderPage? forward(PageCursor from) {
-    final first = _forwardColumn(from);
-    if (first == null || columns == 1) return first;
-    if (index.content.blocks.length == 1 &&
-        _centerableImage(index.content.blocks.single) &&
-        ((index.content.blocks.single as ImageBlock).sizing == null ||
-            (index.content.blocks.single as ImageBlock).sizing!.role ==
-                ImageRole.page)) {
+    if (_standaloneImageUnit case final unit?) {
+      if (normalize(from).unit >= index.chunks.length) return null;
+      final image = _forwardColumn(PageCursor(unit, 0))!;
+      // Normalize blank occupancy, not source blocks: anchors on either side
+      // still belong to this page and retain their original identity/index.
       return ReaderPage(
-        first.start,
-        first.end,
-        first.fragments,
-        fullWidth: true,
+        const PageCursor(0, 0),
+        PageCursor(index.chunks.length, 0),
+        image.fragments,
+        fullWidth: columns == 2,
         centered: true,
       );
     }
+    final first = _forwardColumn(from);
+    if (first == null || columns == 1) return first;
     final second = _forwardColumn(first.end);
     if (second == null) return first;
     return ReaderPage(first.start, second.end, [
@@ -862,6 +862,51 @@ final class PageLayout {
       ...second.fragments,
     ], columnBreak: first.fragments.length);
   }
+
+  late final int? _standaloneImageUnit = () {
+    // Blank spacing may be normalized on a dedicated image page, but a box
+    // with painted content is not whitespace even when its text is empty.
+    bool unpainted(BlockBox? box) =>
+        box == null ||
+        box.backgroundColor == null &&
+            box.backgroundImage == null &&
+            box.decorationColumns == null &&
+            box.borderWidth == 0 &&
+            [
+              box.borders?.top,
+              box.borders?.right,
+              box.borders?.bottom,
+              box.borders?.left,
+            ].every(
+              (side) =>
+                  side == null ||
+                  side.style == BoxBorderStyle.none ||
+                  side.width.value == 0,
+            );
+    int? imageAt;
+    for (var at = 0; at < index.content.blocks.length; at++) {
+      final block = index.content.blocks[at];
+      if (block is ImageBlock) {
+        if (imageAt != null ||
+            (block.sizing?.role != ImageRole.page &&
+                !(block.sizing == null && index.content.blocks.length == 1)) ||
+            !_centerableImage(block)) {
+          return null;
+        }
+        imageAt = at;
+      } else if (block is! ParagraphBlock ||
+          block.text.trim().isNotEmpty ||
+          block.inlineImages.isNotEmpty ||
+          block.linkDecoration != null ||
+          block.tableRow != null ||
+          !unpainted(block.box) ||
+          !unpainted(block.layout)) {
+        return null;
+      }
+    }
+    if (imageAt == null) return null;
+    return index.chunks.indexWhere((chunk) => chunk.blockIndex == imageAt);
+  }();
 
   ReaderPage? backward(PageCursor until) {
     if (columns == 1 &&

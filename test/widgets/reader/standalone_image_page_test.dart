@@ -12,6 +12,159 @@ import 'package:shiori/features/reader/viewport/render_chunk.dart';
 import '../../data/local/support/epub_fixtures.dart';
 
 void main() {
+  for (final (before, after, responsive) in [
+    (false, false, false),
+    (true, false, false),
+    (false, true, false),
+    (true, true, true),
+  ]) {
+    for (final columns in [1, 2]) {
+      testWidgets(
+        'dedicated cover blanks before=$before after=$after responsive=$responsive columns=$columns',
+        (tester) async {
+          final files = epubFiles();
+          files['OPS/text/a.xhtml'] = utf8.encode(
+            '<html><body>'
+            '${before ? '<p id="before" ${responsive ? 'style="margin-top:3em;padding-top:1em;font-size:2em"' : ''}><br/></p>' : ''}'
+            '<div ${responsive ? 'style="width:100%"' : ''}>'
+            '<img id="picture" src="../images/%E6%98%9F%20%E7%A9%BA.png"/>'
+            '</div>${after ? '<p id="after"><br/></p>' : ''}'
+            '</body></html>',
+          );
+          final parsed = EpubParser(
+            zipFiles(files),
+            NovelKey(sourceId: SourceId('local'), novelId: 'blank-cover'),
+            'cover.epub',
+          ).parse().content.chapters.first;
+          final content = ChapterContent.fromJson(
+            jsonDecode(jsonEncode(parsed.toJson())) as Map<String, dynamic>,
+          );
+          final imageAt = content.blocks.indexWhere((b) => b is ImageBlock);
+          expect(
+            (content.blocks[imageAt] as ImageBlock).sizing!.role,
+            ImageRole.page,
+          );
+          expect(content.blocks.length, 1 + (before ? 1 : 0) + (after ? 1 : 0));
+          final index = ChunkIndex(content);
+          final layout = PageLayout(
+            index: index,
+            width: 300,
+            height: 600,
+            style: const TextStyle(fontSize: 20),
+            scaler: TextScaler.noScaling,
+            direction: TextDirection.ltr,
+            columns: columns,
+            imageExtent: (_) => 180,
+          );
+          final page = layout.forward(const PageCursor(0, 0))!;
+          expect(page.start.unit, 0);
+          expect(page.end.unit, index.chunks.length);
+          expect(page.fragments, hasLength(1));
+          expect(index.chunks[page.fragments.single.unit].blockIndex, imageAt);
+          expect(page.centered, isTrue);
+          expect(page.fullWidth, columns == 2);
+          expect(layout.forward(page.end), isNull);
+          final reverse = layout.backward(page.end)!;
+          expect(reverse.start.unit, page.start.unit);
+          expect(reverse.end.unit, page.end.unit);
+          expect(reverse.fullWidth, page.fullWidth);
+          for (var unit = 0; unit < index.chunks.length; unit++) {
+            // Whitespace anchors remain addressable and resolve onto the cover.
+            final position = index.position(unit, 0);
+            expect(index.resolve(position).chunk, unit);
+            expect(index.resolve(position).usedFallback, isFalse);
+            expect(
+              layout.forward(PageCursor(unit, 0))!.fragments.single.unit,
+              page.fragments.single.unit,
+            );
+          }
+          expect(content.toJson(), parsed.toJson());
+          final controller = PagedReaderController();
+          await tester.pumpWidget(
+            MaterialApp(
+              home: Center(
+                child: SizedBox(
+                  width: columns == 1 ? 300 : 750,
+                  height: 600,
+                  child: PagedReaderViewport(
+                    content: content,
+                    controller: controller,
+                    columns: columns,
+                    initialPosition: index.position(index.chunks.length - 1, 0),
+                    imageExtent: (_) => 180,
+                    imageBuilder: (_, _) => const SizedBox.expand(
+                      key: ValueKey('blank-cover-image'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final bounds = tester.getRect(find.byType(PagedReaderViewport));
+          final picture = tester.getRect(
+            find.byKey(const ValueKey('blank-cover-image')),
+          );
+          expect(picture.center.dx, closeTo(bounds.center.dx, .5));
+          expect(picture.center.dy, closeTo(bounds.center.dy, .5));
+          expect(picture.width, columns == 1 ? 300 : 680);
+          expect(
+            controller.inspectDisplayedPage()!.page.end.unit,
+            index.chunks.length,
+          );
+          expect(
+            find.byKey(const ValueKey('reader-spread-gutter')),
+            findsNothing,
+          );
+          final saved = controller.capture()!;
+          expect(saved.blockKey, content.blocks.last.blockKey);
+          expect(saved.blockIndex, content.blocks.length - 1);
+        },
+      );
+    }
+  }
+
+  test(
+    'image-page whitespace normalization preserves authored blank decoration and prose',
+    () {
+      for (final other in [
+        ParagraphBlock(text: 'Body text'),
+        ParagraphBlock(
+          text: '',
+          box: BlockBox(group: 0, backgroundColor: 0xffeeeeee),
+        ),
+        ParagraphBlock(text: '', layout: BlockBox(group: 0, borderWidth: 1)),
+      ]) {
+        final content = ChapterContent(
+          key: fixtureChapterKey(FixtureScenario.singleImage),
+          title: 'Authored content',
+          blocks: [
+            other,
+            ImageBlock(
+              media: fixtureMediaRef(0),
+              width: 300,
+              height: 180,
+              sizing: ImageSizing(role: ImageRole.page),
+            ),
+          ],
+        );
+        final layout = PageLayout(
+          index: ChunkIndex(content),
+          width: 300,
+          height: 600,
+          style: const TextStyle(fontSize: 20),
+          scaler: TextScaler.noScaling,
+          direction: TextDirection.ltr,
+          columns: 2,
+        );
+        final page = layout.forward(const PageCursor(0, 0))!;
+        expect(page.fullWidth, isFalse);
+        expect(page.fragments.first.unit, 0);
+        expect(page.fragments, hasLength(2));
+      }
+    },
+  );
+
   for (final selector in ['.cover', 'img']) {
     for (final columns in [1, 2]) {
       testWidgets(

@@ -139,7 +139,9 @@ Future<ui.Image?> paperDiagramMask(
         black >= dark * .85 &&
         middle <= count * .10 &&
         broadTone == 0 &&
-        _outsidePaper(rgba, source.width, source.height);
+        _outsidePaper(rgba, source.width, source.height) &&
+        !_parallelBars(rgba, source.width, source.height) &&
+        !_parallelBars(rgba, source.height, source.width, rotated: true);
     if (!diagram && !ornament) {
       return null;
     }
@@ -166,6 +168,45 @@ Future<ui.Image?> paperDiagramMask(
     descriptor?.dispose();
     buffer?.dispose();
   }
+}
+
+// Aligned, solid parallel bars may carry information whose polarity matters.
+// Reject this narrow shape in the compact extension; this is not a semantic
+// barcode detector and does not alter the existing diagram classifier.
+bool _parallelBars(
+  Uint8List rgba,
+  int width,
+  int height, {
+  bool rotated = false,
+}) {
+  int? top, bottom;
+  var bars = 0, thickness = 0, widest = 0;
+  for (var x = 0; x < width; x++) {
+    var first = -1, last = -1, count = 0;
+    for (var y = 0; y < height; y++) {
+      final at = (rotated ? x * height + y : y * width + x) * 4;
+      if (math.max(rgba[at], math.max(rgba[at + 1], rgba[at + 2])) > 80) {
+        continue;
+      }
+      if (first < 0) first = y;
+      last = y;
+      count++;
+    }
+    if (count == 0) {
+      thickness = 0;
+      continue;
+    }
+    // Each bar must be solid and share its endpoints with the others.
+    if (count != last - first + 1 ||
+        top != null && (first != top || last != bottom)) {
+      return false;
+    }
+    top ??= first;
+    bottom ??= last;
+    if (thickness == 0) bars++;
+    widest = math.max(widest, ++thickness);
+  }
+  return bars >= 2 && bottom! - top! + 1 >= widest * 2;
 }
 
 // An ornament must have a white rim and no enclosed white shapes. Only the

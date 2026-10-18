@@ -51,8 +51,24 @@ Future<ui.Image> ornament({String kind = 'plain'}) async {
   if (kind == 'edge') {
     c.drawRect(const Rect.fromLTWH(0, 0, 2, 32), ink);
   }
+  if (kind == 'bars' || kind == 'horizontal-bars') {
+    c.drawColor(Colors.white, BlendMode.src);
+    if (kind == 'horizontal-bars') {
+      c.translate(32, 0);
+      c.rotate(1.5707963267948966);
+    }
+    c.drawRect(const Rect.fromLTWH(5, 5, 8, 22), ink);
+    c.drawRect(const Rect.fromLTWH(21, 5, 2, 22), ink);
+  }
   if (kind == 'color') {
     c.drawRect(const Rect.fromLTWH(18, 5, 4, 4), Paint()..color = Colors.red);
+  }
+  if (kind == 'matrix-marker') {
+    c.drawColor(Colors.white, BlendMode.src);
+    // Original information-marker fixture with a white locator interior.
+    c.drawRect(const Rect.fromLTWH(3, 3, 9, 9), ink);
+    c.drawRect(const Rect.fromLTWH(5, 5, 5, 5), Paint()..color = Colors.white);
+    c.drawRect(const Rect.fromLTWH(19, 19, 10, 10), ink);
   }
   if (kind == 'photo') {
     c.drawRect(
@@ -77,6 +93,33 @@ final localMark = MediaRef(
 );
 
 void main() {
+  testWidgets('compact bar patterns retain their original polarity', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      for (final kind in ['bars', 'horizontal-bars', 'matrix-marker']) {
+        final image = await ornament(kind: kind);
+        try {
+          final original = await png(image);
+          for (final mode in PaperImageMode.values) {
+            final mask = await paperDiagramMask(
+              image,
+              mode: mode,
+              intrinsicSize: const Size(32, 32),
+            );
+            try {
+              expect(mask, isNull, reason: '$kind / $mode');
+            } finally {
+              mask?.dispose();
+            }
+          }
+          expect(await png(image), original);
+        } finally {
+          image.dispose();
+        }
+      }
+    });
+  });
   testWidgets('late mode A-B-A decodes cannot replace the current original', (
     tester,
   ) async {
