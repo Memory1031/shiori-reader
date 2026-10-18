@@ -33,7 +33,8 @@ Map<String, Uint8List> baselineFixtures() => {
 };
 
 // Complete persistent content plus parser-owned media/presentation identities.
-// Synthetic data only; used to freeze the pre-observer baseline.
+// Synthetic data only; used to freeze the parser contract and verify that
+// enabling bounded traces does not change any output.
 Map<String, Object?> parserSnapshot(EpubParser parser) {
   final parsed = parser.parse();
   final c = parsed.content;

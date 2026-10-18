@@ -1,6 +1,6 @@
 {
-  "gitSha": "8f28402a3641a4a37e68455877d0ed609f7a3766",
-  "parserVersion": 19,
+  "gitSha": "b8bfb99e018442b8d291f8512da6e875d7b633a1",
+  "parserVersion": 31,
   "fixtures": {
     "semantics": {
       "content": {
@@ -243,7 +243,8 @@
             "targetOffset": 0,
             "unavailable": null,
             "sourceOffset": 0,
-            "sourceLength": 11
+            "sourceLength": 11,
+            "presentationId": 1
           }
         ],
         "readingOrder": [
@@ -1870,7 +1871,72 @@
                   "autoRight": false
                 },
                 "occurrence": 0,
-                "blockKey": "2e2f4b2f06939e06af70d2cbcd13fc01995d8968c0c729955c3427d5f6739b58"
+                "blockKey": "2e2f4b2f06939e06af70d2cbcd13fc01995d8968c0c729955c3427d5f6739b58",
+                "sizing": {
+                  "role": "flow",
+                  "height": {
+                    "value": 40.0,
+                    "unit": "px"
+                  },
+                  "fontScale": 1.0
+                },
+                "layout": {
+                  "group": 0,
+                  "width": 160.0,
+                  "maxWidth": null,
+                  "widthFraction": null,
+                  "maxWidthFraction": null,
+                  "padding": 0.0,
+                  "borderWidth": 0.0,
+                  "borderColor": null,
+                  "backgroundColor": null,
+                  "dashed": false,
+                  "centered": false,
+                  "widthLength": {
+                    "value": 160.0,
+                    "unit": "px"
+                  },
+                  "margins": {},
+                  "paddingEdges": {},
+                  "borders": {
+                    "top": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "right": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "bottom": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    },
+                    "left": {
+                      "width": {
+                        "value": 0.0,
+                        "unit": "px"
+                      },
+                      "style": "none",
+                      "color": null
+                    }
+                  },
+                  "fontScale": 1.0,
+                  "headingRelative": false,
+                  "autoLeft": false,
+                  "autoRight": false
+                }
               },
               {
                 "type": "paragraph",
@@ -2303,7 +2369,8 @@
             "targetOffset": 0,
             "unavailable": null,
             "sourceOffset": 0,
-            "sourceLength": 7
+            "sourceLength": 7,
+            "presentationId": 0
           },
           {
             "source": {
@@ -2326,7 +2393,8 @@
             "targetOffset": 0,
             "unavailable": null,
             "sourceOffset": 0,
-            "sourceLength": 7
+            "sourceLength": 7,
+            "presentationId": 1
           },
           {
             "source": {
@@ -2349,7 +2417,8 @@
             "targetOffset": 0,
             "unavailable": null,
             "sourceOffset": 0,
-            "sourceLength": 7
+            "sourceLength": 7,
+            "presentationId": 2
           },
           {
             "source": {
@@ -2372,7 +2441,8 @@
             "targetOffset": 0,
             "unavailable": null,
             "sourceOffset": 0,
-            "sourceLength": 7
+            "sourceLength": 7,
+            "presentationId": 3
           },
           {
             "source": {
@@ -2395,7 +2465,8 @@
             "targetOffset": 0,
             "unavailable": null,
             "sourceOffset": 0,
-            "sourceLength": 7
+            "sourceLength": 7,
+            "presentationId": 4
           },
           {
             "source": {
@@ -2418,7 +2489,8 @@
             "targetOffset": 0,
             "unavailable": null,
             "sourceOffset": 0,
-            "sourceLength": 7
+            "sourceLength": 7,
+            "presentationId": 5
           },
           {
             "source": {
@@ -2441,7 +2513,8 @@
             "targetOffset": 0,
             "unavailable": null,
             "sourceOffset": 0,
-            "sourceLength": 7
+            "sourceLength": 7,
+            "presentationId": 6
           }
         ],
         "readingOrder": [
@@ -2518,7 +2591,12 @@
                 "alt": null,
                 "caption": null,
                 "occurrence": 0,
-                "blockKey": "2f156e8fd8523bd47f747be0221ebafad0318644d7d2e56c7325eb539c50c6d4"
+                "blockKey": "2f156e8fd8523bd47f747be0221ebafad0318644d7d2e56c7325eb539c50c6d4",
+                "sizing": {
+                  "role": "page",
+                  "alignment": "center",
+                  "fontScale": 1.0
+                }
               }
             ],
             "contentRevision": "4a4704675d4a5312cd57650fcfd0e85c440085dabd282dd3fde1d931ac620e13"
@@ -2574,7 +2652,12 @@
                 "alt": null,
                 "caption": null,
                 "occurrence": 0,
-                "blockKey": "9bae01666c436f01512244054cdc1d3a8454fe30ed4adec448aa4ab9122a7799"
+                "blockKey": "9bae01666c436f01512244054cdc1d3a8454fe30ed4adec448aa4ab9122a7799",
+                "sizing": {
+                  "role": "page",
+                  "alignment": "center",
+                  "fontScale": 1.0
+                }
               }
             ],
             "contentRevision": "e3286155ea64ac1ee24c8eb788f51b9818038648a7668bf2498ce87564fe6a5e"
@@ -2601,7 +2684,12 @@
                 "alt": null,
                 "caption": null,
                 "occurrence": 0,
-                "blockKey": "2f156e8fd8523bd47f747be0221ebafad0318644d7d2e56c7325eb539c50c6d4"
+                "blockKey": "2f156e8fd8523bd47f747be0221ebafad0318644d7d2e56c7325eb539c50c6d4",
+                "sizing": {
+                  "role": "page",
+                  "alignment": "center",
+                  "fontScale": 1.0
+                }
               }
             ],
             "contentRevision": "4a4704675d4a5312cd57650fcfd0e85c440085dabd282dd3fde1d931ac620e13"
@@ -2761,7 +2849,11 @@
                 "alt": null,
                 "caption": null,
                 "occurrence": 0,
-                "blockKey": "eb68d7540b594d14eda7add2c7025ea13423aa24aa11f3247a3eefabaec46c2f"
+                "blockKey": "eb68d7540b594d14eda7add2c7025ea13423aa24aa11f3247a3eefabaec46c2f",
+                "sizing": {
+                  "role": "flow",
+                  "fontScale": 1.0
+                }
               }
             ],
             "contentRevision": "73fab5df2e9f7600f48e61b44ea415cb3ab1b5be90852564015ca231090a91c0"

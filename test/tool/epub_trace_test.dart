@@ -18,12 +18,12 @@ void main() {
           as Map;
   for (final fixture in baselineFixtures().entries) {
     for (final limit in [null, 100000, 1, 0]) {
-      test('${fixture.key}: original baseline, trace capacity $limit', () {
+      test('${fixture.key}: parser baseline, trace capacity $limit', () {
         final trace = limit == null
             ? null
             : EpubTraceCollector(capacity: limit);
         // ZIP fixture encoder embeds the wall-clock timestamp. Pin the caller's
-        // book identity to the original snapshot so byte-container timestamp
+        // book identity to the snapshot so byte-container timestamp
         // changes cannot masquerade as parser changes.
         final expected = baseline[fixture.key] as Map;
         final digest = expected['content'] == null
@@ -44,22 +44,7 @@ void main() {
         } on LocalParseException catch (e) {
           snapshot = {'rejected': e.problem.name};
         }
-        // The historical snapshot predates static HTML anchor identities.
-        // Keep its semantic/link targets frozen; compare the complete current
-        // output separately so tracing cannot alter the new layout metadata.
-        final original = {
-          ...snapshot,
-          if (snapshot['content'] case final Map content)
-            'content': {
-              ...content,
-              'links': [
-                for (final link in content['links'] as List)
-                  Map<String, Object?>.from(link as Map)
-                    ..remove('presentationId'),
-              ],
-            },
-        };
-        expect(original, baseline[fixture.key]);
+        expect(snapshot, baseline[fixture.key]);
         if (trace != null) {
           final unobserved = EpubParser(
             fixture.value,
