@@ -4,6 +4,7 @@
 #include <flutter_windows.h>
 
 #include <algorithm>
+#include <utility>
 
 #include "resource.h"
 
@@ -27,6 +28,7 @@ namespace {
 /// width where the desktop shell's rail replaces its bottom bar.
 constexpr int kMinimumClientWidth = 840;
 constexpr int kMinimumClientHeight = 600;
+constexpr UINT_PTR kPlacementTimer = 0x53485249;
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 
@@ -163,7 +165,8 @@ void WindowClassRegistrar::UnregisterWindowClass() {
   class_registered_ = false;
 }
 
-Win32Window::Win32Window() {
+Win32Window::Win32Window(std::wstring placement_key)
+    : placement_key_(std::move(placement_key)) {
   ++g_active_window_count;
 }
 
@@ -177,13 +180,18 @@ bool Win32Window::Create(const std::wstring& title,
                          const Size& size,
                          bool center) {
   Destroy();
+  placement_ready_ = false;
+  shown_ = false;
+  const auto restored = shiori::window::LoadPlacement(placement_key_);
+  placement_ = restored.value_or(shiori::window::Placement{});
 
   const wchar_t* window_class =
       WindowClassRegistrar::GetInstance()->GetWindowClass();
 
   const POINT target_point = {static_cast<LONG>(origin.x),
                               static_cast<LONG>(origin.y)};
-  HMONITOR monitor = MonitorFromPoint(target_point, MONITOR_DEFAULTTONEAREST);
+  HMONITOR monitor = restored ? shiori::window::PlacementMonitor(*restored)
+                             : MonitorFromPoint(target_point, MONITOR_DEFAULTTONEAREST);
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
@@ -191,36 +199,42 @@ bool Win32Window::Create(const std::wstring& title,
   int window_width = Scale(size.width, scale_factor);
   int window_height = Scale(size.height, scale_factor);
   const RECT work = WorkAreaFor(monitor);
+  RECT bounds{Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
+              Scale(origin.x, scale_factor) + window_width,
+              Scale(origin.y, scale_factor) + window_height};
   if (work.right > work.left && work.bottom > work.top) {
     window_width =
         std::min(window_width, static_cast<int>(work.right - work.left));
     window_height =
         std::min(window_height, static_cast<int>(work.bottom - work.top));
+    if (restored) {
+      bounds = shiori::window::RestoreBounds(*restored, work, dpi, SIZE{});
+    } else {
+      bounds = RECT{center ? work.left + (work.right - work.left - window_width) / 2
+                           : Scale(origin.x, scale_factor),
+                    center ? work.top + (work.bottom - work.top - window_height) / 2
+                           : Scale(origin.y, scale_factor), 0, 0};
+      bounds.right = bounds.left + window_width;
+      bounds.bottom = bounds.top + window_height;
+      bounds = shiori::window::FitBounds(bounds, work, SIZE{});
+    }
   }
 
   HWND window = CreateWindow(
       window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
-      Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
-      window_width, window_height, nullptr, nullptr, GetModuleHandle(nullptr),
+      bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top,
+      nullptr, nullptr, GetModuleHandle(nullptr),
       this);
 
   if (!window) {
     return false;
   }
 
-  if (center) {
-    RECT bounds{};
-    if (work.right > work.left && GetWindowRect(window, &bounds)) {
-      const int width = bounds.right - bounds.left;
-      const int height = bounds.bottom - bounds.top;
-      const int horizontal_space = work.right - work.left - width;
-      const int vertical_space = work.bottom - work.top - height;
-      const int x = work.left + (horizontal_space > 0 ? horizontal_space / 2 : 0);
-      const int y = work.top + (vertical_space > 0 ? vertical_space / 2 : 0);
-      SetWindowPos(window, nullptr, x, y, 0, 0,
-                   SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-    }
-  }
+  ConstrainToWorkArea();
+  GetWindowRect(window, &placement_.bounds);
+  placement_.work = WorkAreaFor(MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST));
+  placement_.dpi = FlutterDesktopGetDpiForHWND(window);
+  placement_ready_ = true;
 
   UpdateTheme(window);
 
@@ -228,7 +242,11 @@ bool Win32Window::Create(const std::wstring& title,
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, SW_SHOWNORMAL);
+  if (shown_) return IsWindowVisible(window_handle_) != FALSE;
+  shown_ = true;
+  ShowWindow(window_handle_, placement_.maximized ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL);
+  RememberPlacement();
+  return IsWindowVisible(window_handle_) != FALSE;
 }
 
 // static
@@ -258,12 +276,36 @@ Win32Window::MessageHandler(HWND hwnd,
                             LPARAM const lparam) noexcept {
   switch (message) {
     case WM_DESTROY:
+      RememberPlacement();
+      KillTimer(hwnd, kPlacementTimer);
+      if (placement_ready_) shiori::window::SavePlacement(placement_key_, placement_);
+      placement_ready_ = false;
       window_handle_ = nullptr;
       Destroy();
       if (quit_on_close_) {
         PostQuitMessage(0);
       }
       return 0;
+
+    case WM_WINDOWPOSCHANGED:
+      RememberPlacement();
+      break;
+
+    case WM_TIMER:
+      if (wparam == kPlacementTimer) {
+        KillTimer(hwnd, kPlacementTimer);
+        shiori::window::SavePlacement(placement_key_, placement_);
+        return 0;
+      }
+      break;
+
+    case WM_DISPLAYCHANGE:
+      ConstrainToWorkArea();
+      break;
+
+    case WM_SETTINGCHANGE:
+      if (wparam == SPI_SETWORKAREA) ConstrainToWorkArea();
+      break;
 
     // Also sent while a DPI change resizes the window, so the minimum
     // follows the monitor the window is on and its scale.
@@ -318,6 +360,43 @@ void Win32Window::Destroy() {
   }
   if (g_active_window_count == 0) {
     WindowClassRegistrar::GetInstance()->UnregisterWindowClass();
+  }
+}
+
+void Win32Window::RememberPlacement() {
+  if (!placement_ready_ || !shown_ || !window_handle_ || IsIconic(window_handle_)) return;
+  placement_.maximized = IsZoomed(window_handle_) ? 1 : 0;
+  const auto monitor = MonitorFromWindow(window_handle_, MONITOR_DEFAULTTONEAREST);
+  MONITORINFOEXW info{};
+  info.cbSize = sizeof(info);
+  if (!GetMonitorInfoW(monitor, &info)) return;
+  const UINT dpi = FlutterDesktopGetDpiForHWND(window_handle_);
+  if (!placement_.maximized) {
+    if (!GetWindowRect(window_handle_, &placement_.bounds)) return;
+  } else if (shiori::window::ValidPlacement(placement_) &&
+             (placement_.dpi != dpi || !EqualRect(&placement_.work, &info.rcWork))) {
+    // Win+Shift+Arrow can move a maximized window without a normal-size frame.
+    placement_.bounds = shiori::window::RestoreBounds(
+        placement_, info.rcWork, dpi, MinimumWindowSize(window_handle_));
+  }
+  placement_.work = info.rcWork;
+  placement_.dpi = dpi;
+  std::copy(std::begin(info.szDevice), std::end(info.szDevice),
+            std::begin(placement_.monitor));
+  SetTimer(window_handle_, kPlacementTimer, 250, nullptr);
+}
+
+void Win32Window::ConstrainToWorkArea() {
+  if (!window_handle_ || IsIconic(window_handle_) || IsZoomed(window_handle_)) return;
+  RECT bounds{};
+  if (!GetWindowRect(window_handle_, &bounds)) return;
+  const RECT work = WorkAreaFor(MonitorFromWindow(window_handle_, MONITOR_DEFAULTTONEAREST));
+  if (work.right <= work.left || work.bottom <= work.top) return;
+  const RECT fitted = shiori::window::FitBounds(bounds, work, MinimumWindowSize(window_handle_));
+  if (!EqualRect(&bounds, &fitted)) {
+    SetWindowPos(window_handle_, nullptr, fitted.left, fitted.top,
+                 fitted.right - fitted.left, fitted.bottom - fitted.top,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
   }
 }
 

@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include "window_placement.h"
 
 // A class abstraction for a high DPI-aware Win32 Window. Intended to be
 // inherited from by classes that wish to specialize with custom
@@ -25,12 +26,12 @@ class Win32Window {
         : width(width), height(height) {}
   };
 
-  Win32Window();
+  explicit Win32Window(std::wstring placement_key = L"Software\\Shiori\\Reader\\Window");
   virtual ~Win32Window();
 
-  // Creates a window on the monitor nearest |origin|. If |center| is true,
-  // positions it in that monitor's work area before the window is shown.
-  // The size is scaled for the monitor's DPI.
+  // Restores saved placement, or uses the DPI-scaled |size| on the monitor
+  // nearest |origin|. |center| applies only to that first-launch default.
+  // Both paths fit the current work area before the window is shown.
   bool Create(const std::wstring& title, const Point& origin, const Size& size,
               bool center = false);
 
@@ -92,6 +93,13 @@ class Win32Window {
   // Update the window frame's theme to match the app's caption, if set, or
   // else the system theme.
   void UpdateTheme(HWND const window);
+  void RememberPlacement();
+  void ConstrainToWorkArea();
+
+  std::wstring placement_key_;
+  shiori::window::Placement placement_{};
+  bool placement_ready_ = false;
+  bool shown_ = false;
 
   bool quit_on_close_ = false;
 
