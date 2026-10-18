@@ -10,6 +10,7 @@ import 'reader_box.dart';
 import '../reader_inline_images.dart';
 import '../reader_audio.dart' show readerAudioExtent;
 import '../reader_image.dart';
+import '../reader_margin.dart';
 
 /// A cursor in transient chunks; exposed/persisted positions always use Domain.
 final class PageCursor {
@@ -61,6 +62,11 @@ final class ReaderPage {
 
   /// Standalone full-page images center vertically instead of hugging the top.
   final bool centered;
+
+  /// Visual whitespace normalization does not change the page's cursor range.
+  PageCursor get visibleStart => fragments.isEmpty
+      ? start
+      : PageCursor(fragments.first.unit, fragments.first.start);
 }
 
 /// Forward layout measures bounded chunks without a global page count. Cold
@@ -80,8 +86,13 @@ final class PageLayout {
     this.textHeightBehavior,
     this.paragraphSpacing = 16,
     this.columns = 1,
+    this.columnGap = readerColumnGap,
   }) {
-    if (width < 1 || height < 1 || (columns != 1 && columns != 2)) {
+    if (width < 1 ||
+        height < 1 ||
+        (columns != 1 && columns != 2) ||
+        columnGap < 0 ||
+        !columnGap.isFinite) {
       throw ArgumentError('Page needs positive dimensions');
     }
   }
@@ -91,6 +102,7 @@ final class PageLayout {
   final TextStyle style;
   final double paragraphSpacing;
   final int columns;
+  final double columnGap;
   final TextScaler scaler;
   final TextDirection direction;
   final Locale? locale;
@@ -737,10 +749,16 @@ final class PageLayout {
 
   double _objectHeight(int unit) {
     final at = index.chunks[unit].blockIndex, block = index.content.blocks[at];
+    final objectWidth = columns == 2 && unit == _standaloneImageUnit
+        ? (width * columns + (columns - 1) * columnGap).clamp(
+            0.0,
+            readerMaxPageWidth,
+          )
+        : width;
     final edges = readerBoxEdges(
       index.content,
       at,
-      width: width,
+      width: objectWidth,
       style: style,
       scaler: scaler,
       pageHeight: height,
@@ -750,7 +768,7 @@ final class PageLayout {
               imageHeights[block.media] ??
               readerImageForColumn(
                 block,
-                width: width,
+                width: objectWidth,
                 height: height,
                 style: style,
                 scaler: scaler,
@@ -779,7 +797,7 @@ final class PageLayout {
         fragments.single.height,
       );
 
-  bool _centerableImage(ContentBlock block) =>
+  static bool _centerableImage(ContentBlock block) =>
       block is ImageBlock &&
       _neutralImageBox(block.box, page: block.sizing?.role == ImageRole.page) &&
       _neutralImageBox(
@@ -789,7 +807,7 @@ final class PageLayout {
 
   // Zero edges and a 100% cap are neutral. Only confirmed page images may also
   // fill their container; real width limits and decoration keep their placement.
-  bool _neutralImageBox(BlockBox? box, {required bool page}) {
+  static bool _neutralImageBox(BlockBox? box, {required bool page}) {
     if (box == null) return true;
     bool zeroInsets(BoxInsets? insets) => [
       insets?.top,
@@ -864,6 +882,14 @@ final class PageLayout {
   }
 
   late final int? _standaloneImageUnit = () {
+    final at = standaloneImageBlockIndex(index.content);
+    return at == null
+        ? null
+        : index.chunks.indexWhere((chunk) => chunk.blockIndex == at);
+  }();
+
+  /// Shared with image measurement so a dedicated page has one geometry policy.
+  static int? standaloneImageBlockIndex(ChapterContent content) {
     // Blank spacing may be normalized on a dedicated image page, but a box
     // with painted content is not whitespace even when its text is empty.
     bool unpainted(BlockBox? box) =>
@@ -884,12 +910,12 @@ final class PageLayout {
                   side.width.value == 0,
             );
     int? imageAt;
-    for (var at = 0; at < index.content.blocks.length; at++) {
-      final block = index.content.blocks[at];
+    for (var at = 0; at < content.blocks.length; at++) {
+      final block = content.blocks[at];
       if (block is ImageBlock) {
         if (imageAt != null ||
             (block.sizing?.role != ImageRole.page &&
-                !(block.sizing == null && index.content.blocks.length == 1)) ||
+                !(block.sizing == null && content.blocks.length == 1)) ||
             !_centerableImage(block)) {
           return null;
         }
@@ -904,9 +930,8 @@ final class PageLayout {
         return null;
       }
     }
-    if (imageAt == null) return null;
-    return index.chunks.indexWhere((chunk) => chunk.blockIndex == imageAt);
-  }();
+    return imageAt;
+  }
 
   ReaderPage? backward(PageCursor until) {
     if (columns == 1 &&

@@ -457,7 +457,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       return (
         position: number == _restorePage && _restoreAnchor != null
             ? _restoreAnchor!
-            : _layout!.position(page.start),
+            : _layout!.position(page.visibleStart),
         last: page.end.unit >= _layout!.index.chunks.length,
       );
     }
@@ -605,7 +605,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
           _seeking = false;
           if (latest != null) {
             _pages[0] = latest;
-            _position = _layout!.position(latest.start);
+            _position = _layout!.position(latest.visibleStart);
             if (latest.end.unit >= _layout!.index.chunks.length) _last = 0;
           }
         }
@@ -835,7 +835,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     if (page == null) return;
     _position = _current == _restorePage && _restoreAnchor != null
         ? _restoreAnchor
-        : _layout!.position(page.start);
+        : _layout!.position(page.visibleStart);
     widget.onPosition?.call(
       _position!,
       page.end.unit >= _layout!.index.chunks.length,
@@ -865,6 +865,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
       final columnWidth =
           (constraints.maxWidth - (widget.columns - 1) * widget.columnGap) /
           widget.columns;
+      final standaloneImageAt = PageLayout.standaloneImageBlockIndex(
+        widget.content,
+      );
       final signature = (
         constraints.maxWidth,
         constraints.maxHeight,
@@ -889,7 +892,9 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                 widget.imageHeights[block.media] ??
                 readerImageForColumn(
                   block,
-                  width: columnWidth,
+                  width: widget.columns == 2 && blockIndex == standaloneImageAt
+                      ? constraints.maxWidth.clamp(0.0, readerMaxPageWidth)
+                      : columnWidth,
                   height: constraints.maxHeight,
                   style: textStyle,
                   scaler: scaler,
@@ -922,6 +927,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
             index: index,
             width: columnWidth,
             columns: widget.columns,
+            columnGap: widget.columnGap,
             height: constraints.maxHeight,
             style: textStyle,
             locale: locale,
@@ -977,7 +983,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                   first.end.unit >= _layout!.index.chunks.length)) {
             _seeking = false;
             _pages[0] = first;
-            _position = _layout!.position(first.start);
+            _position = _layout!.position(first.visibleStart);
             _readyAfterFrame(epoch);
           } else {
             _seeking = true;

@@ -51,6 +51,7 @@ import 'epub_layout_page.dart';
 import '../../domain/local_chapter_progress.dart';
 import 'reader_logical_progress.dart';
 import 'viewport/paged_reader_viewport.dart';
+import 'viewport/page_layout.dart';
 import 'viewport/page_turn.dart';
 
 typedef _ProgressText = ({String? percent, bool document});
@@ -1641,13 +1642,18 @@ class _ReaderContentViewState extends State<ReaderContentView>
     final style = layout.bodyStyle;
     final columnWidth =
         (bounds.maxWidth - (columns - 1) * readerColumnGap) / columns;
+    final standaloneImageAt = PageLayout.standaloneImageBlockIndex(
+      widget.content,
+    );
     final imageIndexes = <String, int>{};
     for (final (index, block) in widget.content.blocks.indexed) {
       if (block is ImageBlock) imageIndexes[block.blockKey] = index;
     }
     ReaderImageGeometry extent(ImageBlock block) => readerImageForColumn(
       block,
-      width: columnWidth,
+      width: columns == 2 && imageIndexes[block.blockKey] == standaloneImageAt
+          ? bounds.maxWidth.clamp(0.0, readerMaxPageWidth)
+          : columnWidth,
       height: bounds.maxHeight,
       style: style,
       scaler: MediaQuery.textScalerOf(context),
