@@ -407,6 +407,18 @@ Map<dom.Element, Map<String, String>> epubTextStyles(
   String? Function(String base, String href)? resolveAsset,
 }) {
   final values = <dom.Element, Map<String, String>>{};
+  // HTML dimensions are presentation hints. CSS, including auto, overrides
+  // them; neither source changes the raster's intrinsic dimensions.
+  for (final image in doc.querySelectorAll('img')) {
+    for (final name in ['width', 'height']) {
+      final value = image.attributes[name]?.trim();
+      if (value != null &&
+          RegExp(r'^\d+(?:\.\d+)?%?$').hasMatch(value) &&
+          epubLayoutLength(value) != null) {
+        (values[image] ??= {})[name] = value;
+      }
+    }
+  }
   final important = <dom.Element, Set<String>>{};
   final rules = <(String, String, int)>[];
   final sources = trace == null && resolveAsset == null

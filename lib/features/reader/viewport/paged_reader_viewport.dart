@@ -883,18 +883,20 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         widget.columnGap,
       );
       final imageGeometry = [
-        for (final block in widget.content.blocks.whereType<ImageBlock>())
-          widget.imageExtent?.call(block) ??
-              widget.imageHeights[block.media] ??
-              readerImageForColumn(
-                block,
-                width: columnWidth,
-                height: constraints.maxHeight,
-                style: textStyle,
-                scaler: scaler,
-                direction: direction,
-                content: widget.content,
-              ).height,
+        for (final (blockIndex, block) in widget.content.blocks.indexed)
+          if (block is ImageBlock)
+            widget.imageExtent?.call(block) ??
+                widget.imageHeights[block.media] ??
+                readerImageForColumn(
+                  block,
+                  width: columnWidth,
+                  height: constraints.maxHeight,
+                  style: textStyle,
+                  scaler: scaler,
+                  direction: direction,
+                  content: widget.content,
+                  blockIndex: blockIndex,
+                ).height,
       ];
       final changed =
           _signature != signature || !listEquals(_imageGeometry, imageGeometry);

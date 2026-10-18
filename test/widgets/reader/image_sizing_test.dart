@@ -9,11 +9,13 @@ import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/reader_image.dart';
+import 'package:shiori/features/reader/reader_margin.dart';
 import 'package:shiori/features/reader/reader_image_preview.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/shared/source_image.dart';
 import 'settings_test.dart' show Store;
+import '../../data/local/epub_image_sizing_test.dart' as sizing show book;
 
 class Images implements ImageRepository {
   Images(this.bytes);
@@ -99,6 +101,77 @@ ChapterContent content({bool unknown = false, bool axes = false}) =>
     );
 
 void main() {
+  for (final wide in [false, true]) {
+    testWidgets(
+      'parsed fill page and HTML ornament paint their measured size ($wide)',
+      (tester) async {
+        tester.view.physicalSize = Size(wide ? 1280 : 500, 700);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final store = Store()..value = ReaderSettings(controlsHintSeen: true);
+        final parsed = sizing.book(
+          '<div style="width:100%"><img src="../images/ornament.png"/></div>',
+          size: 512,
+        );
+        final c = parsed.content.chapters.first;
+        final images = Images(fixturePng(512, 512, 2));
+        final controller = PagedReaderController();
+        await tester.pumpWidget(
+          app(
+            ReaderContentView(
+              content: c,
+              images: images,
+              settings: store,
+              viewportController: controller,
+            ),
+          ),
+        );
+        await frames(tester);
+        final picture = tester.getRect(find.byType(RawImage));
+        final viewport = tester.getRect(find.byType(PagedReaderViewport));
+        expect(picture.center.dx, closeTo(viewport.center.dx, .01));
+        expect(picture.center.dy, closeTo(viewport.center.dy, .01));
+        expect(picture.width, greaterThan(300));
+        expect(picture.width, closeTo(picture.height, .01));
+        expect(controller.inspectDisplayedPage()!.page.centered, isTrue);
+        final ornament = sizing
+            .book(
+              '<p>Before</p><div style="text-align:center"><img width="40" height="20" src="../images/ornament.png"/></div><p>After</p>',
+              size: 512,
+            )
+            .content
+            .chapters
+            .first;
+        await tester.pumpWidget(
+          app(
+            ReaderContentView(
+              key: const ValueKey('ornament'),
+              content: ornament,
+              images: images,
+              settings: store,
+            ),
+          ),
+        );
+        await frames(tester);
+        expect(tester.getSize(find.byType(RawImage)), const Size(40, 20));
+        final reader = tester.widget<PagedReaderViewport>(
+          find.byType(PagedReaderViewport),
+        );
+        final area = tester.getRect(find.byType(PagedReaderViewport));
+        final columnWidth =
+            (area.width - (reader.columns - 1) * readerColumnGap) /
+            reader.columns;
+        expect(
+          tester.getRect(find.byType(RawImage)).center.dx,
+          closeTo(area.left + columnWidth / 2, .01),
+        );
+        expect(tester.widget<RawImage>(find.byType(RawImage)).fit, BoxFit.fill);
+        await tester.pumpWidget(const SizedBox());
+        await frames(tester);
+        expect(images.closed, images.loads);
+      },
+    );
+  }
   for (final dpr in [1.0, 2.0]) {
     testWidgets(
       'Reader paints natural pixels, caption and preview without DPR sizing ($dpr)',

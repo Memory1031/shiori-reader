@@ -68,15 +68,20 @@ void main() {
     }
   }
 
-  for (final selector in ['.cover', 'img']) {
+  for (final (selector, property) in [
+    ('.cover', 'max-width'),
+    ('img', 'max-width'),
+    ('.cover', 'width'),
+    ('img', 'width'),
+  ]) {
     for (final columns in [1, 2]) {
       testWidgets(
-        'stored responsive EPUB cover on $selector centers in $columns columns',
+        'stored responsive EPUB cover with $property on $selector centers in $columns columns',
         (tester) async {
           final files = epubFiles();
           files['OPS/text/a.xhtml'] = utf8.encode(
             '<html><head><style>'
-            '$selector {max-width:100%;margin:0;padding:0;text-align:center;}'
+            '$selector {$property:100%;margin:0;padding:0;text-align:center;}'
             '</style></head><body><div class="cover">'
             '<img src="../images/%E6%98%9F%20%E7%A9%BA.png"/>'
             '</div></body></html>',
@@ -91,8 +96,14 @@ void main() {
           );
           final image = content.blocks.single as ImageBlock;
           final box = selector == '.cover' ? image.box! : image.layout!;
-          expect(box.maxWidthFraction, 1);
-          expect(box.maxWidthLength, LayoutLength(1, LayoutUnit.fraction));
+          expect(
+            property == 'width' ? box.widthFraction : box.maxWidthFraction,
+            1,
+          );
+          expect(
+            property == 'width' ? box.widthLength : box.maxWidthLength,
+            LayoutLength(1, LayoutUnit.fraction),
+          );
           final controller = PagedReaderController();
           await tester.pumpWidget(
             MaterialApp(

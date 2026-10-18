@@ -32,6 +32,49 @@ ParsedEpub book(
 }
 
 void main() {
+  test('HTML dimensions are display hints, not intrinsic raster dimensions', () {
+    final result = book(
+      '<p>Before</p><img width="40" height="20" src="../images/ornament.png"/><p>After</p>',
+      size: 512,
+    );
+    final c = result.content.chapters.first;
+    final b = c.blocks.whereType<ImageBlock>().single;
+    expect((b.width, b.height), (512, 512));
+    expect(b.layout!.widthLength, LayoutLength(40));
+    expect(b.sizing!.height, LayoutLength(20));
+    expect(b.sizing!.role, ImageRole.flow);
+    expect(ChapterContent.fromJson(jsonDecode(jsonEncode(c.toJson()))), c);
+  });
+  test('CSS overrides HTML hints per axis, including auto and mixed units', () {
+    ImageBlock get(String attributes, {String css = ''}) => book(
+      '<p>Before</p><img $attributes src="../images/ornament.png"/><p>After</p>',
+      css: css,
+      size: 512,
+    ).content.chapters.first.blocks.whereType<ImageBlock>().single;
+    final sheet = get('width="40" height="20"', css: 'img{width:60px}');
+    expect(sheet.layout!.widthLength, LayoutLength(60));
+    expect(sheet.sizing!.height, LayoutLength(20));
+    final inline = get('width="40" height="20" style="width:80px;height:auto"');
+    expect(inline.layout!.widthLength, LayoutLength(80));
+    expect(inline.sizing!.height, isNull);
+    final reset = get('width="40" height="20" style="width:auto;height:auto"');
+    expect(reset.layout?.widthLength, isNull);
+    expect(reset.sizing!.height, isNull);
+    final mixed = get('width="40" height="10" style="width:2em"');
+    expect(mixed.layout!.widthLength, LayoutLength(2, LayoutUnit.em));
+    expect(mixed.sizing!.height, LayoutLength(10));
+    final percent = get('width="50%"');
+    expect(percent.layout!.widthLength, LayoutLength(.5, LayoutUnit.fraction));
+    expect(percent.sizing!.height, isNull);
+    final height = get('height="40"');
+    expect(height.layout?.widthLength, isNull);
+    expect(height.sizing!.height, LayoutLength(40));
+    for (final invalid in ['-1', 'NaN', '40px', '2em', '999999999']) {
+      final b = get('width="$invalid" height="$invalid"');
+      expect(b.layout?.widthLength, isNull, reason: invalid);
+      expect(b.sizing!.height, isNull, reason: invalid);
+    }
+  });
   test(
     'unscaled block ornament retains alignment, margins, anchors and links',
     () {

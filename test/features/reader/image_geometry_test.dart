@@ -44,6 +44,7 @@ ReaderImageGeometry geometry(
   scaler: scaler,
   direction: TextDirection.ltr,
   content: chapter([block]),
+  blockIndex: 0,
   knownSize: knownSize,
 );
 PageLayout layout(ChapterContent content, {int columns = 2}) => PageLayout(
@@ -58,6 +59,106 @@ PageLayout layout(ChapterContent content, {int columns = 2}) => PageLayout(
 );
 
 void main() {
+  test(
+    'page role accepts 100% fill but preserves actual authored constraints',
+    () {
+      for (final columns in [1, 2]) {
+        for (final local in [false, true]) {
+          for (final box in [
+            BlockBox(group: 0, widthFraction: 1),
+            BlockBox(
+              group: 0,
+              widthLength: LayoutLength(1, LayoutUnit.fraction),
+            ),
+            BlockBox(group: 0, maxWidthFraction: 1),
+          ]) {
+            final c = chapter([
+              image(
+                width: 300,
+                height: 180,
+                sizing: ImageSizing(role: ImageRole.page),
+                box: local ? null : box,
+                layout: local ? box : null,
+              ),
+            ]);
+            final l = layout(c, columns: columns);
+            final p = l.forward(const PageCursor(0, 0))!;
+            expect(p.centered, isTrue);
+            expect(p.fullWidth, columns == 2);
+            final back = l.backward(p.end)!;
+            expect((back.centered, back.fullWidth), (p.centered, p.fullWidth));
+          }
+          for (final box in [
+            BlockBox(group: 0, width: 200),
+            BlockBox(group: 0, widthFraction: .5),
+            BlockBox(group: 0, maxWidth: 200),
+            BlockBox(
+              group: 0,
+              widthFraction: 1,
+              margins: BoxInsets(top: LayoutLength(12)),
+            ),
+            BlockBox(group: 0, widthFraction: 1, borderWidth: 1),
+            BlockBox(group: 0, widthFraction: 1, padding: 10),
+          ]) {
+            final p = layout(
+              chapter([
+                image(
+                  sizing: ImageSizing(role: ImageRole.page),
+                  box: local ? null : box,
+                  layout: local ? box : null,
+                ),
+              ]),
+              columns: columns,
+            ).forward(const PageCursor(0, 0))!;
+            expect((p.centered, p.fullWidth), (false, false));
+          }
+        }
+      }
+    },
+  );
+  test('known indexes retain grouped edges across an image-heavy chapter', () {
+    final c = chapter(
+      List.generate(
+        2048,
+        (i) => ImageBlock(
+          media: fixtureMediaRef(0),
+          width: 32,
+          height: 32,
+          sizing: ImageSizing(),
+          box: BlockBox(
+            group: i ~/ 2,
+            margins: BoxInsets(top: LayoutLength(8), bottom: LayoutLength(12)),
+          ),
+        ),
+      ),
+    );
+    final l = layout(c, columns: 1);
+    var cursor = const PageCursor(0, 0);
+    var count = 0;
+    while (true) {
+      final p = l.forward(cursor);
+      if (p == null) break;
+      for (final fragment in p.fragments) {
+        final at = l.index.chunks[fragment.unit].blockIndex;
+        final b = c.blocks[at] as ImageBlock;
+        final g = readerImageForColumn(
+          b,
+          width: 600,
+          height: 600,
+          style: const TextStyle(fontSize: 20, height: 1),
+          scaler: TextScaler.noScaling,
+          direction: TextDirection.ltr,
+          content: c,
+          blockIndex: at,
+        );
+        expect(g.size, const Size(32, 32));
+        expect(fragment.height, at.isEven ? 40 : 44);
+        count++;
+      }
+      cursor = p.end;
+    }
+    expect(count, 2048);
+  });
   test(
     'inline authored caps use the same scaled and unscaled span geometry',
     () {

@@ -124,6 +124,7 @@ ReaderImageGeometry readerImageForColumn(
   required TextScaler scaler,
   required TextDirection direction,
   required ChapterContent content,
+  required int blockIndex,
   Size? knownSize,
 }) {
   final boxes = readerBlockBoxes(
@@ -135,7 +136,7 @@ ReaderImageGeometry readerImageForColumn(
   );
   final edges = readerBoxEdges(
     content,
-    content.blocks.indexOf(block),
+    blockIndex,
     width: width,
     style: style,
     scaler: scaler,

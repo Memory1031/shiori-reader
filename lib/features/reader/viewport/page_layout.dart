@@ -756,6 +756,7 @@ final class PageLayout {
                 scaler: scaler,
                 direction: direction,
                 content: index.content,
+                blockIndex: at,
               ).height
         : block is AudioBlock
         ? readerAudioExtent
@@ -780,12 +781,15 @@ final class PageLayout {
 
   bool _centerableImage(ContentBlock block) =>
       block is ImageBlock &&
-      _neutralImageBox(block.box) &&
-      _neutralImageBox(block.layout);
+      _neutralImageBox(block.box, page: block.sizing?.role == ImageRole.page) &&
+      _neutralImageBox(
+        block.layout,
+        page: block.sizing?.role == ImageRole.page,
+      );
 
-  // Zero edges and a responsive max-width of 100% do not change image geometry.
-  // Accept stored forms of both without overriding authored sizing/decoration.
-  bool _neutralImageBox(BlockBox? box) {
+  // Zero edges and a 100% cap are neutral. Only confirmed page images may also
+  // fill their container; real width limits and decoration keep their placement.
+  bool _neutralImageBox(BlockBox? box, {required bool page}) {
     if (box == null) return true;
     bool zeroInsets(BoxInsets? insets) => [
       insets?.top,
@@ -794,11 +798,15 @@ final class PageLayout {
       insets?.left,
     ].every((side) => side == null || side.value == 0);
     final borders = box.borders;
+    final centeredPage = page && box.centered && box.autoLeft && box.autoRight;
     return box.width == null &&
         box.maxWidth == null &&
-        box.widthFraction == null &&
+        (box.widthFraction == null || page && box.widthFraction == 1) &&
         (box.maxWidthFraction == null || box.maxWidthFraction == 1) &&
-        box.widthLength == null &&
+        (box.widthLength == null ||
+            page &&
+                box.widthLength!.unit == LayoutUnit.fraction &&
+                box.widthLength!.value == 1) &&
         (box.maxWidthLength == null ||
             box.maxWidthLength!.unit == LayoutUnit.fraction &&
                 box.maxWidthLength!.value == 1) &&
@@ -808,9 +816,9 @@ final class PageLayout {
         box.backgroundImage == null &&
         (box.radius == null || box.radius!.value == 0) &&
         box.decorationColumns == null &&
-        !box.centered &&
-        !box.autoLeft &&
-        !box.autoRight &&
+        (!box.centered || centeredPage) &&
+        (!box.autoLeft || centeredPage) &&
+        (!box.autoRight || centeredPage) &&
         box.fontScale == 1 &&
         !box.headingRelative &&
         zeroInsets(box.margins) &&

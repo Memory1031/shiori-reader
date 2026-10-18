@@ -1641,6 +1641,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
     final style = layout.bodyStyle;
     final columnWidth =
         (bounds.maxWidth - (columns - 1) * readerColumnGap) / columns;
+    final imageIndexes = <String, int>{};
+    for (final (index, block) in widget.content.blocks.indexed) {
+      if (block is ImageBlock) imageIndexes[block.blockKey] = index;
+    }
     ReaderImageGeometry extent(ImageBlock block) => readerImageForColumn(
       block,
       width: columnWidth,
@@ -1649,6 +1653,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       scaler: MediaQuery.textScalerOf(context),
       direction: Directionality.of(context),
       content: widget.content,
+      blockIndex: imageIndexes[block.blockKey]!,
       knownSize: _sizes[block.media],
     );
     Widget image(BuildContext context, ImageBlock block) {

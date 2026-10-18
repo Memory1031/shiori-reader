@@ -1875,7 +1875,11 @@ class EpubParser {
           final size = imageSizes[img];
           final authoredHeight = em(styles[node]?['height']);
           final authoredWidth = em(styles[node]?['width']);
+          bool inlineAxis(String? value, double? length) =>
+              value == null || value == 'auto' || length != null;
           if (size != null &&
+              inlineAxis(styles[node]?['height'], authoredHeight) &&
+              inlineAxis(styles[node]?['width'], authoredWidth) &&
               (authoredHeight != null || authoredWidth != null)) {
             final h =
                 authoredHeight ?? authoredWidth! * size.height / size.width;
@@ -1953,7 +1957,19 @@ class EpubParser {
               ),
               box: activeBox,
               layout: epubBlockBox(
-                styles[node] ?? const {},
+                {
+                  // A bounded inline image still follows its parent's text
+                  // alignment after it becomes a native image block.
+                  if (imageAlignment == 'center' &&
+                      epubLayoutLength(css['width']) != null &&
+                      css['margin-left'] == null &&
+                      css['margin-right'] == null &&
+                      !{'block', 'flex', 'grid'}.contains(css['display'])) ...{
+                    'margin-left': 'auto',
+                    'margin-right': 'auto',
+                  },
+                  ...css,
+                },
                 0,
                 richStyles[node] ?? const EpubRichStyle(),
                 allowEdges: true,
