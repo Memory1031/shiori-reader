@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import plistlib
 import shutil
+import signal
 import sqlite3
 import subprocess
 import sys
@@ -53,6 +54,7 @@ def main():
         releases = []
         try:
             for version, build in [('0.0.1', 21), ('0.0.2', 22)]:
+                print('Building and packaging test application ' + version, flush=True)
                 tag = 'v' + version
                 release = identity(f'version: {version}+{build}', tag, commit)
                 configs[0].write_bytes(encoded(dict(schemaVersion=1, identity=release, publicKey=key)))
@@ -87,7 +89,7 @@ def test_upgrade(stage, output, releases, secret, key):
 let action = CommandLine.arguments[1], value = CommandLine.arguments[2]
 if action == "find" {
   for app in NSWorkspace.shared.runningApplications {
-    if app.bundleURL?.resolvingSymlinksInPath().path == value && app.isFinishedLaunching {
+    if app.bundleURL?.resolvingSymlinksInPath().path == value && !app.isTerminated {
       print(app.processIdentifier); exit(0)
     }
   }
@@ -130,11 +132,30 @@ exit(app.isFinishedLaunching ? 0 : 1)
         result = subprocess.run([str(lifecycle), 'find', str(install)], capture_output=True, text=True)
         return int(result.stdout.strip()) if result.returncode == 0 else None
 
+    def database_ready():
+        if not database.exists(): return False
+        try:
+            with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as db:
+                return db.execute('pragma user_version').fetchone()[0] == 9
+        except sqlite3.Error:
+            return False
+
+    def diagnostics(pid):
+        (output / 'startup-state.json').write_bytes(encoded(dict(pid=pid, database=str(database),
+            databaseExists=database.exists(), supportFiles=[str(p.relative_to(users.parent))
+                for p in users.parent.rglob('*') if p.is_file()])))
+        if pid:
+            with (output / 'application-sample.log').open('w') as log:
+                subprocess.run(['sample', str(pid), '2'], stdout=log, stderr=subprocess.STDOUT, timeout=15)
+
     old = None
-    old_log = (output / 'old-application.log').open('w')
+    old_pid = None
     try:
-        old = subprocess.Popen([str(install / 'Contents/MacOS/Shiori')], stdout=old_log, stderr=subprocess.STDOUT)
-        wait_for(lambda: find() == old.pid and database.exists(), 'original app and database ready')
+        print('Launching installed application through Launch Services', flush=True)
+        old = subprocess.Popen(['open', '-n', '-W', '--stdout', str(output / 'old-application.log'),
+            '--stderr', str(output / 'old-application.log'), str(install)])
+        old_pid = wait_for(find, 'original app registered')
+        wait_for(database_ready, 'original application database initialized')
         before = snapshot()
         release, dmg = releases[1]
         assets = [dict(platform=p, name=f'shiori-reader-{release["tag"]}-{suffix}', size=1,
@@ -149,21 +170,23 @@ exit(app.isFinishedLaunching ? 0 : 1)
         assert not (workspace / 'volume').exists()
         handoff = workspace / 'handoff'; shutil.copy2(helper, handoff)
         with (output / 'updater.log').open('w') as log:
-            updater = subprocess.Popen([str(handoff), 'run', str(install), str(old.pid)], stdout=log, stderr=subprocess.STDOUT)
+            updater = subprocess.Popen([str(handoff), 'run', str(install), str(old_pid)], stdout=log, stderr=subprocess.STDOUT)
             try:
                 def started():
                     path = workspace / 'started.json'
                     if not path.exists(): return False
                     state = json.loads(path.read_bytes())
-                    return state.get('pid') == updater.pid and state.get('parent') == old.pid
+                    return state.get('pid') == updater.pid and state.get('parent') == old_pid
                 wait_for(started, 'native handoff')
-                run(lifecycle, 'quit', old.pid)
+                print('Requesting normal application exit and waiting for DMG replacement', flush=True)
+                run(lifecycle, 'quit', old_pid)
                 assert old.wait(timeout=30) == 0
                 assert updater.wait(timeout=120) == 0
             finally:
                 if updater.poll() is None: updater.kill(); updater.wait(timeout=10)
         new_pid = wait_for(find, 'updated app launched')
-        assert new_pid != old.pid
+        assert new_pid != old_pid
+        wait_for(database_ready, 'updated application database initialized')
         info = plistlib.loads((install / 'Contents/Info.plist').read_bytes())
         assert info['CFBundleShortVersionString'] == release['version'] and str(info['CFBundleVersion']) == str(release['build'])
         run('codesign', '--verify', '--deep', '--strict', install)
@@ -174,11 +197,22 @@ exit(app.isFinishedLaunching ? 0 : 1)
         (output / 'result.json').write_bytes(encoded(dict(fromBuild=releases[0][0]['build'], toBuild=release['build'],
             architecture=os.uname().machine, legacyWorkspaceMigrated=True, signedDmgUpgrade=True,
             applicationRelaunched=True, databaseRowsPreserved=True, userFilePreserved=True, mountCleaned=True)))
+    except BaseException:
+        diagnostics(find() or old_pid)
+        raise
     finally:
         current = find()
-        if current: run(lifecycle, 'quit', current)
-        if old is not None and old.poll() is None: old.wait(timeout=30)
-        old_log.close()
+        if current:
+            subprocess.run([str(lifecycle), 'quit', str(current)], timeout=10)
+            try:
+                wait_for(lambda: find() is None, 'test application cleanup', timeout=10)
+            except RuntimeError:
+                # This PID was obtained from the unique disposable bundle path.
+                os.kill(current, signal.SIGKILL)
+        if old is not None and old.poll() is None:
+            try: old.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                old.kill(); old.wait(timeout=10)
 
 
 if __name__ == '__main__':
