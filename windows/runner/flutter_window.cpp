@@ -10,6 +10,7 @@
 #include "flutter/generated_plugin_registrant.h"
 #include "launch_view.h"
 #include "utils.h"
+#include "single_instance.h"
 #include "../update/installation_mode.h"
 
 namespace {
@@ -99,6 +100,8 @@ bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
   }
+  if (!SetPropW(GetHandle(), SingleInstance::kWindowProperty,
+                reinterpret_cast<HANDLE>(1))) return false;
 
   RECT frame = GetClientArea();
 
@@ -183,6 +186,10 @@ bool FlutterWindow::OnCreate() {
       result->Success(flutter::EncodableValue(true));
     } else if (call.method_name() == "startUpdater") {
       result->Success(flutter::EncodableValue(StartUpdater()));
+    } else if (call.method_name() == "setExitPending") {
+      const auto* pending = call.arguments() ? std::get_if<bool>(call.arguments()) : nullptr;
+      if (pending) exit_pending_ = *pending;
+      result->Success(flutter::EncodableValue(pending != nullptr));
     } else if (call.method_name() == "exit") {
       // Normal window close, after Dart has flushed and closed its stores.
       result->Success();
@@ -236,6 +243,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  RemovePropW(GetHandle(), SingleInstance::kWindowProperty);
   if (launch_view_) {
     DestroyWindow(launch_view_);
     launch_view_ = nullptr;
@@ -256,6 +264,13 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_CLOSE) exit_pending_ = true;
+  if (message == SingleInstance::ActivationMessage()) {
+    if (exit_pending_) return 2;
+    ShowWindow(hwnd, IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);
+    SetForegroundWindow(hwnd);
+    return 1;
+  }
   if (message == WM_SIZE && launch_view_) {
     RECT bounds = GetClientArea();
     MoveWindow(launch_view_, 0, 0, bounds.right, bounds.bottom, TRUE);

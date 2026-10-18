@@ -41,7 +41,8 @@ T GetArgument(const std::string arg, const EncodableValue* args, T fallback) {
 
 class AudioplayersWindowsPlugin : public Plugin {
  public:
-  static void RegisterWithRegistrar(PluginRegistrarWindows* registrar);
+  static void RegisterWithRegistrar(PluginRegistrarWindows* registrar,
+                                   FlutterDesktopPluginRegistrarRef nativeRegistrar);
 
   AudioplayersWindowsPlugin();
 
@@ -52,6 +53,7 @@ class AudioplayersWindowsPlugin : public Plugin {
   std::map<std::string, std::unique_ptr<AudioPlayer>> audioPlayers;
 
   BinaryMessenger* binaryMessenger;
+  FlutterDesktopMessengerRef nativeMessenger = nullptr;
   std::unique_ptr<MethodChannel<EncodableValue>> methods{};
   std::unique_ptr<MethodChannel<EncodableValue>> globalMethods{};
 
@@ -72,7 +74,7 @@ class AudioplayersWindowsPlugin : public Plugin {
       std::unique_ptr<MethodResult<EncodableValue>> result);
 
   void CreatePlayer(std::string playerId);
-  void DisposePlayers();
+  void DisposePlayers(bool unregister = true);
 
   AudioPlayer* GetPlayer(std::string playerId);
 
@@ -81,10 +83,13 @@ class AudioplayersWindowsPlugin : public Plugin {
 
 // static
 void AudioplayersWindowsPlugin::RegisterWithRegistrar(
-    PluginRegistrarWindows* registrar) {
+    PluginRegistrarWindows* registrar,
+    FlutterDesktopPluginRegistrarRef nativeRegistrar) {
   auto plugin = std::make_unique<AudioplayersWindowsPlugin>();
 
   plugin->binaryMessenger = registrar->messenger();
+  plugin->nativeMessenger = FlutterDesktopMessengerAddRef(
+      FlutterDesktopPluginRegistrarGetMessenger(nativeRegistrar));
 
   plugin->methods = std::make_unique<MethodChannel<EncodableValue>>(
       plugin->binaryMessenger, "xyz.luan/audioplayers",
@@ -122,18 +127,24 @@ AudioplayersWindowsPlugin::AudioplayersWindowsPlugin()
                       audioplayers_windows::PlatformThreadDispatcher>()) {}
 
 AudioplayersWindowsPlugin::~AudioplayersWindowsPlugin() {
-  DisposePlayers();
-  globalEventChannel->SetStreamHandler(nullptr);
+  eventDispatcher->Shutdown();
+  // Engine destruction detaches the messenger before destroying plugins.
+  // Channel registration is valid only while that engine is still available.
+  const bool available = FlutterDesktopMessengerIsAvailable(nativeMessenger);
+  DisposePlayers(available);
+  if (available) globalEventChannel->SetStreamHandler(nullptr);
   globalEventChannel.reset();
   globalEvents = nullptr;
-  eventDispatcher->Shutdown();
+  FlutterDesktopMessengerRelease(nativeMessenger);
 }
 
-void AudioplayersWindowsPlugin::DisposePlayers() {
+void AudioplayersWindowsPlugin::DisposePlayers(bool unregister) {
   for (const auto& entry : audioPlayers) entry.second->Dispose();
   audioPlayers.clear();
-  for (const auto& entry : playerEventChannels) {
-    entry.second->SetStreamHandler(nullptr);
+  if (unregister) {
+    for (const auto& entry : playerEventChannels) {
+      entry.second->SetStreamHandler(nullptr);
+    }
   }
   playerEventChannels.clear();
 }
@@ -343,7 +354,7 @@ void AudioplayersWindowsPluginRegisterWithRegistrar(
 
   if (plugin_registrar) {
     std::cout.flush();
-    AudioplayersWindowsPlugin::RegisterWithRegistrar(plugin_registrar);
+    AudioplayersWindowsPlugin::RegisterWithRegistrar(plugin_registrar, registrar);
   } else {
     std::cerr
         << "====== Audioplayers: Failed to get plugin registrar from manager"

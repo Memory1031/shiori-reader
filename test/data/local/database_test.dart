@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/local/database/user_database.dart';
@@ -8,6 +9,41 @@ import 'package:shiori/data/local/files/app_paths.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 
 void main() {
+  test('startup waits for a retiring owner without losing user data', () async {
+    final temp = await Directory.systemTemp.createTemp('shiori-reopen-');
+    final paths = AppPaths(
+      support: temp,
+      temporary: temp,
+      environment: StorageEnvironment.development,
+    );
+    final first =
+        (await LocalDatabases.open(paths) as Success<LocalDatabases>).value;
+    LocalDatabases? second;
+    Future<void>? closing;
+    final release = Timer(const Duration(milliseconds: 300), () {
+      closing = first.close();
+    });
+    try {
+      await first.users.customStatement(
+        "INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES('s','n',4,7)",
+      );
+      final result = await LocalDatabases.open(paths);
+      expect(result, isA<Success<LocalDatabases>>());
+      second = (result as Success<LocalDatabases>).value;
+      expect(
+        (await second.users
+                .customSelect('SELECT generation FROM progress_sessions')
+                .getSingle())
+            .read<int>('generation'),
+        4,
+      );
+    } finally {
+      release.cancel();
+      await (closing ?? first.close());
+      await second?.close();
+      await temp.delete(recursive: true);
+    }
+  });
   test('v1 tables, indexes, constraints and user/cache separation', () async {
     final users = UserDatabase(NativeDatabase.memory());
     final cache = CacheDatabase(NativeDatabase.memory());

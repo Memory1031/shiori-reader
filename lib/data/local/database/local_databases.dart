@@ -25,7 +25,11 @@ class LocalDatabases {
         NativeDatabase.createInBackground(paths.cacheDatabase),
       );
       await cache.customSelect('SELECT 1').get();
-      final imported = await ManagedLocalBooks.open(paths, users);
+      final imported = await ManagedLocalBooks.open(
+        paths,
+        users,
+        ownershipTimeout: const Duration(seconds: 5),
+      );
       if (imported case Success<ManagedLocalBooks>(:final value)) {
         return Success(LocalDatabases._(users, cache, value));
       }

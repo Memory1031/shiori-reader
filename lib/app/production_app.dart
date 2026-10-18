@@ -73,6 +73,7 @@ class _ProductionAppState extends State<ProductionApp>
   LocalUserBookmarkRepository? _bookmarks;
   AppFailure? _failure;
   bool _opening = false;
+  Future<void>? _openingTask;
   bool _storesClosed = false;
   Future<void>? _storesClosing;
   Future<void>? _closing;
@@ -85,8 +86,14 @@ class _ProductionAppState extends State<ProductionApp>
     unawaited(_open());
   }
 
-  Future<void> _open() async {
-    if (_opening) return;
+  Future<void> _open() {
+    if (_opening || !mounted || _closing != null || _storesClosed) {
+      return _openingTask ?? Future.value();
+    }
+    return _openingTask = _openStores();
+  }
+
+  Future<void> _openStores() async {
     ImportSource? unownedImports;
     setState(() {
       _opening = true;
@@ -96,6 +103,7 @@ class _ProductionAppState extends State<ProductionApp>
       final paths =
           await (widget.resolvePaths?.call() ??
               AppPaths.resolve(StorageEnvironment.production));
+      if (!mounted || _closing != null || _storesClosed) return;
       unownedImports = createImportSource(paths);
       _paths = paths;
       _imageExporter = createImageExporter(paths);
@@ -153,6 +161,7 @@ class _ProductionAppState extends State<ProductionApp>
         _reading,
       );
       await readerPreferences.ready;
+      if (!mounted || _closing != null || _storesClosed) return;
       final updates = await createUpdateController(
         paths,
         beforeInstall: () async {
@@ -183,7 +192,7 @@ class _ProductionAppState extends State<ProductionApp>
       });
       unawaited(_startUpdates());
     } catch (_) {
-      if (mounted) {
+      if (mounted && _closing == null && !_storesClosed) {
         setState(() {
           _opening = false;
           _failure = AppFailure(
@@ -224,6 +233,9 @@ class _ProductionAppState extends State<ProductionApp>
     // The fields stay set so frames drawn before the window closes still build.
     if (_storesClosed) return;
     _storesClosed = true;
+    // An opener may still own resources that have not reached the fields yet.
+    // It observes the closing flag and releases them before exit can complete.
+    await _openingTask;
     await _databases?.localBooks.stopAutomaticReparse();
     await _imports?.shutdown();
     _imports?.dispose();

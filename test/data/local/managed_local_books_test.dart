@@ -90,6 +90,26 @@ void main() {
     store = ok(await ManagedLocalBooks.open(paths, db));
   });
   test(
+    'bounded ownership wait preserves a still-active owner and staging',
+    () async {
+      final staging = File('${paths.localImportStaging.path}/import-live');
+      await staging.writeAsString('keep');
+      final result = await ManagedLocalBooks.open(
+        paths,
+        db,
+        ownershipTimeout: const Duration(milliseconds: 100),
+      );
+      expect(result, isA<Failure<ManagedLocalBooks>>());
+      expect(await staging.readAsString(), 'keep');
+      expect(
+        await ownershipBlockedInIsolate(
+          '${paths.users.path}/local-books-owner.sqlite',
+        ),
+        isTrue,
+      );
+    },
+  );
+  test(
     'live owner excludes startup cleanup until its pending import settles',
     () async {
       final parsing = Completer<LocalImportSession>();

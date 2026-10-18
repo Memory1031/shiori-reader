@@ -5,6 +5,7 @@ import 'dart:ui' show AppExitResponse;
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/app_controller.dart';
@@ -34,6 +35,20 @@ Future<void> exitFrames(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('dev.shiori.reader/app'),
+          (_) async => true,
+        );
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('dev.shiori.reader/app'),
+          null,
+        );
+  });
   testWidgets(
     'passive chapter preload permits exit and preserves the active chapter on restart',
     (tester) async {
@@ -345,6 +360,23 @@ void main() {
       '$failure save cancels exit and leaves the reader available',
       (tester) async {
         final env = FixtureEnvironment(scenario: FixtureScenario.longChapter);
+        final exitPending = <bool>[];
+        const appChannel = MethodChannel('dev.shiori.reader/app');
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          appChannel,
+          (call) async {
+            if (call.method == 'setExitPending') {
+              exitPending.add(call.arguments as bool);
+            }
+            return true;
+          },
+        );
+        addTearDown(() {
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            appChannel,
+            null,
+          );
+        });
         final settings = Store()
           ..value = ReaderSettings(controlsHintSeen: true);
         var shutdowns = 0;
@@ -404,6 +436,7 @@ void main() {
         final exit = tester.binding.handleRequestAppExit();
         await tester.pumpAndSettle();
         expect(await exit, AppExitResponse.cancel);
+        if (Platform.isWindows) expect(exitPending, [true, false]);
         expect(shutdowns, 0);
         expect(find.byType(BookReaderScreen), findsOneWidget);
         expect(find.byType(SnackBar), findsOneWidget);
@@ -412,6 +445,7 @@ void main() {
           final retry = tester.binding.handleRequestAppExit();
           await exitFrames(tester);
           expect(await retry, AppExitResponse.exit);
+          if (Platform.isWindows) expect(exitPending, [true, false, true]);
           expect(shutdowns, 1);
         }
         await tester.pumpWidget(const SizedBox());

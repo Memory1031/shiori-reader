@@ -366,8 +366,9 @@ class ManagedLocalBooks
 
   static Future<Result<ManagedLocalBooks>> open(
     AppPaths paths,
-    UserDatabase db,
-  ) async {
+    UserDatabase db, {
+    Duration ownershipTimeout = Duration.zero,
+  }) async {
     final store = ManagedLocalBooks._(paths, db);
     try {
       for (final dir in [paths.localBooks, paths.localImportStaging]) {
@@ -393,8 +394,23 @@ class ManagedLocalBooks
       // SQLite locks also exclude other connections in the same process/isolate.
       // Keep this separate from user.db so normal database writes remain usable.
       store._ownership = sqlite.sqlite3.open(lock);
-      store._ownership!.execute('PRAGMA journal_mode=MEMORY');
-      store._ownership!.execute('BEGIN EXCLUSIVE');
+      final waiting = Stopwatch()..start();
+      while (true) {
+        try {
+          store._ownership!.execute('PRAGMA journal_mode=MEMORY');
+          store._ownership!.execute('BEGIN EXCLUSIVE');
+          break;
+        } on sqlite.SqliteException catch (error) {
+          final remaining = ownershipTimeout - waiting.elapsed;
+          if (error.resultCode != 5 || remaining <= Duration.zero) rethrow;
+          // Never block the UI isolate with SQLite's synchronous busy timeout.
+          await Future<void>.delayed(
+            remaining < const Duration(milliseconds: 50)
+                ? remaining
+                : const Duration(milliseconds: 50),
+          );
+        }
+      }
       // An unavailable index must not erase data, and ownership precedes snapshot.
       final rows = await db
           .customSelect('SELECT digest,active_bundle FROM local_books')

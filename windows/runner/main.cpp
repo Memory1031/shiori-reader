@@ -4,6 +4,7 @@
 
 #include "flutter_window.h"
 #include "utils.h"
+#include "single_instance.h"
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
@@ -11,6 +12,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // new console when running with a debugger.
   if (!::AttachConsole(ATTACH_PARENT_PROCESS) && ::IsDebuggerPresent()) {
     CreateAndAttachConsole();
+  }
+
+  // Declared before the window, so ownership outlives the engine and plugins.
+  SingleInstance application;
+  const auto startup = application.Acquire();
+  if (startup != SingleInstance::Result::primary) {
+    return startup == SingleInstance::Result::activated ? EXIT_SUCCESS : EXIT_FAILURE;
   }
 
   // Initialize COM, so that it is available for use in the library and/or

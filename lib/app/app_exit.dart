@@ -1,6 +1,8 @@
 import 'dart:ui' show AppExitResponse;
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/state_views.dart';
@@ -52,6 +54,7 @@ class AppExitScopeState extends State<AppExitScope>
     final focus = FocusManager.instance.primaryFocus;
     setState(() => _saving = true);
     try {
+      await _setExitPending(true);
       WidgetsBinding.instance.scheduleForcedFrame();
       await WidgetsBinding.instance.endOfFrame;
       var saved = await widget.save();
@@ -72,12 +75,26 @@ class AppExitScopeState extends State<AppExitScope>
     } catch (_) {
       return AppExitResponse.cancel;
     } finally {
+      if (!_retired) await _setExitPending(false);
       if (mounted && !_retired) {
         setState(() => _saving = false);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && focus?.context != null) focus?.requestFocus();
         });
       }
+    }
+  }
+
+  Future<void> _setExitPending(bool pending) async {
+    if (!Platform.isWindows) return;
+    try {
+      await const MethodChannel(
+        'dev.shiori.reader/app',
+      ).invokeMethod<bool>('setExitPending', pending);
+    } on MissingPluginException {
+      // Older runners and widget hosts do not expose instance activation.
+    } on PlatformException {
+      // Saving and closing must remain available if native activation fails.
     }
   }
 

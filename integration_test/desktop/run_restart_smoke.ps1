@@ -46,6 +46,23 @@ foreach ($phase in $phases) {
         $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
         if ($report.pid -ne $probe.Id) { throw 'Report process identity mismatch' }
         if ($report.status -eq 'failed') { throw $report.error }
+        if ($phase -eq 'plain') {
+            # A repeated launch must activate this process before a second
+            # Flutter engine or storage owner is created.
+            $duplicate = Start-Process -FilePath $exePath -WorkingDirectory (Split-Path -Parent $exePath) -ArgumentList @(('"' + $phaseRoot + '"'), $phase) -WindowStyle Hidden -PassThru
+            try {
+                if (!$duplicate.WaitForExit(15000) -or $duplicate.ExitCode -ne 0) {
+                    throw 'Repeated launch did not activate the existing instance'
+                }
+                $probe.Refresh()
+                if ($probe.HasExited) { throw 'Repeated launch replaced the original process' }
+                $afterActivation = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+                if ($afterActivation.pid -ne $probe.Id) { throw 'Repeated launch created another Flutter engine' }
+            } finally {
+                if (!$duplicate.HasExited) { Stop-Process -Id $duplicate.Id -Force }
+                $duplicate.Dispose()
+            }
+        }
         if ($phase -eq 'restart') {
             if ($report.status -ne 'ready-to-kill') { throw 'Missing kill checkpoint' }
             $probe.Refresh()
