@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
 import '../../domain/models/models.dart';
 import 'reader_ruby.dart';
@@ -145,25 +146,9 @@ List<InlineSpan> readerInlineSpans({
                 ordered[i],
                 readerFontSize: readerFontSize,
               ),
-              TextScaler.noScaling,
-              maxWidth:
-                  maxWidth *
-                  (readerAuthoredStyle(
-                        style,
-                        styles,
-                        ordered[i],
-                        readerFontSize: readerFontSize,
-                      ).fontSize ??
-                      20) /
-                  scaler.scale(
-                    readerAuthoredStyle(
-                          style,
-                          styles,
-                          ordered[i],
-                          readerFontSize: readerFontSize,
-                        ).fontSize ??
-                        20,
-                  ),
+              scaler,
+              maxWidth: maxWidth,
+              unscaled: true,
             ).width,
             height: readerInlineSize(
               image,
@@ -173,7 +158,9 @@ List<InlineSpan> readerInlineSpans({
                 ordered[i],
                 readerFontSize: readerFontSize,
               ),
-              TextScaler.noScaling,
+              scaler,
+              maxWidth: maxWidth,
+              unscaled: true,
             ).height,
             child: imageBuilder?.call(image),
           ),
@@ -407,9 +394,18 @@ Size readerInlineSize(
   TextStyle style,
   TextScaler scaler, {
   double maxWidth = double.infinity,
+  bool unscaled = false,
 }) {
   final em = scaler.scale(style.fontSize ?? 20);
-  return Size((image.widthEm * em).clamp(0, maxWidth), image.heightEm * em);
+  final w = image.widthEm * em, h = image.heightEm * em;
+  final capWidth = math.min(
+    maxWidth,
+    image.maxWidth?.resolve(maxWidth, em) ?? maxWidth,
+  );
+  final capHeight = image.maxHeight?.resolve(0, em) ?? double.infinity;
+  final factor = math.min(1.0, math.min(capWidth / w, capHeight / h));
+  final divisor = unscaled ? em / (style.fontSize ?? 20) : 1.0;
+  return Size(w * factor / divisor, h * factor / divisor);
 }
 
 ReaderInlineStackLayout readerStackLayout({

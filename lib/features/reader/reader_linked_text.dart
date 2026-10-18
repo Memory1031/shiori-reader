@@ -429,6 +429,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
             child: widget.images == null
                 ? const SizedBox.shrink()
                 : SourceImage(
+                    fit: image.stretch ? BoxFit.fill : BoxFit.contain,
                     media: image.media,
                     repository: widget.images!,
                     semanticLabel: image.alt,

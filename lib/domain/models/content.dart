@@ -139,6 +139,9 @@ sealed class ContentBlock extends ValueModel {
         occurrence: occurrence,
       ),
       'image' => ImageBlock(
+        sizing: json['sizing'] == null
+            ? null
+            : ImageSizing.fromJson(json['sizing'] as Map<String, dynamic>),
         box: box,
         layout: layout,
         media: MediaRef.fromJson(json['media'] as Map<String, dynamic>),
@@ -191,6 +194,9 @@ final class InlineImage extends ValueModel {
     required this.widthEm,
     required this.heightEm,
     this.alt,
+    this.maxWidth,
+    this.maxHeight,
+    this.stretch = false,
   }) {
     if (offset < 0 ||
         !widthEm.isFinite ||
@@ -205,12 +211,17 @@ final class InlineImage extends ValueModel {
   final int offset;
   final MediaRef media;
   final double widthEm, heightEm;
+  final LayoutLength? maxWidth, maxHeight;
+  final bool stretch;
   final String? alt;
   Map<String, Object?> toJson() => {
     'offset': offset,
     'media': media.toJson(),
     'widthEm': widthEm,
     'heightEm': heightEm,
+    if (maxWidth != null) 'maxWidth': maxWidth!.toJson(),
+    if (maxHeight != null) 'maxHeight': maxHeight!.toJson(),
+    if (stretch) 'stretch': true,
     'alt': alt,
   };
   factory InlineImage.fromJson(Map<String, dynamic> json) => InlineImage(
@@ -218,10 +229,26 @@ final class InlineImage extends ValueModel {
     media: MediaRef.fromJson(json['media'] as Map<String, dynamic>),
     widthEm: (json['widthEm'] as num).toDouble(),
     heightEm: (json['heightEm'] as num).toDouble(),
+    maxWidth: json['maxWidth'] == null
+        ? null
+        : LayoutLength.fromJson(json['maxWidth'] as Map<String, dynamic>),
+    maxHeight: json['maxHeight'] == null
+        ? null
+        : LayoutLength.fromJson(json['maxHeight'] as Map<String, dynamic>),
+    stretch: json['stretch'] as bool? ?? false,
     alt: json['alt'] as String?,
   );
   @override
-  List<Object?> get values => [offset, media, widthEm, heightEm, alt];
+  List<Object?> get values => [
+    offset,
+    media,
+    widthEm,
+    heightEm,
+    alt,
+    maxWidth,
+    maxHeight,
+    stretch,
+  ];
 }
 
 void validateInlineImages(String text, List<InlineImage> images) {
@@ -511,6 +538,57 @@ final class AudioBlock extends ContentBlock {
   ];
 }
 
+enum ImageRole { flow, page }
+
+/// EPUB layout evidence. Null on old manifests and non-EPUB sources preserves
+/// their existing image policy. Width constraints remain in the local box.
+final class ImageSizing extends ValueModel {
+  ImageSizing({
+    this.role = ImageRole.flow,
+    this.height,
+    this.maxHeight,
+    this.alignment,
+    this.fontScale = 1,
+  }) {
+    if (!fontScale.isFinite || fontScale < .25 || fontScale > 4) {
+      throw ArgumentError('Invalid image font scale');
+    }
+  }
+  final ImageRole role;
+  final LayoutLength? height, maxHeight;
+  final ParagraphAlignment? alignment;
+  final double fontScale;
+  Map<String, Object?> toJson() => {
+    'role': role.name,
+    if (height != null) 'height': height!.toJson(),
+    if (maxHeight != null) 'maxHeight': maxHeight!.toJson(),
+    if (alignment != null) 'alignment': alignment!.name,
+    'fontScale': fontScale,
+  };
+  factory ImageSizing.fromJson(Map<String, dynamic> j) => ImageSizing(
+    role: ImageRole.values.byName(j['role'] as String),
+    height: j['height'] == null
+        ? null
+        : LayoutLength.fromJson(j['height'] as Map<String, dynamic>),
+    maxHeight: j['maxHeight'] == null
+        ? null
+        : LayoutLength.fromJson(j['maxHeight'] as Map<String, dynamic>),
+    alignment: j['alignment'] == null
+        ? null
+        : ParagraphAlignment.values.byName(j['alignment'] as String),
+    fontScale: (j['fontScale'] as num?)?.toDouble() ?? 1,
+  );
+  ImageSizing asPage() => ImageSizing(
+    role: ImageRole.page,
+    height: height,
+    maxHeight: maxHeight,
+    alignment: alignment,
+    fontScale: fontScale,
+  );
+  @override
+  List<Object?> get values => [role, height, maxHeight, alignment, fontScale];
+}
+
 final class ImageBlock extends ContentBlock {
   ImageBlock({
     required this.media,
@@ -518,6 +596,7 @@ final class ImageBlock extends ContentBlock {
     BlockBox? layout,
     this.width,
     this.height,
+    this.sizing,
     String? alt,
     String? caption,
     int occurrence = 0,
@@ -533,6 +612,7 @@ final class ImageBlock extends ContentBlock {
   final MediaRef media;
   final int? width;
   final int? height;
+  final ImageSizing? sizing;
   final String? alt;
   final String? caption;
   @override
@@ -545,6 +625,7 @@ final class ImageBlock extends ContentBlock {
     'media': media.toJson(),
     'width': width,
     'height': height,
+    if (sizing != null) 'sizing': sizing!.toJson(),
     'alt': alt,
     'caption': caption,
   };
@@ -555,6 +636,7 @@ final class ImageBlock extends ContentBlock {
     layout: layout,
     width: width,
     height: height,
+    sizing: sizing,
     alt: alt,
     caption: caption,
     occurrence: occurrence,
@@ -564,6 +646,7 @@ final class ImageBlock extends ContentBlock {
     media,
     width,
     height,
+    sizing,
     alt,
     caption,
     box,

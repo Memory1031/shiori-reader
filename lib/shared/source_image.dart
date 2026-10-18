@@ -244,6 +244,7 @@ class SourceImage extends StatefulWidget {
     this.decoder = decodeSourceImage,
     this.decodeScale = 1,
     this.paperInk,
+    this.fit = BoxFit.contain,
   }) : assert(decodeScale > 0 && decodeScale <= 4);
   final MediaRef media;
   final ImageRepository repository;
@@ -256,6 +257,7 @@ class SourceImage extends StatefulWidget {
 
   /// Reader-only opt-in. Null preserves original pixels (covers and preview).
   final Color? paperInk;
+  final BoxFit fit;
   @override
   State<SourceImage> createState() => _SourceImageState();
 }
@@ -264,6 +266,7 @@ class _SourceImageState extends State<SourceImage> {
   CancellationSource? _request;
   MediaLease? _lease;
   ui.Image? _image;
+  Size? _intrinsicSize;
   bool _isPaperMask = false;
   AppFailure? _failure;
   Timer? _cooldown;
@@ -292,6 +295,7 @@ class _SourceImageState extends State<SourceImage> {
   void _release() {
     _image?.dispose();
     _image = null;
+    _intrinsicSize = null;
     final lease = _lease;
     _lease = null;
     if (lease != null) unawaited(lease.close());
@@ -354,6 +358,7 @@ class _SourceImageState extends State<SourceImage> {
         _lease = pendingLease;
         pendingLease = null;
         _image = pendingImage;
+        _intrinsicSize = decoded.intrinsicSize;
         _isPaperMask = decoded.isPaperMask;
         pendingImage = null;
         _loading = false;
@@ -424,9 +429,19 @@ class _SourceImageState extends State<SourceImage> {
               .clamp(1, 32768);
       if (width != _width) {
         _width = width;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _width == width) unawaited(_load(width));
-        });
+        // A natural-size reflow often shrinks the requested decode width. Keep
+        // a sufficient decoded raster and its lease rather than loading again.
+        final enough =
+            _image != null &&
+            !_loading &&
+            _failure == null &&
+            (_image!.width >= width ||
+                _image!.width >= (_intrinsicSize?.width ?? double.infinity));
+        if (!enough) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _width == width) unawaited(_load(width));
+          });
+        }
       }
       final strings = AppLocalizations.of(context);
       Widget retry() => IconButton(
@@ -446,7 +461,7 @@ class _SourceImageState extends State<SourceImage> {
                 image: _image,
                 color: _isPaperMask ? widget.paperInk : null,
                 colorBlendMode: _isPaperMask ? BlendMode.srcIn : null,
-                fit: BoxFit.contain,
+                fit: widget.fit,
                 filterQuality: FilterQuality.medium,
               ),
             ),

@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../../../domain/models/models.dart';
 import 'page_layout.dart';
+import '../reader_image.dart';
 import 'page_boundaries.dart';
 import 'render_chunk.dart';
 import 'block_style.dart';
@@ -885,9 +886,15 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         for (final block in widget.content.blocks.whereType<ImageBlock>())
           widget.imageExtent?.call(block) ??
               widget.imageHeights[block.media] ??
-              (block.width != null && block.height != null
-                  ? columnWidth * block.height! / block.width!
-                  : 180.0),
+              readerImageForColumn(
+                block,
+                width: columnWidth,
+                height: constraints.maxHeight,
+                style: textStyle,
+                scaler: scaler,
+                direction: direction,
+                content: widget.content,
+              ).height,
       ];
       final changed =
           _signature != signature || !listEquals(_imageGeometry, imageGeometry);

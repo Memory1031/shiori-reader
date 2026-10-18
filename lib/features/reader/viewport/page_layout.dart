@@ -9,6 +9,7 @@ import 'block_style.dart';
 import 'reader_box.dart';
 import '../reader_inline_images.dart';
 import '../reader_audio.dart' show readerAudioExtent;
+import '../reader_image.dart';
 
 /// A cursor in transient chunks; exposed/persisted positions always use Domain.
 final class PageCursor {
@@ -744,18 +745,18 @@ final class PageLayout {
       scaler: scaler,
       pageHeight: height,
     );
-    final inner = readerBoxInnerWidth(
-      block,
-      width,
-      style: style,
-      scaler: scaler,
-    );
     final body = block is ImageBlock
         ? imageExtent?.call(block) ??
               imageHeights[block.media] ??
-              (block.width != null && block.height != null
-                  ? inner * block.height! / block.width!
-                  : 180.0)
+              readerImageForColumn(
+                block,
+                width: width,
+                height: height,
+                style: style,
+                scaler: scaler,
+                direction: direction,
+                content: index.content,
+              ).height
         : block is AudioBlock
         ? readerAudioExtent
         : block is ParagraphBlock
@@ -772,8 +773,10 @@ final class PageLayout {
       _centerableImage(
         index.content.blocks[index.chunks[fragments.single.unit].blockIndex],
       ) &&
-      (fragments.single.height >= height * .6 ||
-          index.content.blocks.length == 1);
+      _fullPageImage(
+        index.chunks[fragments.single.unit].blockIndex,
+        fragments.single.height,
+      );
 
   bool _centerableImage(ContentBlock block) =>
       block is ImageBlock &&
@@ -822,13 +825,20 @@ final class PageLayout {
 
   bool _fullPageImage(int blockIndex, double extent) =>
       index.content.blocks[blockIndex] is ImageBlock &&
-      (extent >= height * .6 || index.content.blocks.length == 1);
+      ((index.content.blocks[blockIndex] as ImageBlock).sizing?.role ==
+              ImageRole.page ||
+          extent >= height * .6 ||
+          (index.content.blocks[blockIndex] as ImageBlock).sizing == null &&
+              index.content.blocks.length == 1);
 
   ReaderPage? forward(PageCursor from) {
     final first = _forwardColumn(from);
     if (first == null || columns == 1) return first;
     if (index.content.blocks.length == 1 &&
-        _centerableImage(index.content.blocks.single)) {
+        _centerableImage(index.content.blocks.single) &&
+        ((index.content.blocks.single as ImageBlock).sizing == null ||
+            (index.content.blocks.single as ImageBlock).sizing!.role ==
+                ImageRole.page)) {
       return ReaderPage(
         first.start,
         first.end,
@@ -851,6 +861,7 @@ final class PageLayout {
           (b) =>
               b.box != null ||
               b.layout != null ||
+              b is ImageBlock && b.sizing != null ||
               b is ParagraphBlock && b.linkDecoration != null ||
               readerUsesParagraphFlow(b, direction),
         )) {

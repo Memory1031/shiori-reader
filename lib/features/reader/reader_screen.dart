@@ -52,7 +52,6 @@ import '../../domain/local_chapter_progress.dart';
 import 'reader_logical_progress.dart';
 import 'viewport/paged_reader_viewport.dart';
 import 'viewport/page_turn.dart';
-import 'viewport/reader_box.dart';
 
 typedef _ProgressText = ({String? percent, bool document});
 typedef _ProgressEndpoint = ({Object scope, double fraction, bool document});
@@ -1642,41 +1641,16 @@ class _ReaderContentViewState extends State<ReaderContentView>
     final style = layout.bodyStyle;
     final columnWidth =
         (bounds.maxWidth - (columns - 1) * readerColumnGap) / columns;
-    final imageIndexes = Map<ImageBlock, int>.identity();
-    for (final (index, block) in widget.content.blocks.indexed) {
-      if (block is ImageBlock) {
-        imageIndexes[block] = index;
-      }
-    }
-    ({double height, double caption}) extent(ImageBlock block) {
-      final boxes = readerBlockBoxes(
-        block,
-        columnWidth,
-        style,
-        MediaQuery.textScalerOf(context),
-        pageHeight: bounds.maxHeight,
-      );
-      final edges = readerBoxEdges(
-        widget.content,
-        imageIndexes[block] ?? widget.content.blocks.indexOf(block),
-        width: columnWidth,
-        style: style,
-        scaler: MediaQuery.textScalerOf(context),
-        pageHeight: bounds.maxHeight,
-      );
-      return readerImageExtent(
-        block,
-        width: boxes.innerWidth,
-        maxHeight: (bounds.maxHeight - edges.top - edges.bottom).clamp(
-          1,
-          bounds.maxHeight,
-        ),
-        scaler: MediaQuery.textScalerOf(context),
-        direction: Directionality.of(context),
-        knownSize: _sizes[block.media],
-      );
-    }
-
+    ReaderImageGeometry extent(ImageBlock block) => readerImageForColumn(
+      block,
+      width: columnWidth,
+      height: bounds.maxHeight,
+      style: style,
+      scaler: MediaQuery.textScalerOf(context),
+      direction: Directionality.of(context),
+      content: widget.content,
+      knownSize: _sizes[block.media],
+    );
     Widget image(BuildContext context, ImageBlock block) {
       final geometry = extent(block);
       return SizedBox(
@@ -1694,7 +1668,14 @@ class _ReaderContentViewState extends State<ReaderContentView>
                 block: block,
                 repository: widget.images!,
                 captionHeight: geometry.caption,
+                geometry: geometry,
                 onIntrinsicSize: (size) {
+                  if (!mounted ||
+                      widget.content.blocks.every(
+                        (b) => !identical(b, block),
+                      )) {
+                    return;
+                  }
                   if (block.width == size.width &&
                       block.height == size.height) {
                     return;

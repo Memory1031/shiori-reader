@@ -677,6 +677,50 @@ class EpubParser {
     final titles = metadataElements(
       'title',
     ).map((e) => _labelWhitespace(e.innerText)).where((e) => e.isNotEmpty);
+    // Promote only document-level evidence, never a fragment produced by
+    // pagination. A lone unlabelled ornament remains a natural-size image.
+    for (var i = 0; i < chapters.length; i++) {
+      final chapter = chapters[i];
+      final images = chapter.blocks.whereType<ImageBlock>().toList();
+      final matter =
+          structural[chapter.key] ?? _frontMatter[chapter.key]?.matter;
+      if (images.length != 1 ||
+          chapter.blocks.any(
+            (b) =>
+                b is! ImageBlock &&
+                !(b is ParagraphBlock && b.text.trim().isEmpty),
+          )) {
+        continue;
+      }
+      final image = images.single;
+      if (image.media != cover &&
+          matter?.kind != LocalNavigationLabel.cover &&
+          matter?.kind != LocalNavigationLabel.illustrations) {
+        continue;
+      }
+      final updated = ChapterContent(
+        key: chapter.key,
+        title: chapter.title,
+        blocks: chapter.blocks.map(
+          (b) => b == image
+              ? ImageBlock(
+                  media: image.media,
+                  width: image.width,
+                  height: image.height,
+                  alt: image.alt,
+                  caption: image.caption,
+                  box: image.box,
+                  layout: image.layout,
+                  sizing: image.sizing?.asPage(),
+                )
+              : b,
+        ),
+      );
+      chapters[i] = updated;
+      if (byPath[chapterPaths[chapter.key]]?.key == chapter.key) {
+        byPath[chapterPaths[chapter.key]!] = updated;
+      }
+    }
     final content = LocalBookContent(
       auxiliaryChapters: auxiliary,
       links: links,
@@ -982,6 +1026,10 @@ class EpubParser {
       blocks: [
         ImageBlock(
           media: media,
+          sizing: ImageSizing(
+            role: ImageRole.page,
+            alignment: ParagraphAlignment.center,
+          ),
           alt: node.attributes['alt'],
           width: size?.width,
           height: size?.height,
@@ -1393,6 +1441,9 @@ class EpubParser {
               media: image.media,
               widthEm: image.widthEm,
               heightEm: image.heightEm,
+              maxWidth: image.maxWidth,
+              maxHeight: image.maxHeight,
+              stretch: image.stretch,
               alt: image.alt,
             ),
           )
@@ -1837,6 +1888,13 @@ class EpubParser {
                   media: img,
                   widthEm: w,
                   heightEm: h,
+                  maxWidth: epubLayoutLength(styles[node]?['max-width']),
+                  // Inline percentage heights have no definite containing height.
+                  maxHeight: epubLayoutLength(
+                    styles[node]?['max-height'],
+                    percentage: false,
+                  ),
+                  stretch: authoredHeight != null && authoredWidth != null,
                   alt: node.attributes['alt'],
                 ),
               );
@@ -1855,8 +1913,44 @@ class EpubParser {
         if (id != null && id.isNotEmpty) anchors[id] = (blocks.length, 0);
         if (img != null) {
           final size = imageSizes[img];
+          String? imageAlignment;
+          for (
+            dom.Element? owner = node.parent;
+            owner != null && imageAlignment == null;
+            owner = owner.parent
+          ) {
+            imageAlignment = styles[owner]?['text-align'];
+          }
+          final css = styles[node] ?? const <String, String>{};
+          final dedicatedImage =
+              doc.body!.text.trim().isEmpty &&
+              doc.querySelectorAll('img,image').length == 1;
+          var fillsDocument = false;
+          if (dedicatedImage) {
+            for (
+              dom.Element? owner = node;
+              owner != null && owner != doc.body;
+              owner = owner.parent
+            ) {
+              fillsDocument |=
+                  styles[owner]?['width'] == '100%' ||
+                  styles[owner]?['height'] == '100%';
+            }
+          }
           blocks.add(
             ImageBlock(
+              sizing: ImageSizing(
+                role: fillsDocument ? ImageRole.page : ImageRole.flow,
+                height: epubLayoutLength(css['height']),
+                maxHeight: epubLayoutLength(css['max-height']),
+                fontScale: richStyles[node]?.scale ?? 1,
+                alignment: switch (imageAlignment) {
+                  'center' => ParagraphAlignment.center,
+                  'right' || 'end' => ParagraphAlignment.end,
+                  'left' || 'start' => ParagraphAlignment.start,
+                  _ => null,
+                },
+              ),
               box: activeBox,
               layout: epubBlockBox(
                 styles[node] ?? const {},
