@@ -1,5 +1,6 @@
 """Opt-in real Flutter/DMG upgrade on a disposable GitHub macOS runner."""
 import hashlib
+import ctypes
 import json
 import os
 from pathlib import Path
@@ -87,13 +88,11 @@ def test_upgrade(stage, output, releases, secret, key):
     swift = stage / 'Lifecycle.swift'
     swift.write_text('''import AppKit
 let action = CommandLine.arguments[1], value = CommandLine.arguments[2]
-if action == "find" {
+if action == "inspect" {
   for app in NSWorkspace.shared.runningApplications {
-    if app.bundleURL?.resolvingSymlinksInPath().path == value && !app.isTerminated {
-      print(app.processIdentifier); exit(0)
-    }
+    print(app.processIdentifier, app.bundleURL?.path ?? "nil", app.executableURL?.path ?? "nil")
   }
-  exit(1)
+  exit(0)
 }
 guard let app = NSRunningApplication(processIdentifier:Int32(value)!) else { exit(1) }
 if action == "quit" { exit(app.terminate() ? 0 : 2) }
@@ -128,19 +127,38 @@ exit(app.isFinishedLaunching ? 0 : 1)
             tables = [r[0] for r in db.execute("select name from sqlite_master where type='table' and name not like 'sqlite_%'")]
             return {t: sorted(repr(r) for r in db.execute('select * from "' + t.replace('"', '""') + '"')) for t in tables}
 
-    def find():
-        result = subprocess.run([str(lifecycle), 'find', str(install)], capture_output=True, text=True)
-        return int(result.stdout.strip()) if result.returncode == 0 else None
+    proc_pidpath = ctypes.CDLL('/usr/lib/libproc.dylib').proc_pidpath
+    proc_pidpath.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+    proc_pidpath.restype = ctypes.c_int
 
-    def database_ready():
+    def find():
+        candidates = subprocess.run(['pgrep', '-u', str(os.getuid()), '-x', 'Shiori'],
+            capture_output=True, text=True)
+        matches = []
+        for candidate in candidates.stdout.split():
+            pid = int(candidate)
+            buffer = ctypes.create_string_buffer(4096)
+            if proc_pidpath(pid, buffer, len(buffer)) > 0:
+                if Path(os.fsdecode(buffer.value)).resolve() == (install / 'Contents/MacOS/Shiori').resolve():
+                    matches.append(pid)
+        assert len(matches) <= 1, 'Multiple processes use the disposable test bundle'
+        return matches[0] if matches else None
+
+    def database_ready(pid):
         if not database.exists(): return False
         try:
             with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as db:
-                return db.execute('pragma user_version').fetchone()[0] == 9
+                if db.execute('pragma user_version').fetchone()[0] != 9: return False
+            opened = subprocess.run(['/usr/sbin/lsof', '-a', '-p', str(pid), '-Fn', str(database)],
+                capture_output=True, text=True)
+            return opened.returncode == 0 and ('n' + str(database)) in opened.stdout.splitlines()
         except sqlite3.Error:
             return False
 
     def diagnostics(pid):
+        with (output / 'application-processes.log').open('w') as log:
+            subprocess.run(['ps', '-axo', 'pid,ppid,command'], stdout=log, timeout=10)
+            subprocess.run([str(lifecycle), 'inspect', str(install)], stdout=log, timeout=10)
         (output / 'startup-state.json').write_bytes(encoded(dict(pid=pid, database=str(database),
             databaseExists=database.exists(), supportFiles=[str(p.relative_to(users.parent))
                 for p in users.parent.rglob('*') if p.is_file()])))
@@ -154,8 +172,8 @@ exit(app.isFinishedLaunching ? 0 : 1)
         print('Launching installed application through Launch Services', flush=True)
         old = subprocess.Popen(['open', '-n', '-W', '--stdout', str(output / 'old-application.log'),
             '--stderr', str(output / 'old-application.log'), str(install)])
-        old_pid = wait_for(find, 'original app registered')
-        wait_for(database_ready, 'original application database initialized')
+        old_pid = wait_for(find, 'original application executable running')
+        wait_for(lambda: database_ready(old_pid), 'original application database initialized and open')
         before = snapshot()
         release, dmg = releases[1]
         assets = [dict(platform=p, name=f'shiori-reader-{release["tag"]}-{suffix}', size=1,
@@ -186,7 +204,7 @@ exit(app.isFinishedLaunching ? 0 : 1)
                 if updater.poll() is None: updater.kill(); updater.wait(timeout=10)
         new_pid = wait_for(find, 'updated app launched')
         assert new_pid != old_pid
-        wait_for(database_ready, 'updated application database initialized')
+        wait_for(lambda: database_ready(new_pid), 'updated application database initialized and open')
         info = plistlib.loads((install / 'Contents/Info.plist').read_bytes())
         assert info['CFBundleShortVersionString'] == release['version'] and str(info['CFBundleVersion']) == str(release['build'])
         run('codesign', '--verify', '--deep', '--strict', install)
