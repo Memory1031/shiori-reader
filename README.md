@@ -1,7 +1,6 @@
 <div align="center">
   <img src="assets/branding/shiori-chibi-logo-v1.png" alt="Shiori" width="96" />
   <h1>Shiori</h1>
-  <p><strong>把喜欢的故事，留在手边。</strong></p>
   <p>开源轻小说阅读器 · EPUB / TXT · Android / iOS / Windows / macOS</p>
   <p>
     <a href="https://memory1031.github.io/shiori-reader/zh-cn/"><strong>官方网站</strong></a>

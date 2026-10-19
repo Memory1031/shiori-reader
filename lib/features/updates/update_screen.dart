@@ -174,14 +174,6 @@ class _UpdateScreenState extends State<UpdateScreen> {
                         ),
                         const SizedBox(height: 18),
                         Text(
-                          l.shelfTagline,
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: muted,
-                          ),
-                        ),
-                        const SizedBox(height: ShioriSpace.small),
-                        Text(
                           _version,
                           style: theme.textTheme.labelMedium?.copyWith(
                             color: muted,

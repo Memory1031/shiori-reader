@@ -2,5 +2,5 @@
 import SiteLayout from '../layouts/SiteLayout.astro';
 import { route } from '../lib/paths';
 ---
-<SiteLayout locale="zh-cn"><section class="entry wrap"><h1>把喜欢的故事，留在手边。</h1><p>Shiori · 开源轻小说阅读器</p><div class="actions"><a class="button primary" href={route('zh-cn')}>进入中文官网</a><a class="button" href={route('en')} lang="en">Continue in English</a></div></section></SiteLayout>
+<SiteLayout locale="zh-cn"><section class="entry wrap"><h1>Shiori</h1><p>开源轻小说阅读器</p><div class="actions"><a class="button primary" href={route('zh-cn')}>进入中文官网</a><a class="button" href={route('en')} lang="en">Continue in English</a></div></section></SiteLayout>
 <script>window.location.replace('/shiori-reader/zh-cn/' + window.location.hash);</script>

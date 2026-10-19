@@ -71,9 +71,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Browse the source groups and choose a volume or chapter to read.';
 
   @override
-  String get shelfTagline => 'Keep your favourite stories close.';
-
-  @override
   String get discoverTagline => 'Find your next chapter.';
 
   @override

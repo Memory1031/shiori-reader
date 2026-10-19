@@ -6,7 +6,7 @@ interface Props { locale: Locale; page?: string; }
 const { locale, page = '' } = Astro.props, t = copy[locale];
 ---
 <footer class="site-footer wrap">
-  <div><a class="wordmark" href={route(locale)}>Shiori</a><p>{t.footer.line}</p></div>
+  <div><a class="wordmark" href={route(locale)}>Shiori</a></div>
   <nav aria-label={locale === 'en' ? 'Project links' : '项目链接'}>
     <a href={repository} class="icon-link" aria-label={locale === 'en' ? 'GitHub repository' : 'GitHub 仓库'} title={locale === 'en' ? 'GitHub repository' : 'GitHub 仓库'}><GitHubIcon /></a><a href={`${repository}/releases/latest`}>Releases</a>
     <a href={`${repository}/issues`}>{t.footer.issues}</a>

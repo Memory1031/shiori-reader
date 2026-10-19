@@ -7,7 +7,7 @@ const { locale } = Astro.props, t = copy[locale], lang = locale === 'en' ? 'en' 
 ---
 <section class="hero wrap" aria-labelledby="hero-title">
   <div class="hero-intro">
-    <h1 id="hero-title">{t.hero[0]}<br />{t.hero[1]}</h1>
+    <h1 id="hero-title">{t.hero}</h1>
     <div class="hero-copy"><p class="lead">{t.intro}</p><div class="actions"><a class="button primary" href={route(locale, 'download')}>{t.download}<span aria-hidden="true">↓</span></a><a class="text-link" href="#experience">{t.explore}</a></div><p class="fine">{t.openSource}</p></div>
   </div>
   <div class="hero-stage">

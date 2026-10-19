@@ -1,10 +1,10 @@
 import type { Locale } from '../lib/paths';
 
 const zh = {
-  title: 'Shiori — 把喜欢的故事，留在手边',
+  title: 'Shiori — 开源轻小说阅读器',
   description: '开源轻小说阅读器。在 Android、iOS、Windows 与 macOS 上阅读自己的 EPUB / TXT，享受双页、插图、全文搜索与书签。',
   nav: ['阅读体验', '下载', '常见问题'], menu: '菜单', close: '关闭菜单', skip: '跳到正文',
-  hero: ['把喜欢的故事，', '留在手边。'],
+  hero: '开源轻小说阅读器',
   intro: 'Shiori 是一款开源轻小说阅读器。导入自己的 EPUB 或 TXT，调整阅读排版，在手机或电脑上专心阅读。',
   download: '下载 Shiori', explore: '了解阅读功能', enlarge: '查看大图', openSource: '免费开源，本地阅读无需账号。',
   desktopCaption: 'Windows · 双页阅读 · 中文界面', mobileCaption: 'Android · 单页阅读', mobileShelfCaption: 'Android · 书架 · 中文界面',
@@ -41,13 +41,13 @@ const zh = {
     { q: '怎样反馈 EPUB 兼容性问题？', a: '请在 GitHub Issues 附上应用版本、系统版本、复现步骤及截图，尽量提供有权分享的最小样本或结构说明。不要上传私人数据、密码或无权分享的完整书籍。' },
   ],
   privacy: { title: '关于 Shiori 与你的数据', body: 'Shiori 是以本地阅读为核心的开源项目。书架、进度、书签、偏好和导入副本由应用保存在本地，系统备份或设备迁移可能包含这些数据。', third: '使用在线阅读时会访问第三方书源；检查或下载更新时会访问 GitHub Releases 及其下载服务。本网站会向 GitHub 获取下载信息，不使用分析追踪，也无需注册账号。', relation: 'Shiori 是非官方第三方客户端，与 LightNovel.fun 及其运营方无关联，也未获官方认可。不提供绕过认证、付费机制、访问控制或 DRM 的功能。第三方内容与商标属于各自权利人。', license: '源码采用 MIT 许可。Shiori 名称、Logo、应用图标和第三方资产不包含在该源码许可授权内。' },
-  footer: { line: '把喜欢的故事，留在手边。', privacy: '隐私与第三方服务', license: '开源许可', issues: '问题反馈', about: '一个安静的阅读空间。', credits: '展示素材：原创演示小说《蓝色借书卡的最后一栏》。' },
+  footer: { privacy: '隐私与第三方服务', license: '开源许可', issues: '问题反馈', about: '一个安静的阅读空间。', credits: '展示素材：原创演示小说《蓝色借书卡的最后一栏》。' },
 };
 
 const en: typeof zh = {
-  title: 'Shiori — Keep the stories you love close', description: 'An open-source light novel reader for Android, iOS, Windows and macOS. Read your EPUB and TXT books with illustrations, two-page layouts, full-text search and bookmarks.',
+  title: 'Shiori — Open-source light novel reader', description: 'An open-source light novel reader for Android, iOS, Windows and macOS. Read your EPUB and TXT books with illustrations, two-page layouts, full-text search and bookmarks.',
   nav: ['Reading experience', 'Download', 'FAQ'], menu: 'Menu', close: 'Close menu', skip: 'Skip to content',
-  hero: ['Keep the stories', 'you love close.'], intro: 'Shiori is an open-source light novel reader. Import your EPUB or TXT books, choose a layout you like, and read on your phone or computer.',
+  hero: 'Open-source light novel reader', intro: 'Shiori is an open-source light novel reader. Import your EPUB or TXT books, choose a layout you like, and read on your phone or computer.',
   download: 'Download Shiori', explore: 'Explore the reader', enlarge: 'View full-size image', openSource: 'Free and open source. No account required to read imported books.',
   desktopCaption: 'Windows · Two-page reading · Chinese UI', mobileCaption: 'Android · Single-page reading', mobileShelfCaption: 'Android · Bookshelf · English UI',
   searchSteps: ['Search inside your EPUB or TXT.', 'Check the words around a match.', 'Return to where you were reading.'],
@@ -82,6 +82,6 @@ const en: typeof zh = {
     { q: 'How should I report an EPUB compatibility issue?', a: 'Open a GitHub issue with your app version, operating system, steps to reproduce and screenshots. Where possible, include a minimal sample you have permission to share. Do not upload private information, passwords or entire copyrighted books without permission.' },
   ],
   privacy: { title: 'About Shiori and your data', body: 'Shiori is an open-source project built around local reading. The app stores your bookshelf, progress, bookmarks, preferences and imported copies locally. System backups and device migration may include that data.', third: 'Optional online reading contacts third-party sources. Update checks and downloads contact GitHub Releases and its download services. This website requests the GitHub API for download details and includes no analytics tracking or account system.', relation: 'Shiori is an unofficial third-party client, with no affiliation with or endorsement by LightNovel.fun or its operators. It does not bypass authentication, payment, access controls or DRM. Third-party content and trademarks belong to their respective owners.', license: 'Source code is licensed under MIT. That license does not grant rights to the Shiori name, logo, app icons or third-party assets.' },
-  footer: { line: 'Keep the stories you love close.', privacy: 'Privacy & third-party services', license: 'Source code license', issues: 'Report an issue', about: 'A quiet place to read.', credits: 'Featuring the original demo novel The Last Line on the Blue Library Card.' },
+  footer: { privacy: 'Privacy & third-party services', license: 'Source code license', issues: 'Report an issue', about: 'A quiet place to read.', credits: 'Featuring the original demo novel The Last Line on the Blue Library Card.' },
 };
 export const copy: Record<Locale, typeof zh> = { 'zh-cn': zh, en };

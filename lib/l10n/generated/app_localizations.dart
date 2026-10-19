@@ -212,12 +212,6 @@ abstract class AppLocalizations {
   /// **'Browse the source groups and choose a volume or chapter to read.'**
   String get volumesDescription;
 
-  /// No description provided for @shelfTagline.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep your favourite stories close.'**
-  String get shelfTagline;
-
   /// No description provided for @discoverTagline.
   ///
   /// In en, this message translates to:

@@ -73,7 +73,6 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Keep your favourite stories close.'), findsOneWidget);
     await tester.tap(find.text('Search'));
     await tester.tap(find.text('Import book'));
     expect(searches, 1);
@@ -422,8 +421,6 @@ void main() {
       find.textContaining('Book ').evaluate().length,
       inInclusiveRange(1, 39),
     );
-    // The empty-shelf invitation gives way once there are books.
-    expect(find.text('Keep your favourite stories close.'), findsNothing);
     await tester.tap(find.byTooltip('List'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

@@ -68,9 +68,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get volumesDescription => '选择卷册或章节开始阅读。';
 
   @override
-  String get shelfTagline => '把喜欢的故事，留在手边。';
-
-  @override
   String get discoverTagline => '下一本，读什么？';
 
   @override
