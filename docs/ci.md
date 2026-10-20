@@ -76,7 +76,7 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 
 `tool/release_ios.py package` 在临时副本中处理完整 Runner.app，清除实际代码签名与主应用 / 扩展残留的嵌入描述文件；保留 Framework、资源和 ShareExtension，拒绝其他签名材料、符号文件和异常路径。打包后与发布前均校验 arm64 真机 Mach-O、未加密及未签名状态、主应用 / 扩展身份和版本、嵌入依赖及 Flutter 必需资源。输出 IPA 与内部验证回执，由统一发布脚本验证摘要及身份后纳入附件白名单，沿用草稿上传、相同附件幂等补齐及禁止覆盖规则。
 
-四端产物齐备后才公开 GitHub Release，未签名 iOS 构建或校验失败也会阻止本次 GitHub 发布；现有独立的 `ios-release.yml` 签名上传流程不依赖这些 job。IPA 不进入自动更新清单，不增加应用内签名、下载安装或第三方签名工具集成。安装与权限边界见[未签名 IPA 使用](release/README.md#ios-未签名-ipa)。
+四端产物齐备后才公开 GitHub Release，未签名 iOS 构建或校验失败也会阻止本次 GitHub 发布；现有独立的 `ios-release.yml` 签名上传流程不依赖这些 job。IPA 不进入应用内更新清单；发布 job 在 Release 公开后维护对应渠道的 AltStore Classic 订阅源，不增加应用内签名或下载安装。源维护和安装权限边界见[未签名 IPA 使用](release/README.md#ios-未签名-ipa)。
 
 ## iOS TestFlight 发布
 

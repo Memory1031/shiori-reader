@@ -1,0 +1,47 @@
+{
+  "name": "Shiori",
+  "identifier": "dev.shiori.reader.altstore.stable",
+  "sourceURL": "https://raw.githubusercontent.com/Memory1031/shiori-reader/develop/alt_store.json",
+  "apps": [
+    {
+      "name": "Shiori",
+      "bundleIdentifier": "dev.shiori.reader",
+      "developerName": "Memory1031",
+      "iconURL": "https://raw.githubusercontent.com/Memory1031/shiori-reader/develop/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png",
+      "localizedDescription": "开源轻小说阅读器 / Open-source EPUB and TXT reader. Install and update with AltStore Classic.",
+      "versions": [
+        {
+          "version": "1.4.1",
+          "buildVersion": "21",
+          "marketingVersion": "1.4.1",
+          "date": "2026-10-18T14:49:41Z",
+          "localizedDescription": "# Shiori 1.4.1\n\nShiori 1.4.1 重点改善了 **EPUB 图片排版与阅读主题适配**，并重新设计了跨平台应用更新机制。\n\n本次更新还为 Windows 增加了正式安装版 EXE，推出中英文官方网站，改进了封面、插图、书签及部分特殊 EPUB 内容的显示体验。\n\n## EPUB 图片与排版改进\n\n### 更准确的图片尺寸\n\n修复部分 EPUB 中小型装饰图片被异常放大、占满阅读区域的问题。\n\n- 普通图片优先按照原始尺寸显示，超出页面可用空间时再等比缩小。\n- 正确处理 EPUB 中通过 CSS 或 HTML 属性声明的图片宽度、高度及最大尺寸。\n- 改善封面、彩插和独立图片页的居中及缩放行为。\n- 修复双页阅读下部分独立图片被错误分栏的问题。\n- 保留正文图片与文字之间的间距及作者指定的布局。\n- 优化图片较多章节的布局处理。\n\n较小的章节分隔符、装饰图案现在不会仅因为独占一个内容块就被当成整页插图。\n\n### 图片背景适配阅读主题\n\n改善白色背景的文字图、线稿和小型黑白装饰图片在不同阅读主题下的显示效果。\n\n符合条件的图片可以自动融入当前纸色，在白纸、暖纸和夜间主题下保持协调。\n\n彩色插画、照片、透明图片及无法可靠识别的图片仍保留原始显示效果。查看原图或导出图片时，也不会修改原始内容。\n\n### 阅读位置与书签\n\n- 改善封面和独立图片页的阅读位置恢复。\n- 修复部分图片页前后存在空白内容时的分页问题。\n- 优化图片页的书签定位和重新解析后的位置迁移。\n- 调整桌面端书签界面的布局与显示细节。\n\n## 全新的 Windows 安装版\n\nWindows 现在提供两种发行方式。\n\n**安装版 EXE（推荐）**\n\n- 提供标准安装向导、开始菜单快捷方式和卸载功能。\n- 默认安装到当前用户目录，无需管理员权限。\n- 支持应用内自动下载和安装后续更新。\n- 更新或卸载时保留独立存储的书库、阅读进度和用户设置。\n\n**便携版 ZIP**\n\n- 完整解压后即可运行，无需安装。\n- 不创建系统安装记录。\n- 继续支持应用内自动更新。\n\n两种版本共用阅读功能，但各自采用适合其安装方式的更新流程。\n\n## 跨平台自动更新改进\n\n重新设计 Android、Windows 和 macOS 的应用内更新机制。\n\n- 使用统一的签名更新清单，减少重复的发布文件。\n- 保留签名清单验证与更新包的 SHA-256 完整性验证。\n- Windows 安装版使用新版安装器升级，便携版继续使用 ZIP 更新。\n- macOS 直接使用 DMG 完成安装和自动更新，不再额外提供更新 ZIP。\n- 改善升级失败后的状态恢复及用户文件保护。\n- 清理可安全识别的旧版更新缓存和临时工作目录。\n\nGitHub Release 附件也由原先的大量安装包、校验文件和平台元数据，精简为 **5 个安装包和 1 个签名更新清单**。\n\n## 官方网站与演示内容\n\nShiori 现在拥有独立的中英文官方网站，提供功能介绍、实际界面截图、平台下载入口及安装说明。\n\n**官方网站：** [https://memory1031.github.io/shiori-reader/](https://memory1031.github.io/shiori-reader/)\n\n同时新增原创 EPUB 展示小说《蓝色借书卡的最后一栏》，提供完整的中文及英文版本，可用于体验 Shiori 的分页阅读、插图、目录、全文搜索和书签功能。\n\n---\n\n## 下载与安装\n\n以下链接直接指向 GitHub Release 中的对应安装文件。\n\n| 平台 | 下载 | 说明 |\n| --- | --- | --- |\n| Android 7.0+ | [下载 APK](https://github.com/Memory1031/shiori-reader/releases/download/v1.4.1/shiori-reader-v1.4.1-android.apk) | 已签名安装包 |\n| Windows x64 | [下载安装版 EXE（推荐）](https://github.com/Memory1031/shiori-reader/releases/download/v1.4.1/shiori-reader-v1.4.1-windows-x64-setup.exe) | 标准安装、卸载与自动更新 |\n| Windows x64 | [下载便携版 ZIP](https://github.com/Memory1031/shiori-reader/releases/download/v1.4.1/shiori-reader-v1.4.1-windows-x64.zip) | 解压即用，支持自动更新 |\n| macOS 12.0+ | [下载通用 DMG](https://github.com/Memory1031/shiori-reader/releases/download/v1.4.1/shiori-reader-v1.4.1-macos-universal.dmg) | 支持 Apple Silicon 与 Intel |\n| iOS / iPadOS 15.0+ | [下载未签名 IPA](https://github.com/Memory1031/shiori-reader/releases/download/v1.4.1/shiori-reader-v1.4.1-ios-arm64-unsigned.ipa) | 需要用户自行签名安装 |\n\n也可以前往 [GitHub Release v1.4.1](https://github.com/Memory1031/shiori-reader/releases/tag/v1.4.1) 查看全部附件。\n\n### 安装注意事项\n\n**Windows：** 推荐使用 EXE 安装版。便携版需要先完整解压 ZIP，再运行 `shiori.exe`，不要只提取单个可执行文件。\n\n**macOS：** 打开 DMG 后，将 Shiori 拖入「应用程序」文件夹。当前版本未经过 Apple Developer ID 签名和公证，首次启动时可能需要在系统「隐私与安全性」中确认。请勿直接在 DMG 内运行应用进行更新。\n\n**iOS：** IPA 未签名，不能直接安装到 iPhone 或 iPad。用户需要自行完成签名和后续版本更新，部分功能可能依赖正确的 App Group 授权。\n\n### 从 v1.4.0 升级\n\n**重要：v1.4.1 使用新的自动更新协议，v1.4.0 无法通过旧版应用内更新机制直接升级到此版本。**\n\n请从上方链接手动下载并安装 v1.4.1。\n\n已有书库、阅读进度、书签和偏好设置独立保存在用户数据目录中，正常升级时会予以保留。\n\n安装 v1.4.1 后，Android、Windows 和 macOS 的正式发行版本将继续支持后续版本的应用内自动更新。\n\n如果已有本地 EPUB 的排版尚未更新，可以等待应用在安全条件下重新解析，或通过本地文件管理中的「重新解析」手动更新。\n\n---\n\n感谢使用 Shiori，也感谢所有反馈阅读兼容性问题的用户。\n\n**把喜欢的故事，留在手边。**\n",
+          "downloadURL": "https://github.com/Memory1031/shiori-reader/releases/download/v1.4.1/shiori-reader-v1.4.1-ios-arm64-unsigned.ipa",
+          "size": 16939802,
+          "sha256": "284c867fc7c486c91a5bc7bf3e2e41d150884aa9e5bb0c59ec654597838b1766",
+          "minOSVersion": "15.0"
+        },
+        {
+          "version": "1.4.0",
+          "buildVersion": "20",
+          "marketingVersion": "1.4.0",
+          "date": "2026-10-16T09:43:45Z",
+          "localizedDescription": "# Shiori 1.4.0\r\n\r\nShiori 1.4.0 是一次较大规模的功能与阅读体验更新。\r\n\r\n本次更新新增了 **macOS 支持、本地全书搜索和多位置书签**，让查找内容、记录喜欢的段落，以及在不同阅读位置之间往返变得更加方便。\r\n\r\n同时，书架新增批量管理功能，旧书的排版兼容性改进可以在安全条件下自动应用。EPUB 阅读器也进一步支持书籍内嵌字体、音频和更多原书排版样式。\r\n\r\n## 全书搜索与书签\r\n\r\n### 本地全书搜索\r\n\r\n现在可以直接在阅读器中搜索整本 EPUB 或 TXT 的内容。\r\n\r\n- 点击阅读器顶部的搜索按钮，即可查找书中的文字。\r\n- 搜索结果展示对应的章节和前后文，方便判断是否是想找的内容。\r\n- 选择结果后直接跳转到对应位置，并高亮匹配文字。\r\n- 搜索过程中可以继续浏览结果，关闭搜索后也能回到原来的阅读位置。\r\n- Windows 支持 `Ctrl+F`，macOS 支持 `⌘F`。\r\n\r\n全书搜索目前适用于**本地导入的 EPUB 和 TXT**，暂不支持在线书籍的全书搜索。\r\n\r\n### 多位置书签\r\n\r\n新增用户书签功能，可以为同一本书保存多个阅读位置。\r\n\r\n- 通过阅读器更多菜单添加或取消书签。\r\n- 在「我的书签」中集中查看、跳转或删除。\r\n- 本地书籍与在线书籍均支持书签。\r\n- 修改字号、纸张设置或窗口大小后，书签会尽量保持准确定位。\r\n- 清理缓存或阅读历史不会删除已保存的书签。\r\n\r\n书签会随着对应书籍的删除而移除。部分特殊版式页面暂不支持添加书签。\r\n\r\n### 阅读位置回跳\r\n\r\n查看书签、搜索结果或 EPUB 书内链接后，现在可以方便地返回跳转前的位置。\r\n\r\n- 跳转后会短暂显示快捷返回按钮。\r\n- 按钮隐藏后，仍然可以通过阅读器更多菜单返回。\r\n- 支持连续查找，以及书签、搜索和书内链接之间的多次跳转。\r\n- 跨章节查看内容后，也可以逐步回到之前的阅读位置。\r\n\r\n阅读时不必再担心查找某段内容后找不到原来的位置。\r\n\r\n## 全新 macOS 版本\r\n\r\n**Shiori 正式增加 macOS 支持。**\r\n\r\nmacOS 版本延续现有的桌面阅读体验，支持：\r\n\r\n- 本地 EPUB/TXT 导入与阅读。\r\n- 拖入文件或通过 Finder 打开书籍。\r\n- 键盘快捷键、鼠标和滚轮翻页。\r\n- 宽屏双页阅读、书架管理、全文搜索和书签。\r\n- 在线阅读、离线缓存及应用内更新。\r\n\r\nGitHub Releases 提供同时适用于 **Apple Silicon 和 Intel Mac** 的通用 DMG，系统要求为 macOS 12.0 或更新版本。\r\n\r\n**安装提醒：** macOS 版本未经过 Apple 开发者身份签名及公证，首次打开时可能受到系统安全机制限制。请将应用复制到「应用程序」文件夹或其他可写位置后运行，不要直接在 DMG 中使用应用内更新。\r\n\r\n## 书架与本地书籍管理\r\n\r\n### 批量管理\r\n\r\n书架和本地文件管理现在支持多选操作。\r\n\r\n- 一次选择多本书籍进行移除。\r\n- 批量重新解析本地 EPUB/TXT。\r\n- 查看每本书的处理结果。\r\n- 处理过程中可以停止，已经完成的操作不会被撤销。\r\n\r\n批量操作会在执行前提示确认，减少逐本处理的重复操作。\r\n\r\n### 旧书自动更新解析\r\n\r\n此前导入的 EPUB/TXT，现在可以在适当条件下自动应用新版解析器的兼容性改进。\r\n\r\n- 不需要为了获得新的排版支持而删除原书、重新导入。\r\n- 自动更新会尽量保留已有阅读位置和书签。\r\n- 如果无法可靠恢复位置、文字编码存在歧义或遇到其他问题，会保留原来的书籍数据。\r\n- 仍然可以从本地文件管理中手动选择「重新解析」。\r\n\r\n自动更新会在后台分批进行，不保证所有旧书在升级应用后立即完成处理。\r\n\r\n### 其他书架改进\r\n\r\n- 「继续阅读」优先展示尚未读完的书籍。\r\n- 书架的网格或列表布局选择现在会被记住。\r\n- 优化导入结果提示，更清楚地区分新增书籍、已有书籍和导入失败。\r\n- 改善批量导入的取消、重试与待处理文件保留。\r\n- 优化书架滚动区域和部分管理操作的交互。\r\n\r\n## EPUB 阅读兼容性增强\r\n\r\n1.4.0 继续扩展 Shiori 对轻小说 EPUB 的原生分页支持。\r\n\r\n### 更多原书排版样式\r\n\r\n- 支持部分 EPUB 内嵌的 TTF/OTF 字体，尽量保留作者指定的文字样式。\r\n- 改善带有背景图片、边框、圆角及装饰元素的页面显示。\r\n- 支持更多简单表格和装饰性标题结构。\r\n- 改善封面、扉页、插图和书中目录的布局。\r\n- 为部分原书缺少目录入口的封面、彩插和前置页面补充导航位置。\r\n- 改善书内链接及特殊版式页面的定位、显示和返回行为。\r\n\r\n对于无法完整还原的复杂样式，阅读器仍然优先保证文字可读，而不是强行显示可能错乱的排版。\r\n\r\n### EPUB 内嵌音频\r\n\r\n部分 EPUB 包含作者提供的音频内容，现在可以在阅读器中使用相应的播放与暂停控件。\r\n\r\n目前支持符合条件的包内 MP3 和 WAV 文件。音频不会自动播放，也不支持后台播放或与正文同步朗读。\r\n\r\n### 阅读器细节\r\n\r\n- 翻页时的章节进度显示更加及时。\r\n- 从搜索结果、书签或书内链接跳转时，增加更自然的位置切换效果。\r\n- 打开目录后，可以更方便地找到当前阅读的小节。\r\n- 关闭并重新打开目录时，在适当条件下保留之前浏览的位置和展开状态。\r\n- 阅读设置与弹出菜单的颜色更加统一，暖纸和夜间主题下的显示效果进一步改善。\r\n- 优化部分阅读加载、翻页和位置恢复场景，减少不必要的画面变化。\r\n\r\n## 在线阅读与离线体验\r\n\r\n- 优化在线书籍的目录加载与刷新，缺少目录数据时可按需获取。\r\n- 阅读器目录可以标记当前正文小节。\r\n- 在线书籍的已缓存内容现在可以直接从缓存管理页面打开阅读。\r\n- 改善章节预取、离线内容切换和取消操作的稳定性。\r\n- 优化网络异常、阅读进度保存失败等情况的提示与重试。\r\n\r\n在线阅读仍依赖第三方书源，已缓存内容的离线可用性取决于实际保存的章节和资源。\r\n\r\n## 界面与稳定性改进\r\n\r\n- 调整 Android、iOS 和 Windows 的原生启动画面，使其与 Shiori 的整体视觉更加一致。\r\n- 统一部分操作成功、失败和重试提示的显示方式。\r\n- 改善正常退出应用时的阅读进度保存。\r\n- 提高导入、删除、重新解析以及缓存管理过程中的数据处理可靠性。\r\n- 修复多项涉及阅读位置、章节切换、异步加载和取消操作的问题。\r\n\r\n## 下载与安装\r\n\r\n1.4.0 通过 GitHub Releases 提供以下安装文件：\r\n\r\n| 平台                 | 分发方式                         |\r\n| ------------------ | ---------------------------- |\r\n| Android 7.0+       | 已签名 APK                      |\r\n| Windows x64        | 便携 ZIP                       |\r\n| macOS 12.0+        | Apple Silicon / Intel 通用 DMG |\r\n| iOS / iPadOS 15.0+ | 未签名 IPA，供用户自行签名安装            |\r\n\r\n**iOS 用户请注意：** GitHub 提供的 IPA 不能直接安装到设备上，需要自行完成签名及后续更新。应用内文件导入针对缺少 App Group 授权的情况增加了兼容处理，但系统分享扩展仍需要正确的签名和 App Group 配置，不保证所有自签工具均可完整支持。\r\n\r\nAndroid、Windows 和 macOS 的正式发布版本支持通过应用内检查更新。iOS 的安装与更新仍由用户采用的签名或分发渠道管理。\r\n\r\n## 升级前请注意\r\n\r\n**在线书籍移除行为有所变化。**\r\n\r\n从 1.4.0 开始，确认将在线书籍从书架或详情页移除时，会同时清除该书的阅读进度、用户书签和相关缓存。这与 1.3.1 中移除在线书籍后保留阅读历史的行为不同。\r\n\r\n如果只是想释放存储空间，请使用**清理缓存**，不要移除书籍。单独清理缓存不会删除阅读进度和书签。\r\n\r\n本地书籍的移除仍会删除 Shiori 保存的导入副本、解析内容、阅读进度与书签，但不会影响设备上的外部原文件。\r\n\r\n已有本地书籍升级后可以继续阅读。新的 EPUB 排版支持会在安全条件下逐步应用；如遇到排版问题，可以尝试通过「重新解析」更新书籍内容。\r\n\r\nShiori 仍以本地 EPUB/TXT 阅读为核心，不支持 DRM 保护书籍、PDF、完整固定版式 EPUB 或云同步。\r\n\r\n感谢使用 Shiori。\r\n\r\n**把喜欢的故事，留在手边。**\r\n",
+          "downloadURL": "https://github.com/Memory1031/shiori-reader/releases/download/v1.4.0/shiori-reader-v1.4.0-ios-arm64-unsigned.ipa",
+          "size": 16920311,
+          "sha256": "1c6b69258d942d969af5eb6ddf56f165da69ecaea3b839f6c6b5869c71dbdb09",
+          "minOSVersion": "15.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [
+          "com.apple.security.application-groups"
+        ],
+        "privacy": {
+          "NSPhotoLibraryAddUsageDescription": "Save original illustrations you choose to your photo library."
+        }
+      }
+    }
+  ],
+  "news": []
+}

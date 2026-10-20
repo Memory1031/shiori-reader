@@ -278,6 +278,14 @@ void main() {
   final updateSigning =
       publisherSteps[publisherIndex('update_manifest.py manifest')]['env']
           as YamlMap;
+  final altStoreIndex = publisherIndex('publish_altstore.py --publish');
+  if (altStoreIndex <= publisherIndex('publish_assets.py') ||
+      publisherSteps[altStoreIndex]['env']?['GH_TOKEN'] !=
+          r'${{ github.token }}') {
+    throw StateError(
+      'AltStore sources must update only after complete Release publication',
+    );
+  }
   if (updateSigning['UPDATE_SIGNING_KEY_PEM_B64'] !=
           r'${{ secrets.UPDATE_SIGNING_KEY_PEM_B64 }}' ||
       updateSigning['UPDATE_PUBLIC_KEY_JSON'] !=
