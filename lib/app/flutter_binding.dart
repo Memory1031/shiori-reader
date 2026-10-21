@@ -1,13 +1,17 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
-/// Flutter 3.38's Windows engine requires int64 view IDs, while the standard
-/// codec encodes small IDs as int32. Keep announcements intact until the pinned
-/// SDK includes https://github.com/flutter/flutter/pull/180071.
 /// Instantiate before runApp in both application entry points.
 class ShioriWidgetsFlutterBinding extends WidgetsFlutterBinding {
+  ShioriWidgetsFlutterBinding() {
+    if (Platform.isMacOS) {
+      unawaited(dismissMacOSLaunchScreen(waitUntilFirstFrameRasterized));
+    }
+  }
+
   @override
   BinaryMessenger createBinaryMessenger() {
     final messenger = super.createBinaryMessenger();
@@ -17,6 +21,23 @@ class ShioriWidgetsFlutterBinding extends WidgetsFlutterBinding {
   }
 }
 
+/// The native cover stays visible until Flutter has actual pixels to present.
+Future<void> dismissMacOSLaunchScreen(Future<void> firstFrame) async {
+  await firstFrame;
+  try {
+    await const MethodChannel(
+      'dev.shiori.reader/launch',
+    ).invokeMethod<void>('firstFrame');
+  } on MissingPluginException {
+    // Older native runners and test hosts have no launch cover.
+  } on PlatformException {
+    // A failed cosmetic notification must not abort application startup.
+  }
+}
+
+/// Flutter 3.38's Windows engine requires int64 view IDs, while the standard
+/// codec encodes small IDs as int32. Keep announcements intact until the pinned
+/// SDK includes https://github.com/flutter/flutter/pull/180071.
 class WindowsAccessibilityMessenger extends BinaryMessenger {
   const WindowsAccessibilityMessenger(this.delegate);
 

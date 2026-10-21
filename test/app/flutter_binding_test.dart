@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
@@ -48,6 +50,55 @@ class RecordingMessenger extends BinaryMessenger {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'native launch cover is dismissed only after the first rasterized frame',
+    () async {
+      final binding = TestDefaultBinaryMessengerBinding.instance;
+      const channel = MethodChannel('dev.shiori.reader/launch');
+      final calls = <String>[];
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        calls.add(call.method);
+        return null;
+      });
+      addTearDown(
+        () => binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+      final frame = Completer<void>();
+      final dismissing = dismissMacOSLaunchScreen(frame.future);
+      await Future<void>.value();
+      expect(calls, isEmpty);
+      frame.complete();
+      await dismissing;
+      expect(calls, ['firstFrame']);
+    },
+  );
+
+  test(
+    'missing or failed native launch notification does not abort startup',
+    () async {
+      final binding = TestDefaultBinaryMessengerBinding.instance;
+      const channel = MethodChannel('dev.shiori.reader/launch');
+      await dismissMacOSLaunchScreen(Future<void>.value());
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        _,
+      ) async {
+        throw PlatformException(code: 'unavailable');
+      });
+      addTearDown(
+        () => binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        ),
+      );
+      await dismissMacOSLaunchScreen(Future<void>.value());
+    },
+  );
 
   test(
     'Windows announcements preserve values and encode only viewId as int64',
