@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:shiori/features/statistics/reading_statistics_controller.dart';
+import 'package:shiori/shared/widgets/reading_statistics_scope.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -162,6 +164,7 @@ Future<ReturnReader> mount(
   bool reduceMotion = false,
   ReturnRepository Function(MemoryBooks)? repositoryFactory,
   UserBookmarkRepository? bookmarks,
+  ReadingStatisticsController? statistics,
 }) async {
   tester.view
     ..physicalSize = size
@@ -197,12 +200,22 @@ Future<ReturnReader> mount(
       key: boundary,
       child: ShioriApp(
         locale: Locale(language),
-        overlayBuilder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(scale),
-            disableAnimations: reduceMotion,
-          ),
-          child: child,
+        navigatorObservers: [
+          if (statistics != null) ReadingStatisticsObserver(statistics),
+        ],
+        overlayBuilder: (context, child) => Builder(
+          builder: (_) {
+            final media = MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(scale),
+                disableAnimations: reduceMotion,
+              ),
+              child: child,
+            );
+            return statistics == null
+                ? media
+                : ReadingStatisticsScope(controller: statistics, child: media);
+          },
         ),
         routes: AppRoutes(
           home: (_) => BookReaderScreen(

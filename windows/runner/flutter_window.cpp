@@ -121,6 +121,14 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  reading_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "dev.shiori.reader/reading",
+      &flutter::StandardMethodCodec::GetInstance());
+  reading_active_ = GetForegroundWindow() == GetHandle();
+  reading_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
+    if (call.method_name() == "state") result->Success(ReadingState());
+    else result->NotImplemented();
+  });
   app_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
       flutter_controller_->engine()->messenger(), "dev.shiori.reader/app",
       &flutter::StandardMethodCodec::GetInstance());
@@ -252,6 +260,7 @@ void FlutterWindow::OnDestroy() {
   drop_sink_.reset();
   drop_channel_.reset();
   if (app_channel_) app_channel_->SetMethodCallHandler(nullptr);
+  reading_channel_.reset();
   app_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
@@ -260,11 +269,32 @@ void FlutterWindow::OnDestroy() {
   Win32Window::OnDestroy();
 }
 
+flutter::EncodableValue FlutterWindow::ReadingState(bool wake) {
+  return flutter::EncodableValue(flutter::EncodableMap{
+    {flutter::EncodableValue("available"), flutter::EncodableValue(reading_active_ && !reading_suspended_ && !IsIconic(GetHandle()))},
+    {flutter::EncodableValue("wake"), flutter::EncodableValue(wake)}});
+}
+void FlutterWindow::SendReadingState(bool wake) {
+  if (reading_channel_) reading_channel_->InvokeMethod("state", std::make_unique<flutter::EncodableValue>(ReadingState(wake)));
+}
+
 LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
   if (message == WM_CLOSE) exit_pending_ = true;
+  if (message == WM_ACTIVATE) {
+    reading_active_ = LOWORD(wparam) != WA_INACTIVE;
+    SendReadingState();
+  }
+  if (message == WM_SIZE) SendReadingState();
+  if (message == WM_POWERBROADCAST) {
+    if (wparam == PBT_APMSUSPEND) { reading_suspended_ = true; SendReadingState(); }
+    if (wparam == PBT_APMRESUMEAUTOMATIC || wparam == PBT_APMRESUMESUSPEND) {
+      reading_suspended_ = false; SendReadingState(true);
+    }
+  }
+
   if (message == SingleInstance::ActivationMessage()) {
     if (exit_pending_) return 2;
     ShowWindow(hwnd, IsIconic(hwnd) ? SW_RESTORE : SW_SHOW);

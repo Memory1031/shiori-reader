@@ -3157,6 +3157,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Back to before bookmark navigation'**
   String get readerBookmarkReturn;
+
+  /// No description provided for @statisticsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading statistics'**
+  String get statisticsTitle;
+
+  /// No description provided for @statisticsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Statistics'**
+  String get statisticsTab;
+
+  /// No description provided for @statisticsManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage records'**
+  String get statisticsManage;
+
+  /// No description provided for @statisticsNoticeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading statistics are on'**
+  String get statisticsNoticeTitle;
+
+  /// No description provided for @statisticsNoticeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading time stays on this device. You can pause or clear it at any time.'**
+  String get statisticsNoticeBody;
+
+  /// No description provided for @statisticsToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today’s reading'**
+  String get statisticsToday;
+
+  /// No description provided for @statisticsLifetime.
+  ///
+  /// In en, this message translates to:
+  /// **'Total reading'**
+  String get statisticsLifetime;
+
+  /// No description provided for @statisticsDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading time'**
+  String get statisticsDuration;
+
+  /// No description provided for @statisticsSeven.
+  ///
+  /// In en, this message translates to:
+  /// **'7 days'**
+  String get statisticsSeven;
+
+  /// No description provided for @statisticsThirty.
+  ///
+  /// In en, this message translates to:
+  /// **'30 days'**
+  String get statisticsThirty;
+
+  /// No description provided for @statisticsYear.
+  ///
+  /// In en, this message translates to:
+  /// **'12 months'**
+  String get statisticsYear;
+
+  /// No description provided for @statisticsBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'Read in this period'**
+  String get statisticsBooks;
+
+  /// No description provided for @statisticsAnonymous.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed books'**
+  String get statisticsAnonymous;
+
+  /// No description provided for @statisticsAnonymousHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only total reading time is retained'**
+  String get statisticsAnonymousHint;
+
+  /// No description provided for @statisticsMissingBook.
+  ///
+  /// In en, this message translates to:
+  /// **'Book details unavailable'**
+  String get statisticsMissingBook;
+
+  /// No description provided for @statisticsLocalOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading records stay on this device.'**
+  String get statisticsLocalOnly;
+
+  /// No description provided for @statisticsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No reading recorded today. Your time will appear here after you start reading.'**
+  String get statisticsEmpty;
+
+  /// No description provided for @statisticsPeriodEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No reading recorded in this period.'**
+  String get statisticsPeriodEmpty;
+
+  /// No description provided for @statisticsPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording is paused.'**
+  String get statisticsPaused;
+
+  /// No description provided for @statisticsEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume recording'**
+  String get statisticsEnable;
+
+  /// No description provided for @statisticsRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Record reading time'**
+  String get statisticsRecording;
+
+  /// No description provided for @statisticsPauseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause new records and keep existing statistics.'**
+  String get statisticsPauseHint;
+
+  /// No description provided for @statisticsRulesSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Records active foreground reading. Timing stops after 300 seconds without reading activity.'**
+  String get statisticsRulesSummary;
+
+  /// No description provided for @statisticsRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get statisticsRulesTitle;
+
+  /// No description provided for @statisticsRulesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Text, illustrations, image previews and footnotes count. The reading toolbar does not pause timing. Contents, bookmarks, search and reading settings pause it; closing a panel to return to the text resumes reading. Background time, locked screens, unfocused and minimized desktop windows do not count. Automatic recovery does not reset the idle limit. Special WebView documents are currently excluded.'**
+  String get statisticsRulesBody;
+
+  /// No description provided for @statisticsRetention.
+  ///
+  /// In en, this message translates to:
+  /// **'Removing a book keeps only daily totals without its title. Records do not expire automatically and can be cleared at any time.'**
+  String get statisticsRetention;
+
+  /// No description provided for @statisticsClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear reading statistics'**
+  String get statisticsClear;
+
+  /// No description provided for @statisticsClearConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear reading statistics?'**
+  String get statisticsClearConfirm;
+
+  /// No description provided for @statisticsClearBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear reading time and per-book statistics without affecting your bookshelf, reading position or bookmarks.'**
+  String get statisticsClearBody;
+
+  /// No description provided for @statisticsClearEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading after clearing will still be recorded.'**
+  String get statisticsClearEnabled;
+
+  /// No description provided for @statisticsError.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading records are temporarily unavailable. Retry to load your existing data.'**
+  String get statisticsError;
+
+  /// No description provided for @statisticsUnderMinute.
+  ///
+  /// In en, this message translates to:
+  /// **'Less than 1 minute'**
+  String get statisticsUnderMinute;
+
+  /// No description provided for @statisticsMinutesUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'min'**
+  String get statisticsMinutesUnit;
+
+  /// No description provided for @statisticsHoursUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'h'**
+  String get statisticsHoursUnit;
+
+  /// No description provided for @statisticsChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading time chart. Adjust left or right to read each date and duration'**
+  String get statisticsChart;
+
+  /// No description provided for @statisticsUntilToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Through today'**
+  String get statisticsUntilToday;
+
+  /// No description provided for @statisticsTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get statisticsTotal;
+
+  /// No description provided for @statisticsMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min'**
+  String statisticsMinutes(String count);
+
+  /// No description provided for @statisticsHoursMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h {minutes} min'**
+  String statisticsHoursMinutes(String hours, String minutes);
+
+  /// No description provided for @statisticsSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording since {date}'**
+  String statisticsSince(String date);
 }
 
 class _AppLocalizationsDelegate

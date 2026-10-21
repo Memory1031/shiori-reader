@@ -4950,6 +4950,1381 @@ class UserBookmarksCompanion extends UpdateCompanion<UserBookmark> {
   }
 }
 
+class ReadingStatisticsState extends Table
+    with TableInfo<ReadingStatisticsState, ReadingStatisticsStateData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  ReadingStatisticsState(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL PRIMARY KEY CHECK (id = 1)',
+  );
+  static const VerificationMeta _enabledMeta = const VerificationMeta(
+    'enabled',
+  );
+  late final GeneratedColumn<int> enabled = GeneratedColumn<int>(
+    'enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1))',
+    defaultValue: const CustomExpression('1'),
+  );
+  static const VerificationMeta _noticeSeenMeta = const VerificationMeta(
+    'noticeSeen',
+  );
+  late final GeneratedColumn<int> noticeSeen = GeneratedColumn<int>(
+    'notice_seen',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 0 CHECK (notice_seen IN (0, 1))',
+    defaultValue: const CustomExpression('0'),
+  );
+  static const VerificationMeta _epochMeta = const VerificationMeta('epoch');
+  late final GeneratedColumn<int> epoch = GeneratedColumn<int>(
+    'epoch',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 0 CHECK (epoch >= 0)',
+    defaultValue: const CustomExpression('0'),
+  );
+  static const VerificationMeta _startedDayMeta = const VerificationMeta(
+    'startedDay',
+  );
+  late final GeneratedColumn<int> startedDay = GeneratedColumn<int>(
+    'started_day',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    enabled,
+    noticeSeen,
+    epoch,
+    startedDay,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'reading_statistics_state';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ReadingStatisticsStateData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('enabled')) {
+      context.handle(
+        _enabledMeta,
+        enabled.isAcceptableOrUnknown(data['enabled']!, _enabledMeta),
+      );
+    }
+    if (data.containsKey('notice_seen')) {
+      context.handle(
+        _noticeSeenMeta,
+        noticeSeen.isAcceptableOrUnknown(data['notice_seen']!, _noticeSeenMeta),
+      );
+    }
+    if (data.containsKey('epoch')) {
+      context.handle(
+        _epochMeta,
+        epoch.isAcceptableOrUnknown(data['epoch']!, _epochMeta),
+      );
+    }
+    if (data.containsKey('started_day')) {
+      context.handle(
+        _startedDayMeta,
+        startedDay.isAcceptableOrUnknown(data['started_day']!, _startedDayMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ReadingStatisticsStateData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReadingStatisticsStateData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      enabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}enabled'],
+      )!,
+      noticeSeen: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}notice_seen'],
+      )!,
+      epoch: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}epoch'],
+      )!,
+      startedDay: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}started_day'],
+      ),
+    );
+  }
+
+  @override
+  ReadingStatisticsState createAlias(String alias) {
+    return ReadingStatisticsState(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class ReadingStatisticsStateData extends DataClass
+    implements Insertable<ReadingStatisticsStateData> {
+  final int id;
+  final int enabled;
+  final int noticeSeen;
+  final int epoch;
+  final int? startedDay;
+  const ReadingStatisticsStateData({
+    required this.id,
+    required this.enabled,
+    required this.noticeSeen,
+    required this.epoch,
+    this.startedDay,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['enabled'] = Variable<int>(enabled);
+    map['notice_seen'] = Variable<int>(noticeSeen);
+    map['epoch'] = Variable<int>(epoch);
+    if (!nullToAbsent || startedDay != null) {
+      map['started_day'] = Variable<int>(startedDay);
+    }
+    return map;
+  }
+
+  ReadingStatisticsStateCompanion toCompanion(bool nullToAbsent) {
+    return ReadingStatisticsStateCompanion(
+      id: Value(id),
+      enabled: Value(enabled),
+      noticeSeen: Value(noticeSeen),
+      epoch: Value(epoch),
+      startedDay: startedDay == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedDay),
+    );
+  }
+
+  factory ReadingStatisticsStateData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReadingStatisticsStateData(
+      id: serializer.fromJson<int>(json['id']),
+      enabled: serializer.fromJson<int>(json['enabled']),
+      noticeSeen: serializer.fromJson<int>(json['notice_seen']),
+      epoch: serializer.fromJson<int>(json['epoch']),
+      startedDay: serializer.fromJson<int?>(json['started_day']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'enabled': serializer.toJson<int>(enabled),
+      'notice_seen': serializer.toJson<int>(noticeSeen),
+      'epoch': serializer.toJson<int>(epoch),
+      'started_day': serializer.toJson<int?>(startedDay),
+    };
+  }
+
+  ReadingStatisticsStateData copyWith({
+    int? id,
+    int? enabled,
+    int? noticeSeen,
+    int? epoch,
+    Value<int?> startedDay = const Value.absent(),
+  }) => ReadingStatisticsStateData(
+    id: id ?? this.id,
+    enabled: enabled ?? this.enabled,
+    noticeSeen: noticeSeen ?? this.noticeSeen,
+    epoch: epoch ?? this.epoch,
+    startedDay: startedDay.present ? startedDay.value : this.startedDay,
+  );
+  ReadingStatisticsStateData copyWithCompanion(
+    ReadingStatisticsStateCompanion data,
+  ) {
+    return ReadingStatisticsStateData(
+      id: data.id.present ? data.id.value : this.id,
+      enabled: data.enabled.present ? data.enabled.value : this.enabled,
+      noticeSeen: data.noticeSeen.present
+          ? data.noticeSeen.value
+          : this.noticeSeen,
+      epoch: data.epoch.present ? data.epoch.value : this.epoch,
+      startedDay: data.startedDay.present
+          ? data.startedDay.value
+          : this.startedDay,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingStatisticsStateData(')
+          ..write('id: $id, ')
+          ..write('enabled: $enabled, ')
+          ..write('noticeSeen: $noticeSeen, ')
+          ..write('epoch: $epoch, ')
+          ..write('startedDay: $startedDay')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, enabled, noticeSeen, epoch, startedDay);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReadingStatisticsStateData &&
+          other.id == this.id &&
+          other.enabled == this.enabled &&
+          other.noticeSeen == this.noticeSeen &&
+          other.epoch == this.epoch &&
+          other.startedDay == this.startedDay);
+}
+
+class ReadingStatisticsStateCompanion
+    extends UpdateCompanion<ReadingStatisticsStateData> {
+  final Value<int> id;
+  final Value<int> enabled;
+  final Value<int> noticeSeen;
+  final Value<int> epoch;
+  final Value<int?> startedDay;
+  const ReadingStatisticsStateCompanion({
+    this.id = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.noticeSeen = const Value.absent(),
+    this.epoch = const Value.absent(),
+    this.startedDay = const Value.absent(),
+  });
+  ReadingStatisticsStateCompanion.insert({
+    this.id = const Value.absent(),
+    this.enabled = const Value.absent(),
+    this.noticeSeen = const Value.absent(),
+    this.epoch = const Value.absent(),
+    this.startedDay = const Value.absent(),
+  });
+  static Insertable<ReadingStatisticsStateData> custom({
+    Expression<int>? id,
+    Expression<int>? enabled,
+    Expression<int>? noticeSeen,
+    Expression<int>? epoch,
+    Expression<int>? startedDay,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (enabled != null) 'enabled': enabled,
+      if (noticeSeen != null) 'notice_seen': noticeSeen,
+      if (epoch != null) 'epoch': epoch,
+      if (startedDay != null) 'started_day': startedDay,
+    });
+  }
+
+  ReadingStatisticsStateCompanion copyWith({
+    Value<int>? id,
+    Value<int>? enabled,
+    Value<int>? noticeSeen,
+    Value<int>? epoch,
+    Value<int?>? startedDay,
+  }) {
+    return ReadingStatisticsStateCompanion(
+      id: id ?? this.id,
+      enabled: enabled ?? this.enabled,
+      noticeSeen: noticeSeen ?? this.noticeSeen,
+      epoch: epoch ?? this.epoch,
+      startedDay: startedDay ?? this.startedDay,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (enabled.present) {
+      map['enabled'] = Variable<int>(enabled.value);
+    }
+    if (noticeSeen.present) {
+      map['notice_seen'] = Variable<int>(noticeSeen.value);
+    }
+    if (epoch.present) {
+      map['epoch'] = Variable<int>(epoch.value);
+    }
+    if (startedDay.present) {
+      map['started_day'] = Variable<int>(startedDay.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingStatisticsStateCompanion(')
+          ..write('id: $id, ')
+          ..write('enabled: $enabled, ')
+          ..write('noticeSeen: $noticeSeen, ')
+          ..write('epoch: $epoch, ')
+          ..write('startedDay: $startedDay')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class ReadingStatisticsDays extends Table
+    with TableInfo<ReadingStatisticsDays, ReadingStatisticsDay> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  ReadingStatisticsDays(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _dayMeta = const VerificationMeta('day');
+  late final GeneratedColumn<int> day = GeneratedColumn<int>(
+    'day',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _millisecondsMeta = const VerificationMeta(
+    'milliseconds',
+  );
+  late final GeneratedColumn<int> milliseconds = GeneratedColumn<int>(
+    'milliseconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (milliseconds >= 0)',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [day, milliseconds];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'reading_statistics_days';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ReadingStatisticsDay> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('day')) {
+      context.handle(
+        _dayMeta,
+        day.isAcceptableOrUnknown(data['day']!, _dayMeta),
+      );
+    }
+    if (data.containsKey('milliseconds')) {
+      context.handle(
+        _millisecondsMeta,
+        milliseconds.isAcceptableOrUnknown(
+          data['milliseconds']!,
+          _millisecondsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_millisecondsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {day};
+  @override
+  ReadingStatisticsDay map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReadingStatisticsDay(
+      day: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}day'],
+      )!,
+      milliseconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}milliseconds'],
+      )!,
+    );
+  }
+
+  @override
+  ReadingStatisticsDays createAlias(String alias) {
+    return ReadingStatisticsDays(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class ReadingStatisticsDay extends DataClass
+    implements Insertable<ReadingStatisticsDay> {
+  final int day;
+  final int milliseconds;
+  const ReadingStatisticsDay({required this.day, required this.milliseconds});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['day'] = Variable<int>(day);
+    map['milliseconds'] = Variable<int>(milliseconds);
+    return map;
+  }
+
+  ReadingStatisticsDaysCompanion toCompanion(bool nullToAbsent) {
+    return ReadingStatisticsDaysCompanion(
+      day: Value(day),
+      milliseconds: Value(milliseconds),
+    );
+  }
+
+  factory ReadingStatisticsDay.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReadingStatisticsDay(
+      day: serializer.fromJson<int>(json['day']),
+      milliseconds: serializer.fromJson<int>(json['milliseconds']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'day': serializer.toJson<int>(day),
+      'milliseconds': serializer.toJson<int>(milliseconds),
+    };
+  }
+
+  ReadingStatisticsDay copyWith({int? day, int? milliseconds}) =>
+      ReadingStatisticsDay(
+        day: day ?? this.day,
+        milliseconds: milliseconds ?? this.milliseconds,
+      );
+  ReadingStatisticsDay copyWithCompanion(ReadingStatisticsDaysCompanion data) {
+    return ReadingStatisticsDay(
+      day: data.day.present ? data.day.value : this.day,
+      milliseconds: data.milliseconds.present
+          ? data.milliseconds.value
+          : this.milliseconds,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingStatisticsDay(')
+          ..write('day: $day, ')
+          ..write('milliseconds: $milliseconds')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(day, milliseconds);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReadingStatisticsDay &&
+          other.day == this.day &&
+          other.milliseconds == this.milliseconds);
+}
+
+class ReadingStatisticsDaysCompanion
+    extends UpdateCompanion<ReadingStatisticsDay> {
+  final Value<int> day;
+  final Value<int> milliseconds;
+  const ReadingStatisticsDaysCompanion({
+    this.day = const Value.absent(),
+    this.milliseconds = const Value.absent(),
+  });
+  ReadingStatisticsDaysCompanion.insert({
+    this.day = const Value.absent(),
+    required int milliseconds,
+  }) : milliseconds = Value(milliseconds);
+  static Insertable<ReadingStatisticsDay> custom({
+    Expression<int>? day,
+    Expression<int>? milliseconds,
+  }) {
+    return RawValuesInsertable({
+      if (day != null) 'day': day,
+      if (milliseconds != null) 'milliseconds': milliseconds,
+    });
+  }
+
+  ReadingStatisticsDaysCompanion copyWith({
+    Value<int>? day,
+    Value<int>? milliseconds,
+  }) {
+    return ReadingStatisticsDaysCompanion(
+      day: day ?? this.day,
+      milliseconds: milliseconds ?? this.milliseconds,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (day.present) {
+      map['day'] = Variable<int>(day.value);
+    }
+    if (milliseconds.present) {
+      map['milliseconds'] = Variable<int>(milliseconds.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingStatisticsDaysCompanion(')
+          ..write('day: $day, ')
+          ..write('milliseconds: $milliseconds')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class ReadingStatisticsBooks extends Table
+    with TableInfo<ReadingStatisticsBooks, ReadingStatisticsBook> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  ReadingStatisticsBooks(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _dayMeta = const VerificationMeta('day');
+  late final GeneratedColumn<int> day = GeneratedColumn<int>(
+    'day',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _novelIdMeta = const VerificationMeta(
+    'novelId',
+  );
+  late final GeneratedColumn<String> novelId = GeneratedColumn<String>(
+    'novel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _millisecondsMeta = const VerificationMeta(
+    'milliseconds',
+  );
+  late final GeneratedColumn<int> milliseconds = GeneratedColumn<int>(
+    'milliseconds',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL CHECK (milliseconds >= 0)',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [day, sourceId, novelId, milliseconds];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'reading_statistics_books';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ReadingStatisticsBook> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('day')) {
+      context.handle(
+        _dayMeta,
+        day.isAcceptableOrUnknown(data['day']!, _dayMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dayMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('novel_id')) {
+      context.handle(
+        _novelIdMeta,
+        novelId.isAcceptableOrUnknown(data['novel_id']!, _novelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_novelIdMeta);
+    }
+    if (data.containsKey('milliseconds')) {
+      context.handle(
+        _millisecondsMeta,
+        milliseconds.isAcceptableOrUnknown(
+          data['milliseconds']!,
+          _millisecondsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_millisecondsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {day, sourceId, novelId};
+  @override
+  ReadingStatisticsBook map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReadingStatisticsBook(
+      day: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}day'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      novelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}novel_id'],
+      )!,
+      milliseconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}milliseconds'],
+      )!,
+    );
+  }
+
+  @override
+  ReadingStatisticsBooks createAlias(String alias) {
+    return ReadingStatisticsBooks(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'PRIMARY KEY(day, source_id, novel_id)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class ReadingStatisticsBook extends DataClass
+    implements Insertable<ReadingStatisticsBook> {
+  final int day;
+  final String sourceId;
+  final String novelId;
+  final int milliseconds;
+  const ReadingStatisticsBook({
+    required this.day,
+    required this.sourceId,
+    required this.novelId,
+    required this.milliseconds,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['day'] = Variable<int>(day);
+    map['source_id'] = Variable<String>(sourceId);
+    map['novel_id'] = Variable<String>(novelId);
+    map['milliseconds'] = Variable<int>(milliseconds);
+    return map;
+  }
+
+  ReadingStatisticsBooksCompanion toCompanion(bool nullToAbsent) {
+    return ReadingStatisticsBooksCompanion(
+      day: Value(day),
+      sourceId: Value(sourceId),
+      novelId: Value(novelId),
+      milliseconds: Value(milliseconds),
+    );
+  }
+
+  factory ReadingStatisticsBook.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReadingStatisticsBook(
+      day: serializer.fromJson<int>(json['day']),
+      sourceId: serializer.fromJson<String>(json['source_id']),
+      novelId: serializer.fromJson<String>(json['novel_id']),
+      milliseconds: serializer.fromJson<int>(json['milliseconds']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'day': serializer.toJson<int>(day),
+      'source_id': serializer.toJson<String>(sourceId),
+      'novel_id': serializer.toJson<String>(novelId),
+      'milliseconds': serializer.toJson<int>(milliseconds),
+    };
+  }
+
+  ReadingStatisticsBook copyWith({
+    int? day,
+    String? sourceId,
+    String? novelId,
+    int? milliseconds,
+  }) => ReadingStatisticsBook(
+    day: day ?? this.day,
+    sourceId: sourceId ?? this.sourceId,
+    novelId: novelId ?? this.novelId,
+    milliseconds: milliseconds ?? this.milliseconds,
+  );
+  ReadingStatisticsBook copyWithCompanion(
+    ReadingStatisticsBooksCompanion data,
+  ) {
+    return ReadingStatisticsBook(
+      day: data.day.present ? data.day.value : this.day,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      novelId: data.novelId.present ? data.novelId.value : this.novelId,
+      milliseconds: data.milliseconds.present
+          ? data.milliseconds.value
+          : this.milliseconds,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingStatisticsBook(')
+          ..write('day: $day, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('milliseconds: $milliseconds')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(day, sourceId, novelId, milliseconds);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReadingStatisticsBook &&
+          other.day == this.day &&
+          other.sourceId == this.sourceId &&
+          other.novelId == this.novelId &&
+          other.milliseconds == this.milliseconds);
+}
+
+class ReadingStatisticsBooksCompanion
+    extends UpdateCompanion<ReadingStatisticsBook> {
+  final Value<int> day;
+  final Value<String> sourceId;
+  final Value<String> novelId;
+  final Value<int> milliseconds;
+  final Value<int> rowid;
+  const ReadingStatisticsBooksCompanion({
+    this.day = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.novelId = const Value.absent(),
+    this.milliseconds = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ReadingStatisticsBooksCompanion.insert({
+    required int day,
+    required String sourceId,
+    required String novelId,
+    required int milliseconds,
+    this.rowid = const Value.absent(),
+  }) : day = Value(day),
+       sourceId = Value(sourceId),
+       novelId = Value(novelId),
+       milliseconds = Value(milliseconds);
+  static Insertable<ReadingStatisticsBook> custom({
+    Expression<int>? day,
+    Expression<String>? sourceId,
+    Expression<String>? novelId,
+    Expression<int>? milliseconds,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (day != null) 'day': day,
+      if (sourceId != null) 'source_id': sourceId,
+      if (novelId != null) 'novel_id': novelId,
+      if (milliseconds != null) 'milliseconds': milliseconds,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ReadingStatisticsBooksCompanion copyWith({
+    Value<int>? day,
+    Value<String>? sourceId,
+    Value<String>? novelId,
+    Value<int>? milliseconds,
+    Value<int>? rowid,
+  }) {
+    return ReadingStatisticsBooksCompanion(
+      day: day ?? this.day,
+      sourceId: sourceId ?? this.sourceId,
+      novelId: novelId ?? this.novelId,
+      milliseconds: milliseconds ?? this.milliseconds,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (day.present) {
+      map['day'] = Variable<int>(day.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (novelId.present) {
+      map['novel_id'] = Variable<String>(novelId.value);
+    }
+    if (milliseconds.present) {
+      map['milliseconds'] = Variable<int>(milliseconds.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingStatisticsBooksCompanion(')
+          ..write('day: $day, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('milliseconds: $milliseconds, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class ReadingStatisticsCheckpoints extends Table
+    with TableInfo<ReadingStatisticsCheckpoints, ReadingStatisticsCheckpoint> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  ReadingStatisticsCheckpoints(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _novelIdMeta = const VerificationMeta(
+    'novelId',
+  );
+  late final GeneratedColumn<String> novelId = GeneratedColumn<String>(
+    'novel_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _epochMeta = const VerificationMeta('epoch');
+  late final GeneratedColumn<int> epoch = GeneratedColumn<int>(
+    'epoch',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _removalGenerationMeta = const VerificationMeta(
+    'removalGeneration',
+  );
+  late final GeneratedColumn<int> removalGeneration = GeneratedColumn<int>(
+    'removal_generation',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _sequenceMeta = const VerificationMeta(
+    'sequence',
+  );
+  late final GeneratedColumn<int> sequence = GeneratedColumn<int>(
+    'sequence',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 0 CHECK (sequence >= 0)',
+    defaultValue: const CustomExpression('0'),
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT \'\'',
+    defaultValue: const CustomExpression('\'\''),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    sessionId,
+    sourceId,
+    novelId,
+    epoch,
+    removalGeneration,
+    sequence,
+    payload,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'reading_statistics_checkpoints';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ReadingStatisticsCheckpoint> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sessionIdMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('novel_id')) {
+      context.handle(
+        _novelIdMeta,
+        novelId.isAcceptableOrUnknown(data['novel_id']!, _novelIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_novelIdMeta);
+    }
+    if (data.containsKey('epoch')) {
+      context.handle(
+        _epochMeta,
+        epoch.isAcceptableOrUnknown(data['epoch']!, _epochMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_epochMeta);
+    }
+    if (data.containsKey('removal_generation')) {
+      context.handle(
+        _removalGenerationMeta,
+        removalGeneration.isAcceptableOrUnknown(
+          data['removal_generation']!,
+          _removalGenerationMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_removalGenerationMeta);
+    }
+    if (data.containsKey('sequence')) {
+      context.handle(
+        _sequenceMeta,
+        sequence.isAcceptableOrUnknown(data['sequence']!, _sequenceMeta),
+      );
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {sessionId};
+  @override
+  ReadingStatisticsCheckpoint map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReadingStatisticsCheckpoint(
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      novelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}novel_id'],
+      )!,
+      epoch: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}epoch'],
+      )!,
+      removalGeneration: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}removal_generation'],
+      )!,
+      sequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sequence'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+    );
+  }
+
+  @override
+  ReadingStatisticsCheckpoints createAlias(String alias) {
+    return ReadingStatisticsCheckpoints(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class ReadingStatisticsCheckpoint extends DataClass
+    implements Insertable<ReadingStatisticsCheckpoint> {
+  final String sessionId;
+  final String sourceId;
+  final String novelId;
+  final int epoch;
+  final int removalGeneration;
+  final int sequence;
+  final String payload;
+  const ReadingStatisticsCheckpoint({
+    required this.sessionId,
+    required this.sourceId,
+    required this.novelId,
+    required this.epoch,
+    required this.removalGeneration,
+    required this.sequence,
+    required this.payload,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['session_id'] = Variable<String>(sessionId);
+    map['source_id'] = Variable<String>(sourceId);
+    map['novel_id'] = Variable<String>(novelId);
+    map['epoch'] = Variable<int>(epoch);
+    map['removal_generation'] = Variable<int>(removalGeneration);
+    map['sequence'] = Variable<int>(sequence);
+    map['payload'] = Variable<String>(payload);
+    return map;
+  }
+
+  ReadingStatisticsCheckpointsCompanion toCompanion(bool nullToAbsent) {
+    return ReadingStatisticsCheckpointsCompanion(
+      sessionId: Value(sessionId),
+      sourceId: Value(sourceId),
+      novelId: Value(novelId),
+      epoch: Value(epoch),
+      removalGeneration: Value(removalGeneration),
+      sequence: Value(sequence),
+      payload: Value(payload),
+    );
+  }
+
+  factory ReadingStatisticsCheckpoint.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReadingStatisticsCheckpoint(
+      sessionId: serializer.fromJson<String>(json['session_id']),
+      sourceId: serializer.fromJson<String>(json['source_id']),
+      novelId: serializer.fromJson<String>(json['novel_id']),
+      epoch: serializer.fromJson<int>(json['epoch']),
+      removalGeneration: serializer.fromJson<int>(json['removal_generation']),
+      sequence: serializer.fromJson<int>(json['sequence']),
+      payload: serializer.fromJson<String>(json['payload']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'session_id': serializer.toJson<String>(sessionId),
+      'source_id': serializer.toJson<String>(sourceId),
+      'novel_id': serializer.toJson<String>(novelId),
+      'epoch': serializer.toJson<int>(epoch),
+      'removal_generation': serializer.toJson<int>(removalGeneration),
+      'sequence': serializer.toJson<int>(sequence),
+      'payload': serializer.toJson<String>(payload),
+    };
+  }
+
+  ReadingStatisticsCheckpoint copyWith({
+    String? sessionId,
+    String? sourceId,
+    String? novelId,
+    int? epoch,
+    int? removalGeneration,
+    int? sequence,
+    String? payload,
+  }) => ReadingStatisticsCheckpoint(
+    sessionId: sessionId ?? this.sessionId,
+    sourceId: sourceId ?? this.sourceId,
+    novelId: novelId ?? this.novelId,
+    epoch: epoch ?? this.epoch,
+    removalGeneration: removalGeneration ?? this.removalGeneration,
+    sequence: sequence ?? this.sequence,
+    payload: payload ?? this.payload,
+  );
+  ReadingStatisticsCheckpoint copyWithCompanion(
+    ReadingStatisticsCheckpointsCompanion data,
+  ) {
+    return ReadingStatisticsCheckpoint(
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      novelId: data.novelId.present ? data.novelId.value : this.novelId,
+      epoch: data.epoch.present ? data.epoch.value : this.epoch,
+      removalGeneration: data.removalGeneration.present
+          ? data.removalGeneration.value
+          : this.removalGeneration,
+      sequence: data.sequence.present ? data.sequence.value : this.sequence,
+      payload: data.payload.present ? data.payload.value : this.payload,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingStatisticsCheckpoint(')
+          ..write('sessionId: $sessionId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('epoch: $epoch, ')
+          ..write('removalGeneration: $removalGeneration, ')
+          ..write('sequence: $sequence, ')
+          ..write('payload: $payload')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    sessionId,
+    sourceId,
+    novelId,
+    epoch,
+    removalGeneration,
+    sequence,
+    payload,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReadingStatisticsCheckpoint &&
+          other.sessionId == this.sessionId &&
+          other.sourceId == this.sourceId &&
+          other.novelId == this.novelId &&
+          other.epoch == this.epoch &&
+          other.removalGeneration == this.removalGeneration &&
+          other.sequence == this.sequence &&
+          other.payload == this.payload);
+}
+
+class ReadingStatisticsCheckpointsCompanion
+    extends UpdateCompanion<ReadingStatisticsCheckpoint> {
+  final Value<String> sessionId;
+  final Value<String> sourceId;
+  final Value<String> novelId;
+  final Value<int> epoch;
+  final Value<int> removalGeneration;
+  final Value<int> sequence;
+  final Value<String> payload;
+  final Value<int> rowid;
+  const ReadingStatisticsCheckpointsCompanion({
+    this.sessionId = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.novelId = const Value.absent(),
+    this.epoch = const Value.absent(),
+    this.removalGeneration = const Value.absent(),
+    this.sequence = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ReadingStatisticsCheckpointsCompanion.insert({
+    required String sessionId,
+    required String sourceId,
+    required String novelId,
+    required int epoch,
+    required int removalGeneration,
+    this.sequence = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : sessionId = Value(sessionId),
+       sourceId = Value(sourceId),
+       novelId = Value(novelId),
+       epoch = Value(epoch),
+       removalGeneration = Value(removalGeneration);
+  static Insertable<ReadingStatisticsCheckpoint> custom({
+    Expression<String>? sessionId,
+    Expression<String>? sourceId,
+    Expression<String>? novelId,
+    Expression<int>? epoch,
+    Expression<int>? removalGeneration,
+    Expression<int>? sequence,
+    Expression<String>? payload,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (sessionId != null) 'session_id': sessionId,
+      if (sourceId != null) 'source_id': sourceId,
+      if (novelId != null) 'novel_id': novelId,
+      if (epoch != null) 'epoch': epoch,
+      if (removalGeneration != null) 'removal_generation': removalGeneration,
+      if (sequence != null) 'sequence': sequence,
+      if (payload != null) 'payload': payload,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ReadingStatisticsCheckpointsCompanion copyWith({
+    Value<String>? sessionId,
+    Value<String>? sourceId,
+    Value<String>? novelId,
+    Value<int>? epoch,
+    Value<int>? removalGeneration,
+    Value<int>? sequence,
+    Value<String>? payload,
+    Value<int>? rowid,
+  }) {
+    return ReadingStatisticsCheckpointsCompanion(
+      sessionId: sessionId ?? this.sessionId,
+      sourceId: sourceId ?? this.sourceId,
+      novelId: novelId ?? this.novelId,
+      epoch: epoch ?? this.epoch,
+      removalGeneration: removalGeneration ?? this.removalGeneration,
+      sequence: sequence ?? this.sequence,
+      payload: payload ?? this.payload,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (novelId.present) {
+      map['novel_id'] = Variable<String>(novelId.value);
+    }
+    if (epoch.present) {
+      map['epoch'] = Variable<int>(epoch.value);
+    }
+    if (removalGeneration.present) {
+      map['removal_generation'] = Variable<int>(removalGeneration.value);
+    }
+    if (sequence.present) {
+      map['sequence'] = Variable<int>(sequence.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReadingStatisticsCheckpointsCompanion(')
+          ..write('sessionId: $sessionId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('novelId: $novelId, ')
+          ..write('epoch: $epoch, ')
+          ..write('removalGeneration: $removalGeneration, ')
+          ..write('sequence: $sequence, ')
+          ..write('payload: $payload, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$UserDatabase extends GeneratedDatabase {
   _$UserDatabase(QueryExecutor e) : super(e);
   $UserDatabaseManager get managers => $UserDatabaseManager(this);
@@ -4979,6 +6354,18 @@ abstract class _$UserDatabase extends GeneratedDatabase {
     'bookmarks_book',
     'CREATE INDEX bookmarks_book ON user_bookmarks (source_id, novel_id, created_at DESC)',
   );
+  late final ReadingStatisticsState readingStatisticsState =
+      ReadingStatisticsState(this);
+  late final ReadingStatisticsDays readingStatisticsDays =
+      ReadingStatisticsDays(this);
+  late final ReadingStatisticsBooks readingStatisticsBooks =
+      ReadingStatisticsBooks(this);
+  late final Index statisticsBook = Index(
+    'statistics_book',
+    'CREATE INDEX statistics_book ON reading_statistics_books (source_id, novel_id)',
+  );
+  late final ReadingStatisticsCheckpoints readingStatisticsCheckpoints =
+      ReadingStatisticsCheckpoints(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4998,6 +6385,11 @@ abstract class _$UserDatabase extends GeneratedDatabase {
     bookmarkVersions,
     userBookmarks,
     bookmarksBook,
+    readingStatisticsState,
+    readingStatisticsDays,
+    readingStatisticsBooks,
+    statisticsBook,
+    readingStatisticsCheckpoints,
   ];
 }
 
@@ -7550,6 +8942,815 @@ typedef $UserBookmarksProcessedTableManager =
       UserBookmark,
       PrefetchHooks Function()
     >;
+typedef $ReadingStatisticsStateCreateCompanionBuilder =
+    ReadingStatisticsStateCompanion Function({
+      Value<int> id,
+      Value<int> enabled,
+      Value<int> noticeSeen,
+      Value<int> epoch,
+      Value<int?> startedDay,
+    });
+typedef $ReadingStatisticsStateUpdateCompanionBuilder =
+    ReadingStatisticsStateCompanion Function({
+      Value<int> id,
+      Value<int> enabled,
+      Value<int> noticeSeen,
+      Value<int> epoch,
+      Value<int?> startedDay,
+    });
+
+class $ReadingStatisticsStateFilterComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsState> {
+  $ReadingStatisticsStateFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get enabled => $composableBuilder(
+    column: $table.enabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get noticeSeen => $composableBuilder(
+    column: $table.noticeSeen,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get epoch => $composableBuilder(
+    column: $table.epoch,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get startedDay => $composableBuilder(
+    column: $table.startedDay,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $ReadingStatisticsStateOrderingComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsState> {
+  $ReadingStatisticsStateOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get enabled => $composableBuilder(
+    column: $table.enabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get noticeSeen => $composableBuilder(
+    column: $table.noticeSeen,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get epoch => $composableBuilder(
+    column: $table.epoch,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get startedDay => $composableBuilder(
+    column: $table.startedDay,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $ReadingStatisticsStateAnnotationComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsState> {
+  $ReadingStatisticsStateAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get enabled =>
+      $composableBuilder(column: $table.enabled, builder: (column) => column);
+
+  GeneratedColumn<int> get noticeSeen => $composableBuilder(
+    column: $table.noticeSeen,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get epoch =>
+      $composableBuilder(column: $table.epoch, builder: (column) => column);
+
+  GeneratedColumn<int> get startedDay => $composableBuilder(
+    column: $table.startedDay,
+    builder: (column) => column,
+  );
+}
+
+class $ReadingStatisticsStateTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          ReadingStatisticsState,
+          ReadingStatisticsStateData,
+          $ReadingStatisticsStateFilterComposer,
+          $ReadingStatisticsStateOrderingComposer,
+          $ReadingStatisticsStateAnnotationComposer,
+          $ReadingStatisticsStateCreateCompanionBuilder,
+          $ReadingStatisticsStateUpdateCompanionBuilder,
+          (
+            ReadingStatisticsStateData,
+            BaseReferences<
+              _$UserDatabase,
+              ReadingStatisticsState,
+              ReadingStatisticsStateData
+            >,
+          ),
+          ReadingStatisticsStateData,
+          PrefetchHooks Function()
+        > {
+  $ReadingStatisticsStateTableManager(
+    _$UserDatabase db,
+    ReadingStatisticsState table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $ReadingStatisticsStateFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $ReadingStatisticsStateOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $ReadingStatisticsStateAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> enabled = const Value.absent(),
+                Value<int> noticeSeen = const Value.absent(),
+                Value<int> epoch = const Value.absent(),
+                Value<int?> startedDay = const Value.absent(),
+              }) => ReadingStatisticsStateCompanion(
+                id: id,
+                enabled: enabled,
+                noticeSeen: noticeSeen,
+                epoch: epoch,
+                startedDay: startedDay,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> enabled = const Value.absent(),
+                Value<int> noticeSeen = const Value.absent(),
+                Value<int> epoch = const Value.absent(),
+                Value<int?> startedDay = const Value.absent(),
+              }) => ReadingStatisticsStateCompanion.insert(
+                id: id,
+                enabled: enabled,
+                noticeSeen: noticeSeen,
+                epoch: epoch,
+                startedDay: startedDay,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $ReadingStatisticsStateProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      ReadingStatisticsState,
+      ReadingStatisticsStateData,
+      $ReadingStatisticsStateFilterComposer,
+      $ReadingStatisticsStateOrderingComposer,
+      $ReadingStatisticsStateAnnotationComposer,
+      $ReadingStatisticsStateCreateCompanionBuilder,
+      $ReadingStatisticsStateUpdateCompanionBuilder,
+      (
+        ReadingStatisticsStateData,
+        BaseReferences<
+          _$UserDatabase,
+          ReadingStatisticsState,
+          ReadingStatisticsStateData
+        >,
+      ),
+      ReadingStatisticsStateData,
+      PrefetchHooks Function()
+    >;
+typedef $ReadingStatisticsDaysCreateCompanionBuilder =
+    ReadingStatisticsDaysCompanion Function({
+      Value<int> day,
+      required int milliseconds,
+    });
+typedef $ReadingStatisticsDaysUpdateCompanionBuilder =
+    ReadingStatisticsDaysCompanion Function({
+      Value<int> day,
+      Value<int> milliseconds,
+    });
+
+class $ReadingStatisticsDaysFilterComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsDays> {
+  $ReadingStatisticsDaysFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get day => $composableBuilder(
+    column: $table.day,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get milliseconds => $composableBuilder(
+    column: $table.milliseconds,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $ReadingStatisticsDaysOrderingComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsDays> {
+  $ReadingStatisticsDaysOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get day => $composableBuilder(
+    column: $table.day,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get milliseconds => $composableBuilder(
+    column: $table.milliseconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $ReadingStatisticsDaysAnnotationComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsDays> {
+  $ReadingStatisticsDaysAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get day =>
+      $composableBuilder(column: $table.day, builder: (column) => column);
+
+  GeneratedColumn<int> get milliseconds => $composableBuilder(
+    column: $table.milliseconds,
+    builder: (column) => column,
+  );
+}
+
+class $ReadingStatisticsDaysTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          ReadingStatisticsDays,
+          ReadingStatisticsDay,
+          $ReadingStatisticsDaysFilterComposer,
+          $ReadingStatisticsDaysOrderingComposer,
+          $ReadingStatisticsDaysAnnotationComposer,
+          $ReadingStatisticsDaysCreateCompanionBuilder,
+          $ReadingStatisticsDaysUpdateCompanionBuilder,
+          (
+            ReadingStatisticsDay,
+            BaseReferences<
+              _$UserDatabase,
+              ReadingStatisticsDays,
+              ReadingStatisticsDay
+            >,
+          ),
+          ReadingStatisticsDay,
+          PrefetchHooks Function()
+        > {
+  $ReadingStatisticsDaysTableManager(
+    _$UserDatabase db,
+    ReadingStatisticsDays table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $ReadingStatisticsDaysFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $ReadingStatisticsDaysOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $ReadingStatisticsDaysAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> day = const Value.absent(),
+                Value<int> milliseconds = const Value.absent(),
+              }) => ReadingStatisticsDaysCompanion(
+                day: day,
+                milliseconds: milliseconds,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> day = const Value.absent(),
+                required int milliseconds,
+              }) => ReadingStatisticsDaysCompanion.insert(
+                day: day,
+                milliseconds: milliseconds,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $ReadingStatisticsDaysProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      ReadingStatisticsDays,
+      ReadingStatisticsDay,
+      $ReadingStatisticsDaysFilterComposer,
+      $ReadingStatisticsDaysOrderingComposer,
+      $ReadingStatisticsDaysAnnotationComposer,
+      $ReadingStatisticsDaysCreateCompanionBuilder,
+      $ReadingStatisticsDaysUpdateCompanionBuilder,
+      (
+        ReadingStatisticsDay,
+        BaseReferences<
+          _$UserDatabase,
+          ReadingStatisticsDays,
+          ReadingStatisticsDay
+        >,
+      ),
+      ReadingStatisticsDay,
+      PrefetchHooks Function()
+    >;
+typedef $ReadingStatisticsBooksCreateCompanionBuilder =
+    ReadingStatisticsBooksCompanion Function({
+      required int day,
+      required String sourceId,
+      required String novelId,
+      required int milliseconds,
+      Value<int> rowid,
+    });
+typedef $ReadingStatisticsBooksUpdateCompanionBuilder =
+    ReadingStatisticsBooksCompanion Function({
+      Value<int> day,
+      Value<String> sourceId,
+      Value<String> novelId,
+      Value<int> milliseconds,
+      Value<int> rowid,
+    });
+
+class $ReadingStatisticsBooksFilterComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsBooks> {
+  $ReadingStatisticsBooksFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get day => $composableBuilder(
+    column: $table.day,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get milliseconds => $composableBuilder(
+    column: $table.milliseconds,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $ReadingStatisticsBooksOrderingComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsBooks> {
+  $ReadingStatisticsBooksOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get day => $composableBuilder(
+    column: $table.day,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get milliseconds => $composableBuilder(
+    column: $table.milliseconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $ReadingStatisticsBooksAnnotationComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsBooks> {
+  $ReadingStatisticsBooksAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get day =>
+      $composableBuilder(column: $table.day, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get novelId =>
+      $composableBuilder(column: $table.novelId, builder: (column) => column);
+
+  GeneratedColumn<int> get milliseconds => $composableBuilder(
+    column: $table.milliseconds,
+    builder: (column) => column,
+  );
+}
+
+class $ReadingStatisticsBooksTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          ReadingStatisticsBooks,
+          ReadingStatisticsBook,
+          $ReadingStatisticsBooksFilterComposer,
+          $ReadingStatisticsBooksOrderingComposer,
+          $ReadingStatisticsBooksAnnotationComposer,
+          $ReadingStatisticsBooksCreateCompanionBuilder,
+          $ReadingStatisticsBooksUpdateCompanionBuilder,
+          (
+            ReadingStatisticsBook,
+            BaseReferences<
+              _$UserDatabase,
+              ReadingStatisticsBooks,
+              ReadingStatisticsBook
+            >,
+          ),
+          ReadingStatisticsBook,
+          PrefetchHooks Function()
+        > {
+  $ReadingStatisticsBooksTableManager(
+    _$UserDatabase db,
+    ReadingStatisticsBooks table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $ReadingStatisticsBooksFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $ReadingStatisticsBooksOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $ReadingStatisticsBooksAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> day = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> novelId = const Value.absent(),
+                Value<int> milliseconds = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ReadingStatisticsBooksCompanion(
+                day: day,
+                sourceId: sourceId,
+                novelId: novelId,
+                milliseconds: milliseconds,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required int day,
+                required String sourceId,
+                required String novelId,
+                required int milliseconds,
+                Value<int> rowid = const Value.absent(),
+              }) => ReadingStatisticsBooksCompanion.insert(
+                day: day,
+                sourceId: sourceId,
+                novelId: novelId,
+                milliseconds: milliseconds,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $ReadingStatisticsBooksProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      ReadingStatisticsBooks,
+      ReadingStatisticsBook,
+      $ReadingStatisticsBooksFilterComposer,
+      $ReadingStatisticsBooksOrderingComposer,
+      $ReadingStatisticsBooksAnnotationComposer,
+      $ReadingStatisticsBooksCreateCompanionBuilder,
+      $ReadingStatisticsBooksUpdateCompanionBuilder,
+      (
+        ReadingStatisticsBook,
+        BaseReferences<
+          _$UserDatabase,
+          ReadingStatisticsBooks,
+          ReadingStatisticsBook
+        >,
+      ),
+      ReadingStatisticsBook,
+      PrefetchHooks Function()
+    >;
+typedef $ReadingStatisticsCheckpointsCreateCompanionBuilder =
+    ReadingStatisticsCheckpointsCompanion Function({
+      required String sessionId,
+      required String sourceId,
+      required String novelId,
+      required int epoch,
+      required int removalGeneration,
+      Value<int> sequence,
+      Value<String> payload,
+      Value<int> rowid,
+    });
+typedef $ReadingStatisticsCheckpointsUpdateCompanionBuilder =
+    ReadingStatisticsCheckpointsCompanion Function({
+      Value<String> sessionId,
+      Value<String> sourceId,
+      Value<String> novelId,
+      Value<int> epoch,
+      Value<int> removalGeneration,
+      Value<int> sequence,
+      Value<String> payload,
+      Value<int> rowid,
+    });
+
+class $ReadingStatisticsCheckpointsFilterComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsCheckpoints> {
+  $ReadingStatisticsCheckpointsFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get epoch => $composableBuilder(
+    column: $table.epoch,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get removalGeneration => $composableBuilder(
+    column: $table.removalGeneration,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sequence => $composableBuilder(
+    column: $table.sequence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $ReadingStatisticsCheckpointsOrderingComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsCheckpoints> {
+  $ReadingStatisticsCheckpointsOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get novelId => $composableBuilder(
+    column: $table.novelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get epoch => $composableBuilder(
+    column: $table.epoch,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get removalGeneration => $composableBuilder(
+    column: $table.removalGeneration,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sequence => $composableBuilder(
+    column: $table.sequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $ReadingStatisticsCheckpointsAnnotationComposer
+    extends Composer<_$UserDatabase, ReadingStatisticsCheckpoints> {
+  $ReadingStatisticsCheckpointsAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get novelId =>
+      $composableBuilder(column: $table.novelId, builder: (column) => column);
+
+  GeneratedColumn<int> get epoch =>
+      $composableBuilder(column: $table.epoch, builder: (column) => column);
+
+  GeneratedColumn<int> get removalGeneration => $composableBuilder(
+    column: $table.removalGeneration,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sequence =>
+      $composableBuilder(column: $table.sequence, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+}
+
+class $ReadingStatisticsCheckpointsTableManager
+    extends
+        RootTableManager<
+          _$UserDatabase,
+          ReadingStatisticsCheckpoints,
+          ReadingStatisticsCheckpoint,
+          $ReadingStatisticsCheckpointsFilterComposer,
+          $ReadingStatisticsCheckpointsOrderingComposer,
+          $ReadingStatisticsCheckpointsAnnotationComposer,
+          $ReadingStatisticsCheckpointsCreateCompanionBuilder,
+          $ReadingStatisticsCheckpointsUpdateCompanionBuilder,
+          (
+            ReadingStatisticsCheckpoint,
+            BaseReferences<
+              _$UserDatabase,
+              ReadingStatisticsCheckpoints,
+              ReadingStatisticsCheckpoint
+            >,
+          ),
+          ReadingStatisticsCheckpoint,
+          PrefetchHooks Function()
+        > {
+  $ReadingStatisticsCheckpointsTableManager(
+    _$UserDatabase db,
+    ReadingStatisticsCheckpoints table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $ReadingStatisticsCheckpointsFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $ReadingStatisticsCheckpointsOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $ReadingStatisticsCheckpointsAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> sessionId = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> novelId = const Value.absent(),
+                Value<int> epoch = const Value.absent(),
+                Value<int> removalGeneration = const Value.absent(),
+                Value<int> sequence = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ReadingStatisticsCheckpointsCompanion(
+                sessionId: sessionId,
+                sourceId: sourceId,
+                novelId: novelId,
+                epoch: epoch,
+                removalGeneration: removalGeneration,
+                sequence: sequence,
+                payload: payload,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String sessionId,
+                required String sourceId,
+                required String novelId,
+                required int epoch,
+                required int removalGeneration,
+                Value<int> sequence = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ReadingStatisticsCheckpointsCompanion.insert(
+                sessionId: sessionId,
+                sourceId: sourceId,
+                novelId: novelId,
+                epoch: epoch,
+                removalGeneration: removalGeneration,
+                sequence: sequence,
+                payload: payload,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $ReadingStatisticsCheckpointsProcessedTableManager =
+    ProcessedTableManager<
+      _$UserDatabase,
+      ReadingStatisticsCheckpoints,
+      ReadingStatisticsCheckpoint,
+      $ReadingStatisticsCheckpointsFilterComposer,
+      $ReadingStatisticsCheckpointsOrderingComposer,
+      $ReadingStatisticsCheckpointsAnnotationComposer,
+      $ReadingStatisticsCheckpointsCreateCompanionBuilder,
+      $ReadingStatisticsCheckpointsUpdateCompanionBuilder,
+      (
+        ReadingStatisticsCheckpoint,
+        BaseReferences<
+          _$UserDatabase,
+          ReadingStatisticsCheckpoints,
+          ReadingStatisticsCheckpoint
+        >,
+      ),
+      ReadingStatisticsCheckpoint,
+      PrefetchHooks Function()
+    >;
 
 class $UserDatabaseManager {
   final _$UserDatabase _db;
@@ -7576,4 +9777,15 @@ class $UserDatabaseManager {
       $BookmarkVersionsTableManager(_db, _db.bookmarkVersions);
   $UserBookmarksTableManager get userBookmarks =>
       $UserBookmarksTableManager(_db, _db.userBookmarks);
+  $ReadingStatisticsStateTableManager get readingStatisticsState =>
+      $ReadingStatisticsStateTableManager(_db, _db.readingStatisticsState);
+  $ReadingStatisticsDaysTableManager get readingStatisticsDays =>
+      $ReadingStatisticsDaysTableManager(_db, _db.readingStatisticsDays);
+  $ReadingStatisticsBooksTableManager get readingStatisticsBooks =>
+      $ReadingStatisticsBooksTableManager(_db, _db.readingStatisticsBooks);
+  $ReadingStatisticsCheckpointsTableManager get readingStatisticsCheckpoints =>
+      $ReadingStatisticsCheckpointsTableManager(
+        _db,
+        _db.readingStatisticsCheckpoints,
+      );
 }

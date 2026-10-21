@@ -107,6 +107,7 @@ class AppExitScopeState extends State<AppExitScope>
   @override
   Widget build(BuildContext context) => _ExitScope(
     owner: this,
+    saving: _saving,
     child: _retired
         ? Scaffold(
             body: Center(
@@ -123,8 +124,14 @@ class AppExitScopeState extends State<AppExitScope>
 }
 
 class _ExitScope extends InheritedWidget {
-  const _ExitScope({required this.owner, required super.child});
+  const _ExitScope({
+    required this.owner,
+    required this.saving,
+    required super.child,
+  });
   final AppExitScopeState owner;
+  final bool saving;
   @override
-  bool updateShouldNotify(_ExitScope oldWidget) => owner != oldWidget.owner;
+  bool updateShouldNotify(_ExitScope oldWidget) =>
+      owner != oldWidget.owner || saving != oldWidget.saving;
 }

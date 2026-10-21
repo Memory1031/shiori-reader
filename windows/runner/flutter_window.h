@@ -23,6 +23,11 @@ class FlutterWindow : public Win32Window {
   // Win32Window:
   bool OnCreate() override;
   void OnDestroy() override;
+  flutter::EncodableValue ReadingState(bool wake = false);
+  void SendReadingState(bool wake = false);
+  bool reading_active_ = false;
+  bool reading_suspended_ = false;
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> reading_channel_;
   LRESULT MessageHandler(HWND window, UINT const message, WPARAM const wparam,
                          LPARAM const lparam) noexcept override;
 

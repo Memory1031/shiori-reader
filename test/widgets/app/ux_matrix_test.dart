@@ -39,10 +39,15 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        expect(find.byType(NavigationBar), findsNothing);
+        expect(find.byType(NavigationBar), findsOneWidget);
         await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
         await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-        await tester.tap(find.byTooltip(locale == 'zh' ? '更多' : 'More'));
+        await tester.tap(
+          find.widgetWithText(
+            NavigationDestination,
+            locale == 'zh' ? '设置' : 'Settings',
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.text(locale == 'zh' ? '应用外观' : 'App appearance'));
         await tester.pumpAndSettle();

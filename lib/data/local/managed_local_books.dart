@@ -899,9 +899,15 @@ class ManagedLocalBooks
       await db.transaction(() async {
         final variables = [Variable(key.sourceId.value), Variable(key.novelId)];
         await LocalUserBookmarkRepository(db).clear(key);
+        await db.removeReadingStatistics(key.sourceId.value, key.novelId);
         // Retain a generation tombstone even across a later re-import.
         await db.customUpdate(
           'INSERT INTO progress_sessions(source_id,novel_id,generation,sequence) VALUES(?,?,1,-1) ON CONFLICT(source_id,novel_id) DO UPDATE SET generation=generation+1,sequence=-1',
+          variables: variables,
+          updates: {db.progressSessions},
+        );
+        await db.customUpdate(
+          'UPDATE progress_sessions SET removal_generation=removal_generation+1 WHERE source_id=? AND novel_id=?',
           variables: variables,
           updates: {db.progressSessions},
         );

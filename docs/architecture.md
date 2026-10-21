@@ -76,7 +76,7 @@ CachedChapter / CacheOverview / PrefetchState 是不可变投影，预取目标�
 
 正式入口为 `lib/main.dart`，组合根负责初始化本地存储、偏好、导入订阅和在线服务；开发入口为 `lib/main_dev.dart`，不进入生产依赖图。
 
-移动端首页只有书架，没有发现页或底部推荐标签。顶部展示品牌图，保留搜索与更多菜单；导入在更多菜单中。继续阅读使用本地进度，书架封面统一 2:3 容器、完整显示图片，标题行数不改变封面尺寸。网格卡片由封面和最多两行书名组成，本地书封面左下角以轻量脚标显示 `epub` 或 `txt`，在线书不显示来源脚标，不常驻展示阅读进度或完成状态，也不预留标题下的 metadata 行。列表模式使用封面与左对齐的书名、作者、辅助信息；作者下方以中点连接小写本地格式和进度，封面不加脚标；更多入口与左滑操作提供详情和移出。本地格式信息尚未就绪时暂不显示来源，进度未知则不显示百分比。书架每项通过索引读取快照，不请求目录或全书正文。在线书移出同时清缓存，失败保留条目供重试；本地书移除先确认，再删除应用内文件和进度，详情成功后返回首页。均无撤销入口。
+移动端首页分为书架、统计和设置三个底部标签，没有发现或推荐页。顶部展示品牌图，保留搜索与更多菜单；导入在更多菜单中。继续阅读使用本地进度，书架封面统一 2:3 容器、完整显示图片，标题行数不改变封面尺寸。网格卡片由封面和最多两行书名组成，本地书封面左下角以轻量脚标显示 `epub` 或 `txt`，在线书不显示来源脚标，不常驻展示阅读进度或完成状态，也不预留标题下的 metadata 行。列表模式使用封面与左对齐的书名、作者、辅助信息；作者下方以中点连接小写本地格式和进度，封面不加脚标；更多入口与左滑操作提供详情和移出。本地格式信息尚未就绪时暂不显示来源，进度未知则不显示百分比。书架每项通过索引读取快照，不请求目录或全书正文。在线书移出同时清缓存，失败保留条目供重试；本地书移除先确认，再删除应用内文件和进度，详情成功后返回首页。均无撤销入口。
 
 搜索显式提交才请求，不随输入自动发请求。结果支持分页、错误重试与空状态；不向应用 UI 暴露 Source 游标、原始协议或站点诊断。详情展示封面、书名、可展开的简介和标签，阅读是主要操作；已在书架的书籍通过更多菜单移出。目录预览最多展示五章并随页面滚动，完整目录保留独立入口；真实分组与合成无卷分组保持区别，目录顺序来自领域快照。
 
@@ -86,7 +86,7 @@ CachedChapter / CacheOverview / PrefetchState 是不可变投影，预取目标�
 
 pointer-first 使用 DesktopShell，按宽度在底部导航、rail 与 sidebar 之间切换；840 / 1200 断点变化不替换 Workspace Navigator 或清空路由栈。Windows 原生窗口最小 client 宽度为 840。移动端保持 touch-first 呈现，宽窗口本身不启用桌面管理页。
 
-书架、搜索、本地文件、离线内容和关于与更新位于 Workspace。详情使用调用方路由上下文，Reader 通过 root 路由全窗口打开，返回后恢复原页面栈。切换 section 或重选当前 section 清除根页上方路由并退出多选，保留列表布局与滚动状态，不建立跨 section 的永久搜索会话。
+书架、阅读统计、搜索、本地文件、离线内容和关于与更新位于 Workspace。详情使用调用方路由上下文，Reader 通过 root 路由全窗口打开，返回后恢复原页面栈。切换 section 或重选当前 section 清除根页上方路由并退出多选，保留列表布局与滚动状态，不建立跨 section 的永久搜索会话。
 
 桌面 Chrome 相对 Workspace 使用固定 gutter，独立于正文最大宽度；正文在实际可用区域内居中。断点与 gutter 使用 Shell 布局宽度，内容 geometry 使用页面约束，不能将扣除侧栏后的宽度用作窗口断点。管理页滚动视口铺满 Workspace，自动滚动条位于最右侧。书架菜单支持右键、Menu 键与 Shift+F10；本地文件与书架共用重新解析流程。桌面与移动端共享视觉 token 和业务状态，页面框架不拥有业务 controller、Navigator 或额外滚动容器。
 
@@ -111,7 +111,7 @@ Presentation 依赖领域契约，通过显式注入获得服务。应用根拥�
 
 | 位置 | Schema | 内容 |
 | --- | --- | --- |
-| `users/users.sqlite` | v9 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions、progress_catalogs、local_reparse_attempts、user_bookmarks、bookmark_versions |
+| `users/users.sqlite` | v10 | bookshelf、reading_progress、progress_sessions、prefetch_choices、prefetch_settings、local_books、local_chapter_revisions、progress_catalogs、local_reparse_attempts、user_bookmarks、bookmark_versions、reading_statistics_state / days / books / checkpoints |
 | `disposable/cache.sqlite` | v2 | novel_cache、catalog_cache、chapter_cache、image_cache、image_owners |
 | 平台 preferences | 独立 codec | readerSettings v4、appSettings v3 |
 | `users/update-preferences.json` | v1 | 更新渠道、自动检查开关、检查时间与限流期限 |
@@ -121,6 +121,12 @@ Presentation 依赖领域契约，通过显式注入获得服务。应用根拥�
 AppPaths 通过 path_provider 解析 ApplicationSupport / temporary，固定 `shiori/production` 或 `shiori/development` 子目录。机器绝对路径、URL 和 Source 秘密不进入持久身份。
 
 LocalDatabases.open 顺序打开用户库和缓存库，各用 NativeDatabase.createInBackground 的后台连接；应用根拥有数据库，Repository 借用。运行期复用连接，不逐页 open。localBooks 管理器负责文件回收，先关闭管理器，再关库。
+
+### 阅读统计存储
+
+阅读统计使用用户库的每日总量、分书每日量和独立偏好，不占正文缓存或阅读进度字段。只保存本机毫秒合计、起始日期、告知状态和在途去重状态，不保存逐页或精确活动轨迹。书名、封面从当前书库读取；统计封面只读缓存，不触发网络请求。
+
+删除书籍在既有成功事务内移除分书量和去重状态，日总量保留；清历史、清缓存与重解析保留统计。删除后重导入不会恢复旧关联。清空统计推进全局 epoch，保留记录开关、书架、进度和书签。数据不自动过期；接口及一致快照规则见[阅读统计合同](contracts.md#阅读统计)。
 
 ### 事务与 codec
 
@@ -140,7 +146,7 @@ preferences 使用独立 JSON key，Store 串行写入，读取等待已排队�
 
 ### 迁移与生成
 
-保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 / v5 / v6 / v7 / v8 / v9 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
+保留 `lib/data/local/database/schemas/user/` v1 / v2 / v3 / v4 / v5 / v6 / v7 / v8 / v9 / v10 和 cache v1 / v2 快照。schema、记录 codec、parser 版本、偏好版本、进度 generation 互不替代。
 
 v8 升级一次性将有有效进度而无书架的在线作品无损补入书架，保留原位置及已有收藏时间；仅有目录或预取选择、没有书架和进度的孤立记录清理，保留会话代次保护，不联网，也不在每次启动重复扫描。
 

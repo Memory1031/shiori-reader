@@ -253,6 +253,7 @@ class SourceImage extends StatefulWidget {
     this.paperInk,
     this.paperMode = PaperImageMode.diagram,
     this.fit = BoxFit.contain,
+    this.readMode = ReadMode.cacheFirst,
   }) : assert(decodeScale > 0 && decodeScale <= 4);
   final MediaRef media;
   final ImageRepository repository;
@@ -267,6 +268,7 @@ class SourceImage extends StatefulWidget {
   final Color? paperInk;
   final PaperImageMode paperMode;
   final BoxFit fit;
+  final ReadMode readMode;
   @override
   State<SourceImage> createState() => _SourceImageState();
 }
@@ -290,6 +292,7 @@ class _SourceImageState extends State<SourceImage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.media != widget.media ||
         oldWidget.repository != widget.repository ||
+        oldWidget.readMode != widget.readMode ||
         oldWidget.decoder != widget.decoder ||
         (oldWidget.paperInk == null ? null : oldWidget.paperMode) !=
             (widget.paperInk == null ? null : widget.paperMode)) {
@@ -345,7 +348,11 @@ class _SourceImageState extends State<SourceImage> {
     try {
       final result = await widget.repository.load(
         widget.media,
-        mode: refresh ? ReadMode.refresh : ReadMode.cacheFirst,
+        mode: widget.readMode == ReadMode.cacheOnly
+            ? ReadMode.cacheOnly
+            : refresh
+            ? ReadMode.refresh
+            : widget.readMode,
         cancellation: request.token,
       );
       if (result case Failure(:final failure)) {

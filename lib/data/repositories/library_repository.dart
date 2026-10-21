@@ -369,6 +369,7 @@ class LocalLibraryRepository implements LibraryRepository, LibraryBookRemoval {
             .getSingleOrNull();
         final removed = row == null ? null : _book(row);
         await LocalUserBookmarkRepository(db).clear(key);
+        await db.removeReadingStatistics(key.sourceId.value, key.novelId);
         await _advance(key);
         await db.customUpdate(
           'UPDATE progress_sessions SET removal_generation=removal_generation+1 WHERE $_where',

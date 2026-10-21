@@ -93,3 +93,28 @@ CREATE TABLE user_bookmarks (
  location TEXT NOT NULL CHECK(location IN ('exact','migrated','inexact','unavailable'))
 );
 CREATE INDEX bookmarks_book ON user_bookmarks(source_id, novel_id, created_at DESC);
+
+CREATE TABLE reading_statistics_state (
+ id INTEGER NOT NULL PRIMARY KEY CHECK(id=1),
+ enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0,1)),
+ notice_seen INTEGER NOT NULL DEFAULT 0 CHECK(notice_seen IN (0,1)),
+ epoch INTEGER NOT NULL DEFAULT 0 CHECK(epoch>=0),
+ started_day INTEGER
+);
+CREATE TABLE reading_statistics_days (
+ day INTEGER NOT NULL PRIMARY KEY,
+ milliseconds INTEGER NOT NULL CHECK(milliseconds>=0)
+);
+CREATE TABLE reading_statistics_books (
+ day INTEGER NOT NULL, source_id TEXT NOT NULL, novel_id TEXT NOT NULL,
+ milliseconds INTEGER NOT NULL CHECK(milliseconds>=0),
+ PRIMARY KEY(day,source_id,novel_id)
+);
+CREATE INDEX statistics_book ON reading_statistics_books(source_id,novel_id);
+CREATE TABLE reading_statistics_checkpoints (
+ session_id TEXT NOT NULL PRIMARY KEY,
+ source_id TEXT NOT NULL, novel_id TEXT NOT NULL,
+ epoch INTEGER NOT NULL, removal_generation INTEGER NOT NULL,
+ sequence INTEGER NOT NULL DEFAULT 0 CHECK(sequence>=0),
+ payload TEXT NOT NULL DEFAULT ''
+);

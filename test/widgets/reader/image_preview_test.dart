@@ -62,7 +62,9 @@ void main() {
         ),
       );
       expect(previewImage.decodeScale, 2);
-      expect(previewImage.onIntrinsicSize, isNull);
+      previewImage.onIntrinsicSize?.call(const Size(500, 500));
+      await tester.pump();
+      expect(controller.capture(), position);
       final viewer = find.byType(InteractiveViewer);
       final transform = tester
           .widget<InteractiveViewer>(viewer)

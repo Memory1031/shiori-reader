@@ -4,6 +4,8 @@ import FlutterMacOS
 class MainFlutterWindow: NSWindow {
   private var services: MacServices?
   private var launchChannel: FlutterMethodChannel?
+  private var readingChannel: FlutterMethodChannel?
+  private var readingSleeping = false
   private let savedFrameName = NSWindow.FrameAutosaveName("ShioriMainWindow")
   override func awakeFromNib() {
     let launch = NativeLaunchView(frame: contentView?.bounds ?? .zero)
@@ -36,12 +38,43 @@ class MainFlutterWindow: NSWindow {
       result(nil)
     }
     launchChannel = channel
+    let reading = FlutterMethodChannel(name:"dev.shiori.reader/reading", binaryMessenger:controller.engine.binaryMessenger)
+    reading.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "state" else { result(FlutterMethodNotImplemented); return }
+      result(self?.readingState() ?? ["available":false,"wake":false])
+    }
+    readingChannel = reading
+    for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification,
+                 NSWindow.didMiniaturizeNotification, NSWindow.didDeminiaturizeNotification, NSWindow.didChangeOcclusionStateNotification] {
+      NotificationCenter.default.addObserver(self, selector:#selector(readingWindowChanged(_:)), name:name, object:self)
+    }
+    for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {
+      NotificationCenter.default.addObserver(self, selector:#selector(readingWindowChanged(_:)), name:name, object:nil)
+    }
+    for name in [NSWorkspace.willSleepNotification, NSWorkspace.didWakeNotification] {
+      NSWorkspace.shared.notificationCenter.addObserver(self, selector:#selector(readingPowerChanged(_:)), name:name, object:nil)
+    }
     RegisterGeneratedPlugins(registry:controller)
     services = MacServices(controller:controller,window:self)
     registerForDraggedTypes([.fileURL])
     super.awakeFromNib()
   }
-  deinit { NotificationCenter.default.removeObserver(self) }
+  deinit {
+    NotificationCenter.default.removeObserver(self)
+    NSWorkspace.shared.notificationCenter.removeObserver(self)
+    readingChannel?.setMethodCallHandler(nil)
+  }
+  private func readingState(wake: Bool = false) -> [String:Bool] {
+    ["available":NSApp.isActive && isKeyWindow && !isMiniaturized && occlusionState.contains(.visible) && !readingSleeping,"wake":wake]
+  }
+  @objc private func readingWindowChanged(_ notification: Notification) {
+    readingChannel?.invokeMethod("state",arguments:readingState())
+  }
+  @objc private func readingPowerChanged(_ notification: Notification) {
+    let wake = notification.name == NSWorkspace.didWakeNotification
+    readingSleeping = !wake
+    readingChannel?.invokeMethod("state",arguments:readingState(wake:wake))
+  }
 
   @objc private func screenConfigurationChanged(_ notification: Notification) { fitToVisibleScreen() }
 

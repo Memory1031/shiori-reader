@@ -1,3 +1,8 @@
+import 'reading_statistics_lifecycle.dart';
+import 'dart:ui' show ViewFocusEvent, ViewFocusState;
+import '../data/repositories/reading_statistics_repository.dart';
+import '../features/statistics/reading_statistics_controller.dart';
+import '../shared/widgets/reading_statistics_scope.dart';
 import 'image_export.dart';
 import '../shared/image_export_scope.dart';
 import '../domain/contracts/image_export.dart';
@@ -71,6 +76,9 @@ class _ProductionAppState extends State<ProductionApp>
   ReaderPreferences? _readerPreferences;
   LocalLibraryRepository? _library;
   LocalUserBookmarkRepository? _bookmarks;
+  ReadingStatisticsController? _statistics;
+  ReadingStatisticsObserver? _statisticsObserver;
+  ReadingStatisticsLifecycle? _statisticsLifecycle;
   AppFailure? _failure;
   bool _opening = false;
   Future<void>? _openingTask;
@@ -137,6 +145,22 @@ class _ProductionAppState extends State<ProductionApp>
       );
       _library = LocalLibraryRepository(databases.users);
       _bookmarks = LocalUserBookmarkRepository(databases.users);
+      final statistics = LocalReadingStatisticsRepository(databases.users);
+      final recorder = _statistics = ReadingStatisticsController(
+        statistics,
+        prepare: statistics.recover,
+      );
+      _statisticsObserver = ReadingStatisticsObserver(recorder);
+      recorder.environment(
+        foreground:
+            WidgetsBinding.instance.lifecycleState == null ||
+            WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
+      );
+      await recorder.ready;
+      final lifecycle = _statisticsLifecycle = ReadingStatisticsLifecycle(
+        recorder,
+      );
+      await lifecycle.start();
       _novels = LocalReadingRepository(
         local: databases.localBooks,
         online: _services!.novels,
@@ -236,6 +260,9 @@ class _ProductionAppState extends State<ProductionApp>
     // An opener may still own resources that have not reached the fields yet.
     // It observes the closing flag and releases them before exit can complete.
     await _openingTask;
+    _statisticsLifecycle?.close();
+    await _statistics?.close();
+    _statistics?.dispose();
     await _databases?.localBooks.stopAutomaticReparse();
     await _imports?.shutdown();
     _imports?.dispose();
@@ -253,6 +280,7 @@ class _ProductionAppState extends State<ProductionApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _statistics?.environment(foreground: state == AppLifecycleState.resumed);
     _databases?.localBooks.automaticReparseActivity(
       resumed: state == AppLifecycleState.resumed,
       cancelPrepare:
@@ -267,6 +295,11 @@ class _ProductionAppState extends State<ProductionApp>
       unawaited(_resumeUpdates());
     }
     if (state == AppLifecycleState.detached) _updates?.cancel();
+  }
+
+  @override
+  void didChangeViewFocus(ViewFocusEvent event) {
+    _statistics?.environment(focused: event.state == ViewFocusState.focused);
   }
 
   Future<void> _resumeUpdates() async {
@@ -367,6 +400,7 @@ class _ProductionAppState extends State<ProductionApp>
         )
       : ShioriApp(
           key: const ValueKey('production-ready'),
+          navigatorObservers: [?_statisticsObserver],
           shutdown: _close,
           navigatorKey: _navigator,
           scaffoldMessengerKey: _messenger,
@@ -386,9 +420,12 @@ class _ProductionAppState extends State<ProductionApp>
                 ),
               ),
             );
-            return UserBookmarkScope(
-              repository: _bookmarks!,
-              child: ImageExportScope(exporter: _imageExporter!, child: app),
+            return ReadingStatisticsScope(
+              controller: _statistics!,
+              child: UserBookmarkScope(
+                repository: _bookmarks!,
+                child: ImageExportScope(exporter: _imageExporter!, child: app),
+              ),
             );
           },
           createController: () => AppController(settingsStore: _appearance),

@@ -113,6 +113,13 @@ class FaultV6 extends UserDatabase {
   Migrator createMigrator() => FaultMigrator(this, 'progress_catalogs');
 }
 
+class FaultV10 extends UserDatabase {
+  FaultV10(super.executor);
+  @override
+  Migrator createMigrator() =>
+      FaultMigrator(this, 'reading_statistics_checkpoints');
+}
+
 class FaultCache extends CacheDatabase {
   FaultCache(super.executor);
   @override
@@ -165,12 +172,36 @@ void main() {
             .data
             .values
             .single,
-        9,
+        10,
       );
       await retry.close();
     },
   );
-  for (final version in [1, 2, 3, 4, 5, 6, 7, 8]) {
+
+  test(
+    'v9 statistics migration failure rolls back all tables and permits retry',
+    () async {
+      final file = File('${root.path}/users.sqlite');
+      seed(file, 'user', 9);
+      final before = rows(file), failing = FaultV10(NativeDatabase(file));
+      await expectLater(
+        failing.customSelect('SELECT 1').get(),
+        throwsA(anything),
+      );
+      await failing.close();
+      expect(rows(file), before);
+      final raw = sql.sqlite3.open(file.path);
+      expect(raw.userVersion, 9);
+      raw.close();
+      final retry = UserDatabase(NativeDatabase(file));
+      expect(
+        await retry.customSelect('SELECT * FROM reading_statistics_days').get(),
+        isEmpty,
+      );
+      await retry.close();
+    },
+  );
+  for (final version in [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
     test(
       'retained user v$version snapshot upgrades and preserves every old field',
       () async {
@@ -183,7 +214,7 @@ void main() {
               .data
               .values
               .single,
-          9,
+          10,
         );
         final library = LocalLibraryRepository(db);
         final shelf =

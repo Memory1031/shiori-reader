@@ -1867,4 +1867,140 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerBookmarkReturn => 'Back to before bookmark navigation';
+
+  @override
+  String get statisticsTitle => 'Reading statistics';
+
+  @override
+  String get statisticsTab => 'Statistics';
+
+  @override
+  String get statisticsManage => 'Manage records';
+
+  @override
+  String get statisticsNoticeTitle => 'Reading statistics are on';
+
+  @override
+  String get statisticsNoticeBody =>
+      'Reading time stays on this device. You can pause or clear it at any time.';
+
+  @override
+  String get statisticsToday => 'Today’s reading';
+
+  @override
+  String get statisticsLifetime => 'Total reading';
+
+  @override
+  String get statisticsDuration => 'Reading time';
+
+  @override
+  String get statisticsSeven => '7 days';
+
+  @override
+  String get statisticsThirty => '30 days';
+
+  @override
+  String get statisticsYear => '12 months';
+
+  @override
+  String get statisticsBooks => 'Read in this period';
+
+  @override
+  String get statisticsAnonymous => 'Removed books';
+
+  @override
+  String get statisticsAnonymousHint => 'Only total reading time is retained';
+
+  @override
+  String get statisticsMissingBook => 'Book details unavailable';
+
+  @override
+  String get statisticsLocalOnly => 'Reading records stay on this device.';
+
+  @override
+  String get statisticsEmpty =>
+      'No reading recorded today. Your time will appear here after you start reading.';
+
+  @override
+  String get statisticsPeriodEmpty => 'No reading recorded in this period.';
+
+  @override
+  String get statisticsPaused => 'Recording is paused.';
+
+  @override
+  String get statisticsEnable => 'Resume recording';
+
+  @override
+  String get statisticsRecording => 'Record reading time';
+
+  @override
+  String get statisticsPauseHint =>
+      'Pause new records and keep existing statistics.';
+
+  @override
+  String get statisticsRulesSummary =>
+      'Records active foreground reading. Timing stops after 300 seconds without reading activity.';
+
+  @override
+  String get statisticsRulesTitle => 'How it works';
+
+  @override
+  String get statisticsRulesBody =>
+      'Text, illustrations, image previews and footnotes count. The reading toolbar does not pause timing. Contents, bookmarks, search and reading settings pause it; closing a panel to return to the text resumes reading. Background time, locked screens, unfocused and minimized desktop windows do not count. Automatic recovery does not reset the idle limit. Special WebView documents are currently excluded.';
+
+  @override
+  String get statisticsRetention =>
+      'Removing a book keeps only daily totals without its title. Records do not expire automatically and can be cleared at any time.';
+
+  @override
+  String get statisticsClear => 'Clear reading statistics';
+
+  @override
+  String get statisticsClearConfirm => 'Clear reading statistics?';
+
+  @override
+  String get statisticsClearBody =>
+      'Clear reading time and per-book statistics without affecting your bookshelf, reading position or bookmarks.';
+
+  @override
+  String get statisticsClearEnabled =>
+      'Reading after clearing will still be recorded.';
+
+  @override
+  String get statisticsError =>
+      'Reading records are temporarily unavailable. Retry to load your existing data.';
+
+  @override
+  String get statisticsUnderMinute => 'Less than 1 minute';
+
+  @override
+  String get statisticsMinutesUnit => 'min';
+
+  @override
+  String get statisticsHoursUnit => 'h';
+
+  @override
+  String get statisticsChart =>
+      'Reading time chart. Adjust left or right to read each date and duration';
+
+  @override
+  String get statisticsUntilToday => 'Through today';
+
+  @override
+  String get statisticsTotal => 'Total';
+
+  @override
+  String statisticsMinutes(String count) {
+    return '$count min';
+  }
+
+  @override
+  String statisticsHoursMinutes(String hours, String minutes) {
+    return '$hours h $minutes min';
+  }
+
+  @override
+  String statisticsSince(String date) {
+    return 'Recording since $date';
+  }
 }

@@ -1,3 +1,4 @@
+import '../../shared/widgets/reading_statistics_scope.dart';
 import '../../domain/contracts/image_export.dart';
 import '../../shared/image_export_scope.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -17,6 +18,7 @@ Future<void> showReaderImagePreview(
   ImageExporter? exporter,
 }) {
   final operation = exporter ?? ImageExportScope.maybeOf(context);
+  final book = ReadingBookScope.maybeOf(context);
   return Navigator.of(context).push<void>(
     PageRouteBuilder<void>(
       barrierDismissible: true,
@@ -30,6 +32,7 @@ Future<void> showReaderImagePreview(
         block: block,
         repository: repository,
         exporter: operation,
+        readingBook: book,
       ),
       transitionsBuilder: (_, animation, _, child) =>
           FadeTransition(opacity: animation, child: child),
@@ -43,17 +46,19 @@ class ReaderImagePreview extends StatefulWidget {
     required this.block,
     required this.repository,
     this.exporter,
+    this.readingBook,
   });
   final ImageBlock block;
   final ImageRepository repository;
   final ImageExporter? exporter;
+  final NovelKey? readingBook;
   @override
   State<ReaderImagePreview> createState() => _ReaderImagePreviewState();
 }
 
 class _ReaderImagePreviewState extends State<ReaderImagePreview> {
   final _transform = TransformationController();
-  bool _closing = false;
+  bool _closing = false, _imageReady = false;
   CancellationSource? _exportCancellation;
   bool _busy = false;
   bool _lastAsFile = false;
@@ -184,7 +189,7 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
     // App typography (including the Windows UI face) on a true-black stage.
     final strings = AppLocalizations.of(context);
     final dark = shioriTheme(Brightness.dark, accent: appAccentOf(context));
-    return PopScope<void>(
+    final page = PopScope<void>(
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) {
           _closing = true;
@@ -255,6 +260,11 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
                                   repository: widget.repository,
                                   semanticLabel: widget.block.alt,
                                   decodeScale: 2,
+                                  onIntrinsicSize: (_) {
+                                    if (mounted && !_imageReady) {
+                                      setState(() => _imageReady = true);
+                                    }
+                                  },
                                 ),
                               ),
                             ),
@@ -281,5 +291,12 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
         ),
       ),
     );
+    return widget.readingBook == null
+        ? page
+        : ReadingActivity(
+            book: widget.readingBook!,
+            ready: _imageReady && !_closing,
+            child: page,
+          );
   }
 }

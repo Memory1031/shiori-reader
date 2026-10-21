@@ -1,3 +1,6 @@
+import '../../shared/widgets/reading_statistics_scope.dart';
+import '../statistics/reading_statistics_controller.dart';
+import '../statistics/statistics_view.dart';
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart' show CupertinoPage;
@@ -88,7 +91,9 @@ class _ReadingHomeState extends State<ReadingHome> {
   late final LibraryController _library;
   late final BookBatchActions _shelfActions;
 
-  bool _mobileSettings = false;
+  bool _mobileSettings = false, _mobileStatistics = false;
+  ReadingStatisticsController? get _statistics =>
+      ReadingStatisticsScope.maybeOf(context);
   HomeNavigation? _ownNavigation;
   HomeNavigation get _navigation =>
       widget.navigation ?? (_ownNavigation ??= HomeNavigation());
@@ -173,6 +178,7 @@ class _ReadingHomeState extends State<ReadingHome> {
   /// transition, and a new root replaces the old one the same way.
   void _navigate() {
     _mobileSettings = false;
+    _mobileStatistics = false;
     _shelfActions.leave();
     _history.clear();
     if (mounted) setState(() {});
@@ -461,6 +467,13 @@ class _ReadingHomeState extends State<ReadingHome> {
             selectedIcon: Icons.auto_stories,
             label: strings.shelfTitle,
           ),
+          if (_statistics != null)
+            ShellItem(
+              section: HomeSection.statistics,
+              icon: Icons.bar_chart_outlined,
+              selectedIcon: Icons.bar_chart_rounded,
+              label: strings.statisticsTab,
+            ),
           ShellItem(
             section: HomeSection.search,
             icon: Icons.search,
@@ -522,6 +535,13 @@ class _ReadingHomeState extends State<ReadingHome> {
   Page<Object?> _sectionPage(BuildContext context, HomeSection section) {
     final WidgetBuilder? root = switch (section) {
       HomeSection.shelf => null,
+      HomeSection.statistics =>
+        _statistics == null
+            ? null
+            : (_) => StatisticsScreen(
+                controller: _statistics!,
+                images: widget.images,
+              ),
       HomeSection.search when widget.sources.isEmpty =>
         (_) => const SearchUnavailable(),
       HomeSection.search => (context) => _routes.search!(
@@ -550,6 +570,8 @@ class _ReadingHomeState extends State<ReadingHome> {
       body: SafeArea(
         child: Column(
           children: [
+            if (_statistics case final recorder?)
+              StatisticsNotice(controller: recorder),
             ?_environment(context),
             Expanded(
               child: PageStorage(
@@ -590,12 +612,26 @@ class _ReadingHomeState extends State<ReadingHome> {
     final strings = AppLocalizations.of(context);
     final selecting = _shelfActions.selection.active;
     return PopScope(
-      canPop: !_mobileSettings,
+      canPop: !_mobileSettings && !_mobileStatistics,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _mobileSettings) _selectMobilePage(0);
+        if (!didPop && (_mobileSettings || _mobileStatistics)) {
+          _selectMobilePage(0);
+        }
       },
       child: Scaffold(
-        appBar: _mobileSettings
+        appBar: _mobileStatistics
+            ? AppBar(
+                title: Text(strings.statisticsTitle),
+                actions: [
+                  IconButton(
+                    onPressed: () =>
+                        showStatisticsSettings(context, _statistics!),
+                    tooltip: strings.statisticsManage,
+                    icon: const Icon(Icons.settings_outlined),
+                  ),
+                ],
+              )
+            : _mobileSettings
             ? AppBar(title: Text(strings.homeSettingsTitle))
             : _shelfActions.selection.active
             ? BookSelectionAppBar(actions: _shelfActions)
@@ -632,12 +668,24 @@ class _ReadingHomeState extends State<ReadingHome> {
                 ],
               ),
         body: IndexedStack(
-          index: _mobileSettings ? 1 : 0,
+          index: _mobileSettings
+              ? (_statistics != null ? 2 : 1)
+              : _mobileStatistics
+              ? 1
+              : 0,
           children: [
             ExcludeFocus(
-              excluding: _mobileSettings,
+              excluding: _mobileSettings || _mobileStatistics,
               child: _mobileShelf(context),
             ),
+            if (_statistics case final recorder?)
+              ExcludeFocus(
+                excluding: !_mobileStatistics,
+                child: StatisticsView(
+                  controller: recorder,
+                  images: widget.images,
+                ),
+              ),
             ExcludeFocus(
               excluding: !_mobileSettings,
               child: SafeArea(
@@ -666,9 +714,15 @@ class _ReadingHomeState extends State<ReadingHome> {
   }
 
   void _selectMobilePage(int index) {
-    if (_mobileSettings == (index == 1) || _library.writing) return;
+    if (_library.writing) return;
+    final statistics = _statistics != null && index == 1;
+    final settings = index == (_statistics != null ? 2 : 1);
+    if (_mobileSettings == settings && _mobileStatistics == statistics) return;
     _shelfActions.leave();
-    setState(() => _mobileSettings = index == 1);
+    setState(() {
+      _mobileSettings = settings;
+      _mobileStatistics = statistics;
+    });
   }
 
   Widget _mobileNavigation(BuildContext context) {
@@ -715,7 +769,11 @@ class _ReadingHomeState extends State<ReadingHome> {
           indicatorColor: Colors.transparent,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           labelPadding: EdgeInsets.zero,
-          selectedIndex: _mobileSettings ? 1 : 0,
+          selectedIndex: _mobileSettings
+              ? (_statistics != null ? 2 : 1)
+              : _mobileStatistics
+              ? 1
+              : 0,
           onDestinationSelected: _selectMobilePage,
           animationDuration: ShioriMotion.of(context, ShioriMotion.feedback),
           overlayColor: WidgetStateProperty.resolveWith((states) {
@@ -731,6 +789,12 @@ class _ReadingHomeState extends State<ReadingHome> {
               selectedIcon: const Icon(Icons.auto_stories),
               label: strings.shelfTitle,
             ),
+            if (_statistics != null)
+              NavigationDestination(
+                icon: const Icon(Icons.bar_chart_outlined),
+                selectedIcon: const Icon(Icons.bar_chart_rounded),
+                label: strings.statisticsTab,
+              ),
             NavigationDestination(
               icon: const Icon(Icons.settings_outlined),
               selectedIcon: const Icon(Icons.settings_rounded),
@@ -763,6 +827,8 @@ class _ReadingHomeState extends State<ReadingHome> {
     bottom: false,
     child: Column(
       children: [
+        if (_statistics case final recorder?)
+          StatisticsNotice(controller: recorder),
         ?_environment(context),
         Expanded(
           child: Align(

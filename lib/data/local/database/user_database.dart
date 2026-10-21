@@ -15,6 +15,19 @@ class UserDatabase extends _$UserDatabase {
       0;
   void notifyRemoved(String source, String novel) =>
       _removals.add((source, novel));
+  Future<void> removeReadingStatistics(String source, String novel) async {
+    await customUpdate(
+      'DELETE FROM reading_statistics_books WHERE source_id=? AND novel_id=?',
+      variables: [Variable(source), Variable(novel)],
+      updates: {readingStatisticsBooks},
+    );
+    await customUpdate(
+      'DELETE FROM reading_statistics_checkpoints WHERE source_id=? AND novel_id=?',
+      variables: [Variable(source), Variable(novel)],
+      updates: {readingStatisticsCheckpoints},
+    );
+  }
+
   @override
   Future<void> close() async {
     await super.close();
@@ -22,13 +35,13 @@ class UserDatabase extends _$UserDatabase {
   }
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
     // Never silently recreate user or cache files on an unknown version.
     onUpgrade: (m, from, to) async {
-      if (from < 1 || from > 8 || to != 9) {
+      if (from < 1 || from > 9 || to != 10) {
         throw StateError('Unsupported database version');
       }
       await transaction(() async {
@@ -63,9 +76,16 @@ class UserDatabase extends _$UserDatabase {
             'ALTER TABLE progress_sessions ADD COLUMN removal_generation INTEGER NOT NULL DEFAULT 0 CHECK(removal_generation >= 0)',
           );
         }
-        await m.createTable(bookmarkVersions);
-        await m.createTable(userBookmarks);
-        await m.createIndex(bookmarksBook);
+        if (from < 9) {
+          await m.createTable(bookmarkVersions);
+          await m.createTable(userBookmarks);
+          await m.createIndex(bookmarksBook);
+        }
+        await m.createTable(readingStatisticsState);
+        await m.createTable(readingStatisticsDays);
+        await m.createTable(readingStatisticsBooks);
+        await m.createIndex(statisticsBook);
+        await m.createTable(readingStatisticsCheckpoints);
         await repairOnlineOwnership();
         await _checkIntegrity();
         // Commit DDL and the version together; Drift's subsequent assignment

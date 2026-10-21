@@ -7,9 +7,15 @@ import '../source_image.dart';
 
 /// Stable book silhouette, including when a source has no cover.
 class BookCover extends StatelessWidget {
-  const BookCover({super.key, required this.book, this.images});
+  const BookCover({
+    super.key,
+    required this.book,
+    this.images,
+    this.readMode = ReadMode.cacheFirst,
+  });
   final NovelSummary book;
   final ImageRepository? images;
+  final ReadMode readMode;
 
   @override
   Widget build(BuildContext context) => ClipRRect(
@@ -20,6 +26,7 @@ class BookCover extends StatelessWidget {
           ? SourceImage(
               media: book.cover!,
               repository: images!,
+              readMode: readMode,
               semanticLabel: AppLocalizations.of(context).detailCover,
             )
           : const CoverPlaceholder(),

@@ -31,6 +31,7 @@ class ShioriApp extends StatefulWidget {
     this.scaffoldMessengerKey,
     this.captionSender,
     this.shutdown,
+    this.navigatorObservers = const [],
   });
 
   final Widget Function(BuildContext, Widget)? overlayBuilder;
@@ -38,6 +39,7 @@ class ShioriApp extends StatefulWidget {
   /// Overrides the native sender for caption integration tests.
   final CaptionSender? captionSender;
   final Future<void> Function()? shutdown;
+  final List<NavigatorObserver> navigatorObservers;
   final GlobalKey<NavigatorState>? navigatorKey;
   final GlobalKey<ScaffoldMessengerState>? scaffoldMessengerKey;
   final AppController Function() createController;
@@ -107,7 +109,11 @@ class _ShioriAppState extends State<ShioriApp> {
       return MaterialApp(
         navigatorKey:
             widget.navigatorKey ?? (Platform.isMacOS ? _macNavigator : null),
-        navigatorObservers: [_feedback, ?_caption],
+        navigatorObservers: [
+          _feedback,
+          ?_caption,
+          ...widget.navigatorObservers,
+        ],
         scaffoldMessengerKey: widget.scaffoldMessengerKey,
         debugShowCheckedModeBanner: false,
         builder: (context, child) {

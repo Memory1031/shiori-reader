@@ -1,3 +1,4 @@
+import '../../shared/widgets/reading_statistics_scope.dart';
 import 'viewport/paragraph_flow.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -19,39 +20,43 @@ Future<void> showReaderFootnote(
   LocalContentLink note, {
   (int, int)? range,
   ThemeData? theme,
-}) => showReaderSheet<void>(
-  context,
-  builder: (context) {
-    final l = AppLocalizations.of(context);
-    final panel = ConstrainedBox(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * .65,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            title: Text(l.readerFootnote(note.label)),
-            trailing: IconButton(
-              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.close),
-            ),
-          ),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: Builder(
-                builder: (context) => _noteText(context, note, range),
+}) {
+  final book = ReadingBookScope.maybeOf(context);
+  return showReaderSheet<void>(
+    context,
+    builder: (context) {
+      final l = AppLocalizations.of(context);
+      final panel = ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .65,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(l.readerFootnote(note.label)),
+              trailing: IconButton(
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-    return theme == null ? panel : Theme(data: theme, child: panel);
-  },
-);
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                child: Builder(
+                  builder: (context) => _noteText(context, note, range),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      final child = theme == null ? panel : Theme(data: theme, child: panel);
+      return book == null ? child : ReadingActivity(book: book, child: child);
+    },
+  );
+}
 
 /// A single footnote for the desktop dialog: its number with a close
 /// control, then its text, selectable and scrolling past the dialog's

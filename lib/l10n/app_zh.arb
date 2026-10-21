@@ -903,5 +903,69 @@
   "bookmarkSaveFailed": "书签未能保存，请重试。",
   "bookmarkOpenFailed": "暂时无法打开书签，请稍后重试。",
   "bookmarkChanged": "书签状态已更新，请重试。",
-  "readerBookmarkReturn": "返回书签跳转前位置"
+  "readerBookmarkReturn": "返回书签跳转前位置",
+  "statisticsTitle": "阅读统计",
+  "statisticsTab": "统计",
+  "statisticsManage": "管理记录",
+  "statisticsNoticeTitle": "已开启阅读统计",
+  "statisticsNoticeBody": "阅读时长仅保存在本机，可随时暂停或清空。",
+  "statisticsToday": "今日阅读",
+  "statisticsLifetime": "累计阅读",
+  "statisticsDuration": "阅读时长",
+  "statisticsSeven": "近7天",
+  "statisticsThirty": "近30天",
+  "statisticsYear": "近12个月",
+  "statisticsBooks": "这段时间读过",
+  "statisticsAnonymous": "已移除书籍",
+  "statisticsAnonymousHint": "仅保留合计时长",
+  "statisticsMissingBook": "书籍信息暂不可用",
+  "statisticsLocalOnly": "阅读记录仅保存在这台设备上。",
+  "statisticsEmpty": "今天还没有阅读记录。开始阅读后，时长会显示在这里。",
+  "statisticsPeriodEmpty": "这段时间还没有阅读记录。",
+  "statisticsPaused": "记录已暂停。",
+  "statisticsEnable": "开启记录",
+  "statisticsRecording": "记录阅读时长",
+  "statisticsPauseHint": "暂停新增记录，已有统计保留。",
+  "statisticsRulesSummary": "只记录有效的前台阅读；连续 300 秒没有阅读操作时停止计时。",
+  "statisticsRulesTitle": "如何计算",
+  "statisticsRulesBody": "正文、插图、图片查看和脚注计时；阅读工具栏不暂停。目录、书签列表、搜索和阅读设置暂停，主动关闭面板回到正文后继续。后台、锁屏、桌面失焦和最小化不计时，自动恢复不会刷新闲置期限。特殊 WebView 文档暂不计入。",
+  "statisticsRetention": "移除书籍后只保留按日合计，不再关联书名。记录不会自动过期，可随时清空。",
+  "statisticsClear": "清空阅读统计",
+  "statisticsClearConfirm": "清空阅读统计？",
+  "statisticsClearBody": "清空阅读时长和分书统计，不影响书架、阅读进度及书签。",
+  "statisticsClearEnabled": "清空后，之后的阅读仍会继续记录。",
+  "statisticsError": "阅读记录暂不可用，请重试。已有数据不会被当作空记录。",
+  "statisticsUnderMinute": "少于1分钟",
+  "statisticsMinutesUnit": "分钟",
+  "statisticsHoursUnit": "小时",
+  "statisticsChart": "阅读时长图表，可左右调整查看日期和时长",
+  "statisticsUntilToday": "截至今天",
+  "statisticsTotal": "合计",
+  "statisticsMinutes": "{count}分钟",
+  "@statisticsMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "statisticsHoursMinutes": "{hours}小时 {minutes}分钟",
+  "@statisticsHoursMinutes": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "String"
+      }
+    }
+  },
+  "statisticsSince": "自 {date} 开始记录",
+  "@statisticsSince": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  }
 }

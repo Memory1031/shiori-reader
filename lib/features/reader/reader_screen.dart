@@ -1,3 +1,4 @@
+import '../../shared/widgets/reading_statistics_scope.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/scheduler.dart';
@@ -593,8 +594,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
     final panel = _openPanel<void>(
       ReaderPanelPlacement.center,
       semanticLabel: AppLocalizations.of(context).readerFootnote(note.label),
-      builder: (context, panel) =>
-          ReaderFootnotePanel(note: note, onClose: () => panel.close()),
+      builder: (context, panel) => ReadingActivity(
+        book: widget.content.key.novelKey,
+        child: ReaderFootnotePanel(note: note, onClose: () => panel.close()),
+      ),
     );
     await panel?.closed;
   }
@@ -799,6 +802,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   bool _announcedReady = false;
+  final _statisticsReady = ValueNotifier(false);
   late final _openingReady = ValueNotifier(
     !widget.active || widget.completion != null,
   );
@@ -808,6 +812,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _audio.stop();
     _layoutEpoch++;
     _announcedReady = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_announcedReady) _statisticsReady.value = false;
+    });
     _cancelCompletion(immediate: true);
     widget.session?.restoringProgress();
     widget.onLayoutInvalidated?.call();
@@ -826,6 +833,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       final epoch = _layoutEpoch;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && epoch == _layoutEpoch) {
+          _statisticsReady.value = true;
           if (!_openingReady.value) {
             _openingReady.value = true;
             if (widget.active) _claimFocus();
@@ -935,6 +943,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
   /// The one handler behind toolbar buttons, menus and shortcuts.
   void _run(BuildContext context, ReaderCommand command) {
     if (!_interactive || !_can(command)) return;
+    ReadingStatisticsScope.maybeOf(
+      context,
+    )?.bookActivity(widget.content.key.novelKey);
     switch (command) {
       case ReaderCommand.toggleBookmark:
         _actions.toggleBookmark?.call();
@@ -1226,6 +1237,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     _progressText.dispose();
     _readingPosition.dispose();
     _openingReady.dispose();
+    _statisticsReady.dispose();
     super.dispose();
   }
 
@@ -1298,7 +1310,19 @@ class _ReaderContentViewState extends State<ReaderContentView>
           _dragSurface.currentState?.cancel();
           _cancelCompletion(immediate: true);
         }
-        return page;
+        return ValueListenableBuilder<bool>(
+          valueListenable: _statisticsReady,
+          builder: (_, ready, child) => ReadingActivity(
+            book: widget.content.key.novelKey,
+            active:
+                widget.active &&
+                widget.completion == null &&
+                _exitOwner?.saving != true,
+            ready: ready && !_usesPresentation,
+            child: child!,
+          ),
+          child: page,
+        );
       },
     );
   }

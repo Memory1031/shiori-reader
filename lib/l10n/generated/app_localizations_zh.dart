@@ -1692,4 +1692,131 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerBookmarkReturn => '返回书签跳转前位置';
+
+  @override
+  String get statisticsTitle => '阅读统计';
+
+  @override
+  String get statisticsTab => '统计';
+
+  @override
+  String get statisticsManage => '管理记录';
+
+  @override
+  String get statisticsNoticeTitle => '已开启阅读统计';
+
+  @override
+  String get statisticsNoticeBody => '阅读时长仅保存在本机，可随时暂停或清空。';
+
+  @override
+  String get statisticsToday => '今日阅读';
+
+  @override
+  String get statisticsLifetime => '累计阅读';
+
+  @override
+  String get statisticsDuration => '阅读时长';
+
+  @override
+  String get statisticsSeven => '近7天';
+
+  @override
+  String get statisticsThirty => '近30天';
+
+  @override
+  String get statisticsYear => '近12个月';
+
+  @override
+  String get statisticsBooks => '这段时间读过';
+
+  @override
+  String get statisticsAnonymous => '已移除书籍';
+
+  @override
+  String get statisticsAnonymousHint => '仅保留合计时长';
+
+  @override
+  String get statisticsMissingBook => '书籍信息暂不可用';
+
+  @override
+  String get statisticsLocalOnly => '阅读记录仅保存在这台设备上。';
+
+  @override
+  String get statisticsEmpty => '今天还没有阅读记录。开始阅读后，时长会显示在这里。';
+
+  @override
+  String get statisticsPeriodEmpty => '这段时间还没有阅读记录。';
+
+  @override
+  String get statisticsPaused => '记录已暂停。';
+
+  @override
+  String get statisticsEnable => '开启记录';
+
+  @override
+  String get statisticsRecording => '记录阅读时长';
+
+  @override
+  String get statisticsPauseHint => '暂停新增记录，已有统计保留。';
+
+  @override
+  String get statisticsRulesSummary => '只记录有效的前台阅读；连续 300 秒没有阅读操作时停止计时。';
+
+  @override
+  String get statisticsRulesTitle => '如何计算';
+
+  @override
+  String get statisticsRulesBody =>
+      '正文、插图、图片查看和脚注计时；阅读工具栏不暂停。目录、书签列表、搜索和阅读设置暂停，主动关闭面板回到正文后继续。后台、锁屏、桌面失焦和最小化不计时，自动恢复不会刷新闲置期限。特殊 WebView 文档暂不计入。';
+
+  @override
+  String get statisticsRetention => '移除书籍后只保留按日合计，不再关联书名。记录不会自动过期，可随时清空。';
+
+  @override
+  String get statisticsClear => '清空阅读统计';
+
+  @override
+  String get statisticsClearConfirm => '清空阅读统计？';
+
+  @override
+  String get statisticsClearBody => '清空阅读时长和分书统计，不影响书架、阅读进度及书签。';
+
+  @override
+  String get statisticsClearEnabled => '清空后，之后的阅读仍会继续记录。';
+
+  @override
+  String get statisticsError => '阅读记录暂不可用，请重试。已有数据不会被当作空记录。';
+
+  @override
+  String get statisticsUnderMinute => '少于1分钟';
+
+  @override
+  String get statisticsMinutesUnit => '分钟';
+
+  @override
+  String get statisticsHoursUnit => '小时';
+
+  @override
+  String get statisticsChart => '阅读时长图表，可左右调整查看日期和时长';
+
+  @override
+  String get statisticsUntilToday => '截至今天';
+
+  @override
+  String get statisticsTotal => '合计';
+
+  @override
+  String statisticsMinutes(String count) {
+    return '$count分钟';
+  }
+
+  @override
+  String statisticsHoursMinutes(String hours, String minutes) {
+    return '$hours小时 $minutes分钟';
+  }
+
+  @override
+  String statisticsSince(String date) {
+    return '自 $date 开始记录';
+  }
 }
