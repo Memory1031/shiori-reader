@@ -5,6 +5,7 @@
   <p>
     <a href="https://memory1031.github.io/shiori-reader/zh-cn/"><strong>官方网站</strong></a>
     · <a href="https://memory1031.github.io/shiori-reader/zh-cn/download/">下载 Shiori</a>
+    · <a href="docs/altstore.md">AltStore 侧载</a>
     · <a href="https://memory1031.github.io/shiori-reader/en/">English</a>
   </p>
 </div>

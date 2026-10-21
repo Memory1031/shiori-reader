@@ -263,3 +263,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           UPDATE_PUBLIC_KEY_JSON: ${{ vars.UPDATE_PUBLIC_KEY_JSON }}
         run: python3 tool/publish_assets.py
+
+      - name: 更新对应渠道的 AltStore 订阅源
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tool/publish_altstore.py --publish

@@ -76,7 +76,7 @@ Stable 只选择正式 Release，Beta 同时允许测试版与正式版。候选
 
 客户端从本仓库 GitHub Releases 有界读取发布列表，不能仅使用 latest 接口发现 Beta。先验签清单原始字节，再接受平台资产；SHA-256 校验下载完整性，不替代清单签名或 Android 安装签名。扫描未穷尽且没有可靠候选时报告检查不完整，不误报最新版。下载绑定官方仓库的指定 Release / asset，限制重定向与资源大小。更新说明使用受限原生 Markdown 预览，不执行 HTML、加载图片或响应文内链接；完整说明通过独立发布页入口打开。
 
-Android 使用系统 `PackageInstaller` 确认覆盖安装；Android 8+ 需授权当前来源安装应用，授权后重新发起安装。iOS 不在应用内下载或覆盖安装 IPA；未签名 IPA 用户自行获取新版并重新签名安装。Windows 流程见下方 [Windows 安装与更新](#windows-安装与更新)。
+Android 使用系统 `PackageInstaller` 确认覆盖安装；Android 8+ 需授权当前来源安装应用，授权后重新发起安装。iOS 不在应用内下载或覆盖安装 IPA；未签名 IPA 可通过 AltStore Classic 订阅安装与更新，或自行获取新版并重新签名安装。Windows 流程见下方 [Windows 安装与更新](#windows-安装与更新)。
 
 设备验证入口包括 [Android 安装 runner](../../android/app/src/androidTest/kotlin/dev/shiori/reader/UpdateInstallSmokeRunner.kt) 和[进程恢复脚本](../../tool/test_android_update_recovery.py)。runner 需显式指定 mode；恢复脚本的 `--require-retained` 要求 session 真正跨进程保留。同进程清理不代替进程死亡验证，本地安装测试不代替真实发布源升级或用户数据保留验证。
 
@@ -142,4 +142,6 @@ GitHub Release 提供 `shiori-reader-<tag>-ios-arm64-unsigned.ipa`，适用于 i
 
 GitHub 附件摘要用于核对原始 IPA；重新签名会改变文件摘要。更改 Bundle ID、卸载应用或更换签名方式可能影响原有容器及数据，操作前先保全，不以卸载作为升级步骤。
 
-未签名 IPA 与其他三端产物在同一草稿验证并上传后统一公开，任何必需构建或校验失败都会阻止该次 GitHub Release；现有独立签名上传流程不受此依赖影响。IPA 不进入 Android、Windows 或 macOS 更新清单，不提供应用内自签、覆盖安装或自签更新源。
+未签名 IPA 与其他三端产物在同一草稿验证并上传后统一公开，任何必需构建或校验失败都会阻止该次 GitHub Release；现有独立签名上传流程不受此依赖影响。IPA 不进入 Android、Windows 或 macOS 更新清单，不提供应用内自签或覆盖安装。
+
+GitHub Release 完整公开后，发布流程维护对应渠道的 AltStore Classic 订阅源。添加源与维护规则见 [AltStore 侧载](../altstore.md)。
