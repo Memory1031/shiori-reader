@@ -12,6 +12,7 @@ import 'continue_reading_card.dart';
 import 'continue_reading_row.dart';
 import 'desktop_shell.dart';
 import 'home_navigation.dart';
+import 'home_settings_view.dart';
 import '../../shared/widgets/shiori_logo.dart';
 import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/shiori_feedback.dart';
@@ -87,6 +88,7 @@ class _ReadingHomeState extends State<ReadingHome> {
   late final LibraryController _library;
   late final BookBatchActions _shelfActions;
 
+  bool _mobileSettings = false;
   HomeNavigation? _ownNavigation;
   HomeNavigation get _navigation =>
       widget.navigation ?? (_ownNavigation ??= HomeNavigation());
@@ -170,6 +172,7 @@ class _ReadingHomeState extends State<ReadingHome> {
   /// section's root: pages opened above it close at once, without an exit
   /// transition, and a new root replaces the old one the same way.
   void _navigate() {
+    _mobileSettings = false;
     _shelfActions.leave();
     _history.clear();
     if (mounted) setState(() {});
@@ -585,108 +588,208 @@ class _ReadingHomeState extends State<ReadingHome> {
 
   Widget _mobile(BuildContext context) {
     final strings = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: _shelfActions.selection.active
-          ? BookSelectionAppBar(actions: _shelfActions)
-          : AppBar(
-              title: const ShioriLogo(),
-              actions: [
-                IconButton(
-                  onPressed: _library.writing ? null : () => _search(context),
-                  tooltip: strings.searchTitle,
-                  icon: const Icon(Icons.search),
-                ),
-                PopupMenuButton<String>(
-                  enabled: !_library.writing,
-                  tooltip: strings.moreActions,
-                  onSelected: (value) {
-                    if (value == 'select') _shelfActions.enter();
-                    if (value == 'import') widget.onImport?.call();
-                    if (value == 'cache') {
-                      _routes.open(context, const CacheDestination());
-                    }
-                    if (value == 'local') {
-                      _routes.open(context, const LocalBooksDestination());
-                    }
-                    if (value == 'appearance') widget.onAppearance?.call();
-                    if (value == 'updates') widget.onUpdates?.call();
-                  },
-                  itemBuilder: (_) => [
-                    ShioriMenuItem(
-                      value: 'select',
-                      icon: Icons.checklist,
-                      label: strings.bookMultiSelect,
-                      enabled: _shelfActions.canEnter,
-                    ),
-                    if (widget.onUpdates != null)
-                      _menuItem(
-                        'updates',
-                        Icons.info_outline,
-                        strings.updateTitle,
+    final selecting = _shelfActions.selection.active;
+    return PopScope(
+      canPop: !_mobileSettings,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _mobileSettings) _selectMobilePage(0);
+      },
+      child: Scaffold(
+        appBar: _mobileSettings
+            ? AppBar(title: Text(strings.homeSettingsTitle))
+            : _shelfActions.selection.active
+            ? BookSelectionAppBar(actions: _shelfActions)
+            : AppBar(
+                title: const ShioriLogo(),
+                actions: [
+                  IconButton(
+                    onPressed: _library.writing ? null : () => _search(context),
+                    tooltip: strings.searchTitle,
+                    icon: const Icon(Icons.search),
+                  ),
+                  PopupMenuButton<String>(
+                    enabled: !_library.writing,
+                    tooltip: strings.moreActions,
+                    onSelected: (value) {
+                      if (value == 'select') _shelfActions.enter();
+                      if (value == 'import') widget.onImport?.call();
+                    },
+                    itemBuilder: (_) => [
+                      ShioriMenuItem(
+                        value: 'select',
+                        icon: Icons.checklist,
+                        label: strings.bookMultiSelect,
+                        enabled: _shelfActions.canEnter,
                       ),
-                    if (widget.onImport != null)
-                      _menuItem(
-                        'import',
-                        Icons.file_upload_outlined,
-                        strings.importTitle,
-                      ),
-                    if (widget.localManagement != null)
-                      _menuItem(
-                        'local',
-                        Icons.folder_outlined,
-                        strings.localBooksTitle,
-                      ),
-                    if (widget.cache != null)
-                      _menuItem(
-                        'cache',
-                        Icons.offline_pin_outlined,
-                        strings.cacheTitle,
-                      ),
-                    if (widget.onAppearance != null)
-                      _menuItem(
-                        'appearance',
-                        Icons.palette_outlined,
-                        strings.appAppearance,
-                      ),
-                  ],
-                ),
-              ],
-            ),
-      body: SafeArea(
-        bottom: false,
-        child: Column(
+                      if (widget.onImport != null)
+                        _menuItem(
+                          'import',
+                          Icons.file_upload_outlined,
+                          strings.importTitle,
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+        body: IndexedStack(
+          index: _mobileSettings ? 1 : 0,
           children: [
-            ?_environment(context),
-            Expanded(
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: ShioriLayout.page,
-                  ),
-                  child: BookshelfView(
-                    batchActions: _shelfActions,
-                    layout: _shelfGrid,
-                    localReparse: widget.localBooks is LocalBookReparse
-                        ? widget.localBooks as LocalBookReparse
-                        : null,
-                    controller: _library,
-                    images: widget.images,
-                    onOpen: _continue,
-                    onDetails: (key) =>
-                        _routes.open(context, NovelDestination(key)),
-                    onSearch: () => _search(context),
-                    onImport: widget.onImport,
-                    header: _continueHeader(context),
-                  ),
+            ExcludeFocus(
+              excluding: _mobileSettings,
+              child: _mobileShelf(context),
+            ),
+            ExcludeFocus(
+              excluding: !_mobileSettings,
+              child: SafeArea(
+                bottom: false,
+                child: HomeSettingsView(
+                  enabled: !_library.writing,
+                  onAppearance: widget.onAppearance,
+                  onUpdates: widget.onUpdates,
+                  onLocalBooks: _routes.localBooks == null
+                      ? null
+                      : () => _routes.open(
+                          context,
+                          const LocalBooksDestination(),
+                        ),
+                  onOfflineContent: _routes.cache == null
+                      ? null
+                      : () => _routes.open(context, const CacheDestination()),
                 ),
               ),
             ),
           ],
         ),
+        bottomNavigationBar: selecting ? null : _mobileNavigation(context),
       ),
     );
   }
+
+  void _selectMobilePage(int index) {
+    if (_mobileSettings == (index == 1) || _library.writing) return;
+    _shelfActions.leave();
+    setState(() => _mobileSettings = index == 1);
+  }
+
+  Widget _mobileNavigation(BuildContext context) {
+    final theme = Theme.of(context);
+    final labelStyle = theme.textTheme.labelMedium!;
+    final labelSize = labelStyle.fontSize!;
+    final largeLabels =
+        MediaQuery.textScalerOf(context).scale(labelSize) > labelSize;
+    final strings = AppLocalizations.of(context);
+    final bar = DecoratedBox(
+      position: DecorationPosition.foreground,
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: .45),
+            width: .5,
+          ),
+        ),
+      ),
+      child: NavigationBarTheme(
+        data: theme.navigationBarTheme.copyWith(
+          iconTheme: WidgetStateProperty.resolveWith(
+            (states) => IconThemeData(
+              size: ShioriSpace.item + ShioriSpace.small,
+              color: states.contains(WidgetState.selected)
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          labelTextStyle: WidgetStateProperty.resolveWith(
+            (states) => labelStyle.copyWith(
+              color: states.contains(WidgetState.selected)
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+              fontWeight: states.contains(WidgetState.selected)
+                  ? FontWeight.w600
+                  : FontWeight.normal,
+            ),
+          ),
+        ),
+        child: NavigationBar(
+          height:
+              ShioriSpace.section * 2 + (largeLabels ? ShioriSpace.tight : 0),
+          indicatorColor: Colors.transparent,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          labelPadding: EdgeInsets.zero,
+          selectedIndex: _mobileSettings ? 1 : 0,
+          onDestinationSelected: _selectMobilePage,
+          animationDuration: ShioriMotion.of(context, ShioriMotion.feedback),
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.focused) ||
+                states.contains(WidgetState.pressed)) {
+              return theme.focusColor;
+            }
+            return Colors.transparent;
+          }),
+          destinations: [
+            NavigationDestination(
+              icon: const Icon(Icons.auto_stories_outlined),
+              selectedIcon: const Icon(Icons.auto_stories),
+              label: strings.shelfTitle,
+            ),
+            NavigationDestination(
+              icon: const Icon(Icons.settings_outlined),
+              selectedIcon: const Icon(Icons.settings_rounded),
+              label: strings.homeSettingsTitle,
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!ShioriCapabilities.of(context).cupertinoNavigation) return bar;
+    // Read the Scaffold's filtered insets, without restoring its top padding.
+    return Builder(
+      builder: (context) {
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(
+            padding: media.padding.copyWith(
+              bottom: media.padding.bottom
+                  .clamp(0.0, ShioriSpace.item)
+                  .toDouble(),
+            ),
+          ),
+          child: bar,
+        );
+      },
+    );
+  }
+
+  Widget _mobileShelf(BuildContext context) => SafeArea(
+    bottom: false,
+    child: Column(
+      children: [
+        ?_environment(context),
+        Expanded(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: ShioriLayout.page),
+              child: BookshelfView(
+                batchActions: _shelfActions,
+                layout: _shelfGrid,
+                localReparse: widget.localBooks is LocalBookReparse
+                    ? widget.localBooks as LocalBookReparse
+                    : null,
+                controller: _library,
+                images: widget.images,
+                onOpen: _continue,
+                onDetails: (key) =>
+                    _routes.open(context, NovelDestination(key)),
+                onSearch: () => _search(context),
+                onImport: widget.onImport,
+                header: _continueHeader(context),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 /// Tracks the routes pushed above a section's root, so a navigation request

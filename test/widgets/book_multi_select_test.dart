@@ -24,7 +24,7 @@ void main() {
         ..gate = Completer<Result<LocalReparseResult>>();
       final h = LocalHarness(tester, store: store);
       await h.pump(width: 390, height: 844, shell: true);
-      await tester.tap(find.byTooltip('More'));
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Local files'));
       await tester.pumpAndSettle();
@@ -109,7 +109,7 @@ void main() {
     (tester) async {
       final h = LocalHarness(tester, store: LocalStore(count: 1));
       await h.pump(width: 390, height: 844, shell: true);
-      await tester.tap(find.byTooltip('More'));
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Local files'));
       await tester.pumpAndSettle();
@@ -148,7 +148,7 @@ void main() {
         ..gate = Completer<Result<LocalReparseResult>>();
       final h = LocalHarness(tester, store: store);
       await h.pump(width: 390, height: 844, shell: true);
-      await tester.tap(find.byTooltip('More'));
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Local files'));
       await tester.pumpAndSettle();
@@ -179,7 +179,7 @@ void main() {
       expect(library.writing, isFalse);
       expect(h.importer.maintenanceBlocked, isFalse);
       expect(find.byType(LocalReparseResultView), findsNothing);
-      await tester.tap(find.byTooltip('More'));
+      await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Local files'));
       await tester.pumpAndSettle();

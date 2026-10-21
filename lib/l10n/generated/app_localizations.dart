@@ -1214,6 +1214,54 @@ abstract class AppLocalizations {
   /// **'Main navigation'**
   String get homeNavigation;
 
+  /// No description provided for @homeSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get homeSettingsTitle;
+
+  /// No description provided for @homeSettingsAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get homeSettingsAppearance;
+
+  /// No description provided for @homeSettingsStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Books and storage'**
+  String get homeSettingsStorage;
+
+  /// No description provided for @homeSettingsAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get homeSettingsAbout;
+
+  /// No description provided for @homeSettingsAppearanceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme and display preferences'**
+  String get homeSettingsAppearanceDescription;
+
+  /// No description provided for @homeSettingsLocalBooksDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage imported books'**
+  String get homeSettingsLocalBooksDescription;
+
+  /// No description provided for @homeSettingsOfflineDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage cached reading content'**
+  String get homeSettingsOfflineDescription;
+
+  /// No description provided for @homeSettingsAboutDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Version details and app updates'**
+  String get homeSettingsAboutDescription;
+
   /// No description provided for @allChapters.
   ///
   /// In en, this message translates to:

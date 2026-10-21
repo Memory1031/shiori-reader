@@ -74,43 +74,53 @@ void main() {
     );
   }
 
-  testWidgets('home menu opens offline content and local files', (
-    tester,
-  ) async {
-    final env = FixtureEnvironment();
-    final local = ReparseStore();
-    await tester.pumpWidget(
-      ShioriApp(
-        locale: const Locale('en'),
-        routes: AppRoutes(
-          home: (_) => ReadingHome(
-            repository: env.novels,
-            library: env.library,
-            sources: [env.source.descriptor],
-            cache: Cache(),
-            localBooks: local,
-            localManagement: local,
-            onImport: () {},
+  testWidgets(
+    'mobile settings opens existing offline content and local files routes',
+    (tester) async {
+      final env = FixtureEnvironment();
+      final local = ReparseStore();
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          routes: AppRoutes(
+            home: (_) => ReadingHome(
+              repository: env.novels,
+              library: env.library,
+              sources: [env.source.descriptor],
+              cache: Cache(),
+              localBooks: local,
+              localManagement: local,
+              onImport: () {},
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    for (final (label, screen) in [
-      ('Offline content', CacheScreen),
-      ('Local files', LocalBooksScreen),
-    ]) {
-      await tester.tap(find.byTooltip('More'));
+      );
       await tester.pumpAndSettle();
-      await tester.tap(find.text(label));
-      await tester.pumpAndSettle();
-      expect(find.byType(screen), findsOneWidget, reason: label);
-      await tester.pageBack();
-      await tester.pumpAndSettle();
-    }
-    await tester.pumpWidget(const SizedBox());
-    await tester.runAsync(env.close);
-  });
+      for (final (label, screen) in [
+        ('Offline content', CacheScreen),
+        ('Local files', LocalBooksScreen),
+      ]) {
+        await tester.tap(
+          find.widgetWithText(NavigationDestination, 'Settings'),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(label));
+        await tester.pumpAndSettle();
+        expect(find.byType(screen), findsOneWidget, reason: label);
+        expect(find.byType(NavigationBar), findsNothing);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<NavigationBar>(find.byType(NavigationBar))
+              .selectedIndex,
+          1,
+        );
+      }
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(env.close);
+    },
+  );
 }
 
 class _EpubReparseStore extends ReparseStore {

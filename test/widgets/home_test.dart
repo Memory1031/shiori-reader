@@ -68,6 +68,8 @@ void main() {
       await tester.tap(find.text(remove));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
       final search = locale == 'zh' ? '搜索' : 'Search';
       await tester.tap(find.byTooltip(search));
       await tester.pumpAndSettle();
@@ -77,6 +79,7 @@ void main() {
         ),
         findsOneWidget,
       );
+      expect(find.byKey(const ValueKey('search-input')), findsOneWidget);
       expect(env.source.controls.calls, isEmpty);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
@@ -110,11 +113,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(env.source.controls.calls, isEmpty);
       expect(find.text('Your bookshelf is empty.'), findsOneWidget);
-      expect(find.byType(NavigationBar), findsNothing);
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.byType(NavigationDestination), findsNWidgets(2));
       expect(find.text('Discover'), findsNothing);
       await tester.tap(find.byTooltip('Search'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('search-input')), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
       expect(find.text('Online source'), findsNothing);
       expect(find.text('LightNovel.fun'), findsOneWidget);
       expect(env.source.controls.calls, isEmpty);

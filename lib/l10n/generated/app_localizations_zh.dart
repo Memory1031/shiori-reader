@@ -579,6 +579,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeNavigation => '主导航';
 
   @override
+  String get homeSettingsTitle => '设置';
+
+  @override
+  String get homeSettingsAppearance => '外观';
+
+  @override
+  String get homeSettingsStorage => '书籍与存储';
+
+  @override
+  String get homeSettingsAbout => '关于';
+
+  @override
+  String get homeSettingsAppearanceDescription => '主题与界面显示';
+
+  @override
+  String get homeSettingsLocalBooksDescription => '管理已导入的书籍';
+
+  @override
+  String get homeSettingsOfflineDescription => '管理已缓存的阅读内容';
+
+  @override
+  String get homeSettingsAboutDescription => '版本信息与应用更新';
+
+  @override
   String get allChapters => '全部章节';
 
   @override
