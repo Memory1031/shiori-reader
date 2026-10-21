@@ -3290,24 +3290,6 @@ abstract class AppLocalizations {
   /// **'Pause new records and keep existing statistics.'**
   String get statisticsPauseHint;
 
-  /// No description provided for @statisticsRulesSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Records active foreground reading. Timing stops after 300 seconds without reading activity.'**
-  String get statisticsRulesSummary;
-
-  /// No description provided for @statisticsRulesTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'How it works'**
-  String get statisticsRulesTitle;
-
-  /// No description provided for @statisticsRulesBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Text, illustrations, image previews and footnotes count. The reading toolbar does not pause timing. Contents, bookmarks, search and reading settings pause it; closing a panel to return to the text resumes reading. Background time, locked screens, unfocused and minimized desktop windows do not count. Automatic recovery does not reset the idle limit. Special WebView documents are currently excluded.'**
-  String get statisticsRulesBody;
-
   /// No description provided for @statisticsRetention.
   ///
   /// In en, this message translates to:

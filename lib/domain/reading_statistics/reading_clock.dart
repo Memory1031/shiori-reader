@@ -48,10 +48,10 @@ class ReadingInterval {
     final elapsed = end - _last;
     final wallDelta = wall.difference(_wall);
     final days = <int, int>{};
-    // Missed wakeups or a changed wall-clock mapping cannot prove reading.
+    // Missed active wakeups or a changed wall-clock mapping cannot prove reading.
     final uncertain =
         elapsed.isNegative ||
-        elapsed > const Duration(seconds: 30) ||
+        allowed && elapsed > const Duration(seconds: 30) ||
         (wallDelta - elapsed).abs() > const Duration(seconds: 2);
     if (uncertain) {
       expire();

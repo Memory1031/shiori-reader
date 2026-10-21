@@ -108,6 +108,21 @@ void main() {
     await repo.read(firstDay: 20261021, lastDay: 20261021, today: 20261021),
   ).total;
   test(
+    'known 40-second focus pause preserves the original idle deadline',
+    () async {
+      await open(Object(), key);
+      clock.advance(const Duration(seconds: 10));
+      recorder.environment(focused: false);
+      clock.advance(const Duration(seconds: 40));
+      recorder.environment(focused: true);
+      expect(recorder.recording, true);
+      clock.advance(const Duration(seconds: 15));
+      await recorder.tick();
+      expect(await total(), 25000);
+      expect(recorder.interval.remaining, const Duration(seconds: 235));
+    },
+  );
+  test(
     'multiple visible surfaces count once and background preserves deadline',
     () async {
       final main = Object(), footnote = Object();

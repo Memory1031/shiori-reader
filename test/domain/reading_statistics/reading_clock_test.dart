@@ -105,8 +105,10 @@ void main() {
       expect(interval.active, false);
       interval.activity();
       // A platform stopwatch may stop during sleep; wall time still changes.
+      interval.allowed = false;
       clock.wall = clock.wall.add(const Duration(hours: 2));
       expect(interval.settle(), isEmpty);
+      interval.allowed = true;
       expect(interval.active, false);
     },
   );

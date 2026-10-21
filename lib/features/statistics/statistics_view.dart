@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../../shared/capabilities.dart';
 import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/desktop_content_frame.dart';
 import '../../shared/widgets/shiori_sheet.dart';
@@ -23,10 +24,23 @@ enum StatisticsRange { week, month, year }
 Future<void> showStatisticsSettings(
   BuildContext context,
   ReadingStatisticsController controller,
-) => showShioriSheet<void>(
-  context,
-  builder: (_) => _RecordSettings(controller: controller),
-);
+) => ShioriCapabilities.of(context).pointerFirst
+    ? showDialog<void>(
+        context: context,
+        builder: (_) => Dialog(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: ShioriLayout.panel),
+            child: Padding(
+              padding: const EdgeInsets.only(top: ShioriSpace.page),
+              child: _RecordSettings(controller: controller),
+            ),
+          ),
+        ),
+      )
+    : showShioriSheet<void>(
+        context,
+        builder: (_) => _RecordSettings(controller: controller),
+      );
 
 class StatisticsScreen extends StatelessWidget {
   const StatisticsScreen({super.key, required this.controller, this.images});
@@ -805,38 +819,79 @@ class _ReadingChart extends StatelessWidget {
           ),
         ),
         ExcludeSemantics(
-          child: Row(
-            children: [
-              for (var i = 0; i < dates.length; i++)
-                Expanded(
-                  child: SizedBox(
-                    height: ShioriSpace.page,
-                    child: Center(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          monthly
-                              ? '${dates[i].month}'
-                              : values.length == 7 ||
-                                    i == 0 ||
-                                    i == 14 ||
-                                    i == 29
-                              ? '${dates[i].month}/${dates[i].day}'
-                              : '',
-                          style: theme.textTheme.bodySmall,
+          child: values.length == 30
+              ? SizedBox(
+                  height: math.max(
+                    ShioriSpace.page,
+                    MediaQuery.textScalerOf(
+                          context,
+                        ).scale(theme.textTheme.bodySmall!.fontSize!) *
+                        (theme.textTheme.bodySmall!.height ?? 1.5),
+                  ),
+                  child: CustomMultiChildLayout(
+                    delegate: _DateLabelLayout(values.length),
+                    children: [
+                      for (final i in [0, 14, 29])
+                        LayoutId(
+                          id: i,
+                          child: Text(
+                            '${dates[i].month}/${dates[i].day}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                    ],
+                  ),
+                )
+              : Row(
+                  children: [
+                    for (var i = 0; i < dates.length; i++)
+                      Expanded(
+                        child: SizedBox(
+                          height: ShioriSpace.page,
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                monthly
+                                    ? '${dates[i].month}'
+                                    : '${dates[i].month}/${dates[i].day}',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                  ],
                 ),
-            ],
-          ),
         ),
         const SizedBox(height: ShioriSpace.small),
         Text(label(selected), style: theme.textTheme.bodySmall),
       ],
     );
   }
+}
+
+class _DateLabelLayout extends MultiChildLayoutDelegate {
+  _DateLabelLayout(this.count);
+  final int count;
+  @override
+  void performLayout(Size size) {
+    for (final i in [0, 14, 29]) {
+      final label = layoutChild(i, BoxConstraints.loose(size));
+      final center = size.width * (i + .5) / count;
+      positionChild(
+        i,
+        Offset(
+          (center - label.width / 2).clamp(0, size.width - label.width),
+          (size.height - label.height) / 2,
+        ),
+      );
+    }
+  }
+
+  @override
+  bool shouldRelayout(_DateLabelLayout oldDelegate) =>
+      count != oldDelegate.count;
 }
 
 class _Bars extends CustomPainter {
@@ -980,17 +1035,6 @@ class _RecordSettingsState extends State<_RecordSettings> {
               onChanged: _busy || c.settings == null
                   ? null
                   : (value) => _run(() => c.setEnabled(value)),
-            ),
-            Text(l.statisticsRulesSummary, style: theme.textTheme.bodySmall),
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: Text(
-                l.statisticsRulesTitle,
-                style: theme.textTheme.bodyMedium,
-              ),
-              children: [
-                Text(l.statisticsRulesBody, style: theme.textTheme.bodySmall),
-              ],
             ),
             const SizedBox(height: ShioriSpace.medium),
             Text(l.statisticsRetention, style: theme.textTheme.bodySmall),

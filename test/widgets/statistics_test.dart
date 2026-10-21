@@ -121,6 +121,117 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('30-day labels retain readable size at phone widths', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.runAsync(() => recorder.ready);
+    for (final width in [320.0, 390.0]) {
+      tester.view.physicalSize = Size(width, 900);
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          overlayBuilder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(1.5)),
+            child: child,
+          ),
+          homeBuilder: (_, _) =>
+              Scaffold(body: StatisticsView(controller: recorder)),
+        ),
+      );
+      await settle(tester);
+      await tester.tap(find.text('30 days'));
+      await settle(tester);
+      final labels = ['9/22', '10/6', '10/21'].map(find.text).toList();
+      final rects = labels.map((label) {
+        final box = tester.renderObject<RenderBox>(label);
+        expect(
+          find.ancestor(of: label, matching: find.byType(FittedBox)),
+          findsNothing,
+        );
+        return MatrixUtils.transformRect(
+          box.getTransformTo(null),
+          Offset.zero & box.size,
+        );
+      }).toList();
+      final chart = tester.getRect(
+        find
+            .descendant(
+              of: find.byWidgetPredicate(
+                (w) => w is Semantics && w.properties.slider == true,
+              ),
+              matching: find.byType(GestureDetector),
+            )
+            .first,
+      );
+      for (final rect in rects) {
+        expect(rect.width, greaterThan(40));
+        expect(rect.height, greaterThanOrEqualTo(27));
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(width));
+      }
+      expect(rects[0].right, lessThan(rects[1].left));
+      expect(rects[1].right, lessThan(rects[2].left));
+      expect(rects.first.left, closeTo(chart.left, .01));
+      expect(rects.last.right, closeTo(chart.right, .01));
+      expect(
+        rects[1].center.dx,
+        closeTo(chart.left + chart.width * 14.5 / 30, .01),
+      );
+      expect(tester.takeException(), isNull);
+    }
+    await tester.pumpWidget(const SizedBox());
+    await settle(tester);
+  });
+
+  testWidgets(
+    'desktop record management is a centered bounded dialog',
+    (tester) async {
+      tester.view
+        ..physicalSize = const Size(1280, 900)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.runAsync(() => recorder.ready);
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          homeBuilder: (_, _) => Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showStatisticsSettings(context, recorder),
+                child: const Text('Open management'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open management'));
+      await settle(tester);
+      expect(find.byType(BottomSheet), findsNothing);
+      final dialog = tester.widget<Dialog>(find.byType(Dialog));
+      final panel = find.byWidget(dialog.child!);
+      expect(tester.getSize(panel).width, lessThanOrEqualTo(560));
+      expect(tester.getCenter(panel), const Offset(640, 450));
+      await tester.tap(find.text('Clear reading statistics'));
+      await settle(tester);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await settle(tester);
+      await tester.tap(find.byType(SwitchListTile));
+      await settle(tester);
+      expect(recorder.enabled, false);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await settle(tester);
+      expect(find.byType(Dialog), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      await settle(tester);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
+  );
+
   testWidgets(
     'three real tabs, once-only notice and record management keep navigation',
     (tester) async {
@@ -148,6 +259,8 @@ void main() {
       expect(find.text('Reading statistics are on'), findsOneWidget);
       await tester.tap(find.text('Manage records').first);
       await settle(tester);
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(find.byType(Dialog), findsNothing);
       expect(find.byType(SwitchListTile), findsOneWidget);
       expect(find.text('Reading statistics are on'), findsNothing);
       await tester.tap(find.byType(SwitchListTile));

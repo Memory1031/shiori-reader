@@ -1760,16 +1760,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statisticsPauseHint => '暂停新增记录，已有统计保留。';
 
   @override
-  String get statisticsRulesSummary => '只记录有效的前台阅读；连续 300 秒没有阅读操作时停止计时。';
-
-  @override
-  String get statisticsRulesTitle => '如何计算';
-
-  @override
-  String get statisticsRulesBody =>
-      '正文、插图、图片查看和脚注计时；阅读工具栏不暂停。目录、书签列表、搜索和阅读设置暂停，主动关闭面板回到正文后继续。后台、锁屏、桌面失焦和最小化不计时，自动恢复不会刷新闲置期限。特殊 WebView 文档暂不计入。';
-
-  @override
   String get statisticsRetention => '移除书籍后只保留按日合计，不再关联书名。记录不会自动过期，可随时清空。';
 
   @override
