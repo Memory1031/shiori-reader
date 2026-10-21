@@ -29,6 +29,7 @@
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
 		4787EAE8BF24EB9C74E574DA /* MacServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90595B8E6AE58B2230E85784 /* MacServices.swift */; };
 		F26D57B3D290E332336EC9E1 /* InstallationLease.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BC9A6F9C71EE8BC6CEAAAC0 /* InstallationLease.swift */; };
+		E32B50F96B9C4F54AEB86302 /* NativeLaunchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E32B50F96B9C4F54AEB86301 /* NativeLaunchView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -77,6 +78,7 @@
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		CD75192EC1B37CCA22E7B9DA /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		DAB68369C1DC87F801B1866B /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
+		E32B50F96B9C4F54AEB86301 /* NativeLaunchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeLaunchView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -148,6 +150,7 @@
 			children = (
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
+				E32B50F96B9C4F54AEB86301 /* NativeLaunchView.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
@@ -370,6 +373,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
+				E32B50F96B9C4F54AEB86302 /* NativeLaunchView.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 				4787EAE8BF24EB9C74E574DA /* MacServices.swift in Sources */,

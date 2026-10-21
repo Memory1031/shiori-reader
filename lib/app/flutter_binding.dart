@@ -21,7 +21,7 @@ class ShioriWidgetsFlutterBinding extends WidgetsFlutterBinding {
   }
 }
 
-/// The native cover stays visible until Flutter has actual pixels to present.
+/// Dismiss promptly once Flutter has pixels; native code also has a timeout.
 Future<void> dismissMacOSLaunchScreen(Future<void> firstFrame) async {
   await firstFrame;
   try {
