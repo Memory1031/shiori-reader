@@ -56,16 +56,12 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
         expect(h.controller.phase, UpdatePhase.verifying);
         expect(find.text(h.l.updateVerifying), findsOneWidget);
-        expect(find.text(h.l.updateVerifyingHint), findsOneWidget);
         expect(find.text(h.l.updateProgress(100)).hitTestable(), findsNothing);
-        expect(
-          tester
-              .widget<LinearProgressIndicator>(
-                find.byType(LinearProgressIndicator),
-              )
-              .value,
-          isNull,
+        final progress = tester.widget<LinearProgressIndicator>(
+          find.byType(LinearProgressIndicator),
         );
+        expect(progress.value, isNull);
+        expect(progress.semanticsLabel, h.l.updateVerifying);
         expect(tester.getTopLeft(releasePage), before);
         expect(install, findsNothing);
         expect(download, findsNothing);

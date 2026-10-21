@@ -216,11 +216,6 @@ class _UpdateScreenState extends State<UpdateScreen> {
                         horizontal: 12,
                       ),
                       title: Text(l.updateChannel),
-                      subtitle: Text(
-                        c.preferences.channel == UpdateChannel.stable
-                            ? l.updateStableHint
-                            : l.updateBetaHint,
-                      ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -531,19 +526,6 @@ class _UpdateScreenState extends State<UpdateScreen> {
                     child: Text(l.updateVerifying),
                   ),
                 ],
-              ),
-              const SizedBox(height: ShioriSpace.tight),
-              // Reserve the same text footprint while downloading so the
-              // release-page action does not move when verification starts.
-              Visibility(
-                visible: c.phase == UpdatePhase.verifying,
-                maintainSize: true,
-                maintainAnimation: true,
-                maintainState: true,
-                child: Text(
-                  l.updateVerifyingHint,
-                  style: theme.textTheme.bodySmall,
-                ),
               ),
             ] else if (c.installing)
               Row(

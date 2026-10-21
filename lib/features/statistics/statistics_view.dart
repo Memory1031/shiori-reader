@@ -516,16 +516,13 @@ class _StatisticsViewState extends State<StatisticsView> {
             SliverPadding(
               padding: EdgeInsets.fromLTRB(
                 wide ? 0 : gutter,
-                ShioriSpace.item,
+                data.anonymous > 0 ? ShioriSpace.item : 0,
                 wide ? 0 : gutter,
-                ShioriSpace.section,
+                wide ? 0 : ShioriSpace.page,
               ),
               sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (data.anonymous > 0)
-                      ListTile(
+                child: data.anonymous > 0
+                    ? ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
                           l.statisticsAnonymous,
@@ -533,16 +530,8 @@ class _StatisticsViewState extends State<StatisticsView> {
                         ),
                         subtitle: Text(l.statisticsAnonymousHint),
                         trailing: Text(readingDuration(l, data.anonymous)),
-                      ),
-                    if (!wide) ...[
-                      const SizedBox(height: ShioriSpace.item),
-                      Text(
-                        l.statisticsLocalOnly,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ],
-                ),
+                      )
+                    : const SizedBox.shrink(),
               ),
             ),
           ],
@@ -597,16 +586,6 @@ class _StatisticsViewState extends State<StatisticsView> {
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(height: ShioriSpace.item),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: ShioriSpace.page,
-                    ),
-                    child: Text(
-                      l.statisticsLocalOnly,
-                      style: theme.textTheme.bodySmall,
                     ),
                   ),
                 ],

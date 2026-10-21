@@ -54,11 +54,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get articleContentsEmpty =>
-      'No recognisable section headings in this article. Use the volume list to switch articles.';
-
-  @override
-  String get articleContentsHint =>
-      'Built from content headings; plain-text detection may be incomplete.';
+      'No in-volume contents. Use the volume list instead.';
 
   @override
   String get volumesTitle => 'Volumes';
@@ -790,10 +786,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get prefetchTitle => 'Reading cache';
 
   @override
-  String get prefetchExplanation =>
-      'Prepares this article and one article you choose. It never opens it or changes your reading progress.';
-
-  @override
   String get prefetchCurrent => 'Cache images in this article';
 
   @override
@@ -1038,7 +1030,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importParseLimit =>
-      'The file or parsed content exceeds the processing budget. TXT input is limited to 16 MiB and EPUB to 64 MiB; even smaller files may produce too much parsed data.';
+      'The book file or its contents are too large to import.';
 
   @override
   String get importParseStructureLimit =>
@@ -1292,7 +1284,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateAutomaticHint =>
-      'At most once a day. You choose when to download.';
+      'You confirm before an update is downloaded.';
 
   @override
   String get updateChannel => 'Update channel';
@@ -1305,7 +1297,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateChannelHint =>
-      'Switching channels never downgrades. If your beta is newer, you\'ll be notified when a stable upgrade is available.';
+      'Switching channels will not downgrade the app.';
 
   @override
   String get updateNeverChecked => 'Not checked yet';
@@ -1370,10 +1362,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateVerifying => 'Verifying update package…';
-
-  @override
-  String get updateVerifyingHint =>
-      'Download complete. Checking file integrity.';
 
   @override
   String get updateDownloaded =>
@@ -1766,7 +1754,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerSearchTooLong =>
-      'Search text is too long. Use up to 256 ordinary characters; some symbols use more space.';
+      'Search text is too long. Please shorten it and try again.';
 
   @override
   String get readerSearchInvalid => 'Use another word or phrase.';
@@ -1939,7 +1927,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statisticsRetention =>
-      'Removing a book keeps only daily totals without its title. Records do not expire automatically and can be cleared at any time.';
+      'Removing a book keeps only its total reading time.';
 
   @override
   String get statisticsClear => 'Clear reading statistics';
@@ -1957,7 +1945,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statisticsError =>
-      'Reading records are temporarily unavailable. Retry to load your existing data.';
+      'Reading statistics are temporarily unavailable. Please retry.';
 
   @override
   String get statisticsUnderMinute => 'Less than 1 minute';

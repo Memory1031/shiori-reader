@@ -53,10 +53,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get articleContents => '卷内目录';
 
   @override
-  String get articleContentsEmpty => '这篇正文没有可识别的章节标题。仍可通过分卷列表切换文章。';
-
-  @override
-  String get articleContentsHint => '从正文标题生成；纯文本标题识别可能不完整。';
+  String get articleContentsEmpty => '暂无卷内目录，可切换至分卷目录。';
 
   @override
   String get volumesTitle => '分卷目录';
@@ -710,9 +707,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get prefetchTitle => '阅读缓存';
 
   @override
-  String get prefetchExplanation => '只准备当前文章和你选定的一篇后续文章，不自动打开或更改阅读进度。';
-
-  @override
   String get prefetchCurrent => '缓存当前文章插图';
 
   @override
@@ -931,8 +925,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importFixedLayout => '暂不支持固定版式 EPUB，请使用流式排版版本。';
 
   @override
-  String get importParseLimit =>
-      '文件或解析后的内容超出处理预算。TXT 原文件上限为 16 MiB，EPUB 为 64 MiB；较小文件也可能因解析后的数据过大而无法导入。';
+  String get importParseLimit => '书籍文件或内容过大，暂时无法导入。';
 
   @override
   String get importParseStructureLimit => 'TXT 的段落或章节过多，超出当前可处理的结构规模，请分卷后导入。';
@@ -1163,7 +1156,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateAutomatic => '自动检查更新';
 
   @override
-  String get updateAutomaticHint => '每天最多检查一次，下载由你确认。';
+  String get updateAutomaticHint => '下载更新前会由你确认。';
 
   @override
   String get updateChannel => '更新渠道';
@@ -1175,7 +1168,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateBeta => '测试版';
 
   @override
-  String get updateChannelHint => '切换渠道不会降级。若当前测试版较新，将在有可升级的正式版时提示。';
+  String get updateChannelHint => '切换渠道不会降级。';
 
   @override
   String get updateNeverChecked => '尚未检查更新';
@@ -1235,9 +1228,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get updateVerifying => '正在校验更新包…';
-
-  @override
-  String get updateVerifyingHint => '下载已完成，正在检查文件完整性。';
 
   @override
   String get updateDownloaded => '下载完成，已通过校验。可前往发布页查看安装说明。';
@@ -1598,7 +1588,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerSearchPaused => '搜索已暂停，已找到的结果仍可查看。';
 
   @override
-  String get readerSearchTooLong => '关键词过长，请缩短后重试。普通文字最多 256 个字符，部分符号占用更多长度。';
+  String get readerSearchTooLong => '搜索内容过长，请缩短后重试。';
 
   @override
   String get readerSearchInvalid => '搜索词不可用，请换一个词句。';
@@ -1760,7 +1750,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statisticsPauseHint => '暂停新增记录，已有统计保留。';
 
   @override
-  String get statisticsRetention => '移除书籍后只保留按日合计，不再关联书名。记录不会自动过期，可随时清空。';
+  String get statisticsRetention => '移除书籍后，仅保留时长合计。';
 
   @override
   String get statisticsClear => '清空阅读统计';
@@ -1775,7 +1765,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statisticsClearEnabled => '清空后，之后的阅读仍会继续记录。';
 
   @override
-  String get statisticsError => '阅读记录暂不可用，请重试。已有数据不会被当作空记录。';
+  String get statisticsError => '阅读统计暂不可用，请重试。';
 
   @override
   String get statisticsUnderMinute => '少于1分钟';

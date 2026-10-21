@@ -185,14 +185,8 @@ abstract class AppLocalizations {
   /// No description provided for @articleContentsEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No recognisable section headings in this article. Use the volume list to switch articles.'**
+  /// **'No in-volume contents. Use the volume list instead.'**
   String get articleContentsEmpty;
-
-  /// No description provided for @articleContentsHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Built from content headings; plain-text detection may be incomplete.'**
-  String get articleContentsHint;
 
   /// No description provided for @volumesTitle.
   ///
@@ -1442,12 +1436,6 @@ abstract class AppLocalizations {
   /// **'Reading cache'**
   String get prefetchTitle;
 
-  /// No description provided for @prefetchExplanation.
-  ///
-  /// In en, this message translates to:
-  /// **'Prepares this article and one article you choose. It never opens it or changes your reading progress.'**
-  String get prefetchExplanation;
-
   /// No description provided for @prefetchCurrent.
   ///
   /// In en, this message translates to:
@@ -1859,7 +1847,7 @@ abstract class AppLocalizations {
   /// No description provided for @importParseLimit.
   ///
   /// In en, this message translates to:
-  /// **'The file or parsed content exceeds the processing budget. TXT input is limited to 16 MiB and EPUB to 64 MiB; even smaller files may produce too much parsed data.'**
+  /// **'The book file or its contents are too large to import.'**
   String get importParseLimit;
 
   /// No description provided for @importParseStructureLimit.
@@ -2273,7 +2261,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateAutomaticHint.
   ///
   /// In en, this message translates to:
-  /// **'At most once a day. You choose when to download.'**
+  /// **'You confirm before an update is downloaded.'**
   String get updateAutomaticHint;
 
   /// No description provided for @updateChannel.
@@ -2297,7 +2285,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateChannelHint.
   ///
   /// In en, this message translates to:
-  /// **'Switching channels never downgrades. If your beta is newer, you\'ll be notified when a stable upgrade is available.'**
+  /// **'Switching channels will not downgrade the app.'**
   String get updateChannelHint;
 
   /// No description provided for @updateNeverChecked.
@@ -2401,12 +2389,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Verifying update package…'**
   String get updateVerifying;
-
-  /// No description provided for @updateVerifyingHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Download complete. Checking file integrity.'**
-  String get updateVerifyingHint;
 
   /// No description provided for @updateDownloaded.
   ///
@@ -2981,7 +2963,7 @@ abstract class AppLocalizations {
   /// No description provided for @readerSearchTooLong.
   ///
   /// In en, this message translates to:
-  /// **'Search text is too long. Use up to 256 ordinary characters; some symbols use more space.'**
+  /// **'Search text is too long. Please shorten it and try again.'**
   String get readerSearchTooLong;
 
   /// No description provided for @readerSearchInvalid.
@@ -3293,7 +3275,7 @@ abstract class AppLocalizations {
   /// No description provided for @statisticsRetention.
   ///
   /// In en, this message translates to:
-  /// **'Removing a book keeps only daily totals without its title. Records do not expire automatically and can be cleared at any time.'**
+  /// **'Removing a book keeps only its total reading time.'**
   String get statisticsRetention;
 
   /// No description provided for @statisticsClear.
@@ -3323,7 +3305,7 @@ abstract class AppLocalizations {
   /// No description provided for @statisticsError.
   ///
   /// In en, this message translates to:
-  /// **'Reading records are temporarily unavailable. Retry to load your existing data.'**
+  /// **'Reading statistics are temporarily unavailable. Please retry.'**
   String get statisticsError;
 
   /// No description provided for @statisticsUnderMinute.

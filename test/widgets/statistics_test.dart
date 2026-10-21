@@ -453,7 +453,7 @@ void main() {
       expect(unavailable.reads, 0);
       expect(
         find.text(
-          'Reading records are temporarily unavailable. Retry to load your existing data.',
+          'Reading statistics are temporarily unavailable. Please retry.',
         ),
         findsOneWidget,
       );

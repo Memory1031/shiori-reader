@@ -112,10 +112,6 @@ class _PrefetchPanelState extends State<PrefetchPanel> {
             const SizedBox(height: ShioriSpace.medium),
             Text(status),
             const SizedBox(height: ShioriSpace.small),
-            Text(
-              l.prefetchExplanation,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(l.prefetchCurrent),

@@ -176,31 +176,15 @@ ReaderContentsLayer articleContentsLayer(
   return ReaderContentsLayer(
     kind: ReaderContentsKind.article,
     label: l.articleContents,
-    build: (context, done) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: ShioriSpace.page),
-            child: Text(
-              l.articleContentsHint,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+    build: (context, done) => headings.isEmpty
+        ? EmptyView(message: l.articleContentsEmpty)
+        : _ArticleContentsList(
+            content: content,
+            browsing: browsing,
+            entries: headings,
+            current: current,
+            onSelect: (position) => done(() => onSelect(position)),
           ),
-          Expanded(
-            child: headings.isEmpty
-                ? EmptyView(message: l.articleContentsEmpty)
-                : _ArticleContentsList(
-                    content: content,
-                    browsing: browsing,
-                    entries: headings,
-                    current: current,
-                    onSelect: (position) => done(() => onSelect(position)),
-                  ),
-          ),
-        ],
-      );
-    },
   );
 }
 
