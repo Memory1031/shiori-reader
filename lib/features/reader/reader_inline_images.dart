@@ -192,7 +192,38 @@ TextStyle readerAuthoredStyle(
       .where((s) => s.start <= offset && offset < s.start + s.length)
       .firstOrNull;
   if (range == null) return base;
+  final border = range.borderBottom;
+  final decorationColor = border?.color == null
+      ? null
+      : resolveColor?.call(Color(border!.color!)) ?? Color(border!.color!);
   return base.copyWith(
+    decoration: border == null
+        ? base.decoration
+        : TextDecoration.combine([
+            if (base.decoration != null) base.decoration!,
+            TextDecoration.underline,
+          ]),
+    decorationStyle: border == null
+        ? base.decorationStyle
+        : switch (border.style) {
+            BoxBorderStyle.dotted => TextDecorationStyle.dotted,
+            BoxBorderStyle.dashed => TextDecorationStyle.dashed,
+            _ => TextDecorationStyle.solid,
+          },
+    decorationColor: border == null
+        ? base.decorationColor
+        : decorationColor ??
+              (range.color == null
+                  ? base.color
+                  : resolveColor?.call(Color(range.color!)) ??
+                        Color(range.color!)),
+    // Native decoration thickness is a font-relative multiplier, not CSS px.
+    decorationThickness: border == null
+        ? base.decorationThickness
+        : (border.width.unit == LayoutUnit.em
+                  ? border.width.value * (readerFontSize ?? base.fontSize ?? 20)
+                  : border.width.value)
+              .clamp(.5, 8),
     fontFamily: range.fonts.isEmpty
         ? base.fontFamily
         : range.fonts.first.familyName,

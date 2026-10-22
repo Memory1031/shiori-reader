@@ -13,6 +13,7 @@ final class InlineTextStyle extends ValueModel {
     this.fontSizeFromReader = false,
     this.bold,
     this.italic,
+    this.borderBottom,
     Iterable<EmbeddedFontFamily> fonts = const [],
   }) : fonts = List.unmodifiable(fonts) {
     if (start < 0 ||
@@ -24,7 +25,22 @@ final class InlineTextStyle extends ValueModel {
         (color != null && (color! < 0 || color! > 0xffffffff))) {
       throw ArgumentError('Invalid authored text style');
     }
+    if (borderBottom case final side?) {
+      if (!{
+            BoxBorderStyle.solid,
+            BoxBorderStyle.dotted,
+            BoxBorderStyle.dashed,
+          }.contains(side.style) ||
+          side.width.unit == LayoutUnit.fraction ||
+          side.width.value <= 0 ||
+          side.width.value > (side.width.unit == LayoutUnit.em ? .5 : 8)) {
+        throw ArgumentError('Invalid inline border');
+      }
+    }
   }
+
+  /// A bounded inline border, painted as a native underline approximation.
+  final BoxBorderSide? borderBottom;
   final int start, length;
   final int? color;
   final double fontScale;
@@ -41,6 +57,7 @@ final class InlineTextStyle extends ValueModel {
       !fontSizeFromReader &&
       bold == null &&
       italic == null &&
+      borderBottom == null &&
       fonts.isEmpty;
   Map<String, Object?> toJson() => {
     'start': start,
@@ -50,6 +67,7 @@ final class InlineTextStyle extends ValueModel {
     if (fontSizeFromReader) 'fontSizeFromReader': true,
     'bold': bold,
     'italic': italic,
+    if (borderBottom != null) 'borderBottom': borderBottom!.toJson(),
     if (fonts.isNotEmpty) 'fonts': fonts.map((f) => f.toJson()).toList(),
   };
   factory InlineTextStyle.fromJson(Map<String, dynamic> j) => InlineTextStyle(
@@ -60,6 +78,9 @@ final class InlineTextStyle extends ValueModel {
     fontSizeFromReader: j['fontSizeFromReader'] as bool? ?? false,
     bold: j['bold'] as bool?,
     italic: j['italic'] as bool?,
+    borderBottom: j['borderBottom'] == null
+        ? null
+        : BoxBorderSide.fromJson(j['borderBottom'] as Map<String, dynamic>),
     fonts: (j['fonts'] as List? ?? const []).map(
       (f) => EmbeddedFontFamily.fromJson(f as Map<String, dynamic>),
     ),
@@ -73,6 +94,7 @@ final class InlineTextStyle extends ValueModel {
     fontSizeFromReader,
     bold,
     italic,
+    borderBottom,
     fonts,
   ];
 }

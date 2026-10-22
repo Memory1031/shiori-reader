@@ -15,6 +15,108 @@ void main() {
     return EpubParser(zipFiles(files), key, 'rich.epub').parse().content;
   }
 
+  test(
+    'inline borders retain source ranges, cascade, links and semantic identity',
+    () {
+      const body =
+          '<p id="one">😀e\u0301<span class="signal">甲<b>乙</b><a href="#one"><i>丙</i></a></span>丁</p>';
+      final plain = parse(body, '');
+      final content = parse(
+        body,
+        '.signal {border-bottom:2px dotted #000;padding-bottom:2px}',
+      );
+      final block = content.chapters.first.blocks.single as ParagraphBlock;
+      final ranges = block.inlineStyles
+          .where((s) => s.borderBottom != null)
+          .toList();
+      expect(block.text, '😀e\u0301甲乙丙丁');
+      expect(ranges.map((s) => s.start), [3, 4, 5]);
+      expect(
+        ranges.every(
+          (s) =>
+              s.length == 1 && s.borderBottom!.style == BoxBorderStyle.dotted,
+        ),
+        isTrue,
+      );
+      expect(ranges.first.borderBottom!.width, LayoutLength(2));
+      expect(ranges.first.borderBottom!.color, isNull);
+      expect(ranges[1].bold, isTrue);
+      expect(ranges[2].italic, isTrue);
+      expect(block.blockKey, plain.chapters.first.blocks.single.blockKey);
+      expect(
+        content.chapters.first.contentRevision,
+        plain.chapters.first.contentRevision,
+      );
+      expect(
+        content.links.map((l) => l.toJson()).toList(),
+        plain.links.map((l) => l.toJson()).toList(),
+      );
+      expect(
+        ChapterContent.fromJson(content.chapters.first.toJson()),
+        content.chapters.first,
+      );
+      expect(
+        InlineTextStyle.fromJson({
+          'start': 0,
+          'length': 1,
+          'color': null,
+          'fontScale': 1,
+          'bold': null,
+          'italic': null,
+        }).borderBottom,
+        isNull,
+      );
+    },
+  );
+  for (final (css, expected) in [
+    (
+      'border-bottom:1px solid red;border-bottom-style:dashed',
+      BoxBorderStyle.dashed,
+    ),
+    (
+      'border-bottom-style:solid;border-bottom-width:.1em;border-bottom-color:blue',
+      BoxBorderStyle.solid,
+    ),
+    (
+      'border-bottom:2px dotted black!important;border-bottom-style:solid',
+      BoxBorderStyle.dotted,
+    ),
+    ('border-bottom:2px dotted black;border-bottom:none', null),
+    ('border-bottom:0 dotted black', null),
+    ('border-bottom:9px dotted black', null),
+    ('border-bottom:1em dotted black', null),
+    ('border-bottom:2px double black', null),
+    ('border-bottom:2px dotted transparent', null),
+  ]) {
+    test('bounded inline border cascade: $css', () {
+      final block =
+          parse(
+                '<p><span style="$css">Text</span></p>',
+                '',
+              ).chapters.first.blocks.single
+              as ParagraphBlock;
+      expect(block.inlineStyles.firstOrNull?.borderBottom?.style, expected);
+    });
+  }
+  test('block borders do not become inline decorations', () {
+    final block =
+        parse(
+              '<p style="border-bottom:2px dotted black">A<span>B</span></p>',
+              '',
+            ).chapters.first.blocks.single
+            as ParagraphBlock;
+    expect(block.box!.borders!.bottom!.style, BoxBorderStyle.dotted);
+    expect(block.inlineStyles.every((s) => s.borderBottom == null), isTrue);
+    expect(
+      () => InlineTextStyle(
+        start: 0,
+        length: 1,
+        borderBottom: BoxBorderSide(width: LayoutLength(9)),
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test('ordinary prose preserves consecutive explicit blank paragraphs', () {
     final content = parse(
       '<p>A</p><p id="gap"><br/></p><p><br/></p>'

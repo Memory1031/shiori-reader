@@ -54,11 +54,13 @@ class EpubRichStyle {
     this.scale = 1,
     this.bold,
     this.italic,
+    this.borderBottom,
     this.hasFontSize = false,
     this.fontSizeFromReader = false,
     this.defaultHeading = false,
     this.fonts = const [],
   });
+  final BoxBorderSide? borderBottom;
   final int? color;
   final double scale;
   final bool? bold, italic;
@@ -70,6 +72,7 @@ class EpubRichStyle {
       !fontSizeFromReader &&
       bold == null &&
       italic == null &&
+      borderBottom == null &&
       fonts.isEmpty;
   InlineTextStyle range(
     int start,
@@ -85,6 +88,17 @@ class EpubRichStyle {
     fontSizeFromReader: fontSizeFromReader,
     bold: bold,
     italic: italic,
+    borderBottom: borderBottom == null
+        ? null
+        : BoxBorderSide(
+            width: borderBottom!.width,
+            style: borderBottom!.style,
+            color:
+                !preserveNeutral &&
+                    {0xff000000, 0xffffffff}.contains(borderBottom!.color)
+                ? null
+                : borderBottom!.color,
+          ),
     fonts: fonts,
   );
 }
@@ -127,10 +141,13 @@ Map<dom.Element, EpubRichStyle> epubRichStyles(
         css['font-size']?.endsWith('%') == true;
     final weight = css['font-weight'];
     final fontStyle = css['font-style'];
+    final color = css['color'] == 'initial'
+        ? null
+        : epubColor(css['color']) ?? parent.color;
     result[e] = EpubRichStyle(
-      color: css['color'] == 'initial'
-          ? null
-          : epubColor(css['color']) ?? parent.color,
+      color: color,
+      borderBottom:
+          _inlineBorder(e, css, color, parent.scale) ?? parent.borderBottom,
       scale: size ?? parent.scale,
       hasFontSize: size != null || parent.hasFontSize,
       fontSizeFromReader: size == null
@@ -165,6 +182,79 @@ Map<dom.Element, EpubRichStyle> epubRichStyles(
     );
   }
   return result;
+}
+
+// Only inline text participates; paragraph borders remain owned by BlockBox.
+BoxBorderSide? _inlineBorder(
+  dom.Element element,
+  Map<String, String> css,
+  int? color,
+  double parentScale,
+) {
+  if (!{
+        'span',
+        'a',
+        'b',
+        'strong',
+        'i',
+        'em',
+        'u',
+        's',
+        'small',
+        'big',
+        'sup',
+        'sub',
+        'code',
+        'abbr',
+        'cite',
+        'q',
+        'mark',
+        'del',
+        'ins',
+      }.contains(element.localName) ||
+      !{null, 'inline'}.contains(css['display']) ||
+      !{null, 'static'}.contains(css['position']) ||
+      !{null, 'none'}.contains(css['float'])) {
+    return null;
+  }
+  final type = switch (css['border-bottom-style']) {
+    'solid' => BoxBorderStyle.solid,
+    'dotted' => BoxBorderStyle.dotted,
+    'dashed' => BoxBorderStyle.dashed,
+    _ => null,
+  };
+  if (type == null) return null;
+  final width = switch (css['border-bottom-width']) {
+    'thin' => LayoutLength(1),
+    'medium' || null => LayoutLength(3),
+    'thick' => LayoutLength(5),
+    final raw => epubLayoutLength(raw, percentage: false),
+  };
+  if (width == null ||
+      width.value <= 0 ||
+      width.value > (width.unit == LayoutUnit.em ? .5 : 8)) {
+    return null;
+  }
+  final rawColor = css['border-bottom-color'];
+  if (rawColor != null &&
+      rawColor != 'currentcolor' &&
+      epubColor(rawColor) == null) {
+    return null;
+  }
+  // Resolve em at the owner's font size; nested smaller text keeps its border.
+  return BoxBorderSide(
+    width: width.unit == LayoutUnit.em
+        ? LayoutLength(
+            (width.value *
+                    (epubFontScale(css['font-size'], parentScale) ??
+                        parentScale))
+                .clamp(.001, .5),
+            LayoutUnit.em,
+          )
+        : width,
+    style: type,
+    color: epubColor(rawColor) ?? color,
+  );
 }
 
 LayoutLength? epubLayoutLength(String? value, {bool percentage = true}) {
