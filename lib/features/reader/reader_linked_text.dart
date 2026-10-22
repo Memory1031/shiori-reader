@@ -9,6 +9,7 @@ import '../../domain/contracts/contracts.dart';
 import '../../shared/source_image.dart';
 import '../../shared/paper_diagram.dart';
 import 'reader_inline_images.dart';
+import 'reader_inline_border.dart';
 import 'reader_authored_colors.dart';
 import 'reader_sheet.dart';
 import 'reader_search_highlight.dart';
@@ -483,9 +484,8 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
       for (final span in segment(start, end, onTap: recognizer.onTap)) {
         spans.add(
           span is TextSpan
-              ? TextSpan(
-                  text: span.text,
-                  style: span.style,
+              ? readerCopyTextSpan(
+                  span,
                   semanticsLabel: note.isFootnote
                       ? AppLocalizations.of(context).readerFootnote(note.label)
                       : null,
@@ -505,7 +505,7 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
       locale: widget.locale,
       textHeightBehavior: widget.textHeightBehavior,
     );
-    return mark == null
+    final painted = mark == null
         ? text
         : ReaderPaintedSearchText(
             highlight: mark,
@@ -515,5 +515,8 @@ class _ReaderLinkedTextState extends State<ReaderLinkedText> {
             collapsed: collapsed,
             child: text,
           );
+    return widget.inlineStyles.any((s) => s.borderBottom != null)
+        ? ReaderPaintedInlineBorders(scaler: widget.scaler, child: painted)
+        : painted;
   }
 }

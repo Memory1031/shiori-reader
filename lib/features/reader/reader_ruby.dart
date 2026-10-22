@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'reader_search_highlight.dart';
+import 'reader_inline_border.dart';
 
 /// Identical glyph layout for pagination placeholders and the painted ruby.
 /// The whole pair is one line-breaking unit; oversized pairs fit the line.
@@ -106,6 +107,7 @@ final class ReaderRubyLayout {
     );
     note.paint(canvas, Offset((width - note.width) / 2, 0));
     body.paint(canvas, at);
+    paintReaderPainterBorders(canvas, body, at, scaler: scaler);
     canvas.restore();
   });
 }

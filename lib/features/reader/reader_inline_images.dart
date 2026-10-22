@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import '../../domain/models/models.dart';
 import 'reader_ruby.dart';
+import 'reader_inline_border.dart';
 import 'reader_superscript.dart';
 import 'reader_search_highlight.dart';
 import 'reader_inline_stack.dart';
@@ -205,17 +206,15 @@ List<InlineSpan> readerInlineSpans({
           ),
         )
       else
-        TextSpan(
-          text: String.fromCharCodes(
+        readerAuthoredSpan(
+          String.fromCharCodes(
             runes.sublist(ordered[i] - offset, ordered[i + 1] - offset),
           ),
-          style: readerAuthoredStyle(
-            style,
-            styles,
-            ordered[i],
-            resolveColor: resolveColor,
-            readerFontSize: readerFontSize,
-          ),
+          style,
+          styles,
+          ordered[i],
+          resolveColor: resolveColor,
+          readerFontSize: readerFontSize,
         ),
   ];
 }
@@ -260,8 +259,8 @@ Map<int, ReaderSuperscriptLayout> _readerSuperscripts({
     );
     if (value.contains(RegExp(r'[\s\uFFFC]'))) continue;
     final layout = ReaderSuperscriptLayout(
-      text: value,
-      style: readerAuthoredStyle(
+      span: readerAuthoredSpan(
+        value,
         style,
         styles,
         range.start,
@@ -278,6 +277,40 @@ Map<int, ReaderSuperscriptLayout> _readerSuperscripts({
   return result;
 }
 
+TextSpan readerAuthoredSpan(
+  String text,
+  TextStyle base,
+  List<InlineTextStyle> styles,
+  int offset, {
+  Color Function(Color)? resolveColor,
+  double? readerFontSize,
+}) {
+  final style = readerAuthoredStyle(
+    base,
+    styles,
+    offset,
+    resolveColor: resolveColor,
+    readerFontSize: readerFontSize,
+  );
+  final range = styles
+      .where((s) => s.start <= offset && offset < s.start + s.length)
+      .firstOrNull;
+  final border = range?.borderBottom;
+  if (border == null) return TextSpan(text: text, style: style);
+  final raw = border.color == null ? null : Color(border.color!);
+  return ReaderBorderSpan(
+    text: text,
+    style: style,
+    borderStyle: border.style,
+    color: raw == null
+        ? style.color ?? Colors.black
+        : resolveColor?.call(raw) ?? raw,
+    width: border.width.unit == LayoutUnit.em
+        ? border.width.value * (readerFontSize ?? base.fontSize ?? 20)
+        : border.width.value,
+  );
+}
+
 TextStyle readerAuthoredStyle(
   TextStyle base,
   List<InlineTextStyle> styles,
@@ -289,38 +322,7 @@ TextStyle readerAuthoredStyle(
       .where((s) => s.start <= offset && offset < s.start + s.length)
       .firstOrNull;
   if (range == null) return base;
-  final border = range.borderBottom;
-  final decorationColor = border?.color == null
-      ? null
-      : resolveColor?.call(Color(border!.color!)) ?? Color(border!.color!);
   return base.copyWith(
-    decoration: border == null
-        ? base.decoration
-        : TextDecoration.combine([
-            if (base.decoration != null) base.decoration!,
-            TextDecoration.underline,
-          ]),
-    decorationStyle: border == null
-        ? base.decorationStyle
-        : switch (border.style) {
-            BoxBorderStyle.dotted => TextDecorationStyle.dotted,
-            BoxBorderStyle.dashed => TextDecorationStyle.dashed,
-            _ => TextDecorationStyle.solid,
-          },
-    decorationColor: border == null
-        ? base.decorationColor
-        : decorationColor ??
-              (range.color == null
-                  ? base.color
-                  : resolveColor?.call(Color(range.color!)) ??
-                        Color(range.color!)),
-    // Native decoration thickness is a font-relative multiplier, not CSS px.
-    decorationThickness: border == null
-        ? base.decorationThickness
-        : (border.width.unit == LayoutUnit.em
-                  ? border.width.value * (readerFontSize ?? base.fontSize ?? 20)
-                  : border.width.value)
-              .clamp(.5, 8),
     fontFamily: range.fonts.isEmpty
         ? base.fontFamily
         : range.fonts.first.familyName,
@@ -600,8 +602,8 @@ ReaderInlineStackLayout readerStackLayout({
       children: [
         for (final span in spans)
           if (span is TextSpan)
-            TextSpan(
-              text: span.text,
+            readerCopyTextSpan(
+              span,
               style: span.style!.copyWith(
                 fontSize: scaler.scale(span.style!.fontSize ?? 20),
                 height: lineHeightEm == null

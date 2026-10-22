@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'reader_search_highlight.dart';
+import 'reader_inline_border.dart';
 
 /// A single shared pair of shaped rows. No scale-to-fit or internal wrapping:
 /// the caller expands oversized units back to their untouched source text.
@@ -109,6 +110,8 @@ final class ReaderInlineStackLayout {
     );
     a.paint(canvas, geometry.upper.topLeft);
     b.paint(canvas, geometry.lower.topLeft);
+    paintReaderPainterBorders(canvas, a, geometry.upper.topLeft);
+    paintReaderPainterBorders(canvas, b, geometry.lower.topLeft);
   });
 }
 

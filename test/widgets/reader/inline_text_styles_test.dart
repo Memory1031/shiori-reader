@@ -5,6 +5,7 @@ import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/features/reader/reader_inline_images.dart';
+import 'package:shiori/features/reader/reader_inline_border.dart';
 import 'package:shiori/features/reader/reader_superscript.dart';
 import 'package:shiori/features/reader/reader_search_highlight.dart';
 import 'package:shiori/features/reader/reader_linked_text.dart';
@@ -435,6 +436,17 @@ void main() {
               boxes.every((b) => b.bottom <= render.size.height + .01),
               isTrue,
             );
+            final borders = tester
+                .renderObject<ReaderInlineBorderRender>(
+                  find.byType(ReaderPaintedInlineBorders),
+                )
+                .strokes;
+            expect(borders, isNotEmpty);
+            for (final border in borders) {
+              expect(border.rect.top, greaterThanOrEqualTo(0));
+              expect(border.rect.bottom, lessThanOrEqualTo(render.size.height));
+              expect(border.rect.height, lessThan(2));
+            }
             await tester.tapAt(
               render.localToGlobal(boxes.first.toRect().center),
             );
@@ -449,16 +461,18 @@ void main() {
         expect(pageIndex, greaterThan(1));
         expect(seen.toString(), block.text);
         final colors = ReaderAuthoredColors(theme);
-        final ink = readerAuthoredStyle(
+        final ink = readerAuthoredSpan(
+          block.text,
           style,
           block.inlineStyles,
           0,
           resolveColor: (c) => colors.resolve(c, ReaderColorRole.foreground),
         );
-        expect(ink.decorationStyle, TextDecorationStyle.dotted);
+        expect(ink, isA<ReaderBorderSpan>());
+        expect(ink.style!.decoration, isNull);
         expect(
           readerColorContrast(
-            ink.decorationColor!,
+            (ink as ReaderBorderSpan).color,
             theme.scaffoldBackgroundColor,
           ),
           greaterThan(4.5),

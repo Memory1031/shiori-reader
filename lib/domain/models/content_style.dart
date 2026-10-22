@@ -42,7 +42,7 @@ final class InlineTextStyle extends ValueModel {
 
   final bool superscript;
 
-  /// A bounded inline border, painted as a native underline approximation.
+  /// A bounded inline border, painted within the existing text line bounds.
   final BoxBorderSide? borderBottom;
   final int start, length;
   final int? color;

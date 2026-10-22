@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'reader_search_highlight.dart';
+import 'reader_inline_border.dart';
 
 /// A short source-preserving run. Measurement and paint share the raised baseline.
 final class ReaderSuperscriptLayout {
   ReaderSuperscriptLayout({
-    required this.text,
-    required this.style,
+    required this.span,
     required this.scaler,
     required this.direction,
     this.locale,
   });
-  final String text;
-  final TextStyle style;
+  final TextSpan span;
+  String get text => span.text!;
+  TextStyle get style => span.style!;
   final TextScaler scaler;
   final TextDirection direction;
   final Locale? locale;
@@ -21,7 +22,7 @@ final class ReaderSuperscriptLayout {
       scaler.scale(style.fontSize ?? 20) / (style.fontSize ?? 20);
   T _withPainter<T>(T Function(TextPainter) use) {
     final p = TextPainter(
-      text: TextSpan(text: text, style: style),
+      text: span,
       textDirection: direction,
       textScaler: scaler,
       locale: locale,
@@ -48,6 +49,7 @@ final class ReaderSuperscriptLayout {
       _withPainter((p) {
         paintReaderGlyphRange(canvas, p, Offset.zero, highlight, text, start);
         p.paint(canvas, Offset.zero);
+        paintReaderPainterBorders(canvas, p, Offset.zero, scaler: scaler);
       });
 }
 
