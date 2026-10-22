@@ -184,6 +184,57 @@ String paintedText(InlineSpan span) {
   return '';
 }
 
+/// Selection can include an unpainted U+0020 past a soft line ending. Only
+/// source-confirmed collapsing prose is eligible; other whitespace stays checked.
+({List<ui.TextBox> boxes, int excludedSpaces}) nativeGeometryBoxes(
+  RenderParagraph render, {
+  required bool collapsesOrdinarySpaces,
+}) {
+  final text = render.text.toPlainText(includeSemanticsLabels: false);
+  bool decorated(InlineSpan span) =>
+      span.style?.background != null ||
+      span.style?.backgroundColor != null ||
+      span.style?.decoration != null &&
+          span.style!.decoration != TextDecoration.none ||
+      span is TextSpan &&
+          (span.children ?? const <InlineSpan>[]).any(decorated);
+  List<ui.TextBox> boxes(int start, int end) => render.getBoxesForSelection(
+    TextSelection(baseOffset: start, extentOffset: end),
+  );
+  if (!collapsesOrdinarySpaces ||
+      render.textDirection != TextDirection.ltr ||
+      decorated(render.text)) {
+    return (boxes: boxes(0, text.length), excludedSpaces: 0);
+  }
+  final result = <ui.TextBox>[];
+  var cursor = 0, excluded = 0;
+  for (var i = 1; i + 1 < text.length; i++) {
+    if (text.codeUnitAt(i) != 0x20 ||
+        text.codeUnitAt(i - 1) == 0x20 ||
+        text.codeUnitAt(i + 1) == 0x20 ||
+        text.codeUnitAt(i + 1) == 10 ||
+        text.codeUnitAt(i + 1) == 13) {
+      continue;
+    }
+    final before = boxes(i - 1, i),
+        space = boxes(i, i + 1),
+        after = boxes(i + 1, i + 2);
+    if (before.length != 1 || space.length != 1 || after.length != 1) continue;
+    final previous = before.single, blank = space.single, next = after.single;
+    if ((blank.top - previous.top).abs() > .01 ||
+        (blank.bottom - previous.bottom).abs() > .01 ||
+        blank.left < previous.right - .01 ||
+        next.top < blank.bottom - .01) {
+      continue;
+    }
+    result.addAll(boxes(cursor, i));
+    cursor = i + 1;
+    excluded++;
+  }
+  result.addAll(boxes(cursor, text.length));
+  return (boxes: result, excludedSpaces: excluded);
+}
+
 Rect renderedRect(RenderBox render) => MatrixUtils.transformRect(
   render.getTransformTo(null),
   Offset.zero & render.size,
@@ -407,6 +458,7 @@ Future<Json> runNativeProbe(
         }
       }
     }
+    var selectionBoxOverflows = 0, excludedSoftWrapSpaces = 0;
     var geometryFailures = 0,
         characterFailures = 0,
         unknownGeometries = 0,
@@ -532,7 +584,27 @@ Future<Json> runNativeProbe(
             if (boxes.isEmpty && widget.text.trim().isNotEmpty) {
               geometryFailures++;
             }
-            for (final box in boxes) {
+            selectionBoxOverflows += boxes
+                .where(
+                  (box) => !containsRect(
+                    viewRect,
+                    MatrixUtils.transformRect(
+                      render.getTransformTo(null),
+                      box.toRect(),
+                    ),
+                  ),
+                )
+                .length;
+            final geometry = nativeGeometryBoxes(
+              render,
+              collapsesOrdinarySpaces:
+                  source?.details['collapsesOrdinarySpaces'] == true &&
+                  block.inlineStyles.every(
+                    (s) => s.fonts.isEmpty && s.borderBottom == null,
+                  ),
+            );
+            excludedSoftWrapSpaces += geometry.excludedSpaces;
+            for (final box in geometry.boxes) {
               final rect = MatrixUtils.transformRect(
                 render.getTransformTo(null),
                 box.toRect(),
@@ -883,6 +955,8 @@ Future<Json> runNativeProbe(
       'visibleFragments': visibleFragments,
       'characterIdentityFailures': characterFailures,
       'geometryFailures': geometryFailures,
+      'selectionBoxOverflows': selectionBoxOverflows,
+      'excludedSoftWrapSpaces': excludedSoftWrapSpaces,
       'unknownGeometry': unknownGeometries,
       'atomicFailures': atomicFailures,
       'mixedLineChecks': mixedLineChecks,

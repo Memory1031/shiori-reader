@@ -560,6 +560,28 @@ final class _Audit {
     return null;
   }
 
+  bool collapsesOrdinarySpaces(
+    dom.Element node,
+    Map<dom.Element, Map<String, String>> styles,
+  ) {
+    for (
+      dom.Element? ancestor = node;
+      ancestor != null;
+      ancestor = ancestor.parent
+    ) {
+      if (ancestor.localName == 'pre') return false;
+    }
+    return [node, ...node.querySelectorAll('*')].every(
+      (e) =>
+          e.localName != 'pre' &&
+          {
+            null,
+            'normal',
+            'initial',
+          }.contains(inherited(e, styles, 'white-space')),
+    );
+  }
+
   String blockText(ContentBlock block) => switch (block) {
     ParagraphBlock(:final text) || HeadingBlock(:final text) => text,
     _ => '',
@@ -976,6 +998,7 @@ final class _Audit {
         expected,
         found < 0 ? null : output[found],
         normalized.ruby,
+        collapsesOrdinarySpaces: collapsesOrdinarySpaces(node, styles),
       );
       if (found < 0) {
         checks['text']!.failed++;

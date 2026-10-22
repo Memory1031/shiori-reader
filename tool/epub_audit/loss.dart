@@ -402,8 +402,9 @@ final class ReadingLossCollector {
     dom.Element node,
     String expected,
     ContentBlock? matched,
-    List<(int, int, String)> ruby,
-  ) {
+    List<(int, int, String)> ruby, {
+    bool collapsesOrdinarySpaces = false,
+  }) {
     final status = matched == null ? CheckStatus.fail : CheckStatus.pass;
     final f = fact(
       path,
@@ -412,6 +413,7 @@ final class ReadingLossCollector {
       status,
       text: expected,
       details: {
+        'collapsesOrdinarySpaces': collapsesOrdinarySpaces,
         'ruby': [
           for (final r in ruby)
             {

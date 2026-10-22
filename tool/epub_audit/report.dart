@@ -5,7 +5,7 @@ import 'loss_report.dart';
 
 typedef Json = Map<String, dynamic>;
 const schemaVersion = 2;
-const auditRulesVersion = '2.0.3';
+const auditRulesVersion = '2.0.4';
 
 final class AuditOptions {
   const AuditOptions({
