@@ -3212,6 +3212,12 @@ abstract class AppLocalizations {
   /// **'Read in this period'**
   String get statisticsBooks;
 
+  /// No description provided for @statisticsShowAllBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all {count} books'**
+  String statisticsShowAllBooks(int count);
+
   /// No description provided for @statisticsAnonymous.
   ///
   /// In en, this message translates to:
@@ -3281,13 +3287,13 @@ abstract class AppLocalizations {
   /// No description provided for @statisticsClear.
   ///
   /// In en, this message translates to:
-  /// **'Clear reading statistics'**
+  /// **'Clear statistics'**
   String get statisticsClear;
 
   /// No description provided for @statisticsClearConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Clear reading statistics?'**
+  /// **'Clear statistics?'**
   String get statisticsClearConfirm;
 
   /// No description provided for @statisticsClearBody.
@@ -3349,6 +3355,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} min'**
   String statisticsMinutes(String count);
+
+  /// No description provided for @statisticsHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} h'**
+  String statisticsHours(String count);
 
   /// No description provided for @statisticsHoursMinutes.
   ///

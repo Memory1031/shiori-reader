@@ -1894,6 +1894,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statisticsBooks => 'Read in this period';
 
   @override
+  String statisticsShowAllBooks(int count) {
+    return 'Show all $count books';
+  }
+
+  @override
   String get statisticsAnonymous => 'Removed books';
 
   @override
@@ -1930,10 +1935,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Removing a book keeps only its total reading time.';
 
   @override
-  String get statisticsClear => 'Clear reading statistics';
+  String get statisticsClear => 'Clear statistics';
 
   @override
-  String get statisticsClearConfirm => 'Clear reading statistics?';
+  String get statisticsClearConfirm => 'Clear statistics?';
 
   @override
   String get statisticsClearBody =>
@@ -1969,6 +1974,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String statisticsMinutes(String count) {
     return '$count min';
+  }
+
+  @override
+  String statisticsHours(String count) {
+    return '$count h';
   }
 
   @override

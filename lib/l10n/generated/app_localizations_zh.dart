@@ -1720,6 +1720,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statisticsBooks => '这段时间读过';
 
   @override
+  String statisticsShowAllBooks(int count) {
+    return '展开全部（$count 本）';
+  }
+
+  @override
   String get statisticsAnonymous => '已移除书籍';
 
   @override
@@ -1788,6 +1793,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String statisticsMinutes(String count) {
     return '$count分钟';
+  }
+
+  @override
+  String statisticsHours(String count) {
+    return '$count小时';
   }
 
   @override

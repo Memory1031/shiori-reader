@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
+import 'package:shiori/l10n/generated/app_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/data/local/database/user_database.dart'
@@ -121,6 +123,160 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Finder periodDuration(String value) => find.descendant(
+    of: find.byKey(const ValueKey('statistics-period-total')),
+    matching: find.text(value),
+  );
+
+  testWidgets('duration groups stay readable at large phone text sizes', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(320, 900)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.runAsync(() async {
+      await recorder.ready;
+      final key = NovelKey(sourceId: SourceId('s'), novelId: 'n');
+      final session =
+          (await repo.begin(key) as Success<ReadingRecordSession?>).value!;
+      await repo.submit(ReadingCheckpoint(session, 1, {20261021: 112 * 60000}));
+    });
+    await tester.pumpWidget(
+      ShioriApp(
+        locale: const Locale('en'),
+        overlayBuilder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(1.5)),
+          child: child,
+        ),
+        homeBuilder: (_, _) =>
+            Scaffold(body: StatisticsView(controller: recorder)),
+      ),
+    );
+    await settle(tester);
+    for (final text in ['1 h', '52 min']) {
+      final group = find.text(text).first;
+      final rect = tester.getRect(group);
+      expect(rect.left, greaterThanOrEqualTo(0));
+      expect(rect.right, lessThanOrEqualTo(320));
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(of: group, matching: find.byType(RichText)),
+      );
+      final painter = TextPainter(
+        text: paragraph.text,
+        textDirection: paragraph.textDirection,
+        textScaler: paragraph.textScaler,
+      )..layout(maxWidth: paragraph.size.width);
+      addTearDown(painter.dispose);
+      expect(painter.computeLineMetrics(), hasLength(1));
+    }
+    final l = AppLocalizations.of(tester.element(find.byType(StatisticsView)));
+    expect(readingDuration(l, 26 * 3600000), '26 h');
+    expect(readingDuration(l, 30000), 'Less than 1 minute');
+    expect(find.text('120'), findsOneWidget);
+    expect(find.text('60'), findsOneWidget);
+    expect(find.text('Oct 15 – 21'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await settle(tester);
+  });
+
+  testWidgets('book list expands from five and keeps removed time separate', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(1280, 1100)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.runAsync(() async {
+      await recorder.ready;
+      for (var i = 0; i < 8; i++) {
+        final key = NovelKey(sourceId: SourceId('s'), novelId: 'book$i');
+        await db.customStatement("INSERT INTO bookshelf VALUES('s',?,?,0,0)", [
+          key.novelId,
+          RecordCodec.summary(NovelSummary(key: key, title: 'Book $i')),
+        ]);
+        final session =
+            (await repo.begin(key) as Success<ReadingRecordSession?>).value!;
+        await repo.submit(
+          ReadingCheckpoint(session, 1, {20261021: (8 - i) * 60000}),
+        );
+      }
+    });
+    await tester.pumpWidget(
+      ShioriApp(
+        locale: const Locale('en'),
+        homeBuilder: (_, _) =>
+            Scaffold(body: StatisticsView(controller: recorder)),
+      ),
+    );
+    await settle(tester);
+    expect(find.text('Book 4'), findsOneWidget);
+    expect(find.text('Book 5'), findsNothing);
+    expect(find.text('Removed books'), findsNothing);
+    await tester.tap(find.text('Show all 8 books'));
+    await settle(tester);
+    expect(find.text('Book 7'), findsOneWidget);
+    await tester.tap(find.text('Show less'));
+    await settle(tester);
+    expect(find.text('Book 5'), findsNothing);
+    await tester.tap(find.text('Show all 8 books'));
+    await settle(tester);
+    tester.view.physicalSize = const Size(1280, 700);
+    await settle(tester);
+    final heading = find.text('Read in this period');
+    final headingTop = tester.getTopLeft(heading);
+    final list = find.byType(CustomScrollView);
+    await tester.scrollUntilVisible(
+      find.text('Show less'),
+      150,
+      scrollable: find
+          .descendant(of: list, matching: find.byType(Scrollable))
+          .first,
+    );
+    await settle(tester);
+    expect(tester.getTopLeft(heading), headingTop);
+    final timeRight = tester.getRect(find.text('1 min').last).right;
+    expect(tester.getRect(list).right - timeRight, greaterThanOrEqualTo(12));
+    await tester.tap(find.text('Show less'));
+    await settle(tester);
+    expect(find.text('Book 5'), findsNothing);
+    expect(find.text('Show all 8 books').hitTestable(), findsOneWidget);
+    await tester.tap(find.text('Show all 8 books'));
+    await settle(tester);
+    await tester.tap(find.text('30 days'));
+    await settle(tester);
+    expect(find.text('Book 5'), findsNothing);
+    expect(find.text('Show all 8 books'), findsOneWidget);
+    await tester.runAsync(() async {
+      final key = NovelKey(sourceId: SourceId('s'), novelId: 'removed');
+      final session =
+          (await repo.begin(key) as Success<ReadingRecordSession?>).value!;
+      await repo.submit(ReadingCheckpoint(session, 1, {20261021: 4 * 60000}));
+      await db.removeReadingStatistics('s', 'removed');
+      await recorder.reload();
+    });
+    await settle(tester);
+    final removedRow = find
+        .ancestor(of: find.text('Removed books'), matching: find.byType(Row))
+        .first;
+    expect(
+      find.descendant(of: removedRow, matching: find.text('4 min')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Show all 8 books'));
+    await settle(tester);
+    expect(
+      find.descendant(of: removedRow, matching: find.text('4 min')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await settle(tester);
+  });
+
   testWidgets('30-day labels retain readable size at phone widths', (
     tester,
   ) async {
@@ -215,9 +371,17 @@ void main() {
       final panel = find.byWidget(dialog.child!);
       expect(tester.getSize(panel).width, lessThanOrEqualTo(560));
       expect(tester.getCenter(panel), const Offset(640, 450));
-      await tester.tap(find.text('Clear reading statistics'));
+      await tester.tap(find.text('Clear statistics'));
       await settle(tester);
       expect(find.byType(AlertDialog), findsOneWidget);
+      final confirm = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Clear statistics'),
+      );
+      final scheme = Theme.of(
+        tester.element(find.byType(AlertDialog)),
+      ).colorScheme;
+      expect(confirm.style!.backgroundColor!.resolve({}), scheme.error);
+      expect(confirm.style!.foregroundColor!.resolve({}), scheme.onError);
       await tester.tap(find.text('Cancel'));
       await settle(tester);
       await tester.tap(find.byType(SwitchListTile));
@@ -278,15 +442,15 @@ void main() {
       expect(recorder.enabled, true);
       await tester.tap(find.byTooltip('Manage records').first);
       await settle(tester);
-      await tester.ensureVisible(find.text('Clear reading statistics').first);
-      await tester.tap(find.text('Clear reading statistics').first);
+      await tester.ensureVisible(find.text('Clear statistics').first);
+      await tester.tap(find.text('Clear statistics').first);
       await settle(tester);
       expect(
         find.text('Reading after clearing will still be recorded.'),
         findsOneWidget,
       );
       await tester.tap(
-        find.widgetWithText(TextButton, 'Clear reading statistics').last,
+        find.widgetWithText(FilledButton, 'Clear statistics').last,
       );
       await settle(tester);
       expect(recorder.enabled, true);
@@ -318,17 +482,10 @@ void main() {
       ),
     );
     await settle(tester);
-    expect(find.text('1 min · Total'), findsOneWidget);
+    expect(periodDuration('1 min'), findsOneWidget);
     await tester.tap(find.text('30 days'));
     await settle(tester);
-    expect(
-      find.textContaining(
-        MaterialLocalizations.of(
-          tester.element(find.byType(StatisticsView)),
-        ).formatShortDate(DateTime(2026, 9, 22)),
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Sep 22 – Oct 21'), findsOneWidget);
     final chart = find.byWidgetPredicate(
       (w) => w is Semantics && w.properties.slider == true,
     );
@@ -365,6 +522,15 @@ void main() {
       tester.getSemantics(chart).getSemanticsData().value,
       contains('0 min'),
     );
+    await tester.pumpAndSettle();
+    final frame = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('reading-chart-focus')),
+    );
+    final border = (frame.decoration as BoxDecoration).border! as Border;
+    expect(
+      border.top.color,
+      Theme.of(tester.element(chart)).colorScheme.primary,
+    );
     handle.dispose();
     final gate = repo.gate = Completer<void>();
     await tester.tap(find.text('12 months'));
@@ -373,16 +539,13 @@ void main() {
     repo.gate = null;
     gate.complete();
     await settle(tester);
-    expect(find.text('1 min · Total'), findsNothing);
-    expect(find.text('0 min · Total'), findsOneWidget);
-    expect(
-      find.textContaining(
-        MaterialLocalizations.of(
-          tester.element(find.byType(StatisticsView)),
-        ).formatShortDate(DateTime(2025, 11, 1)),
-      ),
-      findsOneWidget,
-    );
+    expect(periodDuration('1 min'), findsNothing);
+    expect(periodDuration('0 min'), findsOneWidget);
+    expect(find.text('Nov 2025 – Oct 2026'), findsOneWidget);
+    (recorder.clock as TestReadingClock).wall = DateTime(2027, 1, 3, 12);
+    await tester.tap(find.text('7 days'));
+    await settle(tester);
+    expect(find.text('Dec 28, 2026 – Jan 3, 2027'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     await settle(tester);
@@ -462,7 +625,7 @@ void main() {
       await tester.tap(find.text('Retry'));
       await settle(tester);
       expect(unavailable.reads, greaterThan(0));
-      expect(find.text('0 min · Total'), findsOneWidget);
+      expect(periodDuration('0 min'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       await settle(tester);
     },

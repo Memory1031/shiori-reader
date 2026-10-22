@@ -913,6 +913,12 @@
   "statisticsThirty": "近30天",
   "statisticsYear": "近12个月",
   "statisticsBooks": "这段时间读过",
+  "statisticsShowAllBooks": "展开全部（{count} 本）",
+  "@statisticsShowAllBooks": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "statisticsAnonymous": "已移除书籍",
   "statisticsAnonymousHint": "仅保留合计时长",
   "statisticsMissingBook": "书籍信息暂不可用",
@@ -941,6 +947,12 @@
       "count": {
         "type": "String"
       }
+    }
+  },
+  "statisticsHours": "{count}小时",
+  "@statisticsHours": {
+    "placeholders": {
+      "count": {"type": "String"}
     }
   },
   "statisticsHoursMinutes": "{hours}小时 {minutes}分钟",

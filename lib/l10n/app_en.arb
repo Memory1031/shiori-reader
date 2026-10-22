@@ -913,6 +913,12 @@
   "statisticsThirty": "30 days",
   "statisticsYear": "12 months",
   "statisticsBooks": "Read in this period",
+  "statisticsShowAllBooks": "Show all {count} books",
+  "@statisticsShowAllBooks": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "statisticsAnonymous": "Removed books",
   "statisticsAnonymousHint": "Only total reading time is retained",
   "statisticsMissingBook": "Book details unavailable",
@@ -924,8 +930,8 @@
   "statisticsRecording": "Record reading time",
   "statisticsPauseHint": "Pause new records and keep existing statistics.",
   "statisticsRetention": "Removing a book keeps only its total reading time.",
-  "statisticsClear": "Clear reading statistics",
-  "statisticsClearConfirm": "Clear reading statistics?",
+  "statisticsClear": "Clear statistics",
+  "statisticsClearConfirm": "Clear statistics?",
   "statisticsClearBody": "Clear reading time and per-book statistics without affecting your bookshelf, reading position or bookmarks.",
   "statisticsClearEnabled": "Reading after clearing will still be recorded.",
   "statisticsError": "Reading statistics are temporarily unavailable. Please retry.",
@@ -941,6 +947,12 @@
       "count": {
         "type": "String"
       }
+    }
+  },
+  "statisticsHours": "{count} h",
+  "@statisticsHours": {
+    "placeholders": {
+      "count": {"type": "String"}
     }
   },
   "statisticsHoursMinutes": "{hours} h {minutes} min",
