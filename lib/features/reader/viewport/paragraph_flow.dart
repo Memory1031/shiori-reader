@@ -120,7 +120,12 @@ ParagraphFlow readerParagraphFlow({
   final bodyEnd = label == null
       ? runes.length
       : (label - offset).clamp(0, runes.length);
-  TextPainter painter(int start, int end, double available) {
+  TextPainter painter(
+    int start,
+    int end,
+    double available, {
+    List<(int, int)>? collapsed,
+  }) {
     var source = slice(start, end);
     // Newline belongs to the source range but does not add an empty painted row.
     if (source.endsWith('\n')) source = source.substring(0, source.length - 1);
@@ -129,6 +134,7 @@ ParagraphFlow readerParagraphFlow({
           style: style,
           children: readerInlineSpans(
             text: source,
+            onCollapsed: (start, length) => collapsed?.add((start, length)),
             offset: offset + start,
             images: block.inlineImages,
             ruby: block.inlineRuby,
@@ -170,7 +176,8 @@ ParagraphFlow readerParagraphFlow({
     int end,
     double available,
   ) {
-    final p = painter(start, end, available);
+    final collapsed = <(int, int)>[];
+    final p = painter(start, end, available, collapsed: collapsed);
     int stop = end;
     try {
       final metrics = p.computeLineMetrics();
@@ -185,6 +192,7 @@ ParagraphFlow readerParagraphFlow({
           block.inlineRuby,
           p.getLineBoundary(point).start,
           stacks: stacks,
+          collapsed: collapsed,
         );
         var safe = 0;
         for (final cluster in slice(start, end).characters) {
@@ -392,25 +400,40 @@ double readerTableLabelWidth(
 }) {
   final row = block.tableRow!;
   final label = String.fromCharCodes(block.text.runes.take(row.leftEnd));
-  final painter = TextPainter(
-    text: TextSpan(
-      style: style,
-      children: readerInlineSpans(
-        text: label,
-        offset: 0,
-        images: const [],
-        ruby: const [],
-        styles: block.inlineStyles,
-        style: style,
-        scaler: scaler,
-        maxWidth: double.infinity,
-        locale: locale,
-      ),
-    ),
-    textDirection: TextDirection.ltr,
-    textScaler: scaler,
-    locale: locale,
-  )..layout();
+  final painter =
+      TextPainter(
+          text: TextSpan(
+            style: style,
+            children: readerInlineSpans(
+              text: label,
+              offset: 0,
+              images: const [],
+              ruby: const [],
+              styles: block.inlineStyles,
+              style: style,
+              scaler: scaler,
+              maxWidth: double.infinity,
+              locale: locale,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+          textScaler: scaler,
+          locale: locale,
+        )
+        ..setPlaceholderDimensions(
+          readerInlineDimensions(
+            offset: 0,
+            length: label.runes.length,
+            text: label,
+            images: const [],
+            styles: block.inlineStyles,
+            style: style,
+            scaler: scaler,
+            maxWidth: double.infinity,
+            locale: locale,
+          ),
+        )
+        ..layout();
   try {
     return painter.width + .01;
   } finally {

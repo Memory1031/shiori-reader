@@ -81,6 +81,13 @@ final class ChunkIndex {
         final insideStack = block.inlineStacks.any(
           (s) => s.start < start + length && start + length < s.end,
         );
+        final insideSuperscript = block.inlineStyles.any(
+          (s) =>
+              s.superscript &&
+              s.length <= 16 &&
+              s.start < start + length &&
+              start + length < s.start + s.length,
+        );
         final insideLabel =
             block is ParagraphBlock &&
             block.trailingLabelStart != null &&
@@ -91,6 +98,7 @@ final class ChunkIndex {
             start + length <= block.tableRow!.rightStart;
         if (length + count > maxCodePoints &&
             !insideRuby &&
+            !insideSuperscript &&
             !insideStack &&
             !insideLabel &&
             !insideTableHead) {

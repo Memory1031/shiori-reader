@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shiori/domain/bookmark_position.dart';
 import 'package:shiori/data/local/epub/epub_parser.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
@@ -115,6 +116,82 @@ void main() {
       ),
       throwsArgumentError,
     );
+  });
+
+  test(
+    'explicit superscripts preserve text identity and ordinary link routing',
+    () {
+      const body =
+          '<p id="one">😀e\u0301<a href="#one"><span class="up">[12]</span></a>'
+          '<sup>甲</sup><sup style="vertical-align:baseline">乙</sup>1</p>';
+      final content = parse(body, '.up {font-size:.75em;vertical-align:super}');
+      final block = content.chapters.first.blocks.single as ParagraphBlock;
+      expect(block.text, '😀e\u0301[12]甲乙1');
+      final raised = block.inlineStyles.where((s) => s.superscript).toList();
+      expect(raised.map((s) => s.start), [3, 7]);
+      expect(raised.map((s) => s.fontScale), [.75, .75]);
+      expect(content.links.single.isFootnote, isFalse);
+      expect(content.links.single.sourceOffset, 3);
+      expect(content.links.single.sourceLength, 4);
+      expect(content.links.single.targetBlockKey, block.blockKey);
+      final plain = parse(body, '.up {font-size:.75em}');
+      expect(
+        content.chapters.first.contentRevision,
+        plain.chapters.first.contentRevision,
+      );
+      final position = ReaderPosition(
+        contentRevision: plain.chapters.first.contentRevision,
+        blockKey: block.blockKey,
+        blockIndex: 0,
+        blockFraction: 4 / block.text.runes.length,
+        chapterFraction: 4 / block.text.runes.length,
+      );
+      final anchor = BookmarkPositionIndex(
+        plain.chapters,
+      ).capture(plain.chapters.first.key, position)!;
+      final restored = BookmarkPositionIndex(
+        content.chapters,
+      ).resolve(content.chapters.first.key, anchor);
+      expect(restored.location, BookmarkLocation.exact);
+      expect(restored.anchor!.position, anchor.position);
+
+      expect(
+        ChapterContent.fromJson(content.chapters.first.toJson()),
+        content.chapters.first,
+      );
+      final legacy = InlineTextStyle(start: 0, length: 1).toJson();
+      expect(legacy.containsKey('superscript'), isFalse);
+      expect(InlineTextStyle.fromJson(legacy).superscript, isFalse);
+    },
+  );
+  test(
+    'superscript children retain baseline intent without repeated shrinking',
+    () {
+      final block =
+          parse(
+                '<p><sup><b>A</b><i>B</i></sup><span style="vertical-align:super">C</span>D</p>',
+                '',
+              ).chapters.first.blocks.single
+              as ParagraphBlock;
+      expect(block.inlineStyles.map((s) => s.fontScale), [.75, .75, 1]);
+      expect(block.inlineStyles.every((s) => s.superscript), isTrue);
+      expect(
+        parse(
+          '<p style="vertical-align:super">Body</p>',
+          '',
+        ).chapters.first.blocks.single.inlineStyles,
+        isEmpty,
+      );
+    },
+  );
+
+  test('deep superscript nesting stays within typography bounds', () {
+    final block = parse(
+      '<p>${'<sup>' * 20}A${'</sup>' * 20}</p>',
+      '',
+    ).chapters.first.blocks.single;
+    expect(block.inlineStyles.single.fontScale, .25);
+    expect(block.inlineStyles.single.superscript, isTrue);
   });
 
   test('ordinary prose preserves consecutive explicit blank paragraphs', () {

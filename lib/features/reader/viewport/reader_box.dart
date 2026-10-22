@@ -52,30 +52,49 @@ ReaderLinkLayout? readerLinkLayout(
           length(decoration.padding.bottom),
         );
   final style = readerBlockStyle(block, base, chapter: chapter);
+  final textWidth = math.max(
+    1.0,
+    decoration.onBlock ? width : width - padding.horizontal,
+  );
   final painter =
       TextPainter(
-        text: TextSpan(
-          style: style,
-          children: readerInlineSpans(
-            text: block.text,
+          text: TextSpan(
+            style: style,
+            children: readerInlineSpans(
+              text: block.text,
+              offset: 0,
+              images: const [],
+              styles: block.inlineStyles,
+              style: style,
+              readerFontSize: base.fontSize,
+              scaler: scaler,
+              direction: direction,
+              locale: locale,
+              maxWidth: textWidth,
+            ),
+          ),
+          textDirection: direction,
+          textAlign: readerBlockAlign(block, chapter: chapter),
+          textScaler: scaler,
+          locale: locale,
+          textHeightBehavior: heightBehavior,
+        )
+        ..setPlaceholderDimensions(
+          readerInlineDimensions(
             offset: 0,
+            length: block.text.runes.length,
+            text: block.text,
             images: const [],
             styles: block.inlineStyles,
             style: style,
             readerFontSize: base.fontSize,
+            scaler: scaler,
+            direction: direction,
+            locale: locale,
+            maxWidth: textWidth,
           ),
-        ),
-        textDirection: direction,
-        textAlign: readerBlockAlign(block, chapter: chapter),
-        textScaler: scaler,
-        locale: locale,
-        textHeightBehavior: heightBehavior,
-      )..layout(
-        maxWidth: math.max(
-          1.0,
-          decoration.onBlock ? width : width - padding.horizontal,
-        ),
-      );
+        )
+        ..layout(maxWidth: textWidth);
   try {
     final w = decoration.onBlock
             ? width + padding.horizontal

@@ -13,6 +13,7 @@ import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_linked_text.dart';
+import 'package:shiori/features/reader/reader_superscript.dart';
 import 'package:shiori/features/reader/reader_panel.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import '../../data/local/epub_links_test.dart';
@@ -21,7 +22,7 @@ import '../../data/local/local_reading_test.dart' show ForbiddenOnline;
 import 'local_reading_test.dart' show MemoryBooks;
 
 void main() {
-  for (final route in ['same', 'main', 'auxiliary']) {
+  for (final route in ['same', 'main', 'auxiliary', 'superscript']) {
     testWidgets(
       'fragment backlink seeks the page containing an inline anchor: $route',
       (tester) async {
@@ -33,12 +34,15 @@ void main() {
             ? 'notes.xhtml'
             : 'text/a.xhtml';
         // Keep the target beyond the first spread even on a wide desktop.
+        final marker = route == 'superscript'
+            ? '<sup>MARKER5</sup>'
+            : 'MARKER5';
         final body =
-            '<p>PARAGRAPH_START ${'正文😀跨页内容。' * 480}<a id="b5" href="#note">MARKER5</a>${'后文。' * 50}</p>';
+            '<p>PARAGRAPH_START ${'正文😀跨页内容。' * 480}<a id="b5" href="#note">$marker</a>${'后文。' * 50}</p>';
         files[targetPath] = utf8.encode(
           '<html><body>$body<p id="note"><a href="#b5">BACK</a></p></body></html>',
         );
-        if (route != 'same') {
+        if (route != 'same' && route != 'superscript') {
           files['OPS/last.xhtml'] = utf8.encode(
             '<html><body><p><a href="$targetHref#b5">BACK</a></p></body></html>',
           );
@@ -48,7 +52,9 @@ void main() {
           linkBookKey,
           'book',
         ).parse().content;
-        final source = route == 'same' ? c.chapters.first : c.chapters.last;
+        final source = route == 'same' || route == 'superscript'
+            ? c.chapters.first
+            : c.chapters.last;
         final repo = LocalReadingRepository(
           online: ForbiddenOnline(),
           local: MemoryBooks(
@@ -95,7 +101,35 @@ void main() {
             .widgetList<RichText>(find.byType(RichText))
             .map((w) => w.text.toPlainText())
             .join();
-        expect(displayed, contains('MARKER5'));
+        if (route == 'superscript') {
+          final raised = find.byType(ReaderSuperscript);
+          expect(
+            tester.widget<ReaderSuperscript>(raised).layout.text,
+            'MARKER5',
+          );
+          final origin = tester
+              .widget<PagedReaderViewport>(find.byType(PagedReaderViewport))
+              .controller
+              .capture()!;
+          final box = tester.renderObject<RenderBox>(raised);
+          await tester.tapAt(box.localToGlobal(box.size.center(Offset.zero)));
+          await tester.pumpAndSettle();
+          expect(back, findsOneWidget);
+          tester
+              .widget<ReaderContentView>(find.byType(ReaderContentView))
+              .actions
+              .previousLocation!();
+          await tester.pumpAndSettle();
+          expect(find.byType(ReaderSuperscript), findsOneWidget);
+          final restored = tester
+              .widget<PagedReaderViewport>(find.byType(PagedReaderViewport))
+              .controller
+              .capture()!;
+          expect(restored.blockKey, origin.blockKey);
+          expect(restored.blockFraction, origin.blockFraction);
+        } else {
+          expect(displayed, contains('MARKER5'));
+        }
         expect(displayed, isNot(contains('PARAGRAPH_START')));
         final viewport = tester.widget<PagedReaderViewport>(
           find.byType(PagedReaderViewport),

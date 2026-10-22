@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import '../../domain/models/models.dart';
 import 'reader_ruby.dart';
+import 'reader_superscript.dart';
 import 'reader_search_highlight.dart';
 import 'reader_inline_stack.dart';
 
@@ -26,6 +27,7 @@ List<InlineSpan> readerInlineSpans({
   Color Function(Color)? resolveColor,
   ReaderGlyphHighlight? highlight,
   void Function(int, int)? onCollapsed,
+  bool allowSuperscript = true,
 }) {
   final runes = text.runes.toList();
   final end = offset + runes.length;
@@ -57,6 +59,28 @@ List<InlineSpan> readerInlineSpans({
   for (final s in stacked.values) {
     cuts.removeWhere((c) => c > s.start && c < s.end);
     cuts.addAll([s.start, s.end]);
+  }
+  final raised = allowSuperscript
+      ? _readerSuperscripts(
+          text: text,
+          offset: offset,
+          styles: styles,
+          style: style,
+          scaler: scaler,
+          direction: direction,
+          locale: locale,
+          maxWidth: maxWidth,
+          readerFontSize: readerFontSize,
+          ruby: ruby,
+          stacks: stacks,
+          resolveColor: resolveColor,
+        )
+      : <int, ReaderSuperscriptLayout>{};
+  for (final entry in raised.entries) {
+    final last = entry.key + entry.value.text.runes.length;
+    cuts.removeWhere((c) => c > entry.key && c < last);
+    cuts.addAll([entry.key, last]);
+    onCollapsed?.call(entry.key, entry.value.text.runes.length);
   }
   final ordered = cuts.toList()..sort();
   for (final s in stacked.values) {
@@ -165,6 +189,21 @@ List<InlineSpan> readerInlineSpans({
             child: imageBuilder?.call(image),
           ),
         )
+      else if (raised[ordered[i]] case final raised?)
+        WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          style: raised.style,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onRubyTap,
+            child: ReaderSuperscript(
+              layout: raised,
+              sourceStart: ordered[i],
+              highlight: highlight,
+            ),
+          ),
+        )
       else
         TextSpan(
           text: String.fromCharCodes(
@@ -179,6 +218,64 @@ List<InlineSpan> readerInlineSpans({
           ),
         ),
   ];
+}
+
+Map<int, ReaderSuperscriptLayout> _readerSuperscripts({
+  required String text,
+  required int offset,
+  required List<InlineTextStyle> styles,
+  required TextStyle style,
+  required TextScaler scaler,
+  required TextDirection direction,
+  required double maxWidth,
+  double? readerFontSize,
+  Locale? locale,
+  List<InlineRuby> ruby = const [],
+  List<InlineStack> stacks = const [],
+  Color Function(Color)? resolveColor,
+}) {
+  final result = <int, ReaderSuperscriptLayout>{};
+  if (!styles.any((s) => s.superscript)) return result;
+  final runes = text.runes.toList();
+  final boundaries = <int>{offset};
+  var next = offset;
+  for (final cluster in text.characters) {
+    next += cluster.runes.length;
+    boundaries.add(next);
+  }
+  for (final range in styles) {
+    final end = range.start + range.length;
+    if (!range.superscript ||
+        range.length > 16 ||
+        range.start < offset ||
+        end > offset + runes.length ||
+        !boundaries.contains(range.start) ||
+        !boundaries.contains(end) ||
+        ruby.any((r) => r.start < end && range.start < r.end) ||
+        stacks.any((r) => r.start < end && range.start < r.end)) {
+      continue;
+    }
+    final value = String.fromCharCodes(
+      runes.sublist(range.start - offset, end - offset),
+    );
+    if (value.contains(RegExp(r'[\s\uFFFC]'))) continue;
+    final layout = ReaderSuperscriptLayout(
+      text: value,
+      style: readerAuthoredStyle(
+        style,
+        styles,
+        range.start,
+        readerFontSize: readerFontSize,
+        resolveColor: resolveColor,
+      ),
+      scaler: scaler,
+      direction: direction,
+      locale: locale,
+    );
+    // Oversized or complex runs retain ordinary text; never squeeze glyphs.
+    if (layout.metrics.size.width <= maxWidth) result[range.start] = layout;
+  }
+  return result;
 }
 
 TextStyle readerAuthoredStyle(
@@ -272,6 +369,7 @@ ReaderRubyLayout readerRubyLayout({
     children: readerInlineSpans(
       text: text,
       offset: ruby.start,
+      allowSuperscript: false,
       images: const [],
       styles: styles,
       style: style,
@@ -309,6 +407,28 @@ List<PlaceholderDimensions> readerInlineDimensions({
   required double maxWidth,
 }) {
   final dimensions = <(int, PlaceholderDimensions)>[
+    for (final entry in _readerSuperscripts(
+      text: text,
+      offset: offset,
+      styles: styles,
+      style: style,
+      readerFontSize: readerFontSize,
+      scaler: scaler,
+      direction: direction,
+      locale: locale,
+      maxWidth: maxWidth,
+      ruby: ruby,
+      stacks: stacks,
+    ).entries)
+      (
+        entry.key,
+        PlaceholderDimensions(
+          size: entry.value.metrics.size,
+          baseline: TextBaseline.alphabetic,
+          baselineOffset: entry.value.metrics.baseline,
+          alignment: PlaceholderAlignment.baseline,
+        ),
+      ),
     for (final image in images)
       if (image.offset >= offset && image.offset < offset + length)
         (
@@ -383,14 +503,15 @@ List<PlaceholderDimensions> readerInlineDimensions({
   return dimensions.map((d) => d.$2).toList();
 }
 
-/// TextPainter counts a ruby WidgetSpan as one UTF-16 unit. Positions outside
-/// Flutter continue to address the original base text, never the annotation.
+/// TextPainter counts each placeholder as one UTF-16 unit. Positions outside
+/// Flutter retain original source characters, including raised runs and ruby bases.
 int readerInlineSourceBoundary(
   String text,
   int offset,
   List<InlineRuby> ruby,
   int display, {
   List<InlineStack> stacks = const [],
+  List<(int, int)> collapsed = const [],
 }) {
   final runes = text.runes.toList();
   final pairs = {
@@ -403,12 +524,15 @@ int readerInlineSourceBoundary(
       if (s.start >= offset && s.end <= offset + runes.length)
         s.start - offset: s,
   };
+  final extra = {
+    for (final (start, length) in collapsed) start - offset: length,
+  };
   var source = 0, rendered = 0, utf16 = 0;
   while (source < runes.length && rendered < display) {
     final pair = pairs[source];
     final stack = stacked[source];
-    final count = stack?.length ?? pair?.length ?? 1;
-    final units = pair != null || stack != null
+    final count = extra[source] ?? stack?.length ?? pair?.length ?? 1;
+    final units = extra.containsKey(source) || pair != null || stack != null
         ? 1
         : (runes[source] > 0xffff ? 2 : 1);
     if (rendered + units > display) break;
@@ -464,6 +588,7 @@ ReaderInlineStackLayout readerStackLayout({
     final spans = readerInlineSpans(
       text: text,
       offset: offset,
+      allowSuperscript: false,
       images: const [],
       styles: styles,
       style: style,

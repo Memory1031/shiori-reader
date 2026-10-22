@@ -14,6 +14,7 @@ final class InlineTextStyle extends ValueModel {
     this.bold,
     this.italic,
     this.borderBottom,
+    this.superscript = false,
     Iterable<EmbeddedFontFamily> fonts = const [],
   }) : fonts = List.unmodifiable(fonts) {
     if (start < 0 ||
@@ -39,6 +40,8 @@ final class InlineTextStyle extends ValueModel {
     }
   }
 
+  final bool superscript;
+
   /// A bounded inline border, painted as a native underline approximation.
   final BoxBorderSide? borderBottom;
   final int start, length;
@@ -57,6 +60,7 @@ final class InlineTextStyle extends ValueModel {
       !fontSizeFromReader &&
       bold == null &&
       italic == null &&
+      !superscript &&
       borderBottom == null &&
       fonts.isEmpty;
   Map<String, Object?> toJson() => {
@@ -67,6 +71,7 @@ final class InlineTextStyle extends ValueModel {
     if (fontSizeFromReader) 'fontSizeFromReader': true,
     'bold': bold,
     'italic': italic,
+    if (superscript) 'superscript': true,
     if (borderBottom != null) 'borderBottom': borderBottom!.toJson(),
     if (fonts.isNotEmpty) 'fonts': fonts.map((f) => f.toJson()).toList(),
   };
@@ -78,6 +83,7 @@ final class InlineTextStyle extends ValueModel {
     fontSizeFromReader: j['fontSizeFromReader'] as bool? ?? false,
     bold: j['bold'] as bool?,
     italic: j['italic'] as bool?,
+    superscript: j['superscript'] as bool? ?? false,
     borderBottom: j['borderBottom'] == null
         ? null
         : BoxBorderSide.fromJson(j['borderBottom'] as Map<String, dynamic>),
@@ -95,6 +101,7 @@ final class InlineTextStyle extends ValueModel {
     bold,
     italic,
     borderBottom,
+    superscript,
     fonts,
   ];
 }

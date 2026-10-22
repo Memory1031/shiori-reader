@@ -18,6 +18,7 @@ import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/reader_audio.dart';
 import 'package:shiori/features/reader/reader_ruby.dart';
+import 'package:shiori/features/reader/reader_superscript.dart';
 import 'package:shiori/features/reader/reader_inline_stack.dart';
 import 'package:shiori/features/reader/reader_linked_text.dart';
 import 'package:shiori/features/reader/reader_authored_colors.dart';
@@ -174,6 +175,7 @@ String paintedText(InlineSpan span) {
     Widget child = span.child;
     if (child is GestureDetector) child = child.child!;
     if (child is ReaderRuby) return child.baseText;
+    if (child is ReaderSuperscript) return child.layout.text;
     if (child is ReaderInlineStack) {
       return '${child.layout.upperText}\n${child.layout.lowerText}';
     }
@@ -605,7 +607,7 @@ Future<Json> runNativeProbe(
           'mixedLineHeights': f.flow?.lines.map((l) => l.height).toList(),
         });
       }
-      for (final type in [ReaderRuby, ReaderInlineStack]) {
+      for (final type in [ReaderRuby, ReaderInlineStack, ReaderSuperscript]) {
         for (final element
             in find
                 .descendant(

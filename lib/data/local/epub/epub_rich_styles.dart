@@ -55,11 +55,13 @@ class EpubRichStyle {
     this.bold,
     this.italic,
     this.borderBottom,
+    this.superscript = false,
     this.hasFontSize = false,
     this.fontSizeFromReader = false,
     this.defaultHeading = false,
     this.fonts = const [],
   });
+  final bool superscript;
   final BoxBorderSide? borderBottom;
   final int? color;
   final double scale;
@@ -72,6 +74,7 @@ class EpubRichStyle {
       !fontSizeFromReader &&
       bold == null &&
       italic == null &&
+      !superscript &&
       borderBottom == null &&
       fonts.isEmpty;
   InlineTextStyle range(
@@ -88,6 +91,7 @@ class EpubRichStyle {
     fontSizeFromReader: fontSizeFromReader,
     bold: bold,
     italic: italic,
+    superscript: superscript,
     borderBottom: borderBottom == null
         ? null
         : BoxBorderSide(
@@ -134,11 +138,18 @@ Map<dom.Element, EpubRichStyle> epubRichStyles(
     final parent = result[e.parent] ?? const EpubRichStyle();
     final css = styles[e] ?? const {};
     final root = e.localName == 'body' || e.localName == 'html';
-    final size = root ? null : epubFontScale(css['font-size'], parent.scale);
+    final isSup = e.localName == 'sup';
+    final size = root
+        ? null
+        : epubFontScale(css['font-size'], parent.scale) ??
+              (isSup && css['font-size'] == null
+                  ? (parent.scale * .75).clamp(.25, 4)
+                  : null);
     final heading = RegExp(r'^h[1-6]$').hasMatch(e.localName ?? '');
     final relative =
         css['font-size']?.endsWith('em') == true ||
-        css['font-size']?.endsWith('%') == true;
+        css['font-size']?.endsWith('%') == true ||
+        isSup && css['font-size'] == null;
     final weight = css['font-weight'];
     final fontStyle = css['font-style'];
     final color = css['color'] == 'initial'
@@ -146,6 +157,12 @@ Map<dom.Element, EpubRichStyle> epubRichStyles(
         : epubColor(css['color']) ?? parent.color;
     result[e] = EpubRichStyle(
       color: color,
+      superscript:
+          parent.superscript ||
+          (!root &&
+              _isInlineText(e, css) &&
+              (css['vertical-align'] == 'super' ||
+                  isSup && css['vertical-align'] == null)),
       borderBottom:
           _inlineBorder(e, css, color, parent.scale) ?? parent.borderBottom,
       scale: size ?? parent.scale,
@@ -184,6 +201,33 @@ Map<dom.Element, EpubRichStyle> epubRichStyles(
   return result;
 }
 
+bool _isInlineText(dom.Element element, Map<String, String> css) =>
+    {
+      'span',
+      'a',
+      'b',
+      'strong',
+      'i',
+      'em',
+      'u',
+      's',
+      'small',
+      'big',
+      'sup',
+      'sub',
+      'code',
+      'abbr',
+      'cite',
+      'q',
+      'mark',
+      'del',
+      'ins',
+    }.contains(element.localName) &&
+    {null, 'inline'}.contains(css['display']) &&
+    {null, 'static'}.contains(css['position']) &&
+    {null, 'none'}.contains(css['float']) &&
+    {null, 'none'}.contains(css['transform']);
+
 // Only inline text participates; paragraph borders remain owned by BlockBox.
 BoxBorderSide? _inlineBorder(
   dom.Element element,
@@ -191,32 +235,7 @@ BoxBorderSide? _inlineBorder(
   int? color,
   double parentScale,
 ) {
-  if (!{
-        'span',
-        'a',
-        'b',
-        'strong',
-        'i',
-        'em',
-        'u',
-        's',
-        'small',
-        'big',
-        'sup',
-        'sub',
-        'code',
-        'abbr',
-        'cite',
-        'q',
-        'mark',
-        'del',
-        'ins',
-      }.contains(element.localName) ||
-      !{null, 'inline'}.contains(css['display']) ||
-      !{null, 'static'}.contains(css['position']) ||
-      !{null, 'none'}.contains(css['float'])) {
-    return null;
-  }
+  if (!_isInlineText(element, css)) return null;
   final type = switch (css['border-bottom-style']) {
     'solid' => BoxBorderStyle.solid,
     'dotted' => BoxBorderStyle.dotted,

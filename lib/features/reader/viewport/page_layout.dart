@@ -205,6 +205,7 @@ final class PageLayout {
             )) {
           continue;
         }
+        final collapsed = <(int, int)>[];
         final p =
             TextPainter(
                 text: TextSpan(
@@ -213,6 +214,8 @@ final class PageLayout {
                     const TextSpan(text: '口'),
                     ...readerInlineSpans(
                       text: text,
+                      onCollapsed: (start, length) =>
+                          collapsed.add((start, length)),
                       offset: chunk.start,
                       images: block.inlineImages,
                       ruby: block.inlineRuby,
@@ -287,6 +290,7 @@ final class PageLayout {
                         block.inlineRuby,
                         (display - 1).clamp(0, text.length),
                         stacks: accepted,
+                        collapsed: collapsed,
                       ),
                     )
                     .runes
@@ -335,6 +339,15 @@ final class PageLayout {
       if (stack.start < chunk.start + offset &&
           chunk.start + offset < stack.end) {
         offset = stack.start - chunk.start;
+      }
+    }
+    for (final range in block.inlineStyles.where(
+      (s) => s.superscript && s.length <= 16,
+    )) {
+      if (range.start < chunk.start + offset &&
+          chunk.start + offset < range.start + range.length) {
+        offset = (range.start - chunk.start).clamp(0, chunk.text!.runes.length);
+        break;
       }
     }
     for (final ruby in block.inlineRuby) {
@@ -508,7 +521,8 @@ final class PageLayout {
       );
       double? boxContentHeight;
       if ((block.box != null || block.layout != null) &&
-          (block.inlineImages.isNotEmpty ||
+          (block.inlineStyles.any((s) => s.superscript) ||
+              block.inlineImages.isNotEmpty ||
               block.inlineRuby.isNotEmpty ||
               inlineStacks(block).isNotEmpty)) {
         boxContentHeight = flow.lines.fold<double>(
@@ -569,6 +583,7 @@ final class PageLayout {
       style,
       chapter: index.content.key,
     );
+    final collapsed = <(int, int)>[];
     final painter =
         TextPainter(
             text: TextSpan(
@@ -576,6 +591,8 @@ final class PageLayout {
                 TextSpan(text: prefix),
                 ...readerInlineSpans(
                   text: text,
+                  onCollapsed: (start, length) =>
+                      collapsed.add((start, length)),
                   offset: blockOffset,
                   images: block.inlineImages,
                   ruby: block.inlineRuby,
@@ -619,7 +636,8 @@ final class PageLayout {
       final lines = painter.computeLineMetrics();
       double? boxContentHeight;
       if ((block.box != null || block.layout != null) &&
-          (block.inlineImages.isNotEmpty ||
+          (block.inlineStyles.any((s) => s.superscript) ||
+              block.inlineImages.isNotEmpty ||
               block.inlineRuby.isNotEmpty ||
               inlineStacks(block).isNotEmpty)) {
         // Placeholder-only rows can have paragraph leading beyond line metrics.
@@ -702,6 +720,7 @@ final class PageLayout {
           text.length,
         ),
         stacks: inlineStacks(block),
+        collapsed: collapsed,
       );
       // A Flutter line break is normally grapheme-safe; snap defensively.
       var safe = 0;
@@ -714,7 +733,8 @@ final class PageLayout {
           ? text.substring(boundary)
           : text.substring(0, boundary);
       if (selected.isEmpty) return null;
-      if (block.inlineImages.isNotEmpty ||
+      if (block.inlineStyles.any((s) => s.superscript) ||
+          block.inlineImages.isNotEmpty ||
           block.inlineRuby.isNotEmpty ||
           inlineStacks(block).isNotEmpty) {
         // A new fragment has its own leading and placeholder baselines.
