@@ -5,15 +5,13 @@ import assert from 'node:assert/strict';
 import { assets } from './assets.mjs';
 const root = fileURLToPath(new URL('../dist/', import.meta.url));
 const base = '/shiori-reader/';
-const forbidden = 'reader-bookmarks-desktop-zh';
-assert.ok(Object.values(assets).every(a => !a.source.includes(forbidden)), 'Unapproved bookmark artwork');
+assert.ok(Object.values(assets).filter(a => a.source.startsWith('assets/screenshots/'))
+  .every(a => a.source.startsWith('assets/screenshots/current/')), 'Use the reviewed current screenshots');
 async function files(directory) { return (await Promise.all((await readdir(directory, { withFileTypes: true })).map(e => e.isDirectory() ? files(path.join(directory, e.name)) : path.join(directory, e.name)))).flat(); }
 const all = await files(root);
 for (const file of all) {
-  assert.ok(!file.includes(forbidden), 'Unapproved output asset');
   if (!file.endsWith('.html')) continue;
   const html = await readFile(file, 'utf8');
-  assert.ok(!html.includes(forbidden));
   assert.ok(!/[A-Z]:\\(?:Users|Code|Software)\\/.test(html), 'Machine path leaked');
   assert.ok(html.includes('hreflang="en"') && html.includes('hreflang="zh-CN"'));
   assert.ok(html.includes('rel="canonical"'));

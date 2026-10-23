@@ -31,21 +31,22 @@
 
 ## 截图
 
-以下为 v1.4.0 正式版真实界面，展示原创演示小说《蓝色借书卡的最后一栏》。应用不附带第三方小说。更多阅读、搜索与书签展示见[官网](https://memory1031.github.io/shiori-reader/zh-cn/#experience)。
+以下为当前开发版的 Windows 与 Android 真实界面，展示原创演示小说《蓝色借书卡的最后一栏》。阅读统计使用演示数据，应用不附带第三方小说。更多阅读、搜索与书签展示见[官网](https://memory1031.github.io/shiori-reader/zh-cn/#experience)。
 
 ### Windows 桌面端
 
 **宽屏双页阅读：插图与正文配对**
 
-![Shiori v1.4.0 Windows 插图与正文双页阅读](assets/screenshots/v1.4.0/desktop/zh/reader-illustration-desktop-zh.png)
+![Shiori Windows 插图与正文双页阅读](assets/screenshots/current/desktop/zh/reader-illustration-desktop-zh.png)
 
 ### Android 移动端
 
-书架与续读、单页阅读：
+书架与续读、单页阅读、阅读统计（演示数据）：
 
 <p>
-  <img src="assets/screenshots/v1.4.0/mobile/zh/bookshelf-mobile-zh.png" alt="Shiori v1.4.0 Android 书架与续读" width="260" />
-  <img src="assets/screenshots/v1.4.0/mobile/en/reader-mobile-en.png" alt="Shiori v1.4.0 Android 英文单页阅读界面" width="260" />
+  <img src="assets/screenshots/current/mobile/zh/bookshelf-mobile-zh.png" alt="Shiori Android 中文书架与续读" width="260" />
+  <img src="assets/screenshots/current/mobile/zh/reader-mobile-zh.png" alt="Shiori Android 中文单页阅读界面" width="260" />
+  <img src="assets/screenshots/current/mobile/zh/reading-statistics-mobile-zh.png" alt="Shiori Android 阅读统计，使用演示数据" width="260" />
 </p>
 
 ## 安装

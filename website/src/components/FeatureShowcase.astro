@@ -27,6 +27,11 @@ const GalleryHost = locale === 'en' ? 'details' : 'div';
     <details class="desktop-reference"><summary>{t.search.caption}<span aria-hidden="true">+</span></summary><figure class="wide-image"><ProductImage name="search" alt={t.search.alt} /><figcaption><a href={media('search-2000.webp')}>{t.enlarge}</a></figcaption></figure></details>
   </> : <figure class="wide-image"><ProductImage name="search" alt={t.search.alt} /><figcaption>{t.search.caption} · <a href={media('search-2000.webp')}>{t.enlarge}</a></figcaption></figure>}
 </div></section>
+<section class="section wrap" id="statistics">
+  <div class="feature-heading"><h2>{t.statistics.title}</h2><div><p class="lead">{t.statistics.body}</p><p class="fine">{t.statistics.note}</p></div></div>
+  <figure class="statistics-desktop wide-image"><ProductImage name="statistics" alt={t.statistics.desktopAlt} /><figcaption>{t.statistics.desktopCaption} · <a href={media('statistics-2000.webp')}>{t.enlarge}</a></figcaption></figure>
+  <figure class="statistics-mobile phone"><ProductImage name="statistics-mobile" alt={t.statistics.mobileAlt} sizes="300px" /><figcaption>{t.statistics.mobileCaption}</figcaption></figure>
+</section>
 <section class:list={['section wrap bookmarks', { 'text-bookmarks': !artwork }]} id="bookmarks">
   <div class="bookmark-copy"><p class="section-label">{t.bookmarks.label}</p><h2>{t.bookmarks.title}</h2><p class="lead">{t.bookmarks.body}</p><ul class="quiet-list">{t.bookmarks.items.map(item => <li>{item}</li>)}</ul></div>
   {artwork ? <figure class="bookmark-image phone"><ProductImage name={artwork} alt={t.bookmarks.alt} sizes="(max-width: 760px) 250px, 300px" /><figcaption>{t.bookmarks.caption}</figcaption></figure> : <div class="bookmark-prose"><svg viewBox="0 0 40 60" width="40" height="60" aria-hidden="true"><path d="M5 2h30v52L20 43 5 54Z" fill="none" stroke="currentColor" stroke-width="2" /></svg><p>{t.bookmarks.textOnly}</p><span>{t.bookmarks.textOnlyBody}</span></div>}
@@ -48,3 +53,11 @@ const GalleryHost = locale === 'en' ? 'details' : 'div';
     buttons.forEach((button, i) => button.addEventListener('click', () => show(i)));
   });
 </script>
+<style>
+  .statistics-mobile { display: none; position: relative; }
+  .statistics-mobile figcaption { position: absolute; top: 100%; width: 100%; }
+  @media (max-width: 760px) {
+    .statistics-desktop { display: none; }
+    .statistics-mobile { display: block; width: min(300px, 100%); margin-inline: auto; }
+  }
+</style>
