@@ -21,7 +21,7 @@ Linux / macOS 首次使用需要 `npx playwright install chromium`；Windows 默
 ## 素材与文案
 
 `scripts/assets.mjs` 维护素材白名单；构建前从仓库现有截图、品牌图和原创演示小说封面生成 WebP、图标与分享图，输出 `public/media/`，不重复提交原图或生成文件。
-`src/data/showcase.ts` 单独控制各语言的书签展示图片。当前中文使用真实 Android 书签图，英文使用文字介绍；替换图片时同步白名单与说明，不使用未经认可的界面。
+中英文页面共用真实中文界面截图，分别配中文和英文说明；`src/data/showcase.ts` 控制书签展示图片。替换图片时同步白名单与说明，不使用未经认可的界面。
 中英文文案位于 `src/i18n/copy.ts`，由同一类型约束。
 
 ## 下载与部署

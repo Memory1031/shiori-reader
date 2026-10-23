@@ -31,6 +31,9 @@ for (const locale of ['zh-cn', 'en']) for (const page of ['', 'download/']) {
   const html = await readFile(path.join(root, locale, page, 'index.html'), 'utf8');
   assert.match(html, new RegExp(`lang="${locale === 'en' ? 'en' : 'zh-CN'}"`));
   assert.equal((html.match(/<h1[ >]/g) ?? []).length, 1);
-  if (locale === 'en') assert.ok(!html.includes('/bookmarks-zh-'), 'English bookmarks should use prose');
+  if (!page) {
+    assert.ok(html.includes('/bookmarks-zh-'), 'Both locales should show the shared bookmark screenshot');
+    assert.ok(!/\/(?:reader|shelf)-en-/.test(html), 'Screenshots should share Chinese UI artwork');
+  }
 }
 console.log('Static routes, language metadata, local resources, fallback links and artwork policy verified.');

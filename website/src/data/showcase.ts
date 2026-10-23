@@ -1,8 +1,7 @@
 import type { Locale } from '../lib/paths';
 
-// Replace a locale's bookmark image here when a reviewed release screenshot exists.
-// English intentionally uses prose until appropriate English artwork is available.
+// Both locales share reviewed Chinese UI screenshots with localized descriptions.
 export const bookmarkArtwork = {
   'zh-cn': 'bookmarks-zh',
-  en: null,
+  en: 'bookmarks-zh',
 } as const satisfies Record<Locale, 'bookmarks-zh' | null>;

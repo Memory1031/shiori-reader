@@ -4,7 +4,7 @@ import { copy } from '../i18n/copy';
 import { media, type Locale } from '../lib/paths';
 import { bookmarkArtwork } from '../data/showcase';
 interface Props { locale: Locale; }
-const { locale } = Astro.props, t = copy[locale], lang = locale === 'en' ? 'en' : 'zh';
+const { locale } = Astro.props, t = copy[locale];
 const artwork = bookmarkArtwork[locale];
 const GalleryHost = locale === 'en' ? 'details' : 'div';
 ---
@@ -33,9 +33,9 @@ const GalleryHost = locale === 'en' ? 'details' : 'div';
 </section>
 <section class:list={['library-section section', { 'english-library': locale === 'en' }]} id="library"><div class="wrap">
   <div class="feature-heading"><div><p class="section-label">{t.library.label}</p><h2>{t.library.title}</h2></div><div><p class="lead">{t.library.body}</p><p>{t.library.second}</p></div></div>
-  {locale === 'en' ? <figure class="library-phone phone"><ProductImage name="shelf-en" alt={t.platforms.shelfAlt} sizes="280px" /><figcaption>{t.mobileShelfCaption}</figcaption></figure> : <figure class="wide-image"><ProductImage name="shelf" alt={t.library.alt} /><figcaption>{t.library.caption} · <a href={media('shelf-2000.webp')}>{t.enlarge}</a></figcaption></figure>}<p class="fine">{t.library.note}</p>
+  {locale === 'en' ? <figure class="library-phone phone"><ProductImage name="shelf-zh" alt={t.platforms.shelfAlt} sizes="280px" /><figcaption>{t.mobileShelfCaption}</figcaption></figure> : <figure class="wide-image"><ProductImage name="shelf" alt={t.library.alt} /><figcaption>{t.library.caption} · <a href={media('shelf-2000.webp')}>{t.enlarge}</a></figcaption></figure>}<p class="fine">{t.library.note}</p>
 </div></section>
-<section class="section wrap platform-story"><div><h2>{t.platforms.title}</h2><p class="lead">{t.platforms.body}</p><ul class="platform-names"><li>Windows</li><li>macOS</li><li>Android</li><li>iOS / iPadOS</li></ul><p class="fine">{t.platforms.note}</p></div><div class="platform-phones"><figure class="phone"><ProductImage name={`shelf-${lang}`} alt={t.platforms.shelfAlt} sizes="(max-width: 760px) 40vw, 220px" /></figure><figure class="phone"><ProductImage name={`reader-${lang}`} alt={t.mobileCaption} sizes="(max-width: 760px) 40vw, 220px" /></figure></div></section>
+<section class="section wrap platform-story"><div><h2>{t.platforms.title}</h2><p class="lead">{t.platforms.body}</p><ul class="platform-names"><li>Windows</li><li>macOS</li><li>Android</li><li>iOS / iPadOS</li></ul><p class="fine">{t.platforms.note}</p></div><div class="platform-phones"><figure class="phone"><ProductImage name="shelf-zh" alt={t.platforms.shelfAlt} sizes="(max-width: 760px) 40vw, 220px" /></figure><figure class="phone"><ProductImage name="reader-zh" alt={t.mobileCaption} sizes="(max-width: 760px) 40vw, 220px" /></figure></div></section>
 <script>
   document.querySelectorAll<HTMLElement>('[data-gallery]').forEach(gallery => {
     const slides = gallery.querySelectorAll<HTMLElement>('[data-slide]');
