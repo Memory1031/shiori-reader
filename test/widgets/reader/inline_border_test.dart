@@ -12,6 +12,33 @@ import 'local_search_test.dart' show fonts;
 import 'search_highlight_test.dart' show screenshot;
 
 void main() {
+  test('undecorated visible spans never query selection geometry', () {
+    var calls = 0;
+    for (final span in [
+      const TextSpan(text: '普通正文'),
+      const TextSpan(children: [TextSpan(text: '注音、上标或双层文字的正文')]),
+      const TextSpan(children: [WidgetSpan(child: SizedBox())]),
+      const ReaderBorderSpan(
+        text: '',
+        style: TextStyle(fontSize: 28),
+        borderStyle: BoxBorderStyle.dotted,
+        color: Colors.black,
+        width: 2,
+      ),
+    ]) {
+      expect(
+        readerBorderStrokes(span, TextScaler.noScaling, const Size(320, 48), (
+          _,
+        ) {
+          calls++;
+          return const [];
+        }),
+        isEmpty,
+      );
+    }
+    expect(calls, 0);
+  });
+
   testWidgets('border paint preserves shaping and fits wrapped last lines', (
     tester,
   ) async {

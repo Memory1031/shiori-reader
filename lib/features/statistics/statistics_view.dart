@@ -102,9 +102,15 @@ Future<void> showStatisticsSettings(
       );
 
 class StatisticsScreen extends StatelessWidget {
-  const StatisticsScreen({super.key, required this.controller, this.images});
+  const StatisticsScreen({
+    super.key,
+    required this.controller,
+    this.images,
+    this.visible = true,
+  });
   final ReadingStatisticsController controller;
   final ImageRepository? images;
+  final bool visible;
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -126,7 +132,11 @@ class StatisticsScreen extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: StatisticsView(controller: controller, images: images),
+              child: StatisticsView(
+                controller: controller,
+                images: images,
+                visible: visible,
+              ),
             ),
           ],
         ),
@@ -214,32 +224,72 @@ class _StatisticsNoticeState extends State<StatisticsNotice> {
 }
 
 class StatisticsView extends StatefulWidget {
-  const StatisticsView({super.key, required this.controller, this.images});
+  const StatisticsView({
+    super.key,
+    required this.controller,
+    this.images,
+    this.visible = true,
+  });
   final ReadingStatisticsController controller;
   final ImageRepository? images;
+  final bool visible;
   @override
   State<StatisticsView> createState() => _StatisticsViewState();
 }
 
-class _StatisticsViewState extends State<StatisticsView> {
+class _StatisticsViewState extends State<StatisticsView>
+    with WidgetsBindingObserver {
   StatisticsRange _range = StatisticsRange.week;
   StatisticsRange _snapshotRange = StatisticsRange.week;
   DateTime? _snapshotToday;
   Timer? _dayTimer;
   ReadingStatisticsSnapshot? _snapshot;
   bool _loading = true, _failed = false, _booksExpanded = false;
+  bool _visible = false, _routeVisible = false, _foreground = true;
+  bool _reading = false, _dirty = true;
   int _request = 0, _selected = 0;
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _foreground = switch (WidgetsBinding.instance.lifecycleState) {
+      null || AppLifecycleState.resumed => true,
+      _ => false,
+    };
     widget.controller.addListener(_changed);
-    unawaited(_load());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _routeVisible = ModalRoute.isCurrentOf(context) != false;
+    _updateVisibility();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    _updateVisibility();
+  }
+
+  void _updateVisibility() {
+    final visible = widget.visible && _routeVisible && _foreground;
+    if (_visible == visible) return;
+    setState(() => _visible = visible);
+    _dayTimer?.cancel();
+    if (visible) {
+      unawaited(_load());
+    } else {
+      ++_request;
+      _dirty = true;
+    }
   }
 
   @override
   void dispose() {
     ++_request;
     _dayTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_changed);
     super.dispose();
   }
@@ -252,72 +302,92 @@ class _StatisticsViewState extends State<StatisticsView> {
       widget.controller.addListener(_changed);
       unawaited(_load());
     }
+    _updateVisibility();
   }
 
   void _changed() => unawaited(_load());
   Future<void> _load() async {
-    final request = ++_request, range = _range;
-    await widget.controller.ready;
-    if (!mounted || request != _request) return;
-    if (widget.controller.settings == null) {
-      setState(() {
-        _loading = false;
-        _failed = true;
-      });
-      return;
-    }
-    final now = widget.controller.clock.now;
-    final today = DateTime(now.year, now.month, now.day);
-    final start = switch (range) {
-      StatisticsRange.week => DateTime(today.year, today.month, today.day - 6),
-      StatisticsRange.month => DateTime(
-        today.year,
-        today.month,
-        today.day - 29,
-      ),
-      StatisticsRange.year => DateTime(today.year, today.month - 11),
-    };
-    _dayTimer?.cancel();
-    _dayTimer = Timer(
-      DateTime(now.year, now.month, now.day + 1).difference(now) +
-          const Duration(seconds: 1),
-      _changed,
-    );
-    final result = await widget.controller.repository.read(
-      firstDay: readingDay(start),
-      lastDay: readingDay(today),
-      today: readingDay(today),
-    );
-    if (!mounted || request != _request) return;
-    setState(() {
-      _loading = false;
-      switch (result) {
-        case Success(:final value):
-          if (value.settings.epoch != widget.controller.settings?.epoch) {
-            _snapshot = null;
+    ++_request;
+    _dirty = true;
+    if (!mounted || !_visible || _reading) return;
+    _reading = true;
+    try {
+      while (mounted && _visible && _dirty) {
+        _dirty = false;
+        final request = _request,
+            range = _range,
+            controller = widget.controller;
+        await controller.ready;
+        if (!mounted) return;
+        if (!_visible || request != _request) continue;
+        if (controller.settings == null) {
+          setState(() {
+            _loading = false;
             _failed = true;
-            return;
+          });
+          continue;
+        }
+        final now = controller.clock.now;
+        final today = DateTime(now.year, now.month, now.day);
+        final start = switch (range) {
+          StatisticsRange.week => DateTime(
+            today.year,
+            today.month,
+            today.day - 6,
+          ),
+          StatisticsRange.month => DateTime(
+            today.year,
+            today.month,
+            today.day - 29,
+          ),
+          StatisticsRange.year => DateTime(today.year, today.month - 11),
+        };
+        _dayTimer?.cancel();
+        _dayTimer = Timer(
+          DateTime(now.year, now.month, now.day + 1).difference(now) +
+              const Duration(seconds: 1),
+          _changed,
+        );
+        final result = await controller.repository.read(
+          firstDay: readingDay(start),
+          lastDay: readingDay(today),
+          today: readingDay(today),
+        );
+        if (!mounted) return;
+        if (!_visible || request != _request) continue;
+        setState(() {
+          _loading = false;
+          switch (result) {
+            case Success(:final value):
+              if (value.settings.epoch != widget.controller.settings?.epoch) {
+                _snapshot = null;
+                _failed = true;
+                return;
+              }
+              final changedRange = _snapshot == null || _snapshotRange != range;
+              if (changedRange ||
+                  _snapshot?.settings.epoch != value.settings.epoch) {
+                _booksExpanded = false;
+              }
+              _snapshot = value;
+              _snapshotRange = range;
+              _snapshotToday = today;
+              if (changedRange) {
+                _selected = switch (range) {
+                  StatisticsRange.week => 6,
+                  StatisticsRange.month => 29,
+                  StatisticsRange.year => 11,
+                };
+              }
+              _failed = false;
+            case Failure():
+              _failed = true;
           }
-          final changedRange = _snapshot == null || _snapshotRange != range;
-          if (changedRange ||
-              _snapshot?.settings.epoch != value.settings.epoch) {
-            _booksExpanded = false;
-          }
-          _snapshot = value;
-          _snapshotRange = range;
-          _snapshotToday = today;
-          if (changedRange) {
-            _selected = switch (range) {
-              StatisticsRange.week => 6,
-              StatisticsRange.month => 29,
-              StatisticsRange.year => 11,
-            };
-          }
-          _failed = false;
-        case Failure():
-          _failed = true;
+        });
       }
-    });
+    } finally {
+      _reading = false;
+    }
   }
 
   void _selectRange(StatisticsRange value) {
@@ -352,7 +422,9 @@ class _StatisticsViewState extends State<StatisticsView> {
                   ),
                 ],
               )
-            : CircularProgressIndicator(semanticsLabel: l.loadingSettings),
+            : _visible
+            ? CircularProgressIndicator(semanticsLabel: l.loadingSettings)
+            : const SizedBox.shrink(),
       );
     }
     final today = _snapshotToday!;
@@ -525,7 +597,7 @@ class _StatisticsViewState extends State<StatisticsView> {
         ),
         const SizedBox(height: ShioriSpace.tight),
         Text(period, style: theme.textTheme.bodySmall),
-        if (_loading) const LinearProgressIndicator(),
+        if (_loading && _visible) const LinearProgressIndicator(),
         const SizedBox(height: ShioriSpace.medium),
         _ReadingChart(
           dates: dates,

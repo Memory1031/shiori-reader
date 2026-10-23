@@ -81,6 +81,10 @@ List<ReaderBorderStroke> readerBorderStrokes(
   Size size,
   List<TextBox> Function(TextSelection) boxes,
 ) {
+  bool decorated(InlineSpan span) =>
+      span is ReaderBorderSpan && (span.text?.isNotEmpty ?? false) ||
+      span is TextSpan && (span.children?.any(decorated) ?? false);
+  if (!decorated(text)) return const [];
   final plain = text.toPlainText(includeSemanticsLabels: false);
   final all = boxes(TextSelection(baseOffset: 0, extentOffset: plain.length));
   final result = <ReaderBorderStroke>[];

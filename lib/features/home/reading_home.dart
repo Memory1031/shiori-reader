@@ -533,12 +533,15 @@ class _ReadingHomeState extends State<ReadingHome> {
   }
 
   Page<Object?> _sectionPage(BuildContext context, HomeSection section) {
+    // A workspace route stays current when a root Reader covers the window.
+    final visible = ModalRoute.isCurrentOf(context) != false;
     final WidgetBuilder? root = switch (section) {
       HomeSection.shelf => null,
       HomeSection.statistics =>
         _statistics == null
             ? null
             : (_) => StatisticsScreen(
+                visible: visible,
                 controller: _statistics!,
                 images: widget.images,
               ),
@@ -682,6 +685,7 @@ class _ReadingHomeState extends State<ReadingHome> {
               ExcludeFocus(
                 excluding: !_mobileStatistics,
                 child: StatisticsView(
+                  visible: _mobileStatistics,
                   controller: recorder,
                   images: widget.images,
                 ),

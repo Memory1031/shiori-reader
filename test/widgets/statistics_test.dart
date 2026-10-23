@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
@@ -9,11 +10,13 @@ import 'package:shiori/app/app.dart';
 import 'package:shiori/data/local/database/user_database.dart'
     show UserDatabase;
 import 'package:shiori/data/repositories/reading_statistics_repository.dart';
+import 'package:shiori/data/repositories/library_repository.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/data/local/record_codec.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/home/reading_home.dart';
+import 'package:shiori/features/home/home_navigation.dart';
 import 'package:shiori/features/statistics/reading_statistics_controller.dart';
 import 'package:shiori/features/statistics/statistics_view.dart';
 import 'package:shiori/shared/widgets/reading_statistics_scope.dart';
@@ -23,9 +26,11 @@ import '../domain/reading_statistics/reading_clock_test.dart'
 class DelayedStatistics extends LocalReadingStatisticsRepository {
   DelayedStatistics(super.db);
   Completer<void>? gate;
-  int reads = 0;
+  int reads = 0, inFlight = 0, peak = 0;
+  bool liveChanges = false;
   @override
-  Stream<void> get changes => const Stream.empty();
+  Stream<void> get changes =>
+      liveChanges ? super.changes : const Stream.empty();
   @override
   Future<Result<ReadingStatisticsSnapshot>> read({
     required int firstDay,
@@ -33,14 +38,20 @@ class DelayedStatistics extends LocalReadingStatisticsRepository {
     required int today,
   }) async {
     reads++;
-    final waiting = gate;
-    final result = await super.read(
-      firstDay: firstDay,
-      lastDay: lastDay,
-      today: today,
-    );
-    if (waiting != null) await waiting.future;
-    return result;
+    inFlight++;
+    if (inFlight > peak) peak = inFlight;
+    try {
+      final waiting = gate;
+      final result = await super.read(
+        firstDay: firstDay,
+        lastDay: lastDay,
+        today: today,
+      );
+      if (waiting != null) await waiting.future;
+      return result;
+    } finally {
+      inFlight--;
+    }
   }
 }
 
@@ -119,6 +130,7 @@ void main() {
     await db.close();
   });
   Future<void> settle(WidgetTester tester) async {
+    await tester.pump();
     await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     await tester.pumpAndSettle();
   }
@@ -126,6 +138,274 @@ void main() {
   Finder periodDuration(String value) => find.descendant(
     of: find.byKey(const ValueKey('statistics-period-total')),
     matching: find.text(value),
+  );
+
+  testWidgets(
+    'hidden home defers statistics while progress and recording continue',
+    (tester) async {
+      // Exercise mobile tabs and the desktop nested navigator.
+      final pointer = defaultTargetPlatform == TargetPlatform.windows;
+      tester.view
+        ..physicalSize = pointer ? const Size(1200, 900) : const Size(390, 844)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final env = FixtureEnvironment(), navigation = HomeNavigation();
+      final navigator = GlobalKey<NavigatorState>();
+      final library = LocalLibraryRepository(db);
+      final clock = TestReadingClock(DateTime(2026, 10, 21, 23, 59, 58));
+      await tester.runAsync(() async {
+        await recorder.ready;
+        await recorder.close();
+        recorder.dispose();
+        repo.liveChanges = true;
+        recorder = ReadingStatisticsController(
+          repo,
+          clock: clock,
+          schedule: false,
+        );
+        await recorder.ready;
+        await recorder.dismissNotice();
+      });
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox());
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.runAsync(env.close);
+        navigation.dispose();
+      });
+      await tester.pumpWidget(
+        ShioriApp(
+          navigatorKey: navigator,
+          locale: const Locale('en'),
+          homeBuilder: (_, _) => ReadingStatisticsScope(
+            controller: recorder,
+            child: ReadingHome(
+              repository: env.novels,
+              library: library,
+              sources: const [],
+              navigation: navigation,
+            ),
+          ),
+        ),
+      );
+      await settle(tester);
+      expect(repo.reads, 0);
+      Future<void> section(HomeSection section) async {
+        if (pointer) {
+          navigation.select(section);
+        } else {
+          await tester.tap(
+            find.widgetWithText(
+              NavigationDestination,
+              section == HomeSection.statistics ? 'Statistics' : 'Bookshelf',
+            ),
+          );
+        }
+        await settle(tester);
+      }
+
+      await section(HomeSection.statistics);
+      expect(repo.reads, greaterThan(0));
+      await section(HomeSection.shelf);
+      final before = repo.reads;
+      await tester.runAsync(() => recorder.setEnabled(false));
+      final book = env.source.data.summary(FixtureScenario.shortChapter);
+      final token = CancellationSource().token;
+      late int generation;
+      await tester.runAsync(() async {
+        generation =
+            (await library.beginProgressSession(book.key, cancellation: token)
+                    as Success<int>)
+                .value;
+      });
+      for (var i = 0; i < 10; i++) {
+        await tester.runAsync(() async {
+          expect(
+            await library.saveProgress(
+              ReadingProgress(
+                snapshot: book,
+                chapterKey: ChapterKey(
+                  novelKey: book.key,
+                  chapterId: 'chapter',
+                ),
+                chapterOrdinalSnapshot: 0,
+                catalogRevision: 'catalog',
+                position: ReaderPosition(
+                  contentRevision: 'content',
+                  blockKey: 'block',
+                  blockIndex: 0,
+                  blockFraction: i / 10,
+                  chapterFraction: i / 10,
+                ),
+                completed: false,
+                lastReadAt: clock.now,
+              ),
+              stamp: ProgressWriteStamp(generation: generation, sequence: i),
+              cancellation: token,
+            ),
+            isA<Success<bool>>().having((r) => r.value, 'saved', true),
+          );
+        });
+        await settle(tester);
+        expect(repo.reads, before);
+      }
+      await tester.runAsync(() async {
+        final saved =
+            await library.getProgress(book.key, cancellation: token)
+                as Success<ReadingProgress?>;
+        expect(saved.value!.position.blockFraction, .9);
+      });
+      final owner = Object();
+      await tester.runAsync(() => recorder.setEnabled(true));
+      recorder.source(owner, book.key, visible: true, activity: true);
+      await settle(tester);
+      expect(recorder.recording, true);
+      clock.advance(const Duration(seconds: 10));
+      await tester.runAsync(recorder.tick);
+      recorder.release(owner);
+      await tester.pump(const Duration(seconds: 10));
+      await settle(tester);
+      expect(repo.reads, before);
+      await section(HomeSection.statistics);
+      expect(periodDuration('Less than 1 minute'), findsOneWidget);
+      expect(find.text('Oct 16 – 22'), findsOneWidget);
+
+      final covered = repo.reads;
+      unawaited(
+        navigator.currentState!.push<void>(
+          MaterialPageRoute(
+            builder: (_) => const Scaffold(body: Text('Reader overlay')),
+          ),
+        ),
+      );
+      await settle(tester);
+      for (var i = 0; i < 10; i++) {
+        recorder.environment(focused: i.isOdd);
+        await settle(tester);
+      }
+      expect(repo.reads, covered);
+      navigator.currentState!.pop();
+      await settle(tester);
+      expect(repo.reads, greaterThan(covered));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      final paused = repo.reads;
+      for (var i = 0; i < 10; i++) {
+        recorder.environment(focused: i.isEven);
+        await settle(tester);
+      }
+      clock.advance(const Duration(days: 1));
+      await tester.pump(const Duration(days: 1));
+      await settle(tester);
+      expect(repo.reads, paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await settle(tester);
+      expect(repo.reads, greaterThan(paused));
+      expect(find.text('Oct 17 – 23'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await settle(tester);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+      TargetPlatform.windows,
+    }),
+  );
+
+  testWidgets(
+    'slow statistics reads coalesce changes and reject hidden results',
+    (tester) async {
+      final key = NovelKey(sourceId: SourceId('s'), novelId: 'n');
+      late ReadingRecordSession session;
+      await tester.runAsync(() async {
+        await recorder.ready;
+        session =
+            (await repo.begin(key) as Success<ReadingRecordSession?>).value!;
+        await repo.submit(ReadingCheckpoint(session, 1, {20261021: 90000}));
+      });
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(
+        ShioriApp(
+          navigatorKey: navigator,
+          locale: const Locale('en'),
+          homeBuilder: (_, _) =>
+              Scaffold(body: StatisticsView(controller: recorder)),
+        ),
+      );
+      await settle(tester);
+      final before = repo.reads;
+      final gate = repo.gate = Completer<void>();
+      final hiddenGate = Completer<void>();
+      addTearDown(() async {
+        repo.gate = null;
+        if (!gate.isCompleted) gate.complete();
+        if (!hiddenGate.isCompleted) hiddenGate.complete();
+        await tester.pumpWidget(const SizedBox());
+        await settle(tester);
+      });
+      await tester.tap(find.text('30 days'));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      expect(repo.inFlight, 1);
+      for (var i = 0; i < 10; i++) {
+        recorder.environment(focused: i.isOdd);
+        await tester.pump();
+      }
+      await tester.tap(find.text('12 months'));
+      await tester.pump();
+      expect(repo.reads, before + 1);
+      repo.gate = null;
+      await tester.runAsync(() async {
+        await repo.submit(ReadingCheckpoint(session, 2, {20261021: 90000}));
+        gate.complete();
+      });
+      await settle(tester);
+      expect(repo.reads, before + 2);
+      expect(repo.peak, 1);
+      expect(periodDuration('3 min'), findsOneWidget);
+      expect(find.text('Nov 2025 – Oct 2026'), findsOneWidget);
+
+      repo.gate = hiddenGate;
+      await tester.tap(find.text('7 days'));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      expect(repo.inFlight, 1);
+      unawaited(
+        navigator.currentState!.push<void>(
+          MaterialPageRoute(
+            builder: (_) => const Scaffold(body: Text('Reader overlay')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      repo.gate = null;
+      await tester.runAsync(() async {
+        await repo.submit(ReadingCheckpoint(session, 3, {20261021: 60000}));
+        hiddenGate.complete();
+      });
+      await settle(tester);
+      expect(repo.inFlight, 0);
+      expect(repo.reads, before + 3);
+      expect(periodDuration('3 min'), findsNothing);
+      final hiddenTotal = find.byKey(
+        const ValueKey('statistics-period-total'),
+        skipOffstage: false,
+      );
+      expect(
+        find.descendant(
+          of: hiddenTotal,
+          matching: find.text('3 min', skipOffstage: false),
+          skipOffstage: false,
+        ),
+        findsOneWidget,
+      );
+      navigator.currentState!.pop();
+      await settle(tester);
+      expect(repo.reads, before + 4);
+      expect(repo.peak, 1);
+      expect(periodDuration('4 min'), findsOneWidget);
+      expect(find.text('Oct 15 – 21'), findsOneWidget);
+    },
   );
 
   testWidgets('duration groups stay readable at large phone text sizes', (
