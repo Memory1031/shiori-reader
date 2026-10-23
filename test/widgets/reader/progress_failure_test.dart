@@ -533,6 +533,15 @@ void main() {
           source.actions.leave!();
         }
         if (intent == 'app-exit') {
+          const appChannel = MethodChannel('dev.shiori.reader/app');
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            appChannel,
+            (_) async => true,
+          );
+          addTearDown(
+            () => tester.binding.defaultBinaryMessenger
+                .setMockMethodCallHandler(appChannel, null),
+          );
           expect(await source.session!.saveForExit(), isFalse);
           final owner = AppExitScope.of(
             tester.element(find.byType(ReaderContentView)),

@@ -109,7 +109,7 @@ class VisualHarness extends LocalHarness {
 
 void main() {
   testWidgets(
-    'phone shelf reaches the screen edge and keeps end items and actions safe',
+    'phone shelf keeps end items above navigation and selection actions',
     (tester) async {
       await loadFonts(tester);
       tester.view.padding = const FakeViewPadding(top: 59, bottom: 34);
@@ -134,13 +134,24 @@ void main() {
       }
 
       await h.shot('shelf-safe-grid-start');
-      expect(tester.getRect(scrollable()).bottom, 844);
+      final navigation = find.byType(NavigationBar);
+      expect(navigation, findsOneWidget);
+      expect(
+        tester.getRect(scrollable()).bottom,
+        tester.getRect(navigation).top,
+      );
       for (final grid in [true, false]) {
         shelf.layout!.value = grid;
         await tester.pumpAndSettle();
-        expect(tester.getRect(scrollable()).bottom, 844);
+        expect(
+          tester.getRect(scrollable()).bottom,
+          tester.getRect(navigation).top,
+        );
         await end();
-        expect(tester.getRect(last).bottom, lessThanOrEqualTo(844 - 34));
+        expect(
+          tester.getRect(last).bottom,
+          lessThanOrEqualTo(tester.getRect(navigation).top),
+        );
         await h.shot('shelf-safe-${grid ? 'grid' : 'list'}-end');
       }
 
@@ -149,6 +160,7 @@ void main() {
       await tester.tap(find.text(h.l.bookMultiSelect));
       await tester.pumpAndSettle();
       final bar = find.byType(BookSelectionBottomBar);
+      expect(navigation, findsNothing);
       expect(tester.getRect(bar).bottom, 844);
       expect(tester.getRect(scrollable()).bottom, tester.getRect(bar).top);
       await end();

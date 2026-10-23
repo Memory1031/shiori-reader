@@ -342,6 +342,17 @@ void main() {
     testWidgets(
       'normal exit ${landed ? 'after' : 'during'} turn saves only a stable anchor',
       (tester) async {
+        const appChannel = MethodChannel('dev.shiori.reader/app');
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          appChannel,
+          (_) async => true,
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            appChannel,
+            null,
+          ),
+        );
         final reader = await mountProgress(tester);
         await reader.session.flushProgress();
         final original = await reader.saved();

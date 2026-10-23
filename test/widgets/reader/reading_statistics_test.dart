@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:drift/native.dart';
 import 'package:shiori/app/app_exit.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/data/local/database/user_database.dart'
     show UserDatabase;
@@ -20,6 +21,17 @@ void main() {
   testWidgets(
     'real paged Reader toolbar, search, panel return and auxiliary ownership',
     (tester) async {
+      const appChannel = MethodChannel('dev.shiori.reader/app');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        appChannel,
+        (_) async => true,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          appChannel,
+          null,
+        ),
+      );
       final db = UserDatabase(NativeDatabase.memory());
       final repo = LocalReadingStatisticsRepository(db),
           clock = TestReadingClock();
