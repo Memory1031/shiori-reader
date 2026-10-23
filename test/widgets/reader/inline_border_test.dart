@@ -11,7 +11,220 @@ import '../../data/local/epub_prose_semantics_test.dart' show paragraphs;
 import 'local_search_test.dart' show fonts;
 import 'search_highlight_test.dart' show screenshot;
 
+ReaderBorderSpan _border(
+  String text, {
+  Color color = Colors.black,
+  BoxBorderStyle type = BoxBorderStyle.dotted,
+  double width = 2,
+  double fontSize = 20,
+}) => ReaderBorderSpan(
+  text: text,
+  style: TextStyle(fontSize: fontSize),
+  borderStyle: type,
+  color: color,
+  width: width,
+);
+
 void main() {
+  test('mixed font boxes share one continuous line and phase', () {
+    var queries = 0;
+    const boxes = [
+      TextBox.fromLTRBD(0, 8, 20, 32, TextDirection.ltr),
+      TextBox.fromLTRBD(20, 8, 32, 32, TextDirection.ltr),
+      TextBox.fromLTRBD(32, 8.004, 72, 32.004, TextDirection.ltr),
+    ];
+    final strokes = readerBorderStrokes(
+      _border('示例C123'),
+      TextScaler.noScaling,
+      const Size(80, 48),
+      (_) {
+        queries++;
+        return boxes;
+      },
+    );
+    expect(queries, 2);
+    expect(strokes, hasLength(1));
+    expect(strokes.single.rect.left, 0);
+    expect(strokes.single.rect.right, 72);
+    expect(strokes.single.rect.top, closeTo(33.6, .01));
+  });
+
+  test('adjacent equivalent spans merge before querying UTF-16 ranges', () {
+    final queries = <(int, int)>[];
+    List<ReaderBorderStroke> strokes(InlineSpan span) => readerBorderStrokes(
+      span,
+      TextScaler.noScaling,
+      const Size(100, 48),
+      (selection) {
+        queries.add((selection.start, selection.end));
+        return [TextBox.fromLTRBD(10, 8, 90, 32, TextDirection.ltr)];
+      },
+    );
+    final whole = strokes(_border('甲😀e\u0301C乙'));
+    queries.clear();
+    final split = TextSpan(
+      children: [
+        _border('甲'),
+        TextSpan(children: [_border('😀'), _border('e\u0301')]),
+        readerCopyTextSpan(
+          _border('C'),
+          style: const TextStyle(
+            fontSize: 20,
+            fontFamily: 'another-family',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        _border('乙'),
+      ],
+    );
+    expect(strokes(split), whole);
+    expect(queries, [(0, 7), (0, 7)]);
+    expect(split.toPlainText(), '甲😀e\u0301C乙');
+  });
+
+  test(
+    'non-emphasized content and atomic spans separate touching intervals',
+    () {
+      for (final separator in <InlineSpan>[
+        const TextSpan(text: ' '),
+        const TextSpan(text: '\u200b'),
+        const WidgetSpan(child: SizedBox.shrink()),
+      ]) {
+        final span = TextSpan(
+          children: [_border('甲'), separator, _border('乙')],
+        );
+        final queries = <(int, int)>[];
+        final strokes = readerBorderStrokes(
+          span,
+          TextScaler.noScaling,
+          const Size(60, 48),
+          (s) {
+            queries.add((s.start, s.end));
+            // Even a zero-width separator must prevent a shared dotted phase.
+            const edges = [0.0, 10.0, 10.0, 20.0];
+            return [
+              TextBox.fromLTRBD(
+                edges[s.start],
+                8,
+                edges[s.end],
+                32,
+                TextDirection.ltr,
+              ),
+            ];
+          },
+        );
+        expect(queries, [(0, 3), (0, 1), (2, 3)]);
+        expect(strokes.map((s) => (s.rect.left, s.rect.right)).toList(), [
+          (0.0, 10.0),
+          (10.0, 20.0),
+        ]);
+      }
+      final strokes = readerBorderStrokes(
+        _border('甲 C 乙'),
+        TextScaler.noScaling,
+        const Size(60, 48),
+        (_) => [const TextBox.fromLTRBD(0, 8, 50, 32, TextDirection.ltr)],
+      );
+      expect(strokes, hasLength(1));
+      expect(strokes.single.rect.width, 50);
+    },
+  );
+
+  test('only matching effective decoration parameters merge', () {
+    for (final (second, merged) in [
+      (_border('乙', color: Colors.red), false),
+      (_border('乙', type: BoxBorderStyle.dashed), false),
+      (_border('乙', width: .5), false),
+      (_border('乙', fontSize: 24), false),
+      (_border('乙', width: 8), true),
+    ]) {
+      final strokes = readerBorderStrokes(
+        TextSpan(children: [_border('甲'), second]),
+        TextScaler.noScaling,
+        const Size(60, 48),
+        (s) => [
+          TextBox.fromLTRBD(
+            s.start * 10.0,
+            8,
+            s.end * 10.0,
+            32,
+            TextDirection.ltr,
+          ),
+        ],
+      );
+      expect(strokes, hasLength(merged ? 1 : 2));
+    }
+    final strokes = readerBorderStrokes(
+      TextSpan(
+        children: [
+          _border('甲', width: .5),
+          _border('乙', width: .5, fontSize: 24),
+        ],
+      ),
+      TextScaler.noScaling,
+      const Size(60, 48),
+      (s) => [
+        TextBox.fromLTRBD(
+          s.start * 10.0,
+          8,
+          s.end * 10.0,
+          32,
+          TextDirection.ltr,
+        ),
+      ],
+    );
+    expect(
+      strokes,
+      hasLength(2),
+      reason: 'equal thickness does not erase different em spacing',
+    );
+  });
+
+  test('separate visual islands, directions and rows never bridge', () {
+    final strokes = readerBorderStrokes(
+      _border('示例C123'),
+      TextScaler.noScaling,
+      const Size(100, 100),
+      (_) => const [
+        TextBox.fromLTRBD(0, 8, 10, 32, TextDirection.ltr),
+        TextBox.fromLTRBD(10, 8, 20, 32, TextDirection.rtl),
+        TextBox.fromLTRBD(40, 8, 50, 32, TextDirection.ltr),
+        TextBox.fromLTRBD(0, 50, 20, 74, TextDirection.ltr),
+      ],
+    );
+    expect(strokes, hasLength(4));
+    expect(
+      strokes
+          .where((s) => s.rect.top < 50)
+          .map((s) => s.rect.center.dy)
+          .toSet(),
+      hasLength(1),
+    );
+    expect(strokes.every((s) => s.rect.width <= 20), isTrue);
+    expect(strokes.last.rect.top, greaterThan(74));
+  });
+
+  test('unrecognized row bounds keep touching boxes separate', () {
+    final strokes = readerBorderStrokes(
+      TextSpan(
+        children: [
+          const TextSpan(text: '前'),
+          _border('甲C'),
+        ],
+      ),
+      TextScaler.noScaling,
+      const Size(60, 48),
+      (selection) => selection.start == 0
+          ? [const TextBox.fromLTRBD(0, 8, 30, 32, TextDirection.ltr)]
+          : const [
+              TextBox.fromLTRBD(10, 8, 20, 33, TextDirection.ltr),
+              TextBox.fromLTRBD(20, 8, 30, 33, TextDirection.ltr),
+            ],
+    );
+    expect(strokes, hasLength(2));
+    expect(strokes.first.rect.right, strokes.last.rect.left);
+  });
+
   test('undecorated visible spans never query selection geometry', () {
     var calls = 0;
     for (final span in [
@@ -54,7 +267,7 @@ void main() {
         height: height,
       );
       const prefix = '😀前文 ';
-      const marked = '跨行强调文字，最后一行也保留点线。';
+      const marked = '示例C123混排文字，最后一行也保留点线。';
       final span = ReaderBorderSpan(
         text: marked,
         style: style,
@@ -91,6 +304,13 @@ void main() {
           extentOffset: prefix.length + marked.length,
         );
         final boxes = painter.getBoxesForSelection(selection);
+        List<TextBox> lineBoxes(TextSelection selection) =>
+            painter.getBoxesForSelection(
+              selection,
+              boxHeightStyle: ui.BoxHeightStyle.max,
+              boxWidthStyle: ui.BoxWidthStyle.tight,
+            );
+        final selected = lineBoxes(selection);
         expect(
           boxes.map((b) => b.toRect()).toList(),
           legacy
@@ -102,20 +322,40 @@ void main() {
           painter.text!,
           painter.textScaler,
           painter.size,
-          painter.getBoxesForSelection,
+          lineBoxes,
         );
-        expect(strokes.length, boxes.length);
         expect(strokes.length, greaterThan(1));
-        for (var i = 0; i < strokes.length; i++) {
-          final rect = strokes[i].rect;
-          expect(rect.left, boxes[i].left);
-          expect(rect.right, boxes[i].right);
+        final rows = <double, Set<double>>{};
+        for (final box in selected) {
+          final nextTop = selected
+              .where((b) => b.top > box.top + .01)
+              .fold(painter.height, (top, b) => b.top < top ? b.top : top);
+          final covering = strokes.where(
+            (s) =>
+                s.rect.left <= box.left + .01 &&
+                s.rect.right >= box.right - .01 &&
+                s.rect.center.dy >= box.top &&
+                s.rect.center.dy < nextTop,
+          );
+          expect(
+            covering,
+            hasLength(1),
+            reason: 'every selected interval stays covered',
+          );
+          (rows[box.top] ??= {}).add(covering.single.rect.center.dy);
+        }
+        expect(rows.values.every((ys) => ys.length == 1), isTrue);
+        expect(strokes.length, rows.length);
+        expect(
+          strokes.first.rect.left,
+          selected.first.left,
+          reason: 'the unmarked prefix must remain unmarked',
+        );
+        for (final stroke in strokes) {
+          final rect = stroke.rect;
           expect(rect.top, greaterThanOrEqualTo(0));
           expect(rect.bottom, lessThanOrEqualTo(painter.height));
           expect(rect.height, lessThan(2 * scale));
-          if (height == 1.6 && i < strokes.length - 1) {
-            expect(rect.top - boxes[i].bottom, closeTo(28 * scale * .08, .01));
-          }
         }
       } finally {
         painter.dispose();
