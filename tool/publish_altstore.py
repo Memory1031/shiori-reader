@@ -22,6 +22,10 @@ SOURCE_FILES = {"stable": "alt_store.json", "beta": "alt_store_beta.json"}
 RAW_URL = f"https://raw.githubusercontent.com/{REPOSITORY}/{BRANCH}"
 
 
+def source_bytes(source):
+    return (json.dumps(source, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
 def empty_source(channel):
     return {
         "name": "Shiori" + (" Beta" if channel == "beta" else ""),
@@ -135,8 +139,8 @@ def publish_source(channel, entry, permissions, request=api):
         content = request(f"contents/{SOURCE_FILES[channel]}?ref={head}")
         raw = base64.b64decode(content["content"])
         source = update_source(read_json(raw), channel, entry, permissions)
-        updated = encoded(source)
-        if read_json(raw) == source:
+        updated = source_bytes(source)
+        if raw == updated:
             return
         base = request(f"git/commits/{head}")["tree"]["sha"]
         tree = request("git/trees", {"base_tree": base, "tree": [{
@@ -166,7 +170,7 @@ def main():
         for target in (["stable", "beta"] if channel == "stable" else ["beta"]):
             publish_source(target, entry, permissions)
     else:
-        print(encoded(update_source(empty_source(channel), channel, entry, permissions)).decode(), end="")
+        print(source_bytes(update_source(empty_source(channel), channel, entry, permissions)).decode("utf-8"), end="")
 
 
 if __name__ == "__main__":

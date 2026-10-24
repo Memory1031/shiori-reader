@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from publish_altstore import (BRANCH, SOURCE_FILES, api, empty_source,
-                              main, publish_source, release_entry, update_source)
+                              main, publish_source, release_entry, source_bytes, update_source)
 from publish_assets import REPOSITORY
 from release_android import ReleaseCheckError
 from release_receipt import file_record
@@ -152,7 +152,7 @@ class AltStoreTest(unittest.TestCase):
             if endpoint == f"git/ref/heads/{BRANCH}":
                 return {"object": {"sha": f"head-{attempts}"}}
             if endpoint.startswith(f"contents/{SOURCE_FILES[channel]}?ref="):
-                return {"content": base64.b64encode(encoded(source)).decode()}
+                return {"content": base64.b64encode(source_bytes(source)).decode()}
             if endpoint.startswith("git/commits/head-"):
                 return {"tree": {"sha": f"base-{attempts}"}}
             if endpoint == "git/trees":
@@ -179,6 +179,43 @@ class AltStoreTest(unittest.TestCase):
         self.assertEqual([v["buildVersion"] for v in result["apps"][0]["versions"]], ["12", "11"])
         self.assertFalse(any(SOURCE_FILES["stable"] in endpoint for endpoint, _, _ in calls))
         source = result
+        calls.clear()
+        publish_source(channel, entry, permissions, request)
+        self.assertFalse(any(payload is not None for _, payload, _ in calls))
+
+    def test_minified_source_is_reformatted_without_changing_data_then_noops(self):
+        channel, entry, permissions = self.entry()
+        entry["localizedDescription"] = "更新：阅读统计"
+        source = update_source(empty_source(channel), channel, entry, permissions)
+        remote = encoded(source)
+        calls, written = [], []
+
+        def request(endpoint, payload=None, method=None):
+            nonlocal remote
+            calls.append((endpoint, payload, method))
+            if endpoint.startswith("git/ref/"):
+                return {"object": {"sha": "head"}}
+            if endpoint.startswith("contents/"):
+                return {"content": base64.b64encode(remote).decode()}
+            if endpoint == "git/commits/head":
+                return {"tree": {"sha": "base"}}
+            if endpoint == "git/trees":
+                written.append(payload["tree"][0]["content"])
+                return {"sha": "tree"}
+            if endpoint == "git/commits":
+                return {"sha": "commit"}
+            if method == "PATCH":
+                remote = written[-1].encode("utf-8")
+                return {"ref": "refs/heads/develop"}
+            self.fail(endpoint)
+
+        publish_source(channel, entry, permissions, request)
+        self.assertEqual(len(written), 1)
+        self.assertIn('\n  "name": ', written[0])
+        self.assertIn("更新：阅读统计", written[0])
+        self.assertNotIn("\\u", written[0])
+        self.assertTrue(written[0].endswith("\n"))
+        self.assertEqual(json.loads(written[0]), source)
         calls.clear()
         publish_source(channel, entry, permissions, request)
         self.assertFalse(any(payload is not None for _, payload, _ in calls))
