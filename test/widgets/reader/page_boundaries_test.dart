@@ -50,6 +50,7 @@ Widget view(
   ReaderPosition? initial,
   double height = 200,
   void Function(ReaderPosition, bool)? onPosition,
+  VoidCallback? onRestoreStart,
 }) => MaterialApp(
   home: Center(
     child: SizedBox(
@@ -63,6 +64,7 @@ Widget view(
         textStyle: style,
         paragraphSpacing: 0,
         onPosition: onPosition,
+        onRestoreStart: onRestoreStart,
       ),
     ),
   ),
@@ -84,6 +86,75 @@ Future<void> turn(
 }
 
 void main() {
+  testWidgets(
+    'font invalidation cancels an indented end seek and releases the old layout',
+    (tester) async {
+      final content = ChapterContent(
+        key: chapter(false).key,
+        title: 'Indent',
+        blocks: [
+          for (var i = 0; i < 503; i++)
+            ParagraphBlock(text: '「${'…' * 12}」', leadingIndent: 2),
+        ],
+      );
+      final c = PagedReaderController();
+      final samples = <ReaderPosition>[];
+      var restores = 0;
+      await tester.pumpWidget(
+        view(
+          content,
+          c,
+          end: true,
+          onPosition: (p, _) => samples.add(p),
+          onRestoreStart: () => restores++,
+        ),
+      );
+      expect(c.isRestoring, isTrue);
+      expect(samples, isEmpty);
+      expect(c.measuredChunks, lessThan(503));
+      expect(restores, 1);
+      await tester.binding.handleSystemMessage({'type': 'fontsChange'});
+      await tester.pump();
+      expect(
+        restores,
+        2,
+        reason: 'The font notification itself must invalidate layout',
+      );
+      expect(samples, isEmpty);
+      await tester.pumpWidget(
+        view(
+          content,
+          c,
+          end: true,
+          height: 240,
+          onPosition: (p, _) => samples.add(p),
+          onRestoreStart: () => restores++,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(restores, 3);
+      final owner = layout(content, height: 240);
+      final last = canonical(owner).last;
+      final fragments = find
+          .byType(ReaderLinkedText)
+          .evaluate()
+          .where(
+            (element) =>
+                element.findAncestorWidgetOfExactType<ReaderLinkedText>() ==
+                null,
+          )
+          .map((element) => (element.widget as ReaderLinkedText).text)
+          .join('|');
+      expect(fragments, expected(last));
+      expect(samples, [owner.position(last.visibleStart)]);
+      expect(owner.indentAttempts, greaterThan(0));
+      await tester.pumpWidget(const SizedBox());
+      await tester.binding.handleSystemMessage({'type': 'fontsChange'});
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('deep seek shows loading and retains old page during restore', (
     tester,
   ) async {

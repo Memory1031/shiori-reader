@@ -69,6 +69,10 @@ final class ReaderPage {
       : PageCursor(fragments.first.unit, fragments.first.start);
 }
 
+enum _IndentState { unchanged, geometric, unavailable }
+
+final _indentUnsafeText = RegExp(r'^[\s　]|[\n\r\u00a0\u202f\u2060]');
+
 /// Forward layout measures bounded chunks without a global page count. Cold
 /// reverse spread layout replays the prefix to recover canonical pairing;
 /// the viewport normally reuses PageBoundaries from its incremental forward seek.
@@ -110,6 +114,107 @@ final class PageLayout {
   final Map<MediaRef, double> imageHeights;
   final double Function(ImageBlock)? imageExtent;
   int measuredChunks = 0;
+  // Cheap decisions live with this immutable layout. Only complete, bounded
+  // first-chunk flows use an LRU; eviction never triggers a chapter scan.
+  final _indentStates = <int, _IndentState>{};
+  final _indentFlows = <int, ParagraphFlow>{};
+  final _indentChunks = <int, RenderChunk>{};
+  RenderChunk _indentChunk(int block) => _indentChunks.putIfAbsent(block, () {
+    var lo = 0, hi = index.chunks.length;
+    while (lo < hi) {
+      final mid = (lo + hi) ~/ 2;
+      if (index.chunks[mid].blockIndex < block) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    return index.chunks[lo];
+  });
+  @visibleForTesting
+  int indentAttempts = 0;
+  @visibleForTesting
+  int indentMeasurements = 0;
+  @visibleForTesting
+  int get cachedIndentFlows => _indentFlows.length;
+
+  bool _indentEligible(int blockIndex) {
+    final chunk = _indentChunk(blockIndex);
+    final block = index.content.blocks[blockIndex];
+    return direction == TextDirection.ltr &&
+        block is ParagraphBlock &&
+        block.alignment == ParagraphAlignment.start &&
+        block.box == null &&
+        block.layout == null &&
+        block.hangingIndentEm == null &&
+        block.trailingLabelStart == null &&
+        block.tableRow == null &&
+        block.linkDecoration == null &&
+        block.inlineStyles.isEmpty &&
+        block.inlineImages.isEmpty &&
+        block.inlineRuby.isEmpty &&
+        block.inlineStacks.isEmpty &&
+        chunk.end <= 800 &&
+        !_indentUnsafeText.hasMatch(chunk.text ?? '');
+  }
+
+  ParagraphFlow? _buildIndent(int blockIndex, double textWidth) {
+    // Record failure before measuring, including exhausted candidate/line
+    // budgets. Subsequent visits retain the ordinary layout without retrying.
+    _indentStates[blockIndex] = _IndentState.unavailable;
+    indentAttempts++;
+    final chunk = _indentChunk(blockIndex);
+    final block = index.content.blocks[blockIndex] as ParagraphBlock;
+    try {
+      final flow = readerParagraphFlow(
+        block: block,
+        text: chunk.text!,
+        offset: 0,
+        width: textWidth,
+        chapter: index.content.key,
+        style: readerBlockStyle(block, style, chapter: index.content.key),
+        readerFontSize: style.fontSize,
+        scaler: scaler,
+        locale: locale,
+        textHeightBehavior: textHeightBehavior,
+        emergencyBreaks: true,
+        maxLines: 64,
+        onMeasure: () => indentMeasurements++,
+      );
+      _indentStates[blockIndex] = _IndentState.geometric;
+      _indentFlows.remove(blockIndex);
+      _indentFlows[blockIndex] = flow;
+      if (_indentFlows.length > 32) {
+        _indentFlows.remove(_indentFlows.keys.first);
+      }
+      return flow;
+    } on ParagraphFlowUnavailable {
+      return null;
+    }
+  }
+
+  ParagraphFlow? _knownIndent(
+    int blockIndex,
+    int offset,
+    int length,
+    double textWidth,
+  ) {
+    if (_indentStates[blockIndex] != _IndentState.geometric) return null;
+    if (offset + length > _indentChunk(blockIndex).end) return null;
+    var flow = _indentFlows.remove(blockIndex);
+    if (flow == null) {
+      flow = _buildIndent(blockIndex, textWidth);
+    } else {
+      _indentFlows[blockIndex] = flow;
+    }
+    if (flow == null) return null;
+    final start = flow.lines.indexWhere((line) => line.start == offset);
+    final end = flow.lines.indexWhere((line) => line.end == offset + length);
+    return start < 0 || end < start
+        ? null
+        : flow.sliceLines(start, end - start + 1);
+  }
+
   // ChunkIndex already counted each immutable source block; deep seeks must
   // not traverse a multi-million-character paragraph again for every page.
   late final _blockLengths = <int, int>{
@@ -383,6 +488,52 @@ final class PageLayout {
     ParagraphFlow? flow,
     ReaderLinkLayout? linkLayout,
   })?
+  _fitIndent(
+    ParagraphFlow flow,
+    String text,
+    double available,
+    bool backwards,
+    ContentBlock block,
+  ) {
+    final spacing = readerBlockSpacing(
+      block,
+      paragraphSpacing,
+      chapter: index.content.key,
+      pageHeight: height,
+    );
+    var used = spacing;
+    var count = 0;
+    for (final line in backwards ? flow.lines.reversed : flow.lines) {
+      if (used + line.height > available + .01) break;
+      used += line.height;
+      count++;
+    }
+    if (count == 0) return null;
+    final start = backwards ? flow.lines.length - count : 0;
+    final first = flow.lines[start].start;
+    final last = flow.lines[start + count - 1].end;
+    return (
+      text: _slice(text, first, last),
+      count: last - first,
+      height: used,
+      boxTop: 0,
+      boxBottom: 0,
+      boxContentHeight: null,
+      flow: flow.sliceLines(start, count),
+      linkLayout: null,
+    );
+  }
+
+  ({
+    String text,
+    int count,
+    double height,
+    double boxTop,
+    double boxBottom,
+    double? boxContentHeight,
+    ParagraphFlow? flow,
+    ReaderLinkLayout? linkLayout,
+  })?
   _fit(
     String text,
     double available, {
@@ -481,6 +632,12 @@ final class PageLayout {
                 (table.leftPaddingEm + table.rightPaddingEm) * em +
                 table.dividerWidth <=
             textWidth - em;
+    final knownIndent = available > 0
+        ? _knownIndent(blockIndex, blockOffset, text.runes.length, textWidth)
+        : null;
+    if (knownIndent != null) {
+      return _fitIndent(knownIndent, text, available, backwards, block);
+    }
     if (readerUsesParagraphFlow(block, direction) && tableFits) {
       final paragraph = block as ParagraphBlock;
       var edges = readerBoxEdges(
@@ -634,6 +791,31 @@ final class PageLayout {
           ..layout(maxWidth: textWidth);
     try {
       final lines = painter.computeLineMetrics();
+      if (available > 0 &&
+          startsBlock &&
+          blockOffset == 0 &&
+          prefix.isNotEmpty &&
+          !_indentStates.containsKey(blockIndex)) {
+        if (!_indentEligible(blockIndex)) {
+          _indentStates[blockIndex] = _IndentState.unavailable;
+        } else if (lines.length > 1 &&
+            painter.getLineBoundary(const TextPosition(offset: 0)).end <=
+                prefix.length) {
+          if (_buildIndent(blockIndex, textWidth) != null) {
+            final selected = _knownIndent(
+              blockIndex,
+              0,
+              text.runes.length,
+              textWidth,
+            );
+            if (selected != null) {
+              return _fitIndent(selected, text, available, backwards, block);
+            }
+          }
+        } else if (text.runes.length == _indentChunk(blockIndex).end) {
+          _indentStates[blockIndex] = _IndentState.unchanged;
+        }
+      }
       double? boxContentHeight;
       if ((block.box != null || block.layout != null) &&
           (block.inlineStyles.any((s) => s.superscript) ||
@@ -954,6 +1136,11 @@ final class PageLayout {
   }
 
   ReaderPage? backward(PageCursor until) {
+    // Local single-column reverse preserves source ranges, but cannot infer
+    // canonical page packing without the prefix. Cold Reader entry uses the
+    // viewport's incremental forward seek and its retained PageBoundaries.
+    final end = normalize(until);
+    if (end.unit == 0 && end.offset == 0) return null;
     if (columns == 1 &&
         !index.content.blocks.any(
           (b) =>
@@ -963,10 +1150,8 @@ final class PageLayout {
               b is ParagraphBlock && b.linkDecoration != null ||
               readerUsesParagraphFlow(b, direction),
         )) {
-      return _backwardColumn(until);
+      return _backwardColumn(end);
     }
-    final end = normalize(until);
-    if (end.unit == 0 && end.offset == 0) return null;
     // Packing from the end loses column parity (and text/heading boundaries).
     // A caller without known boundaries must recover the forward chain. No
     // rendered pages or persistent page numbers are retained here.

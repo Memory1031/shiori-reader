@@ -4,6 +4,15 @@ import '../../../domain/models/models.dart';
 import '../reader_inline_images.dart';
 import 'block_style.dart';
 
+/// A bounded optional layout may keep the ordinary paragraph unchanged.
+final class ParagraphFlowUnavailable implements Exception {}
+
+final _lineStartPunctuation = RegExp(
+  r'^[\p{Pe}\p{Pf}、。，．！？：；,.!?;:]',
+  unicode: true,
+);
+final _lineEndPunctuation = RegExp(r'^[\p{Ps}\p{Pi}]', unicode: true);
+
 bool readerUsesParagraphFlow(ContentBlock block, TextDirection direction) =>
     direction == TextDirection.ltr &&
     block is ParagraphBlock &&
@@ -65,6 +74,30 @@ final class ParagraphFlow {
     dividerWidth: dividerWidth,
     dividerColor: dividerColor,
   );
+
+  /// Rebase both source offsets and paint geometry when selecting a suffix.
+  ParagraphFlow sliceLines(int start, int count) {
+    final origin = lines[start];
+    return ParagraphFlow([
+      for (final line in lines.skip(start).take(count))
+        ParagraphFlowLine(
+          line.start - origin.start,
+          line.end - origin.start,
+          line.top - origin.top,
+          line.height,
+          [
+            for (final piece in line.pieces)
+              ParagraphFlowPiece(
+                piece.start - origin.start,
+                piece.end - origin.start,
+                piece.rect.translate(0, -origin.top),
+                piece.width,
+                label: piece.label,
+              ),
+          ],
+        ),
+    ]);
+  }
 }
 
 /// Bounded to the current render chunk. A first line is special only at source
@@ -82,6 +115,9 @@ ParagraphFlow readerParagraphFlow({
   double? readerFontSize,
   double pageHeight = double.infinity,
   double maxHeight = double.infinity,
+  bool emergencyBreaks = false,
+  int? maxLines,
+  VoidCallback? onMeasure,
   Locale? locale,
   TextHeightBehavior? textHeightBehavior,
 }) {
@@ -107,6 +143,7 @@ ParagraphFlow readerParagraphFlow({
   );
   var firstInset = 0.0;
   if (prefix.isNotEmpty) {
+    onMeasure?.call();
     final indent = TextPainter(
       text: TextSpan(text: prefix, style: style),
       textDirection: TextDirection.ltr,
@@ -126,6 +163,7 @@ ParagraphFlow readerParagraphFlow({
     double available, {
     List<(int, int)>? collapsed,
   }) {
+    onMeasure?.call();
     var source = slice(start, end);
     // Newline belongs to the source range but does not add an empty painted row.
     if (source.endsWith('\n')) source = source.substring(0, source.length - 1);
@@ -215,9 +253,43 @@ ParagraphFlow readerParagraphFlow({
               ruby?.length ??
               slice(start, end).characters.first.runes.length);
     }
+    if (emergencyBreaks && stop < end) {
+      var candidate = stop;
+      var found = false;
+      // Reader fallback only: a small paired/common-punctuation guard, not a
+      // CSS word-break implementation or a complete Unicode line-break table.
+      for (var attempt = 0; attempt < 8 && candidate > start; attempt++) {
+        final left = slice(start, candidate);
+        final right = slice(candidate, end);
+        final last = left.characters.lastOrNull;
+        if (last != null &&
+            left.trim().isNotEmpty &&
+            !_lineStartPunctuation.hasMatch(right.characters.first) &&
+            !_lineEndPunctuation.hasMatch(last)) {
+          final check = painter(start, candidate, available);
+          try {
+            final metrics = check.computeLineMetrics();
+            if (metrics.length == 1 && metrics.first.width <= available + .01) {
+              stop = candidate;
+              found = true;
+              break;
+            }
+          } finally {
+            check.dispose();
+          }
+        }
+        if (last == null) break;
+        candidate -= last.runes.length;
+      }
+      if (!found) throw ParagraphFlowUnavailable();
+    }
     final line = painter(start, stop, available);
     try {
       final metrics = line.computeLineMetrics();
+      if (emergencyBreaks &&
+          (metrics.length != 1 || metrics.first.width > available + .01)) {
+        throw ParagraphFlowUnavailable();
+      }
       return (
         end: stop,
         height: line.height,
@@ -313,6 +385,9 @@ ParagraphFlow readerParagraphFlow({
   var top = 0.0;
   var lastBaseline = 0.0;
   while (cursor < bodyEnd) {
+    if (maxLines != null && lines.length >= maxLines) {
+      throw ParagraphFlowUnavailable();
+    }
     if (top > maxHeight) return ParagraphFlow(lines);
     final x = offset + cursor == 0 ? firstInset : inset;
     final available = math.max(1.0, width - x);

@@ -36,6 +36,36 @@ ParagraphFlow flow(
   scaler: TextScaler.linear(scale),
 );
 void main() {
+  testWidgets('line budget rejects an otherwise complete emergency flow', (
+    tester,
+  ) async {
+    final block = ParagraphBlock(text: 'word ' * 20, leadingIndent: 2);
+    ParagraphFlow measure({int? maxLines}) => readerParagraphFlow(
+      block: block,
+      text: block.text,
+      offset: 0,
+      width: 160,
+      style: const TextStyle(fontFamily: 'Ahem', fontSize: 20, height: 1),
+      scaler: TextScaler.noScaling,
+      emergencyBreaks: true,
+      maxLines: maxLines,
+    );
+
+    // Prove the input passes every other emergency boundary/width check.
+    final complete = measure();
+    expect(complete.lines.length, greaterThan(4));
+    expect(complete.end, block.text.runes.length);
+    expect(measure(maxLines: complete.lines.length).end, complete.end);
+    expect(
+      () => measure(maxLines: complete.lines.length - 1),
+      throwsA(isA<ParagraphFlowUnavailable>()),
+    );
+    expect(
+      () => measure(maxLines: 4),
+      throwsA(isA<ParagraphFlowUnavailable>()),
+    );
+  });
+
   testWidgets(
     'label-only flow keeps authored whitespace and narrow indent limits',
     (tester) async {

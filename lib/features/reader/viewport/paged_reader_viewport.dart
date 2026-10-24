@@ -404,6 +404,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
   ReaderPosition? _restoreAnchor;
   int _restorePage = 0;
   int _epoch = 0;
+  int _fontGeneration = 0;
   int? _first;
   int? _last;
   bool _usedFallback = false;
@@ -423,6 +424,11 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
     _attach();
     _position = widget.initialPosition;
     _anchorAtEnd = widget.startAtEnd;
+    PaintingBinding.instance.systemFonts.addListener(_fontsChanged);
+  }
+
+  void _fontsChanged() {
+    if (mounted) setState(() => _fontGeneration++);
   }
 
   bool _visualQueued = false;
@@ -503,6 +509,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
 
   @override
   void dispose() {
+    PaintingBinding.instance.systemFonts.removeListener(_fontsChanged);
     _restoreResult?.complete(false);
     _restoreResult = null;
     widget.controller._state = null;
@@ -869,6 +876,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         widget.content,
       );
       final signature = (
+        _fontGeneration,
         constraints.maxWidth,
         constraints.maxHeight,
         scaler,
