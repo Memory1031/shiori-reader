@@ -17,6 +17,8 @@ import 'package:shiori/domain/contracts/local_content_links.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'report.dart';
 import 'source.dart';
+import 'image_expectations.dart';
+import 'package:shiori/data/local/epub/epub_image_dimensions.dart';
 import 'loss.dart';
 
 const checkNames = [
@@ -143,6 +145,9 @@ final class _Audit {
   final sheetFingerprints = <String, String>{};
   // Only independent, simple source ranges get a model correspondence.
   final sourceRanges = <dom.Element, (ContentBlock, int, int)>{};
+  final sourceImages = <dom.Element, ImageBlock>{};
+  final stylesheets = <String, Json>{};
+  final svgStylesSafe = <String, bool>{};
   late final List<Map<String, Object?>> events =
       parser.trace?.events ?? const [];
 
@@ -170,6 +175,7 @@ final class _Audit {
       'auditComplete': truncations.isEmpty,
       'checks': {for (final e in checks.entries) e.key: e.value.toJson()},
       'documents': documents,
+      'stylesheets': stylesheets.values.toList(),
       'findings': findings.findings,
       'readingLoss': losses.toJson(),
       'truncationReasons': truncations.toSet().toList(),
@@ -260,6 +266,34 @@ final class _Audit {
   );
   void run() {
     source.load();
+    for (final item in source.items.values.where(
+      (i) => i['type'] == 'text/css',
+    )) {
+      final path = item['path'] as String?;
+      if (path == null) continue;
+      final entry = source.zip.entries[path];
+      final empty = entry != null && entry.size == 0;
+      stylesheets[path] = {
+        'path': path,
+        'status': entry == null
+            ? 'missing'
+            : empty
+            ? 'empty'
+            : 'present',
+        'referencedBy': <String>[],
+      };
+      if (empty) {
+        add(
+          'source.stylesheet_empty',
+          path,
+          'source_stylesheet_empty',
+          category: 'source',
+          impact: 'information',
+          disposition: 'invalid_input',
+          evidence: 'source_only',
+        );
+      }
+    }
     for (final c in [
       ...parsed.content.chapters,
       ...parsed.content.auxiliaryChapters,
@@ -324,10 +358,27 @@ final class _Audit {
       ).toList();
       var inlineIndex = 0;
       for (final sheet in sheets) {
+        final references =
+            stylesheets[sheet.$1]?['referencedBy'] as List<String>?;
+        if (references != null && !references.contains(path)) {
+          references.add(path);
+        }
         sheetFingerprints['$path:${sheet.$1 == path ? '$path#style${inlineIndex++}' : sheet.$1}'] =
             digest(sheet.$2);
       }
       final styles = epubTextStyles(doc, sheets.map((s) => s.$2));
+      svgStylesSafe[path] =
+          [
+            ...sheets.map((s) => s.$2),
+            ...doc
+                .querySelectorAll('[style]')
+                .map((n) => n.attributes['style']!),
+          ].every(
+            (css) => !RegExp(
+              r'(?:^|[;{}])\s*(?:transform|clip(?:-path)?|mask(?:-[\w-]+)?|filter)\s*:',
+              caseSensitive: false,
+            ).hasMatch(css.replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '')),
+          );
       anchorIds[path] = {
         for (final n in doc.querySelectorAll('[id]'))
           if (!hidden(n, styles)) n.id,
@@ -442,6 +493,7 @@ final class _Audit {
             ? 'native'
             : 'presentation';
         sourceRanges.clear();
+        sourceImages.clear();
         losses.document(
           path,
           occurrence,
@@ -1164,6 +1216,7 @@ final class _Audit {
         continue;
       }
       String? selected;
+      ({int width, int height})? naturalSize;
       var missing = false, unsupported = false, external = false;
       for (final href in epubImageCandidates(node).take(128)) {
         final ref = epubReference(path, href);
@@ -1181,17 +1234,26 @@ final class _Audit {
           continue;
         }
         selected = sha256.convert(bytes).toString();
+        naturalSize = epubImageDimensions(bytes);
         break;
       }
       checks['images']!.checked++;
       if (selected != null) {
-        losses.media(
+        final matched = losses.media(
           path,
           node,
           'image',
           selected,
           valid: parsed.media.containsKey(selected),
+          details: sourceImageExpectation(
+            node,
+            styles,
+            naturalSize?.width,
+            naturalSize?.height,
+            stylesSafe: svgStylesSafe[path] ?? false,
+          ),
         );
+        if (matched is ImageBlock) sourceImages[node] = matched;
         expected.add(selected);
         selectedResources.add(selected);
         selectedImages++;
@@ -1782,7 +1844,23 @@ final class _Audit {
         );
         continue;
       }
-      final range = sourceRanges[a];
+      final textRange = sourceRanges[a];
+      final images = a
+          .querySelectorAll('img,image')
+          .where((n) => !hidden(n, styles))
+          .toList();
+      final atomic =
+          a.namespaceUri != 'http://www.w3.org/2000/svg' &&
+              a.text.trim().isEmpty &&
+              a.querySelector('a[href]') == null &&
+              images.length == 1
+          ? sourceImages[images.single]
+          : null;
+      final (ContentBlock, int?, int?)? range = textRange != null
+          ? (textRange.$1, textRange.$2, textRange.$3)
+          : atomic == null
+          ? null
+          : (atomic, null, null);
       if (range == null) {
         checks['links']!.unknown++;
         add(
@@ -2100,7 +2178,7 @@ final class _Audit {
               ? 'box.uniform_radius_metadata'
               : decorated
               ? 'link.decoration_conditional'
-              : 'link.decoration_structure_unsupported';
+              : 'box.radius_structure_unsupported';
         } else if (property?.startsWith('border-') == true &&
             property!.endsWith('-style') &&
             boxes &&

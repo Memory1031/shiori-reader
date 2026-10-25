@@ -120,7 +120,14 @@ final class ReadingLossCollector {
       method: method,
       effective: effective,
       status: status,
-      shape: shape(node, _styles['$path:${loc.domPath}']),
+      shape: kind != 'image'
+          ? shape(node, _styles['$path:${loc.domPath}'])
+          : digest(
+              jsonEncode([
+                shape(node, _styles['$path:${loc.domPath}']),
+                if (kind == 'image') details['aspectClass'],
+              ]),
+            ),
       textHash: text == null ? null : digest(text),
       range: text == null
           ? null
@@ -282,6 +289,13 @@ final class ReadingLossCollector {
                 .toSet()
                 .toList(),
             if (block is AudioBlock) 'audioFormat': block.format?.name,
+            if (block is ImageBlock) ...{
+              'encodedNaturalSize': {
+                'width': block.width,
+                'height': block.height,
+              },
+              'imageSizing': block.sizing?.toJson(),
+            },
             if (block is AudioBlock)
               'audioUnavailable': block.unavailable?.name,
           },
@@ -492,7 +506,7 @@ final class ReadingLossCollector {
     }
   }
 
-  void media(
+  ContentBlock? media(
     String path,
     dom.Element node,
     String kind,
@@ -535,6 +549,27 @@ final class ReadingLossCollector {
           ? 'missing'
           : 'native_$kind',
     );
+    if (id != null && !consumed && valid) {
+      // Associate the source instance, including its DOM occurrence, with all
+      // containing visual scopes. A shared media hash alone is not a target.
+      final location = epubTraceLocation(node);
+      for (final visual in facts.where(
+        (v) =>
+            v.kind == 'authored_visual' &&
+            v.location.document == path &&
+            v.location.occurrence == current.$1 &&
+            (v.location.domPath == location ||
+                location.startsWith('${v.location.domPath}/')),
+      )) {
+        relate(
+          visual,
+          [id],
+          CheckStatus.pass,
+          'native_media_scope',
+          reason: 'association_does_not_prove_property_retention',
+        );
+      }
+    }
     if (f != null && !consumed && status == CheckStatus.fail) {
       candidate(
         f,
@@ -548,6 +583,32 @@ final class ReadingLossCollector {
         [f.id],
       );
     }
+    if (f != null &&
+        kind == 'image' &&
+        !consumed &&
+        status == CheckStatus.pass &&
+        (details['expectedAlignment'] != null ||
+            details['aspectClass'] == 'tall_narrow')) {
+      candidate(
+        f,
+        details['expectedAlignment'] == null
+            ? 'image.geometry_observation'
+            : 'image.authored_alignment',
+        details['expectedAlignment'] == null
+            ? 'source_image_geometry_requires_observation'
+            : 'source_alignment_requires_paint_measurement',
+        LossFamily.visual,
+        CheckStatus.unknown,
+        'layout',
+        'suspected',
+        'representation_change_impact_unverified',
+        [f.id],
+      );
+    }
+    final representation = representations.where((r) => r.id == id).firstOrNull;
+    return current.$2?.blocks
+        .where((b) => b.blockKey == representation?.blockKey)
+        .firstOrNull;
   }
 
   void unknown(String path, dom.Element node, String reason) {
@@ -572,7 +633,7 @@ final class ReadingLossCollector {
     String path,
     dom.Element node,
     ContentBlock block,
-    int offset,
+    int? offset,
     int? length,
     bool passed, {
     required bool footnote,
@@ -583,11 +644,10 @@ final class ReadingLossCollector {
       footnote ? 'footnote' : 'link',
       passed ? CheckStatus.pass : CheckStatus.fail,
       details: {
-        'sourceRange': AuditRange(
-          offset,
-          length ?? 1,
-          'unicode_code_point',
-        ).toJson(),
+        'sourceKind': offset == null ? 'block_image' : 'text_range',
+        'sourceRange': offset == null
+            ? null
+            : AuditRange(offset, length ?? 1, 'unicode_code_point').toJson(),
       },
     );
     final chapter = _current[path]?.$2;
@@ -598,7 +658,11 @@ final class ReadingLossCollector {
       f,
       [?id],
       passed ? CheckStatus.pass : CheckStatus.fail,
-      footnote ? 'standard_note_marker_and_payload' : 'native_link_range',
+      footnote
+          ? 'standard_note_marker_and_payload'
+          : offset == null
+          ? 'native_block_image_link'
+          : 'native_link_range',
     );
     if (f != null && !passed) {
       candidate(
@@ -739,7 +803,7 @@ final class ReadingLossCollector {
           final mapped = <String>{};
           for (final text in facts.where(
             (s) =>
-                s.kind == 'text' &&
+                {'text', 'image', 'audio', 'link'}.contains(s.kind) &&
                 s.location.document == path &&
                 s.location.occurrence == context.$1 &&
                 (s.location.domPath == f.location.domPath ||

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/app.dart';
 import 'package:shiori/app/routes.dart';
@@ -21,6 +22,10 @@ import 'package:shiori/features/reader/reader_ruby.dart';
 import 'package:shiori/features/reader/reader_superscript.dart';
 import 'package:shiori/features/reader/reader_inline_stack.dart';
 import 'package:shiori/features/reader/reader_linked_text.dart';
+import 'package:shiori/features/reader/reader_image.dart';
+import 'package:shiori/features/reader/reader_image_preview.dart';
+import 'package:shiori/features/reader/reader_notes.dart';
+import 'package:shiori/l10n/generated/app_localizations.dart';
 import 'package:shiori/features/reader/reader_authored_colors.dart';
 import 'package:shiori/features/reader/reader_theme.dart';
 import 'package:shiori/features/reader/epub_layout_page.dart';
@@ -275,10 +280,11 @@ Future<Json> runNativeProbe(
   final settings = FixtureSettingsStore();
   final library = FixtureLibraryRepository();
   final boundary = GlobalKey();
-  final assertions = <String, dynamic>{};
+  final assertions = <String, dynamic>{'candidateFeatureStatus': 'unknown'};
   final activations = <LocalContentLink>[];
   final appliedFontFamilies = <String>{};
   final decodedImages = <Json>[];
+  var imageGeometryTruncated = false;
   final layers = <EvidenceLayer, CheckStatus>{
     for (final layer in EvidenceLayer.values) layer: CheckStatus.notRun,
   };
@@ -311,13 +317,33 @@ Future<Json> runNativeProbe(
       return {
         'complete': false,
         'observedPath': observedPath,
-        'reason': 'no_represented_target',
+        'reason': 'target_unresolved',
         'layers': {
           for (final e in layers.entries) wireName(e.key): wireName(e.value),
         },
         'assertions': assertions,
       };
     }
+    if (!target.located ||
+        target.blockKeys.any(
+          (key) => !chapter.blocks.any((b) => b.blockKey == key),
+        )) {
+      return {
+        'complete': false,
+        'observedPath': 'not_run',
+        'reason': 'target_unresolved',
+        'layers': {
+          for (final e in layers.entries) wireName(e.key): wireName(e.value),
+        },
+        'assertions': {
+          'targetLocated': false,
+          'runComplete': true,
+          'candidateFeatureStatus': 'unknown',
+          'pages': <Json>[],
+        },
+      };
+    }
+    assertions['targetLocated'] = true;
     if (font != null) {
       await tester.runAsync(() async {
         final bytes = await File(font).readAsBytes();
@@ -360,8 +386,8 @@ Future<Json> runNativeProbe(
               contentLinkObserver: testOnlyObserveLinks
                   ? activations.add
                   : null,
-              initialBlockKey: target.blockKey,
-              startAtBeginning: target.blockKey == null,
+              initialBlockKey: target.blockKeys.firstOrNull,
+              startAtBeginning: target.blockKeys.isEmpty,
             ),
           ),
         ),
@@ -435,14 +461,26 @@ Future<Json> runNativeProbe(
               'border-radius',
             ) ==
             true;
-    final targetBlock = chapter.blocks
-        .where((b) => b.blockKey == target.blockKey)
-        .firstOrNull;
-    final targetBoxes = [
-      targetBlock?.box,
-      targetBlock?.layout,
-    ].whereType<BlockBox>().toList();
+    final targetBoxes = chapter.blocks
+        .where((b) => target.blockKeys.contains(b.blockKey))
+        .expand((b) => [b.box, b.layout])
+        .whereType<BlockBox>()
+        .toList();
     final sourceByBlock = <String, SourceFact>{};
+    final imageSources = <String, SourceFact>{};
+    for (final f in sourceFacts.where((f) => f.kind == 'image')) {
+      for (final relation in correspondences.where(
+        (r) => r.sourceId == f.id && r.status == CheckStatus.pass,
+      )) {
+        for (final r in representationFacts.where(
+          (r) =>
+              relation.representationIds.contains(r.id) &&
+              jsonEncode(r.chapterKey) == jsonEncode(chapter.key.toJson()),
+        )) {
+          if (r.blockKey != null) imageSources[r.blockKey!] = f;
+        }
+      }
+    }
     for (final f in sourceFacts.where((f) => f.kind == 'text')) {
       final match = correspondences
           .where((r) => r.sourceId == f.id && r.status == CheckStatus.pass)
@@ -470,6 +508,7 @@ Future<Json> runNativeProbe(
         mixedLineChecks = 0;
     final decorations = <Json>[];
     var reachedEnd = false, targetSeen = false;
+    final seenTargetBlocks = <String>{};
     final pages = <Json>[], seen = <String>{}, priorEnds = <int, int>{};
     final initial = controller.capture();
     for (var pageNumber = 0; pageNumber < target.maxPages; pageNumber++) {
@@ -499,10 +538,10 @@ Future<Json> runNativeProbe(
         final block = chapter.blocks[chunk.blockIndex];
         final start = chunk.start + f.start, end = chunk.start + f.end;
         visibleFragments++;
-        if (target.blockKey == block.blockKey ||
-            target.blockKey == null &&
-                target.candidate.location.domPath == 'document') {
+        if (target.blockKeys.contains(block.blockKey) ||
+            target.documentTarget) {
           targetSeen = true;
+          seenTargetBlocks.add(block.blockKey);
         }
         if (priorEnds.containsKey(chunk.blockIndex) &&
             priorEnds[chunk.blockIndex] != start &&
@@ -732,29 +771,159 @@ Future<Json> runNativeProbe(
       pages.add({
         'cursor': pageId,
         'fragments': fragments,
-        'columns': inspection.columns,
+        'requestedColumns': configuration.columns,
+        'configuredColumns': inspection.columns,
+        'columns': page.fullWidth || page.columnBreak == null
+            ? 1
+            : inspection.columns,
       });
-      for (final element
-          in find
-              .descendant(
-                of: find.byType(PagedReaderViewport).first,
-                matching: find.byType(RawImage),
-              )
-              .evaluate()) {
-        final widget = element.widget as RawImage;
-        final render = element.renderObject;
-        if (widget.image != null &&
-            render is RenderBox &&
-            render.hasSize &&
-            decodedImages.length < 32) {
-          final rect = renderedRect(render);
-          decodedImages.add({
-            'naturalWidth': widget.image!.width,
-            'naturalHeight': widget.image!.height,
-            'rect': rectJson(rect),
-            'visibleInViewport': containsRect(viewRect, rect),
-          });
-          if (!containsRect(viewRect, rect)) atomicFailures++;
+      final imageWidgets = find.descendant(
+        of: find.byType(PagedReaderViewport).first,
+        matching: find.byType(ReaderImage),
+      );
+      for (final imageElement in imageWidgets.evaluate()) {
+        final image = imageElement.widget as ReaderImage;
+        final imageBlock = image.block;
+        final source = imageSources[imageBlock.blockKey];
+        final container = renderedRect(imageElement.renderObject! as RenderBox);
+        final targetImage = target.blockKeys.contains(imageBlock.blockKey);
+        for (final element
+            in find
+                .descendant(
+                  of: find.byWidget(image),
+                  matching: find.byType(RawImage),
+                )
+                .evaluate()) {
+          final widget = element.widget as RawImage;
+          final render = element.renderObject;
+          if (widget.image != null && render is RenderImage && render.hasSize) {
+            if (decodedImages.length >= 128) {
+              if (!imageGeometryTruncated) {
+                unknownGeometries++;
+              }
+              imageGeometryTruncated = true;
+              continue;
+            }
+            final rect = renderedRect(render);
+            final decodedSize = Size(
+              widget.image!.width.toDouble(),
+              widget.image!.height.toDouble(),
+            );
+            final fitted = applyBoxFit(
+              render.fit ?? BoxFit.scaleDown,
+              decodedSize / render.scale,
+              render.size,
+            );
+            final alignment = render.alignment.resolve(
+              render.textDirection ?? TextDirection.ltr,
+            );
+            final localPaint = alignment.inscribe(
+              fitted.destination,
+              Offset.zero & render.size,
+            );
+            final paintRect = localPaint.shift(
+              render.localToGlobal(Offset.zero),
+            );
+            final cropRect = alignment.inscribe(
+              fitted.source * render.scale,
+              Offset.zero & decodedSize,
+            );
+            final expectedAlignment = source?.details['expectedAlignment'];
+            final error = switch (expectedAlignment) {
+              'center' => (paintRect.center.dx - container.center.dx).abs(),
+              'start' => (paintRect.left - container.left).abs(),
+              'end' => (paintRect.right - container.right).abs(),
+              _ => null,
+            };
+            final alignmentStatus = error == null
+                ? 'unknown'
+                : error <= .75
+                ? 'pass'
+                : 'fail';
+            if (alignmentStatus == 'fail') geometryFailures++;
+            final at = page.fragments.indexWhere(
+              (f) => inspection.chunks[f.unit].blockKey == imageBlock.blockKey,
+            );
+            final column =
+                at >= 0 && page.columnBreak != null && at >= page.columnBreak!
+                ? 1
+                : 0;
+            final columnWidth = page.fullWidth
+                ? viewRect.width
+                : (viewRect.width -
+                          (inspection.columns - 1) * viewport.columnGap) /
+                      inspection.columns;
+            final columnRect = Rect.fromLTWH(
+              viewRect.left + column * (columnWidth + viewport.columnGap),
+              viewRect.top,
+              columnWidth,
+              viewRect.height,
+            );
+            var clip = rect.intersect(columnRect);
+            final clips = <Json>[];
+            element.visitAncestorElements((ancestor) {
+              final box = ancestor.renderObject;
+              if (box is RenderClipRect &&
+                  box.hasSize &&
+                  box.clipBehavior != Clip.none) {
+                final local =
+                    box.clipper?.getClip(box.size) ?? (Offset.zero & box.size);
+                final bounds = local.shift(box.localToGlobal(Offset.zero));
+                clip = clip.intersect(bounds);
+                clips.add({'shape': 'rect', 'rect': rectJson(bounds)});
+              } else if (box is RenderClipRRect &&
+                  box.hasSize &&
+                  box.clipBehavior != Clip.none) {
+                final bounds = renderedRect(box);
+                clip = clip.intersect(bounds);
+                clips.add({
+                  'shape': 'rounded_rect_bounds',
+                  'rect': rectJson(bounds),
+                  'pixelCoverage': 'unknown',
+                });
+              }
+              return true;
+            });
+            decodedImages.add({
+              'blockKey': imageBlock.blockKey,
+              'mediaHash': imageBlock.media.mediaId.split('/').last,
+              'sourceId': source?.id,
+              'sourceLocation': source?.location.toJson(),
+              'pageCursor': pageId,
+              'column': column,
+              'columnRect': rectJson(columnRect),
+              'encodedNaturalSize': source?.details['encodedNaturalSize'],
+              'modelNaturalSize': {
+                'width': imageBlock.width,
+                'height': imageBlock.height,
+              },
+              'decodedWidth': widget.image!.width,
+              'decodedHeight': widget.image!.height,
+              'paintRect': rectJson(paintRect),
+              'sourceCropRect': rectJson(cropRect),
+              'alignmentReferenceRect': rectJson(container),
+              'clipRect': rectJson(clip),
+              'ancestorClips': clips,
+              'fit': render.fit?.name,
+              'alignment': alignment.toString(),
+              'expectedAlignment': expectedAlignment,
+              'alignmentBasis': source?.details['alignmentBasis'],
+              'alignmentError': error,
+              'alignmentStatus': alignmentStatus,
+              'candidateScope': targetImage,
+              'role': imageBlock.sizing?.role.name,
+              'columnOwnershipReason': imageBlock.sizing?.role == ImageRole.page
+                  ? 'explicit_page_role'
+                  : imageBlock.sizing == null && chapter.blocks.length == 1
+                  ? 'legacy_single_image'
+                  : at >= 0 && page.fragments[at].height >= viewRect.height * .6
+                  ? 'height_threshold'
+                  : 'normal_flow',
+              'rect': rectJson(rect),
+              'visibleInViewport': containsRect(viewRect, rect),
+            });
+            if (!containsRect(viewRect, rect)) atomicFailures++;
+          }
         }
       }
       if (page.end.unit >= inspection.chunks.length) {
@@ -840,6 +1009,113 @@ Future<Json> runNativeProbe(
         }
       }
     }
+    final imageLinkChecks = <Json>[];
+    final atomicLinks = snapshot.parsed.content.links.where(
+      (l) =>
+          l.source == chapter.key &&
+          l.sourceOffset == null &&
+          l.sourceLength == null &&
+          !l.isFootnote &&
+          target.blockKeys.contains(l.sourceBlockKey),
+    );
+    for (final link in atomicLinks.take(1)) {
+      final image = find.byWidgetPredicate(
+        (w) => w is ReaderImage && w.block.blockKey == link.sourceBlockKey,
+      );
+      if (image.evaluate().isEmpty) continue;
+      final record = <String, dynamic>{
+        'sourceBlockKey': link.sourceBlockKey,
+        'relationshipPresent': true,
+        'targetAvailable': link.unavailable == null && link.target != null,
+        'directImageClick': 'not_run',
+        'alternativeEntry': 'not_run',
+        'returnToSource': 'not_run',
+      };
+      imageLinkChecks.add(record);
+      final before = activations.length;
+      clickChecks++;
+      await tester.tap(image.first);
+      await settle();
+      final preview = find.byType(ReaderImagePreview).evaluate().isNotEmpty;
+      record['directImageClick'] = preview && activations.length == before
+          ? 'preview_opened_by_reader_policy'
+          : 'unexpected_result';
+      if (!preview || activations.length != before) clickFailures++;
+      if (preview) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await settle();
+      }
+      if (link.unavailable != null || link.target == null) continue;
+      final view = find.byType(PagedReaderViewport).first;
+      final l = AppLocalizations.of(tester.element(view));
+      clickChecks++;
+      await tester.tapAt(
+        tester.getRect(view).center,
+        buttons: kSecondaryMouseButton,
+        kind: PointerDeviceKind.mouse,
+      );
+      await settle();
+      final notes = find.text(l.readerLinks);
+      if (notes.evaluate().isEmpty) {
+        record['alternativeEntry'] = 'menu_entry_not_observed';
+        clickFailures++;
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await settle();
+        continue;
+      }
+      await tester.tap(notes.last);
+      await settle();
+      final tile = find.descendant(
+        of: find.byType(ReaderNotesPanel),
+        matching: find.byKey(ObjectKey(link)),
+      );
+      if (tile.evaluate().isEmpty) {
+        record['alternativeEntry'] = 'link_entry_not_observed';
+        clickFailures++;
+        continue;
+      }
+      await tester.ensureVisible(tile.first);
+      await tester.tap(tile.first);
+      await settle();
+      final current = tester
+          .widgetList<ReaderContentView>(find.byType(ReaderContentView))
+          .where((v) => v.active)
+          .firstOrNull;
+      final display = current?.viewportController?.inspectDisplayedPage();
+      final destination =
+          current?.content.key == link.target &&
+          (link.targetBlockKey == null ||
+              display?.page.fragments.any(
+                    (f) =>
+                        display.chunks[f.unit].blockKey == link.targetBlockKey,
+                  ) ==
+                  true);
+      final routed =
+          activations.length == before + 1 && activations.last == link;
+      record['alternativeEntry'] = destination && routed
+          ? 'target_reached'
+          : 'target_not_reached';
+      if (!destination || !routed) clickFailures++;
+      final back = find.byKey(const ValueKey('reader-location-return'));
+      clickChecks++;
+      if (back.hitTestable().evaluate().isNotEmpty) {
+        await tester.tap(back.hitTestable().last);
+        await settle();
+      }
+      final returned = tester
+          .widgetList<ReaderContentView>(find.byType(ReaderContentView))
+          .where((v) => v.active && v.content.key == chapter.key)
+          .firstOrNull;
+      final returnedPage = returned?.viewportController?.inspectDisplayedPage();
+      final returnedToImage =
+          returnedPage?.page.fragments.any(
+            (f) => returnedPage.chunks[f.unit].blockKey == link.sourceBlockKey,
+          ) ==
+          true;
+      record['returnToSource'] = returnedToImage ? 'pass' : 'fail';
+      if (!returnedToImage) clickFailures++;
+    }
+    assertions['imageLinkChecks'] = imageLinkChecks;
     final linked = find.descendant(
       of: find.byType(PagedReaderViewport).first,
       matching: find.byType(ReaderLinkedText),
@@ -910,7 +1186,9 @@ Future<Json> runNativeProbe(
         }
       }
     }
-    complete = reachedEnd && targetSeen;
+    final targetScopeCovered =
+        target.documentTarget || seenTargetBlocks.containsAll(target.blockKeys);
+    complete = reachedEnd && targetSeen && targetScopeCovered;
     layers[EvidenceLayer.sourceModel] = characterFailures > 0
         ? CheckStatus.fail
         : sourceChecks == 0
@@ -936,6 +1214,19 @@ Future<Json> runNativeProbe(
       layers[EvidenceLayer.fontGlyph] = CheckStatus.unknown;
     }
     assertions.addAll({
+      if (target.candidate.rule == 'image.authored_alignment')
+        'candidateFeatureStatus':
+            decodedImages.where((i) => i['candidateScope'] == true).isEmpty
+            ? 'unknown'
+            : decodedImages
+                  .where((i) => i['candidateScope'] == true)
+                  .any((i) => i['alignmentStatus'] == 'fail')
+            ? 'fail'
+            : decodedImages
+                  .where((i) => i['candidateScope'] == true)
+                  .any((i) => i['alignmentStatus'] == 'unknown')
+            ? 'unknown'
+            : 'pass',
       if (needsBorderPixels)
         'candidateFeatureStatus':
             decorations
@@ -950,6 +1241,18 @@ Future<Json> runNativeProbe(
             : 'pass',
       'pages': pages,
       'reachedDocumentEnd': reachedEnd,
+      'runComplete': true,
+      'targetScopeCovered': targetScopeCovered,
+      'requestedColumns': configuration.columns,
+      'observedColumns': pages.map((p) => p['columns']).toSet().toList(),
+      'documentRangeCoverage': {
+        'startedAtBeginning': target.blockKeys.isEmpty,
+        'reachedEnd': reachedEnd,
+        'pagesInspected': pages.length,
+        'scope': target.blockKeys.isEmpty
+            ? 'document_prefix'
+            : 'target_to_document_end',
+      },
       'targetVisible': targetSeen,
       'partial': !complete,
       'visibleFragments': visibleFragments,
@@ -969,6 +1272,7 @@ Future<Json> runNativeProbe(
       'linkActivations': activations.length,
       'resourceLoads': media.loads.toSet().toList(),
       'decodedImages': decodedImages,
+      'imageGeometryTruncated': imageGeometryTruncated,
       'fonts': {
         'loadRequestsObserved': media.loads
             .where(
@@ -1020,7 +1324,9 @@ Future<Json> runNativeProbe(
       'observedPath': observedPath,
       'reason': complete
           ? 'executed'
-          : 'page_budget_or_target_coverage_partial',
+          : !reachedEnd
+          ? 'page_budget_exhausted'
+          : 'feature_not_observed',
       'layers': {
         for (final e in layers.entries) wireName(e.key): wireName(e.value),
       },

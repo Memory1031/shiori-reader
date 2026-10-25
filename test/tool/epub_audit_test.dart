@@ -692,7 +692,7 @@ void main() {
       ),
     );
     expect(findings(r, 'link.decoration_conditional'), isNotEmpty);
-    expect(findings(r, 'link.decoration_structure_unsupported'), isNotEmpty);
+    expect(findings(r, 'box.radius_structure_unsupported'), isNotEmpty);
   });
   test(
     'picture/srcset chooses one candidate, unused candidate is not missing',

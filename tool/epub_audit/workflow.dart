@@ -436,7 +436,8 @@ Future<int> _verifyCommand(
       if (cancellation.isCancelled) break;
       final hash = target.candidate.location.epubHash;
       String? bundle = bundled ?? captured[hash];
-      if (bundle == null &&
+      if (target.located &&
+          bundle == null &&
           files[hash] != null &&
           capturedBytes <= 512 * 1024 * 1024) {
         final dir = await Directory(
@@ -499,13 +500,18 @@ Future<int> _verifyCommand(
         if (bundle == null) {
           result = {
             'complete': false,
-            'reason': 'authorized_source_unavailable_or_producer_changed',
+            'reason': target.located
+                ? 'authorized_source_unavailable_or_producer_changed'
+                : 'target_unresolved',
             'observedPath': 'not_run',
             'layers': {
               for (final layer in EvidenceLayer.values)
                 wireName(layer): 'not_run',
             },
-            'assertions': {},
+            'assertions': {
+              'targetLocated': false,
+              'candidateFeatureStatus': 'unknown',
+            },
           };
         } else {
           try {
@@ -800,9 +806,28 @@ Future<int> reviewCommand(Map<String, String> v) async {
   if ((scan['run'] as Json)['schemaVersion'] != 2) {
     throw const FormatException('Legacy report needs rescan');
   }
-  final evidence = v['--evidence'] == null
-      ? <VerificationEvidence>[]
-      : await readEvidence(v['--evidence']!);
+  if (v['--evidence'] != null && v['--evidence-paths'] != null) {
+    throw const FormatException('Choose evidence or evidence-paths');
+  }
+  final directories = <String>[if (v['--evidence'] != null) v['--evidence']!];
+  if (v['--evidence-paths'] case final paths?) {
+    final file = File(paths);
+    if (await file.length() > 1024 * 1024) {
+      throw const FormatException('Evidence path budget');
+    }
+    final list = jsonDecode(await file.readAsString());
+    if (list is! List ||
+        list.isEmpty ||
+        list.length > 32 ||
+        list.any((e) => e is! String)) {
+      throw const FormatException('Evidence directory list');
+    }
+    directories.addAll(list.cast<String>());
+  }
+  final evidence = <VerificationEvidence>[];
+  for (final directory in directories.toSet()) {
+    evidence.addAll(await readEvidence(directory));
+  }
   final manual = v['--manual'] == null
       ? <Json>[]
       : objectList(
@@ -826,6 +851,15 @@ Future<int> reviewCommand(Map<String, String> v) async {
     manual: manual,
   );
   final out = await newOutput(required(v, '--out'));
+  reviewed['evidenceIndices'] = [
+    for (final directory in directories.toSet())
+      p
+          .relative(
+            p.join(p.absolute(directory), 'verification.json'),
+            from: out.path,
+          )
+          .replaceAll('\\', '/'),
+  ];
   if (v['--evidence'] != null) {
     reviewed['evidenceIndex'] = p
         .relative(

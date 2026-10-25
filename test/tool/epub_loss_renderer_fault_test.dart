@@ -300,7 +300,7 @@ void main() {
         expect(result['assertions']['reachedDocumentEnd'], false);
         expect(result['assertions']['partial'], true);
         expect(result['complete'], false);
-        expect(result['reason'], 'page_budget_or_target_coverage_partial');
+        expect(result['reason'], 'page_budget_exhausted');
         expect(result['assertions']['paginationFailures'], 0);
         expect(result['assertions']['restoreVisible'], true);
         expect(result['assertions']['characterIdentityFailures'], 0);

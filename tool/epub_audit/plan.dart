@@ -53,13 +53,16 @@ final class VerificationTarget {
     this.chapterKey,
     this.blockKey,
     Iterable<ProbeConfiguration> configurations, {
+    Iterable<String> blockKeys = const [],
     this.maxPages = 12,
     this.timeoutSeconds = 60,
     this.maxScreenshots = 1,
     this.maxEvidenceBytes = 4 * 1024 * 1024,
-  }) : configurations = List.unmodifiable(configurations) {
+  }) : configurations = List.unmodifiable(configurations),
+       blockKeys = List.unmodifiable({?blockKey, ...blockKeys}) {
     if (this.configurations.isEmpty ||
         this.configurations.length > 3 ||
+        this.blockKeys.length > 1024 ||
         maxPages < 1 ||
         maxPages > 64 ||
         timeoutSeconds < 1 ||
@@ -74,12 +77,18 @@ final class VerificationTarget {
   final LossCandidate candidate;
   final Json? chapterKey;
   final String? blockKey;
+  final List<String> blockKeys;
+  bool get documentTarget => candidate.location.domPath == 'document';
+  bool get located =>
+      chapterKey != null && (documentTarget || blockKeys.isNotEmpty);
   final List<ProbeConfiguration> configurations;
   final int maxPages, timeoutSeconds, maxScreenshots, maxEvidenceBytes;
   Json toJson() => {
     'candidate': candidate.toJson(),
     'chapterKey': chapterKey,
     'blockKey': blockKey,
+    'blockKeys': blockKeys,
+    'targetResolution': located ? 'located' : 'target_unresolved',
     'semanticUnit': 'unicode_code_point',
     'question': candidate.family == LossFamily.content
         ? 'Is the expected source instance reachable and visible?'
@@ -111,6 +120,7 @@ final class VerificationTarget {
       j['chapterKey'] as Json?,
       j['blockKey'] as String?,
       objectList(j, 'configurations', max: 3).map(ProbeConfiguration.fromJson),
+      blockKeys: j['blockKeys'] == null ? const [] : stringList(j, 'blockKeys'),
       maxPages: intField(budget, 'maxPages', max: 64),
       timeoutSeconds: intField(budget, 'timeoutSeconds', max: 300),
       maxScreenshots: intField(budget, 'maxScreenshots', max: 3),
@@ -154,33 +164,45 @@ Json makePlan(
   });
   final selected = <VerificationTarget>[];
   final groups = <String>{};
+  final resolved = <VerificationTarget>[];
+  final unresolvedReasons = <String, String>{};
   for (final candidate in all) {
     if (provider != null && !candidate.methods.contains(provider)) continue;
     if ({
-          'security_boundary',
-          'reader_policy',
-          'source_issue',
-        }.contains(candidate.classification) ||
-        groups.contains(candidate.groupId)) {
+      'security_boundary',
+      'reader_policy',
+      'source_issue',
+    }.contains(candidate.classification)) {
       continue;
     }
-    if (selected.length >= maxTargets) break;
-    groups.add(candidate.groupId);
     final book = books.firstWhere(
       (b) => b['sha256'] == candidate.location.epubHash,
     );
     final sidecar = book['readingLoss'] as Json;
-    final map = objectList(sidecar, 'correspondences')
+    final maps = objectList(sidecar, 'correspondences')
         .map(Correspondence.fromJson)
-        .where((m) => m.sourceId == candidate.sourceId)
-        .firstOrNull;
+        .where(
+          (m) =>
+              m.sourceId == candidate.sourceId && m.status == CheckStatus.pass,
+        );
+    final ids = {for (final m in maps) ...m.representationIds};
     final representations = objectList(
       sidecar,
       'representations',
     ).map(RepresentationFact.fromJson).toList();
-    final representation = representations
-        .where((r) => map?.representationIds.contains(r.id) == true)
-        .firstOrNull;
+    final matches = representations.where((r) => ids.contains(r.id)).toList()
+      ..sort(
+        (a, b) => ((a.metadata['blockIndex'] as int?) ?? -1).compareTo(
+          (b.metadata['blockIndex'] as int?) ?? -1,
+        ),
+      );
+    final keys = matches.map((r) => r.blockKey).whereType<String>().toSet();
+    final oversized = keys.length > 1024;
+    // An oversized container is unresolved, never reduced to its first child.
+    final representation = oversized ? null : matches.firstOrNull;
+    if (oversized) {
+      unresolvedReasons[candidate.id] = 'target_scope_budget';
+    }
     final path = objectList(sidecar, 'displayPaths')
         .where(
           (r) =>
@@ -188,7 +210,7 @@ Json makePlan(
               r['occurrence'] == candidate.location.occurrence,
         )
         .firstOrNull;
-    selected.add(
+    resolved.add(
       VerificationTarget(
         candidate,
         representation?.chapterKey ?? path?['chapterKey'] as Json?,
@@ -200,10 +222,45 @@ Json makePlan(
           if (maxConfigurations > 2)
             ProbeConfiguration(width: 1200, height: 800, columns: 2),
         ],
+        blockKeys: oversized ? const [] : keys,
         maxPages: maxPages,
         timeoutSeconds: timeoutSeconds,
         maxScreenshots: maxScreenshots,
       ),
+    );
+  }
+  // Resolve first, then spread each tier across books. Unresolvable scopes
+  // remain explicit, without consuming multi-configuration execution budgets.
+  final bookCounts = <String, int>{};
+  while (selected.length < maxTargets) {
+    final remaining = resolved
+        .where((t) => t.located && !groups.contains(t.candidate.groupId))
+        .toList();
+    if (remaining.isEmpty) break;
+    remaining.sort((a, b) {
+      final tier = candidateTier(
+        a.candidate,
+      ).compareTo(candidateTier(b.candidate));
+      if (tier != 0) return tier;
+      int risk(VerificationTarget t) => t.candidate.rule.startsWith('image.')
+          ? 0
+          : t.candidate.family == LossFamily.interaction
+          ? 1
+          : 2;
+      final riskOrder = risk(a).compareTo(risk(b));
+      if (riskOrder != 0) return riskOrder;
+      final spread = (bookCounts[a.candidate.location.epubHash] ?? 0).compareTo(
+        bookCounts[b.candidate.location.epubHash] ?? 0,
+      );
+      return spread != 0 ? spread : a.candidate.id.compareTo(b.candidate.id);
+    });
+    final target = remaining.first;
+    selected.add(target);
+    groups.add(target.candidate.groupId);
+    bookCounts.update(
+      target.candidate.location.epubHash,
+      (n) => n + 1,
+      ifAbsent: () => 1,
     );
   }
   return {
@@ -223,7 +280,11 @@ Json makePlan(
           (c) => {
             'candidateId': c.id,
             'status': 'not_run',
-            'reason': 'representative_or_budget_limit',
+            'reason':
+                unresolvedReasons[c.id] ??
+                (resolved.any((t) => t.candidate.id == c.id && !t.located)
+                    ? 'target_unresolved'
+                    : 'representative_or_budget_limit'),
           },
         )
         .toList(),
@@ -246,6 +307,18 @@ Json reviewLosses(
   final run = scan['run'] as Json;
   final producer = hashField(run['producer'] as Json, 'fingerprint');
   final accepted = <VerificationEvidence>[];
+  final exactEvidence = <String>{};
+  var duplicateEvidence = 0;
+  String scope(VerificationEvidence e) => jsonEncode([
+    e.candidateId,
+    e.sourceId,
+    e.epubHash,
+    e.producer,
+    e.probe,
+    e.environment,
+    e.configuration,
+    e.provider,
+  ]);
   final rejected = <Json>[];
   final candidates = [
     for (final b in (scan['books'] as List).cast<Json>()) ...bookCandidates(b),
@@ -265,7 +338,12 @@ Json reviewLosses(
         'reason': 'identity_or_scope_mismatch',
       });
     } else {
-      accepted.add(e);
+      final content = e.toJson()..remove('artifacts');
+      if (exactEvidence.add(jsonEncode(content))) {
+        accepted.add(e);
+      } else {
+        duplicateEvidence++;
+      }
     }
   }
   final sorted = [...candidates]
@@ -298,7 +376,7 @@ Json reviewLosses(
         matching.any(
           (e) =>
               e.complete &&
-              e.assertions['candidateFeatureStatus'] != 'unknown' &&
+              e.assertions['candidateFeatureStatus'] == 'pass' &&
               (e.assertions['targetVisible'] == true ||
                   e.observedPath == 'presentation' &&
                       e.assertions['truncated'] == false) &&
@@ -384,8 +462,35 @@ Json reviewLosses(
         .map((d) => d.toJson())
         .toList(),
     'runtimeCoverage': {
-      'executedEvidence': accepted.length,
-      'completeEvidence': accepted.where((e) => e.complete).length,
+      'executedEvidence': accepted.map(scope).toSet().length,
+      'retainedEvidence': accepted.length,
+      'duplicateEvidence': duplicateEvidence,
+      'completeEvidence': accepted
+          .map(scope)
+          .toSet()
+          .where(
+            (key) =>
+                accepted.where((e) => scope(e) == key).every((e) => e.complete),
+          )
+          .length,
+      'conflictingScopes': accepted
+          .map(scope)
+          .toSet()
+          .where((key) => accepted.where((e) => scope(e) == key).length > 1)
+          .length,
+      'requestedTwoColumnEvidence': accepted
+          .where((e) => e.assertions['requestedColumns'] == 2)
+          .map(scope)
+          .toSet()
+          .length,
+      'observedTwoColumnEvidence': accepted
+          .where(
+            (e) =>
+                (e.assertions['observedColumns'] as List?)?.contains(2) == true,
+          )
+          .map(scope)
+          .toSet()
+          .length,
       'notRunCandidates': candidates
           .where((c) => !accepted.any((e) => e.candidateId == c.id))
           .length,

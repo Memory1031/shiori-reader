@@ -25,6 +25,7 @@ const helpText = '''EPUB Reading-Loss Auditor v2 (read-only developer tool)
          --provider native|browser|webview --out NEW_DIRECTORY [--font FONT_FILE]
          (or --input EPUB / --input-dir DIRECTORY / --bundle PRIVATE_BUNDLE)
   review --run RUN_DIRECTORY [--evidence VERIFICATION_DIRECTORY]
+         [--evidence-paths DIRECTORIES_JSON]
          [--manual REVIEWS_JSON] --out NEW_DIRECTORY
   capture --input EPUB --allow-root DIRECTORY --out NEW_PRIVATE_DIRECTORY
           [--timeout-seconds 60]
@@ -111,7 +112,7 @@ Future<int> auditMain(List<String> args) async {
             verifyCommand,
           ),
           'review': (
-            {'--run', '--evidence', '--manual', '--out'},
+            {'--run', '--evidence', '--evidence-paths', '--manual', '--out'},
             reviewCommand,
           ),
           'capture': (

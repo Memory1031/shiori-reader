@@ -32,6 +32,69 @@ ParsedEpub book(
 }
 
 void main() {
+  String svg({
+    String outer = '',
+    String image = '',
+    String extra = '',
+    String view = '0 0 32 32',
+  }) =>
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="$view" $outer>'
+      '<image width="32" height="32" href="../images/ornament.png" $image/>$extra</svg>';
+  test(
+    'simple SVG meet alignment stays independent of image size, role and identity',
+    () {
+      final centered = book(
+        '<p>Before.</p>${svg()}<p>After.</p>',
+      ).content.chapters.first;
+      final left = book(
+        '<p>Before.</p><div style="text-align:left">${svg()}</div><p>After.</p>',
+      ).content.chapters.first;
+      final c = centered.blocks.whereType<ImageBlock>().single;
+      final l = left.blocks.whereType<ImageBlock>().single;
+      expect(c.sizing!.alignment, ParagraphAlignment.center);
+      expect(l.sizing!.alignment, ParagraphAlignment.start);
+      expect(c.sizing!.role, ImageRole.flow);
+      expect(c.sizing!.height, isNull);
+      expect((c.width, c.height), (32, 32));
+      expect(c.blockKey, l.blockKey);
+      expect(centered.contentRevision, left.contentRevision);
+      for (final entry in {
+        'xMinYMid meet': ParagraphAlignment.start,
+        'xMaxYMid meet': ParagraphAlignment.end,
+      }.entries) {
+        final b = book(
+          '<p>Before.</p>${svg(outer: 'preserveAspectRatio="${entry.key}"')}',
+        ).content.chapters.first.blocks.whereType<ImageBlock>().single;
+        expect(b.sizing!.alignment, entry.value);
+      }
+      expect(
+        ChapterContent.fromJson(jsonDecode(jsonEncode(centered.toJson()))),
+        centered,
+      );
+    },
+  );
+  test('complex SVG and ordinary images do not acquire inferred centering', () {
+    for (final markup in [
+      svg(outer: 'transform="scale(2)"'),
+      svg(image: 'x="1"'),
+      svg(outer: 'preserveAspectRatio="none"'),
+      svg(outer: 'preserveAspectRatio="xMidYMid slice"'),
+      svg(view: '0 0 64 32'),
+      svg(extra: '<path d="M0 0L32 32"/>'),
+      svg(image: 'style="clip-path:url(#crop)"'),
+      '<img src="../images/ornament.png"/>',
+    ]) {
+      final images = book(
+        '<p>Before.</p>$markup<p>After.</p>',
+      ).content.chapters.first.blocks.whereType<ImageBlock>();
+      expect(images, isNotEmpty);
+      expect(
+        images.every((b) => b.sizing?.alignment == null),
+        true,
+        reason: markup,
+      );
+    }
+  });
   test('HTML dimensions are display hints, not intrinsic raster dimensions', () {
     final result = book(
       '<p>Before</p><img width="40" height="20" src="../images/ornament.png"/><p>After</p>',

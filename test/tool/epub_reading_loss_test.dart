@@ -77,6 +77,13 @@ void main() {
       );
       expect(
         decision(
+          evidence({}, EvidenceLayer.widgetGeometry, CheckStatus.pass),
+        )['kind'],
+        'verify_next',
+        reason: 'Missing feature assertions are not evidence of preservation',
+      );
+      expect(
+        decision(
           evidence(
             {'candidateFeatureStatus': 'pass'},
             EvidenceLayer.widgetGeometry,

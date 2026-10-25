@@ -28,6 +28,7 @@ import 'epub_image_candidates.dart';
 import 'epub_diagnostics.dart';
 import 'epub_footnotes.dart';
 import 'epub_fixed_image.dart';
+import 'epub_svg_image_alignment.dart';
 import 'epub_trace.dart';
 import 'epub_native_assets.dart';
 import 'epub_front_matter.dart';
@@ -1076,6 +1077,10 @@ class EpubParser {
       trace: trace,
     ).toList();
     final fonts = EpubNativeFonts(sheets, optionalEpubStyleReference, font);
+    final svgAlignmentStylesSafe = epubSvgAlignmentStylesSafe([
+      ...sheets.map((s) => s.$2),
+      ...doc.querySelectorAll('[style]').map((n) => n.attributes['style']!),
+    ]);
     final styles = epubTextStyles(
       doc,
       sheets.map((sheet) => sheet.$2),
@@ -1952,7 +1957,12 @@ class EpubParser {
                   'center' => ParagraphAlignment.center,
                   'right' || 'end' => ParagraphAlignment.end,
                   'left' || 'start' => ParagraphAlignment.start,
-                  _ => null,
+                  _ => epubSvgImageAlignment(
+                    node,
+                    styles,
+                    size,
+                    stylesSafe: svgAlignmentStylesSafe,
+                  ),
                 },
               ),
               box: activeBox,
