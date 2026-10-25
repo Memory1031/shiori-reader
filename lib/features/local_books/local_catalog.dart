@@ -223,9 +223,12 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
           _anchor = restored?.center ?? 0;
           _positioning = restored == null && match > 0;
           _scroll?.dispose();
-          final scroll = _scroll = ScrollController(
+          final scroll = _scroll = _LocalCatalogScrollController(
             initialScrollOffset: restored?.offset ?? 0,
             keepScrollOffset: browsing == null,
+            precedingRows: () => _anchor > 0
+                ? _precedingRows.currentContext?.findRenderObject()
+                : null,
           );
           final version = browsing?.revision;
           scroll.addListener(() {
@@ -327,5 +330,55 @@ class _LocalNavigationViewState extends State<LocalNavigationView> {
         );
       },
     );
+  }
+}
+
+/// An end-anchored viewport clamps its minimum offset to zero, leaving a
+/// leading gap when the rows before its center are shorter than the viewport.
+/// Use their laid-out extent to stop at the first row instead.
+class _LocalCatalogScrollController extends ScrollController {
+  _LocalCatalogScrollController({
+    required super.initialScrollOffset,
+    required super.keepScrollOffset,
+    required this.precedingRows,
+  });
+
+  final RenderObject? Function() precedingRows;
+
+  @override
+  ScrollPosition createScrollPosition(
+    ScrollPhysics physics,
+    ScrollContext context,
+    ScrollPosition? oldPosition,
+  ) => _LocalCatalogScrollPosition(
+    physics: physics,
+    context: context,
+    initialPixels: initialScrollOffset,
+    keepScrollOffset: keepScrollOffset,
+    oldPosition: oldPosition,
+    precedingRows: precedingRows,
+  );
+}
+
+class _LocalCatalogScrollPosition extends ScrollPositionWithSingleContext {
+  _LocalCatalogScrollPosition({
+    required super.physics,
+    required super.context,
+    required super.initialPixels,
+    required super.keepScrollOffset,
+    required super.oldPosition,
+    required this.precedingRows,
+  });
+
+  final RenderObject? Function() precedingRows;
+
+  @override
+  bool applyContentDimensions(double minScrollExtent, double maxScrollExtent) {
+    final preceding = precedingRows();
+    if (preceding is RenderSliver && preceding.geometry != null) {
+      minScrollExtent = viewportDimension - preceding.geometry!.scrollExtent;
+      maxScrollExtent = math.max(minScrollExtent, maxScrollExtent);
+    }
+    return super.applyContentDimensions(minScrollExtent, maxScrollExtent);
   }
 }

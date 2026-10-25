@@ -9,6 +9,7 @@ import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/local_books/local_catalog.dart';
 import 'package:shiori/features/reader/reader_contents.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
+import 'package:shiori/shared/widgets/catalog_browsing.dart';
 
 class _Navigation implements LocalNavigationRepository {
   final result = Completer<Result<List<LocalNavigationEntry>>>();
@@ -212,6 +213,65 @@ void main() {
     expect(find.text('Chapter 4').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'restored contents stop at the first row without leading space',
+    (tester) async {
+      final browsing = CatalogBrowsingState();
+      final rows = List.generate(
+        13,
+        (i) => LocalNavigationEntry(title: 'Entry $i', chapterKey: chapter(i)),
+      );
+      Widget screen() => app(
+        Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: 390,
+              height: 600,
+              child: LocalNavigationView(
+                entries: rows,
+                current: chapter(3),
+                browsing: browsing,
+                onSelect: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpWidget(screen());
+      await tester.pumpAndSettle();
+      final list = find.byType(CustomScrollView);
+      await tester.drag(list, const Offset(0, -100));
+      await tester.pumpAndSettle();
+      expect(browsing.position!.center, greaterThan(0));
+      final row = find.byKey(
+        ValueKey(('local-toc', browsing.position!.center)),
+      );
+      final restoredTop = tester.getTopLeft(row).dy;
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(screen());
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(row).dy, closeTo(restoredTop, 1));
+      await tester.drag(list, const Offset(0, 1000));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey(('local-toc', 0)))).dy,
+        closeTo(tester.getTopLeft(list).dy, 1),
+      );
+      await tester.drag(list, const Offset(0, -1000));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getBottomLeft(find.byKey(const ValueKey(('local-toc', 12)))).dy,
+        closeTo(tester.getBottomLeft(list).dy, 1),
+      );
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
   testWidgets(
     'open contents updates when reading order arrives after navigation',
