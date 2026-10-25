@@ -11,13 +11,15 @@ enum ReaderThemeMode { system, light, dark }
 
 enum ReaderPaper { paper, warm }
 
+enum TxtBlankLineMode { merge, preserve }
+
 /// How a page change animates. [curl] folds the page corner back; [cover]
 /// slides the new page over the old one; [slide] moves both pages side by
 /// side; [none] swaps instantly.
 enum PageTurnStyle { curl, cover, slide, none }
 
 final class ReaderSettings extends ValueModel {
-  static const schemaVersion = 4;
+  static const schemaVersion = 5;
   ReaderSettings({
     double fontSize = 20,
     double lineHeight = 1.6,
@@ -28,6 +30,7 @@ final class ReaderSettings extends ValueModel {
     this.paper = ReaderPaper.paper,
     this.controlsHintSeen = false,
     this.pageTurn = PageTurnStyle.curl,
+    this.txtBlankLines = TxtBlankLineMode.merge,
   }) : fontSize = finiteRange(fontSize, 14, 32, 'fontSize'),
        lineHeight = finiteRange(lineHeight, 1.2, 2.4, 'lineHeight'),
        paragraphSpacing = finiteRange(
@@ -51,6 +54,7 @@ final class ReaderSettings extends ValueModel {
   final ReaderPaper paper;
   final bool controlsHintSeen;
   final PageTurnStyle pageTurn;
+  final TxtBlankLineMode txtBlankLines;
   ReaderSettings copyWith({
     double? fontSize,
     double? lineHeight,
@@ -61,6 +65,7 @@ final class ReaderSettings extends ValueModel {
     ReaderPaper? paper,
     bool? controlsHintSeen,
     PageTurnStyle? pageTurn,
+    TxtBlankLineMode? txtBlankLines,
   }) => ReaderSettings(
     fontSize: fontSize ?? this.fontSize,
     lineHeight: lineHeight ?? this.lineHeight,
@@ -71,6 +76,7 @@ final class ReaderSettings extends ValueModel {
     paper: paper ?? this.paper,
     controlsHintSeen: controlsHintSeen ?? this.controlsHintSeen,
     pageTurn: pageTurn ?? this.pageTurn,
+    txtBlankLines: txtBlankLines ?? this.txtBlankLines,
   );
   Map<String, Object?> toJson() => {
     'schemaVersion': schemaVersion,
@@ -83,10 +89,11 @@ final class ReaderSettings extends ValueModel {
     'paper': paper.name,
     'controlsHintSeen': controlsHintSeen,
     'pageTurn': pageTurn.name,
+    'txtBlankLines': txtBlankLines.name,
   };
   factory ReaderSettings.fromJson(Map<String, dynamic> json) {
     final version = json['schemaVersion'];
-    if (![1, 2, 3, schemaVersion].contains(version)) {
+    if (![1, 2, 3, 4, schemaVersion].contains(version)) {
       throw const FormatException('Unsupported reader settings version');
     }
     double number(String key, double min, double max) {
@@ -100,6 +107,9 @@ final class ReaderSettings extends ValueModel {
           ? ReaderPaper.values.byName(json['paper'] as String)
           : ReaderPaper.paper,
       controlsHintSeen: version >= 3 ? json['controlsHintSeen'] as bool : false,
+      txtBlankLines: version >= 5
+          ? TxtBlankLineMode.values.byName(json['txtBlankLines'] as String)
+          : TxtBlankLineMode.merge,
       // Older settings keep the curl they always had.
       pageTurn: version >= 4
           ? PageTurnStyle.values.byName(json['pageTurn'] as String)
@@ -125,6 +135,7 @@ final class ReaderSettings extends ValueModel {
     paper,
     controlsHintSeen,
     pageTurn,
+    txtBlankLines,
   ];
 }
 

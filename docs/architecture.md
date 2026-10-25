@@ -13,6 +13,7 @@
 - Summary / Detail 以字符串列表表示作者和标签；缺少信息保留 empty / null / unknown，不猜作者、完结状态或时间。Source 负责 HTML entity / 标记清理，Domain 只接收普通文本；不因文本含 `<` 等合法字符便把它当 HTML 删除。
 - Catalog 只持有不可变卷章树，flatChapters 是惰性视图；不按 ID 或标题排序。全目录 ordinal 必须从 0 连续递增；重复 groupId / ChapterKey、跨小说归属或卷归属错误直接拒绝。Source 先处理重复链接和缺名诊断，不能依赖 Domain 静默去重。无卷可用明确 isSynthetic 的分组，缺卷名为 null，由 UI 展示占位名。
 - ChapterContent 接受 Paragraph / Image / Heading / Divider，保留段落顺序和单段完整文本。可读正文至少有一个非空 Paragraph 或 Image；纯图片章有效，只有空白 / 标题 / 分隔符无效。空 Paragraph 可在有效正文中表达已确认的语义空白。
+- ChapterContent 的 `lineSeparated` 标记每个文字块对应一行原文，块尾换行只作结构分隔。本地读取适配器根据已存文件格式为 TXT 设置该展示元数据，不改写原解析记录；它不进入内容摘要，原文和源码点偏移保持不变。
 - Paragraph 的 alignment 为 start / center / end，leadingIndent 为整数 0–8 em，表示段落首行缩进，不是整段左内边距；展示用前缀不计入原文位置。不在 Domain 处理站点标签或嵌套 HTML AST。
 - Paragraph / Heading 可携带有序、不重叠的 inlineRuby：start / length 按基字的 Unicode 码点定位，annotation 独立保存注音。基字仍属于正文文本，注音参与语义身份；旧 JSON 缺字段时为空。
 - Paragraph / Heading 可携带有序的 inlineImages：每项用 Unicode 码点偏移引用文本中的单个 U+FFFC，保存 MediaRef、alt 和 em 宽高；图片参与相同的资源校验与生命周期。无行内图片的旧记录及内容身份保持兼容，em 尺寸只影响布局，不改变语义身份。
@@ -41,7 +42,7 @@
 
 ChapterContent 统一重新分配 occurrence，不信任调用方手填值。不同语义块的插入不改变既有块键；在同样内容的重复块之前插入另一个相同块会改变后续 occurrence，这是规则的明确限制。blockKey 只在章节内使用；纯文本内容完全相同的不同章节可以得到相同摘要，业务定位始终同时使用 ChapterKey。
 
-ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion、块类型、blockKey、occurrence 和 contentRevision。JSON 返回的是独立容器，改动它不会修改值对象。存储 envelope 的 parserVersion、cache codec version、抓取时间不进入 Domain 摘要；其他模型由存储层 codec 负责。ReaderSettings 当前为 schemaVersion=4；读取 v1 / v2 / v3 保留有效排版与阅读明暗，v1 补 paged，v1 / v2 补 paper=paper、controlsHintSeen=false，v1–v3 补 pageTurn=curl。未知版本仍拒绝。
+ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion、块类型、blockKey、occurrence 和 contentRevision。JSON 返回的是独立容器，改动它不会修改值对象。存储 envelope 的 parserVersion、cache codec version、抓取时间不进入 Domain 摘要；其他模型由存储层 codec 负责。ReaderSettings 当前为 schemaVersion=5；读取 v1–v4 保留有效排版与阅读明暗，v1 补 paged，v1 / v2 补 paper=paper、controlsHintSeen=false，v1–v3 补 pageTurn=curl，v1–v4 补 TXT 空行合并模式。未知版本仍拒绝。
 
 字号、屏宽、DPR、主题、pixelOffset、layoutKey、临时渲染切片都不进入正文摘要或正文序列化。一个极长 Paragraph 始终一个语义块，presentation 可临时切片但不能回写 Domain。
 
@@ -49,7 +50,7 @@ ChapterContent 提供 toJson / fromJson；读取时校验 normalizationVersion�
 
 ReaderPosition 的 blockIndex 非负，blockFraction / chapterFraction 必须有限且位于 0..1；NaN / Infinity / 越界直接拒绝，不静默改写错误进度。fractionFor 依 `(blockIndex + blockFraction) / blockCount` 计算，检查 index 属于本章；空内容仅允许 0/0 起点。文本 fraction 按 Unicode code point 偏移定义，UTF-16 布局索引转换留 presentation。构造位置时尚无正文实例，不假装已验证 blockKey 在某章内存在；实际恢复由阅读器处理。
 
-像素提示必须同时包含合法 pixelOffset 和 layoutKey，仅用于同布局提示，不能替代语义位置。ReaderSettings 当前 schemaVersion=4，默认字号 20、行高 1.6、段间距 20、左右边距 30；有效历史排版保留，未知版本拒绝。ReaderMode.scroll 只保留兼容解码，生产偏好层归一化为 paged，详见[阅读器](reader.md)。
+像素提示必须同时包含合法 pixelOffset 和 layoutKey，仅用于同布局提示，不能替代语义位置。ReaderSettings 默认字号 20、行高 1.6、段间距 20、左右边距 30；有效历史排版保留。ReaderMode.scroll 只保留兼容解码，生产偏好层归一化为 paged，详见[阅读器](reader.md)。
 
 AppSettings 独立 schemaVersion=3，包含 system / light / dark、teal / blueGrey / warmBrown / softPink 和书架网格／列表偏好；旧 v1 补默认青绿，v1 / v2 缺少布局时默认网格，不借用阅读主题。应用设置加载完成后才首次展示书架，布局随应用设置持久化。ReaderPaper 表示阅读纸色，controlsHintSeen 记录提示已确认；恢复默认保留该提示状态。所有值模型不含 Flutter Color 或语言文案。
 

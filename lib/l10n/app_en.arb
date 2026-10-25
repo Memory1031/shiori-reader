@@ -966,6 +966,9 @@
       }
     }
   },
+  "readerTxtBlankLines": "TXT blank lines",
+  "readerTxtBlankLinesMerge": "Use spacing",
+  "readerTxtBlankLinesPreserve": "Keep blank lines",
   "statisticsSince": "Recording since {date}",
   "@statisticsSince": {
     "placeholders": {

@@ -31,6 +31,8 @@ final class PageFragment {
     this.boxTop = 0,
     this.boxBottom = 0,
     this.boxContentHeight,
+    this.spacingBefore,
+    this.spacingAfter,
   });
   final int unit;
   final int start;
@@ -41,6 +43,10 @@ final class PageFragment {
 
   /// Actual placeholder row reservation, shared with the painted box geometry.
   final double? boxContentHeight;
+
+  /// Explicit text margins when a source separator owns the transition.
+  /// Null keeps the ordinary EPUB/online block rhythm.
+  final double? spacingBefore, spacingAfter;
   final ParagraphFlow? flow;
   final ReaderLinkLayout? linkLayout;
 }
@@ -53,7 +59,9 @@ final class ReaderPage {
     this.columnBreak,
     this.fullWidth = false,
     this.centered = false,
-  }) : fragments = List.unmodifiable(fragments);
+    PageCursor? visibleStart,
+  }) : fragments = List.unmodifiable(fragments),
+       _visibleStart = visibleStart;
   final PageCursor start;
   final PageCursor end;
   final List<PageFragment> fragments;
@@ -64,9 +72,12 @@ final class ReaderPage {
   final bool centered;
 
   /// Visual whitespace normalization does not change the page's cursor range.
-  PageCursor get visibleStart => fragments.isEmpty
-      ? start
-      : PageCursor(fragments.first.unit, fragments.first.start);
+  final PageCursor? _visibleStart;
+  PageCursor get visibleStart =>
+      _visibleStart ??
+      (fragments.isEmpty
+          ? start
+          : PageCursor(fragments.first.unit, fragments.first.start));
 }
 
 enum _IndentState { unchanged, geometric, unavailable }
@@ -89,6 +100,7 @@ final class PageLayout {
     this.locale,
     this.textHeightBehavior,
     this.paragraphSpacing = 16,
+    this.txtBlankLines = TxtBlankLineMode.merge,
     this.columns = 1,
     this.columnGap = readerColumnGap,
   }) {
@@ -105,6 +117,7 @@ final class PageLayout {
   final double height;
   final TextStyle style;
   final double paragraphSpacing;
+  final TxtBlankLineMode txtBlankLines;
   final int columns;
   final double columnGap;
   final TextScaler scaler;
@@ -543,6 +556,56 @@ final class PageLayout {
     required int blockOffset,
     required int blockIndex,
   }) {
+    final separator =
+        index.content.lineSeparated &&
+        text.endsWith('\n') &&
+        blockOffset + text.runes.length == _blockLengths[blockIndex];
+    final visible = separator ? text.substring(0, text.length - 1) : text;
+    final fitted = _fitText(
+      visible,
+      available,
+      backwards: backwards,
+      block: block,
+      startsBlock: startsBlock,
+      blockOffset: blockOffset,
+      blockIndex: blockIndex,
+    );
+    if (fitted == null) return null;
+    // Consume the unpainted separator with the last visible line, including
+    // reverse slices. It must never create its own page or shift source anchors.
+    final consume =
+        separator && (backwards || fitted.count == visible.runes.length);
+    return (
+      text: fitted.text,
+      count: fitted.count + (consume ? 1 : 0),
+      height: fitted.height,
+      boxTop: fitted.boxTop,
+      boxBottom: fitted.boxBottom,
+      boxContentHeight: fitted.boxContentHeight,
+      flow: fitted.flow,
+      linkLayout: fitted.linkLayout,
+    );
+  }
+
+  ({
+    String text,
+    int count,
+    double height,
+    double boxTop,
+    double boxBottom,
+    double? boxContentHeight,
+    ParagraphFlow? flow,
+    ReaderLinkLayout? linkLayout,
+  })?
+  _fitText(
+    String text,
+    double available, {
+    required bool backwards,
+    required ContentBlock block,
+    required bool startsBlock,
+    required int blockOffset,
+    required int blockIndex,
+  }) {
     if (text.isEmpty) {
       return (
         text: '',
@@ -846,12 +909,14 @@ final class PageLayout {
       final bottom = blockOffset + text.runes.length == blockLength
           ? edges.bottom
           : 0.0;
-      final spacing = readerBlockSpacing(
-        block,
-        paragraphSpacing,
-        pageHeight: height,
-        chapter: index.content.key,
-      );
+      final spacing = index.content.lineSeparated
+          ? 0.0
+          : readerBlockSpacing(
+              block,
+              paragraphSpacing,
+              pageHeight: height,
+              chapter: index.content.key,
+            );
       // Placeholder-only lines can report shorter line metrics than their
       // paragraph: Flutter still reserves leading around the inline image.
       final fullHeight = painter.height + spacing + top + bottom;
@@ -1077,10 +1142,16 @@ final class PageLayout {
     if (first == null || columns == 1) return first;
     final second = _forwardColumn(first.end);
     if (second == null) return first;
-    return ReaderPage(first.start, second.end, [
-      ...first.fragments,
-      ...second.fragments,
-    ], columnBreak: first.fragments.length);
+    final fragments = [...first.fragments, ...second.fragments];
+    return ReaderPage(
+      first.start,
+      second.end,
+      fragments,
+      columnBreak: first.fragments.length,
+      visibleStart: index.content.lineSeparated
+          ? _txtVisibleStart(fragments)
+          : null,
+    );
   }
 
   late final int? _standaloneImageUnit = () {
@@ -1141,7 +1212,8 @@ final class PageLayout {
     // viewport's incremental forward seek and its retained PageBoundaries.
     final end = normalize(until);
     if (end.unit == 0 && end.offset == 0) return null;
-    if (columns == 1 &&
+    if (!index.content.lineSeparated &&
+        columns == 1 &&
         !index.content.blocks.any(
           (b) =>
               b.box != null ||
@@ -1169,7 +1241,225 @@ final class PageLayout {
     }
   }
 
+  // Source blank runs are indexed once. Both policies can jump over a large run
+  // without measuring each whitespace block or revisiting a chapter prefix.
+  late final List<int> _txtBlankEnds = () {
+    final result = List<int>.filled(index.chunks.length, 0);
+    var end = result.length;
+    for (var i = result.length - 1; i >= 0; i--) {
+      final chunk = index.chunks[i];
+      final blank =
+          index.content.blocks[chunk.blockIndex] is ParagraphBlock &&
+          chunk.text!.trim().isEmpty;
+      if (!blank) end = i;
+      result[i] = end;
+    }
+    return result;
+  }();
+
+  late final List<int> _txtPrevious = () {
+    final result = List<int>.filled(index.chunks.length, -1);
+    var previous = -1;
+    for (var i = 0; i < result.length; i++) {
+      result[i] = previous;
+      if (_txtBlankEnds[i] == i) previous = i;
+    }
+    return result;
+  }();
+
+  late final double _txtBlankHeight = () {
+    final painter = TextPainter(
+      text: TextSpan(text: ' ', style: style),
+      textScaler: scaler,
+      textDirection: direction,
+      locale: locale,
+      textHeightBehavior: textHeightBehavior,
+    )..layout();
+    try {
+      return painter.height.clamp(1.0, height);
+    } finally {
+      painter.dispose();
+    }
+  }();
+
+  double _txtGap(int unit) {
+    final previous = _txtPrevious[unit];
+    if (previous < 0) return 0;
+    final at = index.chunks[unit].blockIndex;
+    final before = index.chunks[previous].blockIndex;
+    if (at == before) return 0;
+    double spacing(int block) => readerBlockSpacing(
+      index.content.blocks[block],
+      paragraphSpacing,
+      chapter: index.content.key,
+      pageHeight: index.content.blocks[block] is HeadingBlock
+          ? height
+          : double.infinity,
+    );
+    return (spacing(at) + spacing(before)) / 2;
+  }
+
+  PageCursor? _txtVisibleStart(List<PageFragment> fragments) {
+    final first = fragments
+        .where((f) => f.text?.isNotEmpty == true)
+        .firstOrNull;
+    return first == null ? null : PageCursor(first.unit, first.start);
+  }
+
+  ReaderPage? _forwardTextLines(PageCursor from) {
+    final start = normalize(from);
+    var cursor = start;
+    var remaining = height;
+    final fragments = <PageFragment>[];
+    while (cursor.unit < index.chunks.length) {
+      final unit = cursor.unit;
+      final blankEnd = _txtBlankEnds[unit];
+      if (blankEnd > unit) {
+        if (txtBlankLines == TxtBlankLineMode.merge) {
+          cursor = PageCursor(blankEnd, 0);
+          continue;
+        }
+        final runStart = _txtPrevious[unit] + 1;
+        final runHeight = (blankEnd - runStart) * _txtBlankHeight;
+        // A preserved run already supplies the transition. Only add the deficit
+        // when the configured gap is larger, once at the start of the run.
+        final extra =
+            fragments.isNotEmpty &&
+                unit == runStart &&
+                blankEnd < index.chunks.length
+            ? math.max(0.0, _txtGap(blankEnd) - runHeight)
+            : 0.0;
+        final count = math.min(
+          blankEnd - unit,
+          ((remaining - extra) / _txtBlankHeight).floor(),
+        );
+        if (count <= 0) break;
+        final extent = count * _txtBlankHeight + extra;
+        fragments.add(
+          PageFragment(
+            unit,
+            0,
+            _length(unit),
+            extent,
+            '',
+            spacingBefore: 0,
+            spacingAfter: 0,
+          ),
+        );
+        remaining -= extent;
+        cursor = PageCursor(unit + count, 0);
+        continue;
+      }
+      final chunk = index.chunks[unit];
+      final block = index.content.blocks[chunk.blockIndex];
+      final rest = _slice(chunk.text!, cursor.offset, chunk.text!.runes.length);
+      if (rest == '\n' && chunk.start + cursor.offset + 1 == chunk.total) {
+        // A restored cursor may point at the unpainted source separator itself.
+        // Consume it without falling through the ordinary empty-text geometry.
+        cursor = normalize(PageCursor(unit, cursor.offset + 1));
+        continue;
+      }
+      final startsBlock = chunk.start == 0 && cursor.offset == 0;
+      final afterPreservedBlank =
+          txtBlankLines == TxtBlankLineMode.preserve &&
+          unit > 0 &&
+          _txtBlankEnds[unit - 1] > unit - 1;
+      var gap = fragments.isNotEmpty && startsBlock && !afterPreservedBlank
+          ? _txtGap(unit)
+          : 0.0;
+      if (fragments.isEmpty &&
+          start.unit == 0 &&
+          startsBlock &&
+          block is HeadingBlock) {
+        gap =
+            readerBlockSpacing(
+              block,
+              paragraphSpacing,
+              chapter: index.content.key,
+              pageHeight: height,
+            ) /
+            2;
+      }
+      if (block is HeadingBlock && startsBlock && fragments.isNotEmpty) {
+        final heading = _fit(
+          rest,
+          height,
+          backwards: false,
+          block: block,
+          startsBlock: true,
+          blockOffset: chunk.start,
+          blockIndex: chunk.blockIndex,
+        );
+        var next = unit + 1;
+        if (next < index.chunks.length) next = _txtBlankEnds[next];
+        if (heading != null &&
+            heading.count == rest.runes.length &&
+            next < index.chunks.length) {
+          final bodyChunk = index.chunks[next];
+          final bodyBlock = index.content.blocks[bodyChunk.blockIndex];
+          if (bodyBlock is ParagraphBlock) {
+            final body = _fit(
+              bodyChunk.text!,
+              height,
+              backwards: false,
+              block: bodyBlock,
+              startsBlock: bodyChunk.start == 0,
+              blockOffset: bodyChunk.start,
+              blockIndex: bodyChunk.blockIndex,
+            );
+            if (body != null) {
+              final separation = txtBlankLines == TxtBlankLineMode.preserve
+                  ? math.max(_txtGap(next), (next - unit - 1) * _txtBlankHeight)
+                  : _txtGap(next);
+              final required =
+                  gap +
+                  heading.height +
+                  separation +
+                  math.min(body.height, 2 * _txtBlankHeight);
+              // Keep the complete title with the first body lines when that
+              // combination can fit in a fresh column. Source blanks remain
+              // consumed on the preceding page, never repeated after the move.
+              if (required <= height && required > remaining) break;
+            }
+          }
+        }
+      }
+      final fitted = _fit(
+        rest,
+        remaining - gap,
+        backwards: false,
+        block: block,
+        startsBlock: startsBlock,
+        blockOffset: chunk.start + cursor.offset,
+        blockIndex: chunk.blockIndex,
+      );
+      if (fitted == null) break;
+      fragments.add(
+        PageFragment(
+          unit,
+          cursor.offset,
+          cursor.offset + fitted.count,
+          fitted.height + gap,
+          fitted.text,
+          spacingBefore: gap,
+          spacingAfter: 0,
+        ),
+      );
+      remaining -= fitted.height + gap;
+      cursor = normalize(PageCursor(unit, cursor.offset + fitted.count));
+    }
+    return fragments.isEmpty
+        ? null
+        : ReaderPage(
+            start,
+            cursor,
+            fragments,
+            visibleStart: _txtVisibleStart(fragments),
+          );
+  }
+
   ReaderPage? _forwardColumn(PageCursor from) {
+    if (index.content.lineSeparated) return _forwardTextLines(from);
     final start = normalize(from);
     var cursor = start;
     var remaining = height;

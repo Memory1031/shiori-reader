@@ -603,12 +603,19 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   Future<void> _settingsPanel(BuildContext context) async {
-    if (!_desktopPanels) return showReaderSettings(context, _preferences);
+    if (!_desktopPanels) {
+      return showReaderSettings(
+        context,
+        _preferences,
+        txt: widget.content.lineSeparated,
+      );
+    }
     final panel = _openPanel(
       ReaderPanelPlacement.end,
       semanticLabel: AppLocalizations.of(context).readerSettings,
       builder: (context, panel) => ReaderSettingsPanel(
         preferences: _preferences,
+        txt: widget.content.lineSeparated,
         onDone: () => panel.close(),
       ),
     );
@@ -1773,6 +1780,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
         initialPosition: _position,
         textStyle: style,
         paragraphSpacing: layout.paragraphSpacing,
+        txtBlankLines: _settings.txtBlankLines,
         onCenterTap: _toggle,
         chromeVisible: _chrome,
         onBoundary: (direction) {

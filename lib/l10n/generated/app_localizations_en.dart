@@ -1987,6 +1987,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get readerTxtBlankLines => 'TXT blank lines';
+
+  @override
+  String get readerTxtBlankLinesMerge => 'Use spacing';
+
+  @override
+  String get readerTxtBlankLinesPreserve => 'Keep blank lines';
+
+  @override
   String statisticsSince(String date) {
     return 'Recording since $date';
   }

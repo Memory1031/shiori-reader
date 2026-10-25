@@ -966,6 +966,9 @@
       }
     }
   },
+  "readerTxtBlankLines": "TXT 空行处理",
+  "readerTxtBlankLinesMerge": "合并为段间距",
+  "readerTxtBlankLinesPreserve": "保留原文空行",
   "statisticsSince": "自 {date} 开始记录",
   "@statisticsSince": {
     "placeholders": {

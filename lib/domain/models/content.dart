@@ -778,6 +778,7 @@ final class ChapterContent extends ValueModel {
     required ChapterKey key,
     required String title,
     required Iterable<ContentBlock> blocks,
+    bool lineSeparated = false,
   }) {
     final occurrences = <String, int>{};
     final indexed = <ContentBlock>[];
@@ -803,12 +804,18 @@ final class ChapterContent extends ValueModel {
       key,
       nonBlank(ContentIdentity.normalizeText(title), 'title'),
       List.unmodifiable(indexed),
+      lineSeparated,
     );
   }
-  ChapterContent._(this.key, this.title, this.blocks);
+  ChapterContent._(this.key, this.title, this.blocks, this.lineSeparated);
   final ChapterKey key;
   final String title;
   final List<ContentBlock> blocks;
+
+  /// Each text block represents one source line. Its terminal newline is a
+  /// structural separator, retained in source offsets but not painted as a row.
+  /// Layout metadata only; content identity remains based on the original text.
+  final bool lineSeparated;
   late final String contentRevision = ContentIdentity.digest('chapter', [
     title,
     [for (final block in blocks) block.blockKey],
@@ -821,6 +828,7 @@ final class ChapterContent extends ValueModel {
     'key': key.toJson(),
     'title': title,
     'blocks': blocks.map((b) => b.toJson()).toList(),
+    if (lineSeparated) 'lineSeparated': true,
     'contentRevision': contentRevision,
   };
 
@@ -835,6 +843,7 @@ final class ChapterContent extends ValueModel {
       key: ChapterKey.fromJson(json['key'] as Map<String, dynamic>),
       title: json['title'] as String,
       blocks: input,
+      lineSeparated: json['lineSeparated'] as bool? ?? false,
     );
     if (json['contentRevision'] != content.contentRevision ||
         List.generate(
@@ -846,5 +855,5 @@ final class ChapterContent extends ValueModel {
     return content;
   }
   @override
-  List<Object?> get values => [key, title, blocks];
+  List<Object?> get values => [key, title, blocks, lineSeparated];
 }

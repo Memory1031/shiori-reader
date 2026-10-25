@@ -1806,6 +1806,15 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get readerTxtBlankLines => 'TXT 空行处理';
+
+  @override
+  String get readerTxtBlankLinesMerge => '合并为段间距';
+
+  @override
+  String get readerTxtBlankLinesPreserve => '保留原文空行';
+
+  @override
   String statisticsSince(String date) {
     return '自 $date 开始记录';
   }

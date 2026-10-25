@@ -432,6 +432,33 @@ void main() {
   });
 
   test(
+    'legacy reader settings default TXT gaps to merge without losing preferences',
+    () {
+      final settings = ReaderSettings(
+        fontSize: 27,
+        paragraphSpacing: 28,
+        themeMode: ReaderThemeMode.dark,
+        pageTurn: PageTurnStyle.slide,
+        txtBlankLines: TxtBlankLineMode.preserve,
+      );
+      expect(ReaderSettings.fromJson(settings.toJson()), settings);
+      for (final version in [1, 2, 3, 4]) {
+        final old = settings.toJson()..['schemaVersion'] = version;
+        old.remove('txtBlankLines');
+        final migrated = ReaderSettings.fromJson(old);
+        expect(migrated.txtBlankLines, TxtBlankLineMode.merge);
+        expect(migrated.fontSize, settings.fontSize);
+        expect(migrated.paragraphSpacing, settings.paragraphSpacing);
+        expect(migrated.themeMode, settings.themeMode);
+        expect(
+          migrated.pageTurn,
+          version >= 4 ? PageTurnStyle.slide : PageTurnStyle.curl,
+        );
+      }
+    },
+  );
+
+  test(
     'progress keeps a separate snapshot and validates chapter ownership',
     () {
       final snapshot = NovelSummary(

@@ -169,16 +169,17 @@ void main() {
             record.content.catalog,
           );
           for (final chapter in record.content.chapters) {
-            expect(
-              ok(
-                await novels.loadChapter(
-                  chapter.key,
-                  mode: mode,
-                  cancellation: token(),
-                ),
-              ).value,
-              chapter,
-            );
+            final loaded = ok(
+              await novels.loadChapter(
+                chapter.key,
+                mode: mode,
+                cancellation: token(),
+              ),
+            ).value;
+            expect(loaded.blocks, chapter.blocks);
+            expect(loaded.contentRevision, chapter.contentRevision);
+            expect(chapter.lineSeparated, isFalse);
+            expect(loaded.lineSeparated, format == LocalBookFormat.txt);
           }
         }
         expect(

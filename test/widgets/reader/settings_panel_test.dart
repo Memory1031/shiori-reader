@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/reader/reader_preferences.dart';
@@ -11,6 +12,7 @@ Future<ReaderPreferences> _pumpPanel(
   ReaderSettings settings, {
   String locale = 'en',
   double textScale = 1,
+  bool txt = false,
 }) async {
   final preferences = ReaderPreferences(null)..value = settings;
   addTearDown(preferences.dispose);
@@ -25,7 +27,9 @@ Future<ReaderPreferences> _pumpPanel(
         ).copyWith(textScaler: TextScaler.linear(textScale)),
         child: child!,
       ),
-      home: Scaffold(body: ReaderSettingsPanel(preferences: preferences)),
+      home: Scaffold(
+        body: ReaderSettingsPanel(preferences: preferences, txt: txt),
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -35,6 +39,54 @@ Future<ReaderPreferences> _pumpPanel(
 Finder get _reset => find.byKey(const ValueKey('reader-settings-reset'));
 
 void main() {
+  for (final locale in ['zh', 'en']) {
+    testWidgets('TXT blank line choice at narrow width in $locale', (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(320, 844)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final preferences = await _pumpPanel(
+        tester,
+        ReaderSettings(),
+        locale: locale,
+        textScale: 1.3,
+        txt: true,
+      );
+      final l = AppLocalizations.of(
+        tester.element(find.byType(ReaderSettingsPanel)),
+      );
+      expect(preferences.value.txtBlankLines, TxtBlankLineMode.merge);
+      final preserve = find.text(l.readerTxtBlankLinesPreserve);
+      expect(
+        tester.renderObject<RenderParagraph>(preserve).didExceedMaxLines,
+        isFalse,
+      );
+      expect(
+        tester
+            .renderObject<RenderParagraph>(
+              find.text(l.readerTxtBlankLinesMerge),
+            )
+            .didExceedMaxLines,
+        isFalse,
+      );
+      await tester.ensureVisible(preserve);
+      await tester.tap(preserve);
+      await tester.pumpAndSettle();
+      expect(preferences.value.txtBlankLines, TxtBlankLineMode.preserve);
+      expect(
+        ReaderSettings.fromJson(preferences.value.toJson()).txtBlankLines,
+        TxtBlankLineMode.preserve,
+      );
+      await tester.tap(find.text(l.readerTxtBlankLinesMerge));
+      await tester.pumpAndSettle();
+      expect(preferences.value.txtBlankLines, TxtBlankLineMode.merge);
+      expect(tester.takeException(), isNull);
+      await _pumpPanel(tester, preferences.value, locale: locale);
+      expect(find.text(l.readerTxtBlankLines), findsNothing);
+    });
+  }
   for (final (width, locale, textScale, platform) in [
     (360.0, 'zh', 1.0, TargetPlatform.android),
     (320.0, 'en', 1.3, TargetPlatform.iOS),

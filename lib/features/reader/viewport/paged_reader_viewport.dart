@@ -284,6 +284,7 @@ class PagedReaderViewport extends StatefulWidget {
     this.textStyle = const TextStyle(fontSize: 20, height: 1.7),
     this.maxChunkCodePoints = 800,
     this.paragraphSpacing = 16,
+    this.txtBlankLines = TxtBlankLineMode.merge,
     this.imageHeights = const {},
     this.imageExtent,
     this.imageBuilder,
@@ -322,6 +323,7 @@ class PagedReaderViewport extends StatefulWidget {
   final TextStyle textStyle;
   final int maxChunkCodePoints;
   final double paragraphSpacing;
+  final TxtBlankLineMode txtBlankLines;
   final void Function(ReaderPosition, bool)? onPosition;
   final VoidCallback? onRestoreStart;
   final Map<MediaRef, double> imageHeights;
@@ -890,6 +892,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
         widget.content,
         widget.maxChunkCodePoints,
         widget.paragraphSpacing,
+        widget.content.lineSeparated ? widget.txtBlankLines : null,
         widget.columns,
         widget.columnGap,
       );
@@ -941,6 +944,7 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
             locale: locale,
             textHeightBehavior: heightBehavior,
             paragraphSpacing: widget.paragraphSpacing,
+            txtBlankLines: widget.txtBlankLines,
             scaler: scaler,
             direction: direction,
             imageHeights: widget.imageHeights,
@@ -1143,27 +1147,29 @@ class _PagedReaderViewportState extends State<PagedReaderViewport>
                                       textWidth(fragment)) /
                                   2,
                               top:
+                                  fragment.spacingBefore ??
                                   readerBlockSpacing(
-                                    widget.content.blocks[_layout!
-                                        .index
-                                        .chunks[fragment.unit]
-                                        .blockIndex],
-                                    widget.paragraphSpacing,
-                                    pageHeight: constraints.maxHeight,
-                                    chapter: widget.content.key,
-                                  ) /
-                                  2,
+                                        widget.content.blocks[_layout!
+                                            .index
+                                            .chunks[fragment.unit]
+                                            .blockIndex],
+                                        widget.paragraphSpacing,
+                                        pageHeight: constraints.maxHeight,
+                                        chapter: widget.content.key,
+                                      ) /
+                                      2,
                               bottom:
+                                  fragment.spacingAfter ??
                                   readerBlockSpacing(
-                                    widget.content.blocks[_layout!
-                                        .index
-                                        .chunks[fragment.unit]
-                                        .blockIndex],
-                                    widget.paragraphSpacing,
-                                    pageHeight: constraints.maxHeight,
-                                    chapter: widget.content.key,
-                                  ) /
-                                  2,
+                                        widget.content.blocks[_layout!
+                                            .index
+                                            .chunks[fragment.unit]
+                                            .blockIndex],
+                                        widget.paragraphSpacing,
+                                        pageHeight: constraints.maxHeight,
+                                        chapter: widget.content.key,
+                                      ) /
+                                      2,
                             ),
                             child: ReaderLinkedText(
                               blockKey: fragmentBlock(fragment).blockKey,

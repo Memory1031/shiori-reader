@@ -15,8 +15,9 @@ import 'reader_theme.dart';
 /// and type changes stay readable, and flushes the edits when it closes.
 Future<void> showReaderSettings(
   BuildContext context,
-  ReaderPreferences preferences,
-) async {
+  ReaderPreferences preferences, {
+  bool txt = false,
+}) async {
   await showShioriSheet<void>(
     context,
     barrierColor: Colors.black.withValues(alpha: .18),
@@ -24,6 +25,7 @@ Future<void> showReaderSettings(
     owned: true,
     builder: (sheet) => ReaderSettingsPanel(
       preferences: preferences,
+      txt: txt,
       onDone: () => Navigator.of(sheet).pop(),
       sheet: true,
     ),
@@ -39,12 +41,14 @@ class ReaderSettingsPanel extends StatefulWidget {
     required this.preferences,
     this.onDone,
     this.sheet = false,
+    this.txt = false,
   });
   final ReaderPreferences preferences;
 
   /// Close control for a docked host; a sheet closes by drag or outside tap.
   final VoidCallback? onDone;
   final bool sheet;
+  final bool txt;
 
   @override
   State<ReaderSettingsPanel> createState() => _ReaderSettingsPanelState();
@@ -174,7 +178,11 @@ class _ReaderSettingsPanelState extends State<ReaderSettingsPanel> {
           ],
           _Appearance(settings: s, onChanged: _preferences.update),
           Divider(height: ShioriSpace.item, color: scheme.outlineVariant),
-          _Typography(settings: s, onChanged: _preferences.update),
+          _Typography(
+            settings: s,
+            onChanged: _preferences.update,
+            txt: widget.txt,
+          ),
         ],
       ),
     );
@@ -444,9 +452,14 @@ class _PaperSwatch extends StatelessWidget {
 
 /// Label column plus one full-width control per row.
 class _Typography extends StatelessWidget {
-  const _Typography({required this.settings, required this.onChanged});
+  const _Typography({
+    required this.settings,
+    required this.onChanged,
+    this.txt = false,
+  });
   final ReaderSettings settings;
   final ValueChanged<ReaderSettings> onChanged;
+  final bool txt;
 
   @override
   Widget build(BuildContext context) {
@@ -475,6 +488,7 @@ class _Typography extends StatelessWidget {
       l.readerFontSize,
       l.readerLineHeight,
       l.readerParagraphSpacing,
+      if (txt) l.readerTxtBlankLines,
       l.readerHorizontalPadding,
       l.readerPageTurn,
     ];
@@ -557,6 +571,19 @@ class _Typography extends StatelessWidget {
             ),
           ),
         ),
+        if (txt)
+          row(
+            l.readerTxtBlankLines,
+            _Segmented<TxtBlankLineMode>(
+              wrap: true,
+              selected: s.txtBlankLines,
+              options: [
+                (TxtBlankLineMode.merge, l.readerTxtBlankLinesMerge),
+                (TxtBlankLineMode.preserve, l.readerTxtBlankLinesPreserve),
+              ],
+              onSelect: (value) => onChanged(s.copyWith(txtBlankLines: value)),
+            ),
+          ),
         row(
           l.readerPageTurn,
           _Segmented<PageTurnStyle>(
@@ -789,10 +816,12 @@ class _Segmented<T> extends StatelessWidget {
     required this.options,
     required this.selected,
     required this.onSelect,
+    this.wrap = false,
   });
   final List<(T, String)> options;
   final T selected;
   final ValueChanged<T> onSelect;
+  final bool wrap;
 
   @override
   Widget build(BuildContext context) {
@@ -839,8 +868,11 @@ class _Segmented<T> extends StatelessWidget {
                     child: InkWell(
                       onTap: value == selected ? null : () => onSelect(value),
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          minHeight: _controlHeight - 2 * inset,
+                        constraints: BoxConstraints(
+                          minHeight:
+                              wrap && ShioriCapabilities.of(context).touchFirst
+                              ? kMinInteractiveDimension
+                              : _controlHeight - 2 * inset,
                         ),
                         child: Center(
                           child: Padding(
@@ -861,8 +893,10 @@ class _Segmented<T> extends StatelessWidget {
                               ),
                               child: Text(
                                 label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                maxLines: wrap ? null : 1,
+                                overflow: wrap
+                                    ? TextOverflow.visible
+                                    : TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
                               ),
                             ),

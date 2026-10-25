@@ -35,14 +35,16 @@ final class ChunkIndex {
         _ => null,
       };
       final total = text?.runes.length ?? 0;
-      if (text == null || total == 0) {
+      if (text == null ||
+          total == 0 ||
+          content.lineSeparated && text.trim().isEmpty) {
         result.add(
           RenderChunk(
             blockIndex: i,
             blockKey: block.blockKey,
             start: 0,
-            end: 0,
-            total: 0,
+            end: total,
+            total: total,
             text: text,
           ),
         );
@@ -97,6 +99,7 @@ final class ChunkIndex {
             block.tableRow != null &&
             start + length <= block.tableRow!.rightStart;
         if (length + count > maxCodePoints &&
+            !(content.lineSeparated && grapheme == '\n') &&
             !insideRuby &&
             !insideSuperscript &&
             !insideStack &&

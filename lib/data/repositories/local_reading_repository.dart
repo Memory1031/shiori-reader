@@ -217,15 +217,23 @@ class LocalReadingRepository
     required ReadMode mode,
     required CancellationToken cancellation,
   }) => _local(key.novelKey)
-      ? _read(
-          key.novelKey,
-          Operation.chapter,
-          cancellation,
-          (r) => [
+      ? _read(key.novelKey, Operation.chapter, cancellation, (r) {
+          final chapter = [
             ...r.content.chapters,
             ...r.content.auxiliaryChapters,
-          ].where((c) => c.key == key).firstOrNull,
-        )
+          ].where((c) => c.key == key).firstOrNull;
+          if (chapter == null) return null;
+          final lineSeparated = r.format == LocalBookFormat.txt;
+          if (chapter.lineSeparated == lineSeparated) return chapter;
+          // Format is authoritative even for manifests imported by older
+          // parsers. Never rewrite their text, keys, or stored representation.
+          return ChapterContent(
+            key: chapter.key,
+            title: chapter.title,
+            blocks: chapter.blocks,
+            lineSeparated: lineSeparated,
+          );
+        })
       : online.loadChapter(key, mode: mode, cancellation: cancellation);
   @override
   Future<Result<BookProgressMetrics>> loadProgressMetrics(

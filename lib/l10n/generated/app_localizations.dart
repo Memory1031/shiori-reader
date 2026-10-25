@@ -3368,6 +3368,24 @@ abstract class AppLocalizations {
   /// **'{hours} h {minutes} min'**
   String statisticsHoursMinutes(String hours, String minutes);
 
+  /// No description provided for @readerTxtBlankLines.
+  ///
+  /// In en, this message translates to:
+  /// **'TXT blank lines'**
+  String get readerTxtBlankLines;
+
+  /// No description provided for @readerTxtBlankLinesMerge.
+  ///
+  /// In en, this message translates to:
+  /// **'Use spacing'**
+  String get readerTxtBlankLinesMerge;
+
+  /// No description provided for @readerTxtBlankLinesPreserve.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep blank lines'**
+  String get readerTxtBlankLinesPreserve;
+
   /// No description provided for @statisticsSince.
   ///
   /// In en, this message translates to:
