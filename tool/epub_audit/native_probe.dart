@@ -893,6 +893,7 @@ Future<Json> runNativeProbe(
               'column': column,
               'columnRect': rectJson(columnRect),
               'encodedNaturalSize': source?.details['encodedNaturalSize'],
+              'displayNaturalSize': source?.details['displayNaturalSize'],
               'modelNaturalSize': {
                 'width': imageBlock.width,
                 'height': imageBlock.height,
@@ -1214,7 +1215,10 @@ Future<Json> runNativeProbe(
       layers[EvidenceLayer.fontGlyph] = CheckStatus.unknown;
     }
     assertions.addAll({
-      if (target.candidate.rule == 'image.authored_alignment')
+      if ({
+        'image.authored_alignment',
+        'image.reader_default_alignment',
+      }.contains(target.candidate.rule))
         'candidateFeatureStatus':
             decodedImages.where((i) => i['candidateScope'] == true).isEmpty
             ? 'unknown'

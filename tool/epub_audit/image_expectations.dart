@@ -9,7 +9,15 @@ Json sourceImageExpectation(
   int? width,
   int? height, {
   bool stylesSafe = true,
+  ({int width, int height})? displaySize,
+  bool displaySizeChecked = false,
 }) {
+  final encodedWidth = width, encodedHeight = height;
+  // A checked null means malformed/ambiguous metadata, not orientation 1.
+  if (displaySizeChecked || displaySize != null) {
+    width = displaySize?.width;
+    height = displaySize?.height;
+  }
   String? alignment;
   for (
     var owner = image.parent;
@@ -76,8 +84,13 @@ Json sourceImageExpectation(
       if (alignment != null) basis = 'source_single_raster_svg_meet';
     }
   }
+  if (alignment == null && _singleImageDocument(image, styles)) {
+    alignment = 'center';
+    basis = 'reader_single_image_document_default';
+  }
   return {
-    'encodedNaturalSize': {'width': width, 'height': height},
+    'encodedNaturalSize': {'width': encodedWidth, 'height': encodedHeight},
+    'displayNaturalSize': {'width': width, 'height': height},
     'expectedAlignment': alignment,
     'alignmentBasis': basis,
     'aspectClass': width == null || height == null
@@ -88,4 +101,45 @@ Json sourceImageExpectation(
         ? 'landscape'
         : 'portrait',
   };
+}
+
+/// Source-only evidence for the Reader's single-ImageBlock default. Require a
+/// sole ordinary raster and a chain of simple wrappers. Empty sibling blocks,
+/// explicit breaks and complex SVGs remain unknown, not guessed as author CSS.
+bool _singleImageDocument(
+  dom.Element image,
+  Map<dom.Element, Map<String, String>> styles,
+) {
+  if (image.localName != 'img') return false;
+  dom.Element? current = image;
+  while (current != null) {
+    final css = styles[current] ?? const <String, String>{};
+    if (current.attributes.containsKey('hidden') ||
+        css['display'] == 'none' ||
+        {'hidden', 'collapse'}.contains(css['visibility']) ||
+        !{null, 'static', 'initial'}.contains(css['position']) ||
+        !{null, 'none', 'initial'}.contains(css['float']) ||
+        !{null, 'none', 'initial'}.contains(css['transform'])) {
+      return false;
+    }
+    if (current.localName == 'body') return true;
+    final parent = current.parent;
+    if (parent == null ||
+        !{
+          'body',
+          'div',
+          'p',
+          'figure',
+          'a',
+          'span',
+        }.contains(parent.localName) ||
+        parent.children.length != 1 ||
+        parent.nodes.whereType<dom.Text>().any(
+          (t) => t.text.trim().isNotEmpty,
+        )) {
+      return false;
+    }
+    current = parent;
+  }
+  return false;
 }

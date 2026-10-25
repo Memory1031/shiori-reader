@@ -31,6 +31,7 @@ ReaderImageGeometry readerImageExtent(
   required TextScaler scaler,
   required TextDirection direction,
   Size? knownSize,
+  ParagraphAlignment? fallbackAlignment,
   TextStyle style = const TextStyle(fontSize: 20),
 }) {
   var caption = 0.0;
@@ -100,6 +101,7 @@ ReaderImageGeometry readerImageExtent(
           math.min(width / w, maxImageHeight / h),
         );
   final alignment = switch (sizing.alignment ??
+      fallbackAlignment ??
       (sizing.role == ImageRole.page
           ? ParagraphAlignment.center
           : ParagraphAlignment.start)) {
@@ -151,6 +153,14 @@ ReaderImageGeometry readerImageForColumn(
     scaler: scaler,
     direction: direction,
     knownSize: knownSize,
+    // The default is a Reader policy, not an inferred author style or page role.
+    // Explicit left/right alignment on the image still wins.
+    fallbackAlignment:
+        content.blocks.length == 1 &&
+            blockIndex == 0 &&
+            content.blocks.single is ImageBlock
+        ? ParagraphAlignment.center
+        : null,
   );
 }
 

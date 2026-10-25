@@ -9,6 +9,7 @@ bool epubSvgAlignmentStylesSafe(Iterable<String> styles) => styles.every(
 );
 
 /// Preserve only the horizontal meet alignment of a full-viewport raster.
+/// [size] is orientation-corrected display geometry, not encoded JPEG axes.
 /// Other SVG geometry continues through the existing native/presentation paths.
 ParagraphAlignment? epubSvgImageAlignment(
   dom.Element image,

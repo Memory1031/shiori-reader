@@ -19,7 +19,7 @@ abstract interface class EpubPresentationSession {
 class BookDecoder implements LocalBookDecoder {
   const BookDecoder({this.epubDiagnostics});
   final EpubDiagnosticSlot? epubDiagnostics;
-  static const parserVersion = 34;
+  static const parserVersion = 35;
   static const maxTxtBytes = LocalBookInputLimits.maxTxtBytes;
   static const maxEpubBytes = LocalBookInputLimits.maxEpubBytes;
   @override

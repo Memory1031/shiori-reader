@@ -593,9 +593,15 @@ final class ReadingLossCollector {
         f,
         details['expectedAlignment'] == null
             ? 'image.geometry_observation'
+            : details['alignmentBasis'] ==
+                  'reader_single_image_document_default'
+            ? 'image.reader_default_alignment'
             : 'image.authored_alignment',
         details['expectedAlignment'] == null
             ? 'source_image_geometry_requires_observation'
+            : details['alignmentBasis'] ==
+                  'reader_single_image_document_default'
+            ? 'reader_alignment_policy_requires_paint_measurement'
             : 'source_alignment_requires_paint_measurement',
         LossFamily.visual,
         CheckStatus.unknown,

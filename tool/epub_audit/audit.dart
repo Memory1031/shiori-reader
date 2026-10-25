@@ -1216,7 +1216,7 @@ final class _Audit {
         continue;
       }
       String? selected;
-      ({int width, int height})? naturalSize;
+      ({int width, int height})? naturalSize, displaySize;
       var missing = false, unsupported = false, external = false;
       for (final href in epubImageCandidates(node).take(128)) {
         final ref = epubReference(path, href);
@@ -1235,6 +1235,7 @@ final class _Audit {
         }
         selected = sha256.convert(bytes).toString();
         naturalSize = epubImageDimensions(bytes);
+        displaySize = epubDisplayImageDimensions(bytes);
         break;
       }
       checks['images']!.checked++;
@@ -1250,6 +1251,8 @@ final class _Audit {
             styles,
             naturalSize?.width,
             naturalSize?.height,
+            displaySize: displaySize,
+            displaySizeChecked: true,
             stylesSafe: svgStylesSafe[path] ?? false,
           ),
         );

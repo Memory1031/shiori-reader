@@ -90,3 +90,97 @@ import 'dart:typed_data';
   }
   return null;
 }
+
+/// Header-only display dimensions for bounded JPEG EXIF orientation. Encoded
+/// dimensions remain available through [epubImageDimensions]. Never transforms
+/// image bytes; the platform decoder owns orientation of the displayed pixels.
+/// Malformed or ambiguous EXIF leaves display dimensions unknown.
+({int width, int height})? epubDisplayImageDimensions(Uint8List bytes) {
+  final size = epubImageDimensions(bytes);
+  if (size == null ||
+      bytes.length < 2 ||
+      bytes[0] != 0xff ||
+      bytes[1] != 0xd8) {
+    return size;
+  }
+  final orientation = _jpegOrientation(bytes);
+  if (orientation == null) return null;
+  return orientation >= 5 ? (width: size.height, height: size.width) : size;
+}
+
+int? _jpegOrientation(Uint8List bytes) {
+  final data = ByteData.sublistView(bytes);
+  var at = 2, markers = 0;
+  int? orientation;
+  // No entropy data, thumbnails, recursive IFDs, or pixel decoding are read.
+  while (at < bytes.length) {
+    if (at >= 1024 * 1024 || ++markers > 256) return null;
+    if (bytes[at++] != 0xff) return null;
+    while (at < bytes.length && bytes[at] == 0xff) {
+      if (at >= 1024 * 1024) return null;
+      at++;
+    }
+    if (at >= bytes.length) return null;
+    final marker = bytes[at++];
+    if (marker == 0xda || marker == 0xd9) return orientation ?? 1;
+    if (marker == 0 || marker == 0xd8) return null;
+    if (marker == 1 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (at + 2 > bytes.length) return null;
+    final length = data.getUint16(at);
+    final end = at + length;
+    if (length < 2 || end > bytes.length || end > 1024 * 1024) return null;
+    final start = at + 2;
+    if (marker == 0xe1 &&
+        length >= 8 &&
+        bytes[start] == 0x45 &&
+        bytes[start + 1] == 0x78 &&
+        bytes[start + 2] == 0x69 &&
+        bytes[start + 3] == 0x66 &&
+        bytes[start + 4] == 0 &&
+        bytes[start + 5] == 0) {
+      final exif = _exifOrientation(data, start + 6, end);
+      if (!exif.valid ||
+          orientation != null &&
+              exif.orientation != null &&
+              orientation != exif.orientation) {
+        return null;
+      }
+      orientation = exif.orientation ?? orientation;
+    }
+    at = end;
+  }
+  return orientation ?? 1;
+}
+
+({bool valid, int? orientation}) _exifOrientation(
+  ByteData data,
+  int tiff,
+  int end,
+) {
+  const invalid = (valid: false, orientation: null);
+  if (end - tiff < 8) return invalid;
+  final order = data.getUint16(tiff);
+  if (order != 0x4949 && order != 0x4d4d) return invalid;
+  final endian = order == 0x4949 ? Endian.little : Endian.big;
+  if (data.getUint16(tiff + 2, endian) != 42) return invalid;
+  final offset = data.getUint32(tiff + 4, endian);
+  if (offset < 8 || offset > end - tiff - 2) return invalid;
+  final directory = tiff + offset;
+  final count = data.getUint16(directory, endian);
+  if (count > 1024 || directory + 2 + count * 12 + 4 > end) return invalid;
+  int? orientation;
+  for (var i = 0; i < count; i++) {
+    final entry = directory + 2 + i * 12;
+    if (data.getUint16(entry, endian) != 0x0112) continue;
+    if (data.getUint16(entry + 2, endian) != 3 ||
+        data.getUint32(entry + 4, endian) != 1) {
+      return invalid;
+    }
+    final value = data.getUint16(entry + 8, endian);
+    if (value < 1 || value > 8 || orientation != null && orientation != value) {
+      return invalid;
+    }
+    orientation = value;
+  }
+  return (valid: true, orientation: orientation);
+}

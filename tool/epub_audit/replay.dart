@@ -132,6 +132,7 @@ Future<Json> evaluatorIdentity() async => {
       'image_expectations',
     ])
       'tool/epub_audit/$name.dart',
+    'lib/data/local/epub/epub_image_dimensions.dart',
   ]),
   'rulesVersion': auditRulesVersion,
   'schemaVersion': schemaVersion,
@@ -144,7 +145,7 @@ Future<Json> probeIdentity() async => {
     'tool/epub_audit/workflow.dart',
     'integration_test/epub_loss_webview.dart',
   ]),
-  'version': '2.0.5',
+  'version': '2.0.6',
 };
 
 /// Every file read at replay/verification boundaries must be independently

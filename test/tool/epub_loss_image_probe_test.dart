@@ -12,25 +12,28 @@ import '../../tool/epub_audit/plan.dart';
 import '../../tool/epub_audit/replay.dart';
 import '../../tool/epub_audit/report.dart';
 import '../data/local/support/epub_fixtures.dart';
+import '../data/local/support/oriented_jpeg.dart';
 
 const svg =
     '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 80 200"><image width="80" height="200" href="../images/星 空.png"/></svg>';
-Future<ProducerSnapshot> imageBook(WidgetTester tester, String body) async =>
-    (await tester.runAsync(() async {
-      final files = epubFiles();
-      files['OPS/images/星 空.png'] = fixturePng(80, 200, 2);
-      files['OPS/text/a.xhtml'] = utf8.encode(
-        '<html><body>$body</body></html>',
-      );
-      return produce(zipFiles(files));
-    }))!;
+Future<ProducerSnapshot> imageBook(
+  WidgetTester tester,
+  String body, {
+  String imagePath = 'OPS/images/星 空.png',
+}) async => (await tester.runAsync(() async {
+  final files = epubFiles();
+  files[imagePath] = fixturePng(80, 200, 2);
+  files['OPS/text/a.xhtml'] = utf8.encode('<html><body>$body</body></html>');
+  return produce(zipFiles(files));
+}))!;
 VerificationTarget imageTarget(
   ProducerSnapshot s, {
   ProbeConfiguration? config,
+  String rule = 'image.authored_alignment',
 }) {
   final candidate = bookCandidates(
     auditParsed(s.parser, s.parsed),
-  ).firstWhere((c) => c.rule == 'image.authored_alignment');
+  ).firstWhere((c) => c.rule == rule);
   final chapter = s.parsed.content.chapters.first;
   return VerificationTarget(
     candidate,
@@ -41,6 +44,92 @@ VerificationTarget imageTarget(
 }
 
 void main() {
+  testWidgets(
+    'oriented JPEG SVG gets a measured alignment expectation without rotating bytes',
+    (tester) async {
+      final snapshot = (await tester.runAsync(() async {
+        final files = epubFiles();
+        files['OPS/images/oriented.jpg'] = jpegWithSegments([
+          orientationSegment(8),
+        ]);
+        files['OPS/text/a.xhtml'] = utf8.encode(
+          '<html><body><p>Before.</p>'
+          '<svg width="100%" height="100%" viewBox="0 0 200 80">'
+          '<image width="200" height="80" href="../images/oriented.jpg"/>'
+          '</svg><p>After.</p></body></html>',
+        );
+        return produce(zipFiles(files));
+      }))!;
+      final target = imageTarget(
+        snapshot,
+        config: ProbeConfiguration(width: 1600, height: 350),
+      );
+      final result = await runNativeProbe(
+        tester,
+        snapshot,
+        target,
+        target.configurations.first,
+      );
+      final a = result['assertions'] as Json;
+      expect(a['candidateFeatureStatus'], 'pass');
+      final image = (a['decodedImages'] as List).cast<Json>().firstWhere(
+        (i) => i['candidateScope'] == true,
+      );
+      expect(image['encodedNaturalSize'], {'width': 80, 'height': 200});
+      expect(image['modelNaturalSize'], {'width': 80, 'height': 200});
+      expect(image['displayNaturalSize'], {'width': 200, 'height': 80});
+      expect(image['alignmentBasis'], 'source_single_raster_svg_meet');
+      expect(image['alignmentStatus'], 'pass');
+      expect(image['decodedWidth'], greaterThan(image['decodedHeight']));
+    },
+  );
+  testWidgets(
+    'standalone flow image policy is measured and wrong alignment fails',
+    (tester) async {
+      final s = await imageBook(
+        tester,
+        '<div><p><img src="../images/flow.png"/></p></div>',
+        imagePath: 'OPS/images/flow.png',
+      );
+      final target = imageTarget(
+        s,
+        rule: 'image.reader_default_alignment',
+        config: ProbeConfiguration(width: 1600, height: 350, columns: 2),
+      );
+      final result = await runNativeProbe(
+        tester,
+        s,
+        target,
+        target.configurations.first,
+      );
+      final a = result['assertions'] as Json;
+      expect(a['candidateFeatureStatus'], 'pass');
+      final image = (a['decodedImages'] as List).cast<Json>().firstWhere(
+        (i) => i['candidateScope'] == true,
+      );
+      expect(image['alignmentBasis'], 'reader_single_image_document_default');
+      expect(image['role'], 'flow');
+      expect(image['displayNaturalSize'], {'width': 80, 'height': 200});
+      final damaged = await runNativeProbe(
+        tester,
+        s,
+        target,
+        target.configurations.first,
+        testOnlyTamper: (tester) async {
+          final align = find
+              .descendant(
+                of: find.byType(ReaderImage).first,
+                matching: find.byType(Align),
+              )
+              .first;
+          tester.renderObject<RenderPositionedBox>(align).alignment =
+              Alignment.centerLeft;
+          await tester.pump();
+        },
+      );
+      expect(damaged['assertions']['candidateFeatureStatus'], 'fail');
+    },
+  );
   testWidgets(
     'image probe measures painted pixels and detects misalignment inside viewport',
     (tester) async {

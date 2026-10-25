@@ -846,7 +846,7 @@ Map<String, String>? _expandNativeDeclaration(String name, String value) {
       r'''url\(\s*(?:"[^"]*"|'[^']*'|[^\s)]+)\s*\)''',
       caseSensitive: false,
     ).firstMatch(value);
-    if (url == null) return null;
+    if (url == null) return _solidBackgroundDeclaration(value);
     final remainder = value.replaceRange(url.start, url.end, '');
     if (remainder.contains(',') || remainder.contains('/')) return null;
     final rest = remainder.trim().toLowerCase().split(RegExp(r'\s+'));
@@ -950,6 +950,85 @@ Map<String, String>? _expandNativeDeclaration(String name, String value) {
     }
   }
   return {name: value};
+}
+
+/// Single-layer, image-free shorthand. Reset every background longhand, just
+/// like `background: none`; do not mistake a color token inside a gradient or
+/// a multi-layer declaration for the whole background.
+Map<String, String>? _solidBackgroundDeclaration(String value) {
+  if (value.length > 1024 || value.contains('/')) return null;
+  final tokens = RegExp(
+    r'rgb\([^)]*\)|[^\s]+',
+  ).allMatches(value.toLowerCase()).map((m) => m[0]!).toList();
+  if (tokens.isEmpty || tokens.length > 8) return null;
+  String? color, repeat, attachment;
+  var imageSeen = false, lastPosition = -1;
+  final position = <String>[];
+  bool length(String t) => RegExp(
+    r'^[+-]?(?:\d*\.)?\d+(?:px|em|rem|%)$|^[+-]?0(?:\.0+)?$',
+  ).hasMatch(t);
+  for (var i = 0; i < tokens.length; i++) {
+    final token = tokens[i];
+    if (epubColor(token) != null || token == 'transparent') {
+      if (color != null) return null;
+      color = token;
+    } else if (token == 'none') {
+      if (imageSeen) return null;
+      imageSeen = true;
+    } else if ({
+      'repeat',
+      'no-repeat',
+      'repeat-x',
+      'repeat-y',
+      'space',
+      'round',
+    }.contains(token)) {
+      if (repeat != null) return null;
+      repeat = token;
+    } else if ({'scroll', 'fixed', 'local'}.contains(token)) {
+      if (attachment != null) return null;
+      attachment = token;
+    } else if ({'left', 'right', 'top', 'bottom', 'center'}.contains(token) ||
+        length(token)) {
+      if (position.length == 2 ||
+          position.isNotEmpty && lastPosition != i - 1) {
+        return null;
+      }
+      position.add(token);
+      lastPosition = i;
+    } else {
+      return null;
+    }
+  }
+  bool horizontal(String t) =>
+      {'left', 'right', 'center'}.contains(t) || length(t);
+  bool vertical(String t) =>
+      {'top', 'bottom', 'center'}.contains(t) || length(t);
+  var resolved = '0% 0%';
+  if (position.length == 1) {
+    final p = position.single;
+    resolved = {'top', 'bottom'}.contains(p) ? '50% $p' : '$p 50%';
+  } else if (position.length == 2) {
+    final a = position[0], b = position[1];
+    if (horizontal(a) && vertical(b)) {
+      resolved = '$a $b';
+    } else if ({'top', 'bottom', 'center'}.contains(a) &&
+        {'left', 'right', 'center'}.contains(b)) {
+      resolved = '$b $a';
+    } else {
+      return null;
+    }
+  }
+  return {
+    'background-image': 'none',
+    'background-repeat': repeat ?? 'repeat',
+    'background-position': resolved,
+    'background-size': 'auto',
+    'background-color': color ?? 'transparent',
+    'background-attachment': attachment ?? 'scroll',
+    'background-origin': 'padding-box',
+    'background-clip': 'border-box',
+  };
 }
 
 String? epubCssUrl(String value) {

@@ -147,6 +147,7 @@ class EpubParser {
   final media = <String, Uint8List>{};
   final mediaByPath = <String, MediaRef>{};
   final imageSizes = <MediaRef, ({int width, int height})?>{};
+  final imageDisplaySizes = <MediaRef, ({int width, int height})?>{};
   final items = <String, _Item>{};
   final chapters = <ChapterContent>[];
   final auxiliary = <ChapterContent>[];
@@ -263,6 +264,7 @@ class EpubParser {
       mediaId: '${book.novelId}/$hash',
     );
     imageSizes.putIfAbsent(ref, () => epubImageDimensions(b));
+    imageDisplaySizes.putIfAbsent(ref, () => epubDisplayImageDimensions(b));
     return ref;
   }
 
@@ -1960,7 +1962,7 @@ class EpubParser {
                   _ => epubSvgImageAlignment(
                     node,
                     styles,
-                    size,
+                    imageDisplaySizes[img],
                     stylesSafe: svgAlignmentStylesSafe,
                   ),
                 },
@@ -2110,6 +2112,45 @@ class EpubParser {
       visible = previousVisible;
     }
 
+    bool singleImageContainer(dom.Element owner) {
+      if (owner.text.trim().isNotEmpty ||
+          excluded(owner) ||
+          !visibility(owner, visible)) {
+        return false;
+      }
+      final ordinary =
+          owner.querySelectorAll('img,picture').length -
+          owner.querySelectorAll('picture img').length;
+      final svgs = owner.querySelectorAll('svg');
+      if (svgs.isEmpty) return ordinary == 1;
+      if (ordinary != 0 || svgs.length != 1) return false;
+      final svg = svgs.single;
+      if (svg.children.length != 1 ||
+          svg.children.single.localName != 'image') {
+        return false;
+      }
+      final raster = svg.children.single;
+      if (excluded(svg) ||
+          excluded(raster) ||
+          !visibility(raster, visibility(svg, true))) {
+        return false;
+      }
+      for (final href in epubImageCandidates(raster).take(128)) {
+        final reference = epubReference(path, href);
+        if (reference == null) continue;
+        final media = image(reference.$1);
+        if (media == null) continue;
+        return epubSvgImageAlignment(
+              raster,
+              styles,
+              imageDisplaySizes[media],
+              stylesSafe: svgAlignmentStylesSafe,
+            ) !=
+            null;
+      }
+      return false;
+    }
+
     walk = (node) {
       final previousBox = activeBox;
       final previousBoxOwner = activeBoxOwner;
@@ -2130,10 +2171,7 @@ class EpubParser {
           decorationColumns: decorationTables[node]?.columns,
           allowEdges:
               proseHeadingLevel(node.localName) != null ||
-              node.querySelectorAll('img,picture').length -
-                          node.querySelectorAll('picture img').length ==
-                      1 &&
-                  node.text.trim().isEmpty,
+              singleImageContainer(node),
         );
         if (box != null) {
           flush();
