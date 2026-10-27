@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shiori/app/theme/shiori_theme.dart';
 import 'package:shiori/data/media/memory_image_repository.dart';
 import 'package:shiori/dev/fixtures.dart';
 import 'package:shiori/domain/models/models.dart';
@@ -175,10 +176,19 @@ void main() {
     },
   );
 
-  for (final kind in [PointerDeviceKind.touch, PointerDeviceKind.mouse]) {
-    testWidgets('$kind double tap zooms at the pointer and resets', (
+  for (final (kind, reducedMotion) in [
+    (PointerDeviceKind.touch, false),
+    (PointerDeviceKind.mouse, false),
+    (PointerDeviceKind.touch, true),
+  ]) {
+    testWidgets('$kind double tap zooms and resets, reduced=$reducedMotion', (
       tester,
     ) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          FakeAccessibilityFeatures(disableAnimations: reducedMotion);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
       final env = FixtureEnvironment();
       final repo = MemoryImageRepository(resolve: (_) => env.source);
       addTearDown(() async {
@@ -218,16 +228,69 @@ void main() {
       }
 
       await doubleTap();
+      if (!reducedMotion) {
+        expect(transform.value.getMaxScaleOnAxis(), 1);
+        await tester.pump(ShioriMotion.feedback ~/ 2);
+        expect(transform.value.getMaxScaleOnAxis(), greaterThan(1));
+        expect(transform.value.getMaxScaleOnAxis(), lessThan(2));
+        expect((transform.toScene(local) - local).distance, lessThan(.001));
+        await tester.pump(ShioriMotion.feedback ~/ 2);
+      }
       expect(transform.value.getMaxScaleOnAxis(), 2);
       expect((transform.toScene(local) - local).distance, lessThan(.001));
       await tester.pump(kDoubleTapTimeout);
       expect(route.isCurrent, isTrue);
       await doubleTap();
+      if (!reducedMotion) {
+        expect(transform.value.getMaxScaleOnAxis(), 2);
+        await tester.pump(ShioriMotion.feedback ~/ 2);
+        expect(transform.value.getMaxScaleOnAxis(), greaterThan(1));
+        expect(transform.value.getMaxScaleOnAxis(), lessThan(2));
+        await tester.pump(ShioriMotion.feedback ~/ 2);
+      }
       expect(transform.value, Matrix4.identity());
       await tester.pump(kDoubleTapTimeout);
       expect(route.isCurrent, isTrue);
 
-      // A queued single tap must not pop the reader after Esc closes preview.
+      // Direct manipulation takes over without the animation snapping back.
+      await doubleTap();
+      await tester.pump(ShioriMotion.feedback ~/ 2);
+      final beforeInteraction = transform.value.clone();
+      final pointers = <TestGesture>[];
+      if (kind == PointerDeviceKind.touch) {
+        for (final (id, direction) in [(1, -1.0), (2, 1.0)]) {
+          pointers.add(
+            await tester.startGesture(
+              position + Offset(direction * 30, 0),
+              pointer: id,
+            ),
+          );
+        }
+        for (final delta in [40.0, 30.0]) {
+          await pointers[0].moveBy(Offset(-delta, 0));
+          await pointers[1].moveBy(Offset(delta, 0));
+          await tester.pump();
+        }
+      } else {
+        await tester.sendEventToBinding(
+          PointerScrollEvent(
+            position: position,
+            scrollDelta: const Offset(0, -40),
+          ),
+        );
+      }
+      final interrupted = transform.value.clone();
+      expect(interrupted, isNot(beforeInteraction));
+      await tester.pump(ShioriMotion.feedback);
+      expect(transform.value, interrupted);
+      for (final pointer in pointers) {
+        await pointer.up();
+      }
+      await tester.pumpAndSettle();
+
+      // Esc during animation also retires a queued tap without popping Reader.
+      await doubleTap();
+      await tester.pump(ShioriMotion.feedback ~/ 4);
       await tester.tapAt(position, kind: kind);
       await tester.pump(const Duration(milliseconds: 100));
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);

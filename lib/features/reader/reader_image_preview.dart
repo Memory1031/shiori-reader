@@ -56,14 +56,28 @@ class ReaderImagePreview extends StatefulWidget {
   State<ReaderImagePreview> createState() => _ReaderImagePreviewState();
 }
 
-class _ReaderImagePreviewState extends State<ReaderImagePreview> {
+class _ReaderImagePreviewState extends State<ReaderImagePreview>
+    with SingleTickerProviderStateMixin {
   final _transform = TransformationController();
+  late final AnimationController _zoom;
+  late Matrix4Tween _zoomTween;
   Offset _doubleTapPosition = Offset.zero;
   bool _closing = false, _imageReady = false;
   CancellationSource? _exportCancellation;
   bool _busy = false;
   bool _lastAsFile = false;
   ImageExportResult? _feedback;
+
+  @override
+  void initState() {
+    super.initState();
+    _zoom = AnimationController(vsync: this)
+      ..addListener(() {
+        _transform.value = _zoomTween.transform(
+          Curves.easeOut.transform(_zoom.value),
+        );
+      });
+  }
 
   bool get _active {
     if (!mounted || _closing) return false;
@@ -174,14 +188,16 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
   void _close() {
     if (!_active) return;
     _closing = true;
+    _zoom.stop();
     _exportCancellation?.cancel();
     Navigator.of(context).pop();
   }
 
   void _toggleZoom() {
     if (!_active) return;
+    _zoom.stop();
     final point = _transform.toScene(_doubleTapPosition);
-    _transform.value = _transform.value.getMaxScaleOnAxis() > 1
+    final target = _transform.value.getMaxScaleOnAxis() > 1
         ? Matrix4.identity()
         : (Matrix4.identity()
             ..translateByDouble(
@@ -191,11 +207,20 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
               1,
             )
             ..scaleByDouble(2, 2, 1, 1));
+    final duration = ShioriMotion.of(context, ShioriMotion.feedback);
+    if (duration == Duration.zero) {
+      _transform.value = target;
+      return;
+    }
+    _zoomTween = Matrix4Tween(begin: _transform.value.clone(), end: target);
+    _zoom.duration = duration;
+    _zoom.forward(from: 0);
   }
 
   @override
   void dispose() {
     _exportCancellation?.cancel();
+    _zoom.dispose();
     _transform.dispose();
     super.dispose();
   }
@@ -209,6 +234,7 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) {
           _closing = true;
+          _zoom.stop();
           _exportCancellation?.cancel();
         }
       },
@@ -271,6 +297,7 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
                             onDoubleTap: _toggleZoom,
                             child: InteractiveViewer(
                               transformationController: _transform,
+                              onInteractionStart: (_) => _zoom.stop(),
                               minScale: 1,
                               maxScale: 4,
                               child: SizedBox.expand(
