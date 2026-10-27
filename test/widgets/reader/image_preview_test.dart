@@ -118,7 +118,10 @@ void main() {
         tester.element(find.byType(ReaderImagePreview)),
       )!;
       await tester.tapAt(center);
-      // Pop is synchronous on tap release, without pumping a double-tap timeout.
+      expect(route.isCurrent, isTrue);
+      await tester.pump(kDoubleTapTimeout - const Duration(milliseconds: 1));
+      expect(route.isCurrent, isTrue);
+      await tester.pump(const Duration(milliseconds: 1));
       expect(route.isCurrent, isFalse);
 
       await frames(tester);
@@ -150,6 +153,8 @@ void main() {
         tester.element(find.byType(ReaderImagePreview)),
       )!;
       await tester.tapAt(stage.topLeft + const Offset(3, 3));
+      expect(blankRoute.isCurrent, isTrue);
+      await tester.pump(kDoubleTapTimeout);
       expect(blankRoute.isCurrent, isFalse);
       await frames(tester);
       expect(find.byType(ReaderImagePreview), findsNothing);
@@ -169,6 +174,73 @@ void main() {
       await env.close();
     },
   );
+
+  for (final kind in [PointerDeviceKind.touch, PointerDeviceKind.mouse]) {
+    testWidgets('$kind double tap zooms at the pointer and resets', (
+      tester,
+    ) async {
+      final env = FixtureEnvironment();
+      final repo = MemoryImageRepository(resolve: (_) => env.source);
+      addTearDown(() async {
+        repo.close();
+        await env.close();
+      });
+      await tester.pumpWidget(
+        app(
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showReaderImagePreview(
+                context,
+                block: ImageBlock(media: fixtureMediaRef(0)),
+                repository: repo,
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open'));
+      await frames(tester);
+      final viewer = find.byType(InteractiveViewer);
+      final transform = tester
+          .widget<InteractiveViewer>(viewer)
+          .transformationController!;
+      final route = ModalRoute.of(tester.element(viewer))!;
+      final local = tester.getSize(viewer).center(Offset.zero) / 2;
+      final position = tester.getTopLeft(viewer) + local;
+      Future<void> doubleTap() async {
+        await tester.tapAt(position, kind: kind);
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(route.isCurrent, isTrue);
+        await tester.tapAt(position, kind: kind);
+        await tester.pump();
+      }
+
+      await doubleTap();
+      expect(transform.value.getMaxScaleOnAxis(), 2);
+      expect((transform.toScene(local) - local).distance, lessThan(.001));
+      await tester.pump(kDoubleTapTimeout);
+      expect(route.isCurrent, isTrue);
+      await doubleTap();
+      expect(transform.value, Matrix4.identity());
+      await tester.pump(kDoubleTapTimeout);
+      expect(route.isCurrent, isTrue);
+
+      // A queued single tap must not pop the reader after Esc closes preview.
+      await tester.tapAt(position, kind: kind);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      expect(route.isCurrent, isFalse);
+      await tester.pump(kDoubleTapTimeout);
+      await tester.pumpAndSettle();
+      expect(find.text('Open'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await frames(tester);
+      expect(repo.retainedBytes, 0);
+    });
+  }
 
   testWidgets('caption does not activate image tap', (tester) async {
     final env = FixtureEnvironment();

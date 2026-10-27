@@ -58,6 +58,7 @@ class ReaderImagePreview extends StatefulWidget {
 
 class _ReaderImagePreviewState extends State<ReaderImagePreview> {
   final _transform = TransformationController();
+  Offset _doubleTapPosition = Offset.zero;
   bool _closing = false, _imageReady = false;
   CancellationSource? _exportCancellation;
   bool _busy = false;
@@ -177,6 +178,21 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
     Navigator.of(context).pop();
   }
 
+  void _toggleZoom() {
+    if (!_active) return;
+    final point = _transform.toScene(_doubleTapPosition);
+    _transform.value = _transform.value.getMaxScaleOnAxis() > 1
+        ? Matrix4.identity()
+        : (Matrix4.identity()
+            ..translateByDouble(
+              _doubleTapPosition.dx - point.dx * 2,
+              _doubleTapPosition.dy - point.dy * 2,
+              0,
+              1,
+            )
+            ..scaleByDouble(2, 2, 1, 1));
+  }
+
   @override
   void dispose() {
     _exportCancellation?.cancel();
@@ -250,6 +266,9 @@ class _ReaderImagePreviewState extends State<ReaderImagePreview> {
                           GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: _close,
+                            onDoubleTapDown: (details) =>
+                                _doubleTapPosition = details.localPosition,
+                            onDoubleTap: _toggleZoom,
                             child: InteractiveViewer(
                               transformationController: _transform,
                               minScale: 1,
