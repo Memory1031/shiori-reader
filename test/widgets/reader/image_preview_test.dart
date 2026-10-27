@@ -305,6 +305,77 @@ void main() {
     });
   }
 
+  testWidgets('single-finger drag takes over an in-progress zoom', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: false);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final env = FixtureEnvironment();
+    final repo = MemoryImageRepository(resolve: (_) => env.source);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox());
+      await frames(tester);
+      repo.close();
+      await env.close();
+    });
+    await tester.pumpWidget(
+      app(
+        ReaderImagePreview(
+          block: ImageBlock(media: fixtureMediaRef(0)),
+          repository: repo,
+        ),
+      ),
+    );
+    await frames(tester);
+    final viewer = find.byType(InteractiveViewer);
+    final transform = tester
+        .widget<InteractiveViewer>(viewer)
+        .transformationController!;
+    final center = tester.getCenter(viewer);
+    await tester.tapAt(center);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tapAt(center);
+    await tester.pump();
+    await tester.pump(ShioriMotion.feedback ~/ 2);
+    final midZoom = transform.value.clone();
+    final scale = midZoom.getMaxScaleOnAxis();
+    expect(scale, greaterThan(1));
+    expect(scale, lessThan(2));
+
+    final finger = await tester.startGesture(center);
+    await finger.moveBy(const Offset(40, 24));
+    await tester.pump();
+    await finger.moveBy(const Offset(32, 20));
+    await tester.pump();
+    final dragged = transform.value.clone();
+    expect(dragged.getMaxScaleOnAxis(), closeTo(scale, .001));
+    expect(dragged.getTranslation().x, greaterThan(midZoom.getTranslation().x));
+    expect(dragged.getTranslation().y, greaterThan(midZoom.getTranslation().y));
+
+    // Hold the finger down beyond the zoom deadline to exclude release inertia.
+    await tester.pump(ShioriMotion.feedback);
+    expect(transform.value, dragged);
+    await finger.moveBy(const Offset(24, 16));
+    await tester.pump();
+    final continued = transform.value.clone();
+    expect(continued.getMaxScaleOnAxis(), closeTo(scale, .001));
+    expect(
+      continued.getTranslation().x,
+      greaterThan(dragged.getTranslation().x),
+    );
+    expect(
+      continued.getTranslation().y,
+      greaterThan(dragged.getTranslation().y),
+    );
+    await tester.pump(ShioriMotion.feedback);
+    expect(transform.value, continued);
+    await finger.up();
+    await tester.pumpAndSettle();
+    expect(find.byType(ReaderImagePreview), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('caption does not activate image tap', (tester) async {
     final env = FixtureEnvironment();
     final repo = MemoryImageRepository(resolve: (_) => env.source);
