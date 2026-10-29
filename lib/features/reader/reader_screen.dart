@@ -72,6 +72,7 @@ class ReaderContentView extends StatefulWidget {
     this.onLayoutInvalidated,
     this.onPanelChanged,
     this.onCancelChapter,
+    this.onBoundary,
     this.onBoundaryDrag,
     this.onEdges,
     this.crossChapterTurning = false,
@@ -116,6 +117,7 @@ class ReaderContentView extends StatefulWidget {
       onLayoutInvalidated,
       onCancelChapter;
   final BoundaryPageDrag? Function(int direction, double grip)? onBoundaryDrag;
+  final ValueChanged<int>? onBoundary;
   final void Function(bool first, bool last)? onEdges;
   final bool crossChapterTurning;
   final ValueChanged<ReaderPanelHandle<Object?>?>? onPanelChanged;
@@ -1178,7 +1180,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
       if (forward) {
         _presentationNext();
       } else {
-        _actions.previousChapter?.call();
+        _backwardBoundary();
       }
     } else {
       unawaited(
@@ -1194,6 +1196,16 @@ class _ReaderContentViewState extends State<ReaderContentView>
       next();
     } else if (_actions.bookEnd != null) {
       _completionTransition.currentState?.turn(true);
+    } else {
+      widget.onBoundary?.call(1);
+    }
+  }
+
+  void _backwardBoundary() {
+    if (_actions.previousChapter case final previous?) {
+      previous();
+    } else {
+      widget.onBoundary?.call(-1);
     }
   }
 
@@ -1657,7 +1669,9 @@ class _ReaderContentViewState extends State<ReaderContentView>
         },
         onCenterTap: _toggle,
         chromeVisible: _chrome,
-        onPrevious: _actions.previousChapter,
+        onPrevious:
+            _actions.previousChapter ??
+            (widget.onBoundary == null ? null : _backwardBoundary),
         onNext: _presentationNext,
         onReady: () {
           final position =
@@ -1801,7 +1815,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
           if (direction > 0) {
             _forwardBoundary();
           } else {
-            _actions.previousChapter?.call();
+            _backwardBoundary();
           }
         },
         imageBuilder: image,

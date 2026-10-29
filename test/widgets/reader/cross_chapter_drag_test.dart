@@ -42,6 +42,9 @@ class Chapters
   final holds = <ChapterKey, Completer<Result<LoadResult<ChapterContent>>>>{};
   final contents = <ChapterKey, ChapterContent>{};
   final cacheMisses = <ChapterKey>{};
+  Stream<Result<LoadResult<Catalog>>>? catalogs;
+  Completer<void>? catalogHold;
+  Result<LoadResult<Catalog>>? catalogResult;
   bool cacheMiss = false, forbidOnline = false;
   ChapterContent content(ChapterKey key) =>
       contents[key] ??
@@ -91,10 +94,17 @@ class Chapters
     NovelKey key, {
     required ReadMode mode,
     required CancellationToken cancellation,
-  }) => inner.loadCatalog(key, mode: mode, cancellation: cancellation);
+  }) async {
+    final held = catalogHold;
+    catalogHold = null;
+    await held?.future;
+    if (catalogResult case final result?) return result;
+    return inner.loadCatalog(key, mode: mode, cancellation: cancellation);
+  }
+
   @override
   Stream<Result<LoadResult<Catalog>>> catalogUpdates(NovelKey key) =>
-      inner.catalogUpdates(key);
+      catalogs ?? inner.catalogUpdates(key);
   @override
   Stream<Result<LoadResult<ChapterContent>>> chapterUpdates(ChapterKey key) =>
       const Stream.empty();
@@ -517,6 +527,164 @@ void main() {
     expect(h.cache.pins, {old.content.key});
     await h.close(tester);
   });
+  for (final outcome in ['load', 'cancel', 'update', 'retry']) {
+    final cancel = outcome == 'cancel';
+    testWidgets('online boundary with a pending catalog handles $outcome', (
+      tester,
+    ) async {
+      final h = Harness();
+      final updates = StreamController<Result<LoadResult<Catalog>>>.broadcast();
+      h.repository.catalogs = updates.stream;
+      addTearDown(updates.close);
+      final held = h.repository.catalogHold = Completer<void>();
+      addTearDown(() async {
+        if (!held.isCompleted) held.complete();
+        await h.close(tester);
+      });
+      await h.open(tester);
+      final source = active(tester).session;
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await layoutFrames(tester);
+      final wait = find.byKey(const ValueKey('cancel-chapter-turn'));
+      expect(wait, findsOneWidget);
+      if (cancel) {
+        await tester.tap(wait);
+        await tester.pumpAndSettle();
+        expect(wait, findsNothing);
+      }
+      if (outcome == 'update') {
+        updates.add(
+          await h.repository.inner.loadCatalog(
+            h.key(0).novelKey,
+            mode: ReadMode.cacheFirst,
+            cancellation: CancellationSource().token,
+          ),
+        );
+      } else {
+        if (outcome == 'retry') {
+          h.repository.catalogResult = Failure(
+            AppFailure(
+              kind: FailureKind.sourceUnavailable,
+              operation: Operation.catalog,
+              retryPolicy: RetryPolicy.manual,
+            ),
+          );
+        }
+        held.complete();
+      }
+      await tester.pumpAndSettle();
+      expect(wait, findsNothing);
+      if (outcome == 'retry') {
+        expect(active(tester).session, same(source));
+        expect(
+          find.text(
+            'Could not open the chapter. Your current page is still available.',
+          ),
+          findsOneWidget,
+        );
+        h.repository.catalogResult = null;
+        await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+        await tester.pumpAndSettle();
+      }
+      expect(active(tester).content.key, h.key(cancel ? 0 : 1));
+      expect(h.library.sessions, cancel ? 1 : 2);
+      if (cancel) expect(active(tester).session, same(source));
+    });
+  }
+  for (final refresh in ['same', 'append', 'insert', 'remove']) {
+    final changed = refresh == 'remove' || refresh == 'insert';
+    testWidgets(
+      '$refresh catalog refresh ${changed ? "invalidates" : "preserves"} a confirmed turn',
+      (tester) async {
+        final h = Harness();
+        final updates =
+            StreamController<Result<LoadResult<Catalog>>>.broadcast();
+        h.repository.catalogs = updates.stream;
+        addTearDown(updates.close);
+        final pending = Completer<Result<LoadResult<ChapterContent>>>();
+        h.repository.holds[h.key(1)] = pending;
+        addTearDown(() => h.close(tester));
+        await h.open(tester);
+        final before =
+            (await h.repository.loadCatalog(
+                      h.key(0).novelKey,
+                      mode: ReadMode.cacheFirst,
+                      cancellation: CancellationSource().token,
+                    )
+                    as Success<LoadResult<Catalog>>)
+                .value;
+        final source = active(tester).session;
+        active(tester).actions.nextChapter!();
+        await layoutFrames(tester);
+        final wait = find.byKey(const ValueKey('cancel-chapter-turn'));
+        expect(wait, findsOneWidget);
+        final chapters = before.value.flatChapters.toList();
+        final added = Chapter(
+          key: ChapterKey(novelKey: before.value.novelKey, chapterId: 'added'),
+          title: 'New chapter',
+          ordinal: 0,
+          volumeGroupId: 'updated',
+        );
+        if (refresh == 'append') {
+          chapters.add(added);
+        }
+        if (refresh == 'insert') {
+          chapters.insert(1, added);
+        }
+        if (refresh == 'remove') {
+          chapters.removeWhere((chapter) => chapter.key == h.key(1));
+        }
+        final catalog = Catalog(
+          novelKey: before.value.novelKey,
+          volumes: refresh == 'same'
+              ? before.value.volumes
+              : [
+                  Volume(
+                    groupId: 'updated',
+                    chapters: [
+                      for (final (i, chapter) in chapters.indexed)
+                        Chapter(
+                          key: chapter.key,
+                          title: chapter.title,
+                          ordinal: i,
+                          volumeGroupId: 'updated',
+                        ),
+                    ],
+                  ),
+                ],
+        );
+        final observation = LoadResult(
+          value: catalog,
+          origin: LoadOrigin.remote,
+          fetchedAt: before.fetchedAt.add(const Duration(seconds: 1)),
+        );
+        h.repository.catalogResult = Success(observation);
+        updates.add(Success(observation));
+        await layoutFrames(tester);
+        expect(wait, changed ? findsNothing : findsOneWidget);
+        pending.complete(h.repository.result(h.key(1)));
+        await tester.pumpAndSettle();
+        expect(active(tester).content.key, h.key(changed ? 0 : 1));
+        expect(h.library.sessions, changed ? 1 : 2);
+        if (changed) {
+          expect(active(tester).session, same(source));
+          expect(
+            find.text(
+              'Could not open the chapter. Your current page is still available.',
+            ),
+            findsOneWidget,
+          );
+          active(tester).actions.nextChapter!();
+          await tester.pumpAndSettle();
+          expect(
+            active(tester).content.key,
+            refresh == 'insert' ? added.key : h.key(2),
+          );
+          expect(h.library.sessions, 2);
+        }
+      },
+    );
+  }
   for (final cancel in [false, true]) {
     testWidgets(
       'release waiting for data ${cancel ? "can cancel" : "commits once"}',
@@ -604,6 +772,42 @@ void main() {
       await tester.pumpAndSettle();
       expect(h.library.sessions, 2);
       await h.close(tester);
+    },
+  );
+  testWidgets(
+    'a ready target cannot leave a confirmed turn waiting indefinitely for save',
+    (tester) async {
+      final h = Harness();
+      final saved = h.library.save = Completer<Result<bool>>();
+      addTearDown(() async {
+        if (!saved.isCompleted) saved.complete(const Success(true));
+        await h.close(tester);
+      });
+      await h.open(tester);
+      final source = active(tester).session;
+      active(tester).actions.nextChapter!();
+      await layoutFrames(tester);
+      final wait = find.byKey(const ValueKey('cancel-chapter-turn'));
+      expect(wait, findsOneWidget);
+      await tester.pump(const Duration(seconds: 46));
+      await tester.pumpAndSettle();
+      expect(wait, findsNothing);
+      expect(active(tester).session, same(source));
+      expect(
+        find.text(
+          'Could not open the chapter. Your current page is still available.',
+        ),
+        findsOneWidget,
+      );
+      saved.complete(const Success(true));
+      await tester.pumpAndSettle();
+      expect(active(tester).session, same(source));
+      expect(h.library.sessions, 1);
+      h.library.save = null;
+      active(tester).actions.nextChapter!();
+      await tester.pumpAndSettle();
+      expect(active(tester).content.key, h.key(1));
+      expect(h.library.sessions, 2);
     },
   );
   for (final change in ['resize', 'font', 'scale', 'metadata']) {

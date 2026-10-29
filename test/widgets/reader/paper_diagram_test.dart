@@ -8,6 +8,7 @@ import '../../data/media/image_export_test.dart'
     show ExportRepository, ExportDestination;
 import 'dart:ui' as ui;
 import 'dart:typed_data';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/shared/paper_diagram.dart';
@@ -225,7 +226,7 @@ void main() {
       await frames(tester);
       expect(destination.bytes, bytes);
       await tester.tap(find.byType(InteractiveViewer));
-      await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
       expect(
         ModalRoute.of(
           tester.element(find.byType(ReaderImagePreview)),
