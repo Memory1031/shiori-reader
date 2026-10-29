@@ -22,34 +22,34 @@ Shiori 是一款开源、跨平台的轻小说阅读器，以本地阅读体验�
 
 > **本页以 `develop` 分支的最新功能为准。** GitHub Releases 中的正式安装包可能尚未包含部分新功能，下载前请查看对应版本的[更新说明](https://github.com/Memory1031/shiori-reader/releases)。
 
-## 功能亮点
+## 阅读界面
 
-- **本地书库** — 导入 TXT 和常见的无 DRM 流式 EPUB（2/3），把自己的书放进书架；手机端也可从其他应用打开或分享文件。
-- **舒适翻页** — 选择喜欢的翻页效果，调整字号、行距与纸张颜色，搭配浅色或深色主题；宽屏下可双页阅读。
-- **搜索与书签** — 在本地书中搜索文字，回顾前后文；为本地或在线书籍保存多处书签，随时重读喜欢的段落。
-- **返回原处** — 查看书签、搜索结果或书内链接后，返回原来的阅读位置，继续刚才的故事。
-- **阅读统计** — 安静记录阅读时长，查看近 7 天、30 天或 12 个月的阅读足迹；记录仅保存在本机，可随时暂停或清空。
-- **随时续读** — 书架可切换网格或列表，记住阅读位置，下次打开接着读。
-- **桌面阅读** — Windows 与 macOS 支持拖入文件、键盘和滚轮翻页，宽屏阅读时也能欣赏插图与正文并排的效果。
-- **在线阅读** — 通过 [LightNovel.fun](https://www.lightnovel.fun/) 找书、查看分卷目录并阅读；已缓存的内容可离线阅读，缓存也可按需清理。
+以下为当前开发版的真实界面，使用原创演示小说《蓝色借书卡的最后一栏》；应用不附带第三方小说。更多阅读、搜索与书签展示见[官网](https://memory1031.github.io/shiori-reader/zh-cn/#experience)。
 
-## 截图
-
-以下为当前开发版的 Windows 与 Android 真实界面，展示原创演示小说《蓝色借书卡的最后一栏》。阅读统计使用演示数据，应用不附带第三方小说。更多阅读、搜索与书签展示见[官网](https://memory1031.github.io/shiori-reader/zh-cn/#experience)。
-
-### Windows 桌面端
-
-**宽屏双页阅读：插图与正文配对**
+**Windows · 插图与正文双页阅读**
 
 ![Shiori Windows 插图与正文双页阅读](assets/screenshots/current/desktop/zh/reader-illustration-desktop-zh.png)
 
-### Android 移动端
+**Android · 单页阅读**
 
-书架与续读、单页阅读、阅读统计（演示数据）：
-
-<p>
-  <img src="assets/screenshots/current/mobile/zh/bookshelf-mobile-zh.png" alt="Shiori Android 中文书架与续读" width="260" />
+<p align="center">
   <img src="assets/screenshots/current/mobile/zh/reader-mobile-zh.png" alt="Shiori Android 中文单页阅读界面" width="260" />
+</p>
+
+## 功能亮点
+
+- **本地书库与续读** — 导入常见的无 DRM EPUB（2/3）和 TXT，使用书架管理、继续阅读；移动端支持从其他应用打开或分享文件。
+- **排版与翻页** — 自定义字号、行距、页边距和阅读主题；手机单页、宽屏双页，桌面端支持键盘、滚轮翻页和文件拖入。
+- **搜索与书签** — 搜索本地书籍正文、保存多处书签，查阅目录、搜索结果或书内链接后可返回原来的阅读位置。
+- **阅读统计** — 查看最近 7 天、30 天及 12 个月的阅读时长，记录保存在本机，支持暂停或清空。
+- **在线阅读** — 通过 [LightNovel.fun](https://www.lightnovel.fun/) 搜索和阅读轻小说，支持分卷目录与已缓存内容的离线阅读。
+
+### 其他界面（Android）
+
+书架与续读、阅读统计（演示数据）：
+
+<p align="center">
+  <img src="assets/screenshots/current/mobile/zh/bookshelf-mobile-zh.png" alt="Shiori Android 中文书架与续读" width="260" />
   <img src="assets/screenshots/current/mobile/zh/reading-statistics-mobile-zh.png" alt="Shiori Android 阅读统计，使用演示数据" width="260" />
 </p>
 
