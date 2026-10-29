@@ -665,6 +665,51 @@ void main() {
     });
   }
   for (final commit in [false, true]) {
+    for (final input in ['tap', 'drag']) {
+      testWidgets(
+        '$input waiting for target freezes source images until ${commit ? "commit" : "cancel"}',
+        (tester) async {
+          final h = Harness();
+          h.repository.contents[h.key(0)] = ChapterContent(
+            key: h.key(0),
+            title: 'Source image',
+            blocks: [ImageBlock(media: fixtureMediaRef(0), alt: 'Source')],
+          );
+          final pending = Completer<Result<LoadResult<ChapterContent>>>();
+          h.repository.holds[h.key(1)] = pending;
+          await h.open(tester);
+          final source = active(tester).session;
+          final viewport = active(tester).viewportController!;
+          final generation = viewport.layoutGeneration;
+          if (input == 'tap') {
+            final bounds = tester.getRect(find.byType(PagedReaderViewport));
+            await tester.tapAt(Offset(bounds.right - 10, bounds.bottom - 10));
+          } else {
+            final gesture = await drag(tester, 1);
+            await gesture.up();
+          }
+          tester
+              .widget<ReaderImage>(find.byType(ReaderImage))
+              .onIntrinsicSize(const Size(100, 200));
+          await layoutFrames(tester);
+          final cancel = find.byKey(const ValueKey('cancel-chapter-turn'));
+          expect(viewport.layoutGeneration, generation);
+          expect(cancel, findsOneWidget);
+          expect(frame(tester).progress, 0);
+          expect(active(tester).session, same(source));
+          if (!commit) await tester.tap(cancel);
+          pending.complete(h.repository.result(h.key(1)));
+          await tester.pumpAndSettle();
+          expect(active(tester).content.key, h.key(commit ? 1 : 0));
+          expect(h.library.sessions, commit ? 2 : 1);
+          if (!commit) {
+            expect(viewport.layoutGeneration, greaterThan(generation));
+          }
+          await h.close(tester);
+        },
+        variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+      );
+    }
     testWidgets(
       'both image geometries freeze until ${commit ? "commit" : "cancel"}',
       (tester) async {

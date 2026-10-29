@@ -125,6 +125,7 @@ Future<SplitReader> mount(
   WidgetTester tester, {
   bool delayedMetadata = false,
   LocalBookContent? content,
+  int chapterIndex = 0,
 }) async {
   final book = content ?? splitBook();
   final image = book.chapters
@@ -153,13 +154,13 @@ Future<SplitReader> mount(
       locale: const Locale('en'),
       routes: AppRoutes(
         home: (_) => BookReaderScreen(
-          chapter: book.chapters.first.key,
+          chapter: book.chapters[chapterIndex].key,
           repository: repo,
           images: LocalImageRepository(local: store, online: ForbiddenOnline()),
           library: library,
           settings: settings,
           startAtBeginning: true,
-          initialBlockKey: book.chapters.first.blocks.last.blockKey,
+          initialBlockKey: book.chapters[chapterIndex].blocks.last.blockKey,
         ),
       ),
     ),
@@ -285,6 +286,186 @@ Future<void> dragTo(
 }
 
 void main() {
+  Future<void> tapNext(WidgetTester tester) async {
+    final bounds = tester.getRect(find.byType(PagedReaderViewport));
+    await tester.tapAt(Offset(bounds.right - 10, bounds.center.dy));
+    await tester.pump();
+  }
+
+  final wait = find.byKey(const ValueKey('cancel-chapter-turn'));
+  final ios = TargetPlatformVariant({TargetPlatform.iOS});
+
+  testWidgets(
+    'EPUB boundary tap waits for reading order and target without another tap',
+    (tester) async {
+      final reader = await mount(tester, delayedMetadata: true);
+      final source = reader.view(tester).session;
+      final position = source!.currentPosition;
+      reader.repo.blocked = reader.book.chapters[1].key;
+      reader.repo.target = Completer<void>();
+      await tapNext(tester);
+      expect(wait, findsOneWidget);
+      expect(reader.view(tester).session, same(source));
+      expect(source.currentPosition, position);
+      await tapNext(tester);
+      reader.repo.metadata!.complete();
+      await decodeImages(tester);
+      expect(wait, findsOneWidget);
+      expect(reader.view(tester).session, same(source));
+      reader.repo.target!.complete();
+      await decodeImages(tester);
+      await tester.pumpAndSettle();
+      expect(wait, findsNothing);
+      expect(reader.view(tester).content.key, reader.book.chapters[1].key);
+      expect(
+        (await reader.saved(tester)).chapterKey,
+        reader.book.chapters[1].key,
+      );
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+    variant: ios,
+  );
+
+  for (final cancel in ['button', 'back', 'background', 'layout', 'route']) {
+    testWidgets(
+      'EPUB order wait cancelled by $cancel ignores late metadata',
+      (tester) async {
+        final reader = await mount(tester, delayedMetadata: true);
+        final source = reader.view(tester).session;
+        final navigator = Navigator.of(
+          tester.element(find.byType(PagedReaderViewport)),
+        );
+        await tapNext(tester);
+        expect(wait, findsOneWidget);
+        switch (cancel) {
+          case 'button':
+            await tester.tap(wait);
+          case 'back':
+            await tester.binding.handlePopRoute();
+          case 'background':
+            tester.binding.handleAppLifecycleStateChanged(
+              AppLifecycleState.paused,
+            );
+          case 'layout':
+            final view = reader.view(tester);
+            view.preferences!.update(
+              view.preferences!.value.copyWith(fontSize: 24),
+            );
+          case 'route':
+            navigator.push(
+              MaterialPageRoute<void>(builder: (_) => const Scaffold()),
+            );
+        }
+        await tester.pumpAndSettle();
+        if (cancel == 'background') {
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          );
+        }
+        if (cancel == 'route') {
+          navigator.pop();
+        }
+        reader.repo.metadata!.complete();
+        await decodeImages(tester);
+        await tester.pumpAndSettle();
+        expect(wait, findsNothing);
+        expect(reader.view(tester).session, same(source));
+        expect(
+          (await reader.saved(tester)).chapterKey,
+          reader.book.chapters.first.key,
+        );
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      },
+      variant: cancel == 'back'
+          ? TargetPlatformVariant.only(TargetPlatform.android)
+          : ios,
+    );
+  }
+
+  for (final failure in ['error', 'timeout']) {
+    testWidgets(
+      'EPUB order wait $failure keeps the page and allows an explicit retry',
+      (tester) async {
+        final reader = await mount(tester, delayedMetadata: true);
+        final source = reader.view(tester).session;
+        await tapNext(tester);
+        expect(wait, findsOneWidget);
+        if (failure == 'error') {
+          reader.repo.metadata!.completeError(
+            StateError('Metadata unavailable'),
+          );
+        } else {
+          await tester.pump(const Duration(seconds: 45));
+        }
+        await tester.pumpAndSettle();
+        expect(wait, findsNothing);
+        expect(reader.view(tester).session, same(source));
+        if (failure == 'timeout') reader.repo.metadata!.complete();
+        reader.repo.metadata = null;
+        await decodeImages(tester);
+        expect(reader.view(tester).session, same(source));
+        await tapNext(tester);
+        await decodeImages(tester);
+        await tester.pumpAndSettle();
+        expect(reader.view(tester).content.key, reader.book.chapters[1].key);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      },
+      variant: ios,
+    );
+  }
+
+  testWidgets(
+    'EPUB final boundary waits for order before recording book completion',
+    (tester) async {
+      final book = splitBook();
+      final reader = await mount(
+        tester,
+        delayedMetadata: true,
+        content: book,
+        chapterIndex: book.chapters.length - 1,
+      );
+      final view = reader.view(tester);
+      view.chrome!.value = true;
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.pump();
+      expect(wait, findsOneWidget);
+      expect(
+        (await reader.saved(tester)).bookProgress!.terminal,
+        BookTerminalState.reading,
+      );
+      reader.repo.metadata!.complete();
+      await decodeImages(tester);
+      await tester.pumpAndSettle();
+      expect(wait, findsNothing);
+      expect(reader.view(tester).completion, BookTerminalState.finished);
+      expect(view.chrome!.value, isFalse);
+      expect(
+        (await reader.saved(tester)).bookProgress!.terminal,
+        BookTerminalState.finished,
+      );
+      tester.view.physicalSize = const Size(390, 400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      view.preferences!.update(
+        view.preferences!.value.copyWith(fontSize: 32, lineHeight: 2.4),
+      );
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+      await tester.pumpAndSettle();
+      expect(reader.view(tester).completion, isNull);
+      final page = view.viewportController!.inspectDisplayedPage()!;
+      expect(page.page.end.unit, page.chunks.length);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+    variant: ios,
+  );
+
   testWidgets('split EPUB keeps first section progress across A image and B', (
     tester,
   ) async {

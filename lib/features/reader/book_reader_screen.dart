@@ -416,6 +416,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
 
   ReaderController? _pending;
   _ChapterOperation? _operation;
+  CancellationSource? _awaitingOrder;
   late final ReaderPreferences _preferences;
   Future<void> get _preferencesReady => _preferences.ready;
   ReaderPanelHandle<Object?>? _activePanel;
@@ -969,7 +970,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         ..addListener(_changed);
   void _changed() {
     if (_invalidated) return;
-    if (_reader.status != ReaderStatus.ready && _operation != null) {
+    if (_reader.status != ReaderStatus.ready &&
+        (_operation != null || _awaitingOrder != null)) {
       unawaited(_cancelChapter(immediate: true));
     }
     if (_reader.content == null && _reader.status == ReaderStatus.error) {
@@ -1052,6 +1054,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     _invalidation?.cancel();
     _removal?.cancel();
     _operation?.deadline?.cancel();
+    _awaitingOrder?.cancel();
     _chapterTurn.dispose();
     if (widget.preferences == null) {
       _preferences.dispose();
@@ -1162,6 +1165,50 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       return null;
     }
     return order[index + direction];
+  }
+
+  bool get _orderUnavailable =>
+      widget.linkDepth == 0 && _needsOrder && _readingOrder == null;
+
+  Future<void> _turnAdjacent(int direction) async {
+    if (!_canNavigate || widget.linkDepth > 0) return;
+    if (_orderUnavailable) {
+      final attempt = CancellationSource();
+      setState(() {
+        _awaitingOrder = attempt;
+        _changing = true;
+      });
+      final deadline = Timer(const Duration(seconds: 45), attempt.cancel);
+      try {
+        await Future.any([_loadOrder(), attempt.token.whenCancelled]);
+      } catch (_) {
+        // Keep the current page and offer another explicit attempt below.
+      } finally {
+        deadline.cancel();
+      }
+      if (!mounted || _awaitingOrder != attempt) return;
+      setState(() {
+        _awaitingOrder = null;
+        _changing = false;
+      });
+      if (!_canNavigate) return;
+      if (attempt.token.isCancelled || _orderUnavailable) {
+        _preparationBlocked();
+        return;
+      }
+    }
+    final chapter = _adjacent(direction);
+    if (chapter != null) {
+      await _switch(
+        chapter,
+        fromStart: direction > 0,
+        fromEnd: direction < 0,
+        pageTurn: true,
+        intent: _LocationIntent.sequential,
+      );
+    } else if (direction > 0) {
+      _enterBookEnd(_reader, _readingSequence().$1);
+    }
   }
 
   _ChapterOperation _prepare(
@@ -1507,6 +1554,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   // Called during layout. Invalidate synchronously; defer mutations of the
   // widget tree until the frame is finished. No old ready can pass the gate.
   void _layoutInvalidated(ReaderController reader) {
+    if (reader == _reader && _awaitingOrder != null) {
+      final attempt = _awaitingOrder;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _awaitingOrder == attempt) {
+          _cancelChapter(immediate: true);
+        }
+      });
+    }
     final operation = _operation;
     if (operation == null) return;
     if (reader == operation.target) operation.ready = false;
@@ -1602,6 +1657,13 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   }
 
   Future<void> _cancelChapter({bool immediate = false}) {
+    if (mounted && _awaitingOrder != null) {
+      _awaitingOrder!.cancel();
+      setState(() {
+        _awaitingOrder = null;
+        _changing = false;
+      });
+    }
     final operation = _operation;
     if (!mounted || operation == null) return Future.value();
     // Repeated input shares the current rebound. Lifecycle cancellation may
@@ -1789,6 +1851,10 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   Future<void> _exit({bool toShelf = false}) async {
     if (_completionTurn case final turn?) {
       turn.cancel();
+      return;
+    }
+    if (_awaitingOrder != null) {
+      await _cancelChapter(immediate: true);
       return;
     }
     if (_operation case final operation?) {
@@ -2399,6 +2465,36 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     return (order, index);
   }
 
+  bool _enterBookEnd(ReaderController reader, List<ChapterKey> order) {
+    if (!mounted ||
+        _invalidated ||
+        _changing ||
+        widget.linkDepth > 0 ||
+        _route?.isCurrent == false ||
+        _completion != null ||
+        reader != _reader ||
+        reader.isClosed ||
+        order.isEmpty ||
+        order.last != reader.chapter ||
+        !identical(order, _readingSequence().$1) ||
+        _viewports[reader]?.isRestoring == true) {
+      return false;
+    }
+    final state = bookEndState(
+      local: _local,
+      status: reader.novelStatus == NovelStatus.unknown
+          ? _bookStatus
+          : reader.novelStatus,
+    );
+    _cancelChapter(immediate: true);
+    if (reader.pagePresentation == null) _viewports[reader]?.anchorAtEnd();
+    setState(() => _completion = state);
+    _chrome.value = false;
+    reader.enterBookEnd(state);
+    unawaited(reader.flushProgress());
+    return true;
+  }
+
   Widget _view(ReaderController reader, {required bool active}) {
     final logicalBasis = _logicalIndex;
     final (order, positions) = _readingSequence();
@@ -2422,32 +2518,6 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                 : reader.novelStatus,
           )
         : null;
-    bool bookEnd() {
-      if (!mounted ||
-          _invalidated ||
-          _changing ||
-          _route?.isCurrent == false ||
-          _completion != null ||
-          reader != _reader ||
-          reader.isClosed ||
-          terminal == null ||
-          !identical(order, _readingSequence().$1) ||
-          _viewports[reader]?.isRestoring == true) {
-        return false;
-      }
-      final state = bookEndState(
-        local: _local,
-        status: reader.novelStatus == NovelStatus.unknown
-            ? _bookStatus
-            : reader.novelStatus,
-      );
-      _cancelChapter(immediate: true);
-      setState(() => _completion = state);
-      reader.enterBookEnd(state);
-      unawaited(reader.flushProgress());
-      return true;
-    }
-
     final actions = ReaderActions(
       toggleBookmark: _bookmarkRepository == null
           ? null
@@ -2464,7 +2534,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       restart: order.isEmpty
           ? null
           : () => _switch(order.first, fromStart: true),
-      bookEnd: terminal == null ? null : bookEnd,
+      bookEnd: terminal == null ? null : () => _enterBookEnd(reader, order),
       contentLink: _changing
           ? null
           : (link) {
@@ -2493,21 +2563,11 @@ class _BookReaderScreenState extends State<BookReaderScreen>
           ? (panels) => unawaited(_prefetch(panels, reader))
           : null,
       details: widget.onDetails == null || _changing ? null : _details,
-      previousChapter: !_changing && previous != null
-          ? () => _switch(
-              previous,
-              fromEnd: true,
-              pageTurn: true,
-              intent: _LocationIntent.sequential,
-            )
+      previousChapter: !_changing && (previous != null || _orderUnavailable)
+          ? () => unawaited(_turnAdjacent(-1))
           : null,
-      nextChapter: !_changing && next != null
-          ? () => _switch(
-              next,
-              fromStart: true,
-              pageTurn: true,
-              intent: _LocationIntent.sequential,
-            )
+      nextChapter: !_changing && (next != null || _orderUnavailable)
+          ? () => unawaited(_turnAdjacent(1))
           : null,
       navigateChapter: (direction) {
         final target = direction < 0 ? previous : next;
@@ -2562,7 +2622,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       },
       actions: actions,
       onReady: () => _targetReady(reader),
-      onCancelChapter: active && _changing && _operation != null
+      onCancelChapter:
+          active && _changing && (_operation != null || _awaitingOrder != null)
           ? () => _cancelChapter()
           : null,
       onPanelChanged: (panel) {
@@ -2571,7 +2632,9 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       onLayoutInvalidated: () => _layoutInvalidated(reader),
       onBoundaryDrag: active ? _beginChapterDrag : null,
       onEdges: active ? (first, last) => _edges(reader, first, last) : null,
-      crossChapterTurning: _visualTurn,
+      crossChapterTurning:
+          _visualTurn ||
+          active && (_operation?.engaged == true || _awaitingOrder != null),
       preferences: _preferences,
       preferencesReady: _preferencesReady,
       onPageAppearance: (paper, turn) {
@@ -2756,6 +2819,14 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       });
     }
     _routeWasCurrent = current;
+    if (!current && _awaitingOrder != null) {
+      final attempt = _awaitingOrder;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _awaitingOrder == attempt) {
+          _cancelChapter(immediate: true);
+        }
+      });
+    }
     _scheduleWarm();
     if (_operation case final operation?
         when !identical(operation.basis, _readingSequence().$1)) {
@@ -2826,7 +2897,8 @@ class _BookReaderScreenState extends State<BookReaderScreen>
                           PageTurnOverlay(frame: _chapterFrame, paper: _paper),
                     ),
                   ),
-                  if (_operation?.intent == _ChapterIntent.confirmed)
+                  if (_awaitingOrder != null ||
+                      _operation?.intent == _ChapterIntent.confirmed)
                     Positioned(
                       left: 24,
                       right: 24,

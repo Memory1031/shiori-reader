@@ -887,6 +887,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   EdgeInsets _pageInsets = EdgeInsets.zero;
   final _sizes = <MediaRef, Size>{};
   final _pendingSizes = <MediaRef, Size>{};
+  bool _sizesScheduled = false;
   bool _dragging = false;
   bool get _layoutFrozen =>
       _dragging || widget.crossChapterTurning || _completionTurning;
@@ -900,14 +901,27 @@ class _ReaderContentViewState extends State<ReaderContentView>
     if (!mounted ||
         _layoutFrozen ||
         widget.session?.isClosed == true ||
-        _pendingSizes.isEmpty) {
+        _pendingSizes.isEmpty ||
+        _sizesScheduled) {
       return;
     }
-    _position = _paged.capture();
-    setState(() {
-      _sizes.addAll(_pendingSizes);
-      _pendingSizes.clear();
+    // A confirmed chapter turn may not have rebuilt this page's lock yet.
+    _sizesScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sizesScheduled = false;
+      if (!mounted ||
+          _layoutFrozen ||
+          widget.session?.isClosed == true ||
+          _pendingSizes.isEmpty) {
+        return;
+      }
+      _position = _paged.capture();
+      setState(() {
+        _sizes.addAll(_pendingSizes);
+        _pendingSizes.clear();
+      });
     });
+    WidgetsBinding.instance.scheduleFrame();
   }
 
   void _toggle() => _chrome.value = !_chrome.value;
