@@ -145,7 +145,8 @@ class _ReaderFontGateState extends State<ReaderFontGate> {
   @override
   void didUpdateWidget(ReaderFontGate oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.repository != oldWidget.repository) {
+    // The registry owns font loads across cache-only and active adapters.
+    if ((widget.repository == null) != (oldWidget.repository == null)) {
       _loaded = false;
     }
     _load();

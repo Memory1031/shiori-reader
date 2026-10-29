@@ -89,6 +89,7 @@ void main() {
       final family = EmbeddedFontFamily([fontRef]);
       final repository = _Media(syntheticFont(advance: 900))
         ..pending = Completer<void>();
+      ImageRepository? activeRepository = repository;
       final registry = ReaderFontRegistry();
       final content = ChapterContent(
         key: ChapterKey(
@@ -112,7 +113,7 @@ void main() {
             registry: registry,
             child: ReaderFontGate(
               content: content,
-              repository: repository,
+              repository: activeRepository,
               child: const Text('Ready'),
             ),
           ),
@@ -129,6 +130,13 @@ void main() {
       expect(repository.calls, 1);
       expect(repository.modes, [ReadMode.cacheOnly]);
       expect(repository.leases.every((l) => l.isClosed), isTrue);
+      final ready = tester.element(find.text('Ready'));
+      final replacement = _Media(syntheticFont());
+      activeRepository = replacement;
+      await tester.pumpWidget(gate());
+      expect(find.text('Ready'), findsOneWidget);
+      expect(tester.element(find.text('Ready')), same(ready));
+      expect(replacement.calls, 0);
       final style = readerAuthoredStyle(
         const TextStyle(fontSize: 20, fontFamily: 'Ahem'),
         content.blocks.single.inlineStyles,
