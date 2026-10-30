@@ -1,3 +1,4 @@
+import 'desktop_content_frame.dart';
 import 'dart:collection';
 import 'dart:math' as math;
 
@@ -5,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../app/theme/shiori_theme.dart';
-import '../capabilities.dart';
 
 enum ShioriFeedbackKind { info, success, error }
 
@@ -276,7 +276,7 @@ class _ShioriFeedbackHostState extends State<ShioriFeedbackHost> {
               media.padding.horizontal -
               ShioriSpace.item * 2,
         );
-        final width = ShioriCapabilities.of(context).pointerFirst
+        final width = DesktopLayoutScope.useDesktopPage(context)
             ? math.min(ShioriLayout.feedback, available)
             : available;
         final gutter =

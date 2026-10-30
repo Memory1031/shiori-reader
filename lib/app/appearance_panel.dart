@@ -1,17 +1,17 @@
+import '../shared/widgets/desktop_content_frame.dart';
 import 'package:flutter/material.dart';
-import '../shared/capabilities.dart';
 import '../shared/widgets/shiori_sheet.dart';
 import '../domain/models/models.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'app_controller.dart';
 import 'theme/shiori_theme.dart';
 
-/// A dialog on pointer-first platforms, a sheet on touch ones. Either way
+/// A dialog in wide windows, a sheet in compact ones. Either way
 /// it opens above the current page and leaves it as it was.
 Future<void> showAppAppearance(
   BuildContext context,
   AppController controller,
-) => ShioriCapabilities.of(context).pointerFirst
+) => DesktopLayoutScope.useDesktopPage(context)
     ? showDialog<void>(
         context: context,
         builder: (dialog) => Dialog(

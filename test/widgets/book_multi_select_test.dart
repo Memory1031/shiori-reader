@@ -23,6 +23,7 @@ void main() {
       final store = LocalStore(count: 2)
         ..gate = Completer<Result<LocalReparseResult>>();
       final h = LocalHarness(tester, store: store);
+      h.navigation.select(HomeSection.shelf);
       await h.pump(width: 390, height: 844, shell: true);
       await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
       await tester.pumpAndSettle();
@@ -108,6 +109,7 @@ void main() {
     'legacy single reparse releases the shared lease when confirmation is cancelled',
     (tester) async {
       final h = LocalHarness(tester, store: LocalStore(count: 1));
+      h.navigation.select(HomeSection.shelf);
       await h.pump(width: 390, height: 844, shell: true);
       await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
       await tester.pumpAndSettle();
@@ -147,6 +149,7 @@ void main() {
       final store = LocalStore(count: 2)
         ..gate = Completer<Result<LocalReparseResult>>();
       final h = LocalHarness(tester, store: store);
+      h.navigation.select(HomeSection.shelf);
       await h.pump(width: 390, height: 844, shell: true);
       await tester.tap(find.widgetWithText(NavigationDestination, 'Settings'));
       await tester.pumpAndSettle();

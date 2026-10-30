@@ -102,6 +102,7 @@ void main() {
       final r = await f.mount(
         t,
         repositoryFactory: s.ReaderSearchRepository.new,
+        size: const Size(1280, 800),
       );
       final a = r.position(t);
       await r.link(t, 'Auxiliary');

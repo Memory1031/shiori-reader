@@ -131,21 +131,24 @@ class _ReaderSettingsPanelState extends State<ReaderSettingsPanel> {
                   style: theme.textTheme.titleMedium,
                 ),
               ),
-              TextButton(
-                key: const ValueKey('reader-settings-reset'),
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  foregroundColor: canUndo
-                      ? scheme.primary
-                      : scheme.onSurfaceVariant,
+              Flexible(
+                child: TextButton(
+                  key: const ValueKey('reader-settings-reset'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: canUndo
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant,
+                  ),
+                  onPressed: canUndo
+                      ? _undoReset
+                      : isDefault
+                      ? null
+                      : () => _reset(s),
+                  child: Text(canUndo ? l.readerUndo : l.readerReset),
                 ),
-                onPressed: canUndo
-                    ? _undoReset
-                    : isDefault
-                    ? null
-                    : () => _reset(s),
-                child: Text(canUndo ? l.readerUndo : l.readerReset),
               ),
+
               if (widget.onDone != null && !widget.sheet)
                 IconButton(
                   tooltip: MaterialLocalizations.of(context).closeButtonTooltip,

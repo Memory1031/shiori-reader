@@ -12,6 +12,7 @@ import 'package:shiori/features/bookshelf/desktop_shelf.dart';
 import 'package:shiori/features/home/desktop_shell.dart';
 import 'package:shiori/features/home/home_navigation.dart';
 import 'package:shiori/features/home/reading_home.dart';
+import 'package:shiori/features/home/home_settings_view.dart';
 import 'package:shiori/features/novel_detail/desktop_detail.dart';
 import 'package:shiori/features/novel_detail/detail_screen.dart';
 import 'package:shiori/features/search/search_screen.dart';
@@ -187,11 +188,9 @@ class ShellHarness {
     tester.element(find.byType(DesktopShell, skipOffstage: false)),
   );
 
-  ShellLayout get layout => tester
-      .widget<ShellNavigation>(
-        find.byType(ShellNavigation, skipOffstage: false),
-      )
-      .layout;
+  ShellLayout get layout => shellLayoutFor(
+    tester.getSize(find.byType(DesktopShell, skipOffstage: false)).width,
+  );
 
   NavigatorState get root =>
       tester.state<NavigatorState>(find.byType(Navigator).first);
@@ -250,10 +249,8 @@ class ShellHarness {
   }
 
   /// The layout the shelf toggle shows: grid (true) or list.
-  bool get shelfGrid => tester
-      .widget<SegmentedButton<bool>>(find.byType(SegmentedButton<bool>))
-      .selected
-      .single;
+  bool get shelfGrid =>
+      tester.widget<BookshelfView>(find.byType(BookshelfView)).layout!.value;
 
   Future<void> key(LogicalKeyboardKey key) async {
     await tester.sendKeyEvent(key);
@@ -272,12 +269,12 @@ void main() {
   });
 
   testWidgets(
-    'touch platforms keep the mobile home at desktop sizes',
+    'touch platforms use the desktop workspace at wide sizes',
     (tester) async {
       final h = ShellHarness(tester);
       await h.pump();
-      expect(find.byType(DesktopShell), findsNothing);
-      expect(find.byType(ShellNavigation), findsNothing);
+      expect(find.byType(DesktopShell), findsOneWidget);
+      expect(find.byType(ShellNavigation), findsOneWidget);
       expect(find.byType(ShioriLogo), findsOneWidget);
       await h.close();
     },
@@ -285,11 +282,11 @@ void main() {
   );
 
   testWidgets(
-    'iPad keeps the mobile home',
+    'iPad uses the desktop workspace at wide sizes',
     (tester) async {
       final h = ShellHarness(tester);
       await h.pump(size: const Size(1366, 1024));
-      expect(find.byType(DesktopShell), findsNothing);
+      expect(find.byType(DesktopShell), findsOneWidget);
       await h.close();
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
@@ -312,55 +309,116 @@ void main() {
     await h.close();
   }, variant: _desktop);
 
-  testWidgets('crossing breakpoints keeps the workspace and its stack', (
+  testWidgets(
+    'logical width changes layout without losing the settings tab',
+    (tester) async {
+      final h = ShellHarness(tester);
+      addTearDown(h.close);
+      await h.pump(size: const Size(1600, 1200));
+      h.navigation.select(HomeSection.settings);
+      await tester.pumpAndSettle();
+      final settings = tester.element(find.byType(HomeSettingsView));
+      final workspace = h.workspace;
+      tester.view.devicePixelRatio = 2;
+      await tester.pumpAndSettle();
+      expect(h.layout, ShellLayout.bar);
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        1,
+      );
+      expect(tester.element(find.byType(HomeSettingsView)), same(settings));
+      expect(h.workspace, same(workspace));
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpAndSettle();
+      expect(h.layout, ShellLayout.sidebar);
+      expect(tester.element(find.byType(HomeSettingsView)), same(settings));
+      expect(h.workspace, same(workspace));
+    },
+    variant: _desktop,
+  );
+
+  testWidgets('compact section back returns to its mobile parent', (
     tester,
   ) async {
     final h = ShellHarness(tester);
+    addTearDown(h.close);
     await h.pump();
-    await h.search();
-    await h.openResult();
-    final detail = tester.element(find.byType(DetailScreen));
-    final search = tester.element(
-      find.byType(SearchScreen, skipOffstage: false),
-    );
-    final workspace = h.workspace;
-    for (final (width, layout) in [
-      (900.0, ShellLayout.rail),
-      (1280.0, ShellLayout.sidebar),
-      (900.0, ShellLayout.rail),
-      (820.0, ShellLayout.bar),
-      (1280.0, ShellLayout.sidebar),
-    ]) {
-      await h.resize(width);
-      expect(h.layout, layout, reason: '$width');
-      expect(tester.element(find.byType(DetailScreen)), same(detail));
-      expect(
-        tester.element(find.byType(SearchScreen, skipOffstage: false)),
-        same(search),
-      );
-      expect(h.workspace, same(workspace));
-      expect(h.navigation.section, HomeSection.search);
-      expect(
-        find.byType(ShioriLogo),
-        layout == ShellLayout.sidebar ? findsOneWidget : findsNothing,
-      );
-      expect(tester.takeException(), isNull);
-    }
-    await tester.pageBack();
+    h.navigation.select(HomeSection.updates);
     await tester.pumpAndSettle();
-    expect(find.byType(DetailScreen), findsNothing);
-    expect(tester.element(find.byType(SearchScreen)), same(search));
-    expect(find.text(h.book.title), findsWidgets);
+    await h.resize(390);
+    expect(find.text('updates page'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(h.navigation.section, HomeSection.settings);
+    expect(find.byType(HomeSettingsView), findsOneWidget);
+    expect(find.text('updates page'), findsNothing);
     expect(
-      tester
-          .widget<TextField>(find.byKey(const ValueKey('search-input')))
-          .controller
-          ?.text,
-      h.book.title,
+      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      1,
     );
-    expect(find.byKey(ValueKey(h.book.key)), findsOneWidget);
-    await h.close();
   }, variant: _desktop);
+
+  testWidgets(
+    'crossing breakpoints keeps the workspace and its stack',
+    (tester) async {
+      final h = ShellHarness(tester);
+      await h.pump();
+      await h.search();
+      await h.openResult();
+      final detail = tester.element(find.byType(DetailScreen));
+      final search = tester.element(
+        find.byType(SearchScreen, skipOffstage: false),
+      );
+      final workspace = h.workspace;
+      for (final (width, layout) in [
+        (900.0, ShellLayout.rail),
+        (1280.0, ShellLayout.sidebar),
+        (900.0, ShellLayout.rail),
+        (820.0, ShellLayout.bar),
+        (390.0, ShellLayout.bar),
+        (1280.0, ShellLayout.sidebar),
+      ]) {
+        await h.resize(width);
+        expect(h.layout, layout, reason: '$width');
+        expect(find.byType(NavigationBar), findsNothing);
+        expect(
+          find.byType(ShellNavigation),
+          layout == ShellLayout.bar ? findsNothing : findsOneWidget,
+        );
+        expect(tester.element(find.byType(DetailScreen)), same(detail));
+        expect(
+          tester.element(find.byType(SearchScreen, skipOffstage: false)),
+          same(search),
+        );
+        expect(h.workspace, same(workspace));
+        expect(h.navigation.section, HomeSection.search);
+        expect(
+          find.byType(ShioriLogo),
+          layout == ShellLayout.sidebar ? findsOneWidget : findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+      }
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(DetailScreen), findsNothing);
+      expect(tester.element(find.byType(SearchScreen)), same(search));
+      expect(find.text(h.book.title), findsWidgets);
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('search-input')))
+            .controller
+            ?.text,
+        h.book.title,
+      );
+      expect(find.byKey(ValueKey(h.book.key)), findsOneWidget);
+      await h.close();
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.windows,
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
 
   testWidgets('details open in the workspace beside the navigation', (
     tester,
@@ -632,6 +690,14 @@ void main() {
     await tester.tap(find.byTooltip(h.l.shelfList));
     await tester.pumpAndSettle();
     expect(position().pixels, 400);
+
+    final shelf = tester.element(find.byType(BookshelfView));
+    for (final width in [390.0, 900.0, 1280.0]) {
+      await h.resize(width);
+      expect(tester.element(find.byType(BookshelfView)), same(shelf));
+      expect(find.byType(SliverGrid), findsNothing);
+      expect(position().pixels, 400);
+    }
 
     // Reselecting the shelf returns to its root but keeps the choice.
     await h.select(h.l.shelfTitle);

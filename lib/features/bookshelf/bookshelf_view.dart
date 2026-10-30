@@ -362,6 +362,17 @@ class _BookshelfViewState extends State<BookshelfView> {
     );
   }
 
+  final _gridViewport = GlobalKey(debugLabel: 'shelf-grid-viewport');
+  final _listViewport = GlobalKey(debugLabel: 'shelf-list-viewport');
+
+  Widget _viewport({required List<Widget> slivers}) => KeyedSubtree(
+    key: _grid ? _gridViewport : _listViewport,
+    child: CustomScrollView(
+      key: PageStorageKey(_grid ? 'shelf-grid' : 'shelf-list'),
+      slivers: slivers,
+    ),
+  );
+
   Widget _content(BuildContext context) {
     if (widget.desktop) return _desktop(context);
     final controller = widget.controller;
@@ -523,8 +534,7 @@ class _BookshelfViewState extends State<BookshelfView> {
           );
         }
 
-        return CustomScrollView(
-          key: PageStorageKey(_grid ? 'shelf-grid' : 'shelf-list'),
+        return _viewport(
           slivers: [
             if (widget.header case final header?)
               SliverToBoxAdapter(
@@ -723,8 +733,7 @@ class _BookshelfViewState extends State<BookshelfView> {
                     ),
             ),
             Expanded(
-              child: CustomScrollView(
-                key: PageStorageKey(_grid ? 'shelf-grid' : 'shelf-list'),
+              child: _viewport(
                 slivers: [
                   if (widget.header case final header?)
                     framed(

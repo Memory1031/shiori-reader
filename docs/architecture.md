@@ -85,7 +85,7 @@ CachedChapter / CacheOverview / PrefetchState 是不可变投影，预取目标�
 
 ### 桌面工作区
 
-pointer-first 使用 DesktopShell，按宽度在底部导航、rail 与 sidebar 之间切换；840 / 1200 断点变化不替换 Workspace Navigator 或清空路由栈。Windows 原生窗口最小 client 宽度为 840。移动端保持 touch-first 呈现，宽窗口本身不启用桌面管理页。
+所有平台共用 DesktopShell，按窗口可用逻辑宽度实时选择布局：小于 840 使用书架、阅读统计和设置底部导航，840–1199 使用 rail，1200 起使用 sidebar。断点变化不替换 Workspace Navigator 或清空路由栈；详情、搜索和书架保留状态。macOS 与 Windows 原生窗口支持缩至手机宽度。布局不依赖操作系统或物理像素，触摸、键盘、鼠标与系统返回等交互能力仍遵循平台约定。
 
 书架、阅读统计、搜索、本地文件、离线内容和关于与更新位于 Workspace。详情使用调用方路由上下文，Reader 通过 root 路由全窗口打开，返回后恢复原页面栈。切换 section 或重选当前 section 清除根页上方路由并退出多选，保留列表布局与滚动状态，不建立跨 section 的永久搜索会话。
 

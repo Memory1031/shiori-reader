@@ -86,7 +86,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
         Text(l.updateChannelHint, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
-    final value = await (ShioriCapabilities.of(context).pointerFirst
+    final value = await (DesktopLayoutScope.useDesktopPage(context)
         ? showDialog<UpdateChannel>(
             context: context,
             builder: (context) => AlertDialog(
@@ -420,26 +420,23 @@ class _UpdateScreenState extends State<UpdateScreen> {
       return Scaffold(
         appBar: desktop ? null : AppBar(title: Text(l.updateTitle)),
         body: SafeArea(
-          child: pointerFirst
-              ? Column(
-                  children: [
-                    if (desktop)
-                      DesktopPageChrome(
-                        child: DesktopPageToolbar(
-                          title: l.updateTitle,
-                          leading:
-                              ModalRoute.of(context)?.impliesAppBarDismissal ==
-                                  true
-                              ? const BackButton()
-                              : null,
-                        ),
-                      )
-                    else
-                      const SizedBox.shrink(),
-                    Expanded(child: content),
-                  ],
+          child: Column(
+            children: [
+              if (desktop)
+                DesktopPageChrome(
+                  child: DesktopPageToolbar(
+                    title: l.updateTitle,
+                    leading:
+                        ModalRoute.of(context)?.impliesAppBarDismissal == true
+                        ? const BackButton()
+                        : null,
+                  ),
                 )
-              : content,
+              else
+                const SizedBox.shrink(),
+              Expanded(child: content),
+            ],
+          ),
         ),
       );
     },

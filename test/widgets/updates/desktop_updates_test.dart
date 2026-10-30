@@ -256,15 +256,15 @@ void main() {
 
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     testWidgets(
-      'wide $platform preserves mobile and route primary',
+      'wide $platform uses wide layout and retains route primary',
       (tester) async {
         final h = UpdatesHarness(tester);
         await h.controller.initialize();
         await h.pump(width: 1920, shell: false);
-        expect(find.byType(DesktopPageChrome), findsNothing);
-        expect(find.byType(AppBar), findsOneWidget);
-        expect(tester.getRect(h.view).width, 640);
-        expect(tester.getRect(channel).width, 640 - 48);
+        expect(find.byType(DesktopPageChrome), findsOneWidget);
+        expect(find.byType(AppBar), findsNothing);
+        expect(tester.getRect(h.view).width, 1920);
+        expect(tester.getRect(channel).width, 640);
         expect(tester.widget<ListView>(h.view).controller, isNull);
         final scaffold = find.descendant(
           of: h.page,
@@ -628,13 +628,13 @@ void main() {
   }, variant: windows);
 
   testWidgets(
-    'desktop channel choices stay reachable in a short large-text window',
+    'compact desktop channel choices stay reachable in a short large-text window',
     (tester) async {
       final h = UpdatesHarness(tester);
       await h.controller.initialize();
       await h.pump(width: 360, height: 320, scale: 1.8, shell: false);
       await h.tap(channel);
-      final dialog = find.byType(Dialog);
+      final dialog = find.byType(BottomSheet);
       expect(dialog, findsOneWidget);
       final option = find.descendant(
         of: dialog,

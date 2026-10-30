@@ -1183,15 +1183,28 @@ void main() {
     ),
   );
 
-  void expectCenteredImport(WidgetTester tester) {
+  Finder importPanel() => find.byWidgetPredicate(
+    (widget) => widget.runtimeType.toString() == '_ImportPanel',
+  );
+
+  void expectResponsiveImport(WidgetTester tester) {
+    final viewport = tester.view.physicalSize / tester.view.devicePixelRatio;
+    final wide = viewport.width >= ShioriLayout.page;
+    expect(find.byType(Dialog), wide ? findsOneWidget : findsNothing);
     final surface = find
-        .descendant(of: find.byType(Dialog), matching: find.byType(Material))
+        .descendant(
+          of: wide ? find.byType(Dialog) : importPanel(),
+          matching: find.byType(Material),
+        )
         .first;
     final rect = tester.getRect(surface);
-    final viewport = tester.view.physicalSize / tester.view.devicePixelRatio;
     expect(rect.center.dx, closeTo(viewport.width / 2, 1));
-    expect(rect.center.dy, closeTo(viewport.height / 2, 1));
     expect(rect.width, lessThanOrEqualTo(ShioriLayout.panel));
+    if (wide) {
+      expect(rect.center.dy, closeTo(viewport.height / 2, 1));
+    } else {
+      expect(rect.bottom, closeTo(viewport.height - ShioriSpace.medium, 1));
+    }
   }
 
   testWidgets(
@@ -1209,7 +1222,7 @@ void main() {
       controller.open();
       await tester.runAsync(() => controller.submit());
       await tester.pumpAndSettle();
-      expectCenteredImport(tester);
+      expectResponsiveImport(tester);
       expect(find.text('书籍已存在，未重复导入。'), findsOneWidget);
       expect(find.text('书籍已保存。'), findsNothing);
       expect(find.text('重试'), findsNothing);
@@ -1461,13 +1474,12 @@ void main() {
             find.byKey(const ValueKey('import-dismiss-barrier')),
             findsOneWidget,
           );
-          expectCenteredImport(tester);
+          expectResponsiveImport(tester);
           await tester.sendKeyEvent(LogicalKeyboardKey.tab);
           await tester.pump();
           expect(
-            FocusManager.instance.primaryFocus!.context!
-                .findAncestorWidgetOfExactType<Dialog>(),
-            isNotNull,
+            ModalRoute.of(FocusManager.instance.primaryFocus!.context!),
+            same(ModalRoute.of(tester.element(importPanel()))),
           );
           for (final key in [
             LogicalKeyboardKey.pageDown,
@@ -1538,12 +1550,12 @@ void main() {
           controller.open();
           controller.open();
           await tester.pumpAndSettle();
-          expect(find.byType(Dialog), findsOneWidget);
-          expectCenteredImport(tester);
+          expect(importPanel(), findsOneWidget);
+          expectResponsiveImport(tester);
           if (expanded) {
             await tester.runAsync(controller.submit);
             await tester.pumpAndSettle();
-            expectCenteredImport(tester);
+            expectResponsiveImport(tester);
             await tester.tap(find.text(l.importDone));
             await tester.pumpAndSettle();
           } else {
@@ -2102,7 +2114,7 @@ void main() {
     });
 
     testWidgets(
-      'desktop batch stays centered and scrollable in narrow and short windows',
+      'desktop batch adapts to compact and short windows while staying scrollable',
       (tester) async {
         tester.view
           ..physicalSize = const Size(460, 600)
@@ -2120,7 +2132,7 @@ void main() {
         await tester.pumpAndSettle();
         controller.open();
         await tester.pumpAndSettle();
-        expectCenteredImport(tester);
+        expectResponsiveImport(tester);
         expect(tester.takeException(), null);
         expect(find.text('准备导入 64 本书'), findsOneWidget);
         expect(find.text('导入全部'), findsOneWidget);
@@ -2138,7 +2150,7 @@ void main() {
         expect(tester.getRect(find.text('导入全部')), actionPosition);
         tester.view.physicalSize = const Size(320, 320);
         await tester.pumpAndSettle();
-        expectCenteredImport(tester);
+        expectResponsiveImport(tester);
         await tester.ensureVisible(find.text('导入全部'));
         await tester.pumpAndSettle();
         expect(find.text('导入全部').hitTestable(), findsOneWidget);

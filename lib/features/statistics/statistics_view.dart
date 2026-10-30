@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../l10n/generated/app_localizations.dart';
-import '../../shared/capabilities.dart';
 import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/desktop_content_frame.dart';
 import '../../shared/widgets/shiori_sheet.dart';
@@ -83,7 +82,7 @@ enum StatisticsRange { week, month, year }
 Future<void> showStatisticsSettings(
   BuildContext context,
   ReadingStatisticsController controller,
-) => ShioriCapabilities.of(context).pointerFirst
+) => DesktopLayoutScope.useDesktopPage(context)
     ? showDialog<void>(
         context: context,
         builder: (_) => Dialog(

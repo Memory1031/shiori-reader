@@ -167,9 +167,13 @@ void main() {
             : 232.0;
         final gutter = width < 1200 ? 24.0 : 32.0;
         final frame = width - nav - 2 * gutter;
-        final toolbar = tester.getRect(find.byType(DesktopDetailBar));
-        expect(toolbar.width, frame);
-        expect(toolbar.left, closeTo(nav + (width - nav - frame) / 2, .01));
+        if (width >= 840) {
+          final toolbar = tester.getRect(find.byType(DesktopDetailBar));
+          expect(toolbar.width, frame);
+          expect(toolbar.left, closeTo(nav + (width - nav - frame) / 2, .01));
+        } else {
+          expect(find.byType(AppBar), findsOneWidget);
+        }
         expect(
           tester.getRect(find.byKey(const ValueKey('detail-scroll'))).right,
           width,

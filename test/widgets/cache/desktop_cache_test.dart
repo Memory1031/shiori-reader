@@ -490,13 +490,13 @@ void main() {
 
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     testWidgets(
-      'wide $platform keeps mobile presentation and route primary binding',
+      'wide $platform uses wide presentation and route primary binding',
       (tester) async {
         final h = CacheHarness(tester);
         await h.pump(width: 1600, shell: false);
-        expect(find.byType(DesktopPageToolbar), findsNothing);
-        expect(find.byType(AppBar), findsOneWidget);
-        expect(tester.getRect(h.view).width, 760);
+        expect(find.byType(DesktopPageToolbar), findsOneWidget);
+        expect(find.byType(AppBar), findsNothing);
+        expect(tester.getRect(h.view).width, 1600);
         expect(tester.widget<ListView>(h.view).controller, isNull);
         final scaffold = find.descendant(
           of: h.page,

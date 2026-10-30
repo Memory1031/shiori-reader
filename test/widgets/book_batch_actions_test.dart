@@ -294,6 +294,55 @@ final parseFailure = Failure<LocalReparseResult>(
 );
 
 void main() {
+  testWidgets('batch route keeps its presentation across live resize', (
+    tester,
+  ) async {
+    addTearDown(tester.view.reset);
+    tester.view.devicePixelRatio = 1;
+    for (final width in [390.0, 1280.0]) {
+      tester.view.physicalSize = Size(width, 800);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => Navigator.of(context).push(
+                bookBatchRoute<void>(
+                  context,
+                  (context) => BookBatchPanel(
+                    title: 'Confirm',
+                    content: const Text('Preview'),
+                    actions: [
+                      BookBatchAction('Cancel', () => Navigator.pop(context)),
+                    ],
+                  ),
+                ),
+              ),
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      final panel = tester.element(find.byType(BookBatchPanel));
+      tester.view.physicalSize = Size(width == 390 ? 1280 : 390, 800);
+      await tester.pumpAndSettle();
+      expect(tester.element(find.byType(BookBatchPanel)), same(panel));
+      expect(
+        find.byType(AlertDialog),
+        width == 390 ? findsNothing : findsOneWidget,
+      );
+      expect(
+        find.byType(BottomSheet),
+        width == 390 ? findsOneWidget : findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
+
   for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
     for (final lang in ['zh', 'en']) {
       testWidgets(
@@ -928,7 +977,7 @@ void main() {
       await tester.tap(
         find.descendant(
           of: find.byType(BookBatchPanel).last,
-          matching: find.widgetWithText(OutlinedButton, h.l.importCancel),
+          matching: find.widgetWithText(TextButton, h.l.importCancel),
         ),
       );
       await tester.pumpAndSettle();

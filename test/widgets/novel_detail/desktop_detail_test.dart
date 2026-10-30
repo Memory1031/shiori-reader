@@ -1220,10 +1220,12 @@ void main() {
     for (final (width, cover) in [(400.0, 104.0), (800.0, 120.0)]) {
       final h = DetailHarness(tester, Requests(book(online)), host: Host.root);
       await h.pump(width: width, height: 1000);
-      expect(find.byType(DesktopDetail), findsNothing);
+      expect(find.byType(DesktopDetail), findsOneWidget);
       expect(find.byType(AppBar), findsOneWidget);
-      final header = h.rect(find.byType(DetailBookHeader));
       final coverRect = h.rect(find.byType(DetailCover));
+      final header = coverRect.expandToInclude(
+        h.rect(find.byType(DetailBookInfo)),
+      );
       expect(
         tester
             .widget<Text>(

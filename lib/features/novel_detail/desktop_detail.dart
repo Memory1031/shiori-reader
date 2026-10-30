@@ -198,7 +198,10 @@ class _DesktopDetailState extends State<DesktopDetail> {
   Widget _single(BuildContext context, double frame) {
     final scaler = MediaQuery.textScalerOf(context);
     final stackHeader = frame < 340 || frame < 560 && scaler.scale(20) > 28;
-    final cover = SizedBox(width: DesktopDetail.singleCover, child: _coverPart);
+    final cover = SizedBox(
+      width: frame < 600 ? 104 : DesktopDetail.singleCover,
+      child: _coverPart,
+    );
     return SliverMainAxisGroup(
       slivers: [
         _inset([
@@ -272,7 +275,9 @@ class _DesktopDetailState extends State<DesktopDetail> {
                 SliverPadding(
                   padding: EdgeInsetsDirectional.fromSTEB(
                     math.max(0.0, start),
-                    ShioriSpace.small,
+                    DesktopLayoutScope.useDesktopPage(context)
+                        ? ShioriSpace.small
+                        : ShioriSpace.page,
                     end,
                     ShioriSpace.section,
                   ),
@@ -333,7 +338,17 @@ class _DesktopDetailState extends State<DesktopDetail> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              DesktopPageChrome(child: DesktopDetailBar(menu: widget.menu)),
+              if (DesktopLayoutScope.useDesktopPage(context))
+                DesktopPageChrome(child: DesktopDetailBar(menu: widget.menu))
+              else
+                AppBar(
+                  leading:
+                      (ModalRoute.of(context)?.impliesAppBarDismissal ?? false)
+                      ? const BackButton(key: ValueKey('detail-back'))
+                      : null,
+                  title: Text(AppLocalizations.of(context).novelDetailsTitle),
+                  actions: [widget.menu],
+                ),
               Expanded(child: page),
             ],
           );

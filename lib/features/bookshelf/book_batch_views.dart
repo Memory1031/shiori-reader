@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../l10n/generated/app_localizations.dart';
-import '../../shared/capabilities.dart';
 import '../../shared/widgets/shiori_sheet.dart';
+import '../../shared/widgets/desktop_content_frame.dart';
 import '../../shared/widgets/state_views.dart';
 import '../../shared/widgets/shiori_task_progress_bar.dart';
 import 'book_selection_controller.dart';
@@ -13,14 +13,14 @@ import 'book_selection_controller.dart';
 /// child and stretch these views to match.
 const _contentWidth = 420.0;
 
-/// The route a [BookBatchPanel] opens in: a dialog on pointer-first
-/// platforms, a bottom sheet on touch ones. A route that is not
+/// The route a [BookBatchPanel] opens in: a dialog in wide windows,
+/// a bottom sheet in compact ones. A route that is not
 /// [dismissible] closes only through its own actions.
 ModalRoute<T> bookBatchRoute<T>(
   BuildContext context,
   WidgetBuilder builder, {
   bool dismissible = true,
-}) => ShioriCapabilities.of(context).pointerFirst
+}) => DesktopLayoutScope.useDesktopPage(context)
     ? DialogRoute<T>(
         context: context,
         builder: builder,
@@ -61,7 +61,12 @@ class BookBatchPanel extends StatelessWidget {
       foregroundColor: theme.colorScheme.onError,
       backgroundColor: theme.colorScheme.error,
     );
-    if (ShioriCapabilities.of(context).pointerFirst) {
+    final route = ModalRoute.of(context);
+    final dialog =
+        route is DialogRoute ||
+        route is! ModalBottomSheetRoute &&
+            DesktopLayoutScope.useDesktopPage(context);
+    if (dialog) {
       return AlertDialog(
         constraints: const BoxConstraints(maxWidth: ShioriLayout.panel),
         title: Text(title),

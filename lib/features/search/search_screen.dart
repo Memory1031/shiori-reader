@@ -7,8 +7,8 @@ import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
-import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/desktop_content_frame.dart';
+import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
 import '../../shared/widgets/book_cover.dart';
@@ -272,61 +272,45 @@ class _SearchBodyState extends State<_SearchBody> {
       // scroll-to-top). Pointer layouts keep one owner at every window width.
       controller: pointerFirst ? _scroll : null,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      // Keep the pointer viewport across the Workspace for edge scrollbar and
+      // Keep one viewport across the Workspace for edge scrollbar and
       // wheel access. Persistent sliver wrappers center only the content, also
       // preserving input and list elements when crossing the desktop breakpoint.
-      slivers: pointerFirst
-          ? [
-              for (final sliver in slivers)
-                SliverLayoutBuilder(
-                  builder: (context, constraints) {
-                    final geometry = desktopContentGeometry(
-                      availableWidth: constraints.crossAxisExtent,
-                      gutter: gutter,
-                      maxWidth: desktop
-                          ? ShioriLayout.shelfList
-                          : ShioriLayout.page,
-                    );
-                    return SliverPadding(
-                      padding: EdgeInsets.symmetric(horizontal: geometry.inset),
-                      sliver: sliver,
-                    );
-                  },
-                ),
-            ]
-          : slivers,
-    );
-    if (pointerFirst) {
-      return Scaffold(
-        appBar: desktop ? null : AppBar(title: Text(strings.searchTitle)),
-        body: SafeArea(
-          child: Column(
-            children: [
-              if (desktop)
-                DesktopPageChrome(
-                  child: DesktopPageToolbar(
-                    title: strings.searchTitle,
-                    leading:
-                        ModalRoute.of(context)?.impliesAppBarDismissal == true
-                        ? const BackButton()
-                        : null,
-                  ),
-                )
-              else
-                const SizedBox.shrink(),
-              Expanded(child: content),
-            ],
+      slivers: [
+        for (final sliver in slivers)
+          SliverLayoutBuilder(
+            builder: (context, constraints) {
+              final geometry = desktopContentGeometry(
+                availableWidth: constraints.crossAxisExtent,
+                gutter: gutter,
+                maxWidth: desktop ? ShioriLayout.shelfList : ShioriLayout.page,
+              );
+              return SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: geometry.inset),
+                sliver: sliver,
+              );
+            },
           ),
-        ),
-      );
-    }
-    return AppScaffold(
-      title: strings.searchTitle,
-      body: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: ShioriLayout.page),
-          child: content,
+      ],
+    );
+    return Scaffold(
+      appBar: desktop ? null : AppBar(title: Text(strings.searchTitle)),
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (desktop)
+              DesktopPageChrome(
+                child: DesktopPageToolbar(
+                  title: strings.searchTitle,
+                  leading:
+                      ModalRoute.of(context)?.impliesAppBarDismissal == true
+                      ? const BackButton()
+                      : null,
+                ),
+              )
+            else
+              const SizedBox.shrink(),
+            Expanded(child: content),
+          ],
         ),
       ),
     );

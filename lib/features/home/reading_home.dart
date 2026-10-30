@@ -17,6 +17,7 @@ import 'desktop_shell.dart';
 import 'home_navigation.dart';
 import 'home_settings_view.dart';
 import '../../shared/widgets/shiori_logo.dart';
+import '../../shared/widgets/desktop_content_frame.dart';
 import '../../shared/widgets/shiori_menu.dart';
 import '../../shared/widgets/shiori_feedback.dart';
 import '../bookshelf/library_controller.dart';
@@ -91,16 +92,20 @@ class _ReadingHomeState extends State<ReadingHome> {
   late final LibraryController _library;
   late final BookBatchActions _shelfActions;
 
-  bool _mobileSettings = false, _mobileStatistics = false;
+  bool get _mobileSettings => _navigation.section == HomeSection.settings;
+  bool get _mobileStatistics => _navigation.section == HomeSection.statistics;
+  final _shelfViewKey = GlobalKey(debugLabel: 'responsive-shelf');
   ReadingStatisticsController? get _statistics =>
       ReadingStatisticsScope.maybeOf(context);
   HomeNavigation? _ownNavigation;
   HomeNavigation get _navigation =>
       widget.navigation ?? (_ownNavigation ??= HomeNavigation());
 
-  /// The desktop workspace: one stack of pages above the section's root.
+  /// The workspace keeps one stack of pages above the section's root.
   final _workspace = GlobalKey<NavigatorState>(debugLabel: 'workspace');
-  final _history = _WorkspaceHistory();
+  late final _history = _WorkspaceHistory(
+    () => WidgetsBinding.instance.addPostFrameCallback((_) => _changed()),
+  );
   late final _observers = <NavigatorObserver>[_history];
 
   // Owned here rather than by the shelf page, which is rebuilt whenever its
@@ -177,8 +182,6 @@ class _ReadingHomeState extends State<ReadingHome> {
   /// section's root: pages opened above it close at once, without an exit
   /// transition, and a new root replaces the old one the same way.
   void _navigate() {
-    _mobileSettings = false;
-    _mobileStatistics = false;
     _shelfActions.leave();
     _history.clear();
     if (mounted) setState(() {});
@@ -391,7 +394,7 @@ class _ReadingHomeState extends State<ReadingHome> {
       ShioriMenuItem(value: value, icon: icon, label: label);
 
   void _search(BuildContext context) {
-    if (ShioriCapabilities.of(context).pointerFirst) {
+    if (DesktopLayoutScope.useDesktopPage(context)) {
       _navigation.select(HomeSection.search);
       return;
     }
@@ -446,19 +449,36 @@ class _ReadingHomeState extends State<ReadingHome> {
         );
 
   @override
-  Widget build(BuildContext context) =>
-      ShioriCapabilities.of(context).pointerFirst
-      ? _desktop(context)
-      : _mobile(context);
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, bounds) => DesktopLayoutScope(
+      width: bounds.maxWidth,
+      child: Builder(builder: _desktop),
+    ),
+  );
+
+  bool _mainSection(HomeSection section) =>
+      section == HomeSection.shelf ||
+      section == HomeSection.statistics ||
+      section == HomeSection.settings;
+
+  HomeSection _compactParent(HomeSection section) =>
+      section == HomeSection.search ? HomeSection.shelf : HomeSection.settings;
 
   /// Sections beside one workspace navigator. Pages opened from a section
   /// stack in the workspace; readers cover the window from the root.
   Widget _desktop(BuildContext context) {
     final strings = AppLocalizations.of(context);
+    final page = _sectionPage(context, _navigation.section);
     return DesktopShell(
       navigation: _navigation,
       workspaceNavigator: _workspace,
       semanticLabel: strings.homeNavigation,
+      compactNavigation: (context) =>
+          _shelfActions.selection.active ||
+              _history.hasPages ||
+              !_mainSection(_navigation.section)
+          ? null
+          : _mobileNavigation(context),
       groups: [
         [
           ShellItem(
@@ -523,10 +543,25 @@ class _ReadingHomeState extends State<ReadingHome> {
         onPopWithResult: (_) => _workspace.currentState?.maybePop(),
         child: Navigator(
           key: _workspace,
-          pages: [_sectionPage(context, _navigation.section)],
+          requestFocus: ModalRoute.isCurrentOf(context) != false,
+          pages: [
+            if (!DesktopLayoutScope.useDesktopPage(context) &&
+                page.key != const ValueKey('home-tabs'))
+              _sectionPage(context, _compactParent(_navigation.section)),
+            page,
+          ],
           transitionDelegate: const _InstantTransitionDelegate<Object?>(),
           observers: _observers,
-          onDidRemovePage: (_) {},
+          onDidRemovePage: (page) {
+            final section = _navigation.section;
+            if (!_mainSection(section) && page.key == ValueKey(section)) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && _navigation.section == section) {
+                  _navigation.select(_compactParent(section));
+                }
+              });
+            }
+          },
         ),
       ),
     );
@@ -536,15 +571,9 @@ class _ReadingHomeState extends State<ReadingHome> {
     // A workspace route stays current when a root Reader covers the window.
     final visible = ModalRoute.isCurrentOf(context) != false;
     final WidgetBuilder? root = switch (section) {
-      HomeSection.shelf => null,
-      HomeSection.statistics =>
-        _statistics == null
-            ? null
-            : (_) => StatisticsScreen(
-                visible: visible,
-                controller: _statistics!,
-                images: widget.images,
-              ),
+      HomeSection.statistics when _statistics == null => null,
+      HomeSection.shelf || HomeSection.statistics || HomeSection.settings =>
+        (context) => _homeTabs(context, section: section, active: visible),
       HomeSection.search when widget.sources.isEmpty =>
         (_) => const SearchUnavailable(),
       HomeSection.search => (context) => _routes.search!(
@@ -558,11 +587,17 @@ class _ReadingHomeState extends State<ReadingHome> {
     // A section without a page, e.g. updates in a build without them, falls
     // back to the shelf.
     final shown = root == null ? HomeSection.shelf : section;
-    final child = Builder(builder: root ?? _desktopShelf);
+    final child = Builder(
+      builder:
+          root ?? (context) => _homeTabs(context, section: HomeSection.shelf),
+    );
     final name = '/${shown.name}';
+    final key = _mainSection(shown)
+        ? const ValueKey('home-tabs')
+        : ValueKey(shown);
     return ShioriCapabilities.of(context).cupertinoNavigation
-        ? CupertinoPage(key: ValueKey(shown), name: name, child: child)
-        : MaterialPage(key: ValueKey(shown), name: name, child: child);
+        ? CupertinoPage(key: key, name: name, child: child)
+        : MaterialPage(key: key, name: name, child: child);
   }
 
   /// The shelf titles itself with a fixed toolbar on its left-aligned
@@ -580,6 +615,7 @@ class _ReadingHomeState extends State<ReadingHome> {
               child: PageStorage(
                 bucket: _shelfStorage,
                 child: BookshelfView(
+                  key: _shelfViewKey,
                   batchActions: _shelfActions,
                   desktop: true,
                   localReparse: widget.localBooks is LocalBookReparse
@@ -611,18 +647,27 @@ class _ReadingHomeState extends State<ReadingHome> {
     );
   }
 
-  Widget _mobile(BuildContext context) {
+  Widget _homeTabs(
+    BuildContext context, {
+    required HomeSection section,
+    bool active = true,
+  }) {
+    final current = ModalRoute.isCurrentOf(context) != false;
+    final showSettings = section == HomeSection.settings;
+    final showStatistics = section == HomeSection.statistics;
+    final desktop = DesktopLayoutScope.useDesktopPage(context);
     final strings = AppLocalizations.of(context);
-    final selecting = _shelfActions.selection.active;
     return PopScope(
-      canPop: !_mobileSettings && !_mobileStatistics,
+      canPop: !showSettings && !showStatistics,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && (_mobileSettings || _mobileStatistics)) {
+        if (!didPop && (showSettings || showStatistics)) {
           _selectMobilePage(0);
         }
       },
       child: Scaffold(
-        appBar: _mobileStatistics
+        appBar: desktop
+            ? null
+            : showStatistics
             ? AppBar(
                 title: Text(strings.statisticsTitle),
                 actions: [
@@ -634,7 +679,7 @@ class _ReadingHomeState extends State<ReadingHome> {
                   ),
                 ],
               )
-            : _mobileSettings
+            : showSettings
             ? AppBar(title: Text(strings.homeSettingsTitle))
             : _shelfActions.selection.active
             ? BookSelectionAppBar(actions: _shelfActions)
@@ -670,63 +715,88 @@ class _ReadingHomeState extends State<ReadingHome> {
                   ),
                 ],
               ),
-        body: IndexedStack(
-          index: _mobileSettings
-              ? (_statistics != null ? 2 : 1)
-              : _mobileStatistics
-              ? 1
-              : 0,
+        body: Column(
           children: [
-            ExcludeFocus(
-              excluding: _mobileSettings || _mobileStatistics,
-              child: _mobileShelf(context),
-            ),
-            if (_statistics case final recorder?)
-              ExcludeFocus(
-                excluding: !_mobileStatistics,
-                child: StatisticsView(
-                  visible: _mobileStatistics,
-                  controller: recorder,
-                  images: widget.images,
+            if (desktop && (showSettings || showStatistics))
+              DesktopPageChrome(
+                child: DesktopPageToolbar(
+                  title: showSettings
+                      ? strings.homeSettingsTitle
+                      : strings.statisticsTitle,
+                  actions: [
+                    if (showStatistics)
+                      IconButton(
+                        onPressed: () =>
+                            showStatisticsSettings(context, _statistics!),
+                        tooltip: strings.statisticsManage,
+                        icon: const Icon(Icons.settings_outlined),
+                      ),
+                  ],
                 ),
               ),
-            ExcludeFocus(
-              excluding: !_mobileSettings,
-              child: SafeArea(
-                bottom: false,
-                child: HomeSettingsView(
-                  enabled: !_library.writing,
-                  onAppearance: widget.onAppearance,
-                  onUpdates: widget.onUpdates,
-                  onLocalBooks: _routes.localBooks == null
-                      ? null
-                      : () => _routes.open(
-                          context,
-                          const LocalBooksDestination(),
-                        ),
-                  onOfflineContent: _routes.cache == null
-                      ? null
-                      : () => _routes.open(context, const CacheDestination()),
-                ),
+            Expanded(
+              child: IndexedStack(
+                index: showSettings
+                    ? (_statistics != null ? 2 : 1)
+                    : showStatistics
+                    ? 1
+                    : 0,
+                children: [
+                  ExcludeFocus(
+                    excluding: !current || showSettings || showStatistics,
+                    child: desktop
+                        ? _desktopShelf(context)
+                        : _mobileShelf(context),
+                  ),
+                  if (_statistics case final recorder?)
+                    ExcludeFocus(
+                      excluding: !current || !showStatistics,
+                      child: StatisticsView(
+                        visible: active && showStatistics,
+                        controller: recorder,
+                        images: widget.images,
+                      ),
+                    ),
+                  ExcludeFocus(
+                    excluding: !current || !showSettings,
+                    child: SafeArea(
+                      bottom: false,
+                      child: HomeSettingsView(
+                        enabled: !_library.writing,
+                        onAppearance: widget.onAppearance,
+                        onUpdates: widget.onUpdates,
+                        onLocalBooks: _routes.localBooks == null
+                            ? null
+                            : () => _routes.open(
+                                context,
+                                const LocalBooksDestination(),
+                              ),
+                        onOfflineContent: _routes.cache == null
+                            ? null
+                            : () => _routes.open(
+                                context,
+                                const CacheDestination(),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        bottomNavigationBar: selecting ? null : _mobileNavigation(context),
       ),
     );
   }
 
   void _selectMobilePage(int index) {
     if (_library.writing) return;
-    final statistics = _statistics != null && index == 1;
-    final settings = index == (_statistics != null ? 2 : 1);
-    if (_mobileSettings == settings && _mobileStatistics == statistics) return;
-    _shelfActions.leave();
-    setState(() {
-      _mobileSettings = settings;
-      _mobileStatistics = statistics;
-    });
+    final section = _statistics != null && index == 1
+        ? HomeSection.statistics
+        : index == (_statistics != null ? 2 : 1)
+        ? HomeSection.settings
+        : HomeSection.shelf;
+    if (_navigation.section != section) _navigation.select(section);
   }
 
   Widget _mobileNavigation(BuildContext context) {
@@ -773,9 +843,12 @@ class _ReadingHomeState extends State<ReadingHome> {
           indicatorColor: Colors.transparent,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           labelPadding: EdgeInsets.zero,
-          selectedIndex: _mobileSettings
+          selectedIndex:
+              (_mobileSettings ||
+                  !_mainSection(_navigation.section) &&
+                      _navigation.section != HomeSection.search)
               ? (_statistics != null ? 2 : 1)
-              : _mobileStatistics
+              : _mobileStatistics && _statistics != null
               ? 1
               : 0,
           onDestinationSelected: _selectMobilePage,
@@ -839,20 +912,24 @@ class _ReadingHomeState extends State<ReadingHome> {
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: ShioriLayout.page),
-              child: BookshelfView(
-                batchActions: _shelfActions,
-                layout: _shelfGrid,
-                localReparse: widget.localBooks is LocalBookReparse
-                    ? widget.localBooks as LocalBookReparse
-                    : null,
-                controller: _library,
-                images: widget.images,
-                onOpen: _continue,
-                onDetails: (key) =>
-                    _routes.open(context, NovelDestination(key)),
-                onSearch: () => _search(context),
-                onImport: widget.onImport,
-                header: _continueHeader(context),
+              child: PageStorage(
+                bucket: _shelfStorage,
+                child: BookshelfView(
+                  key: _shelfViewKey,
+                  batchActions: _shelfActions,
+                  layout: _shelfGrid,
+                  localReparse: widget.localBooks is LocalBookReparse
+                      ? widget.localBooks as LocalBookReparse
+                      : null,
+                  controller: _library,
+                  images: widget.images,
+                  onOpen: _continue,
+                  onDetails: (key) =>
+                      _routes.open(context, NovelDestination(key)),
+                  onSearch: () => _search(context),
+                  onImport: widget.onImport,
+                  header: _continueHeader(context),
+                ),
               ),
             ),
           ),
@@ -865,20 +942,28 @@ class _ReadingHomeState extends State<ReadingHome> {
 /// Tracks the routes pushed above a section's root, so a navigation request
 /// can remove them without their exit transitions.
 class _WorkspaceHistory extends NavigatorObserver {
+  _WorkspaceHistory(this.onChanged);
+  final VoidCallback onChanged;
+  bool get hasPages => _pageless.isNotEmpty;
   final _pageless = <Route<dynamic>>[];
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (route.settings is! Page) _pageless.add(route);
+    if (route.settings is! Page) {
+      _pageless.add(route);
+      onChanged();
+    }
   }
 
   @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
-      _pageless.remove(route);
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (_pageless.remove(route)) onChanged();
+  }
 
   @override
-  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) =>
-      _pageless.remove(route);
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    if (_pageless.remove(route)) onChanged();
+  }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
@@ -887,6 +972,7 @@ class _WorkspaceHistory extends NavigatorObserver {
     if (newRoute != null && newRoute.settings is! Page) {
       _pageless.insert(index >= 0 ? index : _pageless.length, newRoute);
     }
+    onChanged();
   }
 
   /// Removes the routes above the root, topmost first.

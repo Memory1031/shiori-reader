@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../app/theme/shiori_theme.dart';
-import '../capabilities.dart';
 
 /// Shell width before navigation takes its share. Standalone routes use the
 /// window width. This is layout information only, not navigation state.
@@ -19,7 +18,6 @@ class DesktopLayoutScope extends InheritedWidget {
       MediaQuery.sizeOf(context).width;
 
   static bool useDesktopPage(BuildContext context) =>
-      ShioriCapabilities.of(context).pointerFirst &&
       widthOf(context) >= ShioriLayout.page;
 
   @override

@@ -25,9 +25,9 @@ namespace {
 #endif
 
 /// The smallest client area the app lays out for, in logical pixels: the
-/// width where the desktop shell's rail replaces its bottom bar.
-constexpr int kMinimumClientWidth = 840;
-constexpr int kMinimumClientHeight = 600;
+/// width of the compact mobile layout.
+constexpr int kMinimumClientWidth = 320;
+constexpr int kMinimumClientHeight = 480;
 constexpr UINT_PTR kPlacementTimer = 0x53485249;
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";

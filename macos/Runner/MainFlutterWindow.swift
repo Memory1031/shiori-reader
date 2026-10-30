@@ -12,7 +12,7 @@ class MainFlutterWindow: NSWindow {
     launch.autoresizingMask = [.width, .height]
     backgroundColor = launch.paperColor
     contentView = launch
-    minSize = NSSize(width:620,height:520)
+    minSize = NSSize(width:320,height:480)
     setContentSize(NSSize(width:1280,height:900))
     if !setFrameUsingName(savedFrameName) { center() }
     _ = setFrameAutosaveName(savedFrameName)
@@ -86,7 +86,7 @@ class MainFlutterWindow: NSWindow {
         (right.isNull ? 0 : right.width * right.height)
     }) else { return }
     let work = target.visibleFrame
-    minSize = NSSize(width:min(620,work.width), height:min(520,work.height))
+    minSize = NSSize(width:min(320,work.width), height:min(480,work.height))
     var fitted = frame
     fitted.size.width = min(max(fitted.width,minSize.width),work.width)
     fitted.size.height = min(max(fitted.height,minSize.height),work.height)

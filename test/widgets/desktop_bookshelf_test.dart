@@ -99,10 +99,7 @@ class _Shelf {
   double get left => workspace.left + (workspace.width - frame(grid)) / 2;
   double frame(bool grid) =>
       (workspace.width - 2 * gutter).clamp(0, grid ? 1600 : 1200);
-  bool get grid => tester
-      .widget<SegmentedButton<bool>>(find.byType(SegmentedButton<bool>))
-      .selected
-      .single;
+  bool get grid => tester.widget<BookshelfView>(shelf).layout!.value;
 
   /// Grid covers, without the one in the continue row.
   List<Rect> get covers {
@@ -379,9 +376,14 @@ void main() {
             : 232.0;
         final gutter = width < 1200 ? 24.0 : 32.0;
         final frame = width - nav - 2 * gutter;
-        final toolbar = tester.getRect(find.byType(DesktopShelfToolbar));
-        expect(toolbar.left, closeTo(nav + (width - nav - frame) / 2, .01));
-        expect(toolbar.width, frame);
+        if (width >= 840) {
+          final toolbar = tester.getRect(find.byType(DesktopShelfToolbar));
+          expect(toolbar.left, closeTo(nav + (width - nav - frame) / 2, .01));
+          expect(toolbar.width, frame);
+        } else {
+          expect(find.byType(DesktopShelfToolbar), findsNothing);
+          expect(find.byType(AppBar), findsOneWidget);
+        }
         expect(tester.takeException(), isNull);
       }
       await h.close();

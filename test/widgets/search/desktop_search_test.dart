@@ -377,18 +377,23 @@ void main() {
 
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     testWidgets(
-      '$platform wide keeps mobile presentation and submit unfocus',
+      '$platform wide uses workspace presentation and retains input on resize',
       (tester) async {
         addTearDown(tester.view.reset);
         final h = SearchHarness(tester);
         await h.mount(width: 1600);
         expect(find.byType(DesktopContentFrame), findsNothing);
-        expect(find.byType(AppBar), findsOneWidget);
+        expect(find.byType(AppBar), findsNothing);
         await tester.enterText(input, 'query');
         await tester.testTextInput.receiveAction(TextInputAction.search);
         await tester.pump();
-        expect(h.field.focusNode!.hasFocus, isFalse);
         expect(h.repository.calls.length, 1);
+        final field = tester.element(input);
+        tester.view.physicalSize = const Size(390, 900);
+        await tester.pump();
+        expect(find.byType(AppBar), findsOneWidget);
+        expect(tester.element(input), same(field));
+        expect(h.field.controller!.text, 'query');
         h.repository.calls.single.pending.complete(Success(page([])));
         await tester.pumpAndSettle();
       },

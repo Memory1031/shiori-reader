@@ -325,19 +325,7 @@ class _ProductionAppState extends State<ProductionApp>
     }
     final navigator = _navigator.currentState;
     if (navigator == null) return;
-    // The desktop shell shows updates as one of its sections.
-    if (ShioriCapabilities.of(navigator.context).pointerFirst) {
-      _home.select(HomeSection.updates);
-      return;
-    }
-    navigator.push(
-      platformPageRoute<void>(
-        navigator.context,
-        settings: const RouteSettings(name: '/updates'),
-        builder: (_) =>
-            UpdateScreen(controller: updates, openPage: openUpdatePage),
-      ),
-    );
+    _home.select(HomeSection.updates);
   }
 
   void _updateChanged() {

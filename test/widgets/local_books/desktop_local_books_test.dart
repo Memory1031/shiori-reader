@@ -521,17 +521,14 @@ void main() {
   }, variant: windows);
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     testWidgets(
-      'wide $platform retains mobile controls and primary position',
+      'wide $platform uses wide controls and retains primary position',
       (tester) async {
         final h = LocalHarness(tester);
         addTearDown(h.close);
         await h.pump();
-        expect(find.byType(DesktopPageToolbar), findsNothing);
-        expect(find.byType(AppBar), findsOneWidget);
-        expect(
-          find.byKey(ValueKey(('local-book-actions', h.store.books.first.key))),
-          findsOneWidget,
-        );
+        expect(find.byType(DesktopPageToolbar), findsOneWidget);
+        expect(find.byType(AppBar), findsNothing);
+        expect(find.byType(DesktopLocalBookRow), findsWidgets);
         final scaffold = tester.element(
           find.descendant(of: h.page, matching: find.byType(Scaffold)),
         );

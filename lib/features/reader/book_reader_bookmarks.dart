@@ -118,7 +118,7 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
     if (repository == null || _bookmarkRoute?.isActive == true || !mounted) {
       return;
     }
-    final desktop = ShioriCapabilities.of(source).pointerFirst;
+    final desktop = DesktopLayoutScope.useDesktopPage(source);
     final accent = appAccentOf(source);
     Widget panel(BuildContext context) => ReaderBookmarksPanel(
       book: widget.chapter.novelKey,

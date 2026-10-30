@@ -760,7 +760,12 @@ void main() {
       '$mode closing and reopening keeps the chosen layer and browse position',
       (tester) async {
         final reader = OnlineReader();
-        await reader.mount(tester);
+        await reader.mount(
+          tester,
+          size: mode == 'iOS drag'
+              ? const Size(600, 800)
+              : const Size(1280, 800),
+        );
         await open(tester);
         await layer(tester, ReaderContentsKind.book);
         await tester.drag(list(), const Offset(0, -300));

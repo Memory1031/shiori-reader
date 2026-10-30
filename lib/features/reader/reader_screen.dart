@@ -1,3 +1,4 @@
+import '../../shared/widgets/desktop_content_frame.dart';
 import '../../shared/widgets/reading_statistics_scope.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -460,11 +461,11 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   /// The open desktop panel, if any: the page's one slot, shared by every
-  /// panel it opens. Phones and tablets use sheets.
+  /// panel it opens. Compact windows use sheets.
   ReaderPanelHandle<Object?>? _panel;
   final _progressAnchor = GlobalKey(debugLabel: 'reader-progress');
 
-  bool get _desktopPanels => ShioriCapabilities.of(context).pointerFirst;
+  bool get _desktopPanels => DesktopLayoutScope.useDesktopPage(context);
 
   /// Whether a live callback from [panel], such as a seek, may still act on
   /// this reader.
@@ -1051,6 +1052,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   /// hidden again or a route covers the page.
   void _requestProgress(BuildContext context) {
     final request = ++_progressRequest;
+    if (!_desktopPanels) _chrome.value = true;
     if (!_desktopPanels || _chrome.value && _progressAnchored) {
       unawaited(_progressPanel(context));
       return;
@@ -1402,7 +1404,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
               // Not modal: a key whose command stands aside, such as Space on
               // a focused button, goes on to the control's own handling.
               body: Shortcuts(
-                shortcuts: _desktopPanels
+                shortcuts: ShioriCapabilities.of(context).pointerFirst
                     ? desktopReaderShortcutsFor(Theme.of(context).platform)
                     : readerShortcuts,
                 child: Actions(

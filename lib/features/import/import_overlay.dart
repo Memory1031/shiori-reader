@@ -1,7 +1,7 @@
+import '../../shared/widgets/desktop_content_frame.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
-import '../../shared/capabilities.dart';
 import 'package:flutter/services.dart';
 import '../../domain/contracts/import_source.dart';
 import '../../domain/contracts/local_book_decoder.dart';
@@ -316,7 +316,7 @@ class _ImportPanelState extends State<_ImportPanel> {
     builder: (context, _) {
       final c = widget.controller;
       final l = AppLocalizations.of(context);
-      final pointerFirst = ShioriCapabilities.of(context).pointerFirst;
+      final desktop = DesktopLayoutScope.useDesktopPage(context);
       final content = Padding(
         padding: const EdgeInsets.all(ShioriSpace.page),
         child: c.discarding
@@ -340,7 +340,7 @@ class _ImportPanelState extends State<_ImportPanel> {
             if (event is KeyDownEvent) _dismiss();
             return KeyEventResult.handled;
           },
-          child: pointerFirst
+          child: desktop
               ? Dialog(
                   constraints: const BoxConstraints(
                     maxWidth: ShioriLayout.panel,
@@ -355,7 +355,7 @@ class _ImportPanelState extends State<_ImportPanel> {
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           maxWidth: ShioriLayout.panel,
-                          maxHeight: MediaQuery.sizeOf(context).height * .7,
+                          maxHeight: MediaQuery.sizeOf(context).height * .85,
                         ),
                         child: Material(
                           elevation: 8,
@@ -376,7 +376,7 @@ class _ImportPanelState extends State<_ImportPanel> {
   );
 
   WrapAlignment _actionAlignment(BuildContext context) =>
-      ShioriCapabilities.of(context).pointerFirst
+      DesktopLayoutScope.useDesktopPage(context)
       ? WrapAlignment.end
       : WrapAlignment.start;
 
@@ -436,7 +436,7 @@ class _ImportPanelState extends State<_ImportPanel> {
       ShioriTaskProgressBar(semanticsLabel: l.importReceiving),
       const SizedBox(height: ShioriSpace.item),
       Align(
-        alignment: ShioriCapabilities.of(context).pointerFirst
+        alignment: DesktopLayoutScope.useDesktopPage(context)
             ? Alignment.centerRight
             : Alignment.centerLeft,
         child: _stopButton(c, l),
@@ -657,7 +657,7 @@ class _ImportPanelState extends State<_ImportPanel> {
         Flexible(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: ShioriCapabilities.of(context).pointerFirst
+              maxHeight: DesktopLayoutScope.useDesktopPage(context)
                   ? MediaQuery.sizeOf(context).height * .5
                   : double.infinity,
             ),
@@ -748,7 +748,7 @@ class _ImportPanelState extends State<_ImportPanel> {
           ],
           const SizedBox(height: ShioriSpace.item),
           Align(
-            alignment: ShioriCapabilities.of(context).pointerFirst
+            alignment: DesktopLayoutScope.useDesktopPage(context)
                 ? Alignment.centerRight
                 : Alignment.centerLeft,
             child: _stopButton(c, l),

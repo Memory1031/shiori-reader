@@ -52,7 +52,7 @@ class WorkspaceBackIntent extends Intent {
   final bool keepTextEditing;
 }
 
-/// Pointer-first home: section navigation beside one workspace navigator.
+/// Responsive home: section navigation beside one workspace navigator.
 ///
 /// The workspace is kept under a global key, so crossing a breakpoint only
 /// moves the navigation and never rebuilds the workspace or its stack.
@@ -71,6 +71,7 @@ class DesktopShell extends StatefulWidget {
     required this.groups,
     required this.footer,
     required this.semanticLabel,
+    this.compactNavigation,
   });
 
   final HomeNavigation navigation;
@@ -81,6 +82,7 @@ class DesktopShell extends StatefulWidget {
   final List<List<ShellItem>> groups;
   final List<ShellItem> footer;
   final String semanticLabel;
+  final Widget? Function(BuildContext)? compactNavigation;
 
   @override
   State<DesktopShell> createState() => _DesktopShellState();
@@ -124,6 +126,9 @@ class _DesktopShellState extends State<DesktopShell> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final layout = shellLayoutFor(constraints.maxWidth);
+              final compact = layout == ShellLayout.bar
+                  ? widget.compactNavigation?.call(context)
+                  : null;
               // One Flex for every layout, so its children keep their
               // elements; the bar sits below by laying out upwards.
               return Flex(
@@ -135,23 +140,39 @@ class _DesktopShellState extends State<DesktopShell> {
                     : VerticalDirection.down,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ListenableBuilder(
-                    listenable: widget.navigation,
-                    builder: (context, _) => ShellNavigation(
-                      layout: layout,
-                      selected: widget.navigation.section,
-                      onSelect: widget.navigation.select,
-                      groups: widget.groups,
-                      footer: widget.footer,
-                      semanticLabel: widget.semanticLabel,
+                  if (layout == ShellLayout.bar &&
+                      widget.compactNavigation != null)
+                    compact == null
+                        ? const SizedBox.shrink()
+                        : MediaQuery.removePadding(
+                            context: context,
+                            removeTop: true,
+                            child: compact,
+                          )
+                  else
+                    ListenableBuilder(
+                      listenable: widget.navigation,
+                      builder: (context, _) => ShellNavigation(
+                        layout: layout,
+                        selected: widget.navigation.section,
+                        onSelect: widget.navigation.select,
+                        groups: widget.groups,
+                        footer: widget.footer,
+                        semanticLabel: widget.semanticLabel,
+                      ),
                     ),
-                  ),
                   Expanded(
                     child: KeyedSubtree(
                       key: _workspaceHost,
                       child: DesktopLayoutScope(
                         width: constraints.maxWidth,
-                        child: widget.workspace,
+                        child: layout == ShellLayout.bar && compact != null
+                            ? MediaQuery.removePadding(
+                                context: context,
+                                removeBottom: true,
+                                child: widget.workspace,
+                              )
+                            : widget.workspace,
                       ),
                     ),
                   ),

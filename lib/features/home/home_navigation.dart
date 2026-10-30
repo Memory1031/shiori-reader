@@ -1,7 +1,15 @@
 import 'package:flutter/foundation.dart';
 
-/// Top-level areas of the desktop management workspace.
-enum HomeSection { shelf, statistics, search, localBooks, offline, updates }
+/// Top-level areas shared by compact tabs and the wide workspace.
+enum HomeSection {
+  shelf,
+  statistics,
+  settings,
+  search,
+  localBooks,
+  offline,
+  updates,
+}
 
 /// The one owner of the selected [HomeSection].
 ///

@@ -1,3 +1,4 @@
+import '../../shared/widgets/desktop_content_frame.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/theme/shiori_theme.dart';
@@ -119,8 +120,9 @@ class ReaderBottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final grouped = ShioriCapabilities.of(context).pointerFirst;
-    String tip(String action, String shortcut) => grouped
+    final grouped = DesktopLayoutScope.useDesktopPage(context);
+    String tip(String action, String shortcut) =>
+        ShioriCapabilities.of(context).pointerFirst
         ? l.readerShortcutTooltip(
             action,
             readerShortcutLabel(Theme.of(context).platform, shortcut),

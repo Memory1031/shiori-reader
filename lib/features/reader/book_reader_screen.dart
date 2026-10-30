@@ -1,3 +1,4 @@
+import '../../shared/widgets/desktop_content_frame.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../../domain/bookmark_position.dart';
@@ -2437,7 +2438,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
   ReaderPanelHandle<VoidCallback>? _contentsPanel;
 
   Future<void> _contents() async {
-    if (!ShioriCapabilities.of(context).pointerFirst) {
+    if (!DesktopLayoutScope.useDesktopPage(context)) {
       return showReaderContents(
         context,
         layers: [_bookContents(context)],

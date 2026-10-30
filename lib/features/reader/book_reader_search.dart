@@ -319,7 +319,7 @@ extension _BookReaderSearch on _BookReaderScreenState {
       MediaQuery.platformBrightnessOf(context),
       accent: appAccentOf(context),
     );
-    if (ShioriCapabilities.of(context).touchFirst) {
+    if (!DesktopLayoutScope.useDesktopPage(context)) {
       await showReaderFootnote(
         context,
         hit.reference,

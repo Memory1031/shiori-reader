@@ -75,7 +75,8 @@ void main() {
     (tester) async {
       final h = ShellHarness(tester);
       await h.pump(size: const Size(1600, 720), shellWidth: 839);
-      await h.select(h.l.searchTitle);
+      await tester.tap(find.byTooltip(h.l.searchTitle));
+      await tester.pumpAndSettle();
       final workspace = h.workspace;
       await tester.enterText(input, 'draft');
       final text = tester.widget<TextField>(input).controller;
@@ -141,7 +142,10 @@ void main() {
           find.byType(DesktopPageToolbar),
           width >= 840 ? findsOneWidget : findsNothing,
         );
-        expect(find.byType(BackButton), findsNothing);
+        expect(
+          find.byType(BackButton),
+          width < 840 ? findsOneWidget : findsNothing,
+        );
         if (width >= 840) {
           final navWidth = width < 1200
               ? ShioriLayout.rail
