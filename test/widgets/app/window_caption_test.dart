@@ -365,7 +365,7 @@ void main() {
     ]) {
       h.nav.push(
         ReaderPanelRoute<void>(
-          placement: ReaderPanelPlacement.center,
+          placement: ReaderPanelPlacement.end,
           barrierLabel: name,
           duration: Duration.zero,
           builder: (_) => const SizedBox(height: 100),
@@ -378,7 +378,7 @@ void main() {
     }
     h.nav.push(
       ReaderPanelRoute<void>(
-        placement: ReaderPanelPlacement.center,
+        placement: ReaderPanelPlacement.end,
         barrierLabel: 'explicit',
         duration: Duration.zero,
         builder: (_) => const WindowCaptionScope(

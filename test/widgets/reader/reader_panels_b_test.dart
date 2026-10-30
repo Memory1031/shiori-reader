@@ -385,7 +385,7 @@ void main() {
         'a close after that', (tester) async {
       final reader = await pumpPage(tester);
       final panels = await slot(tester, reader);
-      expect(panels.desktop, isTrue);
+      expect(panels.live, isTrue);
       expect(panels.live, isTrue);
 
       final first = openInt(panels)!;
@@ -443,7 +443,7 @@ void main() {
       expect(tester.takeException(), isNull);
     }, variant: windows);
 
-    testWidgets('a footnote opens as a compact dialog in the same slot', (
+    testWidgets('a footnote opens as an end panel in the same slot', (
       tester,
     ) async {
       final reader = await pumpPage(tester);
@@ -454,8 +454,14 @@ void main() {
       expect(inPanel(find.byType(ReaderFootnotePanel)), findsOneWidget);
       expect(inPanel(find.text('Footnote 7')), findsOneWidget);
       final rect = tester.getRect(panel);
-      expect(rect.width, ReaderPanelRoute.dialogWidth);
-      expect(rect.center.dx, moreOrLessEquals(800));
+      expect(
+        rect.width,
+        ReaderPanelRoute.sideWidth(
+          ReaderPanelPlacement.end,
+          tester.view.physicalSize.width,
+        ),
+      );
+      expect(rect.right, moreOrLessEquals(1600 - ReaderPanelRoute.margin));
       // Holding the slot, it leaves no room for another panel.
       expect(openInt(panels), isNull);
       await tester.tap(inPanel(find.byTooltip('Close')));
@@ -730,7 +736,7 @@ void main() {
   });
 
   group('a footnote in the text on desktop', () {
-    testWidgets('opens a compact, scrolling dialog whose text selects and '
+    testWidgets('opens a scrolling end panel whose text selects and '
         'copies, and the page takes none of its input', (tester) async {
       String? copied;
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -762,14 +768,23 @@ void main() {
       // Titled with the marker as drawn, as the phone sheet is.
       expect(inPanel(find.text('Footnote ⁽¹⁾')), findsOneWidget);
       final rect = tester.getRect(panel);
-      expect(rect.width, ReaderPanelRoute.dialogWidth);
-      expect(rect.height, lessThanOrEqualTo(ReaderPanelRoute.dialogHeight));
+      expect(
+        rect.width,
+        ReaderPanelRoute.sideWidth(
+          ReaderPanelPlacement.end,
+          tester.view.physicalSize.width,
+        ),
+      );
+      expect(
+        rect.height,
+        tester.view.physicalSize.height - 2 * ReaderPanelRoute.margin,
+      );
       final scroll = tester
           .state<ScrollableState>(inPanel(find.byType(Scrollable)).first)
           .position;
       expect(scroll.maxScrollExtent, greaterThan(0));
 
-      // Page keys, the wheel and a right click stay in the dialog.
+      // Page keys, the wheel and a right click stay in the panel.
       for (final key in [
         LogicalKeyboardKey.space,
         LogicalKeyboardKey.arrowRight,

@@ -461,100 +461,94 @@ void main() {
       variant: windows,
     );
 
+    testWidgets('progress shares the end panel while the window resizes', (
+      tester,
+    ) async {
+      final harness = await pumpReader(tester);
+      void expectProgressSide() {
+        final rect = tester.getRect(panel);
+        final size = tester.view.physicalSize;
+        expect(
+          rect.right,
+          moreOrLessEquals(size.width - ReaderPanelRoute.margin),
+        );
+        expect(rect.top, ReaderPanelRoute.margin);
+        expect(
+          rect.width,
+          ReaderPanelRoute.sideWidth(ReaderPanelPlacement.end, size.width),
+        );
+      }
+
+      await open(tester, find.text('Chapter 0%'));
+      expectProgressSide();
+      for (final size in [
+        const Size(1000, 700),
+        const Size(840, 600),
+        const Size(2200, 1300),
+      ]) {
+        tester.view.physicalSize = size;
+        await tester.pumpAndSettle();
+        expect(panel, findsOneWidget, reason: 'stays open across resize');
+        expectProgressSide();
+      }
+
+      // The scrubber seeks; the stepper closes the panel and steps.
+      final start = harness.pages.capture()!;
+      await tester.drag(inPanel(find.byType(Slider)), const Offset(120, 0));
+      await tester.pumpAndSettle();
+      expect(
+        harness.pages.capture()!.chapterFraction,
+        greaterThan(start.chapterFraction),
+      );
+      await tester.tap(inPanel(find.text('Next chapter')));
+      await tester.pumpAndSettle();
+      expect(panel, findsNothing);
+      expect(harness.nexts, 1);
+    }, variant: windows);
+
     testWidgets(
-      'progress popover follows its control while the window resizes',
+      'a mouse hovering the progress side panel shows its tooltip',
       (tester) async {
-        final harness = await pumpReader(tester);
-        final target = find.ancestor(
+        await pumpReader(tester);
+        final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+        await mouse.addPointer(location: Offset.zero);
+        addTearDown(mouse.removePointer);
+        final button = find.ancestor(
           of: find.text('Chapter 0%'),
           matching: find.byType(TextButton),
         );
-        void expectAnchored() {
-          final anchor = tester.getRect(target);
-          final popover = tester.getRect(panel);
-          expect(popover.center.dx, moreOrLessEquals(anchor.center.dx));
-          expect(
-            popover.bottom,
-            moreOrLessEquals(anchor.top - ReaderPanelRoute.anchorGap),
-          );
-          expect(
-            popover.width,
-            ReaderPanelRoute.popoverWidth(tester.view.physicalSize.width),
-          );
-        }
-
-        await open(tester, find.text('Chapter 0%'));
-        expectAnchored();
-        for (final size in [
-          const Size(1000, 700),
-          const Size(840, 600),
-          const Size(2200, 1300),
-        ]) {
-          tester.view.physicalSize = size;
-          await tester.pumpAndSettle();
-          expect(panel, findsOneWidget, reason: 'stays open across resize');
-          expectAnchored();
-        }
-
-        // The scrubber seeks; the stepper closes the popover and steps.
-        final start = harness.pages.capture()!;
-        await tester.drag(inPanel(find.byType(Slider)), const Offset(120, 0));
+        await mouse.moveTo(tester.getCenter(button));
+        await tester.pump();
+        await mouse.down(tester.getCenter(button));
+        await mouse.up();
         await tester.pumpAndSettle();
+        expect(panel, findsOneWidget);
+
+        // A tooltip lays out against the overlay, so the panel must not
+        // sit under a layer whose transform is only known after layout.
+        final tooltip = inPanel(find.byType(Tooltip)).first;
+        final message = tester.widget<Tooltip>(tooltip).message!;
+        await mouse.moveTo(tester.getCenter(tooltip));
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text(message), findsWidgets);
+
+        // The panel keeps following its control with the tooltip up.
+        tester.view.physicalSize = const Size(1000, 700);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
         expect(
-          harness.pages.capture()!.chapterFraction,
-          greaterThan(start.chapterFraction),
+          tester.getRect(panel).bottom,
+          moreOrLessEquals(700 - ReaderPanelRoute.margin),
         );
-        await tester.tap(inPanel(find.text('Next chapter')));
+
+        await mouse.moveTo(tester.getCenter(inPanel(find.byType(Slider))));
         await tester.pumpAndSettle();
-        expect(panel, findsNothing);
-        expect(harness.nexts, 1);
+        expect(tester.takeException(), isNull);
       },
       variant: windows,
     );
-
-    testWidgets('a mouse hovering the progress popover shows its tooltip', (
-      tester,
-    ) async {
-      await pumpReader(tester);
-      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
-      await mouse.addPointer(location: Offset.zero);
-      addTearDown(mouse.removePointer);
-      final button = find.ancestor(
-        of: find.text('Chapter 0%'),
-        matching: find.byType(TextButton),
-      );
-      await mouse.moveTo(tester.getCenter(button));
-      await tester.pump();
-      await mouse.down(tester.getCenter(button));
-      await mouse.up();
-      await tester.pumpAndSettle();
-      expect(panel, findsOneWidget);
-
-      // A tooltip lays out against the overlay, so the popover must not
-      // sit under a layer whose transform is only known after layout.
-      final tooltip = inPanel(find.byType(Tooltip)).first;
-      final message = tester.widget<Tooltip>(tooltip).message!;
-      await mouse.moveTo(tester.getCenter(tooltip));
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      expect(find.text(message), findsWidgets);
-
-      // The popover keeps following its control with the tooltip up.
-      tester.view.physicalSize = const Size(1000, 700);
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      expect(
-        tester.getRect(panel).bottom,
-        moreOrLessEquals(
-          tester.getRect(button).top - ReaderPanelRoute.anchorGap,
-        ),
-      );
-
-      await mouse.moveTo(tester.getCenter(inPanel(find.byType(Slider))));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    }, variant: windows);
 
     testWidgets('contents header ends with refresh and close in one row', (
       tester,

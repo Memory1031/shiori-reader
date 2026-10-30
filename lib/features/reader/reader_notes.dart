@@ -4,7 +4,7 @@ import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
-import 'reader_sheet.dart';
+import 'reader_panel.dart';
 
 /// Opens the chapter's notes over the reader. Resolves with the chosen
 /// cross-reference to follow, or null when the sheet just closes.
@@ -15,13 +15,16 @@ Future<LocalContentLink?> showReaderNotes(
   required List<LocalContentLink> links,
   required ChapterKey current,
   required String? Function(ChapterKey target) titleOf,
-}) => showReaderSheet<LocalContentLink>(
+}) => showReaderPanel<LocalContentLink>(
   readerContext,
   builder: (sheet) => ReaderNotesPanel(
     links: links,
     current: current,
     titleOf: titleOf,
     onFollow: (link) => Navigator.of(sheet).pop(link),
+    onClose: ShioriPanelScope.isSheet(sheet)
+        ? null
+        : () => Navigator.of(sheet).pop(),
   ),
 );
 

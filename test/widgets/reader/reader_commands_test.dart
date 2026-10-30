@@ -13,6 +13,7 @@ import 'package:shiori/features/reader/book_reader_screen.dart';
 import 'package:shiori/features/reader/reader_commands.dart';
 import 'package:shiori/features/reader/reader_contents.dart';
 import 'package:shiori/features/reader/reader_panel.dart';
+import 'package:shiori/features/reader/reader_progress_panel.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/reader_toolbars.dart';
 import 'package:shiori/features/reader/settings_panel.dart';
@@ -180,14 +181,14 @@ final contentsPanel = inPanel(find.byType(ReaderContentsPanel));
 final progressPanel = inPanel(find.byType(Slider));
 final settingsPanel = inPanel(find.byType(ReaderSettingsPanel));
 
-void expectAnchored(WidgetTester tester) {
+void expectProgressSide(WidgetTester tester) {
   expect(progressPanel, findsOneWidget);
+  final rect = tester.getRect(panel);
   expect(
-    tester.getRect(panel).bottom,
-    moreOrLessEquals(
-      tester.getRect(progressButton).top - ReaderPanelRoute.anchorGap,
-    ),
+    rect.right,
+    moreOrLessEquals(tester.view.physicalSize.width - ReaderPanelRoute.margin),
   );
+  expect(rect.top, ReaderPanelRoute.margin);
 }
 
 /// A [BookReaderScreen] pushed over a home page, as the app opens it.
@@ -321,7 +322,7 @@ void main() {
               await choose(tester, label);
           }
           expect(opened, findsOneWidget, reason: '$label from $input');
-          if (label == 'Progress') expectAnchored(tester);
+          if (label == 'Progress') expectProgressSide(tester);
           await key(tester, LogicalKeyboardKey.escape);
           expect(panel, findsNothing);
           expect(chromeVisible(), isTrue, reason: 'Esc only closes the panel');
@@ -480,7 +481,7 @@ void main() {
         expect(item.dx, inInclusiveRange(800, 824));
         expect(item.dy, inInclusiveRange(500, 524));
         await choose(tester, 'Progress');
-        expectAnchored(tester);
+        expectProgressSide(tester);
         await key(tester, LogicalKeyboardKey.escape);
       }, variant: windows);
     }
@@ -530,19 +531,32 @@ void main() {
     expect(tester.takeException(), isNull);
   }, variant: windows);
 
+  testWidgets('compact desktop context menu opens the shared reader sheet', (
+    tester,
+  ) async {
+    await pumpReader(tester, size: const Size(390, 844));
+    await rightClick(tester, const Offset(180, 300));
+    await choose(tester, 'Progress');
+    expect(find.byType(ReaderProgressPanel), findsOneWidget);
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(panel, findsNothing);
+    await key(tester, LogicalKeyboardKey.escape);
+    expect(find.byType(ReaderProgressPanel), findsNothing);
+  }, variant: windows);
+
   group('progress from the keyboard', () {
-    testWidgets('shows the toolbars and opens over its control', (
+    testWidgets('shows the toolbars and opens the common end panel', (
       tester,
     ) async {
       await pumpReader(tester);
       expect(chromeVisible(), isFalse);
       await chord(tester, LogicalKeyboardKey.keyG, control: true);
       expect(chromeVisible(), isTrue);
-      expectAnchored(tester);
+      expectProgressSide(tester);
       await key(tester, LogicalKeyboardKey.escape);
       // With the toolbars shown it opens at once.
       await chord(tester, LogicalKeyboardKey.keyG, control: true);
-      expectAnchored(tester);
+      expectProgressSide(tester);
     }, variant: windows);
 
     for (final cancel in [
@@ -747,7 +761,7 @@ void main() {
       expect(contentsPanel, findsOneWidget);
       await key(tester, LogicalKeyboardKey.escape);
       await chord(tester, LogicalKeyboardKey.keyG, control: true);
-      expectAnchored(tester);
+      expectProgressSide(tester);
       await key(tester, LogicalKeyboardKey.escape);
       await rightClick(tester, const Offset(800, 500));
       expect(menuItems, findsWidgets);
@@ -784,7 +798,7 @@ void main() {
       expect(contentsPanel, findsOneWidget);
       await key(tester, LogicalKeyboardKey.escape);
       await chord(tester, LogicalKeyboardKey.keyG, control: true);
-      expectAnchored(tester);
+      expectProgressSide(tester);
       await key(tester, LogicalKeyboardKey.escape);
       await b.close();
     }, variant: windows);

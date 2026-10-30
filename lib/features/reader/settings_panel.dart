@@ -6,7 +6,7 @@ import '../../app/theme/shiori_theme.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
-import '../../shared/widgets/shiori_sheet.dart';
+import 'reader_panel.dart';
 import 'reader_margin.dart';
 import 'reader_preferences.dart';
 import 'reader_theme.dart';
@@ -18,7 +18,7 @@ Future<void> showReaderSettings(
   ReaderPreferences preferences, {
   bool txt = false,
 }) async {
-  await showShioriSheet<void>(
+  await showReaderPanel<void>(
     context,
     barrierColor: Colors.black.withValues(alpha: .18),
     // The panel owns the handle so it follows live reading-theme changes.
@@ -27,7 +27,7 @@ Future<void> showReaderSettings(
       preferences: preferences,
       txt: txt,
       onDone: () => Navigator.of(sheet).pop(),
-      sheet: true,
+      sheet: ShioriPanelScope.isSheet(sheet),
     ),
   );
   await preferences.flush();

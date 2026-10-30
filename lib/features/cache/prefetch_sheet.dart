@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
-import '../../shared/widgets/shiori_sheet.dart';
+import '../../shared/widgets/shiori_panel.dart';
 import '../../shared/widgets/shiori_feedback.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -11,7 +11,7 @@ Future<bool?> showPrefetchSheet(
   required CacheManagement cache,
   required Catalog? catalog,
   required ChapterKey current,
-}) => showShioriSheet<bool>(
+}) => showShioriPanel<bool>(
   context,
   size: ShioriSheetSize.tall,
   builder: (context) => PrefetchPanel(
@@ -19,6 +19,9 @@ Future<bool?> showPrefetchSheet(
     catalog: catalog,
     current: current,
     onManage: () => Navigator.of(context).pop(true),
+    onClose: ShioriPanelScope.isSheet(context)
+        ? null
+        : () => Navigator.of(context).pop(),
   ),
 );
 

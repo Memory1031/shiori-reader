@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../shared/widgets/shiori_sheet.dart';
+import '../../shared/widgets/shiori_panel.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
@@ -220,7 +220,7 @@ class _BookshelfViewState extends State<BookshelfView> {
       ),
     ].join(' · ');
     final entries = _entries(book);
-    final action = await showShioriSheet<_BookAction>(
+    final action = await showShioriPanel<_BookAction>(
       context,
       builder: (sheet) => Padding(
         padding: const EdgeInsets.fromLTRB(

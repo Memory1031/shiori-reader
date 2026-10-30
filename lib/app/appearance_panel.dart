@@ -1,6 +1,5 @@
-import '../shared/widgets/desktop_content_frame.dart';
 import 'package:flutter/material.dart';
-import '../shared/widgets/shiori_sheet.dart';
+import '../shared/widgets/shiori_panel.dart';
 import '../domain/models/models.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'app_controller.dart';
@@ -11,26 +10,20 @@ import 'theme/shiori_theme.dart';
 Future<void> showAppAppearance(
   BuildContext context,
   AppController controller,
-) => DesktopLayoutScope.useDesktopPage(context)
-    ? showDialog<void>(
-        context: context,
-        builder: (dialog) => Dialog(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: ShioriLayout.panel),
-            child: Padding(
-              padding: const EdgeInsets.only(top: ShioriSpace.page),
-              child: _AppearancePanel(
-                controller: controller,
-                onClose: () => Navigator.pop(dialog),
-              ),
-            ),
-          ),
-        ),
-      )
-    : showShioriSheet<void>(
-        context,
-        builder: (_) => _AppearancePanel(controller: controller),
-      );
+) => showShioriPanel<void>(
+  context,
+  builder: (context) => Padding(
+    padding: EdgeInsets.only(
+      top: ShioriPanelScope.isSheet(context) ? 0 : ShioriSpace.page,
+    ),
+    child: _AppearancePanel(
+      controller: controller,
+      onClose: ShioriPanelScope.isSheet(context)
+          ? null
+          : () => Navigator.pop(context),
+    ),
+  ),
+);
 
 class _AppearancePanel extends StatefulWidget {
   const _AppearancePanel({required this.controller, this.onClose});
@@ -63,7 +56,7 @@ class _AppearancePanelState extends State<_AppearancePanel> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context), controller = widget.controller;
     final theme = Theme.of(context), scheme = theme.colorScheme;
-    // showShioriSheet already applies the safe-area insets.
+    // The panel host already applies safe-area insets.
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       child: Column(

@@ -1,4 +1,3 @@
-import '../../shared/widgets/desktop_content_frame.dart';
 import '../../shared/widgets/reading_statistics_scope.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show ValueListenable;
@@ -35,8 +34,6 @@ import 'article_contents.dart';
 import 'reader_contents_session.dart';
 import 'reader_panel.dart';
 import 'reader_progress_panel.dart';
-import 'reader_sheet.dart';
-import '../../shared/widgets/shiori_sheet.dart' show shioriSheetRoute;
 import '../../shared/widgets/shiori_feedback.dart';
 import 'reader_search_controller.dart';
 import 'reader_search_panel.dart';
@@ -387,7 +384,6 @@ class _ReaderContentViewState extends State<ReaderContentView>
       _dismissProgressPanel();
       _panel?.dismiss();
       _panel = null;
-      _retireSearchSheet();
     }
   }
 
@@ -460,33 +456,32 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
   }
 
-  /// The open desktop panel, if any: the page's one slot, shared by every
+  /// The open responsive panel, if any: the page's one slot, shared by every
   /// panel it opens. Compact windows use sheets.
   ReaderPanelHandle<Object?>? _panel;
-  final _progressAnchor = GlobalKey(debugLabel: 'reader-progress');
-
-  bool get _desktopPanels => DesktopLayoutScope.useDesktopPage(context);
 
   /// Whether a live callback from [panel], such as a seek, may still act on
   /// this reader.
   bool _owns(ReaderPanelHandle<Object?> panel) =>
       mounted && panel.isValid && identical(_panel, panel);
 
-  /// Opens a desktop panel in the reading theme, following live edits.
+  /// Opens a responsive panel in the reading theme, following live edits.
   /// Null while another panel holds the slot or the page takes no commands.
   ReaderPanelHandle<T>? _openPanel<T>(
     ReaderPanelPlacement placement, {
     required String semanticLabel,
     required Widget Function(BuildContext context, ReaderPanelHandle<T> panel)
     builder,
-    GlobalKey? anchor,
+    ShioriSheetSize size = ShioriSheetSize.fit,
+    bool owned = false,
   }) {
     if (_panel?.isValid == true || !_interactive) return null;
     final panel = ReaderPanelHandle<T>.open(
       this,
       placement: placement,
       semanticLabel: semanticLabel,
-      anchor: anchor,
+      size: size,
+      owned: owned,
       themeChanges: _preferences,
       theme: (context) => readerTheme(
         _preferences.value,
@@ -523,79 +518,43 @@ class _ReaderContentViewState extends State<ReaderContentView>
     }
   }
 
-  void _retireSearchSheet() {
-    final sheet = _searchSheet;
-    _searchSheet = null;
-    if (sheet == null) return;
-    final navigator = sheet.navigator;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (navigator?.mounted == true && sheet.isActive) {
-        navigator!.removeRoute(sheet);
-      }
-    });
-  }
-
-  ModalBottomSheetRoute<void>? _searchSheet;
   Future<void> _searchPanel(BuildContext context) async {
     final state = widget.search;
     if (state == null) return;
-    if (_panel?.isValid == true || _searchSheet?.isActive == true) {
+    if (_panel?.isValid == true) {
       state.focusRequest.value++;
       return;
     }
     if (!_interactive) return;
     widget.onSearchOpen?.call();
     final source = widget.session;
-    if (_desktopPanels) {
-      final panel = _openPanel<void>(
-        ReaderPanelPlacement.end,
-        semanticLabel: AppLocalizations.of(context).readerSearchBook,
-        builder: (context, panel) => ReaderSearchPanel(
-          controller: state,
-          accepts: () => _owns(panel) && identical(source, widget.session),
-          onClose: panel.close,
-          closeForNavigation: () async {
-            panel.close();
-            await panel.completed;
-          },
-          titleFor: widget.searchTitle ?? (_, _) async => widget.content.title,
-        ),
-      );
-      if (panel != null) {
-        await panel.closed;
-        await state.panelClosed();
-      }
-    } else {
-      late ModalBottomSheetRoute<void> route;
-      route = shioriSheetRoute<void>(
-        context,
-        size: ReaderSheetSize.tall,
-        builder: (context) => ReaderSearchPanel(
-          controller: state,
-          accepts: () =>
-              mounted && route.isCurrent && identical(source, widget.session),
-          onClose: () => Navigator.of(context).pop(),
-          closeForNavigation: () async {
-            Navigator.of(context).pop();
-            await route.completed;
-          },
-          titleFor: widget.searchTitle ?? (_, _) async => widget.content.title,
-        ),
-      );
-      _searchSheet = route;
-      await Navigator.of(context, rootNavigator: true).push(route);
-      if (identical(_searchSheet, route)) _searchSheet = null;
+    final panel = _openPanel<void>(
+      ReaderPanelPlacement.end,
+      size: ShioriSheetSize.tall,
+      semanticLabel: AppLocalizations.of(context).readerSearchBook,
+      builder: (context, panel) => ReaderSearchPanel(
+        controller: state,
+        accepts: () => _owns(panel) && identical(source, widget.session),
+        onClose: panel.close,
+        closeForNavigation: () async {
+          panel.close();
+          await panel.completed;
+        },
+        titleFor: widget.searchTitle ?? (_, _) async => widget.content.title,
+      ),
+    );
+    if (panel != null) {
+      await panel.closed;
       await state.panelClosed();
     }
   }
 
-  /// A single footnote over the page: a compact dialog in the reading theme
-  /// on desktop, sharing the page's slot, and the sheet elsewhere.
+  /// Footnotes share the same responsive slot as other reader tools.
   Future<void> _footnote(BuildContext context, LocalContentLink note) async {
     if (!_interactive) return;
-    if (!_desktopPanels) return showReaderFootnote(context, note);
     final panel = _openPanel<void>(
-      ReaderPanelPlacement.center,
+      ReaderPanelPlacement.end,
+      size: ShioriSheetSize.tall,
       semanticLabel: AppLocalizations.of(context).readerFootnote(note.label),
       builder: (context, panel) => ReadingActivity(
         book: widget.content.key.novelKey,
@@ -606,17 +565,12 @@ class _ReaderContentViewState extends State<ReaderContentView>
   }
 
   Future<void> _settingsPanel(BuildContext context) async {
-    if (!_desktopPanels) {
-      return showReaderSettings(
-        context,
-        _preferences,
-        txt: widget.content.lineSeparated,
-      );
-    }
     final panel = _openPanel(
       ReaderPanelPlacement.end,
       semanticLabel: AppLocalizations.of(context).readerSettings,
+      owned: true,
       builder: (context, panel) => ReaderSettingsPanel(
+        sheet: ShioriPanelScope.isSheet(context),
         preferences: _preferences,
         txt: widget.content.lineSeparated,
         onDone: () => panel.close(),
@@ -654,16 +608,6 @@ class _ReaderContentViewState extends State<ReaderContentView>
 
   /// [book] opens on the book-level layer, e.g. from the completion page.
   Future<void> _contents(BuildContext context, {bool book = false}) async {
-    if (!_desktopPanels) {
-      final layers = _contentsLayers(context);
-      if (layers.isEmpty) return;
-      return showReaderContents(
-        context,
-        layers: layers,
-        initialLayer: book ? layers.length - 1 : null,
-        session: widget.contentsSession,
-      );
-    }
     final layers = _contentsLayers(context);
     if (layers.isEmpty) return;
     // The selection comes back as the panel's result and is applied only
@@ -671,6 +615,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
     await _deliver(
       _openPanel<VoidCallback>(
         ReaderPanelPlacement.start,
+        size: ShioriSheetSize.tall,
         semanticLabel: layers.length == 1
             ? layers.single.label
             : AppLocalizations.of(context).catalogTitle,
@@ -678,7 +623,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
           layers: layers,
           initialLayer: book ? layers.length - 1 : null,
           session: widget.contentsSession,
-          closeButton: true,
+          closeButton: !ShioriPanelScope.isSheet(context),
           onDone: ([then]) => panel.close(then),
         ),
       ),
@@ -1041,32 +986,16 @@ class _ReaderContentViewState extends State<ReaderContentView>
     });
   }
 
-  bool get _progressAnchored {
-    final anchor = _progressAnchor.currentContext?.findRenderObject();
-    return anchor is RenderBox && anchor.attached && anchor.hasSize;
-  }
-
-  /// Opens progress over its control, first showing the toolbars when they
-  /// are hidden and waiting for the control to lay out. The request is
-  /// dropped if, by then, the page is no longer active, the toolbars were
-  /// hidden again or a route covers the page.
   void _requestProgress(BuildContext context) {
     final request = ++_progressRequest;
-    if (!_desktopPanels) _chrome.value = true;
-    if (!_desktopPanels || _chrome.value && _progressAnchored) {
-      unawaited(_progressPanel(context));
-      return;
-    }
     _chrome.value = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (request != _progressRequest ||
-          !context.mounted ||
-          !_interactive ||
-          !_chrome.value ||
-          !_progressAnchored) {
-        return;
+      if (request == _progressRequest &&
+          context.mounted &&
+          _interactive &&
+          _chrome.value) {
+        unawaited(_progressPanel(context));
       }
-      unawaited(_progressPanel(context));
     });
     WidgetsBinding.instance.scheduleFrame();
   }
@@ -1103,7 +1032,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
   /// the page from the keyboard. The chosen command runs only if this page
   /// still reads the same session and takes commands.
   Future<void> _contextMenu(BuildContext context, {Offset? at}) async {
-    if (!_desktopPanels || !_interactive) return;
+    if (!ShioriCapabilities.of(context).pointerFirst || !_interactive) return;
     final entries = _contextEntries(AppLocalizations.of(context));
     if (entries.isEmpty) return;
     final overlay =
@@ -1255,7 +1184,6 @@ class _ReaderContentViewState extends State<ReaderContentView>
   @override
   void dispose() {
     _removeExit?.call();
-    _retireSearchSheet();
     _audio.dispose();
     _panel?.dismiss();
     _panel = null;
@@ -1803,9 +1731,7 @@ class _ReaderContentViewState extends State<ReaderContentView>
         // Phones and tablets keep the footnote sheet the text opens itself.
         onFootnote: !widget.active
             ? (_) {}
-            : _desktopPanels
-            ? (note) => unawaited(_footnote(context, note))
-            : null,
+            : (note) => unawaited(_footnote(context, note)),
         contentLinks: widget.session?.contentLinks.toList() ?? const [],
         initialPosition: _position,
         textStyle: style,
@@ -2018,40 +1944,10 @@ class _ReaderContentViewState extends State<ReaderContentView>
             );
           },
         );
-    if (!_desktopPanels) {
-      Future<dynamic>? completed;
-      ModalRoute<VoidCallback>? route;
-      final intent = await showReaderSheet<VoidCallback>(
-        context,
-        builder: (sheet) {
-          if (route == null) {
-            route = ModalRoute.of<VoidCallback>(sheet)!;
-            _progressRoute = route;
-            completed = route!.completed;
-            if (!sameReader()) _dismissProgressPanel();
-          }
-          final sheetRoute = route!;
-          return progress(
-            ([then]) {
-              if (sheetRoute.isCurrent) Navigator.of(sheet).pop(then);
-            },
-            () =>
-                sheetRoute.isCurrent &&
-                mounted &&
-                identical(widget.session, session),
-          );
-        },
-      );
-      await completed;
-      if (identical(_progressRoute, route)) _progressRoute = null;
-      if (intent != null && live()) intent();
-      return;
-    }
     // Same-document seeks retain the panel; other choices leave as its result.
     final panel = _openPanel<VoidCallback>(
-      ReaderPanelPlacement.anchored,
+      ReaderPanelPlacement.end,
       semanticLabel: basis.title,
-      anchor: _progressAnchor,
       builder: (context, panel) =>
           progress(([then]) => panel.close(then), () => _owns(panel)),
     );
@@ -2211,7 +2107,6 @@ class _ReaderContentViewState extends State<ReaderContentView>
               : _progressLabel(l.readerChapterPercent),
           onProgress: _command(context, ReaderCommand.progress),
           onSettings: _command(context, ReaderCommand.settings),
-          progressKey: completion ? null : _progressAnchor,
         ),
       ),
     );
@@ -2229,16 +2124,12 @@ class _ReaderContentViewState extends State<ReaderContentView>
 /// The panel slot of one page for a screen-level command, bound to the
 /// session the command was invoked for.
 class _PagePanels implements ReaderPanels {
-  _PagePanels(this._page, this.context)
-    : _session = _page.widget.session,
-      desktop = _page._desktopPanels;
+  _PagePanels(this._page, this.context) : _session = _page.widget.session;
 
   final _ReaderContentViewState _page;
   final Object? _session;
   @override
   final BuildContext context;
-  @override
-  final bool desktop;
 
   @override
   bool get live =>
@@ -2256,6 +2147,7 @@ class _PagePanels implements ReaderPanels {
   }) => live
       ? _page._openPanel<T>(
           placement,
+          size: ShioriSheetSize.tall,
           semanticLabel: semanticLabel,
           builder: builder,
         )

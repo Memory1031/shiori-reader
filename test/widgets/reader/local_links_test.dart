@@ -384,7 +384,7 @@ void main() {
       tester
           .widget<ReaderContentView>(find.byType(ReaderContentView))
           .actions
-          .links!(_SheetPanels(tester.element(find.byType(ReaderContentView))));
+          .links!(_SheetPanels(tester.state(find.byType(ReaderContentView))));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('external'),
@@ -467,7 +467,7 @@ void main() {
     tester
         .widget<ReaderContentView>(find.byType(ReaderContentView))
         .actions
-        .links!(_SheetPanels(tester.element(find.byType(ReaderContentView))));
+        .links!(_SheetPanels(tester.state(find.byType(ReaderContentView))));
     await tester.pumpAndSettle();
     await tester.tap(find.text('note'));
     await tester.pumpAndSettle();
@@ -484,11 +484,10 @@ void main() {
 /// The page's panel slot as phones and tablets have it: notes open as a
 /// sheet from the page's context.
 class _SheetPanels implements ReaderPanels {
-  _SheetPanels(this.context);
+  _SheetPanels(this.owner);
+  final State owner;
   @override
-  final BuildContext context;
-  @override
-  bool get desktop => false;
+  BuildContext get context => owner.context;
   @override
   bool get live => context.mounted;
   @override
@@ -497,7 +496,12 @@ class _SheetPanels implements ReaderPanels {
     required String semanticLabel,
     required Widget Function(BuildContext context, ReaderPanelHandle<T> panel)
     builder,
-  }) => null;
+  }) => ReaderPanelHandle<T>.open(
+    owner,
+    placement: placement,
+    semanticLabel: semanticLabel,
+    builder: builder,
+  );
   @override
   Future<void> footnote(LocalContentLink note) =>
       showReaderFootnote(context, note);

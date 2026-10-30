@@ -8,7 +8,7 @@ import '../../domain/contracts/contracts.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/desktop_content_frame.dart';
-import '../../shared/widgets/shiori_sheet.dart';
+import '../../shared/widgets/shiori_panel.dart';
 import 'reading_statistics_controller.dart';
 
 String readingDuration(AppLocalizations l, int ms) {
@@ -82,23 +82,15 @@ enum StatisticsRange { week, month, year }
 Future<void> showStatisticsSettings(
   BuildContext context,
   ReadingStatisticsController controller,
-) => DesktopLayoutScope.useDesktopPage(context)
-    ? showDialog<void>(
-        context: context,
-        builder: (_) => Dialog(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: ShioriLayout.panel),
-            child: Padding(
-              padding: const EdgeInsets.only(top: ShioriSpace.page),
-              child: _RecordSettings(controller: controller),
-            ),
-          ),
-        ),
-      )
-    : showShioriSheet<void>(
-        context,
-        builder: (_) => _RecordSettings(controller: controller),
-      );
+) => showShioriPanel<void>(
+  context,
+  builder: (context) => Padding(
+    padding: EdgeInsets.only(
+      top: ShioriPanelScope.isSheet(context) ? 0 : ShioriSpace.page,
+    ),
+    child: _RecordSettings(controller: controller),
+  ),
+);
 
 class StatisticsScreen extends StatelessWidget {
   const StatisticsScreen({

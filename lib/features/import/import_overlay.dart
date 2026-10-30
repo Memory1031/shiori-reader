@@ -1,4 +1,4 @@
-import '../../shared/widgets/desktop_content_frame.dart';
+import '../../shared/widgets/shiori_panel.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
@@ -316,7 +316,8 @@ class _ImportPanelState extends State<_ImportPanel> {
     builder: (context, _) {
       final c = widget.controller;
       final l = AppLocalizations.of(context);
-      final desktop = DesktopLayoutScope.useDesktopPage(context);
+      final desktop =
+          ShioriPanelScope.resolve(context) == ShioriPanelPresentation.dialog;
       final content = Padding(
         padding: const EdgeInsets.all(ShioriSpace.page),
         child: c.discarding
@@ -376,7 +377,7 @@ class _ImportPanelState extends State<_ImportPanel> {
   );
 
   WrapAlignment _actionAlignment(BuildContext context) =>
-      DesktopLayoutScope.useDesktopPage(context)
+      ShioriPanelScope.resolve(context) == ShioriPanelPresentation.dialog
       ? WrapAlignment.end
       : WrapAlignment.start;
 
@@ -436,7 +437,8 @@ class _ImportPanelState extends State<_ImportPanel> {
       ShioriTaskProgressBar(semanticsLabel: l.importReceiving),
       const SizedBox(height: ShioriSpace.item),
       Align(
-        alignment: DesktopLayoutScope.useDesktopPage(context)
+        alignment:
+            ShioriPanelScope.resolve(context) == ShioriPanelPresentation.dialog
             ? Alignment.centerRight
             : Alignment.centerLeft,
         child: _stopButton(c, l),
@@ -657,7 +659,9 @@ class _ImportPanelState extends State<_ImportPanel> {
         Flexible(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: DesktopLayoutScope.useDesktopPage(context)
+              maxHeight:
+                  ShioriPanelScope.resolve(context) ==
+                      ShioriPanelPresentation.dialog
                   ? MediaQuery.sizeOf(context).height * .5
                   : double.infinity,
             ),
@@ -748,7 +752,9 @@ class _ImportPanelState extends State<_ImportPanel> {
           ],
           const SizedBox(height: ShioriSpace.item),
           Align(
-            alignment: DesktopLayoutScope.useDesktopPage(context)
+            alignment:
+                ShioriPanelScope.resolve(context) ==
+                    ShioriPanelPresentation.dialog
                 ? Alignment.centerRight
                 : Alignment.centerLeft,
             child: _stopButton(c, l),

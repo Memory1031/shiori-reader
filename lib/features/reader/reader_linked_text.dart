@@ -11,7 +11,7 @@ import '../../shared/paper_diagram.dart';
 import 'reader_inline_images.dart';
 import 'reader_inline_border.dart';
 import 'reader_authored_colors.dart';
-import 'reader_sheet.dart';
+import 'reader_panel.dart';
 import 'reader_search_highlight.dart';
 
 import '../../l10n/generated/app_localizations.dart';
@@ -23,35 +23,14 @@ Future<void> showReaderFootnote(
   ThemeData? theme,
 }) {
   final book = ReadingBookScope.maybeOf(context);
-  return showReaderSheet<void>(
+  return showReaderPanel<void>(
     context,
+    size: ShioriSheetSize.tall,
     builder: (context) {
-      final l = AppLocalizations.of(context);
-      final panel = ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * .65,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text(l.readerFootnote(note.label)),
-              trailing: IconButton(
-                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
-              ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: Builder(
-                  builder: (context) => _noteText(context, note, range),
-                ),
-              ),
-            ),
-          ],
-        ),
+      final panel = ReaderFootnotePanel(
+        note: note,
+        range: range,
+        onClose: () => Navigator.of(context).pop(),
       );
       final child = theme == null ? panel : Theme(data: theme, child: panel);
       return book == null ? child : ReadingActivity(book: book, child: child);
@@ -59,7 +38,7 @@ Future<void> showReaderFootnote(
   );
 }
 
-/// A single footnote for the desktop dialog: its number with a close
+/// A single footnote for a responsive reader panel: its number with a close
 /// control, then its text, selectable and scrolling past the dialog's
 /// height.
 class ReaderFootnotePanel extends StatelessWidget {

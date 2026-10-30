@@ -6,7 +6,7 @@ import 'reader_panel.dart';
 import 'reading_progress_format.dart';
 
 /// Chapter scrubber with book progress and chapter stepping. Placement
-/// agnostic: [onDone] closes whichever host shows it (sheet or popover) and
+/// agnostic: [onDone] closes whichever host shows it (sheet or side panel) and
 /// hands it the chapter step to apply.
 class ReaderProgressPanel extends StatefulWidget {
   const ReaderProgressPanel({
@@ -57,89 +57,99 @@ class _ReaderProgressPanelState extends State<ReaderProgressPanel> {
       if (action != null) widget.onDone(action);
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        ShioriSpace.page,
-        0,
-        ShioriSpace.page,
-        ShioriSpace.item,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l.readerReadingProgress,
-                  style: theme.textTheme.titleLarge,
-                ),
-              ),
-              if (book != null)
-                Text(
-                  '${formatReadingPercent(book)}%',
-                  style: theme.textTheme.titleMedium,
-                ),
-            ],
-          ),
-          const SizedBox(height: ShioriSpace.page),
-          if (widget.enabled && widget.scopeLabel != null)
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Text(widget.scopeLabel!),
-            ),
-          Row(
-            children: [
-              Expanded(
-                child: Tooltip(
-                  message: widget.chapterTitle,
-                  child: Text(
-                    widget.chapterTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-              const SizedBox(width: ShioriSpace.item),
-              Text(
-                widget.enabled
-                    ? '${formatReadingPercent(_fraction)}%'
-                    : widget.scopeLabel ?? '',
-              ),
-            ],
-          ),
-          Slider(
-            value: _fraction,
-            onChanged: !widget.enabled
-                ? null
-                : (v) => setState(() {
-                    _fraction = v;
-                    _bookBasis = v;
-                  }),
-            onChangeEnd: widget.enabled ? widget.onSeek : null,
-          ),
-          if (widget.showChapterStepper)
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          ShioriSpace.page,
+          ShioriPanelScope.isSheet(context) ? 0 : ShioriSpace.small,
+          ShioriSpace.page,
+          ShioriSpace.item,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             Row(
               children: [
                 Expanded(
-                  child: TextButton(
-                    onPressed: widget.onPreviousChapter == null
-                        ? null
-                        : () => step(widget.onPreviousChapter),
-                    child: Text(l.previousChapter),
+                  child: Text(
+                    l.readerReadingProgress,
+                    style: theme.textTheme.titleLarge,
                   ),
                 ),
-                Expanded(
-                  child: TextButton(
-                    onPressed: widget.onNextChapter == null
-                        ? null
-                        : () => step(widget.onNextChapter),
-                    child: Text(l.nextChapter),
+                if (book != null)
+                  Text(
+                    '${formatReadingPercent(book)}%',
+                    style: theme.textTheme.titleMedium,
                   ),
+                if (!ShioriPanelScope.isSheet(context))
+                  IconButton(
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).closeButtonTooltip,
+                    onPressed: () => widget.onDone(),
+                    icon: const Icon(Icons.close),
+                  ),
+              ],
+            ),
+            const SizedBox(height: ShioriSpace.page),
+            if (widget.enabled && widget.scopeLabel != null)
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(widget.scopeLabel!),
+              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Tooltip(
+                    message: widget.chapterTitle,
+                    child: Text(
+                      widget.chapterTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: ShioriSpace.item),
+                Text(
+                  widget.enabled
+                      ? '${formatReadingPercent(_fraction)}%'
+                      : widget.scopeLabel ?? '',
                 ),
               ],
             ),
-        ],
+            Slider(
+              value: _fraction,
+              onChanged: !widget.enabled
+                  ? null
+                  : (v) => setState(() {
+                      _fraction = v;
+                      _bookBasis = v;
+                    }),
+              onChangeEnd: widget.enabled ? widget.onSeek : null,
+            ),
+            if (widget.showChapterStepper)
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: widget.onPreviousChapter == null
+                          ? null
+                          : () => step(widget.onPreviousChapter),
+                      child: Text(l.previousChapter),
+                    ),
+                  ),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: widget.onNextChapter == null
+                          ? null
+                          : () => step(widget.onNextChapter),
+                      child: Text(l.nextChapter),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }

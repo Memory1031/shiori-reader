@@ -13,7 +13,6 @@ import '../novel_detail/catalog_controller.dart';
 import '../novel_detail/catalog_view.dart';
 import 'article_contents.dart';
 import 'reader_panel.dart';
-import 'reader_sheet.dart';
 import 'reader_contents_session.dart';
 
 /// One navigation level of the reader contents, e.g. headings inside the
@@ -151,14 +150,16 @@ Future<void> showReaderContents(
   required List<ReaderContentsLayer> layers,
   int? initialLayer,
   ReaderContentsSession? session,
-}) => showReaderSheet<void>(
+}) => showReaderPanel<void>(
   context,
-  size: ReaderSheetSize.tall,
+  size: ShioriSheetSize.tall,
+  placement: ReaderPanelPlacement.start,
   builder: (sheet) => ReaderContentsPanel(
+    closeButton: !ShioriPanelScope.isSheet(sheet),
     layers: layers,
     initialLayer: initialLayer,
     session: session,
-    onDone: readerSheetDone(sheet),
+    onDone: readerPanelDone(sheet),
   ),
 );
 

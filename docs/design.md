@@ -129,11 +129,15 @@ rail 变为带文字的侧栏；`list` 760 限制单列内容宽度，`panel` 56
 
 ### 弹窗
 
-- 面板类交互（选择、确认、进度、结果）在触摸平台用底部弹层，在桌面（pointer-first）用居中弹窗，
-  由 `ShioriCapabilities.of(context).pointerFirst` 决定，同一份内容两种外壳（如 `showAppAppearance`、
-  `BookBatchPanel`）。底部弹层的动作按钮在底部等分整行，次要动作用 `OutlinedButton`；
-  弹窗的动作靠右，次要动作用 `TextButton`。
-- 弹窗使用 `AlertDialog`，最大宽度 `ShioriLayout.panel`，内容可能变长时设置 `scrollable: true`。
+- 面板类交互通过 `showShioriPanel` / `shioriPanelRoute` 打开，由共享入口按窗口逻辑宽度选择外壳：
+  小于 840 使用底部弹层，宽窗口的普通页面使用居中 Dialog；阅读器指定 start / end 后使用左右侧栏。
+  阅读器使用 `ReaderPanelHandle` 管理所属页面的生命周期和单一弹层槽位，临时交互可用 `showReaderPanel`。
+  目录、书签在左侧；设置、搜索、进度、章节注释、单条脚注和预取在右侧，不再使用进度锚定浮层或脚注居中弹窗。
+- 页面只提供内容、左右侧语义和关闭结果，不自行按平台或宽度选择路由。`ShioriPanelScope` 提供已打开路由的
+  呈现形式，供内容安排关闭按钮、内边距和动作；弹层打开后保持外壳类型直到关闭，缩放只调整可用尺寸。
+- 底部弹层的动作按钮在底部等分整行，次要动作用 `OutlinedButton`；普通 Dialog 的动作靠右，
+  次要动作用 `TextButton`。需要自带 `AlertDialog` 的确认 / 结果内容通过 `dialogBuilder` 提供，避免双重外壳。
+- 普通 Dialog 最大宽度 `ShioriLayout.panel`，长内容必须可滚动；阅读器侧栏保持正文 viewport 不变。
 - 结构从上到下：标题（动作名）→ 一句话说明 → 后果提示 → 涉及对象 → 补充说明 → 动作按钮。
 - **后果提示**：20px 图标 + 文字的一行。破坏性后果用 error 色图标，可撤销的后果用 secondary 色。
 - **对象列表**：放在 `surfaceContainerHighest` .6 透明度、`control` 圆角的浅底区域中，
@@ -151,9 +155,9 @@ rail 变为带文字的侧栏；`list` 760 限制单列内容宽度，`panel` 56
 
 ### 底部弹层与状态页
 
-- 底部弹层统一用 `showShioriSheet`：在 root navigator 打开，顶角圆角 `sheet`，带拖动把手，
+- 共享面板入口内部通过 `shioriSheetRoute` 复用底部弹层：在 root navigator 打开，顶角圆角 `sheet`，带拖动把手，
   处理底部安全区，尊重减少动态效果。高度用 `fit` / `half` / `tall`。需要自己移除路由的流程用
-  `shioriSheetRoute`；进行中不可中断的弹层设为不可关闭（无把手、不可拖动和点遮罩关闭）。
+  `shioriPanelRoute`；进行中不可中断的弹层设为不可关闭（无把手、不可拖动和点遮罩关闭）。
 - 加载、空、失败使用 `LoadingView`、`EmptyView`、`FailureView`。空状态插画使用代码绘制的
   简单图形（`EmptyBooks`），不使用远程资源或加载动画。
 

@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../l10n/generated/app_localizations.dart';
-import '../../shared/widgets/shiori_sheet.dart';
-import '../../shared/widgets/desktop_content_frame.dart';
+import '../../shared/widgets/shiori_panel.dart';
 import '../../shared/widgets/state_views.dart';
 import '../../shared/widgets/shiori_task_progress_bar.dart';
 import 'book_selection_controller.dart';
@@ -20,13 +19,12 @@ ModalRoute<T> bookBatchRoute<T>(
   BuildContext context,
   WidgetBuilder builder, {
   bool dismissible = true,
-}) => DesktopLayoutScope.useDesktopPage(context)
-    ? DialogRoute<T>(
-        context: context,
-        builder: builder,
-        barrierDismissible: dismissible,
-      )
-    : shioriSheetRoute<T>(context, builder: builder, dismissible: dismissible);
+}) => shioriPanelRoute<T>(
+  context,
+  builder: builder,
+  dialogBuilder: builder,
+  dismissible: dismissible,
+);
 
 class BookBatchAction {
   const BookBatchAction(
@@ -61,12 +59,7 @@ class BookBatchPanel extends StatelessWidget {
       foregroundColor: theme.colorScheme.onError,
       backgroundColor: theme.colorScheme.error,
     );
-    final route = ModalRoute.of(context);
-    final dialog =
-        route is DialogRoute ||
-        route is! ModalBottomSheetRoute &&
-            DesktopLayoutScope.useDesktopPage(context);
-    if (dialog) {
+    if (!ShioriPanelScope.isSheet(context)) {
       return AlertDialog(
         constraints: const BoxConstraints(maxWidth: ShioriLayout.panel),
         title: Text(title),

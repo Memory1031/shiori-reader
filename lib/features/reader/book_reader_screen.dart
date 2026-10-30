@@ -1,11 +1,10 @@
-import '../../shared/widgets/desktop_content_frame.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import '../../domain/bookmark_position.dart';
 import '../../shared/widgets/user_bookmark_scope.dart';
 import 'reader_bookmarks.dart';
 import 'reader_return_history.dart';
-import '../../shared/widgets/shiori_sheet.dart';
+import '../../shared/widgets/shiori_panel.dart';
 import '../../app/window_caption.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
@@ -1961,30 +1960,19 @@ class _BookReaderScreenState extends State<BookReaderScreen>
         mounted && !_invalidated && source == _reader
         ? _navigation[target]?.first.$1.title
         : null;
-    final LocalContentLink? link;
-    if (panels.desktop) {
-      final panel = panels.open<LocalContentLink>(
-        ReaderPanelPlacement.end,
-        semanticLabel: AppLocalizations.of(context).readerLinks,
-        builder: (context, panel) => ReaderNotesPanel(
-          links: source.contentLinks,
-          current: source.chapter,
-          titleOf: titleOf,
-          onFollow: panel.close,
-          onClose: () => panel.close(),
-        ),
-      );
-      if (panel == null) return;
-      link = await panel.closed;
-    } else {
-      // Shown from the page's context so the sheet takes its paper theme.
-      link = await showReaderNotes(
-        panels.context,
+    final panel = panels.open<LocalContentLink>(
+      ReaderPanelPlacement.end,
+      semanticLabel: AppLocalizations.of(context).readerLinks,
+      builder: (context, panel) => ReaderNotesPanel(
         links: source.contentLinks,
         current: source.chapter,
         titleOf: titleOf,
-      );
-    }
+        onFollow: panel.close,
+        onClose: ShioriPanelScope.isSheet(context) ? null : () => panel.close(),
+      ),
+    );
+    if (panel == null) return;
+    final link = await panel.closed;
     if (link == null ||
         !mounted ||
         !panels.live ||
@@ -2008,29 +1996,19 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     final cache = _cache;
     if (cache?.prefetch == null) return;
     if (_changing || _invalidated) return;
-    final bool? manage;
-    if (!panels.desktop) {
-      manage = await showPrefetchSheet(
-        context,
+    final panel = panels.open<bool>(
+      ReaderPanelPlacement.end,
+      semanticLabel: AppLocalizations.of(context).prefetchTitle,
+      builder: (context, panel) => PrefetchPanel(
         cache: cache!,
         catalog: _catalog.loaded?.value,
         current: source.chapter,
-      );
-    } else {
-      final panel = panels.open<bool>(
-        ReaderPanelPlacement.end,
-        semanticLabel: AppLocalizations.of(context).prefetchTitle,
-        builder: (context, panel) => PrefetchPanel(
-          cache: cache!,
-          catalog: _catalog.loaded?.value,
-          current: source.chapter,
-          onClose: () => panel.close(),
-          onManage: () => panel.close(true),
-        ),
-      );
-      if (panel == null) return;
-      manage = await panel.closed;
-    }
+        onClose: ShioriPanelScope.isSheet(context) ? null : () => panel.close(),
+        onManage: () => panel.close(true),
+      ),
+    );
+    if (panel == null) return;
+    final manage = await panel.closed;
     if (manage != true ||
         !mounted ||
         !panels.live ||
@@ -2434,22 +2412,16 @@ class _BookReaderScreenState extends State<BookReaderScreen>
     }
   }
 
-  /// The contents panel opened from the failure page on desktop.
+  /// The responsive contents panel opened from the failure page.
   ReaderPanelHandle<VoidCallback>? _contentsPanel;
 
   Future<void> _contents() async {
-    if (!DesktopLayoutScope.useDesktopPage(context)) {
-      return showReaderContents(
-        context,
-        layers: [_bookContents(context)],
-        session: _contentsSession,
-      );
-    }
     if (_contentsPanel != null || _invalidated) return;
     final layer = _bookContents(context);
     final panel = ReaderPanelHandle<VoidCallback>.open(
       this,
       placement: ReaderPanelPlacement.start,
+      size: ShioriSheetSize.tall,
       themeChanges: _preferences,
       theme: (context) => readerTheme(
         _preferences.value,
@@ -2460,7 +2432,7 @@ class _BookReaderScreenState extends State<BookReaderScreen>
       builder: (context, panel) => ReaderContentsPanel(
         layers: [layer],
         session: _contentsSession,
-        closeButton: true,
+        closeButton: !ShioriPanelScope.isSheet(context),
         onDone: ([then]) {
           if (mounted && panel.isValid && identical(_contentsPanel, panel)) {
             panel.close(then);

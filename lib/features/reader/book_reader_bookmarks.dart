@@ -118,35 +118,26 @@ extension _BookReaderBookmarks on _BookReaderScreenState {
     if (repository == null || _bookmarkRoute?.isActive == true || !mounted) {
       return;
     }
-    final desktop = DesktopLayoutScope.useDesktopPage(source);
     final accent = appAccentOf(source);
     Widget panel(BuildContext context) => ReaderBookmarksPanel(
       book: widget.chapter.novelKey,
       repository: repository,
       onOpen: _openBookmark,
-      closeButton: desktop,
+      closeButton: !ShioriPanelScope.isSheet(context),
     );
-    final route = _bookmarkRoute = desktop
-        ? ReaderPanelRoute<void>(
-            placement: ReaderPanelPlacement.start,
-            semanticLabel: AppLocalizations.of(source).readerBookmarks,
-            barrierLabel: MaterialLocalizations.of(
-              source,
-            ).modalBarrierDismissLabel,
-            duration: ShioriMotion.of(source, ReaderPanelRoute.motion),
-            themeChanges: _preferences,
-            theme: (context) => readerTheme(
-              _preferences.value,
-              MediaQuery.platformBrightnessOf(context),
-              accent: accent,
-            ),
-            builder: panel,
-          )
-        : shioriSheetRoute<void>(
-            source,
-            size: ShioriSheetSize.tall,
-            builder: panel,
-          );
+    final route = _bookmarkRoute = shioriPanelRoute<void>(
+      source,
+      side: ShioriPanelSide.start,
+      size: ShioriSheetSize.tall,
+      semanticLabel: AppLocalizations.of(source).readerBookmarks,
+      themeChanges: _preferences,
+      theme: (context) => readerTheme(
+        _preferences.value,
+        MediaQuery.platformBrightnessOf(context),
+        accent: accent,
+      ),
+      builder: panel,
+    );
     await Navigator.of(source, rootNavigator: true).push(route);
     if (!mounted) return;
     if (identical(_bookmarkRoute, route)) _bookmarkRoute = null;

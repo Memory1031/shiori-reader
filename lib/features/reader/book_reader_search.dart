@@ -319,28 +319,20 @@ extension _BookReaderSearch on _BookReaderScreenState {
       MediaQuery.platformBrightnessOf(context),
       accent: appAccentOf(context),
     );
-    if (!DesktopLayoutScope.useDesktopPage(context)) {
-      await showReaderFootnote(
-        context,
-        hit.reference,
+    final panel = ReaderPanelHandle<void>.open(
+      this,
+      placement: ReaderPanelPlacement.end,
+      size: ShioriSheetSize.tall,
+      theme: (_) => theme,
+      builder: (context, panel) => ReaderFootnotePanel(
+        note: hit.reference,
         range: (hit.noteStart, hit.noteEnd),
-        theme: theme,
-      );
-    } else {
-      final panel = ReaderPanelHandle<void>.open(
-        this,
-        placement: ReaderPanelPlacement.center,
-        theme: (_) => theme,
-        builder: (context, panel) => ReaderFootnotePanel(
-          note: hit.reference,
-          range: (hit.noteStart, hit.noteEnd),
-          onClose: panel.close,
-        ),
-      );
-      _activePanel = panel;
-      await panel.closed;
-      if (identical(_activePanel, panel)) _activePanel = null;
-    }
+        onClose: panel.close,
+      ),
+    );
+    _activePanel = panel;
+    await panel.closed;
+    if (identical(_activePanel, panel)) _activePanel = null;
   }
 }
 

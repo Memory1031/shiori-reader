@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../../shared/widgets/shiori_sheet.dart';
+import '../../shared/widgets/shiori_panel.dart';
 import '../../app/theme/shiori_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -86,42 +86,30 @@ class _UpdateScreenState extends State<UpdateScreen> {
         Text(l.updateChannelHint, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
-    final value = await (DesktopLayoutScope.useDesktopPage(context)
-        ? showDialog<UpdateChannel>(
-            context: context,
-            builder: (context) => AlertDialog(
-              constraints: const BoxConstraints(maxWidth: ShioriLayout.panel),
-              scrollable: true,
-              title: Text(l.updateChooseChannel),
-              content: SizedBox(
-                width: ShioriLayout.panel,
-                child: options(context),
-              ),
+    final value = await showShioriPanel<UpdateChannel>(
+      context,
+      dialogBuilder: (context) => AlertDialog(
+        constraints: const BoxConstraints(maxWidth: ShioriLayout.panel),
+        scrollable: true,
+        title: Text(l.updateChooseChannel),
+        content: SizedBox(width: ShioriLayout.panel, child: options(context)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l.updateChooseChannel,
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-          )
-        : showShioriSheet<UpdateChannel>(
-            context,
-            builder: (context) => SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l.updateChooseChannel,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: ShioriSpace.item),
-                    Flexible(
-                      child: SingleChildScrollView(child: options(context)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ));
+            const SizedBox(height: ShioriSpace.item),
+            Flexible(child: SingleChildScrollView(child: options(context))),
+          ],
+        ),
+      ),
+    );
     if (value != null && context.mounted && !controller.busy) {
       await controller.setChannel(value);
     }
