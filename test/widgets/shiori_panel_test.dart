@@ -40,6 +40,9 @@ void main() {
                             dialogTheme: DialogThemeData(
                               backgroundColor: themes.value,
                             ),
+                            bottomSheetTheme: BottomSheetThemeData(
+                              backgroundColor: themes.value,
+                            ),
                           );
                         },
                         builder: (context) {
@@ -84,6 +87,15 @@ void main() {
           Theme.of(tester.element(surface)).scaffoldBackgroundColor,
           Colors.blue,
         );
+        if (width < 840) {
+          final material = find
+              .descendant(
+                of: find.byType(BottomSheet),
+                matching: find.byType(Material),
+              )
+              .first;
+          expect(tester.widget<Material>(material).color, Colors.blue);
+        }
         if (width >= 840 && side == null) {
           final material = find
               .descendant(

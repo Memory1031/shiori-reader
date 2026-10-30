@@ -24,6 +24,7 @@ import 'package:shiori/features/reader/reader_linked_text.dart';
 import 'package:shiori/features/reader/reader_notes.dart';
 import 'package:shiori/features/reader/reader_panel.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/features/reader/reader_theme.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
 import 'package:shiori/shared/source_image.dart';
 import 'package:shiori/shared/widgets/shiori_menu.dart';
@@ -860,6 +861,82 @@ void main() {
   });
 
   group('reading theme and languages', () {
+    testWidgets(
+      'compact footnote paper and handle follow system brightness '
+      'without losing its scroll state',
+      (tester) async {
+        tester.platformDispatcher.platformBrightnessTestValue =
+            Brightness.light;
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        final book = Epub(tester);
+        addTearDown(book.close);
+        book.settings.value = ReaderSettings(
+          controlsHintSeen: true,
+          themeMode: ReaderThemeMode.system,
+          paper: ReaderPaper.warm,
+        );
+        await book.pump(size: const Size(390, 844));
+        await tester.tapAt(book.marker);
+        await tester.pumpAndSettle();
+        final note = find.byType(ReaderFootnotePanel);
+        final sheet = find.byType(BottomSheet);
+        final surface = find
+            .descendant(of: sheet, matching: find.byType(Material))
+            .first;
+        final scroll = tester.state<ScrollableState>(
+          find.descendant(of: note, matching: find.byType(Scrollable)).first,
+        );
+        scroll.position.jumpTo(120);
+        await tester.pump();
+        for (final brightness in [
+          Brightness.light,
+          Brightness.dark,
+          Brightness.light,
+        ]) {
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          await tester.pumpAndSettle();
+          final expected = readerTheme(book.settings.value, brightness);
+          expect(Theme.of(tester.element(note)).brightness, brightness);
+          expect(
+            tester.widget<Material>(surface).color,
+            expected.bottomSheetTheme.backgroundColor,
+          );
+          final handle = find.descendant(
+            of: sheet,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Container &&
+                  widget.decoration is BoxDecoration &&
+                  (widget.decoration! as BoxDecoration).color ==
+                      expected.bottomSheetTheme.dragHandleColor,
+            ),
+          );
+          expect(handle, findsOneWidget);
+          expect(
+            tester.state<ScrollableState>(
+              find
+                  .descendant(of: note, matching: find.byType(Scrollable))
+                  .first,
+            ),
+            same(scroll),
+          );
+          expect(scroll.position.pixels, 120);
+          expect(tester.takeException(), isNull);
+        }
+        await tester.dragFrom(
+          tester.getTopLeft(sheet) +
+              Offset(tester.getSize(sheet).width / 2, 22),
+          const Offset(0, 750),
+        );
+        await tester.pumpAndSettle();
+        expect(sheet, findsNothing);
+      },
+      variant: TargetPlatformVariant({
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+      }),
+    );
+
     for (final (locale, notes, footnote) in [
       (const Locale('en'), 'Chapter notes', 'Footnote ⁽¹⁾'),
       (const Locale('zh'), '本章注释', '脚注 ⁽¹⁾'),

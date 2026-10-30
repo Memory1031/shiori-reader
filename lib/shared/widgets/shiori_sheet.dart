@@ -42,6 +42,7 @@ Future<T?> showShioriSheet<T>(
 /// The route [showShioriSheet] pushes, for owners that retire the sheet
 /// themselves. A sheet that is not [dismissible] has no handle, drag or
 /// barrier dismissal; its content takes the handle's room as top padding.
+/// [wrapper] owns theme capture and wraps the whole sheet, including its surface.
 ModalBottomSheetRoute<T> shioriSheetRoute<T>(
   BuildContext context, {
   required WidgetBuilder builder,
@@ -49,14 +50,15 @@ ModalBottomSheetRoute<T> shioriSheetRoute<T>(
   bool owned = false,
   bool dismissible = true,
   Color? barrierColor,
+  Widget Function(WidgetBuilder)? wrapper,
 }) {
   final navigator = Navigator.of(context, rootNavigator: true);
   final localizations = MaterialLocalizations.of(context);
-  return ModalBottomSheetRoute<T>(
-    capturedThemes: InheritedTheme.capture(
-      from: context,
-      to: navigator.context,
-    ),
+  return _ShioriSheetRoute<T>(
+    wrapper: wrapper,
+    capturedThemes: wrapper == null
+        ? InheritedTheme.capture(from: context, to: navigator.context)
+        : null,
     barrierLabel: localizations.scrimLabel,
     barrierOnTapHint: localizations.scrimOnTapHint(
       localizations.bottomSheetLabel,
@@ -91,4 +93,36 @@ ModalBottomSheetRoute<T> shioriSheetRoute<T>(
       };
     },
   );
+}
+
+class _ShioriSheetRoute<T> extends ModalBottomSheetRoute<T> {
+  _ShioriSheetRoute({
+    required super.builder,
+    required super.isScrollControlled,
+    super.capturedThemes,
+    super.barrierLabel,
+    super.barrierOnTapHint,
+    super.modalBarrierColor,
+    super.useSafeArea,
+    super.isDismissible,
+    super.enableDrag,
+    super.showDragHandle,
+    super.backgroundColor,
+    super.sheetAnimationStyle,
+    this.wrapper,
+  });
+
+  // Wrap the entire sheet so live themes reach its paper and drag handle.
+  final Widget Function(WidgetBuilder)? wrapper;
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) => wrapper == null
+      ? super.buildPage(context, animation, secondaryAnimation)
+      : wrapper!(
+          (context) => super.buildPage(context, animation, secondaryAnimation),
+        );
 }

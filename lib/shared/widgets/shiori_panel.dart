@@ -87,7 +87,8 @@ ModalRoute<T> shioriPanelRoute<T>(
   if (presentation == ShioriPanelPresentation.sheet) {
     return shioriSheetRoute<T>(
       context,
-      builder: (_) => wrap(builder),
+      builder: builder,
+      wrapper: wrap,
       size: size,
       owned: owned,
       dismissible: dismissible,
