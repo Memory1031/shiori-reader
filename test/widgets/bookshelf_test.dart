@@ -8,6 +8,8 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/bookshelf/library_controller.dart';
+import 'package:shiori/features/bookshelf/book_batch_actions.dart';
+import 'package:shiori/shared/widgets/book_list_tile.dart';
 import 'package:shiori/features/bookshelf/bookshelf_view.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 
@@ -73,8 +75,18 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Search'));
-    await tester.tap(find.text('Import book'));
+    await tester.tap(
+      find.ancestor(
+        of: find.text('Search'),
+        matching: find.byWidgetPredicate((w) => w is TextButton),
+      ),
+    );
+    await tester.tap(
+      find.ancestor(
+        of: find.text('Import book'),
+        matching: find.byWidgetPredicate((w) => w is FilledButton),
+      ),
+    );
     expect(searches, 1);
     expect(imports, 1);
     expect(tester.takeException(), isNull);
@@ -85,6 +97,44 @@ void main() {
       controller.dispose();
       await repo.close();
     });
+  });
+
+  testWidgets('empty shelf keeps search primary when import is unavailable', (
+    tester,
+  ) async {
+    final repo = FixtureLibraryRepository();
+    final controller = LibraryController(repo)..onStart();
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox());
+      controller.onDelete();
+      await controller.resourcesReleased;
+      controller.dispose();
+      await repo.close();
+    });
+    var searches = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookshelfView(
+            controller: controller,
+            onOpen: (_) {},
+            onSearch: () => searches++,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Import book'), findsNothing);
+    await tester.tap(
+      find.ancestor(
+        of: find.text('Search'),
+        matching: find.byWidgetPredicate((w) => w is FilledButton),
+      ),
+    );
+    expect(searches, 1);
   });
 
   for (final grid in [true, false]) {
@@ -432,6 +482,138 @@ void main() {
       await repo.close();
     });
   });
+
+  for (final direction in TextDirection.values) {
+    testWidgets('list follows drag and restores cancellation in $direction', (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(390, 844)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final repo = FixtureLibraryRepository();
+      final controller = LibraryController(repo)..onStart();
+      final actions = BookBatchActions(controller, bindShelf: true);
+      final layout = ValueNotifier(false);
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox());
+        actions.dispose();
+        layout.dispose();
+        controller.onDelete();
+        await controller.resourcesReleased;
+        controller.dispose();
+        await repo.close();
+      });
+      for (var i = 0; i < 12; i++) {
+        await controller.add(
+          NovelSummary(
+            key: NovelKey(sourceId: SourceId('fixture'), novelId: '$i'),
+            title: 'Book $i',
+          ),
+        );
+      }
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Directionality(
+            textDirection: direction,
+            child: Scaffold(
+              body: BookshelfView(
+                controller: controller,
+                batchActions: actions,
+                layout: layout,
+                onOpen: (_) {},
+                onSearch: () {},
+                onDetails: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final key = controller.sorted.first.snapshot.key;
+      final row = find.byKey(ValueKey(key));
+      final tile = find.descendant(
+        of: row,
+        matching: find.byType(BookListTile),
+      );
+      final other = find.byType(BookListTile).at(1);
+      final otherWidget = tester.widget(other);
+      final origin = tester.getTopLeft(tile).dx;
+      final sign = direction == TextDirection.ltr ? -1.0 : 1.0;
+      Future<TestGesture> start() async {
+        final gesture = await tester.startGesture(tester.getCenter(row));
+        await gesture.moveBy(Offset(sign * 22, 0));
+        await tester.pump();
+        return gesture;
+      }
+
+      var gesture = await start();
+      await gesture.moveBy(Offset(sign * 60, 0));
+      await tester.pump();
+      expect(tester.getTopLeft(tile).dx - origin, closeTo(sign * 60, .01));
+      expect(identical(tester.widget(other), otherWidget), isTrue);
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(tile).dx, closeTo(origin, .01));
+
+      gesture = await start();
+      await gesture.moveBy(Offset(sign * 30, 0));
+      await tester.pump(const Duration(milliseconds: 400));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(tile).dx, closeTo(origin, .01));
+
+      gesture = await start();
+      await gesture.moveBy(Offset(sign * 100, 0));
+      await tester.pump(const Duration(milliseconds: 400));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      final opened = tester.getTopLeft(tile).dx;
+      expect(opened - origin, closeTo(sign * 148, .01));
+      gesture = await start();
+      await gesture.moveBy(Offset(-sign * 70, 0));
+      await tester.pump();
+      expect(tester.getTopLeft(tile).dx - opened, closeTo(-sign * 70, .01));
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(tile).dx, closeTo(opened, .01));
+
+      gesture = await start();
+      await gesture.moveBy(Offset(-sign * 70, 0));
+      await tester.pump();
+      actions.enter(key);
+      await tester.pumpAndSettle();
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(tile).dx, closeTo(origin, .01));
+      await tester.drag(row, Offset(sign * 200, 0));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(tile).dx, closeTo(origin, .01));
+      actions.selection.exit();
+      await tester.pumpAndSettle();
+      await tester.fling(row, Offset(sign * 60, 0), 600);
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(tile).dx - origin, closeTo(sign * 148, .01));
+      gesture = await start();
+      await gesture.moveBy(Offset(-sign * 40, 0));
+      await tester.pump();
+      layout.value = true;
+      await tester.pumpAndSettle();
+      await gesture.up();
+      layout.value = false;
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(tile).dx, closeTo(origin, .01));
+      final scroll = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      );
+      await tester.drag(row, const Offset(0, -200));
+      await tester.pumpAndSettle();
+      expect(scroll.position.pixels, greaterThan(0));
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('list swipe mirrors in right-to-left layouts', (tester) async {
     final repo = FixtureLibraryRepository();

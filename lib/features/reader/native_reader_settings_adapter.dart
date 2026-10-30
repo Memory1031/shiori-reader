@@ -14,19 +14,21 @@ abstract final class NativeReaderSettingsAdapter {
     required bool explicitUiTypeface,
   }) {
     final typography = explicitUiTypeface ? theme.textTheme.bodyLarge : null;
+    final bodyStyle = TextStyle(
+      fontFamily: typography?.fontFamily,
+      fontFamilyFallback: typography?.fontFamilyFallback,
+      // Flutter applies textScaler during measurement and painting once.
+      fontSize: settings.fontSize,
+      height: settings.lineHeight,
+      color: theme.colorScheme.onSurface,
+    );
     return NativeReaderLayoutSettings(
-      bodyStyle: TextStyle(
-        fontFamily: typography?.fontFamily,
-        fontFamilyFallback: typography?.fontFamilyFallback,
-        // Flutter applies textScaler during measurement and painting once.
-        fontSize: settings.fontSize,
-        height: settings.lineHeight,
-        color: theme.colorScheme.onSurface,
-      ),
+      bodyStyle: bodyStyle,
       horizontalMargin: readerHorizontalMargin(
         settings,
         textScaler,
         textDirection,
+        bodyStyle: bodyStyle,
       ),
       paragraphSpacing: settings.paragraphSpacing,
     );

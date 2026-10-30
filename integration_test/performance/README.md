@@ -2,6 +2,13 @@
 
 仅显式入口，不被生产 main 引用。使用 ProductionApp、SQLite 与图片持久层；正文滚动场景挂载开发用 ReaderScreen / ReaderViewport，不代表生产分页或当前翻页性能。合成内容与平台无关；只有存储根目录通过 ProductionApp 的可选参数注入。
 
+同一入口另有两个生产阅读组件分支，在 Profile 构建时选择一个 `--dart-define`：
+
+- `SHIORI_PROFILE_PAGINATION=true`：卷曲、覆盖和滑动各采样章内翻页、会话首次跨章、图文翻页及字号重排，并检查重排后的语义位置。每组从首章开头开始，沿用正常预取和共享的内存缓存，首次跨章不等于冷缓存加载。
+- `SHIORI_PROFILE_COMPLETION=true`：完成页的三种翻页效果，以及进入／返回时的取消和提交。
+
+这两个分支使用离线内存 Fixture，章间导航挂载 `BookReaderScreen`，独立图文场景挂载 `ReaderContentView`。结果保存在同一专用目录的 `report.json`；分页分支包含显示刷新率、逻辑窗口尺寸、UI／Raster 分位数与峰值、超预算帧数及原始帧时间。运行错误也写入报告。下方 `run_android.py` 编排的是默认探针流程；这些分支通过 Flutter Profile 入口直接运行。
+
 运行前连接已授权的 ARM64 Android 手机，并准备可恢复的生产 APK。沿用 `docs/development.md` 的 JDK / Flutter 镜像设置：
 
 ```sh

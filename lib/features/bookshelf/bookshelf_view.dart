@@ -99,7 +99,6 @@ class _BookshelfViewState extends State<BookshelfView> {
       ? null
       : LocalReparseFlow(widget.localReparse!);
   NovelKey? _revealed;
-  double _drag = 0;
 
   @override
   void initState() {
@@ -131,23 +130,6 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 
   void _layoutChanged() => setState(() => _revealed = null);
-
-  // Reveal or hide row actions once a swipe commits by distance or speed,
-  // not on the first couple of pixels of any horizontal movement.
-  // Actions sit at the trailing edge, so a swipe toward the leading edge
-  // reveals them: leftwards in left-to-right layouts, rightwards otherwise.
-  void _dragEnd(NovelKey key, DragEndDetails details) {
-    final sign = Directionality.of(context) == TextDirection.rtl ? -1 : 1;
-    final velocity = (details.primaryVelocity ?? 0) * sign;
-    _drag *= sign;
-    final open = _revealed == key;
-    if (!open && (_drag < -48 || velocity < -300)) {
-      setState(() => _revealed = key);
-    } else if (open && (_drag > 48 || velocity > 300)) {
-      setState(() => _revealed = null);
-    }
-    _drag = 0;
-  }
 
   /// The book's actions, shared by the pointer menu and the touch sheet so
   /// both offer the same choices. A null entry separates groups.
@@ -385,15 +367,15 @@ class _BookshelfViewState extends State<BookshelfView> {
     final controller = widget.controller;
     final strings = AppLocalizations.of(context);
     final books = controller.sorted;
-    final theme = Theme.of(context);
+    final swipeActionStyle = TextButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: ShioriSpace.tight),
+    );
     final bottomInset = _selecting ? 0.0 : MediaQuery.paddingOf(context).bottom;
     return LayoutBuilder(
       builder: (context, bounds) {
         final scale = MediaQuery.textScalerOf(context).scale(15) / 15;
-        final titleStyle = theme.textTheme.titleSmall;
-        final titleLine =
-            MediaQuery.textScalerOf(context).scale(titleStyle?.fontSize ?? 15) *
-            (titleStyle?.height ?? 1.5);
+        final swipeExtent = 148.0 * scale.clamp(1, 1.5);
+        final titleHeight = _grid ? _ShelfGridCard.titleHeight(context) : 0;
         final columns = (bounds.maxWidth / (110 * scale.clamp(1, 1.5)))
             .floor()
             .clamp(2, 6);
@@ -416,145 +398,114 @@ class _BookshelfViewState extends State<BookshelfView> {
               padding: const EdgeInsets.symmetric(
                 horizontal: ShioriSpace.page - BookListItem.inset,
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(ShioriShape.control),
-                child: Stack(
+              child: _ShelfSwipeRow(
+                revealed: open,
+                enabled: !_selecting,
+                extent: swipeExtent,
+                onChanged: (value) =>
+                    setState(() => _revealed = value ? book.key : null),
+                actions: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    if (open)
-                      Positioned.fill(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            SizedBox(
-                              width: 148,
-                              child: Row(
+                    SizedBox(
+                      width: swipeExtent,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              style: swipeActionStyle,
+                              onPressed: !open || widget.onDetails == null
+                                  ? null
+                                  : () {
+                                      setState(() => _revealed = null);
+                                      widget.onDetails!(book.key);
+                                    },
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Expanded(
-                                    child: TextButton(
-                                      onPressed:
-                                          !open || widget.onDetails == null
-                                          ? null
-                                          : () {
-                                              setState(() => _revealed = null);
-                                              widget.onDetails!(book.key);
-                                            },
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.info_outline),
-                                          Text(
-                                            strings.shelfDetails,
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: TextButton(
-                                      onPressed: !open || controller.writing
-                                          ? null
-                                          : () {
-                                              setState(() => _revealed = null);
-                                              removeShelfBook(
-                                                context,
-                                                controller,
-                                                book,
-                                              );
-                                            },
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            book.key.sourceId ==
-                                                    LocalBookIdentity.sourceId
-                                                ? Icons.delete_outline
-                                                : Icons
-                                                      .bookmark_remove_outlined,
-                                          ),
-                                          Text(
-                                            book.key.sourceId ==
-                                                    LocalBookIdentity.sourceId
-                                                ? strings.shelfDelete
-                                                : strings.shelfRemove,
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                                  const Icon(Icons.info_outline),
+                                  Text(
+                                    strings.shelfDetails,
+                                    textAlign: TextAlign.center,
                                   ),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    GestureDetector(
-                      onHorizontalDragStart: _selecting
-                          ? null
-                          : (_) => _drag = 0,
-                      onHorizontalDragUpdate: _selecting
-                          ? null
-                          : (d) => _drag += d.delta.dx,
-                      onHorizontalDragEnd: _selecting
-                          ? null
-                          : (d) => _dragEnd(book.key, d),
-                      child: AnimatedContainer(
-                        duration: ShioriMotion.of(
-                          context,
-                          ShioriMotion.feedback,
-                        ),
-                        transform: Matrix4.translationValues(
-                          open
-                              ? (Directionality.of(context) == TextDirection.rtl
-                                    ? 148
-                                    : -148)
-                              : 0,
-                          0,
-                          0,
-                        ),
-                        child: BookListItem(
-                          selected: _selecting
-                              ? _batch.selection.selected.contains(book.key)
-                              : null,
-                          selectionLabel: _selecting
-                              ? strings.bookToggleSelection(book.title)
-                              : null,
-                          onLongPress: _selecting ? null : () => _actions(book),
-                          onTap: () {
-                            if (open) {
-                              setState(() => _revealed = null);
-                            } else {
-                              _openBook(book.key);
-                            }
-                          },
-                          minHeight: open ? 120 * scale.clamp(1, 2) : 120,
-                          child: BookListTile(
-                            cover: cover,
-                            title: book.title,
-                            subtitle: book.authors.isEmpty
-                                ? null
-                                : book.authors.join(', '),
-                            metadata: metadata,
-                            trailing: _selecting
-                                ? BookSelectionCheck(
-                                    selected: _batch.selection.selected
-                                        .contains(book.key),
-                                  )
-                                : IconButton(
-                                    key: ValueKey(('shelf-more', book.key)),
-                                    tooltip: strings.moreActions,
-                                    onPressed: () => _actions(book),
-                                    icon: const Icon(
-                                      Icons.more_horiz,
-                                      size: 20,
-                                    ),
-                                  ),
                           ),
-                        ),
+                          Expanded(
+                            child: TextButton(
+                              style: swipeActionStyle,
+                              onPressed: !open || controller.writing
+                                  ? null
+                                  : () {
+                                      setState(() => _revealed = null);
+                                      removeShelfBook(
+                                        context,
+                                        controller,
+                                        book,
+                                      );
+                                    },
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    book.key.sourceId ==
+                                            LocalBookIdentity.sourceId
+                                        ? Icons.delete_outline
+                                        : Icons.bookmark_remove_outlined,
+                                  ),
+                                  Text(
+                                    book.key.sourceId ==
+                                            LocalBookIdentity.sourceId
+                                        ? strings.shelfDelete
+                                        : strings.shelfRemove,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
+                ),
+                child: BookListItem(
+                  selected: _selecting
+                      ? _batch.selection.selected.contains(book.key)
+                      : null,
+                  selectionLabel: _selecting
+                      ? strings.bookToggleSelection(book.title)
+                      : null,
+                  onLongPress: _selecting ? null : () => _actions(book),
+                  onTap: () {
+                    if (open) {
+                      setState(() => _revealed = null);
+                    } else {
+                      _openBook(book.key);
+                    }
+                  },
+                  minHeight: open ? 120 * scale.clamp(1, 2) : 120,
+                  child: BookListTile(
+                    cover: cover,
+                    title: book.title,
+                    subtitle: book.authors.isEmpty
+                        ? null
+                        : book.authors.join(', '),
+                    metadata: metadata,
+                    trailing: _selecting
+                        ? BookSelectionCheck(
+                            selected: _batch.selection.selected.contains(
+                              book.key,
+                            ),
+                          )
+                        : IconButton(
+                            key: ValueKey(('shelf-more', book.key)),
+                            tooltip: strings.moreActions,
+                            onPressed: () => _actions(book),
+                            icon: const Icon(Icons.more_horiz, size: 20),
+                          ),
+                  ),
                 ),
               ),
             );
@@ -621,7 +572,12 @@ class _BookshelfViewState extends State<BookshelfView> {
               SliverFillRemaining(hasScrollBody: false, child: _empty(strings))
             else if (_grid)
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(16, 4, 16, 16 + bottomInset),
+                padding: EdgeInsets.fromLTRB(
+                  ShioriSpace.page,
+                  ShioriSpace.tight,
+                  ShioriSpace.page,
+                  ShioriSpace.item + bottomInset,
+                ),
                 sliver: SliverGrid.builder(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
@@ -629,11 +585,13 @@ class _BookshelfViewState extends State<BookshelfView> {
                     mainAxisSpacing: 20,
                     // Cover, the 10dp gap and two title lines at the card style.
                     mainAxisExtent:
-                        ((bounds.maxWidth - 32 - (columns - 1) * 16) /
+                        ((bounds.maxWidth -
+                                    2 * ShioriSpace.page -
+                                    (columns - 1) * ShioriSpace.item) /
                                 columns) /
                             ShioriShape.coverRatio +
-                        10 +
-                        2 * titleLine +
+                        _ShelfGridCard.titleGap +
+                        titleHeight +
                         2,
                   ),
                   itemCount: books.length,
@@ -659,16 +617,20 @@ class _BookshelfViewState extends State<BookshelfView> {
     children: [
       EmptyView(message: strings.shelfEmpty),
       FilledButton.icon(
-        onPressed: widget.onSearch,
-        icon: const Icon(Icons.search),
-        label: Text(strings.searchTitle),
+        onPressed: widget.onImport ?? widget.onSearch,
+        icon: Icon(
+          widget.onImport != null ? Icons.file_upload_outlined : Icons.search,
+        ),
+        label: Text(
+          widget.onImport != null ? strings.importTitle : strings.searchTitle,
+        ),
       ),
       if (widget.onImport != null) ...[
         const SizedBox(height: ShioriSpace.small),
         TextButton.icon(
-          onPressed: widget.onImport,
-          icon: const Icon(Icons.file_upload_outlined),
-          label: Text(strings.importTitle),
+          onPressed: widget.onSearch,
+          icon: const Icon(Icons.search),
+          label: Text(strings.searchTitle),
         ),
       ],
       const SizedBox(height: 24),
@@ -682,18 +644,7 @@ class _BookshelfViewState extends State<BookshelfView> {
     final scaler = MediaQuery.textScalerOf(context);
     final gutter = desktopShelfGutter(DesktopLayoutScope.widthOf(context));
     final maxFrame = _grid ? ShioriLayout.shelfGrid : ShioriLayout.shelfList;
-    // Two title lines at the card style and the real text scale.
-    final titles = TextPainter(
-      text: TextSpan(
-        text: '书 Ag\n书 Ag',
-        style: _ShelfGridCard.titleStyle(Theme.of(context)),
-      ),
-      textScaler: scaler,
-      textDirection: Directionality.of(context),
-      maxLines: 2,
-    )..layout();
-    final titleHeight = titles.height;
-    titles.dispose();
+    final titleHeight = _grid ? _ShelfGridCard.titleHeight(context) : 0;
 
     return LayoutBuilder(
       builder: (context, bounds) {
@@ -866,6 +817,133 @@ class _BookshelfViewState extends State<BookshelfView> {
   }
 }
 
+class _ShelfSwipeRow extends StatefulWidget {
+  const _ShelfSwipeRow({
+    required this.revealed,
+    required this.enabled,
+    required this.extent,
+    required this.onChanged,
+    required this.actions,
+    required this.child,
+  });
+
+  final bool revealed, enabled;
+  final double extent;
+  final ValueChanged<bool> onChanged;
+  final Widget actions, child;
+
+  @override
+  State<_ShelfSwipeRow> createState() => _ShelfSwipeRowState();
+}
+
+class _ShelfSwipeRowState extends State<_ShelfSwipeRow>
+    with SingleTickerProviderStateMixin {
+  late final _offset = AnimationController(
+    vsync: this,
+    value: widget.revealed ? 1 : 0,
+  );
+  double _distance = 0;
+  bool _dragging = false;
+  double get _sign => Directionality.of(context) == TextDirection.rtl ? -1 : 1;
+
+  @override
+  void didUpdateWidget(_ShelfSwipeRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled) {
+      _dragging = false;
+      _offset.value = 0;
+    } else if (oldWidget.revealed != widget.revealed) {
+      _dragging = false;
+      _settle(widget.revealed);
+    }
+  }
+
+  void _settle(bool open) => _offset.animateTo(
+    open ? 1 : 0,
+    duration: ShioriMotion.of(context, ShioriMotion.feedback),
+    curve: Curves.easeOut,
+  );
+
+  void _cancel() {
+    if (!_dragging) return;
+    setState(() => _dragging = false);
+    _settle(widget.revealed);
+  }
+
+  void _end(DragEndDetails details) {
+    if (!_dragging) return;
+    final velocity = (details.primaryVelocity ?? 0) * _sign;
+    final open = widget.revealed
+        ? !(_distance > 48 || velocity > 300)
+        : _distance < -48 || velocity < -300;
+    setState(() => _dragging = false);
+    _settle(open);
+    if (open != widget.revealed) widget.onChanged(open);
+  }
+
+  @override
+  void dispose() {
+    _offset.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(ShioriShape.control),
+    child: Listener(
+      // An accepted drag may report PointerCancel as an end; restore first.
+      onPointerCancel: (_) => _cancel(),
+      child: GestureDetector(
+        onHorizontalDragStart: !widget.enabled
+            ? null
+            : (_) {
+                _offset.stop();
+                _distance = 0;
+                setState(() => _dragging = true);
+              },
+        onHorizontalDragUpdate: !widget.enabled
+            ? null
+            : (details) {
+                if (!_dragging) return;
+                final delta = details.delta.dx * _sign;
+                _distance += delta;
+                _offset.value = (_offset.value - delta / widget.extent).clamp(
+                  0,
+                  1,
+                );
+              },
+        onHorizontalDragEnd: widget.enabled ? _end : null,
+        onHorizontalDragCancel: widget.enabled ? _cancel : null,
+        child: AnimatedBuilder(
+          animation: _offset,
+          child: widget.child,
+          builder: (context, child) => Stack(
+            children: [
+              if (_offset.value > 0)
+                Positioned.fill(
+                  child: ExcludeFocus(
+                    excluding: _dragging || !widget.revealed,
+                    child: ExcludeSemantics(
+                      excluding: _dragging || !widget.revealed,
+                      child: IgnorePointer(
+                        ignoring: _dragging || !widget.revealed,
+                        child: widget.actions,
+                      ),
+                    ),
+                  ),
+                ),
+              Transform.translate(
+                offset: Offset(-_offset.value * widget.extent * _sign, 0),
+                child: child,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 enum _BookAction { open, details, reparse, remove, select }
 
 class _BookEntry {
@@ -933,6 +1011,26 @@ class _ShelfGridCard extends StatefulWidget {
       (theme.textTheme.titleSmall ?? const TextStyle()).copyWith(
         fontWeight: FontWeight.w500,
       );
+
+  static double titleHeight(BuildContext context) {
+    final defaults = DefaultTextStyle.of(context);
+    final painter = TextPainter(
+      text: TextSpan(
+        text: '书 Ag\n书 Ag',
+        style: defaults.style.merge(titleStyle(Theme.of(context))),
+      ),
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: Directionality.of(context),
+      locale: Localizations.maybeLocaleOf(context),
+      textHeightBehavior:
+          defaults.textHeightBehavior ??
+          DefaultTextHeightBehavior.maybeOf(context),
+      maxLines: 2,
+    )..layout();
+    final height = painter.height;
+    painter.dispose();
+    return height;
+  }
 
   @override
   State<_ShelfGridCard> createState() => _ShelfGridCardState();

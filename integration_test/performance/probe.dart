@@ -1,6 +1,6 @@
 // Explicit profile entry. Only the dedicated test003 directory is touched.
 import 'dart:async';
-import 'completion_probe.dart' show runCompletionProbe;
+import 'completion_probe.dart' show runReaderProfileProbe;
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -46,17 +46,26 @@ T value<T>(Result<T> result) => (result as Success<T>).value;
 final token = CancellationSource().token;
 
 Future<void> main() async {
-  if (const bool.fromEnvironment('SHIORI_PROFILE_COMPLETION')) {
-    await runCompletionProbe();
-    return;
-  }
-  started
-      .start(); // Force initialization at entry, not at the first metric read.
+  started.start();
   WidgetsFlutterBinding.ensureInitialized();
   output = Directory(
     '${(await getApplicationSupportDirectory()).path}/test003',
   );
   await output.create(recursive: true);
+  if (const bool.fromEnvironment('SHIORI_PROFILE_COMPLETION') ||
+      const bool.fromEnvironment('SHIORI_PROFILE_PAGINATION')) {
+    const pagination = bool.fromEnvironment('SHIORI_PROFILE_PAGINATION');
+    try {
+      report[pagination ? 'pagination' : 'completion'] =
+          await runReaderProfileProbe(pagination: pagination);
+    } catch (error) {
+      report['error'] = error.toString();
+      rethrow;
+    } finally {
+      await save();
+    }
+    return;
+  }
   final paths = AppPaths(
     support: output,
     temporary: output,

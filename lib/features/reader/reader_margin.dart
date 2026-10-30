@@ -12,13 +12,11 @@ int readerMarginTier(double value) => ((value - 12) / 9).round().clamp(0, 4);
 double readerHorizontalMargin(
   ReaderSettings settings,
   TextScaler scaler,
-  TextDirection direction,
-) {
+  TextDirection direction, {
+  required TextStyle bodyStyle,
+}) {
   final painter = TextPainter(
-    text: TextSpan(
-      text: '正文排版',
-      style: TextStyle(fontSize: settings.fontSize),
-    ),
+    text: TextSpan(text: '正文排版', style: bodyStyle),
     textScaler: scaler,
     textDirection: direction,
   )..layout();

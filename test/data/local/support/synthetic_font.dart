@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-/// Self-authored two-glyph TrueType font. ASCII glyphs are simple rectangles;
+/// Self-authored two-glyph TrueType font. Glyphs are simple rectangles;
 /// different advances make font selection observable without licensed assets.
-Uint8List syntheticFont({int advance = 600}) {
+Uint8List syntheticFont({int advance = 600, bool cjk = false}) {
   Uint8List table(int size, void Function(ByteData) fill) {
     final bytes = Uint8List(size);
     fill(ByteData.sublistView(bytes));
@@ -76,6 +76,24 @@ Uint8List syntheticFont({int advance = 600}) {
       d.setUint16(p + 32 + i * 2, 1);
     }
   });
+  if (cjk) {
+    const characters = [0x6392, 0x6587, 0x6b63, 0x7248]; // 正文排版
+    tables['cmap'] = table(28 + characters.length * 12, (d) {
+      d.setUint16(2, 1);
+      d.setUint16(4, 3);
+      d.setUint16(6, 10);
+      d.setUint32(8, 12);
+      d.setUint16(12, 12);
+      d.setUint32(16, 16 + characters.length * 12);
+      d.setUint32(24, characters.length);
+      for (var i = 0; i < characters.length; i++) {
+        final offset = 28 + i * 12;
+        d.setUint32(offset, characters[i]);
+        d.setUint32(offset + 4, characters[i]);
+        d.setUint32(offset + 8, 1);
+      }
+    });
+  }
   tables['post'] = table(32, (d) {
     d.setUint32(0, 0x00030000);
   });

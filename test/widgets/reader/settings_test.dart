@@ -437,6 +437,7 @@ void main() {
                   panel.preferences.value,
                   MediaQuery.textScalerOf(tester.element(viewport)),
                   TextDirection.ltr,
+                  bodyStyle: paged.textStyle,
                 ),
       );
       expect(Theme.of(tester.element(viewport)).brightness, Brightness.dark);

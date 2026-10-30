@@ -14,6 +14,7 @@ void main() {
               ReaderSettings(horizontalPadding: value),
               TextScaler.linear(scale),
               TextDirection.ltr,
+              bodyStyle: const TextStyle(fontSize: 20),
             ),
         ];
         expect(margins[2], 30);
