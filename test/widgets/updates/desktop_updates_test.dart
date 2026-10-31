@@ -19,6 +19,38 @@ final download = find.byKey(const ValueKey('update-download'));
 final install = find.byKey(const ValueKey('update-install'));
 
 void main() {
+  testWidgets(
+    'update actions share a row when they fit and wrap at large text sizes',
+    (tester) async {
+      final h = UpdatesHarness(tester);
+      h.repo.result = fakeUpdateCandidate(notes: '');
+      h.repo.supportsInstallation = true;
+      await h.controller.initialize();
+      await h.controller.check();
+      await h.pump(width: 1280, shell: false);
+      final releasePage = find.widgetWithText(
+        TextButton,
+        h.l.updateOpenReleasePage,
+      );
+      await h.show(releasePage);
+      expect(tester.getCenter(download).dy, tester.getCenter(releasePage).dy);
+      await h.tap(download);
+      await h.show(releasePage);
+      expect(tester.getCenter(install).dy, tester.getCenter(releasePage).dy);
+      await h.pump(width: 320, height: 900, scale: 1.8, shell: false);
+      await h.show(releasePage);
+      expect(
+        tester.getTopLeft(releasePage).dy,
+        greaterThanOrEqualTo(tester.getBottomRight(install).dy),
+      );
+      await h.tap(releasePage);
+      expect(h.opened, [h.repo.result!.page]);
+      expect(tester.takeException(), isNull);
+      await h.close();
+    },
+    variant: windows,
+  );
+
   for (final (lang, size, platform) in [
     ('en', const Size(320, 1000), TargetPlatform.android),
     ('zh', const Size(1280, 900), TargetPlatform.windows),

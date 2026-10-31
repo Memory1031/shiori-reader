@@ -567,11 +567,6 @@ class _UpdateScreenState extends State<UpdateScreen> {
                       l.updateInstallPermission,
                       style: theme.textTheme.bodySmall,
                     ),
-                    const SizedBox(height: ShioriSpace.medium),
-                    FilledButton(
-                      onPressed: c.busy ? null : c.openInstallSettings,
-                      child: Text(l.updateInstallSettings),
-                    ),
                   ] else ...[
                     if (c.installState == UpdateInstallState.cancelled) ...[
                       Text(l.updateInstallCancelled),
@@ -587,29 +582,55 @@ class _UpdateScreenState extends State<UpdateScreen> {
                       ),
                       const SizedBox(height: ShioriSpace.medium),
                     ],
-                    FilledButton.icon(
-                      key: const ValueKey('update-install'),
-                      onPressed: c.busy ? null : c.install,
-                      icon: Icon(
-                        windows ? Icons.restart_alt : Icons.system_update,
-                      ),
-                      label: Text(
-                        windows ? l.updateRestartInstall : l.updateInstall,
-                      ),
-                    ),
                   ],
                 ],
-              ] else
-                FilledButton.icon(
-                  key: const ValueKey('update-download'),
-                  onPressed: c.busy ? null : c.download,
-                  icon: const Icon(Icons.download_outlined),
-                  label: Text(l.updateDownload),
-                ),
-              const SizedBox(height: ShioriSpace.small),
-              TextButton(
-                onPressed: () => _openPage(context, target.page),
-                child: Text(l.updateOpenReleasePage),
+              ],
+              if (c.phase == UpdatePhase.downloading ||
+                  c.phase == UpdatePhase.verifying ||
+                  c.installing ||
+                  c.phase == UpdatePhase.downloaded)
+                const SizedBox(height: ShioriSpace.small),
+              Wrap(
+                spacing: ShioriSpace.small,
+                runSpacing: ShioriSpace.small,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (c.phase != UpdatePhase.downloading &&
+                      c.phase != UpdatePhase.verifying &&
+                      !c.installing)
+                    if (c.phase == UpdatePhase.downloaded) ...[
+                      if (c.canInstall)
+                        if (c.installState ==
+                            UpdateInstallState.permissionRequired)
+                          FilledButton(
+                            onPressed: c.busy ? null : c.openInstallSettings,
+                            child: Text(l.updateInstallSettings),
+                          )
+                        else
+                          FilledButton.icon(
+                            key: const ValueKey('update-install'),
+                            onPressed: c.busy ? null : c.install,
+                            icon: Icon(
+                              windows ? Icons.restart_alt : Icons.system_update,
+                            ),
+                            label: Text(
+                              windows
+                                  ? l.updateRestartInstall
+                                  : l.updateInstall,
+                            ),
+                          ),
+                    ] else
+                      FilledButton.icon(
+                        key: const ValueKey('update-download'),
+                        onPressed: c.busy ? null : c.download,
+                        icon: const Icon(Icons.download_outlined),
+                        label: Text(l.updateDownload),
+                      ),
+                  TextButton(
+                    onPressed: () => _openPage(context, target.page),
+                    child: Text(l.updateOpenReleasePage),
+                  ),
+                ],
               ),
             ],
           ],
