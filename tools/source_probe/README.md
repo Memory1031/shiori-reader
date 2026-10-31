@@ -1,6 +1,6 @@
 # Source 调查工具
 
-独立纯 Dart 包，只服务可重复的调查证据，不是生产 Source / Parser。依赖本仓库的 `test/fixtures/lightnovel/`，不依赖主 Flutter 包，也不修改 App 依赖。
+用这个独立 Dart 包复现 LightNovel.fun 的固定查询、目录、正文和图片链路。默认使用 `test/fixtures/lightnovel/` 离线运行；访问真实书源需显式开启 live 模式。工具的 Source / Parser 与主 Flutter 应用分开维护。
 
 ## 复跑（Windows PowerShell）
 

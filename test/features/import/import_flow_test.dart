@@ -1224,7 +1224,7 @@ void main() {
       await tester.pumpAndSettle();
       expectResponsiveImport(tester);
       expect(find.text('书籍已存在，未重复导入。'), findsOneWidget);
-      expect(find.text('书籍已保存。'), findsNothing);
+      expect(find.text('书籍已导入。'), findsNothing);
       expect(find.text('重试'), findsNothing);
       await tester.tap(find.text('立即阅读'));
       expect(readKey, key);
@@ -1259,7 +1259,7 @@ void main() {
       await tester.pumpAndSettle();
       final surface = find
           .ancestor(
-            of: find.text('Import processing complete'),
+            of: find.text('Import finished'),
             matching: find.byType(Material),
           )
           .first;
@@ -1268,7 +1268,7 @@ void main() {
         tester.getRect(surface).bottom,
         closeTo(844 - ShioriSpace.medium, 1),
       );
-      expect(find.text('Import processing complete'), findsOneWidget);
+      expect(find.text('Import finished'), findsOneWidget);
       expect(
         find.text('2 already exist. No books were added.'),
         findsOneWidget,
@@ -1808,7 +1808,7 @@ void main() {
         });
       }
       await tester.pumpAndSettle();
-      expect(find.text('导入处理完成'), findsOneWidget);
+      expect(find.text('本次导入已结束'), findsOneWidget);
       expect(find.text('新增 3 本'), findsOneWidget);
     });
 
@@ -1856,7 +1856,7 @@ void main() {
         }
         await tester.pumpAndSettle();
         expect(controller.phase, ImportPhase.succeeded);
-        expect(find.text('导入处理完成'), findsOneWidget);
+        expect(find.text('本次导入已结束'), findsOneWidget);
         expect(find.text('新增 2 本'), findsOneWidget);
         expect(find.text('完成'), findsOneWidget);
         expect(source.acked, ['a', 'b']);
@@ -1884,7 +1884,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.runAsync(() => controller.submit());
         await tester.pumpAndSettle();
-        expect(find.text('导入处理完成'), findsOneWidget);
+        expect(find.text('本次导入已结束'), findsOneWidget);
         expect(find.text('新增 1 本 · 已存在 1 本 · 失败 1 本'), findsOneWidget);
         expect(find.text('已导入'), findsOneWidget);
         expect(find.text('已存在，未重复导入'), findsOneWidget);
@@ -1920,7 +1920,7 @@ void main() {
         }
       });
       await tester.pumpAndSettle();
-      expect(find.text('导入处理完成'), findsOneWidget);
+      expect(find.text('本次导入已结束'), findsOneWidget);
       expect(find.text('新增 3 本'), findsOneWidget);
       expect(source.acked, ['a', 'c', 'b']);
       expect(parses, 3); // Committed items never re-parse.
@@ -1966,7 +1966,7 @@ void main() {
       expect(find.textContaining('剩余 1 本未处理'), findsOneWidget);
       expect(find.text('等待导入'), findsOneWidget); // c never started
       expect(find.textContaining('内容与格式不符'), findsOneWidget); // a's own row
-      expect(find.text('导入处理完成'), findsNothing);
+      expect(find.text('本次导入已结束'), findsNothing);
       expect(tester.takeException(), null);
     });
 
@@ -2002,7 +2002,7 @@ void main() {
         await run;
       });
       await tester.pumpAndSettle();
-      expect(find.text('导入处理完成'), findsOneWidget);
+      expect(find.text('本次导入已结束'), findsOneWidget);
       expect(find.text('新增 2 本'), findsOneWidget);
       expect(source.acked, ['a', 'b']);
     });

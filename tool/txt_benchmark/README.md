@@ -1,6 +1,6 @@
 # TXT 宿主基准
 
-在项目根目录使用固定 Dart SDK；不安装第三方检测器，不访问网络。
+测量 TXT 解码、编码探测和解析建模的宿主耗时与进程内存。工具离线运行，在项目根目录使用固定 Dart SDK：
 
 ```sh
 .fvm/flutter_sdk/bin/dart --disable-dart-dev --packages=.dart_tool/package_config.json tool/txt_benchmark/main.dart 1 lines

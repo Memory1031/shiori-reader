@@ -155,13 +155,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get localDeleteBook => '删除本地书籍';
 
   @override
-  String get onlineRemoveMessage => '将从书架移除，并清除这本书的缓存和阅读进度。再次阅读时将从头开始。';
+  String get onlineRemoveMessage => '将这本书移出书架，并清除缓存、阅读进度和书签。再次阅读将从头开始。';
 
   @override
-  String get onlineBookRemoved => '这本书已移出书架，缓存和阅读进度已清除。';
+  String get onlineBookRemoved => '已移出书架，并清除缓存、阅读进度和书签。';
 
   @override
-  String get bookDeleteAndRemove => '删除与移除';
+  String get bookDeleteAndRemove => '移除所选';
 
   @override
   String get detailActionsPending => '暂不可用的阅读和书架操作仍在开发中。';
@@ -209,7 +209,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchNoMore => '已显示全部结果';
 
   @override
-  String get searchDraftNotice => '当前为上次搜索结果，请提交修改后的关键词重新搜索。';
+  String get searchDraftNotice => '关键词已修改，点击搜索以更新结果。';
 
   @override
   String searchResultsFor(String query) {
@@ -285,7 +285,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get connectionFailureMessage => '无法连接，请检查网络后重试。';
 
   @override
-  String get databaseFailureMessage => '本地存储发生问题，暂时无法完成操作。';
+  String get databaseFailureMessage => '无法读写本地数据，操作未完成。';
 
   @override
   String get featurePending => '此功能尚在开发中。';
@@ -303,7 +303,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get novelDetailsTitle => '小说详情';
 
   @override
-  String get parseFailureMessage => '内容格式可能已变化，暂时无法读取。';
+  String get parseFailureMessage => '无法读取书源返回的内容。';
 
   @override
   String get rateLimitedMessage => '请求过于频繁，请稍后再试。';
@@ -324,7 +324,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get searchTitle => '搜索';
 
   @override
-  String get sessionFailureMessage => '访问会话不可用，请稍后再试。';
+  String get sessionFailureMessage => '暂时无法访问书源，请稍后重试。';
 
   @override
   String get sourceUnavailableMessage => '内容服务暂时不可用，请稍后再试。';
@@ -336,7 +336,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get unsupportedMessage => '暂不支持此功能。';
 
   @override
-  String get unrecognizedSourceResponseMessage => '书源未能完成本次请求，原因暂时无法确定。';
+  String get unrecognizedSourceResponseMessage => '书源未能完成这次请求。';
 
   @override
   String get readerSettings => '阅读设置';
@@ -351,7 +351,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerParagraphSpacing => '段间距';
 
   @override
-  String get readerHorizontalPadding => '横向边距';
+  String get readerHorizontalPadding => '左右边距';
 
   @override
   String get readerThemeSystem => '跟随系统';
@@ -372,7 +372,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerProgressNotSaved => '未保存';
 
   @override
-  String get readerProgressSavingPaused => '保存暂停';
+  String get readerProgressSavingPaused => '保存已暂停';
 
   @override
   String get readerRetrySaveProgress => '重试保存进度';
@@ -500,7 +500,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerRestoreNearby => '内容更新，已恢复到附近位置';
 
   @override
-  String get readerRestoreReadFailed => '暂时无法读取旧进度，已暂停保存；点按重试恢复';
+  String get readerRestoreReadFailed => '无法读取已存进度，已暂停保存。点按重试。';
 
   @override
   String get appAppearance => '应用外观';
@@ -631,7 +631,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get cacheOfflineHint => '已缓存的在线书籍章节，可在离线时阅读。缓存可能因空间管理被清理。';
+  String get cacheOfflineHint => '已缓存的在线章节可离线阅读。缓存可能被自动清理以释放空间。';
 
   @override
   String cacheChapterStatus(int saved, int total) {
@@ -684,15 +684,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String cacheClearAllCount(int books, int chapters) {
-    return '当前缓存列表中有 $books 本书、$chapters 个章节。';
+    return '已缓存 $books 本书、$chapters 个章节。';
   }
 
   @override
   String get cacheClearAllExplanation =>
-      '这将清除相关的在线正文、目录、资料和图片缓存。书架、阅读进度和设置会保留。再次打开已清理内容可能需要联网。';
+      '清除在线正文、目录、资料和图片缓存，保留书架、阅读进度和设置。再次打开这些内容可能需要联网。';
 
   @override
-  String get cacheClearExplanation => '书架、阅读进度和设置会保留。再次打开已清理内容可能需要联网。';
+  String get cacheClearExplanation => '保留书架、阅读进度和设置。再次打开已清理内容可能需要联网。';
 
   @override
   String get cacheClearBook => '清除此书缓存';
@@ -728,19 +728,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get prefetchIdle => '尚未开始';
 
   @override
-  String get prefetchRunning => '正在准备图片与接下来阅读';
+  String get prefetchRunning => '正在缓存图片和后续文章';
 
   @override
   String get prefetchPaused => '缓存已暂停';
 
   @override
-  String get prefetchBudget => '本批额度已用完，可手动继续';
+  String get prefetchBudget => '已达到本次缓存上限，点击继续可缓存更多内容';
 
   @override
-  String get prefetchPartial => '部分资源未能缓存，可重试';
+  String get prefetchPartial => '部分内容未能缓存，可重试';
 
   @override
-  String get prefetchComplete => '本批准备结束，离线状态以缓存列表为准';
+  String get prefetchComplete => '本次缓存已结束，可在「离线内容」查看已保存的章节';
 
   @override
   String get prefetchSaveFailed => '未能保存选择，请重试';
@@ -773,7 +773,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importBookProcessing => '正在处理书籍…';
 
   @override
-  String get importSuccess => '书籍已保存。';
+  String get importSuccess => '书籍已导入。';
 
   @override
   String get importHint => '支持 TXT（≤16 MiB）和 EPUB（≤64 MiB）。';
@@ -849,7 +849,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get importBatchComplete => '导入处理完成';
+  String get importBatchComplete => '本次导入已结束';
 
   @override
   String importBatchCreated(int count) {
@@ -889,7 +889,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importMultiple => '每次仅支持一个文件，请重新选择。';
 
   @override
-  String get importBusy => '收件箱正在处理其他文件，请稍后重试；也可以先查看已有的待导入文件。';
+  String get importBusy => '正在接收其他文件，请稍后重试，或先查看待导入文件。';
 
   @override
   String get importUnsupported => '请选择 TXT 或 EPUB 文件；不支持导入网页链接。';
@@ -898,13 +898,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importInvalid => '文件为空或内容与格式不符，请检查文件。';
 
   @override
-  String get importParserUnavailable => '当前版本暂不支持解析此格式。文件尚未导入，你可以取消并稍后重新选择。';
+  String get importParserUnavailable => '此版本无法读取这种格式，文件尚未导入。';
 
   @override
   String get importStorage => '无法保存文件，请检查可用空间后重试。';
 
   @override
-  String get importCancelled => '导入已取消，书籍未提交。';
+  String get importCancelled => '导入已取消，书籍未保存。';
 
   @override
   String get importUnreadable => '无法读取文件，请确认文件仍可访问后重新选择。';
@@ -916,7 +916,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importEncodingAuto => '文字编码：自动识别';
 
   @override
-  String get importEncodingInvalid => '无法按所选编码完整解码，请更换编码或检查原文件。';
+  String get importEncodingInvalid => '无法用此编码完整读取文件，请换一种编码或检查原文件。';
 
   @override
   String get importDrm => '这本 EPUB 含受保护或加密的内容，暂不支持导入。';
@@ -928,7 +928,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importParseLimit => '书籍文件或内容过大，暂时无法导入。';
 
   @override
-  String get importParseStructureLimit => 'TXT 的段落或章节过多，超出当前可处理的结构规模，请分卷后导入。';
+  String get importParseStructureLimit => 'TXT 的段落或章节过多，请分卷后导入。';
 
   @override
   String get importParseTimeout => '处理这本书耗时过长，已停止导入。可以重试，或分卷后导入。';
@@ -953,7 +953,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get localBooksTitle => '本地文件';
 
   @override
-  String get localBooksHint => '管理已导入的书籍。移除本地书籍会删除应用内文件及阅读进度，外部原文件不受影响。';
+  String get localBooksHint => '管理导入的 EPUB 和 TXT 书籍。';
 
   @override
   String get localBooksEmpty => '还没有导入本地书籍。';
@@ -963,7 +963,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String localDeleteMessage(String title) {
-    return '将删除《$title》的应用内原文件、正文、插图、书架记录和阅读进度。外部原文件不受影响，此操作无法撤销。';
+    return '将永久删除《$title》的应用内副本、阅读进度和书签。外部原文件保留。';
   }
 
   @override
@@ -1029,7 +1029,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get localReparse => '重新解析';
 
   @override
-  String get localReparseConfirm => '使用保留的原文件重新解析，并尽量恢复阅读位置。失败或取消会保留旧内容。';
+  String get localReparseConfirm => '从保留的原文件重新解析，并尽量保留阅读位置。失败或取消时保留原内容。';
 
   @override
   String get localReparseDone => '重新解析完成，阅读位置已保留。';
@@ -1062,10 +1062,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerLinkReturn => '返回原位置';
 
   @override
-  String get readerLinkUnavailable => '此链接不可用，仅支持书内有效文档和锚点。';
+  String get readerLinkUnavailable => '无法打开此链接。仅支持跳转到书内文档或指定位置。';
 
   @override
-  String get readerLinkDepth => '已达到链接层级上限，请先返回。';
+  String get readerLinkDepth => '打开的书内链接过多，请先返回上一处。';
 
   @override
   String get readerMarginVeryNarrow => '极窄';
@@ -1144,10 +1144,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get updateDevelopment => '开发版本不连接正式更新源。';
+  String get updateDevelopment => '开发版本不检查正式发布的更新。';
 
   @override
-  String get updateUnsupported => '请通过 App Store 或 TestFlight 获取更新。';
+  String get updateUnsupported => '请通过原来的安装方式更新。使用自签名 IPA 时，请重新签名安装新版。';
 
   @override
   String get updateInvalidIdentity => '无法确认当前版本信息，暂时无法检查更新。';
@@ -1156,7 +1156,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateAutomatic => '自动检查更新';
 
   @override
-  String get updateAutomaticHint => '下载更新前会由你确认。';
+  String get updateAutomaticHint => '下载和安装由你手动开始。';
 
   @override
   String get updateChannel => '更新渠道';
@@ -1196,7 +1196,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get updateIncomplete => '发布信息尚不完整，暂时无法确定更新，请稍后重试。';
+  String get updateIncomplete => '发布文件尚不完整，无法确认新版，请稍后重试。';
 
   @override
   String get updateVerificationError => '更新校验失败，请重新检查更新。';
@@ -1250,7 +1250,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateInstall => '安装更新';
 
   @override
-  String get updateInstallHint => '安装包已校验。确认安装后应用将关闭；书架、阅读位置和设置会保留。';
+  String get updateInstallHint => '安装时 Shiori 将关闭，书架、阅读位置和设置会保留。';
 
   @override
   String get updateInstallPermission => '请允许 Shiori 安装应用更新。授权后返回此页面，再点击安装更新。';
@@ -1280,21 +1280,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get updateInstallHintWindows =>
-      '安装包已校验。Shiori 将关闭、替换程序文件后重新启动；书架、阅读位置和设置会保留。';
+      'Shiori 将关闭、更新程序文件后重新启动。书架、阅读位置和设置会保留。';
 
   @override
   String get updateRestarting => '正在关闭 Shiori 以安装更新，安装完成后会自动重新启动。';
 
   @override
   String get updateInstallFailedWindows =>
-      '更新未能完成。请重试，或从发布页下载完整的 Windows ZIP 重新解压。书架和阅读数据单独保存，不受影响。';
+      '更新未完成。请重试，或从发布页下载完整安装包：安装版运行 EXE，便携版完整解压 ZIP。书架和阅读数据单独保存。';
 
   @override
   String get updateInstallInstances => '请先关闭其他 Shiori 窗口，然后重试。';
 
   @override
   String get updateInstallLocation =>
-      'Shiori 无法在当前文件夹中自动更新。请将完整的 Windows ZIP 解压到本地磁盘上可写入的文件夹，或从发布页手动更新。';
+      '当前位置无法自动更新。安装版请从发布页重新安装；便携版请将完整 ZIP 解压到本地磁盘的可写文件夹。';
 
   @override
   String get updateWorkspaceConflict =>
@@ -1304,7 +1304,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateInstallBusy => '请等待当前操作完成后再安装更新。';
 
   @override
-  String get updateReturnToLibrary => '请先返回书架并完成导入，再从菜单进入应用更新。';
+  String get updateReturnToLibrary => '请先返回书架并完成导入，再打开「关于与更新」。';
 
   @override
   String get updateSection => '更新';
@@ -1442,10 +1442,10 @@ class AppLocalizationsZh extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       excluded,
       locale: localeName,
-      other: '\n另有 $excluded 本所选书籍不参与。',
+      other: '\n另有 $excluded 本不参与重新解析。',
       zero: '',
     );
-    return '重新生成所选 $count 本本地书籍的解析数据。解析失败时保留原有数据。$_temp0';
+    return '重新解析所选 $count 本本地书籍，失败时保留原内容。$_temp0';
   }
 
   @override
@@ -1459,17 +1459,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String bookBatchRemoveConfirm(int count) {
-    return '处理所选的 $count 本书籍？';
+    return '确认移除所选的 $count 本书？';
   }
 
   @override
   String bookBatchOnline(int count) {
-    return '$count 本在线书籍：移出书架并清除缓存和阅读进度，再次阅读将从头开始。';
+    return '$count 本在线书籍：移出书架，清除缓存、进度和书签。再次阅读将从头开始。';
   }
 
   @override
   String bookBatchLocal(int count) {
-    return '$count 本本地书籍：永久删除应用内书籍数据与阅读进度，保留外部原文件。此操作不可撤销。';
+    return '$count 本本地书籍：永久删除应用内副本、进度和书签，保留外部原文件。';
   }
 
   @override
@@ -1549,7 +1549,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get localAutoReparseApproximate => '已跳过：阅读位置无法精确迁移';
+  String get localAutoReparseApproximate => '已跳过：无法准确保留阅读位置';
 
   @override
   String get localAutoReparseEncoding => '已跳过：TXT 编码不确定';
@@ -1576,7 +1576,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerSearchBook => '搜索本书';
 
   @override
-  String get readerSearchHint => '输入词句，提交后搜索';
+  String get readerSearchHint => '输入词句，点击搜索';
 
   @override
   String get readerSearchSubmit => '搜索';
@@ -1585,7 +1585,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerSearchLoading => '正在搜索…';
 
   @override
-  String get readerSearchPaused => '搜索已暂停，已找到的结果仍可查看。';
+  String get readerSearchPaused => '搜索已暂停，仍可查看已找到的结果。';
 
   @override
   String get readerSearchTooLong => '搜索内容过长，请缩短后重试。';
@@ -1636,7 +1636,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerSearchReturn => '返回搜索前位置';
 
   @override
-  String get readerSearchDocument => '已打开对应文档，此页暂不支持逐字定位和高亮。';
+  String get readerSearchDocument => '已打开匹配内容所在文档，此页暂不支持精确定位或高亮。';
 
   @override
   String get readerSearchClear => '清空搜索';
@@ -1663,10 +1663,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookmarkDelete => '删除书签';
 
   @override
-  String get bookmarkPositionUnavailable => '原位置已变化，无法可靠定位。书签已保留。';
+  String get bookmarkPositionUnavailable => '原位置已变化，暂时无法跳转。书签仍保留。';
 
   @override
-  String get bookmarkUnsupported => '当前页面无法保存可靠的位置书签。';
+  String get bookmarkUnsupported => '当前页面不支持添加书签。';
 
   @override
   String get bookmarkLoadFailed => '无法读取书签，请关闭后重试。';
@@ -1681,7 +1681,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bookmarkChanged => '书签状态已更新，请重试。';
 
   @override
-  String get readerBookmarkReturn => '返回书签跳转前位置';
+  String get readerBookmarkReturn => '返回跳转前位置';
 
   @override
   String get statisticsTitle => '阅读统计';
@@ -1737,7 +1737,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statisticsLocalOnly => '阅读记录仅保存在这台设备上。';
 
   @override
-  String get statisticsEmpty => '今天还没有阅读记录。开始阅读后，时长会显示在这里。';
+  String get statisticsEmpty => '开始阅读后，在这里查看今天的阅读时长。';
 
   @override
   String get statisticsPeriodEmpty => '这段时间还没有阅读记录。';
@@ -1767,7 +1767,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statisticsClearBody => '清空阅读时长和分书统计，不影响书架、阅读进度及书签。';
 
   @override
-  String get statisticsClearEnabled => '清空后，之后的阅读仍会继续记录。';
+  String get statisticsClearEnabled => '清空后继续记录新的阅读时长。';
 
   @override
   String get statisticsError => '阅读统计暂不可用，请重试。';

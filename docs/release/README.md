@@ -1,6 +1,6 @@
 # 发布操作
 
-本文件只维护通用流程，不记录当前版本进度。版本变化写入 `docs/release/notes/vX.Y.Z.md`，测试结果在提交 / PR 或发布操作反馈中说明，不单独维护历史验收文档。
+发布新版本依次完成准备、提交、发布和验收。版本变化写入 `docs/release/notes/vX.Y.Z.md`，实际测试结果记录在提交、PR 或发布反馈中。
 
 ## 每次先读
 
@@ -136,7 +136,7 @@ GitHub Actions 需要以下仓库配置：
 
 ## iOS 未签名 IPA
 
-GitHub Release 提供 `shiori-reader-<tag>-ios-arm64-unsigned.ipa`，适用于 iOS / iPadOS 15.0+ 真机。IPA 包含完整主应用、Flutter 资源及 ShareExtension，没有可直接安装的开发者签名或描述文件，不能直接在 iPhone 上安装。用户自行选择签名方式、承担安装配置并处理后续更新；不承诺所有自签工具兼容。
+GitHub Release 提供 `shiori-reader-<tag>-ios-arm64-unsigned.ipa`，适用于 iOS / iPadOS 15.0+ 真机。IPA 包含主应用、Flutter 资源和 ShareExtension，安装前需使用自选工具签名，后续通过原签名方式更新。系统分享扩展所需的授权配置见下文。
 
 主应用成功安装后，即使 App Group 不可用，也能通过应用内选择 EPUB / TXT 或系统直接打开文件导入。系统分享扩展需要主应用及扩展的签名、描述文件与 `SHIORI_IMPORT_GROUP` 指向同一个获授权的共享容器；没有共享权限时明确接收失败。私有 Inbox 降级不能修复签名或扩展权限错误造成的安装失败，也不会让扩展访问主应用私有目录。收件箱切换与未处理文件保留见[导入规则](../local-import.md#ios)。
 

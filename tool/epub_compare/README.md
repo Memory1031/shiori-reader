@@ -1,6 +1,6 @@
 # EPUB 解析库对比
 
-生产依赖保持不变。工具把 epubx 4.0.0、epub_parser 3.0.1 和实际 Shiori 解析器分别编译为独立 AOT 进程，输出元数据、计数和哈希，不输出正文或图片。实验目录 `.tooling/epub-compare` 不入库；使用项目固定 Dart SDK（工具约束为 `>=3.10.3 <3.11.0`）和 Python 3。
+对同一组 EPUB 比较 epubx 4.0.0、epub_parser 3.0.1 和 Shiori 解析器的输出。工具将三者编译为独立 AOT 进程，输出元数据、计数和哈希；正文与图片保留在本地输入中。实验依赖位于忽略目录 `.tooling/epub-compare`，与生产依赖分开；使用项目固定 Dart SDK（工具约束为 `>=3.10.3 <3.11.0`）和 Python 3。
 
 ```text
 python tool/epub_compare/prepare.py --dart <Dart可执行文件绝对路径>

@@ -1013,7 +1013,7 @@ void main() {
       expect(find.byType(BottomSheet), findsNothing);
       expect(inPanel(find.byType(PrefetchPanel)), findsOneWidget);
       expect(
-        inPanel(find.text('Preparing images and next reading')),
+        inPanel(find.text('Caching images and the next article')),
         findsOneWidget,
       );
 
@@ -1026,7 +1026,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(engine.resumes, 1);
       expect(
-        inPanel(find.text('Preparing images and next reading')),
+        inPanel(find.text('Caching images and the next article')),
         findsOneWidget,
       );
 

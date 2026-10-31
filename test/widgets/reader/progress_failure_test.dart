@@ -463,7 +463,7 @@ void main() {
     (tester) async {
       final reader = await mount(tester, readFailure: true, seed: true);
       final saved = await reader.saved();
-      expect(find.text('Paused'), findsOneWidget);
+      expect(find.text('Saving paused'), findsOneWidget);
       await turn(tester, reader);
       await tester.pump(const Duration(seconds: 1));
       expect(reader.library.writes, isEmpty);
@@ -471,7 +471,7 @@ void main() {
       await retry(tester, reader, read: true);
       hiddenChrome(tester, reader);
       await tester.pumpAndSettle();
-      expect(find.text('Paused'), findsOneWidget);
+      expect(find.text('Saving paused'), findsOneWidget);
       reader.library.failRead = false;
       reader.library.pending = Completer<Result<ReadingProgress?>>();
       final session = reader.view(tester).session!;
@@ -484,7 +484,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
-      expect(find.text('Paused'), findsOneWidget);
+      expect(find.text('Saving paused'), findsOneWidget);
       expect(
         reader.library.pendingWrites,
         hasLength(1),

@@ -162,10 +162,10 @@ Windows Setup / ZIP 保留 Flutter 的 `data/flutter_assets/NOTICES.Z` 与根 LI
 
 Windows 安装器使用 [Inno Setup 6.7.3](https://github.com/jrsoftware/issrc/releases/tag/is-6_7_3)，编译工具与下载摘要固定在 `tool/inno_setup.ps1`。许可允许使用和分发，安装器保留 Inno 原有版权及网站信息；原文随程序放在 `licenses/Inno-Setup-LICENSE.txt`。该许可不授予 Windows Authenticode 信任。
 
-本文件是 Dart 锁定依赖文本快照，未宣称原生/产物许可全部审查通过。分发范围与其他素材边界见[发布说明](README.md)。
+上表覆盖 Dart 锁定依赖；发布时还需核对实际原生依赖和产物中的许可。其他素材的分发要求见[发布说明](README.md)。
 
 ## 许可与隐私边界
 
 本项目源码以根目录 [MIT License](../../LICENSE) 授权；Shiori 名称、Logo、应用图标等品牌素材不随源码 MIT 许可授予，该许可也不授予第三方小说内容、第三方商标、LightNovel.fun 的名称 / 服务 / 内容及其他第三方资产的任何权利。Shiori 是非官方第三方客户端，与 LightNovel.fun 及其运营方无关联，也未获得其官方认可。
 
-应用不附带小说；在线查询与媒体请求会发送给对应书源服务；检查或下载更新时会访问本项目的 GitHub Releases 及其下载服务。书架、进度、书签、阅读统计、偏好和导入原件存于应用本地，Android 系统备份 / 换机迁移可能包含用户数据；缓存与导入暂存按配置排除。iOS 备份排除行为未完成全面验证，因此不承诺所有数据永远只在单台设备上。
+应用不附带小说。在线查询与媒体请求发送给对应书源服务，检查或下载更新访问本项目的 GitHub Releases 及其下载服务。书架、进度、书签、阅读统计、偏好和导入原件保存在应用本地。Android 系统备份或换机迁移可能包含用户数据，缓存与导入暂存按配置排除；iOS 备份排除行为尚未完成全面验证。

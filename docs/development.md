@@ -15,7 +15,7 @@
 
 ## 首次安装与启动
 
-macOS / Linux shell：
+先安装固定版本 Flutter 和三个包的依赖，再从正常入口启动应用。macOS / Linux shell：
 
 ```sh
 fvm install 3.38.10
@@ -33,9 +33,11 @@ Windows PowerShell 设置 `$env:PUB_HOSTED_URL = 'https://pub.flutter-io.cn'`，
 
 Windows 拉取固定提交的 WebView Git 依赖需要 Git 支持长路径；可用 `git config --global core.longpaths true` 启用，以完整检出包含多个平台的仓库。
 
-iOS 安装依赖后在 `ios` 目录执行 `pod install`，打开 `ios/Runner.xcworkspace`。不要打开单独的 `.xcodeproj` 来构建 CocoaPods 工程。选择实际设备，使用自己的 Team 与唯一 Bundle ID；完整分享导入还要求 Runner 和 ShareExtension 获得同一 App Group 授权，`SHIORI_IMPORT_GROUP` 同步配置其 entitlements 与 Info.plist。主应用在取不到共享容器时使用私有 Inbox；这不能解决签名错误导致的安装失败。不要借用公司 Team。GitHub 未签名 IPA、签名及个人安装边界见[发布说明](release/README.md#ios-未签名-ipa)。
+iOS 安装依赖后，在 `ios` 目录执行 `pod install`，打开 `ios/Runner.xcworkspace` 构建 CocoaPods 工程。选择实际设备、自己的 Team 和唯一 Bundle ID，不使用公司 Team。
 
-macOS 使用 `fvm flutter run -d macos --target lib/main.dart`，或 `fvm flutter build macos --release --no-pub --target lib/main.dart`；Xcode 打开 `macos/Runner.xcworkspace`。构建不需要 Apple Team，分发打包会对应用及嵌套代码做 ad-hoc 签名，不能替代 Apple 开发者签名或公证。重新构建同一应用目录前先退出已运行实例，避免运行中的原生库被替换。
+使用系统分享扩展时，Runner 和 ShareExtension 还需获得同一 App Group 授权，并通过 `SHIORI_IMPORT_GROUP` 同步配置 entitlements 与 Info.plist。主应用取不到共享容器时使用私有 Inbox；签名错误仍需在 Xcode 或签名工具中解决。GitHub 未签名 IPA 的安装配置见[发布说明](release/README.md#ios-未签名-ipa)。
+
+macOS 使用 `fvm flutter run -d macos --target lib/main.dart`，或 `fvm flutter build macos --release --no-pub --target lib/main.dart`；Xcode 打开 `macos/Runner.xcworkspace`。构建无需 Apple Team；分发包对应用及嵌套代码做 ad-hoc 签名，未使用 Apple 开发者签名或公证。重新构建同一目录前先退出应用，避免替换运行中的原生库。
 
 版本与构建号只修改 `pubspec.yaml`。Runner 与 ShareExtension 共用 Flutter 生成的版本变量；更改 pubspec 后，直接在 Xcode 构建前先同步本地 Flutter 参数，避免使用旧版本：
 
@@ -126,4 +128,4 @@ Windows PowerShell 先设置 `$env:SHIORI_AUTHORED_SCREENSHOTS` 和 `$env:SHIORI
 
 已发布版本的 schema 快照必须保留；迁移用旧快照和自制数据测试，检查事务失败回滚与未知版本拒绝。不要删除用户数据库来处理升级失败。先退出应用，保全数据库及 WAL / SHM、preferences、托管原件和 manifest，在副本上检查。
 
-设备探针使用隔离目录，入口留在 `integration_test/`。本机 `.tooling/evidence/` 是忽略目录，不承诺随仓库提供；历史测量查 Git 或对应操作记录。旧滚动性能数据不能作为新翻页动画的性能结果。
+设备探针入口位于 `integration_test/`，使用隔离数据目录。证据输出到 Git 忽略的 `.tooling/evidence/`；历史测量查对应操作记录。比较性能时，使用与目标阅读模式和翻页效果一致的场景。

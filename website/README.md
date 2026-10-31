@@ -1,6 +1,6 @@
 # Shiori 官网
 
-Astro 静态网站，入口为 `/shiori-reader/zh-cn/` 和 `/shiori-reader/en/`，各有独立下载页。
+在 `website/` 启动 Astro 网站，可预览中英文介绍和下载页。页面入口为 `/shiori-reader/zh-cn/` 和 `/shiori-reader/en/`。
 需要 Node.js 22.22.0 及以上；CI 固定 Node 22，依赖通过 npm lockfile 锁定。
 
 ```sh

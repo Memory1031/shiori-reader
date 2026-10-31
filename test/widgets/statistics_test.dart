@@ -726,7 +726,7 @@ void main() {
       await tester.tap(find.text('Clear statistics').first);
       await settle(tester);
       expect(
-        find.text('Reading after clearing will still be recorded.'),
+        find.text('New reading time will continue to be recorded.'),
         findsOneWidget,
       );
       await tester.tap(

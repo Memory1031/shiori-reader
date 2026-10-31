@@ -200,7 +200,7 @@ void main() {
       );
       expect(
         h.view(t).actions.previousLocationLabel,
-        'Back to before bookmark navigation',
+        'Back to previous reading position',
       );
       await t.runAsync(
         () => cache.customStatement('DELETE FROM chapter_cache'),
@@ -276,7 +276,7 @@ void main() {
         expect((await h.snapshot(t)).bookmarks.single.id, 'b');
         expect(
           find.text(
-            'Link unavailable. Only valid documents and anchors within this book can be opened.',
+            'Cannot open this link. Only links to documents or positions within this book are supported.',
           ),
           findsOneWidget,
         );
@@ -374,9 +374,7 @@ void main() {
       expect(t.widget<PopupMenuItem<ReaderCommand>>(add).enabled, isFalse);
       expect(find.text('My bookmarks'), findsNothing);
       expect(
-        find.byTooltip(
-          'A reliable position bookmark is unavailable on this page.',
-        ),
+        find.byTooltip('Bookmarks are not supported on this page.'),
         findsOneWidget,
       );
       expect((await h.snapshot(t)).bookmarks, isEmpty);
@@ -519,11 +517,17 @@ void main() {
           );
       await t.pumpAndSettle();
       await h.menu(t, 'My bookmarks');
-      expect(find.textContaining('cannot be located reliably'), findsOneWidget);
+      expect(
+        find.textContaining('Cannot locate the saved position'),
+        findsOneWidget,
+      );
       await t.tap(find.byKey(const ValueKey('bookmark-invalid')));
       await t.pumpAndSettle();
       expect(find.byType(ReaderBookmarksPanel), findsOneWidget);
-      expect(find.textContaining('cannot be located reliably'), findsWidgets);
+      expect(
+        find.textContaining('Cannot locate the saved position'),
+        findsWidgets,
+      );
       expect(h.view(t).content.key, source);
       final b = (await h.snapshot(t)).bookmarks.single;
       expect(b.located, isFalse);

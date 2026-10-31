@@ -64,7 +64,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get volumesDescription =>
-      'Browse the source groups and choose a volume or chapter to read.';
+      'Choose a volume or chapter to start reading.';
 
   @override
   String get discoverTagline => 'Find your next chapter.';
@@ -162,14 +162,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onlineRemoveMessage =>
-      'Remove this book from the shelf and clear its cache and reading progress. Reading it again will start from the beginning.';
+      'Remove this book from your bookshelf and clear its cache, progress and bookmarks. Reading will restart from the beginning.';
 
   @override
   String get onlineBookRemoved =>
-      'This book was removed from the shelf. Its cache and reading progress were cleared.';
+      'Book removed. Its cache, progress and bookmarks were cleared.';
 
   @override
-  String get bookDeleteAndRemove => 'Delete / remove';
+  String get bookDeleteAndRemove => 'Remove';
 
   @override
   String get detailActionsPending =>
@@ -219,7 +219,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchDraftNotice =>
-      'These are previous results. Submit your edited keyword to search again.';
+      'Your keywords have changed. Choose Search to update the results.';
 
   @override
   String searchResultsFor(String query) {
@@ -298,7 +298,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get databaseFailureMessage =>
-      'A local storage problem prevented this operation.';
+      'Could not read or save local data. The operation did not finish.';
 
   @override
   String get featurePending => 'This feature is still in development.';
@@ -317,7 +317,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get parseFailureMessage =>
-      'The content format may have changed and cannot be read right now.';
+      'Could not read the content returned by the source.';
 
   @override
   String get rateLimitedMessage => 'Too many requests. Please try again later.';
@@ -339,7 +339,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sessionFailureMessage =>
-      'The access session is unavailable. Try again later.';
+      'Could not access the source. Try again later.';
 
   @override
   String get sourceUnavailableMessage =>
@@ -353,7 +353,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unrecognizedSourceResponseMessage =>
-      'The source could not complete this request. The cause is unknown.';
+      'The source could not complete this request.';
 
   @override
   String get readerSettings => 'Reading settings';
@@ -368,7 +368,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerParagraphSpacing => 'Paragraph spacing';
 
   @override
-  String get readerHorizontalPadding => 'Horizontal padding';
+  String get readerHorizontalPadding => 'Side margins';
 
   @override
   String get readerThemeSystem => 'System';
@@ -390,7 +390,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerProgressNotSaved => 'Not saved';
 
   @override
-  String get readerProgressSavingPaused => 'Paused';
+  String get readerProgressSavingPaused => 'Saving paused';
 
   @override
   String get readerRetrySaveProgress => 'Retry saving progress';
@@ -523,7 +523,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerRestoreReadFailed =>
-      'Could not read saved progress. Saving is paused; tap to retry restoration.';
+      'Could not load saved progress. Saving is paused. Tap to retry.';
 
   @override
   String get appAppearance => 'App appearance';
@@ -659,12 +659,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String cacheUsage(String text, String images) {
-    return 'Text & metadata $text MiB · Images $images MiB';
+    return 'Text and book details $text MiB · Images $images MiB';
   }
 
   @override
   String get cacheOfflineHint =>
-      'Chapters cached from online books, available for offline reading. Cached content may be cleared to free up space.';
+      'Read cached online chapters offline. Cached content may be cleared to free up space.';
 
   @override
   String cacheChapterStatus(int saved, int total) {
@@ -723,7 +723,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cacheClearAll => 'Clear all cache';
 
   @override
-  String get cacheEmpty => 'No cached articles yet';
+  String get cacheEmpty => 'No cached chapters yet';
 
   @override
   String get cacheClearTitle => 'Clear all cache?';
@@ -762,16 +762,16 @@ class AppLocalizationsEn extends AppLocalizations {
       one: '1 chapter',
       zero: '0 chapters',
     );
-    return 'The current cache list contains $_temp0 and $_temp1.';
+    return '$_temp0 and $_temp1 cached.';
   }
 
   @override
   String get cacheClearAllExplanation =>
-      'This clears the related online text, catalogs, book details and image cache. Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.';
+      'Clear cached chapters, contents, book details and images. Keep your bookshelf, progress and settings. Reopening cleared content may need an internet connection.';
 
   @override
   String get cacheClearExplanation =>
-      'Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.';
+      'Keep your bookshelf, progress and settings. Reopening cleared content may need an internet connection.';
 
   @override
   String get cacheClearBook => 'Clear book cache';
@@ -807,21 +807,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get prefetchIdle => 'Not started';
 
   @override
-  String get prefetchRunning => 'Preparing images and next reading';
+  String get prefetchRunning => 'Caching images and the next article';
 
   @override
   String get prefetchPaused => 'Caching paused';
 
   @override
-  String get prefetchBudget => 'Batch limit reached. Continue manually.';
+  String get prefetchBudget =>
+      'Cache limit reached. Continue to save more content.';
 
   @override
   String get prefetchPartial =>
-      'Some resources could not be saved. You can retry.';
+      'Some content could not be cached. Retry to save it.';
 
   @override
   String get prefetchComplete =>
-      'Batch finished. Check saved content for offline availability.';
+      'Caching finished. View saved chapters in Offline content.';
 
   @override
   String get prefetchSaveFailed => 'Could not save your choice. Please retry.';
@@ -856,7 +857,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importBookProcessing => 'Processing book…';
 
   @override
-  String get importSuccess => 'The book has been saved.';
+  String get importSuccess => 'Book imported.';
 
   @override
   String get importHint => 'Supports TXT (≤16 MiB) and EPUB (≤64 MiB).';
@@ -934,7 +935,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get importBatchComplete => 'Import processing complete';
+  String get importBatchComplete => 'Import finished';
 
   @override
   String importBatchCreated(int count) {
@@ -984,7 +985,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importBusy =>
-      'The inbox is processing other files. Try again shortly, or check the files already waiting to be imported.';
+      'Receiving other files. Try again shortly, or review pending imports.';
 
   @override
   String get importUnsupported =>
@@ -996,7 +997,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importParserUnavailable =>
-      'This version cannot parse this format yet. Nothing was imported. You can cancel and choose the file again later.';
+      'This version cannot read this format. The file was not imported.';
 
   @override
   String get importStorage =>
@@ -1018,7 +1019,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importEncodingInvalid =>
-      'The entire file could not be decoded with this encoding. Choose another encoding or check the original.';
+      'Could not read the entire file using this encoding. Choose another encoding or check the original file.';
 
   @override
   String get importDrm =>
@@ -1034,7 +1035,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importParseStructureLimit =>
-      'This TXT has too many paragraphs or chapters to process. Split it into volumes and import them separately.';
+      'This TXT has too many paragraphs or chapters. Split it into volumes before importing.';
 
   @override
   String get importParseTimeout =>
@@ -1067,8 +1068,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get localBooksTitle => 'Local files';
 
   @override
-  String get localBooksHint =>
-      'Manage imported books. Removing a local book deletes its in-app files and reading progress. The original external file is unaffected.';
+  String get localBooksHint => 'Manage your imported EPUB and TXT books.';
 
   @override
   String get localBooksEmpty => 'No local books imported yet.';
@@ -1078,7 +1078,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String localDeleteMessage(String title) {
-    return 'Delete the app-owned original, text, images, shelf entry, and reading progress for “$title”. The external original is unaffected. This cannot be undone.';
+    return 'Permanently delete the imported copy, progress and bookmarks for “$title”. Keep the original file.';
   }
 
   @override
@@ -1147,7 +1147,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localReparseConfirm =>
-      'Reparse the saved original and restore your reading position where possible. Failure or cancellation keeps the previous content.';
+      'Reparse the saved original, keeping your reading position where possible. Keep the previous content if this fails or is cancelled.';
 
   @override
   String get localReparseDone =>
@@ -1184,11 +1184,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerLinkUnavailable =>
-      'Link unavailable. Only valid documents and anchors within this book can be opened.';
+      'Cannot open this link. Only links to documents or positions within this book are supported.';
 
   @override
   String get readerLinkDepth =>
-      'Link depth limit reached. Return before opening another link.';
+      'Too many book links are open. Return to the previous location first.';
 
   @override
   String get readerMarginVeryNarrow => 'Narrowest';
@@ -1269,11 +1269,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateDevelopment =>
-      'Development builds do not connect to the production update source.';
+      'Development builds do not check for release updates.';
 
   @override
   String get updateUnsupported =>
-      'Get updates through the App Store or TestFlight.';
+      'Update using your original installation method. For a self-signed IPA, sign and install the new version.';
 
   @override
   String get updateInvalidIdentity =>
@@ -1284,7 +1284,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateAutomaticHint =>
-      'You confirm before an update is downloaded.';
+      'You choose when to download and install updates.';
 
   @override
   String get updateChannel => 'Update channel';
@@ -1327,7 +1327,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateIncomplete =>
-      'Release information is incomplete. Try checking again later.';
+      'Release files are incomplete. Check again later.';
 
   @override
   String get updateVerificationError =>
@@ -1386,7 +1386,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateInstallHint =>
-      'The package is verified. Installing will close the app; your library, reading position and settings will be kept.';
+      'Shiori will close to install the update. Your bookshelf, reading position and settings will be kept.';
 
   @override
   String get updateInstallPermission =>
@@ -1420,7 +1420,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateInstallHintWindows =>
-      'The package is verified. Shiori will close, replace its program files and start again; your library, reading position and settings will be kept.';
+      'Shiori will close, update its program files and restart. Your bookshelf, reading position and settings will be kept.';
 
   @override
   String get updateRestarting =>
@@ -1428,7 +1428,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateInstallFailedWindows =>
-      'The update could not be completed. Retry, or download the full Windows ZIP from the release page and extract it again. Your library and reading data are stored separately and are not affected.';
+      'Update did not finish. Retry, or download the full package from the release page: run the EXE for an installed edition, or extract the ZIP for a portable edition. Reading data is stored separately.';
 
   @override
   String get updateInstallInstances =>
@@ -1436,7 +1436,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateInstallLocation =>
-      'Shiori cannot update itself in this folder. Extract the full Windows ZIP to a writable folder on a local drive, or update manually from the release page.';
+      'Cannot update in this folder. For the installed edition, reinstall from the release page. For the portable edition, extract the full ZIP to a writable folder on a local drive.';
 
   @override
   String get updateWorkspaceConflict =>
@@ -1448,7 +1448,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updateReturnToLibrary =>
-      'Return to the library and finish any import, then open App updates from the menu.';
+      'Return to your bookshelf and finish importing, then open About & updates.';
 
   @override
   String get updateSection => 'Updates';
@@ -1600,10 +1600,10 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       excluded,
       locale: localeName,
-      other: '\n$excluded other selected books will be excluded.',
+      other: '\n$excluded other selected books will be skipped.',
       zero: '',
     );
-    return 'Regenerate parsing data for $count selected local books. The original data is kept if parsing fails.$_temp0';
+    return 'Reparse $count selected local books. Keep the previous content if parsing fails.$_temp0';
   }
 
   @override
@@ -1617,17 +1617,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String bookBatchRemoveConfirm(int count) {
-    return 'Process these $count selected books?';
+    return 'Remove these $count selected books?';
   }
 
   @override
   String bookBatchOnline(int count) {
-    return '$count online books: remove them from the shelf and clear their cache and reading progress. Reading them again will start from the beginning.';
+    return '$count online books: remove from bookshelf and clear cache, progress and bookmarks. Read again from the beginning.';
   }
 
   @override
   String bookBatchLocal(int count) {
-    return '$count local books: permanently delete app-owned book data and reading progress. External original files are kept. This cannot be undone.';
+    return '$count local books: permanently delete imported copies, progress and bookmarks. Keep original files.';
   }
 
   @override
@@ -1710,7 +1710,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localAutoReparseApproximate =>
-      'Skipped: reading position cannot migrate precisely';
+      'Skipped: could not preserve the exact reading position';
 
   @override
   String get localAutoReparseEncoding => 'Skipped: TXT encoding is uncertain';
@@ -1740,7 +1740,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerSearchBook => 'Search this book';
 
   @override
-  String get readerSearchHint => 'Enter a word or phrase';
+  String get readerSearchHint => 'Enter a word or phrase, then search';
 
   @override
   String get readerSearchSubmit => 'Search';
@@ -1750,7 +1750,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerSearchPaused =>
-      'Search paused. Available results are preserved.';
+      'Search paused. You can still view the matches found.';
 
   @override
   String get readerSearchTooLong =>
@@ -1804,7 +1804,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerSearchDocument =>
-      'Opened the document. Exact text positioning and highlighting are unavailable on this page.';
+      'Opened the document containing the match. This page does not support exact positioning or highlighting.';
 
   @override
   String get readerSearchClear => 'Clear search';
@@ -1832,11 +1832,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookmarkPositionUnavailable =>
-      'The original position has changed and cannot be located reliably. The bookmark is kept.';
+      'Cannot locate the saved position after the content changed. Your bookmark is kept.';
 
   @override
-  String get bookmarkUnsupported =>
-      'A reliable position bookmark is unavailable on this page.';
+  String get bookmarkUnsupported => 'Bookmarks are not supported on this page.';
 
   @override
   String get bookmarkLoadFailed =>
@@ -1854,7 +1853,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookmarkChanged => 'Bookmarks have changed. Please try again.';
 
   @override
-  String get readerBookmarkReturn => 'Back to before bookmark navigation';
+  String get readerBookmarkReturn => 'Back to previous reading position';
 
   @override
   String get statisticsTitle => 'Reading statistics';
@@ -1912,7 +1911,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statisticsEmpty =>
-      'No reading recorded today. Your time will appear here after you start reading.';
+      'Start reading to see today’s reading time here.';
 
   @override
   String get statisticsPeriodEmpty => 'No reading recorded in this period.';
@@ -1946,7 +1945,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statisticsClearEnabled =>
-      'Reading after clearing will still be recorded.';
+      'New reading time will continue to be recorded.';
 
   @override
   String get statisticsError =>

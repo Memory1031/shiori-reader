@@ -197,7 +197,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Shiori'), findsOneWidget);
-      expect(find.text('本地存储发生问题，暂时无法完成操作。'), findsOneWidget);
+      expect(find.text('无法读写本地数据，操作未完成。'), findsOneWidget);
       await tester.tap(find.text('重试'));
       await tester.pump();
       store.requests.last.complete(

@@ -203,7 +203,7 @@ abstract class AppLocalizations {
   /// No description provided for @volumesDescription.
   ///
   /// In en, this message translates to:
-  /// **'Browse the source groups and choose a volume or chapter to read.'**
+  /// **'Choose a volume or chapter to start reading.'**
   String get volumesDescription;
 
   /// No description provided for @discoverTagline.
@@ -389,19 +389,19 @@ abstract class AppLocalizations {
   /// No description provided for @onlineRemoveMessage.
   ///
   /// In en, this message translates to:
-  /// **'Remove this book from the shelf and clear its cache and reading progress. Reading it again will start from the beginning.'**
+  /// **'Remove this book from your bookshelf and clear its cache, progress and bookmarks. Reading will restart from the beginning.'**
   String get onlineRemoveMessage;
 
   /// No description provided for @onlineBookRemoved.
   ///
   /// In en, this message translates to:
-  /// **'This book was removed from the shelf. Its cache and reading progress were cleared.'**
+  /// **'Book removed. Its cache, progress and bookmarks were cleared.'**
   String get onlineBookRemoved;
 
   /// No description provided for @bookDeleteAndRemove.
   ///
   /// In en, this message translates to:
-  /// **'Delete / remove'**
+  /// **'Remove'**
   String get bookDeleteAndRemove;
 
   /// No description provided for @detailActionsPending.
@@ -497,7 +497,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchDraftNotice.
   ///
   /// In en, this message translates to:
-  /// **'These are previous results. Submit your edited keyword to search again.'**
+  /// **'Your keywords have changed. Choose Search to update the results.'**
   String get searchDraftNotice;
 
   /// No description provided for @searchResultsFor.
@@ -641,7 +641,7 @@ abstract class AppLocalizations {
   /// No description provided for @databaseFailureMessage.
   ///
   /// In en, this message translates to:
-  /// **'A local storage problem prevented this operation.'**
+  /// **'Could not read or save local data. The operation did not finish.'**
   String get databaseFailureMessage;
 
   /// No description provided for @featurePending.
@@ -677,7 +677,7 @@ abstract class AppLocalizations {
   /// No description provided for @parseFailureMessage.
   ///
   /// In en, this message translates to:
-  /// **'The content format may have changed and cannot be read right now.'**
+  /// **'Could not read the content returned by the source.'**
   String get parseFailureMessage;
 
   /// No description provided for @rateLimitedMessage.
@@ -719,7 +719,7 @@ abstract class AppLocalizations {
   /// No description provided for @sessionFailureMessage.
   ///
   /// In en, this message translates to:
-  /// **'The access session is unavailable. Try again later.'**
+  /// **'Could not access the source. Try again later.'**
   String get sessionFailureMessage;
 
   /// No description provided for @sourceUnavailableMessage.
@@ -743,7 +743,7 @@ abstract class AppLocalizations {
   /// No description provided for @unrecognizedSourceResponseMessage.
   ///
   /// In en, this message translates to:
-  /// **'The source could not complete this request. The cause is unknown.'**
+  /// **'The source could not complete this request.'**
   String get unrecognizedSourceResponseMessage;
 
   /// No description provided for @readerSettings.
@@ -773,7 +773,7 @@ abstract class AppLocalizations {
   /// No description provided for @readerHorizontalPadding.
   ///
   /// In en, this message translates to:
-  /// **'Horizontal padding'**
+  /// **'Side margins'**
   String get readerHorizontalPadding;
 
   /// No description provided for @readerThemeSystem.
@@ -815,7 +815,7 @@ abstract class AppLocalizations {
   /// No description provided for @readerProgressSavingPaused.
   ///
   /// In en, this message translates to:
-  /// **'Paused'**
+  /// **'Saving paused'**
   String get readerProgressSavingPaused;
 
   /// No description provided for @readerRetrySaveProgress.
@@ -1067,7 +1067,7 @@ abstract class AppLocalizations {
   /// No description provided for @readerRestoreReadFailed.
   ///
   /// In en, this message translates to:
-  /// **'Could not read saved progress. Saving is paused; tap to retry restoration.'**
+  /// **'Could not load saved progress. Saving is paused. Tap to retry.'**
   String get readerRestoreReadFailed;
 
   /// No description provided for @appAppearance.
@@ -1307,13 +1307,13 @@ abstract class AppLocalizations {
   /// No description provided for @cacheUsage.
   ///
   /// In en, this message translates to:
-  /// **'Text & metadata {text} MiB · Images {images} MiB'**
+  /// **'Text and book details {text} MiB · Images {images} MiB'**
   String cacheUsage(String text, String images);
 
   /// No description provided for @cacheOfflineHint.
   ///
   /// In en, this message translates to:
-  /// **'Chapters cached from online books, available for offline reading. Cached content may be cleared to free up space.'**
+  /// **'Read cached online chapters offline. Cached content may be cleared to free up space.'**
   String get cacheOfflineHint;
 
   /// No description provided for @cacheChapterStatus.
@@ -1367,7 +1367,7 @@ abstract class AppLocalizations {
   /// No description provided for @cacheEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No cached articles yet'**
+  /// **'No cached chapters yet'**
   String get cacheEmpty;
 
   /// No description provided for @cacheClearTitle.
@@ -1397,19 +1397,19 @@ abstract class AppLocalizations {
   /// No description provided for @cacheClearAllCount.
   ///
   /// In en, this message translates to:
-  /// **'The current cache list contains {books, plural, =0{0 books} =1{1 book} other{{books} books}} and {chapters, plural, =0{0 chapters} =1{1 chapter} other{{chapters} chapters}}.'**
+  /// **'{books, plural, =0{0 books} =1{1 book} other{{books} books}} and {chapters, plural, =0{0 chapters} =1{1 chapter} other{{chapters} chapters}} cached.'**
   String cacheClearAllCount(int books, int chapters);
 
   /// No description provided for @cacheClearAllExplanation.
   ///
   /// In en, this message translates to:
-  /// **'This clears the related online text, catalogs, book details and image cache. Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.'**
+  /// **'Clear cached chapters, contents, book details and images. Keep your bookshelf, progress and settings. Reopening cleared content may need an internet connection.'**
   String get cacheClearAllExplanation;
 
   /// No description provided for @cacheClearExplanation.
   ///
   /// In en, this message translates to:
-  /// **'Your bookshelf, progress and settings are kept. Cleared content may need a connection when reopened.'**
+  /// **'Keep your bookshelf, progress and settings. Reopening cleared content may need an internet connection.'**
   String get cacheClearExplanation;
 
   /// No description provided for @cacheClearBook.
@@ -1481,7 +1481,7 @@ abstract class AppLocalizations {
   /// No description provided for @prefetchRunning.
   ///
   /// In en, this message translates to:
-  /// **'Preparing images and next reading'**
+  /// **'Caching images and the next article'**
   String get prefetchRunning;
 
   /// No description provided for @prefetchPaused.
@@ -1493,19 +1493,19 @@ abstract class AppLocalizations {
   /// No description provided for @prefetchBudget.
   ///
   /// In en, this message translates to:
-  /// **'Batch limit reached. Continue manually.'**
+  /// **'Cache limit reached. Continue to save more content.'**
   String get prefetchBudget;
 
   /// No description provided for @prefetchPartial.
   ///
   /// In en, this message translates to:
-  /// **'Some resources could not be saved. You can retry.'**
+  /// **'Some content could not be cached. Retry to save it.'**
   String get prefetchPartial;
 
   /// No description provided for @prefetchComplete.
   ///
   /// In en, this message translates to:
-  /// **'Batch finished. Check saved content for offline availability.'**
+  /// **'Caching finished. View saved chapters in Offline content.'**
   String get prefetchComplete;
 
   /// No description provided for @prefetchSaveFailed.
@@ -1571,7 +1571,7 @@ abstract class AppLocalizations {
   /// No description provided for @importSuccess.
   ///
   /// In en, this message translates to:
-  /// **'The book has been saved.'**
+  /// **'Book imported.'**
   String get importSuccess;
 
   /// No description provided for @importHint.
@@ -1715,7 +1715,7 @@ abstract class AppLocalizations {
   /// No description provided for @importBatchComplete.
   ///
   /// In en, this message translates to:
-  /// **'Import processing complete'**
+  /// **'Import finished'**
   String get importBatchComplete;
 
   /// No description provided for @importBatchCreated.
@@ -1775,7 +1775,7 @@ abstract class AppLocalizations {
   /// No description provided for @importBusy.
   ///
   /// In en, this message translates to:
-  /// **'The inbox is processing other files. Try again shortly, or check the files already waiting to be imported.'**
+  /// **'Receiving other files. Try again shortly, or review pending imports.'**
   String get importBusy;
 
   /// No description provided for @importUnsupported.
@@ -1793,7 +1793,7 @@ abstract class AppLocalizations {
   /// No description provided for @importParserUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'This version cannot parse this format yet. Nothing was imported. You can cancel and choose the file again later.'**
+  /// **'This version cannot read this format. The file was not imported.'**
   String get importParserUnavailable;
 
   /// No description provided for @importStorage.
@@ -1829,7 +1829,7 @@ abstract class AppLocalizations {
   /// No description provided for @importEncodingInvalid.
   ///
   /// In en, this message translates to:
-  /// **'The entire file could not be decoded with this encoding. Choose another encoding or check the original.'**
+  /// **'Could not read the entire file using this encoding. Choose another encoding or check the original file.'**
   String get importEncodingInvalid;
 
   /// No description provided for @importDrm.
@@ -1853,7 +1853,7 @@ abstract class AppLocalizations {
   /// No description provided for @importParseStructureLimit.
   ///
   /// In en, this message translates to:
-  /// **'This TXT has too many paragraphs or chapters to process. Split it into volumes and import them separately.'**
+  /// **'This TXT has too many paragraphs or chapters. Split it into volumes before importing.'**
   String get importParseStructureLimit;
 
   /// No description provided for @importParseTimeout.
@@ -1895,7 +1895,7 @@ abstract class AppLocalizations {
   /// No description provided for @localBooksHint.
   ///
   /// In en, this message translates to:
-  /// **'Manage imported books. Removing a local book deletes its in-app files and reading progress. The original external file is unaffected.'**
+  /// **'Manage your imported EPUB and TXT books.'**
   String get localBooksHint;
 
   /// No description provided for @localBooksEmpty.
@@ -1913,7 +1913,7 @@ abstract class AppLocalizations {
   /// No description provided for @localDeleteMessage.
   ///
   /// In en, this message translates to:
-  /// **'Delete the app-owned original, text, images, shelf entry, and reading progress for “{title}”. The external original is unaffected. This cannot be undone.'**
+  /// **'Permanently delete the imported copy, progress and bookmarks for “{title}”. Keep the original file.'**
   String localDeleteMessage(String title);
 
   /// No description provided for @localDeleteConfirm.
@@ -2027,7 +2027,7 @@ abstract class AppLocalizations {
   /// No description provided for @localReparseConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Reparse the saved original and restore your reading position where possible. Failure or cancellation keeps the previous content.'**
+  /// **'Reparse the saved original, keeping your reading position where possible. Keep the previous content if this fails or is cancelled.'**
   String get localReparseConfirm;
 
   /// No description provided for @localReparseDone.
@@ -2093,13 +2093,13 @@ abstract class AppLocalizations {
   /// No description provided for @readerLinkUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'Link unavailable. Only valid documents and anchors within this book can be opened.'**
+  /// **'Cannot open this link. Only links to documents or positions within this book are supported.'**
   String get readerLinkUnavailable;
 
   /// No description provided for @readerLinkDepth.
   ///
   /// In en, this message translates to:
-  /// **'Link depth limit reached. Return before opening another link.'**
+  /// **'Too many book links are open. Return to the previous location first.'**
   String get readerLinkDepth;
 
   /// No description provided for @readerMarginVeryNarrow.
@@ -2237,13 +2237,13 @@ abstract class AppLocalizations {
   /// No description provided for @updateDevelopment.
   ///
   /// In en, this message translates to:
-  /// **'Development builds do not connect to the production update source.'**
+  /// **'Development builds do not check for release updates.'**
   String get updateDevelopment;
 
   /// No description provided for @updateUnsupported.
   ///
   /// In en, this message translates to:
-  /// **'Get updates through the App Store or TestFlight.'**
+  /// **'Update using your original installation method. For a self-signed IPA, sign and install the new version.'**
   String get updateUnsupported;
 
   /// No description provided for @updateInvalidIdentity.
@@ -2261,7 +2261,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateAutomaticHint.
   ///
   /// In en, this message translates to:
-  /// **'You confirm before an update is downloaded.'**
+  /// **'You choose when to download and install updates.'**
   String get updateAutomaticHint;
 
   /// No description provided for @updateChannel.
@@ -2333,7 +2333,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateIncomplete.
   ///
   /// In en, this message translates to:
-  /// **'Release information is incomplete. Try checking again later.'**
+  /// **'Release files are incomplete. Check again later.'**
   String get updateIncomplete;
 
   /// No description provided for @updateVerificationError.
@@ -2429,7 +2429,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateInstallHint.
   ///
   /// In en, this message translates to:
-  /// **'The package is verified. Installing will close the app; your library, reading position and settings will be kept.'**
+  /// **'Shiori will close to install the update. Your bookshelf, reading position and settings will be kept.'**
   String get updateInstallHint;
 
   /// No description provided for @updateInstallPermission.
@@ -2483,7 +2483,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateInstallHintWindows.
   ///
   /// In en, this message translates to:
-  /// **'The package is verified. Shiori will close, replace its program files and start again; your library, reading position and settings will be kept.'**
+  /// **'Shiori will close, update its program files and restart. Your bookshelf, reading position and settings will be kept.'**
   String get updateInstallHintWindows;
 
   /// No description provided for @updateRestarting.
@@ -2495,7 +2495,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateInstallFailedWindows.
   ///
   /// In en, this message translates to:
-  /// **'The update could not be completed. Retry, or download the full Windows ZIP from the release page and extract it again. Your library and reading data are stored separately and are not affected.'**
+  /// **'Update did not finish. Retry, or download the full package from the release page: run the EXE for an installed edition, or extract the ZIP for a portable edition. Reading data is stored separately.'**
   String get updateInstallFailedWindows;
 
   /// No description provided for @updateInstallInstances.
@@ -2507,7 +2507,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateInstallLocation.
   ///
   /// In en, this message translates to:
-  /// **'Shiori cannot update itself in this folder. Extract the full Windows ZIP to a writable folder on a local drive, or update manually from the release page.'**
+  /// **'Cannot update in this folder. For the installed edition, reinstall from the release page. For the portable edition, extract the full ZIP to a writable folder on a local drive.'**
   String get updateInstallLocation;
 
   /// No description provided for @updateWorkspaceConflict.
@@ -2525,7 +2525,7 @@ abstract class AppLocalizations {
   /// No description provided for @updateReturnToLibrary.
   ///
   /// In en, this message translates to:
-  /// **'Return to the library and finish any import, then open App updates from the menu.'**
+  /// **'Return to your bookshelf and finish importing, then open About & updates.'**
   String get updateReturnToLibrary;
 
   /// No description provided for @updateSection.
@@ -2765,7 +2765,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookReparseSelectedConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Regenerate parsing data for {count} selected local books. The original data is kept if parsing fails.{excluded, plural, =0{} other{\n{excluded} other selected books will be excluded.}}'**
+  /// **'Reparse {count} selected local books. Keep the previous content if parsing fails.{excluded, plural, =0{} other{\n{excluded} other selected books will be skipped.}}'**
   String bookReparseSelectedConfirm(int count, int excluded);
 
   /// No description provided for @bookBatchRemoveTitle.
@@ -2789,19 +2789,19 @@ abstract class AppLocalizations {
   /// No description provided for @bookBatchRemoveConfirm.
   ///
   /// In en, this message translates to:
-  /// **'Process these {count} selected books?'**
+  /// **'Remove these {count} selected books?'**
   String bookBatchRemoveConfirm(int count);
 
   /// No description provided for @bookBatchOnline.
   ///
   /// In en, this message translates to:
-  /// **'{count} online books: remove them from the shelf and clear their cache and reading progress. Reading them again will start from the beginning.'**
+  /// **'{count} online books: remove from bookshelf and clear cache, progress and bookmarks. Read again from the beginning.'**
   String bookBatchOnline(int count);
 
   /// No description provided for @bookBatchLocal.
   ///
   /// In en, this message translates to:
-  /// **'{count} local books: permanently delete app-owned book data and reading progress. External original files are kept. This cannot be undone.'**
+  /// **'{count} local books: permanently delete imported copies, progress and bookmarks. Keep original files.'**
   String bookBatchLocal(int count);
 
   /// No description provided for @bookBatchProgress.
@@ -2885,7 +2885,7 @@ abstract class AppLocalizations {
   /// No description provided for @localAutoReparseApproximate.
   ///
   /// In en, this message translates to:
-  /// **'Skipped: reading position cannot migrate precisely'**
+  /// **'Skipped: could not preserve the exact reading position'**
   String get localAutoReparseApproximate;
 
   /// No description provided for @localAutoReparseEncoding.
@@ -2939,7 +2939,7 @@ abstract class AppLocalizations {
   /// No description provided for @readerSearchHint.
   ///
   /// In en, this message translates to:
-  /// **'Enter a word or phrase'**
+  /// **'Enter a word or phrase, then search'**
   String get readerSearchHint;
 
   /// No description provided for @readerSearchSubmit.
@@ -2957,7 +2957,7 @@ abstract class AppLocalizations {
   /// No description provided for @readerSearchPaused.
   ///
   /// In en, this message translates to:
-  /// **'Search paused. Available results are preserved.'**
+  /// **'Search paused. You can still view the matches found.'**
   String get readerSearchPaused;
 
   /// No description provided for @readerSearchTooLong.
@@ -3047,7 +3047,7 @@ abstract class AppLocalizations {
   /// No description provided for @readerSearchDocument.
   ///
   /// In en, this message translates to:
-  /// **'Opened the document. Exact text positioning and highlighting are unavailable on this page.'**
+  /// **'Opened the document containing the match. This page does not support exact positioning or highlighting.'**
   String get readerSearchDocument;
 
   /// No description provided for @readerSearchClear.
@@ -3101,13 +3101,13 @@ abstract class AppLocalizations {
   /// No description provided for @bookmarkPositionUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'The original position has changed and cannot be located reliably. The bookmark is kept.'**
+  /// **'Cannot locate the saved position after the content changed. Your bookmark is kept.'**
   String get bookmarkPositionUnavailable;
 
   /// No description provided for @bookmarkUnsupported.
   ///
   /// In en, this message translates to:
-  /// **'A reliable position bookmark is unavailable on this page.'**
+  /// **'Bookmarks are not supported on this page.'**
   String get bookmarkUnsupported;
 
   /// No description provided for @bookmarkLoadFailed.
@@ -3137,7 +3137,7 @@ abstract class AppLocalizations {
   /// No description provided for @readerBookmarkReturn.
   ///
   /// In en, this message translates to:
-  /// **'Back to before bookmark navigation'**
+  /// **'Back to previous reading position'**
   String get readerBookmarkReturn;
 
   /// No description provided for @statisticsTitle.
@@ -3245,7 +3245,7 @@ abstract class AppLocalizations {
   /// No description provided for @statisticsEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No reading recorded today. Your time will appear here after you start reading.'**
+  /// **'Start reading to see today’s reading time here.'**
   String get statisticsEmpty;
 
   /// No description provided for @statisticsPeriodEmpty.
@@ -3305,7 +3305,7 @@ abstract class AppLocalizations {
   /// No description provided for @statisticsClearEnabled.
   ///
   /// In en, this message translates to:
-  /// **'Reading after clearing will still be recorded.'**
+  /// **'New reading time will continue to be recorded.'**
   String get statisticsClearEnabled;
 
   /// No description provided for @statisticsError.

@@ -81,7 +81,13 @@ SettingsStore.load/save 使用 ReaderSettings；取消前提交规则同上。�
 
 `AppUpdateRepository` 由应用根拥有，页面借用同一个 `UpdateController`。更新检查与小说 Source 的网络服务独立；领域候选只暴露发布身份、大小、纯文本说明和发布页，不暴露缓存文件路径。候选须通过内置公钥验签及平台资产校验；下载完成核对大小与摘要，重启恢复时重新验签并核对文件。
 
-`UpdateChannel` 表示 Stable / Beta 版本筛选；`InstalledUpdateApp.installation` 描述安装形态与分发渠道，无法确认时保留 unknown。macOS 安装形态为 `.app`，DMG 是更新包格式。direct 包含通过 AltStore 或其他用户自选签名工具安装的 iOS IPA，签名工具不单列渠道。`UpdateCapabilities` 以更新方式和可选外部入口描述检测、下载、安装能力，可表达 iOS 仅检测新版、由用户通过原签名方式更新。更新是否启用仍使用 `UpdateAvailability`，安装位置及权限由现有安装器检查。
+更新模型分别描述版本筛选、分发来源和安装方式：
+
+- `UpdateChannel`：Stable / Beta，决定可选择的版本。
+- `InstalledUpdateApp.installation`：安装形态与分发渠道，无法确认时使用 unknown。macOS 的安装形态为 `.app`，更新包为 DMG。iOS 经 AltStore 或其他自选工具签名安装的 IPA 均归入 direct。
+- `UpdateCapabilities`：更新方式和可选外部入口，可描述仅检测新版、由用户通过原签名方式更新等能力组合。
+
+当前更新是否启用由 `UpdateAvailability` 决定，iOS 尚未启用应用内检查。安装位置和权限由安装器检查。
 
 检查与下载共用互斥操作状态，取消等待 I/O 结束后完成；根关闭时先取消并等待操作，再关闭更新网络。检查预算内找到有效升级时，返回已验证的最高构建号候选；未穷尽历史且没有有效候选时报告检查不完整。渠道及自动检查偏好独立持久化；自动检查按当前渠道上次尝试间隔 24 小时，切换渠道使检查结果和尝试时间失效，服务端限流等待仍然保留。正式包核对原生版本与包内身份后启用更新，开发构建不访问正式更新源。
 

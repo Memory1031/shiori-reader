@@ -1,6 +1,6 @@
 # AltStore 侧载
 
-Shiori 提供 AltStore Classic 订阅源，使用 GitHub Release 的未签名 IPA，由 AltStore 完成重签和安装。适用于 iOS / iPadOS 15.0+。
+在 AltStore Classic 中添加 Shiori 订阅源，即可安装和更新本项目发布的 IPA。AltStore 负责签名与安装，支持 iOS / iPadOS 15.0+。
 
 ## 添加源
 
@@ -11,15 +11,15 @@ Shiori 提供 AltStore Classic 订阅源，使用 GitHub Release 的未签名 IP
 | 正式版 | [添加正式版源](https://altstore.io/source/raw.githubusercontent.com/Memory1031/shiori-reader/develop/alt_store.json) | [alt_store.json](https://raw.githubusercontent.com/Memory1031/shiori-reader/develop/alt_store.json) |
 | Beta | [添加 Beta 源](https://altstore.io/source/raw.githubusercontent.com/Memory1031/shiori-reader/develop/alt_store_beta.json) | [alt_store_beta.json](https://raw.githubusercontent.com/Memory1031/shiori-reader/develop/alt_store_beta.json) |
 
-正式版源只提供正式版，Beta 源同时提供正式版与测试版，按内部构建号从新到旧排列；两者使用相同的应用 ID，请选择其中一个。源收录已完整发布并通过校验的 IPA。添加源后，在 AltStore 中选择 Shiori 安装。
+正式版源只收录正式版；Beta 源同时收录正式版和测试版。两个源使用相同的应用 ID，选择一个即可。添加后，在 AltStore 中选择 Shiori 安装。
 
 ## 更新与续签
 
 新版本完整发布后，源会自动更新，AltStore 检测到新版时会提示更新。请通过 AltStore 执行覆盖更新，保持原有账号和应用身份；从 Beta 切回正式版时应等待构建号更高的正式版本。
 
-免费账号的应用通常需要每七天续签；AltStore 会尝试后台刷新签名，常规配置需能连接运行中的 AltServer。续签不等于安装新版，订阅源不保证后台自动升级。具体条件见 [AltStore 使用说明](https://faq.altstore.io/altstore-classic/your-altstore)。
+免费账号的应用通常每七天需要续签。AltStore 会尝试在后台刷新签名，常规配置需能连接运行中的 AltServer。安装新版需另行执行更新操作，具体条件见 [AltStore 使用说明](https://faq.altstore.io/altstore-classic/your-altstore)。
 
-应用内选择 EPUB / TXT 或系统直接打开文件的导入方式不依赖 App Group；系统分享扩展需要主应用和扩展获得匹配的 App Group 授权。AltStore 重签后的分享与升级数据保留仍需真机验证。更改 Bundle ID、卸载或更换签名方式可能影响原有数据，请先保全。完整权限边界见[未签名 IPA 说明](release/README.md#ios-未签名-ipa)。
+应用内选择 EPUB / TXT 或通过系统直接打开文件均可导入。使用系统分享扩展时，主应用和扩展还需获得匹配的 App Group 授权；是否可用取决于实际签名配置。更改 Bundle ID、卸载或更换签名方式前请先备份数据。配置要求见[未签名 IPA 说明](release/README.md#ios-未签名-ipa)。
 
 ## 发布维护
 

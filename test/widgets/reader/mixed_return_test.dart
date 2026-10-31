@@ -365,9 +365,9 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byType(PopupMenuButton<ReaderCommand>));
       await t.pumpAndSettle();
-      expect(find.text('Back to before bookmark navigation'), findsOneWidget);
+      expect(find.text('Back to previous reading position'), findsOneWidget);
       await f.snapshot(t, r, 'bookmark-return-menu-phone-en-large');
-      await t.tap(find.text('Back to before bookmark navigation'));
+      await t.tap(find.text('Back to previous reading position'));
       await t.pumpAndSettle();
       expect(r.view(t).content.key, r.key('a'));
       expect(r.view(t).actions.previousLocation, isNull);
@@ -567,7 +567,7 @@ void main() {
       await m.lookup(t, 'd');
       expect(
         r.view(t).actions.previousLocationLabel,
-        'Back to before bookmark navigation',
+        'Back to previous reading position',
       );
       final stored = await t.runAsync(
         () => m.bookmarks.snapshot(r.book.detail.summary.key),

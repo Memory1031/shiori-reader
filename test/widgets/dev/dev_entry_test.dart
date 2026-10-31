@@ -123,9 +123,7 @@ void main() {
         await tester.tap(more);
         await tester.pumpAndSettle();
         expect(
-          find.text(
-            'The content format may have changed and cannot be read right now.',
-          ),
+          find.text('Could not read the content returned by the source.'),
           findsOneWidget,
         );
       }
