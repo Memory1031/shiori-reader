@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/features/updates/release_notes_preview.dart';
+import 'package:shiori/l10n/generated/app_localizations.dart';
 
 void main() {
   Future<void> mount(
@@ -13,14 +14,21 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData(brightness: brightness),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('en'),
         home: Scaffold(
           body: MediaQuery(
             data: MediaQueryData(textScaler: TextScaler.linear(scale)),
-            child: Center(
-              child: SizedBox(
-                width: 280,
-                child: ReleaseNotesPreview(notes: notes),
-              ),
+            child: ListView(
+              children: [
+                Center(
+                  child: SizedBox(
+                    width: 280,
+                    child: ReleaseNotesPreview(notes: notes),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -119,17 +127,54 @@ ${List.generate(80, (i) => '- Change $i').join('\n')}
           scale: 1.5,
         );
         expect(
-          tester.getSize(find.byType(ReleaseNotesPreview)).height,
+          tester.getSize(find.byType(ClipRect).last).height,
           lessThanOrEqualTo(330),
         );
         expect(tester.takeException(), isNull);
+        expect(find.text('Read full notes'), findsOneWidget);
         await mount(tester, 'Short note', brightness: brightness);
         expect(
           tester.getSize(find.byType(ReleaseNotesPreview)).height,
           lessThan(60),
         );
         expect(tester.takeException(), isNull);
+        expect(find.byKey(const ValueKey('update-notes-toggle')), findsNothing);
       },
     );
   }
+
+  testWidgets('expands in the page and collapses back to its preview', (
+    tester,
+  ) async {
+    final notes =
+        '${List.generate(30, (i) => '- Change $i').join('\n')}\n\nLast change';
+    await mount(tester, notes);
+    final preview = find.byType(ReleaseNotesPreview);
+    final toggle = find.byKey(const ValueKey('update-notes-toggle'));
+    final collapsedHeight = tester.getSize(preview).height;
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(preview).height, greaterThan(collapsedHeight));
+    expect(find.text('Collapse notes'), findsOneWidget);
+    expect(find.byType(Scrollable), findsOneWidget);
+    final last = find.text('Last change', findRichText: true);
+    await tester.ensureVisible(last);
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(last).dy, greaterThanOrEqualTo(0));
+    expect(tester.getBottomRight(last).dy, lessThanOrEqualTo(600));
+    await tester.ensureVisible(toggle);
+    await tester.pumpAndSettle();
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect(tester.getSize(preview).height, collapsedHeight);
+    expect(toggle.hitTestable(), findsOneWidget);
+    expect(tester.getTopLeft(preview).dy, greaterThanOrEqualTo(0));
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    await mount(tester, '$notes\n\nA different release');
+    expect(find.text('Read full notes'), findsOneWidget);
+    expect(tester.getSize(preview).height, collapsedHeight);
+  });
 }

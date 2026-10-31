@@ -1246,7 +1246,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateDownloaded => '下载完成，已通过校验。可前往发布页查看安装说明。';
 
   @override
-  String get updateReleasePage => '查看完整发布说明';
+  String get updateExpandNotes => '展开全文';
+
+  @override
+  String get updateCollapseNotes => '收起';
 
   @override
   String get updateLinkCopied => '无法打开浏览器，链接已复制。';

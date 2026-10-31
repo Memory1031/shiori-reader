@@ -1383,7 +1383,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Download verified. Visit the release page for installation instructions.';
 
   @override
-  String get updateReleasePage => 'View full release notes';
+  String get updateExpandNotes => 'Read full notes';
+
+  @override
+  String get updateCollapseNotes => 'Collapse notes';
 
   @override
   String get updateLinkCopied => 'Could not open the browser. Link copied.';

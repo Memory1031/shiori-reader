@@ -47,7 +47,7 @@ void main() {
         expect(find.text(h.l.updateProgress(100)), findsOneWidget);
         final releasePage = find.widgetWithText(
           TextButton,
-          h.l.updateReleasePage,
+          h.l.updateOpenReleasePage,
         );
         await h.show(releasePage);
         final before = tester.getTopLeft(releasePage);

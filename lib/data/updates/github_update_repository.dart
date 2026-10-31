@@ -145,7 +145,7 @@ final class GithubUpdateRepository implements AppUpdateRepository {
   ) => UpdateCandidate(
     release: identity,
     bytes: bytes,
-    notes: notes.length > 10000 ? notes.substring(0, 10000) : notes,
+    notes: notes,
     page: releasePage(identity.tag),
   );
 

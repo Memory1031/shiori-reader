@@ -484,7 +484,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
               const SizedBox(height: ShioriSpace.item),
               ReleaseNotesPreview(
                 notes: target.notes,
-                key: const ValueKey('update-notes'),
+                key: ValueKey(target.release),
               ),
             ],
             const SizedBox(height: ShioriSpace.page),
@@ -609,7 +609,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
               const SizedBox(height: ShioriSpace.small),
               TextButton(
                 onPressed: () => _openPage(context, target.page),
-                child: Text(l.updateReleasePage),
+                child: Text(l.updateOpenReleasePage),
               ),
             ],
           ],

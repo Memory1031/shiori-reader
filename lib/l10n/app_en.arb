@@ -658,7 +658,8 @@
   "updateDownload": "Download update",
   "updateVerifying": "Verifying update package…",
   "updateDownloaded": "Download verified. Visit the release page for installation instructions.",
-  "updateReleasePage": "View full release notes",
+  "updateExpandNotes": "Read full notes",
+  "updateCollapseNotes": "Collapse notes",
   "updateLinkCopied": "Could not open the browser. Link copied.",
   "updateAvailable": "Update available: {version}",
   "@updateAvailable": {

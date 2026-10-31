@@ -2420,11 +2420,17 @@ abstract class AppLocalizations {
   /// **'Download verified. Visit the release page for installation instructions.'**
   String get updateDownloaded;
 
-  /// No description provided for @updateReleasePage.
+  /// No description provided for @updateExpandNotes.
   ///
   /// In en, this message translates to:
-  /// **'View full release notes'**
-  String get updateReleasePage;
+  /// **'Read full notes'**
+  String get updateExpandNotes;
+
+  /// No description provided for @updateCollapseNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse notes'**
+  String get updateCollapseNotes;
 
   /// No description provided for @updateLinkCopied.
   ///

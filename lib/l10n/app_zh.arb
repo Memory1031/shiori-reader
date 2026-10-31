@@ -658,7 +658,8 @@
   "updateDownload": "下载更新",
   "updateVerifying": "正在校验更新包…",
   "updateDownloaded": "下载完成，已通过校验。可前往发布页查看安装说明。",
-  "updateReleasePage": "查看完整发布说明",
+  "updateExpandNotes": "展开全文",
+  "updateCollapseNotes": "收起",
   "updateLinkCopied": "无法打开浏览器，链接已复制。",
   "updateAvailable": "发现新版本 {version}",
   "@updateAvailable": {

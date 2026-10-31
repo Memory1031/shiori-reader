@@ -323,6 +323,23 @@ void main() {
     },
   );
 
+  test(
+    'full release notes survive checking and download restoration',
+    () async {
+      final notes = '${'Long release notes.\n' * 700}\nLast section';
+      http.releases.first['body'] = notes;
+      final candidate = (await repo.check(UpdateChannel.beta, token()))!;
+      expect(candidate.notes, notes);
+      await repo.download(candidate, token(), (_) {});
+      final reopened = repository();
+      expect(
+        (await reopened.restore(UpdateChannel.beta, token()))!.notes,
+        notes,
+      );
+      await reopened.close();
+    },
+  );
+
   for (final platform in [
     'windows-x64-portable',
     'windows-x64-setup',
