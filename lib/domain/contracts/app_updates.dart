@@ -1,6 +1,10 @@
 import '../models/release_identity.dart';
+import '../models/app_distribution.dart';
 import '../models/value_model.dart';
 import 'cancellation.dart';
+
+export '../models/app_distribution.dart';
+export '../models/update_capabilities.dart';
 
 enum UpdateAvailability { enabled, development, unsupported, invalidIdentity }
 
@@ -40,13 +44,22 @@ final class InstalledUpdateApp extends ValueModel {
     required this.build,
     required this.availability,
     this.release,
+    this.installation = const AppInstallation(),
   });
   final String version;
   final int build;
   final UpdateAvailability availability;
   final ReleaseIdentity? release;
+  final AppInstallation installation;
+
   @override
-  List<Object?> get values => [version, build, availability, release];
+  List<Object?> get values => [
+    version,
+    build,
+    availability,
+    release,
+    installation,
+  ];
 }
 
 final class UpdateCandidate extends ValueModel {

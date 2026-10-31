@@ -31,7 +31,7 @@ final class GithubUpdateRepository implements AppUpdateRepository {
   });
   @override
   final InstalledUpdateApp installed;
-  final String platform;
+  final String? platform;
   final UpdatePublicKey? key;
   final UpdateHttp http;
   final UpdateStorage storage;

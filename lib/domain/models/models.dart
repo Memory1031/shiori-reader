@@ -5,4 +5,6 @@ export 'reader.dart';
 export 'app_settings.dart';
 export 'book_progress.dart';
 export 'release_identity.dart';
+export 'app_distribution.dart';
+export 'update_capabilities.dart';
 export 'user_bookmark.dart';

@@ -8,6 +8,7 @@ import '../data/updates/github_update_repository.dart';
 import '../data/updates/update_http.dart';
 import '../data/updates/update_manifest.dart';
 import '../data/updates/update_storage.dart';
+import '../data/updates/update_target.dart';
 import '../data/updates/update_installer.dart';
 import '../data/updates/windows_update_installer.dart';
 import '../data/updates/macos_update_installer.dart';
@@ -23,7 +24,13 @@ Future<UpdateController> createUpdateController(
 }) async {
   var version = '—';
   var build = 0;
-  var windowsMode = 'portable';
+  var kind = Platform.isAndroid
+      ? AppInstallationKind.androidApk
+      : Platform.isMacOS
+      ? AppInstallationKind.macosApp
+      : Platform.isIOS
+      ? AppInstallationKind.iosApp
+      : AppInstallationKind.unknown;
   BundledRelease? bundled;
   var availability = UpdateAvailability.invalidIdentity;
   try {
@@ -31,10 +38,7 @@ Future<UpdateController> createUpdateController(
     version = info!['version'] as String;
     build = info['build'] as int;
     if (Platform.isWindows) {
-      windowsMode = info['installationMode'] as String;
-      if (windowsMode != 'portable' && windowsMode != 'setup') {
-        throw const FormatException('Invalid Windows installation identity');
-      }
+      kind = windowsInstallationKind(info['installationMode'] as String);
     }
     if (Platform.isAndroid || Platform.isWindows || Platform.isMacOS) {
       bundled = BundledRelease.fromJson(
@@ -64,12 +68,14 @@ Future<UpdateController> createUpdateController(
         build: build,
         availability: availability,
         release: bundled?.identity,
+        installation: AppInstallation(
+          kind: kind,
+          distribution: availability == UpdateAvailability.enabled
+              ? DistributionChannel.direct
+              : DistributionChannel.unknown,
+        ),
       ),
-      platform: Platform.isMacOS
-          ? 'macos-universal'
-          : Platform.isWindows
-          ? 'windows-x64-$windowsMode'
-          : 'android',
+      platform: updateAssetPlatform(kind),
       installer: Platform.isAndroid
           ? const AndroidUpdateInstaller()
           : Platform.isWindows
