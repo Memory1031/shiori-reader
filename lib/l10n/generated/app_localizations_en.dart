@@ -1287,6 +1287,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'You choose when to download and install updates.';
 
   @override
+  String get updateCheckOnlyAutomaticHint =>
+      'Notify me when a new release is available.';
+
+  @override
+  String get updateManualInstallHint =>
+      'Install the new version using your original signing method, such as AltStore or another signing tool.';
+
+  @override
+  String get updateOpenReleasePage => 'Open release page';
+
+  @override
+  String get updateTestFlightHint =>
+      'This version updates through TestFlight. Check TestFlight for available builds.';
+
+  @override
   String get updateChannel => 'Update channel';
 
   @override

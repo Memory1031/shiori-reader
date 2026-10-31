@@ -205,8 +205,12 @@ jobs:
           python3 tool/release_android.py version
           flutter pub get --enforce-lockfile
           git diff --exit-code -- pubspec.lock
+      - name: 写入 iOS 发布身份与更新公钥
+        env:
+          UPDATE_PUBLIC_KEY_JSON: ${{ vars.UPDATE_PUBLIC_KEY_JSON }}
+        run: python3 tool/update_manifest.py identity
       - name: 构建未签名 iOS 真机 Release
-        run: flutter build ios --release --no-codesign --no-pub --target lib/main.dart
+        run: flutter build ios --release --no-codesign --no-pub --target lib/main.dart --dart-define=SHIORI_DISTRIBUTION=direct
       - name: 校验并打包完整 IPA
         run: python3 tool/release_ios.py package
       - name: 保存未签名 iOS 产物

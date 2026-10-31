@@ -178,7 +178,11 @@ class _UpdateScreenState extends State<UpdateScreen> {
                       child: Text(
                         switch (c.installed.availability) {
                           UpdateAvailability.development => l.updateDevelopment,
-                          UpdateAvailability.unsupported => l.updateUnsupported,
+                          UpdateAvailability.unsupported =>
+                            c.installed.installation.distribution ==
+                                    DistributionChannel.testFlight
+                                ? l.updateTestFlightHint
+                                : l.updateUnsupported,
                           _ => l.updateInvalidIdentity,
                         },
                         style: theme.textTheme.bodyMedium?.copyWith(
@@ -192,7 +196,11 @@ class _UpdateScreenState extends State<UpdateScreen> {
                         horizontal: 12,
                       ),
                       title: Text(l.updateAutomatic),
-                      subtitle: Text(l.updateAutomaticHint),
+                      subtitle: Text(
+                        c.capabilities.canDownload
+                            ? l.updateAutomaticHint
+                            : l.updateCheckOnlyAutomaticHint,
+                      ),
                       value: c.preferences.automatic,
                       onChanged: c.busy || !c.initialized
                           ? null
@@ -462,12 +470,13 @@ class _UpdateScreenState extends State<UpdateScreen> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(target.release.tag, style: theme.textTheme.titleLarge),
-                  Text(
-                    '${(target.bytes / 1048576).toStringAsFixed(1)} MB',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                  if (c.capabilities.canDownload)
+                    Text(
+                      '${(target.bytes / 1048576).toStringAsFixed(1)} MB',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -479,119 +488,130 @@ class _UpdateScreenState extends State<UpdateScreen> {
               ),
             ],
             const SizedBox(height: ShioriSpace.page),
-            if (c.phase == UpdatePhase.downloading ||
-                c.phase == UpdatePhase.verifying) ...[
-              LinearProgressIndicator(
-                value: c.phase == UpdatePhase.verifying
-                    ? null
-                    : (c.received / target.bytes).clamp(0, 1),
-                semanticsLabel: c.phase == UpdatePhase.verifying
-                    ? l.updateVerifying
-                    : null,
+            if (!c.capabilities.canDownload) ...[
+              Text(l.updateManualInstallHint, style: theme.textTheme.bodySmall),
+              const SizedBox(height: ShioriSpace.medium),
+              FilledButton.icon(
+                key: const ValueKey('update-release-page'),
+                onPressed: () => _openPage(context, target.page),
+                icon: const Icon(Icons.open_in_new),
+                label: Text(l.updateOpenReleasePage),
               ),
-              const SizedBox(height: ShioriSpace.small),
-              Stack(
-                children: [
-                  Visibility(
-                    visible: c.phase == UpdatePhase.downloading,
-                    maintainSize: true,
-                    maintainAnimation: true,
-                    maintainState: true,
-                    child: Text(
-                      l.updateProgress(
-                        (c.received * 100 / target.bytes).floor(),
+            ] else ...[
+              if (c.phase == UpdatePhase.downloading ||
+                  c.phase == UpdatePhase.verifying) ...[
+                LinearProgressIndicator(
+                  value: c.phase == UpdatePhase.verifying
+                      ? null
+                      : (c.received / target.bytes).clamp(0, 1),
+                  semanticsLabel: c.phase == UpdatePhase.verifying
+                      ? l.updateVerifying
+                      : null,
+                ),
+                const SizedBox(height: ShioriSpace.small),
+                Stack(
+                  children: [
+                    Visibility(
+                      visible: c.phase == UpdatePhase.downloading,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
+                      child: Text(
+                        l.updateProgress(
+                          (c.received * 100 / target.bytes).floor(),
+                        ),
                       ),
                     ),
-                  ),
-                  Visibility(
-                    visible: c.phase == UpdatePhase.verifying,
-                    maintainSize: true,
-                    maintainAnimation: true,
-                    maintainState: true,
-                    child: Text(l.updateVerifying),
-                  ),
-                ],
-              ),
-            ] else if (c.installing)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 3),
-                    child: SizedBox.square(
-                      dimension: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                    Visibility(
+                      visible: c.phase == UpdatePhase.verifying,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
+                      child: Text(l.updateVerifying),
                     ),
-                  ),
-                  const SizedBox(width: ShioriSpace.medium),
-                  Expanded(
-                    child: Text(
-                      windows ? l.updateRestarting : l.updateInstalling,
+                  ],
+                ),
+              ] else if (c.installing)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 3),
+                      child: SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                     ),
-                  ),
-                ],
-              )
-            else if (c.phase == UpdatePhase.downloaded) ...[
-              Text(
-                !c.canInstall
-                    ? l.updateDownloaded
-                    : windows
-                    ? l.updateInstallHintWindows
-                    : l.updateInstallHint,
-                style: theme.textTheme.bodySmall,
-              ),
-              if (c.canInstall) ...[
-                const SizedBox(height: ShioriSpace.medium),
-                if (c.installState ==
-                    UpdateInstallState.permissionRequired) ...[
-                  Text(
-                    l.updateInstallPermission,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                    const SizedBox(width: ShioriSpace.medium),
+                    Expanded(
+                      child: Text(
+                        windows ? l.updateRestarting : l.updateInstalling,
+                      ),
+                    ),
+                  ],
+                )
+              else if (c.phase == UpdatePhase.downloaded) ...[
+                Text(
+                  !c.canInstall
+                      ? l.updateDownloaded
+                      : windows
+                      ? l.updateInstallHintWindows
+                      : l.updateInstallHint,
+                  style: theme.textTheme.bodySmall,
+                ),
+                if (c.canInstall) ...[
                   const SizedBox(height: ShioriSpace.medium),
-                  FilledButton(
-                    onPressed: c.busy ? null : c.openInstallSettings,
-                    child: Text(l.updateInstallSettings),
-                  ),
-                ] else ...[
-                  if (c.installState == UpdateInstallState.cancelled) ...[
-                    Text(l.updateInstallCancelled),
-                    const SizedBox(height: ShioriSpace.medium),
-                  ],
-                  if (c.installState == UpdateInstallState.failed) ...[
+                  if (c.installState ==
+                      UpdateInstallState.permissionRequired) ...[
                     Text(
-                      windows
-                          ? Theme.of(context).platform == TargetPlatform.macOS
-                                ? l.updateInstallFailedMacOS
-                                : l.updateInstallFailedWindows
-                          : l.updateInstallFailed,
+                      l.updateInstallPermission,
+                      style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(height: ShioriSpace.medium),
+                    FilledButton(
+                      onPressed: c.busy ? null : c.openInstallSettings,
+                      child: Text(l.updateInstallSettings),
+                    ),
+                  ] else ...[
+                    if (c.installState == UpdateInstallState.cancelled) ...[
+                      Text(l.updateInstallCancelled),
+                      const SizedBox(height: ShioriSpace.medium),
+                    ],
+                    if (c.installState == UpdateInstallState.failed) ...[
+                      Text(
+                        windows
+                            ? Theme.of(context).platform == TargetPlatform.macOS
+                                  ? l.updateInstallFailedMacOS
+                                  : l.updateInstallFailedWindows
+                            : l.updateInstallFailed,
+                      ),
+                      const SizedBox(height: ShioriSpace.medium),
+                    ],
+                    FilledButton.icon(
+                      key: const ValueKey('update-install'),
+                      onPressed: c.busy ? null : c.install,
+                      icon: Icon(
+                        windows ? Icons.restart_alt : Icons.system_update,
+                      ),
+                      label: Text(
+                        windows ? l.updateRestartInstall : l.updateInstall,
+                      ),
+                    ),
                   ],
-                  FilledButton.icon(
-                    key: const ValueKey('update-install'),
-                    onPressed: c.busy ? null : c.install,
-                    icon: Icon(
-                      windows ? Icons.restart_alt : Icons.system_update,
-                    ),
-                    label: Text(
-                      windows ? l.updateRestartInstall : l.updateInstall,
-                    ),
-                  ),
                 ],
-              ],
-            ] else
-              FilledButton.icon(
-                key: const ValueKey('update-download'),
-                onPressed: c.busy ? null : c.download,
-                icon: const Icon(Icons.download_outlined),
-                label: Text(l.updateDownload),
+              ] else
+                FilledButton.icon(
+                  key: const ValueKey('update-download'),
+                  onPressed: c.busy ? null : c.download,
+                  icon: const Icon(Icons.download_outlined),
+                  label: Text(l.updateDownload),
+                ),
+              const SizedBox(height: ShioriSpace.small),
+              TextButton(
+                onPressed: () => _openPage(context, target.page),
+                child: Text(l.updateReleasePage),
               ),
-            const SizedBox(height: ShioriSpace.small),
-            TextButton(
-              onPressed: () => _openPage(context, target.page),
-              child: Text(l.updateReleasePage),
-            ),
+            ],
           ],
         ),
       ),

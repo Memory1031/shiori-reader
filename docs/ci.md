@@ -72,7 +72,7 @@ APK 校验固定使用 runner 预装的 Build Tools **35.0.0**，发布构建前
 
 ## iOS 未签名 IPA
 
-`release.yml` 的 `ios-unsigned` job 使用 `macos-15`、明确选择 Xcode 26.3 和固定 Flutter；严格安装锁定依赖，校验 tag / pubspec 后，以 `lib/main.dart` 执行 `flutter build ios --release --no-codesign --no-pub`。不读取 Apple Secrets、不调用签名准备脚本，也不修改官方 Team、Bundle ID 或 ShareExtension 配置。
+`release.yml` 的 `ios-unsigned` job 使用 `macos-15`、明确选择 Xcode 26.3 和固定 Flutter；严格安装锁定依赖，校验 tag / pubspec 后，将发布身份和公开的 `UPDATE_PUBLIC_KEY_JSON` 写入 `assets/release/build-info.json`，以 `lib/main.dart` 执行未签名构建，并传入 `SHIORI_DISTRIBUTION=direct`。不读取 Apple Secrets、不调用签名准备脚本，也不修改官方 Team、Bundle ID 或 ShareExtension 配置。独立签名流程传入 `SHIORI_DISTRIBUTION=testFlight`，由 TestFlight 提供更新。
 
 `tool/release_ios.py package` 在临时副本中处理完整 Runner.app，清除实际代码签名与主应用 / 扩展残留的嵌入描述文件；保留 Framework、资源和 ShareExtension，拒绝其他签名材料、符号文件和异常路径。打包后与发布前均校验 arm64 真机 Mach-O、未加密及未签名状态、主应用 / 扩展身份和版本、嵌入依赖及 Flutter 必需资源。输出 IPA 与内部验证回执，由统一发布脚本验证摘要及身份后纳入附件白名单，沿用草稿上传、相同附件幂等补齐及禁止覆盖规则。
 

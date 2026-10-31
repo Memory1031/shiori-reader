@@ -206,6 +206,8 @@ void main() {
     'git diff --exit-code -- pubspec.lock',
     'release_android.py version',
     'flutter build ios --release --no-codesign --no-pub --target lib/main.dart',
+    'update_manifest.py identity',
+    '--dart-define=SHIORI_DISTRIBUTION=direct',
     'release_ios.py package',
   ]) {
     if (!unsignedCommands.contains(required)) {
@@ -214,11 +216,26 @@ void main() {
   }
   if (unsigned.toString().contains('secrets.') ||
       unsignedCommands.contains('ios_release_signing.py') ||
-      unsignedCommands.contains('update_manifest.py identity') ||
       unsignedCommands.contains('altool') ||
       unsignedCommands.contains('-exportArchive')) {
     throw StateError(
-      'Unsigned iOS must not use signing, private uploads or updater identity',
+      'Unsigned iOS must not use Apple signing or private uploads',
+    );
+  }
+  final iosIdentityIndex = unsignedSteps.indexWhere(
+    (step) =>
+        (step['run']?.toString() ?? '').contains('update_manifest.py identity'),
+  );
+  final iosBuildIndex = unsignedSteps.indexWhere(
+    (step) =>
+        (step['run']?.toString() ?? '').contains('flutter build ios --release'),
+  );
+  if (iosIdentityIndex < 0 ||
+      iosIdentityIndex >= iosBuildIndex ||
+      unsignedSteps[iosIdentityIndex]['env']?['UPDATE_PUBLIC_KEY_JSON'] !=
+          r'${{ vars.UPDATE_PUBLIC_KEY_JSON }}') {
+    throw StateError(
+      'Direct iOS must embed its release identity and public key before building',
     );
   }
   final unsignedUpload = unsignedSteps.last as YamlMap;
@@ -326,6 +343,15 @@ void main() {
     throw StateError('iOS release must contain only the release job');
   }
   final iosSteps = iosJobs['ios-release']['steps'] as YamlList;
+  if (!iosSteps.any(
+    (step) => (step['run']?.toString() ?? '').contains(
+      'flutter build ios --config-only --no-codesign --no-pub --dart-define=SHIORI_DISTRIBUTION=testFlight',
+    ),
+  )) {
+    throw StateError(
+      'TestFlight builds must retain their distribution channel',
+    );
+  }
   int iosIndex(String needle) => iosSteps.indexWhere(
     (step) => ((step as YamlMap)['run']?.toString() ?? '').contains(needle),
   );

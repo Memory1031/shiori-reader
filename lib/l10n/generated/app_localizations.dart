@@ -2264,6 +2264,30 @@ abstract class AppLocalizations {
   /// **'You choose when to download and install updates.'**
   String get updateAutomaticHint;
 
+  /// No description provided for @updateCheckOnlyAutomaticHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify me when a new release is available.'**
+  String get updateCheckOnlyAutomaticHint;
+
+  /// No description provided for @updateManualInstallHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the new version using your original signing method, such as AltStore or another signing tool.'**
+  String get updateManualInstallHint;
+
+  /// No description provided for @updateOpenReleasePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Open release page'**
+  String get updateOpenReleasePage;
+
+  /// No description provided for @updateTestFlightHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This version updates through TestFlight. Check TestFlight for available builds.'**
+  String get updateTestFlightHint;
+
   /// No description provided for @updateChannel.
   ///
   /// In en, this message translates to:

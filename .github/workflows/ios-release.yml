@@ -90,7 +90,7 @@ jobs:
       # （ASC 要求同一 versionName 下 CFBundleVersion 严格递增）。
       - name: 准备工程配置与 Pods
         run: |
-          flutter build ios --config-only --no-codesign --no-pub
+          flutter build ios --config-only --no-codesign --no-pub --dart-define=SHIORI_DISTRIBUTION=testFlight
           cd ios && pod install
 
       # 只在 runner 的工作副本中覆盖 Release 签名设置；两个 target 的 profile 各自匹配。

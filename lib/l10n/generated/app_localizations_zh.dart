@@ -1159,6 +1159,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateAutomaticHint => '下载和安装由你手动开始。';
 
   @override
+  String get updateCheckOnlyAutomaticHint => '发现新版本时提醒。';
+
+  @override
+  String get updateManualInstallHint => '请通过原来的签名方式安装新版，例如 AltStore 或其他自签工具。';
+
+  @override
+  String get updateOpenReleasePage => '前往发布页';
+
+  @override
+  String get updateTestFlightHint =>
+      '此版本通过 TestFlight 更新，请在 TestFlight 中查看可用版本。';
+
+  @override
   String get updateChannel => '更新渠道';
 
   @override

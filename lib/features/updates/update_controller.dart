@@ -24,6 +24,9 @@ class UpdateController extends ChangeNotifier {
   final Future<void> Function()? beforeInstall;
   final DateTime Function() _now;
   InstalledUpdateApp get installed => repository.installed;
+  UpdateCapabilities get capabilities => installed.capabilitiesFor(
+    supportsInstallation: repository.supportsInstallation,
+  );
   late UpdatePreferences preferences = UpdatePreferences(
     channel: installed.release?.channel ?? UpdateChannel.stable,
   );
@@ -41,7 +44,7 @@ class UpdateController extends ChangeNotifier {
   CancellationSource? _cancel;
   Future<void>? _pending;
   bool get busy => _pending != null || installing;
-  bool get enabled => installed.availability == UpdateAvailability.enabled;
+  bool get enabled => capabilities.canCheck;
 
   void _changed() {
     if (!_closed) notifyListeners();
@@ -231,7 +234,7 @@ class UpdateController extends ChangeNotifier {
   });
   Future<void> download() => _run((token) async {
     final target = candidate;
-    if (target == null || !enabled) return;
+    if (target == null || !capabilities.canDownload) return;
     phase = UpdatePhase.downloading;
     received = 0;
     _changed();

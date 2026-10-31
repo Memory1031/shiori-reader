@@ -1,5 +1,6 @@
 import '../models/release_identity.dart';
 import '../models/app_distribution.dart';
+import '../models/update_capabilities.dart';
 import '../models/value_model.dart';
 import 'cancellation.dart';
 
@@ -51,6 +52,25 @@ final class InstalledUpdateApp extends ValueModel {
   final UpdateAvailability availability;
   final ReleaseIdentity? release;
   final AppInstallation installation;
+
+  UpdateCapabilities capabilitiesFor({required bool supportsInstallation}) {
+    if (availability != UpdateAvailability.enabled) {
+      return const UpdateCapabilities(method: UpdateMethod.unavailable);
+    }
+    if (installation.kind == AppInstallationKind.iosApp) {
+      return installation.distribution == DistributionChannel.direct
+          ? const UpdateCapabilities(
+              method: UpdateMethod.checkOnly,
+              externalTarget: ExternalUpdateTarget.originalSource,
+            )
+          : const UpdateCapabilities(method: UpdateMethod.unavailable);
+    }
+    return UpdateCapabilities(
+      method: supportsInstallation
+          ? UpdateMethod.inApp
+          : UpdateMethod.downloadOnly,
+    );
+  }
 
   @override
   List<Object?> get values => [

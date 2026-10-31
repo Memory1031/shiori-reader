@@ -31,7 +31,7 @@ Shiori 是一款以本地阅读为核心的开源轻小说阅读器。导入 EPU
 - **Android**：打开 APK，按系统提示安装。覆盖安装需要相同签名，从 Debug 包切换到正式签名包前，请先备份数据。
 - **Windows**：推荐使用 EXE 安装版，支持当前用户安装和系统卸载。便携版需完整解压到可写目录后运行 `shiori.exe`。安装包未经 Windows 代码签名，可能出现 SmartScreen 提示；部分特殊版式 EPUB 页面需要 WebView2。
 - **macOS**：将 Shiori 从 DMG 拖入「应用程序」或其他可写目录，再运行和更新。应用未经 Apple 开发者签名或公证，首次打开可能需要在系统「隐私与安全性」中确认。
-- **iOS**：通过自选工具签名安装 IPA，或使用 Xcode 自行构建，后续通过原签名方式更新。应用内导入 EPUB / TXT 不依赖 App Group；系统分享扩展还需要匹配的签名和 App Group 授权。更改 Bundle ID、卸载或更换签名方式前，请先备份数据。
+- **iOS**：通过自选工具签名安装 IPA，或使用 Xcode 自行构建。官方直接分发版可在应用内检查新版和查看说明，再通过原签名方式更新；TestFlight 版本继续在 TestFlight 更新。应用内导入 EPUB / TXT 不依赖 App Group；系统分享扩展还需要匹配的签名和 App Group 授权。更改 Bundle ID、卸载或更换签名方式前，请先备份数据。
 
 本仓库发布的 Android、Windows 和 macOS 安装包可在「关于与更新」检查新版。Windows 安装版和便携版均支持应用内更新。v1.4.0 用户升级新版需手动安装一次。
 

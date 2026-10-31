@@ -76,13 +76,13 @@ Stable 只选择正式 Release，Beta 同时允许测试版与正式版。候选
 
 客户端从本仓库 GitHub Releases 有界读取发布列表，不能仅使用 latest 接口发现 Beta。先验签清单原始字节，再接受平台资产；SHA-256 校验下载完整性，不替代清单签名或 Android 安装签名。扫描未穷尽且没有可靠候选时报告检查不完整，不误报最新版。下载绑定官方仓库的指定 Release / asset，限制重定向与资源大小。更新说明使用受限原生 Markdown 预览，不执行 HTML、加载图片或响应文内链接；完整说明通过独立发布页入口打开。
 
-Android 使用系统 `PackageInstaller` 确认覆盖安装；Android 8+ 需授权当前来源安装应用，授权后重新发起安装。iOS 不在应用内下载或覆盖安装 IPA；未签名 IPA 可通过 AltStore Classic 订阅安装与更新，或自行获取新版并重新签名安装。Windows 流程见下方 [Windows 安装与更新](#windows-安装与更新)。
+Android 使用系统 `PackageInstaller` 确认覆盖安装；Android 8+ 需授权当前来源安装应用，授权后重新发起安装。iOS 官方直接分发版支持应用内检查新版、查看更新说明和打开发布页，不在应用内下载或覆盖安装 IPA；用户通过原来的 AltStore 或其他自签名方式更新。TestFlight 版通过 TestFlight 更新。Windows 流程见下方 [Windows 安装与更新](#windows-安装与更新)。
 
 设备验证入口包括 [Android 安装 runner](../../android/app/src/androidTest/kotlin/dev/shiori/reader/UpdateInstallSmokeRunner.kt) 和[进程恢复脚本](../../tool/test_android_update_recovery.py)。runner 需显式指定 mode；恢复脚本的 `--require-retained` 要求 session 真正跨进程保留。同进程清理不代替进程死亡验证，本地安装测试不代替真实发布源升级或用户数据保留验证。
 
 ## 更新清单签名配置
 
-Android / Windows / macOS 的 tag 构建将发布身份与更新公钥写入 `assets/release/build-info.json`。唯一公开更新文件为 `shiori-update.json`：`schemaVersion: 2` 的 Envelope 包含 Base64 编码的原始 Manifest 和签名。签名协议为 RSA-3072 / PKCS#1 v1.5 / SHA-256，指数 65537；必须先对原始字节验签，再解析发布身份、目标变体、大小和 SHA-256。Windows 使用系统 CNG，macOS 使用系统 Security。
+Android / Windows / macOS 和 iOS 直接分发版的 tag 构建将发布身份与更新公钥写入 `assets/release/build-info.json`。唯一公开更新文件为 `shiori-update.json`：`schemaVersion: 2` 的 Envelope 包含 Base64 编码的原始 Manifest 和签名。签名协议为 RSA-3072 / PKCS#1 v1.5 / SHA-256，指数 65537；必须先对原始字节验签，再解析发布身份、目标变体、大小和 SHA-256。Windows 使用系统 CNG，macOS 使用系统 Security。
 
 统一清单包含 Android APK 的证书身份、Windows 便携 ZIP 的逐文件清单、Windows Setup EXE 和 macOS DMG；原生安装器再次验证同一原始清单与实际包。内部 `receipts/` 只用于跨构建 Job 核对身份和产物字节，不上传 Release。公开附件仅有 APK、Windows Setup EXE、Windows ZIP、macOS DMG、未签名 IPA 和 `shiori-update.json`，不再附带独立签名、校验 TXT 或平台元数据。
 

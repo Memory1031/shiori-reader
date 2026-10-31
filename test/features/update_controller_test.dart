@@ -229,6 +229,35 @@ void main() {
   });
 
   test(
+    'direct iOS keeps automatic check timing and never starts downloads',
+    () async {
+      repository.installed = InstalledUpdateApp(
+        version: repository.installed.version,
+        build: repository.installed.build,
+        availability: UpdateAvailability.enabled,
+        release: repository.installed.release,
+        installation: const AppInstallation(
+          kind: AppInstallationKind.iosApp,
+          distribution: DistributionChannel.direct,
+        ),
+      );
+      repository.result = fakeUpdateCandidate();
+      await controller.initialize();
+      await controller.check(manual: false);
+      expect(repository.checks, 1);
+      expect(controller.phase, UpdatePhase.available);
+      expect(controller.capabilities.method, UpdateMethod.checkOnly);
+      await controller.check(manual: false);
+      expect(repository.checks, 1);
+      await controller.download();
+      expect(repository.downloads, 0);
+      expect(controller.phase, UpdatePhase.available);
+      await controller.check();
+      expect(repository.checks, 2);
+    },
+  );
+
+  test(
     '100 percent waits for verification; verification remains exclusive',
     () async {
       repository.result = fakeUpdateCandidate();

@@ -133,7 +133,7 @@ ReleaseIdentity _identity(Map<String, dynamic> json) {
   return result;
 }
 
-/// Read assets/release/build-info.json; local/iOS builds are marked development.
+/// Read assets/release/build-info.json; local builds are marked development.
 final class BundledRelease {
   BundledRelease._(this.identity, this.publicKey);
   final ReleaseIdentity identity;

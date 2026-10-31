@@ -1,5 +1,12 @@
 import '../../domain/models/app_distribution.dart';
 
+DistributionChannel distributionFromBuild(String value) => switch (value) {
+  'direct' => DistributionChannel.direct,
+  'testFlight' => DistributionChannel.testFlight,
+  'appStore' => DistributionChannel.appStore,
+  _ => DistributionChannel.unknown,
+};
+
 AppInstallationKind windowsInstallationKind(String mode) => switch (mode) {
   'setup' => AppInstallationKind.windowsSetup,
   'portable' => AppInstallationKind.windowsPortable,

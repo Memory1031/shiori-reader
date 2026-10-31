@@ -76,6 +76,66 @@ void main() {
   });
   for (final language in ['zh', 'en']) {
     testWidgets(
+      '$language direct iOS offers a release page without download controls',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final repo = FakeUpdateRepository();
+        repo.installed = InstalledUpdateApp(
+          version: repo.installed.version,
+          build: repo.installed.build,
+          availability: UpdateAvailability.enabled,
+          release: repo.installed.release,
+          installation: const AppInstallation(
+            kind: AppInstallationKind.iosApp,
+            distribution: DistributionChannel.direct,
+          ),
+        );
+        repo.result = fakeUpdateCandidate();
+        final controller = UpdateController(repo);
+        await controller.initialize();
+        await controller.check();
+        Uri? opened;
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: Locale(language),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            home: UpdateScreen(
+              controller: controller,
+              openPage: (uri) async {
+                opened = uri;
+                return true;
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final l = AppLocalizations.of(
+          tester.element(find.byType(UpdateScreen)),
+        );
+        expect(find.text(l.updateCheckOnlyAutomaticHint), findsOneWidget);
+        expect(find.byKey(const ValueKey('update-check')), findsOneWidget);
+        expect(find.text(l.updateManualInstallHint), findsOneWidget);
+        expect(find.byKey(const ValueKey('update-download')), findsNothing);
+        expect(find.byKey(const ValueKey('update-install')), findsNothing);
+        expect(find.textContaining(' MB'), findsNothing);
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('update-release-page')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('update-release-page')));
+        expect(opened, repo.result!.page);
+        expect(repo.downloads, 0);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await controller.shutdown();
+        controller.dispose();
+      },
+    );
+
+    testWidgets(
       '$language channel switch displays not checked until requested',
       (tester) async {
         tester.view.physicalSize = const Size(1000, 1800);
@@ -271,4 +331,35 @@ void main() {
       });
     }
   }
+  testWidgets('TestFlight retains its own update channel', (tester) async {
+    final repo = FakeUpdateRepository();
+    repo.installed = InstalledUpdateApp(
+      version: repo.installed.version,
+      build: repo.installed.build,
+      availability: UpdateAvailability.unsupported,
+      installation: const AppInstallation(
+        kind: AppInstallationKind.iosApp,
+        distribution: DistributionChannel.testFlight,
+      ),
+    );
+    final controller = UpdateController(repo);
+    await controller.initialize();
+    await controller.check(manual: false);
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: UpdateScreen(controller: controller, openPage: (_) async => true),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final l = AppLocalizations.of(tester.element(find.byType(UpdateScreen)));
+    expect(find.text(l.updateTestFlightHint), findsOneWidget);
+    expect(find.byKey(const ValueKey('update-check')), findsNothing);
+    expect(repo.checks, 0);
+    await tester.pumpWidget(const SizedBox());
+    await controller.shutdown();
+    controller.dispose();
+  });
 }

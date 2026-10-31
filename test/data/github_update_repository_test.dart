@@ -8,6 +8,7 @@ import 'package:shiori/data/updates/github_update_repository.dart';
 import 'package:shiori/data/updates/update_storage.dart';
 import 'package:shiori/data/updates/update_installer.dart';
 import 'package:shiori/data/updates/update_manifest.dart';
+import 'package:shiori/data/updates/update_http.dart';
 import 'package:shiori/domain/contracts/app_updates.dart';
 import 'package:shiori/domain/contracts/cancellation.dart';
 import 'package:shiori/domain/models/release_identity.dart';
@@ -24,7 +25,7 @@ void main() {
   Matcher issue(UpdateProblem problem) =>
       isA<UpdateIssue>().having((e) => e.problem, 'problem', problem);
   GithubUpdateRepository repository({
-    String platform = 'windows-x64-portable',
+    String? platform = 'windows-x64-portable',
     InstalledUpdateApp? installed,
     UpdateInstaller? installer,
   }) => GithubUpdateRepository(
@@ -450,6 +451,104 @@ void main() {
     );
     expect(await repo.check(UpdateChannel.beta, token()), isNull);
     expect(await repo.restore(UpdateChannel.beta, token()), isNull);
+    expect(http.reads, isEmpty);
+  });
+
+  InstalledUpdateApp iosInstalled(DistributionChannel distribution) =>
+      InstalledUpdateApp(
+        version: fixture.installed.version,
+        build: fixture.installed.build,
+        release: fixture.installed.release,
+        availability: UpdateAvailability.enabled,
+        installation: AppInstallation(
+          kind: AppInstallationKind.iosApp,
+          distribution: distribution,
+        ),
+      );
+  void addIpa(Map<String, dynamic> release) {
+    final tag = release['tag_name'] as String;
+    final name = 'shiori-reader-$tag-ios-arm64-unsigned.ipa';
+    (release['assets'] as List).add({
+      'name': name,
+      'size': 4096,
+      'state': 'uploaded',
+      'browser_download_url': releaseAsset(tag, name).toString(),
+    });
+  }
+
+  test(
+    'direct iOS verifies releases without offering a downloadable package',
+    () async {
+      repo = repository(
+        installed: iosInstalled(DistributionChannel.direct),
+        platform: null,
+      );
+      http.releases = [fixture.releaseFor('beta2'), fixture.release];
+      http.casesByTag['v1.2.1-beta.2'] = 'beta2';
+      for (final release in http.releases) {
+        addIpa(release as Map<String, dynamic>);
+      }
+      expect(await repo.check(UpdateChannel.stable, token()), isNull);
+      final candidate = (await repo.check(UpdateChannel.beta, token()))!;
+      expect(candidate.release.build, 12);
+      expect(candidate.bytes, 4096);
+      expect(candidate.page, releasePage('v1.2.1-beta.2'));
+      expect(candidate.notes, contains('Notes'));
+      expect(await repo.restore(UpdateChannel.beta, token()), isNull);
+      await expectLater(
+        repo.download(candidate, token(), (_) {}),
+        throwsA(issue(UpdateProblem.verification)),
+      );
+      await expectLater(
+        repo.install(candidate, token()),
+        throwsA(issue(UpdateProblem.verification)),
+      );
+      expect(http.reads.any((uri) => uri.path.endsWith('.ipa')), isFalse);
+      expect(storage.file('package.bin').existsSync(), isFalse);
+      expect(storage.file('download.json').existsSync(), isFalse);
+    },
+  );
+
+  test(
+    'iOS checks require a complete IPA release and valid signed identity',
+    () async {
+      repo = repository(
+        installed: iosInstalled(DistributionChannel.direct),
+        platform: 'ios-arm64',
+      );
+      await expectLater(
+        repo.check(UpdateChannel.beta, token()),
+        throwsA(issue(UpdateProblem.incomplete)),
+      );
+      addIpa(http.releases.first as Map<String, dynamic>);
+      final ipa = (http.releases.first['assets'] as List).last as Map;
+      final url = ipa['browser_download_url'];
+      ipa['browser_download_url'] = 'https://example.com/unsigned.ipa';
+      await expectLater(
+        repo.check(UpdateChannel.beta, token()),
+        throwsA(issue(UpdateProblem.verification)),
+      );
+      ipa['browser_download_url'] = url;
+      http.badCase = 'wrongApp';
+      await expectLater(
+        repo.check(UpdateChannel.beta, token()),
+        throwsA(issue(UpdateProblem.verification)),
+      );
+    },
+  );
+
+  test('TestFlight and unknown iOS builds never query GitHub', () async {
+    for (final distribution in [
+      DistributionChannel.testFlight,
+      DistributionChannel.unknown,
+    ]) {
+      repo = repository(
+        installed: iosInstalled(distribution),
+        platform: 'ios-arm64',
+      );
+      expect(await repo.check(UpdateChannel.beta, token()), isNull);
+      expect(await repo.restore(UpdateChannel.beta, token()), isNull);
+    }
     expect(http.reads, isEmpty);
   });
 

@@ -24,6 +24,9 @@ Future<UpdateController> createUpdateController(
 }) async {
   var version = '—';
   var build = 0;
+  final iosDistribution = distributionFromBuild(
+    const String.fromEnvironment('SHIORI_DISTRIBUTION'),
+  );
   var kind = Platform.isAndroid
       ? AppInstallationKind.androidApk
       : Platform.isMacOS
@@ -40,7 +43,12 @@ Future<UpdateController> createUpdateController(
     if (Platform.isWindows) {
       kind = windowsInstallationKind(info['installationMode'] as String);
     }
-    if (Platform.isAndroid || Platform.isWindows || Platform.isMacOS) {
+    if (Platform.isIOS && iosDistribution != DistributionChannel.direct) {
+      availability = UpdateAvailability.unsupported;
+    } else if (Platform.isAndroid ||
+        Platform.isWindows ||
+        Platform.isMacOS ||
+        Platform.isIOS) {
       bundled = BundledRelease.fromJson(
         jsonDecode(
               await rootBundle.loadString('assets/release/build-info.json'),
@@ -70,7 +78,9 @@ Future<UpdateController> createUpdateController(
         release: bundled?.identity,
         installation: AppInstallation(
           kind: kind,
-          distribution: availability == UpdateAvailability.enabled
+          distribution: Platform.isIOS
+              ? iosDistribution
+              : availability == UpdateAvailability.enabled
               ? DistributionChannel.direct
               : DistributionChannel.unknown,
         ),

@@ -87,7 +87,7 @@ SettingsStore.load/save 使用 ReaderSettings；取消前提交规则同上。�
 - `InstalledUpdateApp.installation`：安装形态与分发渠道，无法确认时使用 unknown。macOS 的安装形态为 `.app`，更新包为 DMG。iOS 经 AltStore 或其他自选工具签名安装的 IPA 均归入 direct。
 - `UpdateCapabilities`：更新方式和可选外部入口，可描述仅检测新版、由用户通过原签名方式更新等能力组合。
 
-当前更新是否启用由 `UpdateAvailability` 决定，iOS 尚未启用应用内检查。安装位置和权限由安装器检查。
+`UpdateAvailability` 表示发布身份是否可用于更新，`capabilitiesFor` 根据安装形态和后端区分检测、下载与安装。iOS direct 构建使用 checkOnly：验证签名发布身份与公开 IPA 附件后提示新版，只提供发布页入口；TestFlight、App Store 和未知来源通过原渠道更新。iOS 不恢复下载记录或在应用内下载 IPA。安装位置和权限由安装器检查。
 
 检查与下载共用互斥操作状态，取消等待 I/O 结束后完成；根关闭时先取消并等待操作，再关闭更新网络。检查预算内找到有效升级时，返回已验证的最高构建号候选；未穷尽历史且没有有效候选时报告检查不完整。渠道及自动检查偏好独立持久化；自动检查按当前渠道上次尝试间隔 24 小时，切换渠道使检查结果和尝试时间失效，服务端限流等待仍然保留。正式包核对原生版本与包内身份后启用更新，开发构建不访问正式更新源。
 

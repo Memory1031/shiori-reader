@@ -36,6 +36,8 @@ final class GithubUpdateRepository implements AppUpdateRepository {
   final UpdateHttp http;
   final UpdateStorage storage;
   final UpdateInstaller? installer;
+  bool get _checkOnly =>
+      installed.installation.kind == AppInstallationKind.iosApp;
   @override
   bool get supportsInstallation => installer != null;
   @override
@@ -129,17 +131,23 @@ final class GithubUpdateRepository implements AppUpdateRepository {
       (asset) => asset.platform == platform,
     );
     return _VerifiedUpdate(
-      UpdateCandidate(
-        release: manifest.identity,
-        bytes: asset.size,
-        notes: notes.length > 10000 ? notes.substring(0, 10000) : notes,
-        page: releasePage(tag),
-      ),
+      _candidate(manifest.identity, notes, asset.size),
       asset,
       raw,
       sig,
     );
   }
+
+  UpdateCandidate _candidate(
+    ReleaseIdentity identity,
+    String notes,
+    int bytes,
+  ) => UpdateCandidate(
+    release: identity,
+    bytes: bytes,
+    notes: notes.length > 10000 ? notes.substring(0, 10000) : notes,
+    page: releasePage(identity.tag),
+  );
 
   bool _eligible(_VerifiedUpdate value, UpdateChannel channel) =>
       value.candidate.release.canReplace(installed.release!, channel);
@@ -149,7 +157,11 @@ final class GithubUpdateRepository implements AppUpdateRepository {
     UpdateChannel channel,
     CancellationToken token,
   ) => _guard(() async {
-    if (installed.availability != UpdateAvailability.enabled) return null;
+    if (!installed
+        .capabilitiesFor(supportsInstallation: supportsInstallation)
+        .canCheck) {
+      return null;
+    }
     await storage.prepare();
     Map<String, dynamic> cache;
     try {
@@ -163,7 +175,8 @@ final class GithubUpdateRepository implements AppUpdateRepository {
       cache = {};
     }
     final replacements = <String, dynamic>{};
-    final verified = <_VerifiedUpdate>[];
+    final verified =
+        <({UpdateCandidate candidate, _VerifiedUpdate? download})>[];
     var inspected = 0;
     var complete = false;
     scan:
@@ -271,16 +284,27 @@ final class GithubUpdateRepository implements AppUpdateRepository {
           key!,
           expectedTag: tag,
         );
-        final candidate = _verify(
-          tag,
-          (release['body'] as String?) ?? '',
-          envelope.bytes,
-          envelope.signature,
-        );
         for (final asset in envelope.manifest.assets) {
           assetReady(asset.name, asset.size, exact: asset.size);
         }
-        if (_eligible(candidate, channel)) verified.add(candidate);
+        final notes = (release['body'] as String?) ?? '';
+        final UpdateCandidate candidate;
+        _VerifiedUpdate? download;
+        if (_checkOnly) {
+          final name = 'shiori-reader-$tag-ios-arm64-unsigned.ipa';
+          assetReady(name, 2 * 1024 * 1024 * 1024);
+          candidate = _candidate(
+            envelope.manifest.identity,
+            notes,
+            assets[name]!['size'] as int,
+          );
+        } else {
+          download = _verify(tag, notes, envelope.bytes, envelope.signature);
+          candidate = download.candidate;
+        }
+        if (candidate.release.canReplace(installed.release!, channel)) {
+          verified.add((candidate: candidate, download: download));
+        }
       }
       if (list.length < 20) {
         complete = true;
@@ -309,8 +333,8 @@ final class GithubUpdateRepository implements AppUpdateRepository {
       }
       return null;
     }
-    _selected = verified.first;
-    return _selected!.candidate;
+    _selected = verified.first.download;
+    return verified.first.candidate;
   });
 
   Future<void> _verifyPackage(
@@ -341,7 +365,9 @@ final class GithubUpdateRepository implements AppUpdateRepository {
     UpdateChannel channel,
     CancellationToken token,
   ) => _guard(() async {
-    if (installed.availability != UpdateAvailability.enabled) return null;
+    if (_checkOnly || installed.availability != UpdateAvailability.enabled) {
+      return null;
+    }
     await storage.prepare();
     final part = storage.file('package.part');
     final metadata = storage.file('download.json');
