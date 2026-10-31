@@ -729,7 +729,10 @@ class _BookshelfViewState extends State<BookshelfView> {
                       onImport: widget.controller.writing || _batch.busy
                           ? null
                           : widget.onImport,
-                      selectionEntry: BookSelectionEntry(actions: _batch),
+                      selectionEntry: BookSelectionEntry(
+                        actions: _batch,
+                        compact: true,
+                      ),
                     ),
             ),
             Expanded(

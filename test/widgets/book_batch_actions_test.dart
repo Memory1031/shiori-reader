@@ -690,6 +690,9 @@ void main() {
         brightness: Brightness.dark,
         extra: 30,
       );
+      final entry = find.byKey(const ValueKey('book-multi-select'));
+      expect(tester.widget<IconButton>(entry).tooltip, h.l.bookMultiSelect);
+      expect(find.text(h.l.bookMultiSelect), findsNothing);
       final firstKey = h.library.sorted.first.snapshot.key;
       final cover = tester.getSize(
         find
