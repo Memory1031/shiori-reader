@@ -69,7 +69,10 @@ def release_entry(root, assets, tag, commit, release, run=gh):
         "buildVersion": info["CFBundleVersion"],
         "marketingVersion": tag.removeprefix("v"),
         "date": release["published_at"],
-        "localizedDescription": release.get("body") or tag,
+        "localizedDescription": (
+            f"Shiori {tag.removeprefix('v')}\n\n完整更新内容请查看：\n"
+            f"https://github.com/{REPOSITORY}/releases/tag/{tag}"
+        ),
         "downloadURL": url,
         "size": record["size"],
         "sha256": record["sha256"],

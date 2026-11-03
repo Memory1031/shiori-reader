@@ -49,6 +49,9 @@ class AltStoreTest(unittest.TestCase):
         self.assertEqual(channel, "beta")
         self.assertEqual((entry["version"], entry["buildVersion"], entry["minOSVersion"]),
                          ("1.2.1", "11", "15.0"))
+        self.assertEqual(entry["localizedDescription"],
+                         "Shiori 1.2.1-beta.1\n\n完整更新内容请查看：\n"
+                         f"https://github.com/{REPOSITORY}/releases/tag/v1.2.1-beta.1")
         self.assertEqual(entry["size"], self.path.stat().st_size)
         self.assertEqual(entry["sha256"], self.record["sha256"])
         self.assertEqual(permissions["privacy"], {"NSPhotoLibraryAddUsageDescription": "Save illustrations."})
@@ -82,6 +85,9 @@ class AltStoreTest(unittest.TestCase):
         }])
         channel, entry, permissions = self.entry()
         self.assertEqual(channel, "stable")
+        self.assertEqual(entry["localizedDescription"],
+                         "Shiori 1.2.1\n\n完整更新内容请查看：\n"
+                         f"https://github.com/{REPOSITORY}/releases/tag/v1.2.1")
         source = update_source(empty_source(channel), channel, entry, permissions)
         self.assertEqual(source["apps"][0]["versions"][0]["marketingVersion"], "1.2.1")
         beta = update_source(empty_source("beta"), "beta", entry, permissions)
@@ -132,6 +138,9 @@ class AltStoreTest(unittest.TestCase):
                 builds = [int(v["buildVersion"]) for v in versions]
                 self.assertEqual(builds, sorted(set(builds), reverse=True))
                 for version in versions:
+                    self.assertEqual(version["localizedDescription"],
+                                     f"Shiori {version['marketingVersion']}\n\n完整更新内容请查看：\n"
+                                     f"https://github.com/{REPOSITORY}/releases/tag/v{version['marketingVersion']}")
                     if channel == "stable":
                         self.assertNotIn("-beta.", version["marketingVersion"])
                     self.assertGreater(version["size"], 0)
