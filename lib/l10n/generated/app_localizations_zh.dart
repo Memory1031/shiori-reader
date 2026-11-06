@@ -910,13 +910,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importUnreadable => '无法读取文件，请确认文件仍可访问后重新选择。';
 
   @override
-  String get importEncodingHint => '请检查预览，选择文字显示正确的编码后继续。';
+  String get importEncodingHint => '请选择文字显示正常的一项。';
 
   @override
-  String get importEncodingAuto => '文字编码：自动识别';
+  String get importUseText => '使用此显示';
 
   @override
-  String get importEncodingInvalid => '无法用此编码完整读取文件，请换一种编码或检查原文件。';
+  String get importEncodingAuto => '自动识别';
+
+  @override
+  String get importEncodingInvalid => '无法完整读取文件中的文字。请检查原文件，或将它另存为 UTF-8 文本后重试。';
 
   @override
   String get importDrm => '这本 EPUB 含受保护或加密的内容，暂不支持导入。';
@@ -1027,6 +1030,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get localReparse => '重新解析';
+
+  @override
+  String get localTextDisplay => '文字显示异常';
+
+  @override
+  String get localTextReviewHint => '先预览原文件中的文字，再更新这本书。';
+
+  @override
+  String get localTextPreview => '查看文字预览';
+
+  @override
+  String get localTextAdvanced => '高级选项';
+
+  @override
+  String get localTextDecodeFailure => '无法用当前方式完整读取文字，请检查原文件。';
+
+  @override
+  String get localParseTimeout => '处理这本书耗时过长，已停止。原有内容已保留。';
 
   @override
   String get localReparseConfirm => '从保留的原文件重新解析，并尽量保留阅读位置。失败或取消时保留原内容。';

@@ -191,10 +191,12 @@ final class LocalReparseResult {
 }
 
 abstract interface class LocalBookReparse implements LocalBookInvalidation {
+  /// TXT reuses its saved encoding unless overridden or [reviewText] is set.
   Future<Result<LocalReparseResult>> reparseBook(
     NovelKey key, {
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
     required CancellationToken cancellation,
   });
 }

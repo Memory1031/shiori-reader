@@ -222,12 +222,15 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     setState(() => _deleting = false);
   }
 
-  Future<void> _reparse(LocalBookInfo info) =>
-      _startReparse([LocalReparseTarget.fromInfo(info)]);
+  Future<void> _reparse(LocalBookInfo info, {bool reviewText = false}) =>
+      _startReparse([
+        LocalReparseTarget.fromInfo(info),
+      ], reviewText: reviewText);
 
   Future<void> _startReparse(
     Iterable<LocalReparseTarget> books, {
     bool batch = false,
+    bool reviewText = false,
   }) async {
     final flow = _reparseFlow;
     if (_busy || flow == null) return;
@@ -249,6 +252,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
         context,
         books,
         batch: batch,
+        reviewText: reviewText,
         desktop: DesktopLayoutScope.useDesktopPage(context),
       );
     } finally {
@@ -696,6 +700,12 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
             label: l.localReparse,
             icon: Icons.autorenew,
           ),
+        if (_canReparse && book.format == LocalBookFormat.txt)
+          ShioriMenuItem(
+            value: 'review-text',
+            label: l.localTextDisplay,
+            icon: Icons.text_fields,
+          ),
         ShioriMenuItem(
           value: 'delete',
           label: l.localDeleteConfirm,
@@ -713,6 +723,8 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
         widget.onDetails?.call(book.key);
       case 'reparse':
         _reparse(book);
+      case 'review-text':
+        _reparse(book, reviewText: true);
       case 'delete':
         _delete(book);
       case 'select':
@@ -731,6 +743,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
       tooltip: l.moreActions,
       onSelected: (action) {
         if (action == 'reparse') _reparse(book);
+        if (action == 'review-text') _reparse(book, reviewText: true);
         if (action == 'delete') _delete(book);
         if (action == 'select') _batch.enter(book.key);
       },
@@ -742,6 +755,8 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
         ),
         if (_canReparse)
           ShioriMenuItem(value: 'reparse', label: l.localReparse),
+        if (_canReparse && book.format == LocalBookFormat.txt)
+          ShioriMenuItem(value: 'review-text', label: l.localTextDisplay),
         ShioriMenuItem(value: 'delete', label: l.localDeleteConfirm),
       ],
     );

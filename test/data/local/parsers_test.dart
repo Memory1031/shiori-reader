@@ -32,6 +32,11 @@ List<int> utf16(String text, {bool le = true}) => [
   ...le ? [255, 254] : [254, 255],
   for (final c in text.codeUnits) ...le ? [c & 255, c >> 8] : [c >> 8, c & 255],
 ];
+// Both byte lanes support a byte order; neither decoded text contains NUL.
+final ambiguousUtf16Bytes = [
+  for (final c in 'ABCDEF'.codeUnits) ...[c, 0],
+  for (final c in 'abcdef'.codeUnits) ...[0, c],
+];
 Matcher problem(LocalParseProblem p) =>
     isA<LocalParseException>().having((e) => e.problem, 'problem', p);
 
@@ -197,10 +202,13 @@ void main() {
         expect(original(one), '这不是标题，正文\n\n  有空白。');
       },
     );
-    test('ambiguous suffix is not hidden by identical preview prefixes', () {
-      final preview = inspectTxt(utf8.encode('A' * 700 + '中文'), null);
-      expect(preview.samples.length, 2);
-      expect(preview.samples.values.toSet().length, 2);
+    test('review exposes differences outside the normal sample windows', () {
+      final bytes = utf8.encode('${'A' * 250}中文${'A' * 950}');
+      expect(inspectTxt(bytes, null).detected, TxtEncoding.utf8);
+      final preview = inspectTxt(bytes, null, reviewText: true);
+      expect(preview.samples.keys, [TxtEncoding.utf8, TxtEncoding.gb18030]);
+      expect(preview.samples[TxtEncoding.utf8], contains('中文'));
+      expect(preview.samples.values.toSet(), hasLength(2));
       expect(preview.detected, isNull);
     });
     test('long paragraph is never split into render chunks', () {
@@ -209,26 +217,22 @@ void main() {
       expect(c.chapters.single.blocks.length, 1);
       expect(original(c), text);
     });
-    test('unmarked GBK requires preview before publication', () async {
-      var asked = false;
+    test('unmarked strict GBK is automatic when UTF-8 fails', () async {
       final session = ParserSession([0xd6, 0xd0, 0xce, 0xc4]);
       final c = await decode(
         session,
         LocalBookFormat.txt,
-        choose: (preview) async {
-          asked = true;
-          expect(preview.samples, {TxtEncoding.gb18030: '中文'});
-          return TxtEncoding.gb18030;
-        },
+        choose: (_) async => throw StateError('Unexpected prompt'),
       );
-      expect(asked, true);
+      expect(c.txtEncoding, TxtEncoding.gb18030);
       expect(original(c), '中文');
     });
     test(
-      'ASCII and UTF8 BOM need no ambiguous-encoding confirmation',
+      'ASCII, UTF8 BOM and strict UTF8 with a GBK alternative need no confirmation',
       () async {
         for (final b in [
           utf8.encode('plain text'),
+          utf8.encode('中文\x1a'),
           [239, 187, 191, ...utf8.encode('中文')],
         ]) {
           await decode(
@@ -237,6 +241,22 @@ void main() {
             choose: (_) async => throw StateError('Unexpected prompt'),
           );
         }
+      },
+    );
+    test(
+      'dual UTF16 evidence uses the selected, fully validated text',
+      () async {
+        final content = await decode(
+          ParserSession(ambiguousUtf16Bytes),
+          LocalBookFormat.txt,
+          choose: (p) async {
+            expect(p.detected, isNull);
+            expect(p.samples.keys, [TxtEncoding.utf16le, TxtEncoding.utf16be]);
+            expect(p.samples.values.toSet(), hasLength(2));
+            return TxtEncoding.utf16be;
+          },
+        );
+        expect(original(content), endsWith('abcdef'));
       },
     );
     test(

@@ -771,6 +771,7 @@ class ShelfReparseBooks extends ShelfLocalBooks implements LocalBookReparse {
     NovelKey key, {
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
     required CancellationToken cancellation,
   }) async {
     reparsed.add(key);

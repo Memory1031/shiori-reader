@@ -4,7 +4,7 @@ import 'package:shiori/data/local/epub/epub_parser.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/contracts/local_books.dart';
 import 'package:shiori/domain/models/models.dart';
-import 'parsers_test.dart' show decode, ParserSession, utf16;
+import 'parsers_test.dart' show decode, original, ParserSession, utf16;
 import 'support/epub_fixtures.dart';
 import 'support/mixed_epub_fixture.dart';
 
@@ -129,19 +129,21 @@ void main() {
     }
   });
 
-  test('CSS comment tolerance does not relax XHTML or TXT content', () {
+  test('TXT compatibility does not relax strict XHTML decoding', () async {
     final files = styledFiles(utf8.encode('$comment p{text-align:center;}'));
     files['OPS/text/a.xhtml'] = utf8.encode(
       '<html><body><p>正文 /*\x01*/</p></body></html>',
     );
     expect(() => parser(files).parse(), encodingError);
     expect(
-      decode(
-        ParserSession(utf8.encode('正文 /*\x01*/')),
-        LocalBookFormat.txt,
-        encoding: TxtEncoding.utf8,
+      original(
+        await decode(
+          ParserSession(utf8.encode('正文 /*\x01*/')),
+          LocalBookFormat.txt,
+          encoding: TxtEncoding.utf8,
+        ),
       ),
-      encodingError,
+      '正文 /**/',
     );
   });
 

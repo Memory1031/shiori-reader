@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/theme/shiori_theme.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
+import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/features/bookshelf/book_selection_widgets.dart';
 import 'package:shiori/shared/widgets/book_list_tile.dart';
 import 'package:shiori/shared/widgets/state_views.dart';
@@ -65,6 +66,69 @@ void main() {
         ))
         .load();
   });
+
+  testWidgets(
+    'TXT recovery previews only this book and hides advanced choices',
+    (tester) async {
+      final store = LocalStore(count: 2);
+      final boundary = GlobalKey();
+      final h = LocalHarness(
+        tester,
+        store: store,
+        preview: (context, child) => preview(context, child, boundary),
+      );
+      addTearDown(h.close);
+      await h.pump(width: 320, height: 780, scale: 1.6);
+      final key = store.books.last.key;
+      final menu = find.byKey(ValueKey(('local-book-actions', key)));
+      final l = h.l;
+      Future<void> openRecovery() async {
+        await tester.tap(menu);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(l.localTextDisplay));
+        await tester.pumpAndSettle();
+      }
+
+      await openRecovery();
+      expect(find.byType(DropdownButton<TxtEncoding?>), findsNothing);
+      expect(store.calls, isEmpty);
+      await tester.runAsync(() => screenshot(boundary, 'txt-recovery-ready'));
+      await tester.tap(find.widgetWithText(FilledButton, l.localTextPreview));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(store.calls.single.key, key);
+      expect(store.calls.single.reviewText, isTrue);
+      expect(store.calls.single.encoding, isNull);
+      expect(find.text('Sample'), findsOneWidget);
+      expect(find.text('Other sample'), findsOneWidget);
+      expect(find.text('UTF-8'), findsNothing);
+      await tester.runAsync(() => screenshot(boundary, 'txt-recovery-preview'));
+      await tester.tap(find.widgetWithText(OutlinedButton, l.importCancel));
+      await tester.pumpAndSettle();
+      expect(store.calls.single.token.isCancelled, isTrue);
+      expect(store.revision, 0);
+
+      await openRecovery();
+      await tester.tap(find.text(l.localTextAdvanced));
+      await tester.pumpAndSettle();
+      final dropdown = find.byType(DropdownButton<TxtEncoding?>);
+      await tester.ensureVisible(dropdown);
+      await tester.tap(dropdown);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('GB18030 / GBK').hitTestable());
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, l.localTextPreview));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(store.calls.map((c) => c.key), [key, key]);
+      expect(store.calls.last.encoding, TxtEncoding.gb18030);
+      expect(find.text('Sample'), findsNothing);
+      await tester.tap(find.text(l.importUseText));
+      await tester.pumpAndSettle();
+      expect(store.revision, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final (name, platform, width, lang, scale, dark, format, count) in [
     (

@@ -25,6 +25,7 @@ final class TxtEncodingPreview {
 typedef ChooseTxtEncoding = Future<TxtEncoding> Function(TxtEncodingPreview);
 
 abstract interface class LocalBookDecoder {
+  /// A reader-requested review asks for a preview even with one viable result.
   Future<LocalBookContent> decode(
     LocalImportSession session, {
     required LocalBookFormat format,
@@ -32,6 +33,7 @@ abstract interface class LocalBookDecoder {
     required CancellationToken cancellation,
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
   });
 }
 

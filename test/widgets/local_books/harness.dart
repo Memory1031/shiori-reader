@@ -40,7 +40,14 @@ class LocalStore
   final maintenance = StreamController<NovelKey>.broadcast(sync: true);
   final changed = StreamController<NovelKey>.broadcast(sync: true);
   final calls =
-      <({NovelKey key, CancellationToken token, TxtEncoding? encoding})>[];
+      <
+        ({
+          NovelKey key,
+          CancellationToken token,
+          TxtEncoding? encoding,
+          bool reviewText,
+        })
+      >[];
   Completer<Result<LocalReparseResult>>? gate;
   bool prompt = false, cleanup = false;
   int watches = 0, reads = 0, deletes = 0, revision = 0;
@@ -78,16 +85,25 @@ class LocalStore
     NovelKey key, {
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
     required CancellationToken cancellation,
   }) async {
-    calls.add((key: key, token: cancellation, encoding: encoding));
+    calls.add((
+      key: key,
+      token: cancellation,
+      encoding: encoding,
+      reviewText: reviewText,
+    ));
     maintenance.add(key);
-    if (prompt) {
+    if (prompt || reviewText) {
+      const samples = {
+        TxtEncoding.utf8: 'Sample',
+        TxtEncoding.gb18030: 'Other sample',
+      };
       await chooseEncoding(
-        TxtEncodingPreview({
-          TxtEncoding.utf8: 'Sample',
-          TxtEncoding.gb18030: 'Other sample',
-        }),
+        TxtEncodingPreview(
+          encoding == null ? samples : {encoding: samples[encoding]!},
+        ),
       );
     }
     final result =

@@ -1,6 +1,8 @@
 import 'dart:collection';
 import 'dart:typed_data';
 
+import 'txt_decoder.dart';
+
 const maxTxtLines = 250000;
 
 /// Bounded, line-oriented structural analysis. Offsets here are UTF-16 indices
@@ -46,7 +48,7 @@ List<TxtLine> txtLines(String text, Never Function() tooMany) {
   var start = 0;
   for (var i = 0; i < text.length; i++) {
     final c = text.codeUnitAt(i);
-    if (c != 10 && c != 13) continue;
+    if (c != 10 && c != 13 && c != 11) continue;
     if (c == 13 && i + 1 < text.length && text.codeUnitAt(i + 1) == 10) i++;
     add(i + 1);
     start = i + 1;
@@ -73,12 +75,12 @@ Set<int> txtHeadingLines(String text, List<TxtLine> lines) {
   bool blank(int i) =>
       i < 0 ||
       i >= lines.length ||
-      text.substring(lines[i].start, lines[i].end).trim().isEmpty;
+      cleanTxtText(text.substring(lines[i].start, lines[i].end)).trim().isEmpty;
   for (var i = 0; i < lines.length; i++) {
     final line = lines[i];
     // Do not regex or copy arbitrarily long lines.
     if (line.end - line.start > 110) continue;
-    final value = text.substring(line.start, line.end).trim();
+    final value = cleanTxtText(text.substring(line.start, line.end)).trim();
     if (value.isEmpty || value.length > 100 || _sentence.hasMatch(value)) {
       continue;
     }

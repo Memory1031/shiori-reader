@@ -26,10 +26,6 @@ class ImportItemState {
   ImportProblem? problem;
   LocalBookRecord? result;
   LocalBookImportDisposition? disposition;
-
-  /// Manual TXT encoding override; scoped to this item, never reused for the
-  /// next file.
-  TxtEncoding? encoding;
 }
 
 enum _BatchResult { done, fatal, cancelled }
@@ -146,7 +142,6 @@ class ImportController extends ChangeNotifier {
               batchProblem != null ||
               items.any((item) => item.phase != ImportItemPhase.succeeded));
 
-  TxtEncoding? get encoding => focus?.encoding;
   bool get choosingEncoding => encodingPreview != null;
 
   void _emit() {
@@ -210,14 +205,6 @@ class ImportController extends ChangeNotifier {
       _emit();
       await refresh();
     }
-  }
-
-  void setEncoding(TxtEncoding? value) {
-    if (busy) return;
-    final view = focus;
-    if (view == null) return;
-    view.encoding = value;
-    _emit();
   }
 
   void confirmEncoding(TxtEncoding value) {
@@ -583,7 +570,6 @@ class ImportController extends ChangeNotifier {
         filename: item.candidate.name,
         cancellation: cancellation.token,
         chooseEncoding: _chooseEncoding,
-        encoding: item.encoding,
       );
     } on LocalParseException catch (error) {
       item.problem = switch (error.problem) {

@@ -53,12 +53,20 @@ class ManagedLocalBooks
     NovelKey key, {
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
     required CancellationToken cancellation,
   }) => _foregroundOperation(
     key,
     () => _run(
       Operation.libraryWrite,
-      () => _reparse(this, key, chooseEncoding, encoding, cancellation),
+      () => _reparse(
+        this,
+        key,
+        chooseEncoding,
+        encoding,
+        cancellation,
+        reviewText: reviewText,
+      ),
     ),
   );
 
@@ -465,17 +473,33 @@ class ManagedLocalBooks
       } catch (e) {
         return Failure<T>(
           e is LocalParseException && e.problem == LocalParseProblem.timeout
-              ? AppFailure(kind: FailureKind.timeout, operation: op)
+              ? AppFailure(
+                  kind: FailureKind.timeout,
+                  operation: op,
+                  context: FailureContext.localParseTimeout,
+                )
               : e is _LimitExceeded ||
                     e is LocalParseException &&
                         (e.problem == LocalParseProblem.tooLarge ||
                             e.problem == LocalParseProblem.structureLimit)
-              ? AppFailure(kind: FailureKind.tooLarge, operation: op)
+              ? AppFailure(
+                  kind: FailureKind.tooLarge,
+                  operation: op,
+                  context:
+                      e is LocalParseException &&
+                          e.problem == LocalParseProblem.structureLimit
+                      ? FailureContext.textStructureLimit
+                      : FailureContext.none,
+                )
               : e is FormatException
               ? AppFailure(
                   kind: FailureKind.parse,
                   operation: op,
-                  context: FailureContext.invalidContent,
+                  context:
+                      e is LocalParseException &&
+                          e.problem == LocalParseProblem.encoding
+                      ? FailureContext.textEncoding
+                      : FailureContext.invalidContent,
                 )
               : localFailure(op, e),
         );

@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/app/theme.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/contracts/import_source.dart';
+import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/import/import_controller.dart';
 import 'package:shiori/features/import/import_overlay.dart';
@@ -109,7 +110,8 @@ class GatedStore implements LocalBookStore {
 }
 
 class Harness {
-  Harness({this.inputLimits = const {}});
+  Harness({this.inputLimits = const {}, this.decoder});
+  final LocalBookDecoder? decoder;
   final navigatorKey = GlobalKey<NavigatorState>();
   final Map<LocalBookFormat, int> inputLimits;
   final source = StreamSource(), store = GatedStore();
@@ -117,12 +119,14 @@ class Harness {
     source: source,
     store: store,
     inputLimits: inputLimits,
+    decoder: decoder,
     parsers: {
-      LocalBookFormat.txt: (session) async {
-        final gate = store.gates.last;
-        await Future.any([gate.parsing.future, gate.token.whenCancelled]);
-        return fakeParser(session);
-      },
+      if (decoder == null)
+        LocalBookFormat.txt: (session) async {
+          final gate = store.gates.last;
+          await Future.any([gate.parsing.future, gate.token.whenCancelled]);
+          return fakeParser(session);
+        },
     },
   );
 }

@@ -57,6 +57,7 @@ void main() {
   });
   Future<LocalBookRecord> add([
     String source = '第一章\nSome sufficiently long text for reading.',
+    TxtEncoding encoding = TxtEncoding.utf8,
   ]) async => ok(
     await store.importBook(
       bytes: Stream.value(utf8.encode(source)),
@@ -68,8 +69,8 @@ void main() {
         format: LocalBookFormat.txt,
         filename: 'Title.txt',
         cancellation: token(),
-        encoding: TxtEncoding.utf8,
-        chooseEncoding: (_) async => TxtEncoding.utf8,
+        encoding: encoding,
+        chooseEncoding: (_) async => encoding,
       ),
     ),
   ).book;
@@ -756,24 +757,73 @@ void main() {
       );
     },
   );
-  Future<void> removeEncoding(LocalBookRecord old) async {
-    final key = old.content.detail.summary.key;
-    final f = File('${paths.localBooks.path}/${key.novelId}/manifest.json');
-    final map = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
-    map.remove('txtEncoding');
-    final bytes = utf8.encode(jsonEncode(map));
-    await f.writeAsBytes(bytes, flush: true);
-    await db.customStatement(
-      'UPDATE local_books SET manifest_hash=? WHERE digest=?',
-      [sha256.convert(bytes).toString(), key.novelId],
-    );
-  }
+  test(
+    'saved encoding wins until the user chooses another text display',
+    () async {
+      final before = await add('中文', TxtEncoding.gb18030);
+      final key = before.content.detail.summary.key;
+      final readBefore = fixtures.progress(before.content);
+      final generation = ok(
+        await library.beginProgressSession(key, cancellation: token()),
+      );
+      ok(
+        await library.saveProgress(
+          readBefore,
+          stamp: ProgressWriteStamp(generation: generation, sequence: 0),
+          cancellation: token(),
+        ),
+      );
+      final unchanged = ok(
+        await store.reparseBook(
+          key,
+          chooseEncoding: (_) async =>
+              throw StateError('Saved encoding needs no prompt'),
+          cancellation: token(),
+        ),
+      );
+      expect(unchanged.approximate, isFalse);
+      final same = ok(await store.read(key, cancellation: token()))!.content;
+      expect(same.txtEncoding, TxtEncoding.gb18030);
+      expect(same.chapters, before.content.chapters);
+
+      final recovered = ok(
+        await store.reparseBook(
+          key,
+          reviewText: true,
+          chooseEncoding: (preview) async {
+            expect(preview.samples[TxtEncoding.utf8], '中文');
+            expect(preview.samples[TxtEncoding.gb18030], isNot('中文'));
+            return TxtEncoding.utf8;
+          },
+          cancellation: token(),
+        ),
+      );
+      expect(recovered.approximate, isTrue);
+      final after = ok(await store.read(key, cancellation: token()))!.content;
+      expect(after.detail.summary.key, key);
+      expect(after.txtEncoding, TxtEncoding.utf8);
+      expect(
+        (after.chapters.single.blocks.single as ParagraphBlock).text,
+        '中文',
+      );
+      expect(
+        await File(
+          '${paths.localBooks.path}/${key.novelId}/original',
+        ).readAsBytes(),
+        utf8.encode('中文'),
+      );
+      final progress = ok(
+        await library.getProgress(key, cancellation: token()),
+      )!;
+      expect(progress.lastReadAt, readBefore.lastReadAt);
+      expect(progress.completed, isFalse);
+    },
+  );
 
   test(
     'history cleared during encoding preview is not resurrected; new session blocked',
     () async {
       final old = await add('中文正文用于编码预览');
-      await removeEncoding(old);
       final key = old.content.detail.summary.key;
       final generation = ok(
         await library.beginProgressSession(key, cancellation: token()),
@@ -788,6 +838,7 @@ void main() {
       final entered = Completer<void>(), choice = Completer<TxtEncoding>();
       final run = store.reparseBook(
         key,
+        reviewText: true,
         chooseEncoding: (_) {
           entered.complete();
           return choice.future;
@@ -809,15 +860,36 @@ void main() {
       );
     },
   );
+  test('an invalid manual display cannot replace the active book', () async {
+    final book = await add('plain');
+    final key = book.content.detail.summary.key;
+    final result = await store.reparseBook(
+      key,
+      reviewText: true,
+      encoding: TxtEncoding.utf16le,
+      chooseEncoding: (_) async => throw StateError('Invalid preview'),
+      cancellation: token(),
+    );
+    expect(result, isA<Failure<LocalReparseResult>>());
+    expect(
+      (result as Failure<LocalReparseResult>).failure.context,
+      FailureContext.textEncoding,
+    );
+    expect(
+      ok(await store.read(key, cancellation: token()))!.content.chapters,
+      book.content.chapters,
+    );
+    expect(await paths.localImportStaging.list().toList(), isEmpty);
+  });
   test(
     'cancel during pending preview releases maintenance without publishing',
     () async {
       final old = await add('中文正文用于编码预览');
-      await removeEncoding(old);
       final entered = Completer<void>();
       final cancellation = CancellationSource();
       final run = store.reparseBook(
         old.content.detail.summary.key,
+        reviewText: true,
         chooseEncoding: (_) {
           entered.complete();
           return Completer<TxtEncoding>().future;

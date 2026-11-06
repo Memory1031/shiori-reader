@@ -56,9 +56,15 @@ class QueuedStore extends LocalStore {
     NovelKey key, {
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
     required CancellationToken cancellation,
   }) async {
-    calls.add((key: key, token: cancellation, encoding: encoding));
+    calls.add((
+      key: key,
+      token: cancellation,
+      encoding: encoding,
+      reviewText: reviewText,
+    ));
     if (prompt &&
         books.any((b) => b.key == key && b.format == LocalBookFormat.txt)) {
       await chooseEncoding(

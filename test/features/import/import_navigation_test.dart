@@ -6,6 +6,7 @@ import 'package:shiori/features/import/import_overlay.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/contracts/import_source.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
+import 'import_flow_test.dart' show PreviewDecoder;
 import 'import_progress_test.dart'
     show Harness, cleanup, tick, strings, readFile, mount, shot;
 
@@ -59,15 +60,24 @@ Future<Object?> gesture(WidgetTester tester, String method) async {
 
 void main() {
   for (final view in [
-    (lang: 'zh', width: 360.0, brightness: Brightness.light),
-    (lang: 'en', width: 1000.0, brightness: Brightness.dark),
+    (lang: 'zh', width: 390.0, brightness: Brightness.light),
+    (lang: 'en', width: 320.0, brightness: Brightness.dark),
   ]) {
-    testWidgets('${view.lang} manual encoding menu is visible and owns back', (
+    testWidgets('${view.lang} TXT import only shows previews when needed', (
       tester,
     ) async {
-      final h = Harness(), capture = GlobalKey();
+      final h = Harness(
+        decoder: PreviewDecoder(
+          {'Book.txt'},
+          {
+            TxtEncoding.utf16le: '窗边的灯亮着。\n夜色渐深。',
+            TxtEncoding.utf16be: '捤笔梕唣庬绘。\n龠韞腜暙。',
+          },
+        ),
+      );
+      final capture = GlobalKey();
       cleanup(tester, h);
-      h.source.stage('Book');
+      final input = h.source.stage('Book');
       await h.controller.start();
       h.controller.open();
       await mount(
@@ -77,24 +87,27 @@ void main() {
         lang: view.lang,
         width: view.width,
         brightness: view.brightness,
-        scale: 1.6,
+        scale: view.lang == 'en' ? 1.8 : 1,
       );
-      await tester.tap(find.byType(DropdownButton<TxtEncoding?>));
       await tester.pumpAndSettle();
-      expect(find.text('GB18030 / GBK').hitTestable(), findsOneWidget);
-      await shot(tester, capture, 'review-encoding-${view.lang}-menu');
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(h.controller.panelOpen, isTrue);
-      expect(h.controller.encoding, isNull);
-      await tester.tap(find.byType(DropdownButton<TxtEncoding?>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('GB18030 / GBK').hitTestable());
-      await tester.pumpAndSettle();
-      expect(h.controller.encoding, TxtEncoding.gb18030);
-      expect(h.source.acked, isEmpty);
+      final l = strings(tester);
+      expect(find.byType(DropdownButton<TxtEncoding?>), findsNothing);
+      await shot(tester, capture, 'txt-ready-${view.lang}');
+      await tester.tap(find.text(l.importStart));
+      await tick(tester);
+      await readFile(tester, input);
+      expect(find.text(l.importEncodingHint), findsOneWidget);
+      expect(find.text('窗边的灯亮着。\n夜色渐深。'), findsOneWidget);
+      expect(find.text('UTF-16 LE'), findsNothing);
+      await shot(tester, capture, 'txt-preview-${view.lang}');
+      final choice = find.byKey(const ValueKey(TxtEncoding.utf16le));
+      await tester.ensureVisible(choice);
+      await tester.tap(choice);
+      await tick(tester);
+      h.store.gates.single.publishing.complete();
+      await tick(tester);
+      expect(h.source.acked, ['Book']);
       expect(tester.takeException(), isNull);
-      await shot(tester, capture, 'review-encoding-${view.lang}-selected');
     });
   }
 
@@ -128,26 +141,6 @@ void main() {
       expect(backs, 1);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.android),
-  );
-
-  testWidgets(
-    'manual TXT dropdown opens above import and sends the chosen encoding',
-    (tester) async {
-      final h = Harness();
-      cleanup(tester, h);
-      h.source.stage('Book');
-      await h.controller.start();
-      h.controller.open();
-      await mountNavigation(tester, h, () {});
-      await tester.tap(find.byType(DropdownButton<TxtEncoding?>));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await tester.tap(find.text('UTF-16 LE').hitTestable());
-      await tester.pumpAndSettle();
-      expect(h.controller.encoding, TxtEncoding.utf16le);
-      expect(tester.takeException(), isNull);
-      expect(find.text('Book.txt'), findsOneWidget);
-    },
   );
 
   for (final stage in ['receiving', 'importing', 'discarding']) {

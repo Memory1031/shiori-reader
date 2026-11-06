@@ -56,6 +56,7 @@ class ReparseStore
     NovelKey key, {
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
     required CancellationToken cancellation,
   }) async {
     called = true;
@@ -96,6 +97,7 @@ class BatchReparseStore extends ReparseStore {
     NovelKey key, {
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
     required CancellationToken cancellation,
   }) async {
     final index = calls.length;

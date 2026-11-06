@@ -1011,15 +1011,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'The file could not be read. Check access and choose it again.';
 
   @override
-  String get importEncodingHint =>
-      'Check the previews and choose the encoding that displays the text correctly.';
+  String get importEncodingHint => 'Choose the preview that reads correctly.';
 
   @override
-  String get importEncodingAuto => 'Text encoding: Automatic';
+  String get importUseText => 'Use this text';
+
+  @override
+  String get importEncodingAuto => 'Automatic';
 
   @override
   String get importEncodingInvalid =>
-      'Could not read the entire file using this encoding. Choose another encoding or check the original file.';
+      'Could not read all the text. Check the original file or save a copy as UTF-8 text and try again.';
 
   @override
   String get importDrm =>
@@ -1144,6 +1146,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localReparse => 'Reparse';
+
+  @override
+  String get localTextDisplay => 'Fix text display';
+
+  @override
+  String get localTextReviewHint =>
+      'Preview the saved file before updating this book.';
+
+  @override
+  String get localTextPreview => 'Preview text';
+
+  @override
+  String get localTextAdvanced => 'Advanced options';
+
+  @override
+  String get localTextDecodeFailure =>
+      'Could not read all the text this way. Check the original file.';
+
+  @override
+  String get localParseTimeout =>
+      'Processing took too long and was stopped. Your previous content was kept.';
 
   @override
   String get localReparseConfirm =>

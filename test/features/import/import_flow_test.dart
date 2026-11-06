@@ -115,7 +115,11 @@ class PreviewDecoder implements LocalBookDecoder {
   final names = <String>[];
   final encodings = <TxtEncoding?>[];
   final Set<String> pauseOn;
-  PreviewDecoder([this.pauseOn = const {}]);
+  final Map<TxtEncoding, String> samples;
+  PreviewDecoder([
+    this.pauseOn = const {},
+    this.samples = const {TxtEncoding.gb18030: '中文样本'},
+  ]);
   @override
   Future<LocalBookContent> decode(
     LocalImportSession session, {
@@ -124,13 +128,12 @@ class PreviewDecoder implements LocalBookDecoder {
     required CancellationToken cancellation,
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
   }) async {
     names.add(filename);
     encodings.add(encoding);
     if (pauseOn.contains(filename)) {
-      await chooseEncoding(
-        TxtEncodingPreview(const {TxtEncoding.gb18030: '中文样本'}),
-      );
+      await chooseEncoding(TxtEncodingPreview(samples));
     }
     return fakeParser(session);
   }
@@ -854,7 +857,6 @@ void main() {
         source.receive(id: 'b', name: 'b.txt', content: utf8.encode('beta'));
         source.receive(id: 'c', name: 'c.txt', content: utf8.encode('gamma'));
         await controller.start();
-        controller.setEncoding(TxtEncoding.utf16le);
         final run = controller.submit();
         await untilImport(() => controller.choosingEncoding);
         expect(decoder.names, ['a.txt']); // Batch pauses on the current item.
@@ -864,9 +866,7 @@ void main() {
         controller.confirmEncoding(TxtEncoding.gb18030);
         await run;
         expect(decoder.names, ['a.txt', 'b.txt', 'c.txt']);
-        // Manual override applies only to its own item; confirmations and
-        // overrides never carry into the next TXT.
-        expect(decoder.encodings, [TxtEncoding.utf16le, null, null]);
+        expect(decoder.encodings, [null, null, null]);
         expect(controller.items.map((i) => i.phase).toSet(), {
           ImportItemPhase.succeeded,
         });
@@ -1989,16 +1989,17 @@ void main() {
       controller.open();
       await tester.pumpAndSettle();
       late Future<void> run;
+      expect(find.byType(DropdownButton<TxtEncoding?>), findsNothing);
       await tester.runAsync(() async {
         run = controller.submit();
         await untilImport(() => controller.choosingEncoding);
       });
       await tester.pump();
       expect(find.text('a.txt'), findsOneWidget); // The paused TXT itself.
-      expect(find.text('请检查预览，选择文字显示正确的编码后继续。'), findsOneWidget);
+      expect(find.text('请选择文字显示正常的一项。'), findsOneWidget);
       expect(find.text('中文样本'), findsOneWidget);
       await tester.runAsync(() async {
-        await tester.tap(find.text('GB18030 / GBK'));
+        await tester.tap(find.text('使用此显示'));
         await run;
       });
       await tester.pumpAndSettle();

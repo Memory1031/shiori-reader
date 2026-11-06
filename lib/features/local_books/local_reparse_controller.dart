@@ -67,6 +67,7 @@ class LocalReparseController extends ChangeNotifier {
     required bool batch,
     required ReparseEncodingChooser chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
     bool? Function(NovelKey key)? exists,
   }) async {
     if (_disposed || busy) return;
@@ -104,6 +105,7 @@ class LocalReparseController extends ChangeNotifier {
         request,
         chooseEncoding,
         batch ? null : encoding,
+        !batch && reviewText,
       );
       switch (result) {
         case Success(:final value):
@@ -148,11 +150,13 @@ class LocalReparseController extends ChangeNotifier {
     CancellationSource request,
     ReparseEncodingChooser chooser,
     TxtEncoding? encoding,
+    bool reviewText,
   ) async {
     try {
       return await service.reparseBook(
         book.key,
         encoding: encoding,
+        reviewText: reviewText,
         cancellation: request.token,
         chooseEncoding: (preview) async {
           if (_disposed || request.token.isCancelled) {

@@ -19,7 +19,7 @@ abstract interface class EpubPresentationSession {
 class BookDecoder implements LocalBookDecoder {
   const BookDecoder({this.epubDiagnostics});
   final EpubDiagnosticSlot? epubDiagnostics;
-  static const parserVersion = 35;
+  static const parserVersion = 36;
   static const maxTxtBytes = LocalBookInputLimits.maxTxtBytes;
   static const maxEpubBytes = LocalBookInputLimits.maxEpubBytes;
   @override
@@ -30,6 +30,7 @@ class BookDecoder implements LocalBookDecoder {
     required CancellationToken cancellation,
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
   }) async {
     final builder = BytesBuilder(copy: false);
     final limit = format == LocalBookFormat.txt ? maxTxtBytes : maxEpubBytes;
@@ -44,7 +45,7 @@ class BookDecoder implements LocalBookDecoder {
     final bytes = builder.takeBytes();
     final key = session.key;
     if (format == LocalBookFormat.txt) {
-      final preview = await _inspect(bytes, encoding, cancellation);
+      final preview = await _inspect(bytes, encoding, reviewText, cancellation);
       checkLocalCancellation(cancellation);
       TxtEncoding chosen;
       if (preview.detected case final detected?) {
@@ -108,8 +109,9 @@ class BookDecoder implements LocalBookDecoder {
 Future<TxtEncodingPreview> _inspect(
   Uint8List b,
   TxtEncoding? e,
+  bool reviewText,
   CancellationToken t,
-) => runParserWorker(() => inspectTxt(b, e), t);
+) => runParserWorker(() => inspectTxt(b, e, reviewText: reviewText), t);
 Future<LocalBookContent> _txt(
   Uint8List b,
   NovelKey k,

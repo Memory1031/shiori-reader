@@ -163,6 +163,19 @@ String failureMessage(AppLocalizations strings, AppFailure failure) {
   if (failure.context == FailureContext.cacheMiss) {
     return strings.cacheMissMessage;
   }
+  if (failure.context == FailureContext.textEncoding) {
+    return strings.localTextDecodeFailure;
+  }
+  if (failure.context == FailureContext.textStructureLimit) {
+    return strings.importParseStructureLimit;
+  }
+  if (failure.context == FailureContext.localParseTimeout) {
+    return strings.localParseTimeout;
+  }
+  if (failure.context == FailureContext.invalidContent &&
+      failure.operation == Operation.libraryWrite) {
+    return strings.importInvalid;
+  }
   return switch (failure.kind) {
     FailureKind.network ||
     FailureKind.timeout => strings.connectionFailureMessage,

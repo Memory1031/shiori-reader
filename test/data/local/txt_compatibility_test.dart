@@ -5,7 +5,7 @@ import 'package:shiori/data/local/txt/txt_parser.dart';
 import 'package:shiori/data/local/txt/txt_headings.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/domain/contracts/local_books.dart';
-import 'parsers_test.dart' show utf16, original;
+import 'parsers_test.dart' show utf16, original, problem;
 
 final key = LocalBookIdentity.book('b' * 64);
 void main() {
@@ -69,13 +69,13 @@ void main() {
   });
   for (final le in [true, false]) {
     test(
-      'unmarked UTF16 ${le ? 'LE' : 'BE'} remains a confirmed candidate',
+      'unmarked UTF16 ${le ? 'LE' : 'BE'} with a strong lane is automatic',
       () {
         final bytes = utf16('Chapter 1\n中文😀𠮷\n', le: le).sublist(2);
         final preview = inspectTxt(bytes, null);
         final encoding = le ? TxtEncoding.utf16le : TxtEncoding.utf16be;
         expect(preview.samples[encoding], 'Chapter 1\n中文😀𠮷\n');
-        expect(preview.detected, isNull);
+        expect(preview.detected, encoding);
         expect(inspectTxt(bytes, encoding).samples.keys, [encoding]);
       },
     );
@@ -83,10 +83,99 @@ void main() {
   test(
     'ASCII is not guessed as UTF16 and invalid suffix is never selectable',
     () {
-      expect(txtUtf16Hint(utf8.encode('plain ASCII text')), isNull);
+      expect(txtUtf16Candidates(utf8.encode('plain ASCII text')), isEmpty);
       expect(
         () => inspectTxt([...utf8.encode('A' * 2000), 255], TxtEncoding.utf8),
         throwsA(isA<LocalParseException>()),
+      );
+    },
+  );
+  test('UTF16 evidence after the first 2048 code units is counted', () {
+    final bytes = utf16('${'中' * 2500}${'a' * 1600}').sublist(2);
+    expect(inspectTxt(bytes, null).detected, TxtEncoding.utf16le);
+  });
+  test('all encodings clean the same controls without dropping a suffix', () {
+    const before = '\x1a中\x01\x08\x1b[31m文\x1a\t\x7f\r\n\x1a\r尾\x0b页\x0c尾\x1a';
+    const after = '中[31m文\t\n\n尾\n页\x0c尾';
+    for (final encoding in TxtEncoding.values) {
+      final bytes = switch (encoding) {
+        TxtEncoding.utf8 => utf8.encode(before),
+        TxtEncoding.utf16le => utf16(before),
+        TxtEncoding.utf16be => utf16(before, le: false),
+        TxtEncoding.gb18030 => [
+          for (final point in before.runes)
+            ...switch (point) {
+              0x4e2d => [0xd6, 0xd0],
+              0x6587 => [0xce, 0xc4],
+              0x5c3e => [0xce, 0xb2],
+              0x9875 => [0xd2, 0xb3],
+              _ => [point],
+            },
+        ],
+      };
+      expect(inspectTxt(bytes, encoding).samples[encoding], after);
+      expect(original(parseTxt(bytes, key, 'x.txt', encoding)), after);
+    }
+  });
+  test('content erased by cleanup is invalid, not an encoding failure', () {
+    final bytes = utf8.encode('\x1a\r\x0b\x7f\t　');
+    expect(
+      () => inspectTxt(bytes, null),
+      throwsA(problem(LocalParseProblem.invalid)),
+    );
+    expect(
+      () => parseTxt(bytes, key, 'x.txt', TxtEncoding.utf8),
+      throwsA(problem(LocalParseProblem.invalid)),
+    );
+  });
+  test('actual NUL and malformed BOM tails still fail for TXT', () {
+    for (final bytes in [
+      utf16('A\u0000B'),
+      [...utf16('A' * 1000), 0x00, 0xd8],
+      [0xef, 0xbb, 0xbf, ...utf8.encode('A' * 1000), 0xff],
+    ]) {
+      expect(
+        () => inspectTxt(bytes, null),
+        throwsA(problem(LocalParseProblem.encoding)),
+      );
+    }
+  });
+  test('resource decode is unchanged and TXT keeps the second BOM as text', () {
+    final bytes = utf8.encode('\ufeff\ufeff正文');
+    expect(decodeTxt(bytes, TxtEncoding.utf8), '正文');
+    expect(
+      original(parseTxt(bytes, key, 'x.txt', TxtEncoding.utf8)),
+      '\ufeff正文',
+    );
+    expect(
+      () => decodeTxt(utf8.encode('正文\x1a'), TxtEncoding.utf8),
+      throwsA(problem(LocalParseProblem.encoding)),
+    );
+  });
+  test(
+    'clean headings keep original scalar offsets and Unicode in body blocks',
+    () {
+      const body = '　\u00a0\t😀\u200c\u200d\u200f\ufe0f�\ufeff';
+      const text = '第一章\r\n$body\x1a\r\x1a\n第\x1a二章\r\n后文';
+      final parsed = parseTxt(
+        utf8.encode(text),
+        key,
+        'x.txt',
+        TxtEncoding.utf8,
+      );
+      final offset = text.substring(0, text.indexOf('第\x1a二章')).runes.length;
+      expect(
+        parsed.chapters.last.key,
+        LocalBookIdentity.chapter(key, 'txt:$offset'),
+      );
+      expect(parsed.chapters.last.title, '第二章');
+      expect(original(parsed), '第一章\n$body\n\n第二章\n后文');
+      expect(
+        original(parsed),
+        inspectTxt(
+          utf8.encode(text),
+          TxtEncoding.utf8,
+        ).samples[TxtEncoding.utf8],
       );
     },
   );

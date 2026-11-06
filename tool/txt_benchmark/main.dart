@@ -14,7 +14,7 @@ void main(List<String> args) {
   final text = (unit * (size ~/ unit.length + 1)).substring(0, size);
   final bytes = utf8.encode(text);
   final clock = Stopwatch()..start();
-  final decoded = decodeTxt(bytes, TxtEncoding.utf8);
+  final decoded = decodeTxtSource(bytes, TxtEncoding.utf8);
   final decodeMs = clock.elapsedMilliseconds;
   clock.reset();
   final preview = inspectTxt(bytes, null);

@@ -5,8 +5,9 @@ Future<LocalReparseResult> _reparse(
   NovelKey key,
   ChooseTxtEncoding choose,
   TxtEncoding? encoding,
-  CancellationToken token,
-) async {
+  CancellationToken token, {
+  required bool reviewText,
+}) async {
   checkLocalCancellation(token);
   final old = await store._read(key, token: token);
   if (old == null) throw const FormatException('Missing book');
@@ -38,7 +39,14 @@ Future<LocalReparseResult> _reparse(
   try {
     await store._retireSearchSnapshot(key);
     store._invalidations.add(key);
-    prepared = await _prepareReparse(store, old, choose, encoding, token);
+    prepared = await _prepareReparse(
+      store,
+      old,
+      choose,
+      encoding,
+      token,
+      reviewText: reviewText,
+    );
     final migration = await _migrate(
       old.content,
       prepared.content,
@@ -96,8 +104,9 @@ Future<_PreparedReparse> _prepareReparse(
   LocalBookRecord old,
   ChooseTxtEncoding choose,
   TxtEncoding? encoding,
-  CancellationToken token,
-) async {
+  CancellationToken token, {
+  bool reviewText = false,
+}) async {
   final key = old.content.detail.summary.key;
   final stage = await store.paths.localImportStaging.createTemp('import-');
   _ImportSession? session;
@@ -115,13 +124,17 @@ Future<_PreparedReparse> _prepareReparse(
       throw const _OriginalCorrupt();
     }
     session = _ImportSession(key, stage, token, await copy.length());
+    final saved = reviewText ? null : old.content.txtEncoding;
     final parsed = await store._automaticDecoder.decode(
       session,
       format: old.format,
       filename: '${old.content.detail.summary.title}.${old.format.name}',
       cancellation: token,
-      chooseEncoding: choose,
-      encoding: encoding ?? old.content.txtEncoding,
+      chooseEncoding: encoding == null && saved != null
+          ? (_) async => saved
+          : choose,
+      encoding: encoding ?? saved,
+      reviewText: reviewText,
     );
     await session.finish();
     final written = await _writeParsedArtifacts(

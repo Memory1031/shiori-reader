@@ -1817,19 +1817,25 @@ abstract class AppLocalizations {
   /// No description provided for @importEncodingHint.
   ///
   /// In en, this message translates to:
-  /// **'Check the previews and choose the encoding that displays the text correctly.'**
+  /// **'Choose the preview that reads correctly.'**
   String get importEncodingHint;
+
+  /// No description provided for @importUseText.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this text'**
+  String get importUseText;
 
   /// No description provided for @importEncodingAuto.
   ///
   /// In en, this message translates to:
-  /// **'Text encoding: Automatic'**
+  /// **'Automatic'**
   String get importEncodingAuto;
 
   /// No description provided for @importEncodingInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Could not read the entire file using this encoding. Choose another encoding or check the original file.'**
+  /// **'Could not read all the text. Check the original file or save a copy as UTF-8 text and try again.'**
   String get importEncodingInvalid;
 
   /// No description provided for @importDrm.
@@ -2023,6 +2029,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reparse'**
   String get localReparse;
+
+  /// No description provided for @localTextDisplay.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix text display'**
+  String get localTextDisplay;
+
+  /// No description provided for @localTextReviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview the saved file before updating this book.'**
+  String get localTextReviewHint;
+
+  /// No description provided for @localTextPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview text'**
+  String get localTextPreview;
+
+  /// No description provided for @localTextAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced options'**
+  String get localTextAdvanced;
+
+  /// No description provided for @localTextDecodeFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read all the text this way. Check the original file.'**
+  String get localTextDecodeFailure;
+
+  /// No description provided for @localParseTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing took too long and was stopped. Your previous content was kept.'**
+  String get localParseTimeout;
 
   /// No description provided for @localReparseConfirm.
   ///

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../app/theme/shiori_theme.dart';
 import '../../domain/contracts/contracts.dart';
 import '../../domain/models/models.dart';
 import '../../domain/contracts/local_book_decoder.dart';
@@ -12,6 +13,7 @@ import '../../shared/widgets/shiori_feedback.dart';
 import 'local_reparse_controller.dart';
 import '../bookshelf/book_selection_controller.dart';
 import '../bookshelf/book_batch_views.dart';
+import '../import/txt_preview_choices.dart';
 
 enum LocalReparseIntent { single, selected, all }
 
@@ -78,6 +80,7 @@ class LocalReparseFlow extends ChangeNotifier {
     Iterable<LocalReparseTarget> books, {
     bool batch = false,
     bool desktop = false,
+    bool reviewText = false,
     LocalReparseIntent? intent,
     int excluded = 0,
     bool? Function(NovelKey key)? exists,
@@ -88,6 +91,11 @@ class LocalReparseFlow extends ChangeNotifier {
     batch = selected || intent == LocalReparseIntent.all || batch;
     final targets = List<LocalReparseTarget>.of(books);
     if (targets.isEmpty) return null;
+    reviewText =
+        reviewText &&
+        !batch &&
+        targets.length == 1 &&
+        targets.single.format == LocalBookFormat.txt;
     final session = _session = CancellationSource();
     _busy = true;
     _modal = desktop || selected;
@@ -132,48 +140,72 @@ class LocalReparseFlow extends ChangeNotifier {
                   ),
                 ],
               )
-            : StatefulBuilder(
-                builder: (context, change) => AlertDialog(
-                  title: Text(batch ? l.localReparseAll : l.localReparse),
-                  scrollable: true,
+            : reviewText
+            ? StatefulBuilder(
+                builder: (context, change) => BookBatchPanel(
+                  title: l.localTextDisplay,
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        batch
-                            ? l.localReparseAllConfirm(targets.length)
-                            : l.localReparseConfirm,
-                      ),
-                      if (!batch &&
-                          targets.single.format == LocalBookFormat.txt)
-                        DropdownButton<TxtEncoding>(
-                          isExpanded: true,
-                          value: encoding,
-                          hint: Text(l.importEncodingAuto),
-                          items: [
-                            for (final e in TxtEncoding.values)
+                      Text(l.localTextReviewHint),
+                      ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        title: Text(l.localTextAdvanced),
+                        children: [
+                          DropdownButton<TxtEncoding?>(
+                            isExpanded: true,
+                            value: encoding,
+                            items: [
                               DropdownMenuItem(
-                                value: e,
-                                child: Text(e.name.toUpperCase()),
+                                value: null,
+                                child: Text(l.importEncodingAuto),
                               ),
-                          ],
-                          onChanged: (e) => change(() => encoding = e),
-                        ),
+                              for (final e in TxtEncoding.values)
+                                DropdownMenuItem(
+                                  value: e,
+                                  child: Text(txtEncodingName(e)),
+                                ),
+                            ],
+                            onChanged: (e) => change(() => encoding = e),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialog, false),
-                      child: Text(l.importCancel),
+                    BookBatchAction(
+                      l.importCancel,
+                      () => Navigator.pop(dialog, false),
                     ),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(dialog, true),
-                      child: Text(batch ? l.localReparseAll : l.localReparse),
+                    BookBatchAction(
+                      l.localTextPreview,
+                      () => Navigator.pop(dialog, true),
+                      primary: true,
                     ),
                   ],
                 ),
+              )
+            : AlertDialog(
+                title: Text(batch ? l.localReparseAll : l.localReparse),
+                scrollable: true,
+                content: Text(
+                  batch
+                      ? l.localReparseAllConfirm(targets.length)
+                      : l.localReparseConfirm,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialog, false),
+                    child: Text(l.importCancel),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dialog, true),
+                    child: Text(batch ? l.localReparseAll : l.localReparse),
+                  ),
+                ],
               ),
-        panel: selected,
+        panel: selected || reviewText,
         cancellation: session.token,
       );
       if (confirmed != true ||
@@ -190,26 +222,36 @@ class LocalReparseFlow extends ChangeNotifier {
                 targets,
                 batch: batch,
                 encoding: encoding,
+                reviewText: reviewText,
                 exists: exists,
                 chooseEncoding: (book, preview) => _dialog<TxtEncoding>(
                   context,
                   (dialog) {
-                    final choices = Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(l.importEncodingHint),
-                        for (final entry in preview.samples.entries)
-                          ListTile(
-                            title: Text(entry.key.name.toUpperCase()),
-                            subtitle: Text(entry.value),
-                            onTap: () => Navigator.pop(dialog, entry.key),
-                          ),
-                      ],
+                    final choices = TxtPreviewChoices(
+                      preview: preview,
+                      onChoice: (encoding) => Navigator.pop(dialog, encoding),
                     );
-                    return selected
+                    return selected || reviewText
                         ? BookBatchPanel(
-                            title: book.title,
-                            content: choices,
+                            title: reviewText ? l.localTextPreview : book.title,
+                            content: reviewText
+                                ? Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        book.title,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(
+                                        height: ShioriSpace.medium,
+                                      ),
+                                      choices,
+                                    ],
+                                  )
+                                : choices,
                             actions: [
                               BookBatchAction(
                                 l.importCancel,
@@ -219,9 +261,10 @@ class LocalReparseFlow extends ChangeNotifier {
                           )
                         : AlertDialog(
                             title: Text(book.title),
+                            scrollable: true,
                             content: SizedBox(
-                              width: 420,
-                              child: SingleChildScrollView(child: choices),
+                              width: ShioriLayout.panel,
+                              child: choices,
                             ),
                             actions: [
                               TextButton(
@@ -231,7 +274,7 @@ class LocalReparseFlow extends ChangeNotifier {
                             ],
                           );
                   },
-                  panel: selected,
+                  panel: selected || reviewText,
                   cancellation: controller.cancellation,
                 ),
               ),

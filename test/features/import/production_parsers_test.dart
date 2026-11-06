@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,7 @@ import 'package:shiori/features/import/import_controller.dart';
 import 'package:shiori/features/import/import_overlay.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
 import '../../data/local/support/epub_fixtures.dart';
+import '../../data/local/parsers_test.dart' show ambiguousUtf16Bytes, original;
 import 'import_flow_test.dart' show MemorySource;
 
 class RejectingDecoder implements LocalBookDecoder {
@@ -30,6 +32,7 @@ class RejectingDecoder implements LocalBookDecoder {
     required CancellationToken cancellation,
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
   }) {
     if (filename == 'reject.txt') throw LocalParseException(problem);
     return const BookDecoder().decode(
@@ -39,6 +42,7 @@ class RejectingDecoder implements LocalBookDecoder {
       cancellation: cancellation,
       chooseEncoding: chooseEncoding,
       encoding: encoding,
+      reviewText: reviewText,
     );
   }
 }
@@ -304,52 +308,46 @@ void main() {
     },
   );
 
-  test(
-    'strict encoding failure preserves receipt, manual retry commits and deduplicates',
-    () async {
-      source.bytes = [0xd6, 0xd0, 0xce, 0xc4];
-      source.receive(name: '中文.txt');
-      await controller.start();
-      controller.setEncoding(TxtEncoding.utf8);
-      await controller.submit();
-      expect(controller.problem, ImportProblem.encoding);
-      expect(source.acked, isEmpty);
-      controller.setEncoding(TxtEncoding.gb18030);
-      final submit = controller.submit();
-      await until(() => controller.choosingEncoding);
-      expect(
-        (await db.customSelect('SELECT * FROM local_books').get()),
-        isEmpty,
-      );
-      controller.confirmEncoding(TxtEncoding.gb18030);
-      await submit;
-      expect(controller.phase, ImportPhase.succeeded);
-      final first = controller.result!;
-      expect(first.content.detail.summary.title, '中文');
-      expect(
-        (first.content.chapters.single.blocks.single as ParagraphBlock).text,
-        '中文',
-      );
-      await controller.finish();
-      source.receive(id: 'again', name: '改名.txt');
-      await controller.refresh();
-      await controller
-          .submit(); // Existing byte identity skips parsing and prompts.
-      expect(controller.choosingEncoding, false);
-      expect(
-        controller.result!.content.detail.summary.key,
-        first.content.detail.summary.key,
-      );
-      expect(
-        (await db.customSelect('SELECT * FROM local_books').get()).length,
-        1,
-      );
-    },
-  );
+  test('automatic GBK preserves original bytes and deduplicates', () async {
+    final bytes = source.bytes = [0x1a, 0xd6, 0xd0, 0xce, 0xc4, 0x1a];
+    source.receive(name: '中文.txt');
+    await controller.start();
+    await controller.submit();
+    expect(controller.phase, ImportPhase.succeeded);
+    final first = controller.result!;
+    expect(first.content.detail.summary.title, '中文');
+    expect(first.content.txtEncoding, TxtEncoding.gb18030);
+    final key = first.content.detail.summary.key;
+    expect(key.novelId, sha256.convert(bytes).toString());
+    expect(
+      await File(
+        '${paths.localBooks.path}/${key.novelId}/original',
+      ).readAsBytes(),
+      bytes,
+    );
+    expect(
+      (first.content.chapters.single.blocks.single as ParagraphBlock).text,
+      '中文',
+    );
+    await controller.finish();
+    source.receive(id: 'again', name: '改名.txt');
+    await controller.refresh();
+    await controller
+        .submit(); // Existing byte identity skips parsing and prompts.
+    expect(controller.choosingEncoding, false);
+    expect(
+      controller.result!.content.detail.summary.key,
+      first.content.detail.summary.key,
+    );
+    expect(
+      (await db.customSelect('SELECT * FROM local_books').get()).length,
+      1,
+    );
+  });
   test(
     'cancel or shutdown during encoding selection unwinds parser and storage',
     () async {
-      source.bytes = [0xd6, 0xd0];
+      source.bytes = ambiguousUtf16Bytes;
       source.receive();
       await controller.start();
       final submit = controller.submit();
@@ -445,22 +443,17 @@ void main() {
     },
   );
   test(
-    'unmarked UTF16 reaches preview without manually selecting encoding',
+    'unmarked UTF16 with one evidenced byte order imports automatically',
     () async {
       source.bytes = [
         for (final c in 'Chapter 1\n中文😀𠮷'.codeUnits) ...[c & 255, c >> 8],
       ];
       source.receive();
       await controller.start();
-      final submit = controller.submit();
-      await until(() => controller.choosingEncoding);
-      expect(
-        controller.encodingPreview!.samples[TxtEncoding.utf16le],
-        'Chapter 1\n中文😀𠮷',
-      );
-      controller.confirmEncoding(TxtEncoding.utf16le);
-      await submit;
+      await controller.submit();
       expect(controller.phase, ImportPhase.succeeded);
+      expect(controller.result!.content.txtEncoding, TxtEncoding.utf16le);
+      expect(original(controller.result!.content), 'Chapter 1\n中文😀𠮷');
     },
   );
   test(
@@ -474,28 +467,14 @@ void main() {
       expect(await db.customSelect('SELECT * FROM local_books').get(), isEmpty);
     },
   );
-  test(
-    'manual UTF16 without BOM is previewed through intake validation',
-    () async {
-      source.bytes = [
-        for (final c in 'Manual 中文'.codeUnits) ...[c & 255, c >> 8],
-      ];
-      source.receive();
-      await controller.start();
-      controller.setEncoding(TxtEncoding.utf16le);
-      final submit = controller.submit();
-      await until(() => controller.choosingEncoding);
-      controller.confirmEncoding(TxtEncoding.utf16le);
-      await submit;
-      expect(controller.phase, ImportPhase.succeeded);
-      expect(
-        (controller.result!.content.chapters.single.blocks.single
-                as ParagraphBlock)
-            .text,
-        'Manual 中文',
-      );
-    },
-  );
+  test('control-only TXT is reported as invalid content', () async {
+    source.bytes = utf8.encode('\x1a\t\n\x7f');
+    source.receive();
+    await controller.start();
+    await controller.submit();
+    expect(controller.problem, ImportProblem.invalidContent);
+    expect(source.acked, isEmpty);
+  });
   test(
     'invalid semantic navigation is rolled back at the storage boundary',
     () async {
@@ -579,7 +558,7 @@ void main() {
       '$locale encoding preview is usable with large text and preserves reader',
       (tester) async {
         await tester.runAsync(() async {
-          source.bytes = [0xd6, 0xd0, 0xce, 0xc4];
+          source.bytes = ambiguousUtf16Bytes;
           source.receive();
           await controller.start();
           controller.open();
@@ -606,11 +585,13 @@ void main() {
           ),
         );
         await tester.pump();
-        expect(find.text('中文'), findsOneWidget);
+        expect(find.textContaining('ABCDEF'), findsOneWidget);
+        expect(find.text('UTF-16 LE'), findsNothing);
         expect(find.text('Existing reader'), findsOneWidget);
         expect(tester.takeException(), isNull);
-        await tester.ensureVisible(find.text('GB18030 / GBK'));
-        await tester.tap(find.text('GB18030 / GBK'));
+        final choice = find.byKey(const ValueKey(TxtEncoding.utf16le));
+        await tester.ensureVisible(choice);
+        await tester.tap(choice);
         await tester.runAsync(
           () => until(() => controller.phase == ImportPhase.succeeded),
         );

@@ -19,10 +19,7 @@ LocalBookContent parseTxt(
   String filename,
   TxtEncoding encoding,
 ) {
-  final text = decodeTxt(bytes, encoding);
-  if (text.trim().isEmpty) {
-    throw const LocalParseException(LocalParseProblem.invalid);
-  }
+  final text = decodeTxtSource(bytes, encoding);
   final title = filenameTitle(filename);
   final chapters = <ChapterContent>[];
   var blocks = <ContentBlock>[];
@@ -58,7 +55,7 @@ LocalBookContent parseTxt(
   }
 
   void line(String original, bool isHeading) {
-    final trimmed = original.trim();
+    final cleaned = cleanTxtText(original);
 
     if (isHeading) {
       // Whitespace preceding the first heading remains with that first chapter.
@@ -70,11 +67,13 @@ LocalBookContent parseTxt(
         flush();
         chapterStart = offset;
       }
-      chapterTitle = trimmed;
+      chapterTitle = cleaned.trim();
     }
-    blocks.add(
-      isHeading ? HeadingBlock(text: original) : ParagraphBlock(text: original),
-    );
+    if (cleaned.isNotEmpty) {
+      blocks.add(
+        isHeading ? HeadingBlock(text: cleaned) : ParagraphBlock(text: cleaned),
+      );
+    }
     offset += original.runes.length;
   }
 
@@ -83,6 +82,9 @@ LocalBookContent parseTxt(
     line(text.substring(range.start, range.end), headings.contains(i));
   }
   flush();
+  if (chapters.isEmpty) {
+    throw const LocalParseException(LocalParseProblem.invalid);
+  }
   return LocalBookContent(
     txtEncoding: encoding,
     detail: NovelDetail(

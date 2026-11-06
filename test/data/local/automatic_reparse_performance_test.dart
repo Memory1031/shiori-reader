@@ -25,6 +25,7 @@ class _ObservedDecoder extends BookDecoder {
     required CancellationToken cancellation,
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
   }) {
     if (!entered.isCompleted) entered.complete();
     return super.decode(

@@ -22,6 +22,7 @@ class GatedReparse implements LocalBookReparse {
     NovelKey key, {
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
     required CancellationToken cancellation,
   }) {
     final result = Completer<Result<LocalReparseResult>>();

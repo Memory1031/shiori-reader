@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import '../../app/theme/shiori_theme.dart';
 import 'package:flutter/services.dart';
 import '../../domain/contracts/import_source.dart';
-import '../../domain/contracts/local_book_decoder.dart';
 import '../../domain/contracts/local_books.dart';
 import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import 'import_controller.dart';
+import 'txt_preview_choices.dart';
 import '../../shared/widgets/shiori_task_progress_bar.dart';
 
 String _problemText(AppLocalizations l, ImportProblem p) => switch (p) {
@@ -512,21 +512,6 @@ class _ImportPanelState extends State<_ImportPanel> {
             Text(_problemText(l, problem), key: const ValueKey('import-error'))
           else
             Text(l.importHint),
-          if (!c.busy && !done && name.toLowerCase().endsWith('.txt'))
-            DropdownButton<TxtEncoding?>(
-              isExpanded: true,
-              value: c.encoding,
-              hint: Text(l.importEncodingAuto),
-              items: [
-                DropdownMenuItem(
-                  value: null,
-                  child: Text(l.importEncodingAuto),
-                ),
-                for (final e in TxtEncoding.values)
-                  DropdownMenuItem(value: e, child: Text(_encodingName(e))),
-              ],
-              onChanged: c.setEncoding,
-            ),
           if (!c.busy && !done && name.toLowerCase().endsWith('.epub'))
             Text(l.importEpubSupport),
           const SizedBox(height: ShioriSpace.item),
@@ -741,15 +726,10 @@ class _ImportPanelState extends State<_ImportPanel> {
               ),
             ),
           const SizedBox(height: ShioriSpace.medium),
-          Text(l.importEncodingHint),
-          for (final entry in c.encodingPreview!.samples.entries) ...[
-            const SizedBox(height: ShioriSpace.medium),
-            Text(entry.value),
-            OutlinedButton(
-              onPressed: () => c.confirmEncoding(entry.key),
-              child: Text(_encodingName(entry.key)),
-            ),
-          ],
+          TxtPreviewChoices(
+            preview: c.encodingPreview!,
+            onChoice: c.confirmEncoding,
+          ),
           const SizedBox(height: ShioriSpace.item),
           Align(
             alignment:
@@ -775,13 +755,6 @@ class _ImportPanelState extends State<_ImportPanel> {
     if (size <= 0) return null;
     return (c.copiedBytes / size).clamp(0.0, 1.0);
   }
-
-  String _encodingName(TxtEncoding e) => switch (e) {
-    TxtEncoding.utf8 => 'UTF-8',
-    TxtEncoding.utf16le => 'UTF-16 LE',
-    TxtEncoding.utf16be => 'UTF-16 BE',
-    TxtEncoding.gb18030 => 'GB18030 / GBK',
-  };
 }
 
 /// One staged file: icon + readable status (never color-only), ellipsized

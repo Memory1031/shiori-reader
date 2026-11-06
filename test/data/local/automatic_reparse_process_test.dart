@@ -29,6 +29,7 @@ class _CrashDecoder extends BookDecoder {
     required CancellationToken cancellation,
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
   }) async {
     await crash();
     throw StateError('Unreachable');

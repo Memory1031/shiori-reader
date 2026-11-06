@@ -1,3 +1,4 @@
+import 'parsers_test.dart' show ambiguousUtf16Bytes;
 import 'dart:async';
 import 'package:shiori/data/repositories/user_bookmark_repository.dart';
 import 'package:shiori/domain/bookmark_position.dart';
@@ -52,6 +53,7 @@ class GateDecoder implements LocalBookDecoder {
     required CancellationToken cancellation,
     required ChooseTxtEncoding chooseEncoding,
     TxtEncoding? encoding,
+    bool reviewText = false,
   }) async {
     calls.add(session.key);
     if (!entered.isCompleted) {
@@ -68,6 +70,7 @@ class GateDecoder implements LocalBookDecoder {
         cancellation: cancellation,
         chooseEncoding: chooseEncoding,
         encoding: encoding,
+        reviewText: reviewText,
       );
     } finally {
       exited = true;
@@ -147,11 +150,14 @@ void main() {
     String text, {
     bool shelf = false,
     bool epub = false,
+    List<int>? txtBytes,
   }) async {
     final format = epub ? LocalBookFormat.epub : LocalBookFormat.txt;
     final result = ok(
       await store.importBook(
-        bytes: Stream.value(epub ? zipFiles(epubFiles()) : utf8.encode(text)),
+        bytes: Stream.value(
+          epub ? zipFiles(epubFiles()) : txtBytes ?? utf8.encode(text),
+        ),
         format: format,
         addToShelf: shelf,
         cancellation: token(),
@@ -160,7 +166,7 @@ void main() {
           format: format,
           filename: '$text.${format.name}',
           cancellation: token(),
-          chooseEncoding: (_) async => TxtEncoding.utf8,
+          chooseEncoding: (p) async => p.samples.keys.first,
         ),
       ),
     ).book;
@@ -1950,7 +1956,7 @@ WHEN NEW.outcome='cancelled' BEGIN SELECT RAISE(ABORT,'Injected cancellation fai
   test(
     'strict saved TXT chooser succeeds; ambiguous missing encoding is terminal',
     () async {
-      final a = await add('中文正文用于编码预览');
+      final a = await add('Ambiguous', txtBytes: ambiguousUtf16Bytes);
       final key = a.content.detail.summary.key;
       final file = File(
         '${paths.localBooks.path}/${key.novelId}/manifest.json',
