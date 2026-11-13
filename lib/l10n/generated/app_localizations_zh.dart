@@ -579,6 +579,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeSettingsTitle => '设置';
 
   @override
+  String get homeSettingsApp => '应用';
+
+  @override
   String get homeSettingsStorage => '书籍与存储';
 
   @override

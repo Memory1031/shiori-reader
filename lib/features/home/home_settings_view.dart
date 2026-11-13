@@ -20,6 +20,30 @@ class HomeSettingsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context);
+    final app = [
+      if (onAppearance case final open?)
+        _entry(context, Icons.palette_outlined, strings.appAppearance, open),
+      if (onUpdates case final open?)
+        _entry(context, Icons.info_outline, strings.updateTitle, open),
+    ];
+    final storage = [
+      if (onLocalBooks case final open?)
+        _entry(
+          context,
+          Icons.folder_outlined,
+          strings.localBooksTitle,
+          open,
+          description: strings.homeSettingsLocalBooksDescription,
+        ),
+      if (onOfflineContent case final open?)
+        _entry(
+          context,
+          Icons.offline_pin_outlined,
+          strings.cacheTitle,
+          open,
+          description: strings.homeSettingsOfflineDescription,
+        ),
+    ];
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
@@ -32,99 +56,46 @@ class HomeSettingsView extends StatelessWidget {
             ShioriSpace.page,
           ),
           children: [
-            if (onAppearance != null)
-              _group(context, [
-                _entry(
-                  context,
-                  Icons.palette_outlined,
-                  strings.appAppearance,
-                  onAppearance!,
-                ),
-              ]),
-            if (onLocalBooks != null || onOfflineContent != null)
-              _group(context, [
-                if (onLocalBooks != null)
-                  _entry(
-                    context,
-                    Icons.folder_outlined,
-                    strings.localBooksTitle,
-                    onLocalBooks!,
-                    description: strings.homeSettingsLocalBooksDescription,
-                  ),
-                if (onOfflineContent != null)
-                  _entry(
-                    context,
-                    Icons.offline_pin_outlined,
-                    strings.cacheTitle,
-                    onOfflineContent!,
-                    description: strings.homeSettingsOfflineDescription,
-                  ),
-              ], title: strings.homeSettingsStorage),
-            if (onUpdates != null)
-              _group(context, [
-                _entry(
-                  context,
-                  Icons.info_outline,
-                  strings.updateTitle,
-                  onUpdates!,
-                ),
-              ]),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: ShioriSpace.item),
-              child: Text(
-                strings.appTitle,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
+            if (app.isNotEmpty) _group(context, strings.homeSettingsApp, app),
+            if (app.isNotEmpty && storage.isNotEmpty)
+              const SizedBox(height: ShioriSpace.page),
+            if (storage.isNotEmpty)
+              _group(context, strings.homeSettingsStorage, storage),
           ],
         ),
       ),
     );
   }
 
-  Widget _group(BuildContext context, List<Widget> entries, {String? title}) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: ShioriSpace.item),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (title != null)
-              Padding(
-                padding: const EdgeInsetsDirectional.only(
-                  start: ShioriSpace.item,
-                  bottom: ShioriSpace.small,
-                ),
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-            Material(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(ShioriShape.card),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  for (var i = 0; i < entries.length; i++) ...[
-                    if (i > 0)
-                      Divider(
-                        height: 1,
-                        thickness: .5,
-                        indent: ShioriSpace.item * 3 + ShioriSpace.small,
-                        endIndent: ShioriSpace.item,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.outlineVariant.withValues(alpha: .45),
-                      ),
-                    entries[i],
-                  ],
-                ],
-              ),
-            ),
-          ],
+  Widget _group(BuildContext context, String title, List<Widget> entries) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsetsDirectional.only(
+            start: ShioriSpace.item,
+            bottom: ShioriSpace.small,
+          ),
+          child: Semantics(
+            header: true,
+            child: Text(title, style: theme.textTheme.titleSmall),
+          ),
         ),
-      );
+        Material(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(ShioriShape.card),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: ListTile.divideTiles(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: .45),
+              tiles: entries,
+            ).toList(),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _entry(
     BuildContext context,
@@ -150,7 +121,7 @@ class HomeSettingsView extends StatelessWidget {
       ),
       title: Text(label),
       subtitle: description == null ? null : Text(description),
-      titleTextStyle: theme.textTheme.bodyMedium,
+      titleTextStyle: theme.textTheme.bodyLarge,
       subtitleTextStyle: theme.textTheme.bodySmall,
       trailing: Icon(Icons.chevron_right, size: ShioriSpace.page),
     );

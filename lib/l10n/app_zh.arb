@@ -218,6 +218,7 @@
   "homeShelf": "我的书架",
   "homeNavigation": "主导航",
   "homeSettingsTitle": "设置",
+  "homeSettingsApp": "应用",
   "homeSettingsStorage": "书籍与存储",
   "homeSettingsLocalBooksDescription": "管理已导入的书籍",
   "homeSettingsOfflineDescription": "管理已缓存的阅读内容",

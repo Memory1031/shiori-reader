@@ -604,6 +604,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeSettingsTitle => 'Settings';
 
   @override
+  String get homeSettingsApp => 'App';
+
+  @override
   String get homeSettingsStorage => 'Books and storage';
 
   @override

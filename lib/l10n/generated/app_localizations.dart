@@ -1214,6 +1214,12 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get homeSettingsTitle;
 
+  /// No description provided for @homeSettingsApp.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get homeSettingsApp;
+
   /// No description provided for @homeSettingsStorage.
   ///
   /// In en, this message translates to:
