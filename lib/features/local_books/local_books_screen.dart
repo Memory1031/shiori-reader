@@ -276,6 +276,10 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     final books = _lastBooks;
     final hasEpub = books.any((b) => b.format == LocalBookFormat.epub);
     final hasTxt = books.any((b) => b.format == LocalBookFormat.txt);
+    final showFormatFilter = hasEpub && hasTxt || _filter != null;
+    final summary = books.isEmpty
+        ? null
+        : _libraryCard(context, books, showCounts: !showFormatFilter);
     final filter = _filter;
     final shown = filter == null
         ? books
@@ -314,22 +318,22 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
                 else ...[
                   if (snapshot.data case Failure(:final failure))
                     SliverToBoxAdapter(child: FailureView(failure: failure)),
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      inset,
-                      ShioriSpace.small,
-                      inset,
-                      ShioriSpace.item,
+                  if (summary != null)
+                    SliverPadding(
+                      key: const ValueKey('local-library-summary-slot'),
+                      padding: EdgeInsets.fromLTRB(
+                        inset,
+                        ShioriSpace.small,
+                        inset,
+                        ShioriSpace.item,
+                      ),
+                      sliver: SliverToBoxAdapter(child: summary),
                     ),
-                    sliver: SliverToBoxAdapter(
-                      child: _libraryCard(context, books),
-                    ),
-                  ),
-                  if (hasEpub && hasTxt || _filter != null)
+                  if (showFormatFilter)
                     SliverPadding(
                       padding: EdgeInsets.fromLTRB(
                         inset,
-                        0,
+                        summary == null ? ShioriSpace.small : 0,
                         inset,
                         ShioriSpace.small,
                       ),
@@ -430,15 +434,25 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
 
   /// Shared library summary. Inline sessions keep their progress here across
   /// resizing; modal sessions show progress in their owning dialog.
-  Widget _libraryCard(BuildContext context, List<LocalBookInfo> books) {
+  Widget? _libraryCard(
+    BuildContext context,
+    List<LocalBookInfo> books, {
+    required bool showCounts,
+  }) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final epub = books.where((b) => b.format == LocalBookFormat.epub).length;
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: colors.onSurfaceVariant,
     );
     final failed = _failure != null;
+    final unfinished = books.where((b) => b.autoReparseIssue != null).length;
+    final processing =
+        (_operation?.busy == true && _reparseFlow?.modal == false) || _deleting;
+    final showResult = !_busy && (_batchSummary != null || failed);
+    if (!showCounts && unfinished == 0 && !processing && !showResult) {
+      return null;
+    }
     return DecoratedBox(
       key: const ValueKey('local-library-summary'),
       decoration: BoxDecoration(
@@ -449,44 +463,23 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
         padding: const EdgeInsets.all(ShioriSpace.item),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: ShioriSpace.small,
           children: [
-            Wrap(
-              spacing: ShioriSpace.medium,
-              runSpacing: ShioriSpace.tight,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  l.localBooksCount(books.length),
-                  style: theme.textTheme.titleLarge,
-                ),
-                Text('EPUB $epub · TXT ${books.length - epub}', style: muted),
-              ],
-            ),
-            const SizedBox(height: ShioriSpace.tight),
-            Text(l.localBooksSubtitle, style: muted),
-            if (books.any((book) => book.autoReparseIssue != null)) ...[
-              const SizedBox(height: ShioriSpace.tight),
+            if (showCounts)
               Text(
-                l.localAutoReparseUnfinished(
-                  books.where((book) => book.autoReparseIssue != null).length,
-                ),
-                style: muted,
+                l.localBooksCount(books.length),
+                style: theme.textTheme.titleLarge,
               ),
-            ],
-            if ((_operation?.busy == true && _reparseFlow?.modal == false) ||
-                _deleting) ...[
-              const SizedBox(height: ShioriSpace.item),
-              _reparseProgress(context),
-            ],
-            if (!_busy && (_batchSummary != null || failed)) ...[
-              const SizedBox(height: ShioriSpace.medium),
+            if (unfinished > 0)
+              Text(l.localAutoReparseUnfinished(unfinished), style: muted),
+            if (processing) _reparseProgress(context),
+            if (showResult)
               Text(
                 failed ? failureMessage(l, _failure!) : _batchSummary!,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: failed ? colors.error : colors.onSurfaceVariant,
                 ),
               ),
-            ],
           ],
         ),
       ),

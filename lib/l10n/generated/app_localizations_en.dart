@@ -604,26 +604,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeSettingsTitle => 'Settings';
 
   @override
-  String get homeSettingsAppearance => 'Appearance';
-
-  @override
   String get homeSettingsStorage => 'Books and storage';
-
-  @override
-  String get homeSettingsAbout => 'About';
-
-  @override
-  String get homeSettingsAppearanceDescription =>
-      'Theme and display preferences';
 
   @override
   String get homeSettingsLocalBooksDescription => 'Manage imported books';
 
   @override
   String get homeSettingsOfflineDescription => 'Manage cached reading content';
-
-  @override
-  String get homeSettingsAboutDescription => 'Version details and app updates';
 
   @override
   String get allChapters => 'All chapters';
@@ -1056,10 +1043,6 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
-
-  @override
-  String get localBooksSubtitle =>
-      'Your imported books, ready to read offline.';
 
   @override
   String localBooksImportedOn(String date) {
@@ -1781,7 +1764,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readerSearchBook => 'Search this book';
 
   @override
-  String get readerSearchHint => 'Enter a word or phrase, then search';
+  String get readerSearchHint => 'Enter a word or phrase';
 
   @override
   String get readerSearchSubmit => 'Search';

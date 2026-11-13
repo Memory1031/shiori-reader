@@ -218,13 +218,9 @@
   "homeShelf": "我的书架",
   "homeNavigation": "主导航",
   "homeSettingsTitle": "设置",
-  "homeSettingsAppearance": "外观",
   "homeSettingsStorage": "书籍与存储",
-  "homeSettingsAbout": "关于",
-  "homeSettingsAppearanceDescription": "主题与界面显示",
   "homeSettingsLocalBooksDescription": "管理已导入的书籍",
   "homeSettingsOfflineDescription": "管理已缓存的阅读内容",
-  "homeSettingsAboutDescription": "版本信息与应用更新",
   "allChapters": "全部章节",
   "onlineSource": "在线书源",
   "shelfDetails": "详情",
@@ -451,7 +447,6 @@
       }
     }
   },
-  "localBooksSubtitle": "已导入的书籍，随时离线阅读。",
   "localBooksImportedOn": "{date} 导入",
   "@localBooksImportedOn": {
     "placeholders": {
@@ -858,7 +853,7 @@
   "localAutoReparseTimeout": "等待重试：解析超时",
   "localAutoReparseOther": "自动更新失败，可手动重新解析",
   "readerSearchBook": "搜索本书",
-  "readerSearchHint": "输入词句，点击搜索",
+  "readerSearchHint": "输入词句",
   "readerSearchSubmit": "搜索",
   "readerSearchLoading": "正在搜索…",
   "readerSearchPaused": "搜索已暂停，仍可查看已找到的结果。",

@@ -210,45 +210,34 @@ void main() {
         expect(card, findsNothing);
         expect(find.text(h.l.localBooksEmpty), findsOneWidget);
       } else {
-        final epub = store.books
-            .where((b) => b.format == LocalBookFormat.epub)
-            .length;
-        expect(
-          find.descendant(
-            of: card,
-            matching: find.text(h.l.localBooksCount(count)),
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.descendant(
-            of: card,
-            matching: find.text('EPUB $epub · TXT ${count - epub}'),
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.descendant(
-            of: card,
-            matching: find.text(h.l.localBooksSubtitle),
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.byType(ChoiceChip),
-          format == null ? findsNWidgets(3) : findsNothing,
-        );
-        final decoration =
-            tester.widget<DecoratedBox>(card).decoration as BoxDecoration;
-        final context = tester.element(card);
-        expect(
-          decoration.color,
-          summarySurfaceColor(Theme.of(context).colorScheme),
-        );
-        expect(
-          decoration.borderRadius,
-          BorderRadius.circular(ShioriShape.card),
-        );
+        if (format == null) {
+          expect(card, findsNothing);
+          expect(find.byType(ChoiceChip), findsNWidgets(3));
+          expect(
+            find.widgetWithText(ChoiceChip, '${h.l.localFilterAll} $count'),
+            findsOneWidget,
+          );
+        } else {
+          expect(find.byType(ChoiceChip), findsNothing);
+          expect(
+            find.descendant(
+              of: card,
+              matching: find.text(h.l.localBooksCount(count)),
+            ),
+            findsOneWidget,
+          );
+          final decoration =
+              tester.widget<DecoratedBox>(card).decoration as BoxDecoration;
+          final context = tester.element(card);
+          expect(
+            decoration.color,
+            summarySurfaceColor(Theme.of(context).colorScheme),
+          );
+          expect(
+            decoration.borderRadius,
+            BorderRadius.circular(ShioriShape.card),
+          );
+        }
         expect(find.byIcon(Icons.more_horiz), findsNWidgets(count));
         await tester.tap(find.text(store.books.first.title));
         expect(h.reads, 1);
@@ -260,7 +249,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text(store.books[0].title), findsNothing);
         expect(find.text(store.books[1].title), findsOneWidget);
-        expect(find.text(h.l.localBooksCount(3)), findsOneWidget);
+        expect(
+          find.widgetWithText(ChoiceChip, '${h.l.localFilterAll} 3'),
+          findsOneWidget,
+        );
         await tester.tap(find.byKey(const ValueKey('book-multi-select')));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('book-selection-all')));
@@ -299,7 +291,7 @@ void main() {
         final beforeTitle = tester.getRect(find.text(store.books.first.title));
         final beforeCover = tester.getRect(find.byType(BookListTile).first);
         final card = find.byKey(const ValueKey('local-library-summary'));
-        final normalCardHeight = tester.getSize(card).height;
+        expect(card, findsNothing);
         await tester.tap(menu);
         await tester.pumpAndSettle();
         await tester.tap(find.text(h.l.localReparse));
@@ -396,7 +388,7 @@ void main() {
             findsOneWidget,
           );
         } else {
-          expect(tester.getSize(card).height, normalCardHeight);
+          expect(card, findsNothing);
           expect(tester.getRect(menu), beforeMenu);
         }
         expect(tester.takeException(), isNull);

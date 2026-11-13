@@ -7,6 +7,7 @@ import 'package:shiori/features/bookshelf/bookshelf_view.dart';
 import 'package:shiori/features/bookshelf/desktop_shelf.dart';
 import 'package:shiori/features/home/desktop_shell.dart';
 import 'package:shiori/features/home/home_navigation.dart';
+import 'package:shiori/features/local_books/desktop_local_books.dart';
 import 'package:shiori/features/novel_detail/detail_sections.dart';
 import 'package:shiori/features/search/search_screen.dart';
 import 'package:shiori/features/updates/update_controller.dart';
@@ -129,9 +130,7 @@ void main() {
         expect(searchView.width, gridView.width);
         await section(HomeSection.localBooks, strings.localBooksTitle);
         record();
-        final local = tester.getRect(
-          find.byKey(const ValueKey('local-library-summary')),
-        );
+        final local = tester.getRect(find.byType(DesktopLocalBookRow).first);
         await section(HomeSection.offline, strings.cacheTitle);
         record();
         final cache = tester.getRect(

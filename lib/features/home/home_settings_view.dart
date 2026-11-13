@@ -33,41 +33,39 @@ class HomeSettingsView extends StatelessWidget {
           ),
           children: [
             if (onAppearance != null)
-              _group(context, strings.homeSettingsAppearance, [
+              _group(context, [
                 _entry(
                   context,
                   Icons.palette_outlined,
                   strings.appAppearance,
-                  strings.homeSettingsAppearanceDescription,
                   onAppearance!,
                 ),
               ]),
             if (onLocalBooks != null || onOfflineContent != null)
-              _group(context, strings.homeSettingsStorage, [
+              _group(context, [
                 if (onLocalBooks != null)
                   _entry(
                     context,
                     Icons.folder_outlined,
                     strings.localBooksTitle,
-                    strings.homeSettingsLocalBooksDescription,
                     onLocalBooks!,
+                    description: strings.homeSettingsLocalBooksDescription,
                   ),
                 if (onOfflineContent != null)
                   _entry(
                     context,
                     Icons.offline_pin_outlined,
                     strings.cacheTitle,
-                    strings.homeSettingsOfflineDescription,
                     onOfflineContent!,
+                    description: strings.homeSettingsOfflineDescription,
                   ),
-              ]),
+              ], title: strings.homeSettingsStorage),
             if (onUpdates != null)
-              _group(context, strings.homeSettingsAbout, [
+              _group(context, [
                 _entry(
                   context,
                   Icons.info_outline,
                   strings.updateTitle,
-                  strings.homeSettingsAboutDescription,
                   onUpdates!,
                 ),
               ]),
@@ -85,19 +83,23 @@ class HomeSettingsView extends StatelessWidget {
     );
   }
 
-  Widget _group(BuildContext context, String title, List<Widget> entries) =>
+  Widget _group(BuildContext context, List<Widget> entries, {String? title}) =>
       Padding(
         padding: const EdgeInsets.only(bottom: ShioriSpace.item),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(
-                left: ShioriSpace.item,
-                bottom: ShioriSpace.small,
+            if (title != null)
+              Padding(
+                padding: const EdgeInsetsDirectional.only(
+                  start: ShioriSpace.item,
+                  bottom: ShioriSpace.small,
+                ),
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
-              child: Text(title, style: Theme.of(context).textTheme.bodySmall),
-            ),
             Material(
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(ShioriShape.card),
@@ -128,9 +130,9 @@ class HomeSettingsView extends StatelessWidget {
     BuildContext context,
     IconData icon,
     String label,
-    String description,
-    VoidCallback onTap,
-  ) {
+    VoidCallback onTap, {
+    String? description,
+  }) {
     final theme = Theme.of(context);
     return ListTile(
       enabled: enabled,
@@ -147,7 +149,7 @@ class HomeSettingsView extends StatelessWidget {
         size: ShioriSpace.item + ShioriSpace.small,
       ),
       title: Text(label),
-      subtitle: Text(description),
+      subtitle: description == null ? null : Text(description),
       titleTextStyle: theme.textTheme.bodyMedium,
       subtitleTextStyle: theme.textTheme.bodySmall,
       trailing: Icon(Icons.chevron_right, size: ShioriSpace.page),

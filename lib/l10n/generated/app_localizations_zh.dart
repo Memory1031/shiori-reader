@@ -579,25 +579,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeSettingsTitle => '设置';
 
   @override
-  String get homeSettingsAppearance => '外观';
-
-  @override
   String get homeSettingsStorage => '书籍与存储';
-
-  @override
-  String get homeSettingsAbout => '关于';
-
-  @override
-  String get homeSettingsAppearanceDescription => '主题与界面显示';
 
   @override
   String get homeSettingsLocalBooksDescription => '管理已导入的书籍';
 
   @override
   String get homeSettingsOfflineDescription => '管理已缓存的阅读内容';
-
-  @override
-  String get homeSettingsAboutDescription => '版本信息与应用更新';
 
   @override
   String get allChapters => '全部章节';
@@ -943,9 +931,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String localBooksCount(int count) {
     return '$count 本书';
   }
-
-  @override
-  String get localBooksSubtitle => '已导入的书籍，随时离线阅读。';
 
   @override
   String localBooksImportedOn(String date) {
@@ -1613,7 +1598,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readerSearchBook => '搜索本书';
 
   @override
-  String get readerSearchHint => '输入词句，点击搜索';
+  String get readerSearchHint => '输入词句';
 
   @override
   String get readerSearchSubmit => '搜索';

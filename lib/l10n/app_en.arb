@@ -218,13 +218,9 @@
   "homeShelf": "My bookshelf",
   "homeNavigation": "Main navigation",
   "homeSettingsTitle": "Settings",
-  "homeSettingsAppearance": "Appearance",
   "homeSettingsStorage": "Books and storage",
-  "homeSettingsAbout": "About",
-  "homeSettingsAppearanceDescription": "Theme and display preferences",
   "homeSettingsLocalBooksDescription": "Manage imported books",
   "homeSettingsOfflineDescription": "Manage cached reading content",
-  "homeSettingsAboutDescription": "Version details and app updates",
   "allChapters": "All chapters",
   "onlineSource": "Online source",
   "shelfDetails": "Details",
@@ -451,7 +447,6 @@
       }
     }
   },
-  "localBooksSubtitle": "Your imported books, ready to read offline.",
   "localBooksImportedOn": "Imported {date}",
   "@localBooksImportedOn": {
     "placeholders": {
@@ -858,7 +853,7 @@
   "localAutoReparseTimeout": "Waiting to retry: parsing timed out",
   "localAutoReparseOther": "Automatic update failed; manual reparsing is available",
   "readerSearchBook": "Search this book",
-  "readerSearchHint": "Enter a word or phrase, then search",
+  "readerSearchHint": "Enter a word or phrase",
   "readerSearchSubmit": "Search",
   "readerSearchLoading": "Searching…",
   "readerSearchPaused": "Search paused. You can still view the matches found.",

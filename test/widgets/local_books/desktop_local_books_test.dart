@@ -58,26 +58,21 @@ void main() {
       final chrome = tester.getRect(find.byType(DesktopPageToolbar));
       expect(chrome.left, viewport.left + ShioriLayout.gutter(width));
       expect(chrome.right, viewport.right - ShioriLayout.gutter(width));
-      final frame = tester.getRect(
-        find.byKey(const ValueKey('local-library-summary')),
-      );
+      final row = tester.getRect(find.byType(DesktopLocalBookRow).first);
       final expected = (viewport.width - 2 * (width < 1200 ? 24 : 32)).clamp(
         0,
         1200,
       );
-      expect(frame.width, expected);
-      expect(frame.center.dx, viewport.center.dx);
+      expect(row.width, expected);
+      expect(row.center.dx, viewport.center.dx);
       final tile = tester.getRect(find.byType(BookListTile).first);
-      final row = tester.getRect(find.byType(DesktopLocalBookRow).first);
       final more = tester.getRect(
         find.descendant(
           of: find.byType(DesktopLocalBookRow).first,
           matching: find.byType(IconButton),
         ),
       );
-      expect(row.left, frame.left);
-      expect(row.right, frame.right);
-      expect(tile.left, frame.left + ShioriSpace.item);
+      expect(tile.left, row.left + ShioriSpace.item);
       expect(
         tile.width,
         (expected - 3 * ShioriSpace.item - more.width).clamp(
@@ -85,30 +80,15 @@ void main() {
           ShioriLayout.page,
         ),
       );
-      expect(more.right, frame.right - ShioriSpace.item);
+      expect(more.right, row.right - ShioriSpace.item);
       expect(more.top, tile.top);
-      final card = find.byKey(const ValueKey('local-library-summary'));
-      expect(tester.getRect(card).left, frame.left);
-      expect(tester.getRect(card).right, frame.right);
-      expect(
-        find.descendant(of: card, matching: find.text(h.l.localBooksCount(45))),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: card, matching: find.text('EPUB 23 · TXT 22')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: card, matching: find.text(h.l.localBooksSubtitle)),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: card,
-          matching: find.byKey(const ValueKey('local-books-reparse-all')),
-        ),
-        findsNothing,
-      );
+      expect(find.byKey(const ValueKey('local-library-summary')), findsNothing);
+      for (final label in ['${h.l.localFilterAll} 45', 'TXT 22', 'EPUB 23']) {
+        final filter = find.widgetWithText(ChoiceChip, label);
+        expect(filter, findsOneWidget);
+        expect(tester.getRect(filter).bottom, lessThan(row.top));
+      }
+      expect(tester.getRect(find.byType(ChoiceChip).first).left, row.left);
       expect(
         find.descendant(
           of: find.byType(DesktopPageToolbar),

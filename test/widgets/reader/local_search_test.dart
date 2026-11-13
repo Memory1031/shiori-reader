@@ -1327,12 +1327,15 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('reader-search-open')));
       await tester.pumpAndSettle();
       expect(find.byType(ReaderSearchPanel), findsOneWidget);
+      final status = find.byKey(const ValueKey('reader-search-status'));
+      expect(status, findsNothing);
       final size = tester.getSize(
         find.byKey(const ValueKey('reader-search-results')),
       );
       tester.view.viewInsets = const FakeViewPadding(bottom: 280);
       await tester.pumpAndSettle();
       await submit(tester, state, 'later');
+      expect(status, findsOneWidget);
       await f.snapshot(tester, reader, 'mobile-keyboard-search');
       expect(reader.position(tester), origin);
       expect(

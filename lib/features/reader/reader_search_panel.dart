@@ -243,7 +243,7 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context), theme = Theme.of(context);
-    String status = state.loading
+    final status = state.loading
         ? l.readerSearchLoading
         : state.error == ReaderSearchError.tooLong
         ? l.readerSearchTooLong
@@ -256,7 +256,7 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
         : state.paused
         ? l.readerSearchPaused
         : state.submitted.isEmpty
-        ? l.readerSearchHint
+        ? null
         : state.totalMatches == 0
         ? l.readerSearchEmpty
         : state.totalMatches != null
@@ -353,19 +353,20 @@ class _ReaderSearchPanelState extends State<ReaderSearchPanel> {
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ShioriSpace.page,
-                  ),
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Text(
-                      status,
-                      key: const ValueKey('reader-search-status'),
-                      style: theme.textTheme.bodySmall,
+                if (status != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: ShioriSpace.page,
+                    ),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        status,
+                        key: const ValueKey('reader-search-status'),
+                        style: theme.textTheme.bodySmall,
+                      ),
                     ),
                   ),
-                ),
                 if (state.draft.trim() != state.submitted &&
                     state.submitted.isNotEmpty)
                   Padding(
