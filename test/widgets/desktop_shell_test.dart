@@ -282,6 +282,25 @@ void main() {
   );
 
   testWidgets(
+    'navigation list keeps vertical position across rail and sidebar',
+    (tester) async {
+      final h = ShellHarness(tester);
+      addTearDown(h.close);
+      await h.pump(size: const Size(1200, 720));
+      expect(h.layout, ShellLayout.sidebar);
+      final navList = find.descendant(
+        of: find.byType(ShellNavigation),
+        matching: find.byType(ListView),
+      );
+      final sidebarTop = tester.getTopLeft(navList).dy;
+      await h.resize(1199);
+      expect(h.layout, ShellLayout.rail);
+      expect(tester.getTopLeft(navList).dy, sidebarTop);
+    },
+    variant: _desktop,
+  );
+
+  testWidgets(
     'iPad uses the desktop workspace at wide sizes',
     (tester) async {
       final h = ShellHarness(tester);
@@ -395,6 +414,10 @@ void main() {
         expect(
           find.byType(ShioriLogo),
           layout == ShellLayout.sidebar ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.byType(ShioriMark),
+          layout == ShellLayout.rail ? findsOneWidget : findsNothing,
         );
         expect(tester.takeException(), isNull);
       }

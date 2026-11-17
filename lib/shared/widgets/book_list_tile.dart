@@ -13,6 +13,7 @@ class BookListTile extends StatelessWidget {
     required this.cover,
     required this.title,
     this.subtitle,
+    this.subtitleMaxLines = 1,
     this.metadata,
     this.trailing,
   });
@@ -21,6 +22,7 @@ class BookListTile extends StatelessWidget {
   final Widget cover;
   final String title;
   final String? subtitle, metadata;
+  final int? subtitleMaxLines;
   final Widget? trailing;
 
   static const coverWidth = 64.0;
@@ -66,8 +68,10 @@ class BookListTile extends StatelessWidget {
                       const SizedBox(height: ShioriSpace.tight),
                       Text(
                         subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        maxLines: subtitleMaxLines,
+                        overflow: subtitleMaxLines == null
+                            ? null
+                            : TextOverflow.ellipsis,
                         style: secondary,
                       ),
                     ],
@@ -106,6 +110,7 @@ class BookListItem extends StatefulWidget {
     this.minHeight = 120,
     this.selected,
     this.selectionLabel,
+    this.backgroundColor,
   });
   final Widget child;
   final VoidCallback? onTap, onLongPress;
@@ -116,6 +121,7 @@ class BookListItem extends StatefulWidget {
   final double minHeight;
   final bool? selected;
   final String? selectionLabel;
+  final Color? backgroundColor;
 
   static const inset = ShioriSpace.medium;
 
@@ -150,13 +156,19 @@ class _BookListItemState extends State<BookListItem> {
           ? (_hovered ? .11 : .08)
           : (active ? .06 : 0),
     );
-    // Opaque paper keeps swipe actions hidden behind the row at rest.
+    // Opaque paper keeps swipe actions hidden behind the row at rest unless
+    // hosted on another surface such as a bottom sheet or reader panel.
     return Semantics(
       checked: widget.selected,
       selected: widget.selected,
       label: widget.selectionLabel,
       child: Material(
-        color: theme.scaffoldBackgroundColor,
+        type: widget.backgroundColor == Colors.transparent
+            ? MaterialType.transparency
+            : MaterialType.canvas,
+        color: widget.backgroundColor == Colors.transparent
+            ? null
+            : widget.backgroundColor ?? theme.scaffoldBackgroundColor,
         child: InkWell(
           onTap: widget.onTap,
           onLongPress: widget.onLongPress,

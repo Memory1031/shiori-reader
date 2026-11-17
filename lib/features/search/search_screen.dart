@@ -264,18 +264,23 @@ class _SearchBodyState extends State<_SearchBody> {
           ),
         ),
       ] else
-        SliverToBoxAdapter(
+        SliverFillRemaining(
+          hasScrollBody: false,
           child: Padding(
-            padding: const EdgeInsets.only(top: 32),
-            child: switch (state.status) {
-              SearchStatus.loading => const LoadingView(),
-              SearchStatus.error => FailureView(
-                failure: state.failure!,
-                onRetry: submit,
-              ),
-              SearchStatus.empty => EmptyView(message: strings.searchNoResults),
-              _ => EmptyView(message: strings.searchInitial),
-            },
+            padding: const EdgeInsets.symmetric(vertical: ShioriSpace.section),
+            child: Center(
+              child: switch (state.status) {
+                SearchStatus.loading => const LoadingView(),
+                SearchStatus.error => FailureView(
+                  failure: state.failure!,
+                  onRetry: submit,
+                ),
+                SearchStatus.empty => EmptyView(
+                  message: strings.searchNoResults,
+                ),
+                _ => EmptyView(message: strings.searchInitial),
+              },
+            ),
           ),
         ),
     ];
@@ -451,59 +456,17 @@ class _ResultRow extends StatelessWidget {
     label: [book.title, ...book.authors].join(', '),
     excludeSemantics: true,
     child: Padding(
-      padding: EdgeInsets.fromLTRB(desktop ? 0 : 20, 0, desktop ? 0 : 20, 12),
-      child: Material(
-        color: desktop
-            ? Theme.of(context).scaffoldBackgroundColor
-            : Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(ShioriShape.card),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          hoverColor: desktop
-              ? Theme.of(context).colorScheme.primary.withValues(alpha: .04)
-              : null,
-          focusColor: desktop
-              ? Theme.of(context).colorScheme.primary.withValues(alpha: .12)
-              : null,
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: desktop ? BookListItem.inset : 14,
-              vertical: 14,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 68,
-                  child: BookCover(book: book, images: images),
-                ),
-                const SizedBox(width: ShioriSpace.item),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        book.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (book.authors.isNotEmpty) ...[
-                        const SizedBox(height: ShioriSpace.small),
-                        Text(
-                          book.authors.join(', '),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+      padding: EdgeInsets.symmetric(
+        horizontal: desktop ? 0 : ShioriSpace.page - BookListItem.inset,
+      ),
+      child: BookListItem(
+        minHeight: 0,
+        onTap: onTap,
+        child: BookListTile(
+          cover: BookCover(book: book, images: images),
+          title: book.title,
+          subtitle: book.authors.isEmpty ? null : book.authors.join(', '),
+          subtitleMaxLines: null,
         ),
       ),
     ),

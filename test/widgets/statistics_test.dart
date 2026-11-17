@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:drift/native.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -931,5 +932,62 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await settle(tester);
     },
+  );
+
+  testWidgets(
+    'desktop chart hover previews hovered day without losing selection',
+    (tester) async {
+      tester.view
+        ..physicalSize = const Size(1280, 900)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.runAsync(() async {
+        await recorder.ready;
+        final key = NovelKey(sourceId: SourceId('s'), novelId: 'n');
+        final session =
+            (await repo.begin(key) as Success<ReadingRecordSession?>).value!;
+        await repo.submit(
+          ReadingCheckpoint(session, 1, {20261015: 120000, 20261021: 60000}),
+        );
+      });
+      await tester.pumpWidget(
+        ShioriApp(
+          locale: const Locale('en'),
+          homeBuilder: (_, _) =>
+              Scaffold(body: StatisticsView(controller: recorder)),
+        ),
+      );
+      await settle(tester);
+      final chart = find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.slider == true,
+      );
+      final plot = find
+          .descendant(of: chart, matching: find.byType(GestureDetector))
+          .first;
+      final rect = tester.getRect(plot);
+      expect(find.textContaining('2 min'), findsNothing);
+      final handle = tester.ensureSemantics();
+      expect(
+        tester.getSemantics(chart).getSemanticsData().value,
+        contains('1 min'),
+      );
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer();
+      await mouse.moveTo(Offset(rect.left + 8, rect.center.dy));
+      await tester.pump();
+      expect(find.textContaining('2 min'), findsOneWidget);
+      expect(
+        tester.getSemantics(chart).getSemanticsData().value,
+        contains('1 min'),
+      );
+      await mouse.moveTo(Offset.zero);
+      await tester.pump();
+      expect(find.textContaining('2 min'), findsNothing);
+      await mouse.removePointer();
+      handle.dispose();
+      await tester.pumpWidget(const SizedBox());
+      await settle(tester);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.windows),
   );
 }

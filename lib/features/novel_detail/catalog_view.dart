@@ -5,6 +5,7 @@ import '../../domain/models/models.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/capabilities.dart';
 import '../../shared/widgets/app_scaffold.dart';
+import '../../shared/widgets/book_list_tile.dart';
 import '../../shared/widgets/controller_scope.dart';
 import '../../shared/widgets/state_views.dart';
 import '../../shared/widgets/catalog_browsing.dart';
@@ -207,7 +208,9 @@ class _CatalogViewState extends State<CatalogView> {
         return Padding(
           padding: EdgeInsets.only(top: index == 0 ? 0 : 12),
           child: Material(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: .05),
             borderRadius: BorderRadius.circular(ShioriShape.cover),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
@@ -256,58 +259,88 @@ class _CatalogViewState extends State<CatalogView> {
       }
       final chapter = row as Chapter;
       final selected = chapter.key == (_selected ?? widget.current);
+      final ordinalLabel = '${ordinals[chapter.key]}'.padLeft(2, '0');
       return Padding(
-        padding: EdgeInsets.only(top: index == 0 ? 0 : 4),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(ShioriShape.control),
-          clipBehavior: Clip.antiAlias,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 2,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(ShioriShape.control),
-            ),
-            key: ValueKey(chapter.key),
-            selected: selected,
-            minLeadingWidth: 28,
-            horizontalTitleGap: 12,
-            leading: Container(
-              width: 28,
-              height: 28,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(ShioriShape.cover),
-              ),
-              child: selected
-                  ? Icon(
-                      Icons.bookmark,
-                      size: 16,
-                      color: Theme.of(context).colorScheme.primary,
-                    )
-                  : Text(
-                      '${ordinals[chapter.key]}'.padLeft(2, '0'),
-                      style: Theme.of(context).textTheme.bodySmall,
+        padding: EdgeInsets.only(top: index == 0 ? 0 : ShioriSpace.tight / 2),
+        child: BookListItem(
+          key: ValueKey(chapter.key),
+          minHeight: 0,
+          selected: selected,
+          backgroundColor: Colors.transparent,
+          onTap: () {
+            setState(() => _selected = chapter.key);
+            widget.onSelect(chapter.key);
+          },
+          child: Builder(
+            builder: (context) {
+              final theme = Theme.of(context);
+              final colors = theme.colorScheme;
+              final highlighted = BookListItem.activeOf(context) && !selected;
+              return Tooltip(
+                message: chapter.title,
+                child: Row(
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 28,
+                        minHeight: 28,
+                      ),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? colors.primary.withValues(alpha: .12)
+                              : colors.onSurface.withValues(alpha: .06),
+                          borderRadius: BorderRadius.circular(
+                            ShioriShape.cover,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: ShioriSpace.small - 2,
+                            vertical: ShioriSpace.tight,
+                          ),
+                          child: Center(
+                            widthFactor: 1,
+                            heightFactor: 1,
+                            child: selected
+                                ? Icon(
+                                    Icons.bookmark,
+                                    size: 16,
+                                    color: colors.primary,
+                                  )
+                                : Text(
+                                    ordinalLabel,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
                     ),
-            ),
-            title: Tooltip(
-              message: chapter.title,
-              child: Text(
-                chapter.title,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(height: 1.5),
-              ),
-            ),
-            trailing: const Icon(Icons.chevron_right, size: 16),
-            onTap: () {
-              setState(() => _selected = chapter.key);
-              widget.onSelect(chapter.key);
+                    const SizedBox(width: ShioriSpace.medium),
+                    Expanded(
+                      child: Text(
+                        chapter.title,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          height: 1.5,
+                          color: highlighted ? colors.primary : null,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: ShioriSpace.small),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 16,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              );
             },
           ),
         ),

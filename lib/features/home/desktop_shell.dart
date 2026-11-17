@@ -267,7 +267,7 @@ class ShellNavigation extends StatelessWidget {
                   ),
                 )
               else
-                const SizedBox(height: ShioriSpace.medium),
+                const SizedBox(height: 56, child: Center(child: ShioriMark())),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(

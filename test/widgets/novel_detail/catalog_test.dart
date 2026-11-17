@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/domain/models/models.dart';
 import 'package:shiori/features/novel_detail/catalog_view.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
+import 'package:shiori/shared/widgets/book_list_tile.dart';
 
 final novel = NovelKey(sourceId: SourceId('fixture'), novelId: 'book');
 Catalog catalog({int count = 4, bool synthetic = false}) => Catalog(
@@ -44,7 +45,7 @@ void main() {
       expect(selected, data.volumes.first.chapters[1].key);
       await tester.pumpWidget(view(catalog()));
       expect(
-        tester.widget<ListTile>(find.byKey(ValueKey(selected!))).selected,
+        tester.widget<BookListItem>(find.byKey(ValueKey(selected!))).selected,
         isTrue,
       );
       await tester.tap(find.byKey(const ValueKey(('volume', '0'))));
@@ -68,9 +69,24 @@ void main() {
   testWidgets('large catalog only builds visible chapter tiles', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      app(CatalogView(catalog: catalog(count: 1000), onSelect: (_) {})),
+    final data = catalog(count: 1000);
+    await tester.pumpWidget(app(CatalogView(catalog: data, onSelect: (_) {})));
+    expect(
+      find.byType(ListTile).evaluate().length +
+          find.byType(BookListItem).evaluate().length,
+      lessThan(30),
     );
-    expect(find.byType(ListTile).evaluate().length, lessThan(30));
+    // Anchoring near chapter 1000 checks 4-digit badge layout stays clean.
+    await tester.pumpWidget(
+      app(
+        CatalogView(
+          catalog: data,
+          current: data.flatChapters.elementAt(1005).key,
+          onSelect: (_) {},
+        ),
+      ),
+    );
+    expect(find.text('1007'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

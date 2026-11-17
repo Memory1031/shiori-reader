@@ -243,7 +243,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(ValueKey(result.items.single.key)));
       await tester.pumpAndSettle();
-      expect(tester.getRect(find.byType(BookCover)).width, 68);
+      expect(
+        tester.getRect(find.byType(BookCover)).width,
+        BookListTile.coverWidth,
+      );
       await tester.tap(find.byType(BookCover));
       await tester.pumpAndSettle();
       expect(h.opened, 1);

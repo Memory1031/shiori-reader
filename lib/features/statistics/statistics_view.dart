@@ -514,25 +514,9 @@ class _StatisticsViewState extends State<StatisticsView>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                flex: 3,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ShioriSpace.page,
-                  ),
-                  child: todayMetric,
-                ),
-              ),
+              Expanded(flex: 3, child: todayMetric),
               const SizedBox(width: ShioriSpace.page),
-              Expanded(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ShioriSpace.page,
-                  ),
-                  child: totalMetric(true),
-                ),
-              ),
+              Expanded(flex: 2, child: totalMetric(true)),
             ],
           )
         else ...[
@@ -828,17 +812,23 @@ class _StatisticsViewState extends State<StatisticsView>
 
   Widget _rangeControl(BuildContext context) {
     final l = AppLocalizations.of(context), theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final labels = [l.statisticsSeven, l.statisticsThirty, l.statisticsYear];
     final large = MediaQuery.textScalerOf(context).scale(12) > 15;
+    const inset = 3.0;
+    final segmentRadius = BorderRadius.circular(ShioriShape.control - inset);
+    final raised = theme.brightness == Brightness.dark
+        ? Color.lerp(scheme.surface, scheme.onSurface, .14)!
+        : scheme.surface;
     return Align(
       alignment: AlignmentDirectional.centerStart,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 400),
         child: Container(
           height: kMinInteractiveDimension + (large ? ShioriSpace.item : 0),
-          padding: const EdgeInsets.all(ShioriSpace.tight / 2),
+          padding: const EdgeInsets.all(inset),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
+            color: scheme.onSurface.withValues(alpha: .05),
             borderRadius: BorderRadius.circular(ShioriShape.control),
           ),
           child: Stack(
@@ -852,10 +842,15 @@ class _StatisticsViewState extends State<StatisticsView>
                     heightFactor: 1,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(alpha: .08),
-                        borderRadius: BorderRadius.circular(
-                          ShioriShape.control,
-                        ),
+                        color: raised,
+                        borderRadius: segmentRadius,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: .08),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -877,9 +872,12 @@ class _StatisticsViewState extends State<StatisticsView>
                               0,
                               kMinInteractiveDimension,
                             ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: segmentRadius,
+                            ),
                             foregroundColor: range == _range
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurfaceVariant,
+                                ? scheme.primary
+                                : scheme.onSurfaceVariant,
                           ),
                           child: Text(
                             labels[range.index],
@@ -966,6 +964,7 @@ class _ReadingChart extends StatefulWidget {
 
 class _ReadingChartState extends State<_ReadingChart> {
   bool _showFocus = false;
+  int? _hovered;
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context),
@@ -1026,27 +1025,35 @@ class _ReadingChartState extends State<_ReadingChart> {
             ),
             child: LayoutBuilder(
               builder: (context, bounds) {
-                void pick(double x) => widget.onSelect(
-                  (x / bounds.maxWidth * values.length).floor().clamp(
-                    0,
-                    values.length - 1,
-                  ),
-                );
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapDown: (e) => pick(e.localPosition.dx),
-                  onHorizontalDragUpdate: (e) => pick(e.localPosition.dx),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 160,
-                    child: CustomPaint(
-                      painter: _Bars(
-                        values: values,
-                        maximum: step * 2 * unit,
-                        selected: selected,
-                        color: theme.colorScheme.primary,
-                        line: theme.colorScheme.outlineVariant.withValues(
-                          alpha: .45,
+                int indexFor(double x) => (x / bounds.maxWidth * values.length)
+                    .floor()
+                    .clamp(0, values.length - 1);
+                void pick(double x) => widget.onSelect(indexFor(x));
+                return MouseRegion(
+                  onHover: (e) {
+                    final next = indexFor(e.localPosition.dx);
+                    if (_hovered != next) setState(() => _hovered = next);
+                  },
+                  onExit: (_) {
+                    if (_hovered != null) setState(() => _hovered = null);
+                  },
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (e) => pick(e.localPosition.dx),
+                    onHorizontalDragUpdate: (e) => pick(e.localPosition.dx),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 160,
+                      child: CustomPaint(
+                        painter: _Bars(
+                          values: values,
+                          maximum: step * 2 * unit,
+                          selected: selected,
+                          hovered: _hovered,
+                          color: theme.colorScheme.primary,
+                          line: theme.colorScheme.outlineVariant.withValues(
+                            alpha: .45,
+                          ),
                         ),
                       ),
                     ),
@@ -1147,7 +1154,7 @@ class _ReadingChartState extends State<_ReadingChart> {
           ],
         ),
         const SizedBox(height: ShioriSpace.small),
-        Text(label(selected), style: theme.textTheme.bodySmall),
+        Text(label(_hovered ?? selected), style: theme.textTheme.bodySmall),
       ],
     );
   }
@@ -1181,11 +1188,13 @@ class _Bars extends CustomPainter {
     required this.values,
     required this.maximum,
     required this.selected,
+    this.hovered,
     required this.color,
     required this.line,
   });
   final List<int> values;
   final int maximum, selected;
+  final int? hovered;
   final Color color, line;
   @override
   void paint(Canvas canvas, Size size) {
@@ -1195,14 +1204,19 @@ class _Bars extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
     final slot = size.width / values.length, width = math.min(24.0, slot * .64);
-    final x = slot * (selected + .5);
+    final active = hovered ?? selected;
+    final x = slot * (active + .5);
     paint.color = color.withValues(alpha: .2);
     canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
 
     for (var i = 0; i < values.length; i++) {
       if (values[i] == 0) continue;
       final height = size.height * values[i] / maximum;
-      paint.color = i == selected ? color : color.withValues(alpha: .55);
+      paint.color = i == selected
+          ? color
+          : i == hovered
+          ? color.withValues(alpha: .8)
+          : color.withValues(alpha: .55);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH(
@@ -1222,6 +1236,7 @@ class _Bars extends CustomPainter {
   bool shouldRepaint(_Bars old) =>
       old.values != values ||
       old.selected != selected ||
+      old.hovered != hovered ||
       old.color != color ||
       old.line != line;
 }

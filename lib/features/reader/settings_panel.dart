@@ -510,23 +510,50 @@ class _Typography extends StatelessWidget {
     painter.dispose();
     labelWidth = labelWidth.ceilToDouble().clamp(0.0, 96.0);
 
-    Widget row(String label, Widget control) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: ShioriSpace.tight),
-      child: Row(
-        children: [
-          SizedBox(
-            width: labelWidth,
-            child: Text(label, style: labelStyle),
+    Widget row(String label, Widget control, {double? minControlWidth}) =>
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: ShioriSpace.tight),
+          child: LayoutBuilder(
+            builder: (context, bounds) {
+              if (minControlWidth != null &&
+                  bounds.maxWidth - labelWidth - ShioriSpace.item <
+                      minControlWidth) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(label, style: labelStyle),
+                    const SizedBox(height: ShioriSpace.tight),
+                    control,
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  SizedBox(
+                    width: labelWidth,
+                    child: Text(label, style: labelStyle),
+                  ),
+                  const SizedBox(width: ShioriSpace.item),
+                  Expanded(child: control),
+                ],
+              );
+            },
           ),
-          const SizedBox(width: ShioriSpace.item),
-          Expanded(child: control),
-        ],
-      ),
-    );
+        );
 
     ReaderSettings font(double v) => s.copyWith(fontSize: v);
     ReaderSettings line(double v) => s.copyWith(lineHeight: v);
     ReaderSettings paragraph(double v) => s.copyWith(paragraphSpacing: v);
+    final marginTier = readerMarginTier(s.horizontalPadding);
+    final marginLabels = [
+      l.readerMarginVeryNarrow,
+      l.readerMarginNarrow,
+      l.readerMarginMedium,
+      l.readerMarginWide,
+      l.readerMarginVeryWide,
+    ];
+    ReaderSettings marginAt(int tier) =>
+        s.copyWith(horizontalPadding: readerMarginValues[tier]);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -560,18 +587,17 @@ class _Typography extends StatelessWidget {
         ),
         row(
           l.readerHorizontalPadding,
-          _Segmented<int>(
-            selected: readerMarginTier(s.horizontalPadding),
-            options: [
-              (0, l.readerMarginVeryNarrow),
-              (1, l.readerMarginNarrow),
-              (2, l.readerMarginMedium),
-              (3, l.readerMarginWide),
-              (4, l.readerMarginVeryWide),
-            ],
-            onSelect: (tier) => onChanged(
-              s.copyWith(horizontalPadding: readerMarginValues[tier]),
-            ),
+          minControlWidth: 185,
+          _Stepper(
+            label: l.readerHorizontalPadding,
+            value: marginLabels[marginTier],
+            wrapLabel: true,
+            onDecrease: marginTier > 0
+                ? () => onChanged(marginAt(marginTier - 1))
+                : null,
+            onIncrease: marginTier < readerMarginValues.length - 1
+                ? () => onChanged(marginAt(marginTier + 1))
+                : null,
           ),
         ),
         if (txt)
@@ -697,9 +723,11 @@ class _Stepper extends StatelessWidget {
     required this.value,
     required this.onDecrease,
     required this.onIncrease,
+    this.wrapLabel = false,
   });
   final String label, value;
   final VoidCallback? onDecrease, onIncrease;
+  final bool wrapLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -716,11 +744,28 @@ class _Stepper extends StatelessWidget {
             child: const Icon(Icons.remove, size: 18),
           ),
           Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontFeatures: const [FontFeature.tabularFigures()],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: ShioriSpace.tight,
+                vertical: ShioriSpace.tight,
+              ),
+              child: Text(
+                value,
+                maxLines: wrapLabel ? null : 1,
+                overflow: wrapLabel
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style:
+                    (wrapLabel
+                            ? theme.textTheme.bodyMedium?.copyWith(
+                                height: 1.3,
+                                fontWeight: FontWeight.w600,
+                              )
+                            : theme.textTheme.titleSmall)
+                        ?.copyWith(
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
               ),
             ),
           ),

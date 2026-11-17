@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shiori/domain/models/models.dart';
+import 'package:shiori/features/reader/reader_margin.dart';
 import 'package:shiori/features/reader/reader_preferences.dart';
 import 'package:shiori/features/reader/settings_panel.dart';
 import 'package:shiori/l10n/generated/app_localizations.dart';
@@ -342,5 +343,67 @@ void main() {
       tester.getSemantics(find.bySemanticsLabel('Warm paper')),
       containsSemantics(isSelected: true),
     );
+  });
+
+  testWidgets('margins stepper avoids narrow truncation and enforces limits', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(320, 844)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final preferences = await _pumpPanel(
+      tester,
+      ReaderSettings(),
+      locale: 'en',
+      textScale: 1.3,
+    );
+    final l = AppLocalizations.of(
+      tester.element(find.byType(ReaderSettingsPanel)),
+    );
+    expect(find.text(l.readerMarginMedium), findsOneWidget);
+    final decrease = find.bySemanticsLabel(
+      l.readerDecrease(l.readerHorizontalPadding),
+    );
+    final increase = find.bySemanticsLabel(
+      l.readerIncrease(l.readerHorizontalPadding),
+    );
+    await tester.ensureVisible(decrease);
+    await tester.tap(decrease);
+    await tester.pumpAndSettle();
+    expect(preferences.value.horizontalPadding, readerMarginValues[1]);
+    await tester.tap(decrease);
+    await tester.pumpAndSettle();
+    expect(preferences.value.horizontalPadding, readerMarginValues[0]);
+    expect(find.text(l.readerMarginVeryNarrow), findsOneWidget);
+    expect(
+      tester
+          .renderObject<RenderParagraph>(find.text(l.readerMarginVeryNarrow))
+          .didExceedMaxLines,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<IconButton>(
+            find.descendant(of: decrease, matching: find.byType(IconButton)),
+          )
+          .onPressed,
+      isNull,
+    );
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(increase);
+      await tester.pumpAndSettle();
+    }
+    expect(preferences.value.horizontalPadding, readerMarginValues[4]);
+    expect(find.text(l.readerMarginVeryWide), findsOneWidget);
+    expect(
+      tester
+          .widget<IconButton>(
+            find.descendant(of: increase, matching: find.byType(IconButton)),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
   });
 }

@@ -23,6 +23,7 @@ import 'package:shiori/features/reader/reader_contents.dart';
 import 'package:shiori/features/reader/reader_contents_session.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
 import 'package:shiori/features/reader/viewport/paged_reader_viewport.dart';
+import 'package:shiori/shared/widgets/book_list_tile.dart';
 import 'package:shiori/shared/widgets/catalog_browsing.dart';
 
 import 'link_return_test.dart' as local;
@@ -161,10 +162,13 @@ Future<double> browse(WidgetTester tester, double offset) async {
   return memory?.position?.offset ?? position(tester).pixels;
 }
 
+final _tocRowMatcher = find.byWidgetPredicate(
+  (w) => (w is ListTile || w is BookListItem) && w.key != null,
+);
+
 ({Key? key, double top}) visibleRow(WidgetTester tester) {
   final bounds = tester.getRect(find.byType(Scrollable).last);
-  final tiles = find
-      .byType(ListTile)
+  final tiles = _tocRowMatcher
       .evaluate()
       .where(
         (element) => tester
@@ -578,7 +582,7 @@ void main() {
           );
           await tester.pumpWidget(app(true));
           await tester.pumpAndSettle();
-          expect(find.byType(ListTile).evaluate().length, lessThan(45));
+          expect(_tocRowMatcher.evaluate().length, lessThan(45));
           expect(
             memory.position,
             isNull,
@@ -595,7 +599,11 @@ void main() {
           final previous = debugOnRebuildDirtyWidget;
           var built = 0;
           debugOnRebuildDirtyWidget = (element, first) {
-            if (element.widget is ListTile) built++;
+            if ((element.widget is ListTile ||
+                    element.widget is BookListItem) &&
+                element.widget.key != null) {
+              built++;
+            }
             previous?.call(element, first);
           };
           try {
@@ -622,7 +630,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(visibleRow(tester).key, before.key);
           expect(visibleRow(tester).top, closeTo(before.top, .01));
-          expect(find.byType(ListTile).evaluate().length, lessThan(45));
+          expect(_tocRowMatcher.evaluate().length, lessThan(45));
           final mouse = Offset(200, 300);
           await tester.sendEventToBinding(
             PointerScrollEvent(
