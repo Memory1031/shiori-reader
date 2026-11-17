@@ -410,9 +410,19 @@ void main() {
       await h.mount();
       final result = page(['one']);
       await h.search(result);
+      final clear = find.byKey(const ValueKey('search-clear'));
       final row = find.byKey(ValueKey(result.items.single.key));
       h.field.focusNode!.requestFocus();
       await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(Focus.of(tester.element(clear)).hasFocus, isTrue);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump();
+      expect(h.field.focusNode!.hasFocus, isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
       expect(
@@ -423,12 +433,6 @@ void main() {
         ).hasFocus,
         isTrue,
       );
-      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
-      await tester.pump();
-      expect(h.field.focusNode!.hasFocus, isTrue);
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
       final rowFocus = Focus.of(

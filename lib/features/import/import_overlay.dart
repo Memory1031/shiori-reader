@@ -304,6 +304,18 @@ class _ImportPanelState extends State<_ImportPanel> {
     );
   }
 
+  Widget _errorText(
+    BuildContext context,
+    ImportProblem problem,
+    AppLocalizations l,
+  ) => Text(
+    _problemText(l, problem),
+    key: const ValueKey('import-error'),
+    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: Theme.of(context).colorScheme.error,
+    ),
+  );
+
   @override
   void dispose() {
     _discardFocus.dispose();
@@ -360,8 +372,16 @@ class _ImportPanelState extends State<_ImportPanel> {
                         ),
                         child: Material(
                           elevation: 8,
-                          borderRadius: BorderRadius.circular(
-                            ShioriShape.sheet,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              ShioriShape.sheet,
+                            ),
+                            side: BorderSide(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outlineVariant
+                                  .withValues(alpha: .5),
+                            ),
                           ),
                           color: Theme.of(context).colorScheme.surface,
                           surfaceTintColor: Colors.transparent,
@@ -401,7 +421,7 @@ class _ImportPanelState extends State<_ImportPanel> {
       ),
       if (c.batchProblem case final problem?) ...[
         const SizedBox(height: ShioriSpace.small),
-        Text(_problemText(l, problem), key: const ValueKey('import-error')),
+        _errorText(context, problem, l),
       ],
       const SizedBox(height: ShioriSpace.medium),
       Wrap(
@@ -457,7 +477,7 @@ class _ImportPanelState extends State<_ImportPanel> {
       Text(l.importTitle, style: Theme.of(context).textTheme.titleLarge),
       const SizedBox(height: ShioriSpace.medium),
       if (c.problem case final problem?)
-        Text(_problemText(l, problem), key: const ValueKey('import-error'))
+        _errorText(context, problem, l)
       else if (!c.busy)
         Text(l.importHint),
       if (!c.busy) const SizedBox(height: ShioriSpace.item),
@@ -490,10 +510,8 @@ class _ImportPanelState extends State<_ImportPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(l.importTitle, style: Theme.of(context).textTheme.titleLarge),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: ShioriSpace.medium),
-            child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis),
-          ),
+          const SizedBox(height: ShioriSpace.medium),
+          Text(name, maxLines: 2, overflow: TextOverflow.ellipsis),
           const SizedBox(height: ShioriSpace.medium),
           if (c.phase == ImportPhase.importing) ...[
             Text(_workLabel(c, l)),
@@ -509,7 +527,7 @@ class _ImportPanelState extends State<_ImportPanel> {
                   : l.importSuccess,
             )
           else if (c.problem case final problem?)
-            Text(_problemText(l, problem), key: const ValueKey('import-error'))
+            _errorText(context, problem, l)
           else
             Text(l.importHint),
           if (!c.busy && !done && name.toLowerCase().endsWith('.epub'))
@@ -536,7 +554,12 @@ class _ImportPanelState extends State<_ImportPanel> {
                   child: Text(l.localReadNow),
                 ),
               if (done && !c.busy)
-                FilledButton(onPressed: c.finish, child: Text(l.importDone))
+                widget.onRead != null
+                    ? TextButton(onPressed: c.finish, child: Text(l.importDone))
+                    : FilledButton(
+                        onPressed: c.finish,
+                        child: Text(l.importDone),
+                      )
               else if (c.busy)
                 _stopButton(c, l)
               else ...[
@@ -632,13 +655,7 @@ class _ImportPanelState extends State<_ImportPanel> {
         ],
         if (c.batchProblem case final problem?) ...[
           const SizedBox(height: ShioriSpace.tight),
-          Text(
-            _problemText(l, problem),
-            key: const ValueKey('import-error'),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.error,
-            ),
-          ),
+          _errorText(context, problem, l),
         ],
         const SizedBox(height: ShioriSpace.small),
         Flexible(
@@ -716,15 +733,14 @@ class _ImportPanelState extends State<_ImportPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(l.importTitle, style: Theme.of(context).textTheme.titleLarge),
-          if (current != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: ShioriSpace.medium),
-              child: Text(
-                current.candidate.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+          if (current != null) ...[
+            const SizedBox(height: ShioriSpace.medium),
+            Text(
+              current.candidate.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
+          ],
           const SizedBox(height: ShioriSpace.medium),
           TxtPreviewChoices(
             preview: c.encodingPreview!,

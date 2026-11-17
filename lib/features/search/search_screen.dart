@@ -134,6 +134,12 @@ class _SearchBodyState extends State<_SearchBody> {
       controller.submit();
     }
 
+    void clear() {
+      _text.clear();
+      controller.edit('');
+      _inputFocus.requestFocus();
+    }
+
     final slivers = <Widget>[
       SliverPadding(
         padding: EdgeInsets.symmetric(
@@ -183,6 +189,7 @@ class _SearchBodyState extends State<_SearchBody> {
                     focusNode: _inputFocus,
                     keepFocus: desktop,
                     onChanged: controller.edit,
+                    onClear: clear,
                     onSubmit: submit,
                     enabled:
                         state.draftKeyword.trim().isNotEmpty &&
@@ -197,8 +204,13 @@ class _SearchBodyState extends State<_SearchBody> {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
-                  if (state.needsSubmission && state.items.isNotEmpty)
-                    Text(strings.searchDraftNotice),
+                  if (state.needsSubmission && state.items.isNotEmpty) ...[
+                    const SizedBox(height: ShioriSpace.tight),
+                    Text(
+                      strings.searchDraftNotice,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -320,6 +332,7 @@ class _SearchBodyState extends State<_SearchBody> {
 class _SearchInput extends StatelessWidget {
   const _SearchInput({
     required this.onChanged,
+    required this.onClear,
     required this.onSubmit,
     required this.enabled,
     required this.text,
@@ -331,6 +344,7 @@ class _SearchInput extends StatelessWidget {
   final bool keepFocus;
   final bool enabled;
   final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
   final VoidCallback onSubmit;
   @override
   Widget build(BuildContext context) => Focus(
@@ -381,18 +395,35 @@ class _SearchInput extends StatelessWidget {
         prefixIcon: const Icon(Icons.search, size: 22),
         suffixIcon: Padding(
           padding: const EdgeInsets.all(ShioriSpace.tight),
-          child: TextButton(
-            key: const ValueKey('search-submit'),
-
-            onPressed: enabled ? onSubmit : null,
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.primary,
-              padding: const EdgeInsets.symmetric(horizontal: ShioriSpace.item),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(ShioriShape.control),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: text,
+                builder: (context, value, _) => value.text.isEmpty
+                    ? const SizedBox.shrink()
+                    : IconButton(
+                        key: const ValueKey('search-clear'),
+                        tooltip: AppLocalizations.of(context).readerSearchClear,
+                        onPressed: onClear,
+                        icon: const Icon(Icons.clear, size: 20),
+                      ),
               ),
-            ),
-            child: Text(AppLocalizations.of(context).searchTitle),
+              TextButton(
+                key: const ValueKey('search-submit'),
+                onPressed: enabled ? onSubmit : null,
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ShioriSpace.item,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(ShioriShape.control),
+                  ),
+                ),
+                child: Text(AppLocalizations.of(context).searchTitle),
+              ),
+            ],
           ),
         ),
       ),

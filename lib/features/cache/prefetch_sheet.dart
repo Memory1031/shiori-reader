@@ -91,10 +91,10 @@ class _PrefetchPanelState extends State<PrefetchPanel> {
         );
         return ListView(
           padding: EdgeInsets.fromLTRB(
-            20,
+            ShioriSpace.page,
             widget.onClose == null ? 0 : ShioriSpace.small,
-            20,
-            24,
+            ShioriSpace.page,
+            ShioriSpace.page,
           ),
           children: [
             if (widget.onClose case final close?)

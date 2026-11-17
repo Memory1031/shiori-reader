@@ -73,7 +73,7 @@ class ContinueReadingCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 2),
-          const SizedBox(width: 10, child: Icon(Icons.chevron_right, size: 14)),
+          const Icon(Icons.chevron_right, size: 16),
         ],
       ),
     );

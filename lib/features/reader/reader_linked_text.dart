@@ -3,6 +3,7 @@ import 'viewport/paragraph_flow.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../app/theme/shiori_theme.dart';
 import 'viewport/reader_box.dart';
 import '../../domain/models/models.dart';
 import '../../domain/contracts/contracts.dart';
@@ -61,7 +62,12 @@ class ReaderFootnotePanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 8, 0),
+          padding: EdgeInsets.fromLTRB(
+            ShioriSpace.page,
+            ShioriPanelScope.isSheet(context) ? 0 : ShioriSpace.small,
+            ShioriSpace.small,
+            0,
+          ),
           child: Row(
             children: [
               Expanded(
@@ -80,7 +86,12 @@ class ReaderFootnotePanel extends StatelessWidget {
         ),
         Flexible(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            padding: const EdgeInsets.fromLTRB(
+              ShioriSpace.page,
+              ShioriSpace.tight,
+              ShioriSpace.page,
+              ShioriSpace.page,
+            ),
             child: _noteText(context, note, range),
           ),
         ),

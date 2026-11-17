@@ -182,6 +182,7 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: Text(l.localDeleteTitle),
         content: Text(l.localDeleteMessage(info.title)),
         actions: [
@@ -190,6 +191,10 @@ class _LocalBooksScreenState extends State<LocalBooksScreen> {
             child: Text(l.importCancel),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
             onPressed: () => Navigator.pop(context, true),
             child: Text(l.localDeleteConfirm),
           ),

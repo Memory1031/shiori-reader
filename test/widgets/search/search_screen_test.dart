@@ -42,6 +42,7 @@ Future<void> mount(
 );
 
 final input = find.byKey(const ValueKey('search-input'));
+final clear = find.byKey(const ValueKey('search-clear'));
 final submit = find.byKey(const ValueKey('search-submit'));
 final more = find.byKey(const ValueKey('search-more'));
 
@@ -434,4 +435,28 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'clear button cancels in-flight search, clears draft and refocuses',
+    (tester) async {
+      final repo = Repository();
+      await mount(tester, repo);
+      expect(clear, findsNothing);
+      await tester.enterText(input, 'query');
+      await tester.pump();
+      expect(clear, findsOneWidget);
+      await tester.tap(submit);
+      await tester.pump();
+      expect(repo.calls, hasLength(1));
+      expect(repo.calls.single.token.isCancelled, isFalse);
+
+      await tester.tap(clear);
+      await tester.pump();
+      expect(repo.calls.single.token.isCancelled, isTrue);
+      expect(tester.widget<TextField>(input).controller!.text, isEmpty);
+      expect(clear, findsNothing);
+      expect(tester.widget<TextField>(input).focusNode!.hasFocus, isTrue);
+      expect(tester.widget<TextButton>(submit).onPressed, isNull);
+    },
+  );
 }

@@ -95,7 +95,12 @@ class _UpdateScreenState extends State<UpdateScreen> {
         content: SizedBox(width: ShioriLayout.panel, child: options(context)),
       ),
       builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        padding: const EdgeInsets.fromLTRB(
+          ShioriSpace.page,
+          0,
+          ShioriSpace.page,
+          ShioriSpace.page,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -663,22 +668,14 @@ class _ProjectAction extends StatelessWidget {
         type: MaterialType.transparency,
         shape: shape,
         clipBehavior: Clip.antiAlias,
-        child: Theme(
-          data: Theme.of(context).copyWith(
-            splashFactory: NoSplash.splashFactory,
-            highlightColor: colors.onSurface.withValues(alpha: .06),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: ShioriSpace.medium,
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: ShioriSpace.medium,
-            ),
-            shape: shape,
-            hoverColor: colors.onSurface.withValues(alpha: .04),
-            focusColor: colors.onSurface.withValues(alpha: .08),
-            title: Text(title),
-            trailing: Icon(icon, size: 18, color: colors.onSurfaceVariant),
-            onTap: onTap,
-          ),
+          shape: shape,
+          title: Text(title),
+          trailing: Icon(icon, size: 18, color: colors.onSurfaceVariant),
+          onTap: onTap,
         ),
       ),
     );
