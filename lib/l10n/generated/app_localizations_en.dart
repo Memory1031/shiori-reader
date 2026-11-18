@@ -604,9 +604,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeSettingsTitle => 'Settings';
 
   @override
-  String get homeSettingsApp => 'App';
-
-  @override
   String get homeSettingsStorage => 'Books and storage';
 
   @override
@@ -1915,6 +1912,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statisticsYear => '12 months';
+
+  @override
+  String statisticsPeriodRead(String range) {
+    return 'Total over $range';
+  }
+
+  @override
+  String get statisticsDaily => 'Daily reading';
+
+  @override
+  String get statisticsMonthly => 'Monthly reading';
 
   @override
   String get statisticsBooks => 'Read in this period';

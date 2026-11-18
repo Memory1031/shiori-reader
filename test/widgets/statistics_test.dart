@@ -409,6 +409,55 @@ void main() {
     },
   );
 
+  testWidgets('expanding the sidebar preserves the two-column period view', (
+    tester,
+  ) async {
+    tester.view
+      ..physicalSize = const Size(1199, 800)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final navigation = HomeNavigation(HomeSection.statistics);
+    final env = FixtureEnvironment();
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(env.close);
+      navigation.dispose();
+    });
+    await tester.runAsync(() => recorder.ready);
+    await tester.pumpWidget(
+      ShioriApp(
+        locale: const Locale('en'),
+        homeBuilder: (_, _) => ReadingStatisticsScope(
+          controller: recorder,
+          child: ReadingHome(
+            repository: env.novels,
+            library: env.library,
+            sources: const [],
+            navigation: navigation,
+          ),
+        ),
+      ),
+    );
+    await settle(tester);
+    await tester.tap(find.text('12 months'));
+    for (final width in [1199.0, 1200.0]) {
+      tester.view.physicalSize = Size(width, 800);
+      await settle(tester);
+      final trend = tester.getRect(find.text('Monthly reading'));
+      final books = tester.getRect(find.text('Read in this period'));
+      expect(books.top, trend.top);
+      expect(books.left, greaterThan(trend.right));
+      expect(
+        tester.getRect(find.text('Total over 12 months')).bottom,
+        lessThan(trend.top),
+      );
+      expect(
+        tester.getRect(find.text('12 months')).bottom,
+        lessThan(books.top),
+      );
+    }
+  });
+
   testWidgets('duration groups stay readable at large phone text sizes', (
     tester,
   ) async {

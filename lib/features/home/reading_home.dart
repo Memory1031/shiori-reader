@@ -48,6 +48,7 @@ class ReadingHome extends StatefulWidget {
     this.readerPreferences,
     this.onAppearance,
     this.onUpdates,
+    this.availableUpdateTag,
     this.onImport,
     this.localBooks,
     this.localManagement,
@@ -67,6 +68,7 @@ class ReadingHome extends StatefulWidget {
   final ReaderPreferences? readerPreferences;
   final VoidCallback? onAppearance;
   final VoidCallback? onUpdates;
+  final String? availableUpdateTag;
   final VoidCallback? onImport;
   final LocalBookStore? localBooks;
   final LocalBookManagement? localManagement;
@@ -765,6 +767,7 @@ class _ReadingHomeState extends State<ReadingHome> {
                         enabled: !_library.writing,
                         onAppearance: widget.onAppearance,
                         onUpdates: widget.onUpdates,
+                        availableUpdateTag: widget.availableUpdateTag,
                         onLocalBooks: _routes.localBooks == null
                             ? null
                             : () => _routes.open(

@@ -61,6 +61,7 @@ class _DurationMetric extends StatelessWidget {
               child: Align(
                 alignment: AlignmentDirectional.bottomStart,
                 heightFactor: 1,
+                widthFactor: 1,
                 child: Text(l.statisticsUnderMinute, style: unitStyle),
               ),
             )
@@ -449,44 +450,19 @@ class _StatisticsViewState extends State<StatisticsView>
         )
         .toList();
     final locale = MaterialLocalizations.of(context);
-    final todayMetric = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(l.statisticsToday, style: theme.textTheme.bodyMedium),
-        _DurationMetric(
-          data.today,
-          style: theme.textTheme.headlineLarge!.copyWith(
-            fontWeight: FontWeight.w500,
-            fontSize: 40,
-          ),
-        ),
-      ],
+    final lifetime = Text(
+      '${l.statisticsLifetime} ${readingDuration(l, data.lifetime)}',
+      style: theme.textTheme.bodySmall,
     );
-    Widget totalMetric(bool wide) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (wide) ...[
-          Text(l.statisticsLifetime, style: theme.textTheme.bodyMedium),
-          _DurationMetric(
-            data.lifetime,
-            style: theme.textTheme.headlineMedium!.copyWith(
-              fontWeight: FontWeight.w500,
+    final since = data.settings.startedDay == null
+        ? null
+        : Text(
+            l.statisticsSince(
+              locale.formatShortDate(readingDate(data.settings.startedDay!)),
             ),
-          ),
-          const SizedBox(height: ShioriSpace.small),
-        ] else
-          Text(
-            '${l.statisticsLifetime} ${readingDuration(l, data.lifetime)}',
             style: theme.textTheme.bodySmall,
-          ),
-        if (data.settings.startedDay case final day?)
-          Text(
-            l.statisticsSince(locale.formatShortDate(readingDate(day))),
-            style: theme.textTheme.bodySmall,
-          ),
-      ],
-    );
-    Widget summary(bool wide) => Column(
+          );
+    Widget summary() => Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (error)
@@ -510,20 +486,19 @@ class _StatisticsViewState extends State<StatisticsView>
             ),
           ),
 
-        if (wide)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 3, child: todayMetric),
-              const SizedBox(width: ShioriSpace.page),
-              Expanded(flex: 2, child: totalMetric(true)),
-            ],
-          )
-        else ...[
-          todayMetric,
-          const SizedBox(height: ShioriSpace.small),
-          totalMetric(false),
-        ],
+        Wrap(
+          spacing: ShioriSpace.page,
+          runSpacing: ShioriSpace.tight,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              '${l.statisticsToday} ${readingDuration(l, data.today)}',
+              style: theme.textTheme.titleSmall,
+            ),
+            lifetime,
+            ?since,
+          ],
+        ),
         if (!data.settings.enabled) ...[
           const SizedBox(height: ShioriSpace.small),
           Text(l.statisticsPaused),
@@ -547,54 +522,25 @@ class _StatisticsViewState extends State<StatisticsView>
         ? DateFormat.d(dateLocale)
         : startFormat;
     final period = '${startFormat.format(first)} – ${endFormat.format(today)}';
-    Widget trend(bool wide) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (wide)
-          Row(
-            children: [
-              Text(l.statisticsDuration, style: theme.textTheme.titleMedium),
-              const SizedBox(width: ShioriSpace.item),
-              Expanded(child: _rangeControl(context)),
-            ],
-          )
-        else ...[
-          Text(l.statisticsDuration, style: theme.textTheme.titleMedium),
-          const SizedBox(height: ShioriSpace.small),
-          _rangeControl(context),
-        ],
-        const SizedBox(height: ShioriSpace.item),
-        Text(l.statisticsTotal, style: theme.textTheme.bodySmall),
-        _DurationMetric(
-          data.total,
-          key: const ValueKey('statistics-period-total'),
-          style: theme.textTheme.headlineSmall!,
-        ),
-        const SizedBox(height: ShioriSpace.tight),
-        Text(period, style: theme.textTheme.bodySmall),
-        if (_loading && _visible) const LinearProgressIndicator(),
-        const SizedBox(height: ShioriSpace.medium),
-        _ReadingChart(
-          dates: dates,
-          values: values,
-          monthly: shownRange == StatisticsRange.year,
-          selected: _selected,
-          onSelect: (i) => setState(() => _selected = i),
-        ),
-      ],
+    final rangeLabels = [
+      l.statisticsSeven,
+      l.statisticsThirty,
+      l.statisticsYear,
+    ];
+    final rangeControl = _rangeControl(context, rangeLabels);
+    final dateLabel = Text(period, style: theme.textTheme.bodySmall);
+    Widget chart({double height = 160}) => _ReadingChart(
+      height: height,
+      dates: dates,
+      values: values,
+      monthly: monthly,
+      selected: _selected,
+      onSelect: (i) => setState(() => _selected = i),
     );
-    Widget booksHeading(bool wide) => Column(
+    final booksHeading = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: wide ? kMinInteractiveDimension : 0,
-          ),
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: Text(l.statisticsBooks, style: theme.textTheme.titleMedium),
-          ),
-        ),
+        Text(l.statisticsBooks, style: theme.textTheme.titleMedium),
         if (data.books.isEmpty && data.anonymous == 0)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: ShioriSpace.item),
@@ -611,21 +557,64 @@ class _StatisticsViewState extends State<StatisticsView>
     );
     return LayoutBuilder(
       builder: (context, bounds) {
-        final gutter = bounds.maxWidth >= ShioriLayout.page
-            ? ShioriLayout.gutter(bounds.maxWidth)
+        final windowWidth = DesktopLayoutScope.widthOf(context);
+        final gutter = windowWidth >= ShioriLayout.page
+            ? ShioriLayout.gutter(windowWidth)
             : ShioriSpace.page;
         final wide =
-            bounds.maxWidth >= 1000 &&
+            bounds.maxWidth >= ShioriLayout.detailColumns &&
             MediaQuery.textScalerOf(context).scale(12) <= 18;
+        final periodMetric = _DurationMetric(
+          data.total,
+          key: const ValueKey('statistics-period-total'),
+          style: wide
+              ? theme.textTheme.headlineLarge!
+              : theme.textTheme.displaySmall!.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+        );
         final heading = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (!wide) ...[
-              summary(false),
+              summary(),
+              const SizedBox(height: ShioriSpace.item),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: summarySurfaceColor(theme.colorScheme),
+                  borderRadius: BorderRadius.circular(ShioriShape.card),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    ShioriSpace.item,
+                    ShioriSpace.page,
+                    ShioriSpace.item,
+                    ShioriSpace.item,
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        l.statisticsPeriodRead(rangeLabels[shownRange.index]),
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      periodMetric,
+                      dateLabel,
+                      const SizedBox(height: ShioriSpace.item),
+                      Align(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 360),
+                          child: rangeControl,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_loading && _visible) const LinearProgressIndicator(),
               const SizedBox(height: ShioriSpace.section),
-              trend(false),
+              chart(),
               const SizedBox(height: ShioriSpace.section),
-              booksHeading(false),
+              booksHeading,
             ],
           ],
         );
@@ -746,14 +735,6 @@ class _StatisticsViewState extends State<StatisticsView>
           ],
         );
         if (!wide) return list;
-        Widget surface(Widget child) => Material(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(ShioriShape.card),
-          child: Padding(
-            padding: const EdgeInsets.all(ShioriSpace.page),
-            child: child,
-          ),
-        );
         return Align(
           alignment: Alignment.topCenter,
           child: Padding(
@@ -768,7 +749,36 @@ class _StatisticsViewState extends State<StatisticsView>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  summary(true),
+                  summary(),
+                  Divider(height: ShioriSpace.section),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l.statisticsPeriodRead(
+                                rangeLabels[shownRange.index],
+                              ),
+                              style: theme.textTheme.titleSmall,
+                            ),
+                            Wrap(
+                              spacing: ShioriSpace.medium,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [periodMetric, dateLabel],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: ShioriSpace.page),
+                      SizedBox(
+                        width: MediaQuery.textScalerOf(context).scale(264),
+                        child: rangeControl,
+                      ),
+                    ],
+                  ),
+                  if (_loading && _visible) const LinearProgressIndicator(),
                   const SizedBox(height: ShioriSpace.section),
                   Expanded(
                     child: Row(
@@ -778,24 +788,24 @@ class _StatisticsViewState extends State<StatisticsView>
                           flex: 3,
                           child: SingleChildScrollView(
                             primary: false,
-                            child: surface(trend(true)),
-                          ),
-                        ),
-                        const SizedBox(width: ShioriSpace.page),
-                        Expanded(
-                          flex: 2,
-                          child: Align(
-                            alignment: Alignment.topCenter,
-                            child: surface(
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  booksHeading(true),
-                                  Flexible(child: list),
-                                ],
+                            child: chart(
+                              height: (bounds.maxHeight * .3).clamp(
+                                160.0,
+                                200.0,
                               ),
                             ),
+                          ),
+                        ),
+                        const SizedBox(width: ShioriSpace.section),
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              booksHeading,
+                              const SizedBox(height: ShioriSpace.small),
+                              Flexible(child: list),
+                            ],
                           ),
                         ),
                       ],
@@ -810,10 +820,9 @@ class _StatisticsViewState extends State<StatisticsView>
     );
   }
 
-  Widget _rangeControl(BuildContext context) {
-    final l = AppLocalizations.of(context), theme = Theme.of(context);
+  Widget _rangeControl(BuildContext context, List<String> labels) {
+    final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final labels = [l.statisticsSeven, l.statisticsThirty, l.statisticsYear];
     final large = MediaQuery.textScalerOf(context).scale(12) > 15;
     const inset = 3.0;
     final segmentRadius = BorderRadius.circular(ShioriShape.control - inset);
@@ -947,12 +956,14 @@ class _StatisticsViewState extends State<StatisticsView>
 
 class _ReadingChart extends StatefulWidget {
   const _ReadingChart({
+    required this.height,
     required this.dates,
     required this.values,
     required this.monthly,
     required this.selected,
     required this.onSelect,
   });
+  final double height;
   final List<DateTime> dates;
   final List<int> values;
   final bool monthly;
@@ -1043,7 +1054,7 @@ class _ReadingChartState extends State<_ReadingChart> {
                     onHorizontalDragUpdate: (e) => pick(e.localPosition.dx),
                     child: SizedBox(
                       width: double.infinity,
-                      height: 160,
+                      height: widget.height,
                       child: CustomPaint(
                         painter: _Bars(
                           values: values,
@@ -1068,17 +1079,27 @@ class _ReadingChartState extends State<_ReadingChart> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          monthly ? l.statisticsHoursUnit : l.statisticsMinutesUnit,
-          style: theme.textTheme.bodySmall,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                monthly ? l.statisticsMonthly : l.statisticsDaily,
+                style: theme.textTheme.titleMedium,
+              ),
+            ),
+            Text(
+              monthly ? l.statisticsHoursUnit : l.statisticsMinutesUnit,
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
         ),
-        const SizedBox(height: ShioriSpace.small),
+        const SizedBox(height: ShioriSpace.medium),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ExcludeSemantics(
               child: SizedBox(
-                height: 160 + labelHeight,
+                height: widget.height + labelHeight,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.end,

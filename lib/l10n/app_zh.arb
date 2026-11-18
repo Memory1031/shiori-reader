@@ -218,7 +218,6 @@
   "homeShelf": "我的书架",
   "homeNavigation": "主导航",
   "homeSettingsTitle": "设置",
-  "homeSettingsApp": "应用",
   "homeSettingsStorage": "书籍与存储",
   "homeSettingsLocalBooksDescription": "管理已导入的书籍",
   "homeSettingsOfflineDescription": "管理已缓存的阅读内容",
@@ -920,6 +919,14 @@
   "statisticsSeven": "近7天",
   "statisticsThirty": "近30天",
   "statisticsYear": "近12个月",
+  "statisticsPeriodRead": "{range}共读",
+  "@statisticsPeriodRead": {
+    "placeholders": {
+      "range": {"type": "String"}
+    }
+  },
+  "statisticsDaily": "每日阅读",
+  "statisticsMonthly": "每月阅读",
   "statisticsBooks": "这段时间读过",
   "statisticsShowAllBooks": "展开全部（{count} 本）",
   "@statisticsShowAllBooks": {

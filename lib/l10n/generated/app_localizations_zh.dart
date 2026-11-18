@@ -579,9 +579,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeSettingsTitle => '设置';
 
   @override
-  String get homeSettingsApp => '应用';
-
-  @override
   String get homeSettingsStorage => '书籍与存储';
 
   @override
@@ -1740,6 +1737,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get statisticsYear => '近12个月';
+
+  @override
+  String statisticsPeriodRead(String range) {
+    return '$range共读';
+  }
+
+  @override
+  String get statisticsDaily => '每日阅读';
+
+  @override
+  String get statisticsMonthly => '每月阅读';
 
   @override
   String get statisticsBooks => '这段时间读过';

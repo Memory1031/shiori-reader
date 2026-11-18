@@ -1214,12 +1214,6 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get homeSettingsTitle;
 
-  /// No description provided for @homeSettingsApp.
-  ///
-  /// In en, this message translates to:
-  /// **'App'**
-  String get homeSettingsApp;
-
   /// No description provided for @homeSettingsStorage.
   ///
   /// In en, this message translates to:
@@ -3253,6 +3247,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'12 months'**
   String get statisticsYear;
+
+  /// No description provided for @statisticsPeriodRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Total over {range}'**
+  String statisticsPeriodRead(String range);
+
+  /// No description provided for @statisticsDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily reading'**
+  String get statisticsDaily;
+
+  /// No description provided for @statisticsMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly reading'**
+  String get statisticsMonthly;
 
   /// No description provided for @statisticsBooks.
   ///

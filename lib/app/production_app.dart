@@ -65,7 +65,7 @@ class _ProductionAppState extends State<ProductionApp>
   final _messenger = GlobalKey<ScaffoldMessengerState>();
   final _home = HomeNavigation();
   UpdateController? _updates;
-  String? _notifiedUpdate;
+  String? _notifiedUpdate, _availableUpdateTag;
   LocalReadingRepository? _novels;
   LocalImageRepository? _images;
   LocalDatabases? _databases;
@@ -330,6 +330,8 @@ class _ProductionAppState extends State<ProductionApp>
 
   void _updateChanged() {
     final candidate = _updates?.candidate;
+    final tag = candidate?.release.tag;
+    if (tag != _availableUpdateTag) setState(() => _availableUpdateTag = tag);
     if (candidate == null || candidate.release.tag == _notifiedUpdate) return;
     _notifiedUpdate = candidate.release.tag;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -429,6 +431,7 @@ class _ProductionAppState extends State<ProductionApp>
             readerPreferences: _readerPreferences,
             onAppearance: () => showAppAppearance(context, app),
             onUpdates: _openUpdates,
+            availableUpdateTag: _availableUpdateTag,
             navigation: _home,
             updates: _updates == null
                 ? null

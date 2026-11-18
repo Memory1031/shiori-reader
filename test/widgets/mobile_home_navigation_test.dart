@@ -189,6 +189,7 @@ void main() {
           sources: const [],
           onAppearance: () => showAppAppearance(context, app),
           onUpdates: () => updates++,
+          availableUpdateTag: 'v2.0',
         ),
       ),
     );
@@ -197,15 +198,26 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Local files'), findsNothing);
     expect(find.text('Offline content'), findsNothing);
+    expect(find.text('System · Soft teal'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Light'));
+    await tester.pumpAndSettle();
+    expect(find.text('Light · Soft teal'), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.text('Update available: v2.0'), findsOneWidget);
     await tester.tap(find.text('App appearance'));
     await tester.pumpAndSettle();
     expect(find.byType(BottomSheet), findsOneWidget);
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Dark'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Blue grey'));
+    await tester.pumpAndSettle();
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
       1,
     );
+    expect(find.text('Dark · Blue grey'), findsOneWidget);
     await tester.tap(find.text('About & updates'));
     await tester.pumpAndSettle();
     expect(updates, 1);

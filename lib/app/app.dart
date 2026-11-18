@@ -126,12 +126,16 @@ class _ShioriAppState extends State<ShioriApp> {
           final page = _caption == null
               ? app
               : WindowCaptionSync(controller: _caption, child: app);
-          return ReaderFontScope(
-            registry: _readerFonts,
-            child: AppExitScope(
-              save: controller.saveForExit,
-              shutdown: widget.shutdown,
-              child: page,
+          return AppAppearanceScope(
+            settings: controller.settings,
+            onThemeModeChanged: controller.setAppearance,
+            child: ReaderFontScope(
+              registry: _readerFonts,
+              child: AppExitScope(
+                save: controller.saveForExit,
+                shutdown: widget.shutdown,
+                child: page,
+              ),
             ),
           );
         },

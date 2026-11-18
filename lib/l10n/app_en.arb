@@ -218,7 +218,6 @@
   "homeShelf": "My bookshelf",
   "homeNavigation": "Main navigation",
   "homeSettingsTitle": "Settings",
-  "homeSettingsApp": "App",
   "homeSettingsStorage": "Books and storage",
   "homeSettingsLocalBooksDescription": "Manage imported books",
   "homeSettingsOfflineDescription": "Manage cached reading content",
@@ -920,6 +919,14 @@
   "statisticsSeven": "7 days",
   "statisticsThirty": "30 days",
   "statisticsYear": "12 months",
+  "statisticsPeriodRead": "Total over {range}",
+  "@statisticsPeriodRead": {
+    "placeholders": {
+      "range": {"type": "String"}
+    }
+  },
+  "statisticsDaily": "Daily reading",
+  "statisticsMonthly": "Monthly reading",
   "statisticsBooks": "Read in this period",
   "statisticsShowAllBooks": "Show all {count} books",
   "@statisticsShowAllBooks": {
