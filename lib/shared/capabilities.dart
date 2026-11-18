@@ -57,12 +57,13 @@ PageRoute<T> platformPageRoute<T>(
   BuildContext context, {
   required WidgetBuilder builder,
   RouteSettings? settings,
+  bool slideFromEnd = false,
 }) {
   // Full application pages explicitly own the app appearance. A reader or
   // image can declare a more specific appearance inside this page.
   Widget page(BuildContext context) =>
       WindowCaptionScope.appDefault(child: builder(context));
-  return ShioriCapabilities.of(context).cupertinoNavigation
+  return slideFromEnd || ShioriCapabilities.of(context).cupertinoNavigation
       ? CupertinoPageRoute<T>(builder: page, settings: settings)
       : MaterialPageRoute<T>(builder: page, settings: settings);
 }

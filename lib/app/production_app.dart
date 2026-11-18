@@ -307,10 +307,8 @@ class _ProductionAppState extends State<ProductionApp>
     await _updates?.check(manual: false);
   }
 
-  void _openUpdates() {
-    if (!mounted) return;
-    final updates = _updates;
-    if (updates == null) return;
+  bool _canOpenUpdates() {
+    if (!mounted || _updates == null) return false;
     // Enter from the library after the reader's normal save/exit path completes.
     // A notification may arrive while reading or while an import is active.
     if (_navigator.currentState?.canPop() == true || _imports?.busy == true) {
@@ -321,11 +319,13 @@ class _ProductionAppState extends State<ProductionApp>
           message: AppLocalizations.of(context).updateReturnToLibrary,
         );
       }
-      return;
+      return false;
     }
-    final navigator = _navigator.currentState;
-    if (navigator == null) return;
-    _home.select(HomeSection.updates);
+    return _navigator.currentState != null;
+  }
+
+  void _openUpdates() {
+    if (_canOpenUpdates()) _home.select(HomeSection.updates);
   }
 
   void _updateChanged() {
@@ -431,6 +431,7 @@ class _ProductionAppState extends State<ProductionApp>
             readerPreferences: _readerPreferences,
             onAppearance: () => showAppAppearance(context, app),
             onUpdates: _openUpdates,
+            canOpenUpdates: _canOpenUpdates,
             availableUpdateTag: _availableUpdateTag,
             navigation: _home,
             updates: _updates == null

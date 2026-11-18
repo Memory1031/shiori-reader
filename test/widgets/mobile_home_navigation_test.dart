@@ -113,6 +113,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Import book'), findsOneWidget);
+      expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.text('Local files'), findsNothing);
       expect(find.text('App appearance'), findsNothing);
       await tester.tap(find.text('Import book'));

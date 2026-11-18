@@ -645,9 +645,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cacheTitle => 'Offline content';
 
   @override
-  String cacheUsage(String text, String images) {
-    return 'Text and book details $text MiB · Images $images MiB';
+  String cacheTextSize(String size) {
+    return 'Text and book details $size';
   }
+
+  @override
+  String cacheImageSize(String size) {
+    return 'Images $size';
+  }
+
+  @override
+  String get cacheUntitled => 'Untitled book';
 
   @override
   String get cacheOfflineHint =>
@@ -1304,8 +1312,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updateOpenReleasePage => 'Open release page';
 
   @override
-  String get updateTestFlightHint =>
-      'This version updates through TestFlight. Check TestFlight for available builds.';
+  String get updateAboutDescription => 'Open-source light novel reader';
+
+  @override
+  String get updateInstalledVersion => 'Installed version';
+
+  @override
+  String get updateTestFlightHint => 'Check TestFlight for new builds.';
 
   @override
   String get updateChannel => 'Update channel';
@@ -1475,7 +1488,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Return to your bookshelf and finish importing, then open About & updates.';
 
   @override
+  String get updatePreferencesTitle => 'Update preferences';
+
+  @override
   String get updateSection => 'Updates';
+
+  @override
+  String get updateStarHint => 'Enjoying Shiori? Give it a star on GitHub.';
 
   @override
   String get updateProject => 'Project';

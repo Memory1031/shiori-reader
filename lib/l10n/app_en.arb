@@ -236,17 +236,15 @@
   "launchTagline": "Your story continues",
   "launchLoading": "Preparing your library…",
   "cacheTitle": "Offline content",
-  "cacheUsage": "Text and book details {text} MiB · Images {images} MiB",
-  "@cacheUsage": {
-    "placeholders": {
-      "text": {
-        "type": "String"
-      },
-      "images": {
-        "type": "String"
-      }
-    }
+  "cacheTextSize": "Text and book details {size}",
+  "@cacheTextSize": {
+    "placeholders": {"size": {"type": "String"}}
   },
+  "cacheImageSize": "Images {size}",
+  "@cacheImageSize": {
+    "placeholders": {"size": {"type": "String"}}
+  },
+  "cacheUntitled": "Untitled book",
   "cacheOfflineHint": "Read cached online chapters offline. Cached content may be cleared to free up space.",
   "cacheChapterStatus": "Text cached · Images {saved}/{total}",
   "@cacheChapterStatus": {
@@ -609,7 +607,9 @@
   "updateCheckOnlyAutomaticHint": "Notify me when a new release is available.",
   "updateManualInstallHint": "Install the new version using your original signing method, such as AltStore or another signing tool.",
   "updateOpenReleasePage": "Open release page",
-  "updateTestFlightHint": "This version updates through TestFlight. Check TestFlight for available builds.",
+  "updateAboutDescription": "Open-source light novel reader",
+  "updateInstalledVersion": "Installed version",
+  "updateTestFlightHint": "Check TestFlight for new builds.",
   "updateChannel": "Update channel",
   "updateStable": "Stable",
   "updateBeta": "Beta",
@@ -690,7 +690,9 @@
   "updateWorkspaceConflict": "The .update folder beside Shiori cannot be used safely. If it contains an unfinished update or backup, complete recovery first. Alternatively, quit Shiori, keep and move that folder aside, then manually install the complete new version. Do not delete its contents.",
   "updateInstallBusy": "Wait for the current operation to finish before installing.",
   "updateReturnToLibrary": "Return to your bookshelf and finish importing, then open About & updates.",
+  "updatePreferencesTitle": "Update preferences",
   "updateSection": "Updates",
+  "updateStarHint": "Enjoying Shiori? Give it a star on GitHub.",
   "updateProject": "Project",
   "updateChooseChannel": "Choose update channel",
   "updateStableHint": "Receive stable releases only",

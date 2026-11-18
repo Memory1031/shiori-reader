@@ -466,11 +466,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('42%'), findsOneWidget);
     // Two EPUBs and one TXT: the filter narrows the list.
-    await tester.tap(find.widgetWithText(ChoiceChip, 'TXT 1'));
+    await tester.tap(find.widgetWithText(TextButton, 'TXT 1'));
     await tester.pumpAndSettle();
     expect(find.text('Book 2'), findsOneWidget);
     expect(find.text('Book 1'), findsNothing);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'All 3'));
+    await tester.tap(find.widgetWithText(TextButton, 'All 3'));
     await tester.pumpAndSettle();
     // A reparse marks its row and disables the other row actions.
     final key = store.books[2].key;

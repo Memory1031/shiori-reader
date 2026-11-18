@@ -194,7 +194,19 @@ class _CacheScreenState extends State<CacheScreen> {
             ),
           _storage(context, groups.length),
           const SizedBox(height: ShioriSpace.section),
-          Text(l.cacheBooks, style: theme.textTheme.titleSmall),
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: ShioriSpace.medium,
+            runSpacing: ShioriSpace.tight,
+            children: [
+              Text(l.cacheBooks, style: theme.textTheme.titleMedium),
+              Text(
+                l.cacheCounts(groups.length, _overview?.chapters.length ?? 0),
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
           const SizedBox(height: ShioriSpace.tight),
           Text(
             l.cacheOfflineHint,
@@ -212,9 +224,8 @@ class _CacheScreenState extends State<CacheScreen> {
             ),
           for (final group in entries)
             // Book identity also survives an inserted refresh failure banner.
-            Padding(
+            KeyedSubtree(
               key: ValueKey(('cache-book', group.key)),
-              padding: const EdgeInsets.only(bottom: ShioriSpace.medium),
               child: _book(context, group.key, group.value),
             ),
         ],
@@ -289,8 +300,7 @@ class _CacheScreenState extends State<CacheScreen> {
     );
   }
 
-  /// Total cached size, a two-part bar for text versus images, counts and
-  /// the clear-all control.
+  /// Total measured cache size and its text/image breakdown.
   Widget _storage(BuildContext context, int books) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
@@ -298,7 +308,17 @@ class _CacheScreenState extends State<CacheScreen> {
     final textBytes = _overview?.textBytes ?? 0;
     final imageBytes = _overview?.imageBytes ?? 0;
     final total = textBytes + imageBytes;
-    String mib(int bytes) => (bytes / 1048576).toStringAsFixed(1);
+    (String, String) size(int bytes) => bytes < 1024
+        ? ('$bytes', 'B')
+        : bytes < 1048576
+        ? ((bytes / 1024).toStringAsFixed(1), 'KiB')
+        : ((bytes / 1048576).toStringAsFixed(1), 'MiB');
+    String sizeLabel(int bytes) {
+      final (value, unit) = size(bytes);
+      return '$value $unit';
+    }
+
+    final (value, unit) = size(total);
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: colors.onSurfaceVariant,
     );
@@ -325,30 +345,50 @@ class _CacheScreenState extends State<CacheScreen> {
       child: Padding(
         padding: const EdgeInsets.all(ShioriSpace.item),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              l.cacheStored,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: ShioriSpace.tight),
-            Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: mib(total),
-                    style: theme.textTheme.headlineSmall,
-                  ),
-                  TextSpan(
-                    text: ' MiB',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: colors.onSurfaceVariant,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: ShioriSpace.medium,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.cacheStored, style: muted),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: value,
+                            style: theme.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          TextSpan(
+                            text: ' $unit',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (books > 0 || total > 0)
+                  TextButton.icon(
+                    key: const ValueKey('cache-clear-all'),
+                    onPressed: _locked ? null : () => _clear(widget.novel),
+                    icon: const Icon(
+                      Icons.cleaning_services_outlined,
+                      size: 18,
+                    ),
+                    label: Text(
+                      widget.novel == null ? l.cacheClearAll : l.cacheClearBook,
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
             const SizedBox(height: ShioriSpace.medium),
             ClipRRect(
@@ -379,52 +419,12 @@ class _CacheScreenState extends State<CacheScreen> {
               ),
             ),
             const SizedBox(height: ShioriSpace.small),
-            Semantics(
-              label: l.cacheUsage(mib(textBytes), mib(imageBytes)),
-              excludeSemantics: true,
-              child: Wrap(
-                spacing: ShioriSpace.item,
-                runSpacing: ShioriSpace.tight,
-                children: [
-                  legend(
-                    textColor,
-                    l
-                        .cacheUsage(mib(textBytes), mib(imageBytes))
-                        .split(' · ')
-                        .first,
-                  ),
-                  legend(
-                    imageColor,
-                    l
-                        .cacheUsage(mib(textBytes), mib(imageBytes))
-                        .split(' · ')
-                        .last,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: ShioriSpace.medium),
-            // Counts and the destructive action wrap onto two lines when
-            // narrow or at large text sizes.
             Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: ShioriSpace.small,
+              spacing: ShioriSpace.item,
+              runSpacing: ShioriSpace.tight,
               children: [
-                Text(
-                  l.cacheCounts(books, _overview?.chapters.length ?? 0),
-                  style: theme.textTheme.bodyMedium,
-                ),
-                if (books > 0 || total > 0)
-                  TextButton.icon(
-                    key: const ValueKey('cache-clear-all'),
-                    style: TextButton.styleFrom(foregroundColor: colors.error),
-                    onPressed: _locked ? null : () => _clear(widget.novel),
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    label: Text(
-                      widget.novel == null ? l.cacheClearAll : l.cacheClearBook,
-                    ),
-                  ),
+                legend(textColor, l.cacheTextSize(sizeLabel(textBytes))),
+                legend(imageColor, l.cacheImageSize(sizeLabel(imageBytes))),
               ],
             ),
           ],
@@ -446,9 +446,12 @@ class _CacheScreenState extends State<CacheScreen> {
     final saved = chapters.fold(0, (sum, chapter) => sum + chapter.savedImages);
     final total = chapters.fold(0, (sum, chapter) => sum + chapter.imageCount);
     final summary = widget.summaryOf?.call(key);
-    final titleText = _overview?.books[key] ?? summary?.title;
+    final storedTitle = _overview?.books[key]?.trim();
+    final titleText = storedTitle != null && storedTitle.isNotEmpty
+        ? storedTitle
+        : summary?.title;
     final title = Text(
-      titleText ?? chapters.first.title,
+      titleText ?? (chapters.isEmpty ? l.cacheUntitled : chapters.first.title),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
       style: theme.textTheme.titleSmall,
@@ -456,32 +459,13 @@ class _CacheScreenState extends State<CacheScreen> {
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: colors.onSurfaceVariant,
     );
-    final subtitle = Padding(
-      padding: const EdgeInsets.only(top: ShioriSpace.tight),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            chapters.isEmpty
-                ? l.cacheNoChapters
-                : total == 0
-                ? l.cacheBookNoImages(chapters.length)
-                : l.cacheBookImages(chapters.length, saved, total),
-            style: muted,
-          ),
-          if (total > 0) ...[
-            const SizedBox(height: ShioriSpace.small),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(ShioriShape.indicator),
-              child: LinearProgressIndicator(
-                value: saved / total,
-                minHeight: 3,
-                backgroundColor: colors.outlineVariant.withValues(alpha: .5),
-              ),
-            ),
-          ],
-        ],
-      ),
+    final subtitle = Text(
+      chapters.isEmpty
+          ? l.cacheNoChapters
+          : total == 0
+          ? l.cacheBookNoImages(chapters.length)
+          : l.cacheBookImages(chapters.length, saved, total),
+      style: muted,
     );
     final cover = SizedBox(
       width: 44,
@@ -503,13 +487,32 @@ class _CacheScreenState extends State<CacheScreen> {
         ShioriMenuItem(value: 'clear', label: l.cacheClearBook),
       ],
     );
-    final card = BoxDecoration(
-      color: colors.surface,
-      borderRadius: BorderRadius.circular(ShioriShape.card),
-      border: Border.all(color: colors.outlineVariant.withValues(alpha: .6)),
+    final heading = LayoutBuilder(
+      builder: (context, bounds) => Row(
+        children: [
+          if (bounds.maxWidth >=
+              MediaQuery.textScalerOf(context).scale(14) * 10) ...[
+            cover,
+            const SizedBox(width: ShioriSpace.medium),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                title,
+                const SizedBox(height: ShioriSpace.tight),
+                subtitle,
+              ],
+            ),
+          ),
+        ],
+      ),
     );
-    const tilePadding = EdgeInsets.fromLTRB(
-      ShioriSpace.medium,
+    final rule = Border(
+      bottom: BorderSide(color: colors.outlineVariant.withValues(alpha: .6)),
+    );
+    const tilePadding = EdgeInsetsDirectional.fromSTEB(
+      ShioriSpace.item,
       ShioriSpace.small,
       ShioriSpace.tight,
       ShioriSpace.small,
@@ -523,22 +526,21 @@ class _CacheScreenState extends State<CacheScreen> {
         if (chapters.isEmpty) {
           return DecoratedBox(
             key: ValueKey(key),
-            decoration: card,
+            decoration: BoxDecoration(border: rule),
             child: ListTile(
               contentPadding: tilePadding,
-              leading: cover,
-              title: title,
-              subtitle: subtitle,
+              leading: const SizedBox(width: 24),
+              minLeadingWidth: 24,
+              title: heading,
               trailing: menu,
             ),
           );
         }
         return DecoratedBox(
-          decoration: card,
+          decoration: BoxDecoration(border: rule),
           child: Material(
             type: MaterialType.transparency,
-            borderRadius: BorderRadius.circular(ShioriShape.card),
-            clipBehavior: Clip.antiAlias,
+
             child: ExpansionTile(
               key: PageStorageKey(key),
               tilePadding: tilePadding,
@@ -550,14 +552,17 @@ class _CacheScreenState extends State<CacheScreen> {
               ),
               shape: const Border(),
               collapsedShape: const Border(),
+              backgroundColor: colors.surface,
               textColor: colors.onSurface,
               iconColor: colors.onSurfaceVariant,
-              leading: cover,
-              title: title,
-              subtitle: subtitle,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: heading,
               trailing: menu,
               children: [
-                const Divider(height: 1),
+                Divider(
+                  height: 1,
+                  color: colors.outlineVariant.withValues(alpha: .5),
+                ),
                 // Chapter rows highlight as rounded blocks; keep them off the
                 // divider so a hovered row does not butt against it.
                 const SizedBox(height: ShioriSpace.small),

@@ -1,3 +1,4 @@
+import 'package:shiori/shared/widgets/shiori_segmented_control.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -11,7 +12,7 @@ import 'package:shiori/app/theme/shiori_theme.dart';
 import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/domain/contracts/local_book_decoder.dart';
 import 'package:shiori/features/bookshelf/book_selection_widgets.dart';
-import 'package:shiori/shared/widgets/book_list_tile.dart';
+import 'package:shiori/features/local_books/local_book_plate.dart';
 import 'package:shiori/shared/widgets/state_views.dart';
 
 import 'harness.dart';
@@ -206,36 +207,38 @@ void main() {
       expect(find.byIcon(Icons.autorenew), findsNothing);
       expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(find.byType(LinearProgressIndicator), findsNothing);
+      if (width < ShioriLayout.page) {
+        final import = tester.widget<IconButton>(
+          find.byKey(const ValueKey('local-books-import')),
+        );
+        expect(import.tooltip, h.l.importTitle);
+      }
       if (count == 0) {
         expect(card, findsNothing);
         expect(find.text(h.l.localBooksEmpty), findsOneWidget);
       } else {
         if (format == null) {
           expect(card, findsNothing);
-          expect(find.byType(ChoiceChip), findsNWidgets(3));
           expect(
-            find.widgetWithText(ChoiceChip, '${h.l.localFilterAll} $count'),
+            tester
+                .widget<ShioriSegmentedControl>(
+                  find.byType(ShioriSegmentedControl),
+                )
+                .labels,
+            hasLength(3),
+          );
+          expect(
+            find.widgetWithText(TextButton, '${h.l.localFilterAll} $count'),
             findsOneWidget,
           );
         } else {
-          expect(find.byType(ChoiceChip), findsNothing);
+          expect(find.byType(ShioriSegmentedControl), findsNothing);
+          expect(card, findsNothing);
           expect(
-            find.descendant(
-              of: card,
-              matching: find.text(h.l.localBooksCount(count)),
+            find.text(
+              '${format.name.toUpperCase()} · ${h.l.localBooksCount(count)}',
             ),
             findsOneWidget,
-          );
-          final decoration =
-              tester.widget<DecoratedBox>(card).decoration as BoxDecoration;
-          final context = tester.element(card);
-          expect(
-            decoration.color,
-            summarySurfaceColor(Theme.of(context).colorScheme),
-          );
-          expect(
-            decoration.borderRadius,
-            BorderRadius.circular(ShioriShape.card),
           );
         }
         expect(find.byIcon(Icons.more_horiz), findsNWidgets(count));
@@ -244,13 +247,26 @@ void main() {
       }
       expect(tester.takeException(), isNull);
       await tester.runAsync(() => screenshot(boundary, name));
+      if (name == 'phone-epub') {
+        final first = find.byKey(ValueKey(store.books.first.key));
+        final second = find.byKey(ValueKey(store.books[1].key));
+        final before = tester.getRect(first);
+        await tester.tap(find.byKey(const ValueKey('book-multi-select')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('book-selection-all')));
+        await tester.pumpAndSettle();
+        expect(find.text(h.l.bookSelectedCount(count)), findsOneWidget);
+        expect(tester.getRect(first), before);
+        expect(tester.getRect(second).top, before.top);
+        expect(tester.getRect(second).left, greaterThan(before.right));
+      }
       if (count == 3 && platform == TargetPlatform.android) {
-        await tester.tap(find.widgetWithText(ChoiceChip, 'TXT 1'));
+        await tester.tap(find.widgetWithText(TextButton, 'TXT 1'));
         await tester.pumpAndSettle();
         expect(find.text(store.books[0].title), findsNothing);
         expect(find.text(store.books[1].title), findsOneWidget);
         expect(
-          find.widgetWithText(ChoiceChip, '${h.l.localFilterAll} 3'),
+          find.widgetWithText(TextButton, '${h.l.localFilterAll} 3'),
           findsOneWidget,
         );
         await tester.tap(find.byKey(const ValueKey('book-multi-select')));
@@ -262,7 +278,7 @@ void main() {
         expect(find.byIcon(Icons.more_horiz), findsNothing);
         await tester.runAsync(() => screenshot(boundary, 'phone-selected-txt'));
         await tester.tap(
-          find.widgetWithText(ChoiceChip, '${h.l.localFilterAll} 3'),
+          find.widgetWithText(TextButton, '${h.l.localFilterAll} 3'),
         );
         await tester.pumpAndSettle();
         // Returning to all formats does not silently select the other books.
@@ -289,7 +305,7 @@ void main() {
         final menu = find.byKey(ValueKey(('local-book-actions', key)));
         final beforeMenu = tester.getRect(menu);
         final beforeTitle = tester.getRect(find.text(store.books.first.title));
-        final beforeCover = tester.getRect(find.byType(BookListTile).first);
+        final beforeCover = tester.getRect(find.byType(LocalBookPlate).first);
         final card = find.byKey(const ValueKey('local-library-summary'));
         expect(card, findsNothing);
         await tester.tap(menu);
@@ -307,7 +323,7 @@ void main() {
         expect(tester.getRect(loading).left, beforeMenu.left);
         expect(
           tester.getRect(loading).top -
-              tester.getRect(find.byType(BookListTile).first).top,
+              tester.getRect(find.byType(LocalBookPlate).first).top,
           beforeMenu.top - beforeCover.top,
         );
         expect(
@@ -316,7 +332,7 @@ void main() {
         );
         // The summary gains existing operation feedback, shifting rows vertically only.
         expect(
-          tester.getSize(find.byType(BookListTile).first),
+          tester.getSize(find.byType(LocalBookPlate).first),
           beforeCover.size,
         );
         expect(
@@ -376,7 +392,7 @@ void main() {
         expect(tester.widget<PopupMenuButton<String>>(menu).enabled, isTrue);
         expect(find.byType(LinearProgressIndicator), findsNothing);
         expect(
-          tester.getSize(find.byType(BookListTile).first),
+          tester.getSize(find.byType(LocalBookPlate).first),
           beforeCover.size,
         );
         if (outcome == 'failure') {

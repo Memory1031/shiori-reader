@@ -466,6 +466,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        expect(find.text('300 B', findRichText: true), findsOneWidget);
         expect(find.text('Fixture book'), findsOneWidget);
         expect(find.textContaining(RegExp(r'1\s*/\s*2')), findsOneWidget);
         expect(find.text('Volume 1'), findsNothing);

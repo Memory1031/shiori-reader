@@ -614,9 +614,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cacheTitle => '离线内容';
 
   @override
-  String cacheUsage(String text, String images) {
-    return '正文与资料 $text MiB · 图片 $images MiB';
+  String cacheTextSize(String size) {
+    return '正文与资料 $size';
   }
+
+  @override
+  String cacheImageSize(String size) {
+    return '图片 $size';
+  }
+
+  @override
+  String get cacheUntitled => '未命名书籍';
 
   @override
   String get cacheOfflineHint => '已缓存的在线章节可离线阅读。缓存可能被自动清理以释放空间。';
@@ -1174,8 +1182,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateOpenReleasePage => '前往发布页';
 
   @override
-  String get updateTestFlightHint =>
-      '此版本通过 TestFlight 更新，请在 TestFlight 中查看可用版本。';
+  String get updateAboutDescription => '开源轻小说阅读器';
+
+  @override
+  String get updateInstalledVersion => '当前版本';
+
+  @override
+  String get updateTestFlightHint => '在 TestFlight 中查看和安装新版。';
 
   @override
   String get updateChannel => '更新渠道';
@@ -1329,7 +1342,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updateReturnToLibrary => '请先返回书架并完成导入，再打开「关于与更新」。';
 
   @override
+  String get updatePreferencesTitle => '更新设置';
+
+  @override
   String get updateSection => '更新';
+
+  @override
+  String get updateStarHint => '喜欢 Shiori？欢迎在 GitHub 点一颗星。';
 
   @override
   String get updateProject => '项目';

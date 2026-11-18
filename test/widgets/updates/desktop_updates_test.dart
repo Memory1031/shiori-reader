@@ -20,6 +20,45 @@ final install = find.byKey(const ValueKey('update-install'));
 
 void main() {
   testWidgets(
+    'settings pushes updates from the right and pops to the same tab',
+    (tester) async {
+      final h = UpdatesHarness(tester);
+      h.navigation.select(HomeSection.settings);
+      await h.controller.initialize();
+      await h.pump(width: 390, height: 844);
+      expect(find.byType(NavigationBar), findsOneWidget);
+      await tester.tap(find.text('About & updates'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      final left = tester.getTopLeft(h.page).dx;
+      expect(left, greaterThan(0));
+      expect(left, lessThan(390));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(h.page).dx, closeTo(0, .01));
+      expect(h.navigation.section, HomeSection.settings);
+      expect(Navigator.of(tester.element(h.page)), h.workspace);
+      expect(find.byType(NavigationBar), findsNothing);
+      if (Theme.of(tester.element(h.page)).platform == TargetPlatform.iOS) {
+        await tester.dragFrom(const Offset(1, 360), const Offset(330, 0));
+      } else {
+        await tester.binding.handlePopRoute();
+      }
+      await tester.pumpAndSettle();
+      expect(h.page, findsNothing);
+      expect(h.navigation.section, HomeSection.settings);
+      expect(find.text('About & updates'), findsOneWidget);
+      expect(
+        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+        1,
+      );
+      await h.close();
+    },
+    variant: TargetPlatformVariant({
+      TargetPlatform.iOS,
+      TargetPlatform.android,
+    }),
+  );
+  testWidgets(
     'update actions share a row when they fit and wrap at large text sizes',
     (tester) async {
       final h = UpdatesHarness(tester);
@@ -341,8 +380,8 @@ void main() {
       await h.tap(download);
       expect(h.controller.phase, UpdatePhase.downloaded);
       await h.show(install);
-      await h.show(find.text(h.l.updateCopyVersion));
-      await h.show(channel, delta: -200);
+      await h.show(find.byTooltip(h.l.updateCopyVersion), delta: -200);
+      await h.show(channel);
       final tile = tester.getRect(channel);
       final trailing = tester.getRect(
         find.descendant(
@@ -421,7 +460,7 @@ void main() {
         _ => h.l.updateInvalidIdentity,
       };
       expect(find.text(message), findsOneWidget);
-      await h.show(find.text(h.l.updateCopyVersion));
+      await h.show(find.byTooltip(h.l.updateCopyVersion));
       await h.close();
     }, variant: windows);
   }
@@ -503,7 +542,10 @@ void main() {
         expect(h.controller.preferences.channel, UpdateChannel.beta);
         expect(h.controller.phase, UpdatePhase.downloading);
       }
-      await h.tap(find.text(h.l.updateCancel));
+      final cancel = find.text(h.l.updateCancel);
+      await h.show(cancel, delta: -200);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
       expect(h.repo.downloadToken!.isCancelled, isTrue);
       expect(h.repo.downloads, 1);
       h.repo.downloading = null;
@@ -742,7 +784,7 @@ void main() {
       await tester.drag(find.byType(SnackBar), const Offset(0, 100));
       await tester.pumpAndSettle();
       expect(find.byType(SnackBar), findsNothing);
-      await h.tap(find.text(l.updateCopyVersion));
+      await h.tap(find.byTooltip(l.updateCopyVersion));
       expect(
         clipboard,
         'Shiori 1.2.1\nRelease: v1.2.1\nBuild: 10\nPlatform: windows',

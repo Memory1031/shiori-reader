@@ -48,6 +48,7 @@ class ReadingHome extends StatefulWidget {
     this.readerPreferences,
     this.onAppearance,
     this.onUpdates,
+    this.canOpenUpdates,
     this.availableUpdateTag,
     this.onImport,
     this.localBooks,
@@ -68,6 +69,7 @@ class ReadingHome extends StatefulWidget {
   final ReaderPreferences? readerPreferences;
   final VoidCallback? onAppearance;
   final VoidCallback? onUpdates;
+  final bool Function()? canOpenUpdates;
   final String? availableUpdateTag;
   final VoidCallback? onImport;
   final LocalBookStore? localBooks;
@@ -78,8 +80,8 @@ class ReadingHome extends StatefulWidget {
   /// by its caller; without one the home creates and disposes its own.
   final HomeNavigation? navigation;
 
-  /// Root of the desktop shell's updates section; without it the entry
-  /// runs [onUpdates] instead.
+  /// Shared page for the desktop section and the compact settings stack.
+  /// Without a page builder, the entry runs [onUpdates] instead.
   final WidgetBuilder? updates;
   final ImportController? importController;
   final bool initialShelfGrid;
@@ -694,6 +696,8 @@ class _ReadingHomeState extends State<ReadingHome> {
                     icon: const Icon(Icons.search),
                   ),
                   PopupMenuButton<String>(
+                    // Cover the shell without turning its menu into a workspace page.
+                    useRootNavigator: true,
                     enabled: !_library.writing,
                     tooltip: strings.moreActions,
                     onSelected: (value) {
@@ -766,20 +770,26 @@ class _ReadingHomeState extends State<ReadingHome> {
                       child: HomeSettingsView(
                         enabled: !_library.writing,
                         onAppearance: widget.onAppearance,
-                        onUpdates: widget.onUpdates,
+                        onUpdates: desktop
+                            ? widget.onUpdates
+                            : _settingsPageAction(
+                                    context,
+                                    widget.updates,
+                                    '/updates',
+                                    allowed: widget.canOpenUpdates,
+                                  ) ??
+                                  widget.onUpdates,
                         availableUpdateTag: widget.availableUpdateTag,
-                        onLocalBooks: _routes.localBooks == null
-                            ? null
-                            : () => _routes.open(
-                                context,
-                                const LocalBooksDestination(),
-                              ),
-                        onOfflineContent: _routes.cache == null
-                            ? null
-                            : () => _routes.open(
-                                context,
-                                const CacheDestination(),
-                              ),
+                        onLocalBooks: _settingsPageAction(
+                          context,
+                          _routes.localBooks,
+                          const LocalBooksDestination().routeName,
+                        ),
+                        onOfflineContent: _settingsPageAction(
+                          context,
+                          _routes.cache,
+                          const CacheDestination().routeName,
+                        ),
                       ),
                     ),
                   ),
@@ -790,6 +800,28 @@ class _ReadingHomeState extends State<ReadingHome> {
         ),
       ),
     );
+  }
+
+  VoidCallback? _settingsPageAction(
+    BuildContext context,
+    WidgetBuilder? page,
+    String name, {
+    bool Function()? allowed,
+  }) {
+    if (page == null) return null;
+    return () {
+      if (allowed?.call() == false) return;
+      Navigator.of(context).push(
+        platformPageRoute<void>(
+          context,
+          builder: page,
+          settings: RouteSettings(name: name),
+          slideFromEnd:
+              !DesktopLayoutScope.useDesktopPage(context) &&
+              ShioriCapabilities.of(context).touchFirst,
+        ),
+      );
+    };
   }
 
   void _selectMobilePage(int index) {

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../app/theme/shiori_theme.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_list_tile.dart';
 import '../../shared/widgets/desktop_menu.dart';
@@ -15,7 +14,7 @@ class DesktopLocalBookRow extends StatefulWidget {
     this.selected,
     this.selectionLabel,
   });
-  final Widget content;
+  final Widget Function(Widget action) content;
   final VoidCallback? onRead;
   final Future<bool> Function(Rect anchor) onMenu;
   final bool? selected;
@@ -51,6 +50,7 @@ class _DesktopLocalBookRowState extends State<DesktopLocalBookRow> {
   Widget build(BuildContext context) => DesktopMenuShortcuts(
     onMenu: () => _openAtMore(keyboard: true),
     child: BookListItem(
+      minHeight: 88,
       selected: widget.selected,
       selectionLabel: widget.selectionLabel,
       focusNode: _focus,
@@ -58,38 +58,15 @@ class _DesktopLocalBookRowState extends State<DesktopLocalBookRow> {
       onSecondaryTapUp: widget.selected != null
           ? null
           : (details) => _open(details.globalPosition & Size.zero),
-      // Keep the shared mobile book content readable without shrinking the
-      // pointer target, hover surface, or the surrounding Workspace viewport.
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: ShioriSpace.item - BookListItem.inset,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: ShioriLayout.page,
-                  ),
-                  child: widget.content,
-                ),
-              ),
-            ),
-            const SizedBox(width: ShioriSpace.item),
-            if (widget.selected != null)
-              BookSelectionCheck(selected: widget.selected!)
-            else
-              IconButton(
+      child: widget.content(
+        widget.selected != null
+            ? BookSelectionCheck(selected: widget.selected!)
+            : IconButton(
                 key: _more,
                 tooltip: AppLocalizations.of(context).moreActions,
                 onPressed: widget.onRead == null ? null : _openAtMore,
                 icon: const Icon(Icons.more_horiz, size: 20),
               ),
-          ],
-        ),
       ),
     ),
   );

@@ -169,13 +169,13 @@ class CacheHarness {
   Finder chapter(int i) =>
       find.byKey(ValueKey(('cache-chapter', cache.chapter(i))));
   Future<void> expand(int i) async {
-    await tester.ensureVisible(book(i));
-    await tester.tap(
-      find.descendant(
-        of: book(i),
-        matching: find.text('Cached book $i with a long title'),
-      ),
+    final title = find.descendant(
+      of: book(i),
+      matching: find.text('Cached book $i with a long title'),
     );
+    await tester.ensureVisible(title);
+    await tester.pumpAndSettle();
+    await tester.tap(title);
     await tester.pumpAndSettle();
   }
 

@@ -57,6 +57,28 @@ class _UpdateScreenState extends State<UpdateScreen> {
     }
   }
 
+  Future<void> _copyVersion(BuildContext context) async {
+    final c = controller, l = AppLocalizations.of(context);
+    await Clipboard.setData(
+      ClipboardData(
+        text: [
+          'Shiori ${c.installed.version}',
+          if (c.installed.release case final release?)
+            'Release: ${release.tag}',
+          'Build: ${c.installed.build}',
+          'Platform: ${defaultTargetPlatform.name}',
+        ].join('\n'),
+      ),
+    );
+    if (context.mounted) {
+      ShioriFeedback.show(
+        context,
+        message: l.updateVersionCopied,
+        kind: ShioriFeedbackKind.success,
+      );
+    }
+  }
+
   Future<void> _chooseChannel(BuildContext context) async {
     final l = AppLocalizations.of(context);
     Widget options(BuildContext context) => Column(
@@ -157,155 +179,101 @@ class _UpdateScreenState extends State<UpdateScreen> {
                 padding: EdgeInsets.fromLTRB(inset, 8, inset, 32),
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 28),
-                    child: Column(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: ShioriSpace.item,
+                    ),
+                    child: Row(
                       children: [
-                        const SizedBox(
-                          width: 160,
-                          height: 43,
-                          child: FittedBox(child: ShioriLogo()),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(ShioriShape.card),
+                          child: Image.asset(
+                            'assets/branding/shiori-chibi-logo-v1.png',
+                            width: 72,
+                            height: 72,
+                            cacheWidth:
+                                (72 * MediaQuery.devicePixelRatioOf(context))
+                                    .ceil(),
+                            excludeFromSemantics: true,
+                          ),
                         ),
-                        const SizedBox(height: 18),
-                        Text(
-                          _version,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: muted,
+                        const SizedBox(width: ShioriSpace.item),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const ShioriLogo(),
+                              const SizedBox(height: ShioriSpace.tight),
+                              Text(
+                                l.updateAboutDescription,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: muted,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const Divider(height: 32),
-                  _SectionTitle(l.updateSection),
-                  if (!c.enabled)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
-                      child: Text(
-                        switch (c.installed.availability) {
-                          UpdateAvailability.development => l.updateDevelopment,
-                          UpdateAvailability.unsupported =>
-                            c.installed.installation.distribution ==
-                                    DistributionChannel.testFlight
-                                ? l.updateTestFlightHint
-                                : l.updateUnsupported,
-                          _ => l.updateInvalidIdentity,
-                        },
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: muted,
-                        ),
-                      ),
-                    )
-                  else ...[
-                    SwitchListTile.adaptive(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                      ),
-                      title: Text(l.updateAutomatic),
-                      subtitle: Text(
-                        c.capabilities.canDownload
-                            ? l.updateAutomaticHint
-                            : l.updateCheckOnlyAutomaticHint,
-                      ),
-                      value: c.preferences.automatic,
-                      onChanged: c.busy || !c.initialized
-                          ? null
-                          : c.setAutomatic,
-                    ),
-                    ListTile(
-                      key: const ValueKey('update-channel'),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                      ),
-                      title: Text(l.updateChannel),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
+                  const Divider(height: ShioriSpace.section),
+                  _SectionTitle(l.updateInstalledVersion),
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: ShioriSpace.small,
+                    children: [
+                      Wrap(
+                        spacing: ShioriSpace.small,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Text(
-                            c.preferences.channel == UpdateChannel.stable
-                                ? l.updateStable
-                                : l.updateBeta,
-                            style: theme.textTheme.bodyMedium?.copyWith(
+                          Text(_version, style: theme.textTheme.titleLarge),
+                          IconButton(
+                            tooltip: l.updateCopyVersion,
+                            onPressed: () => _copyVersion(context),
+                            icon: Icon(
+                              Icons.copy_outlined,
+                              size: 16,
                               color: muted,
                             ),
                           ),
-                          const SizedBox(width: ShioriSpace.tight),
-                          Icon(Icons.chevron_right, size: 18, color: muted),
                         ],
                       ),
-                      onTap: c.busy || !c.initialized
-                          ? null
-                          : () => _chooseChannel(context),
-                    ),
-                    const SizedBox(height: ShioriSpace.small),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: ShioriSpace.medium,
-                      ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final checked = Text(
-                            date == null
-                                ? l.updateNeverChecked
-                                : l.updateLastChecked(
-                                    DateFormat.yMd(
-                                      locale,
-                                    ).add_Hm().format(date.toLocal()),
-                                  ),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: muted,
-                            ),
-                          );
-                          final actions = Wrap(
-                            alignment: WrapAlignment.end,
-                            children: [
-                              TextButton(
-                                key: const ValueKey('update-check'),
-                                onPressed: c.busy
-                                    ? null
-                                    : () => c.initialized
-                                          ? c.check()
-                                          : c.initialize(),
-                                child: Text(l.updateCheck),
+                      if (c.enabled)
+                        Wrap(
+                          children: [
+                            TextButton(
+                              key: const ValueKey('update-check'),
+                              style: TextButton.styleFrom(
+                                backgroundColor: summarySurfaceColor(
+                                  theme.colorScheme,
+                                ),
                               ),
-                              if (c.busy &&
-                                  !c.installing &&
-                                  !c.preparingInstall)
-                                TextButton(
-                                  onPressed: c.cancel,
-                                  child: Text(l.updateCancel),
-                                ),
-                            ],
-                          );
-                          // Desktop keeps a narrow reading column even in a
-                          // wide Workspace. Bound the action Wrap separately
-                          // so Check + Cancel can reflow at large text sizes.
-                          if (desktop ||
-                              c.busy ||
-                              (constraints.maxWidth < 400 &&
-                                  MediaQuery.textScalerOf(context).scale(14) >
-                                      18)) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                checked,
-                                Align(
-                                  alignment: desktop
-                                      ? AlignmentDirectional.centerEnd
-                                      : Alignment.centerRight,
-                                  child: actions,
-                                ),
-                              ],
-                            );
-                          }
-                          return Row(
-                            children: [
-                              Expanded(child: checked),
-                              const SizedBox(width: ShioriSpace.small),
-                              actions,
-                            ],
-                          );
-                        },
-                      ),
+                              onPressed: c.busy
+                                  ? null
+                                  : () => c.initialized
+                                        ? c.check()
+                                        : c.initialize(),
+                              child: Text(l.updateCheck),
+                            ),
+                            if (c.busy && !c.installing && !c.preparingInstall)
+                              TextButton(
+                                onPressed: c.cancel,
+                                child: Text(l.updateCancel),
+                              ),
+                          ],
+                        ),
+                    ],
+                  ),
+                  if (c.enabled) ...[
+                    Text(
+                      date == null
+                          ? l.updateNeverChecked
+                          : l.updateLastChecked(
+                              DateFormat.yMd(
+                                locale,
+                              ).add_Hm().format(date.toLocal()),
+                            ),
+                      style: theme.textTheme.bodySmall,
                     ),
                     if (c.phase == UpdatePhase.checking ||
                         c.phase == UpdatePhase.loading) ...[
@@ -365,10 +333,83 @@ class _UpdateScreenState extends State<UpdateScreen> {
                       _candidate(context, target),
                     ],
                   ],
-                  const Divider(height: 40),
+                  if (!c.enabled)
+                    Text(
+                      switch (c.installed.availability) {
+                        UpdateAvailability.development => l.updateDevelopment,
+                        UpdateAvailability.unsupported =>
+                          c.installed.installation.distribution ==
+                                  DistributionChannel.testFlight
+                              ? l.updateTestFlightHint
+                              : l.updateUnsupported,
+                        _ => l.updateInvalidIdentity,
+                      },
+                      style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+                    ),
+                  if (c.enabled) ...[
+                    const SizedBox(height: ShioriSpace.section),
+                    _SectionTitle(l.updatePreferencesTitle),
+                    Material(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(ShioriShape.card),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        children: [
+                          SwitchListTile.adaptive(
+                            activeTrackColor: theme.colorScheme.primary,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                            ),
+                            title: Text(l.updateAutomatic),
+                            subtitle: Text(
+                              c.capabilities.canDownload
+                                  ? l.updateAutomaticHint
+                                  : l.updateCheckOnlyAutomaticHint,
+                            ),
+                            value: c.preferences.automatic,
+                            onChanged: c.busy || !c.initialized
+                                ? null
+                                : c.setAutomatic,
+                          ),
+                          ListTile(
+                            key: const ValueKey('update-channel'),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                            ),
+                            title: Text(l.updateChannel),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  c.preferences.channel == UpdateChannel.stable
+                                      ? l.updateStable
+                                      : l.updateBeta,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: muted,
+                                  ),
+                                ),
+                                const SizedBox(width: ShioriSpace.tight),
+                                Icon(
+                                  Icons.chevron_right,
+                                  size: 18,
+                                  color: muted,
+                                ),
+                              ],
+                            ),
+                            onTap: c.busy || !c.initialized
+                                ? null
+                                : () => _chooseChannel(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: ShioriSpace.section),
                   _SectionTitle(l.updateProject),
                   _ProjectAction(
                     title: 'GitHub',
+                    leadingIcon: Icons.star_outline_rounded,
+                    subtitle: l.updateStarHint,
                     icon: Icons.north_east,
                     onTap: () => _openPage(
                       context,
@@ -377,6 +418,7 @@ class _UpdateScreenState extends State<UpdateScreen> {
                   ),
                   _ProjectAction(
                     title: l.updateLicenses,
+                    leadingIcon: Icons.description_outlined,
                     icon: Icons.chevron_right,
                     onTap: () => showLicensePage(
                       context: context,
@@ -387,30 +429,6 @@ class _UpdateScreenState extends State<UpdateScreen> {
                         child: ShioriLogo(),
                       ),
                     ),
-                  ),
-                  _ProjectAction(
-                    title: l.updateCopyVersion,
-                    icon: Icons.copy_outlined,
-                    onTap: () async {
-                      await Clipboard.setData(
-                        ClipboardData(
-                          text: [
-                            'Shiori ${c.installed.version}',
-                            if (c.installed.release case final release?)
-                              'Release: ${release.tag}',
-                            'Build: ${c.installed.build}',
-                            'Platform: ${defaultTargetPlatform.name}',
-                          ].join('\n'),
-                        ),
-                      );
-                      if (context.mounted) {
-                        ShioriFeedback.show(
-                          context,
-                          message: l.updateVersionCopied,
-                          kind: ShioriFeedbackKind.success,
-                        );
-                      }
-                    },
                   ),
                 ],
               ),
@@ -648,12 +666,15 @@ class _UpdateScreenState extends State<UpdateScreen> {
 class _ProjectAction extends StatelessWidget {
   const _ProjectAction({
     required this.title,
+    required this.leadingIcon,
+    this.subtitle,
     required this.icon,
     required this.onTap,
   });
 
   final String title;
-  final IconData icon;
+  final String? subtitle;
+  final IconData leadingIcon, icon;
   final VoidCallback onTap;
 
   @override
@@ -673,7 +694,16 @@ class _ProjectAction extends StatelessWidget {
             horizontal: ShioriSpace.medium,
           ),
           shape: shape,
+          leading: CircleAvatar(
+            radius: 18,
+            backgroundColor: summarySurfaceColor(colors),
+            foregroundColor: colors.primary,
+            child: Icon(leadingIcon, size: 20),
+          ),
           title: Text(title),
+          subtitle: subtitle == null
+              ? null
+              : Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
           trailing: Icon(icon, size: 18, color: colors.onSurfaceVariant),
           onTap: onTap,
         ),

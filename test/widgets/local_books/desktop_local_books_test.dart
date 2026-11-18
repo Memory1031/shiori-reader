@@ -1,3 +1,4 @@
+import 'package:shiori/shared/widgets/shiori_segmented_control.dart';
 import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +9,7 @@ import 'package:shiori/domain/contracts/contracts.dart';
 import 'package:shiori/features/local_books/desktop_local_books.dart';
 import 'package:shiori/features/local_books/local_reparse_flow.dart';
 import 'package:shiori/features/bookshelf/book_batch_views.dart';
-import 'package:shiori/shared/widgets/book_list_tile.dart';
+import 'package:shiori/features/local_books/local_book_plate.dart';
 import 'package:shiori/shared/widgets/desktop_content_frame.dart';
 import 'harness.dart';
 import 'package:shiori/shared/widgets/state_views.dart';
@@ -59,36 +60,37 @@ void main() {
       expect(chrome.left, viewport.left + ShioriLayout.gutter(width));
       expect(chrome.right, viewport.right - ShioriLayout.gutter(width));
       final row = tester.getRect(find.byType(DesktopLocalBookRow).first);
-      final expected = (viewport.width - 2 * (width < 1200 ? 24 : 32)).clamp(
-        0,
-        1200,
+      final frameWidth = (viewport.width - 2 * ShioriLayout.gutter(width))
+          .clamp(0, ShioriLayout.shelfList);
+      final columns = (frameWidth / 194).floor().clamp(1, 6);
+      expect(
+        row.width,
+        closeTo(
+          (frameWidth - ShioriSpace.small * (columns - 1)) / columns,
+          .01,
+        ),
       );
-      expect(row.width, expected);
-      expect(row.center.dx, viewport.center.dx);
-      final tile = tester.getRect(find.byType(BookListTile).first);
+      expect(row.left, closeTo(viewport.center.dx - frameWidth / 2, .01));
+      final tile = tester.getRect(find.byType(LocalBookPlate).first);
       final more = tester.getRect(
         find.descendant(
           of: find.byType(DesktopLocalBookRow).first,
           matching: find.byType(IconButton),
         ),
       );
-      expect(tile.left, row.left + ShioriSpace.item);
-      expect(
-        tile.width,
-        (expected - 3 * ShioriSpace.item - more.width).clamp(
-          0,
-          ShioriLayout.page,
-        ),
-      );
-      expect(more.right, row.right - ShioriSpace.item);
+      expect(more.right, tile.right);
       expect(more.top, tile.top);
+      expect(tester.getTopLeft(find.byType(LocalBookPlate).at(1)).dy, tile.top);
       expect(find.byKey(const ValueKey('local-library-summary')), findsNothing);
       for (final label in ['${h.l.localFilterAll} 45', 'TXT 22', 'EPUB 23']) {
-        final filter = find.widgetWithText(ChoiceChip, label);
+        final filter = find.widgetWithText(TextButton, label);
         expect(filter, findsOneWidget);
         expect(tester.getRect(filter).bottom, lessThan(row.top));
       }
-      expect(tester.getRect(find.byType(ChoiceChip).first).left, row.left);
+      expect(
+        tester.getRect(find.byType(ShioriSegmentedControl).first).left,
+        closeTo(row.left, ShioriSpace.tight),
+      );
       expect(
         find.descendant(
           of: find.byType(DesktopPageToolbar),
@@ -149,7 +151,7 @@ void main() {
     (tester) async {
       final h = LocalHarness(tester);
       await h.pump(shell: true);
-      await tester.tap(find.widgetWithText(ChoiceChip, 'EPUB 23'));
+      await tester.tap(find.widgetWithText(TextButton, 'EPUB 23'));
       await tester.pumpAndSettle();
       final page = tester.element(h.page),
           view = tester.element(h.view),
@@ -164,7 +166,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(scroll.position.pixels, 650);
+      expect(
+        scroll.position.pixels,
+        650.0.clamp(0, scroll.position.maxScrollExtent),
+      );
       for (final width in [839.0, 840.0, 1199.0, 1200.0, 1920.0]) {
         await h.resize(width);
         expect(tester.element(h.page), same(page));

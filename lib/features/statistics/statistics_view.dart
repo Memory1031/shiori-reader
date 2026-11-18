@@ -9,6 +9,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../shared/widgets/book_cover.dart';
 import '../../shared/widgets/desktop_content_frame.dart';
 import '../../shared/widgets/shiori_panel.dart';
+import '../../shared/widgets/shiori_segmented_control.dart';
 import 'reading_statistics_controller.dart';
 
 String readingDuration(AppLocalizations l, int ms) {
@@ -527,7 +528,11 @@ class _StatisticsViewState extends State<StatisticsView>
       l.statisticsThirty,
       l.statisticsYear,
     ];
-    final rangeControl = _rangeControl(context, rangeLabels);
+    final rangeControl = ShioriSegmentedControl(
+      labels: rangeLabels,
+      selectedIndex: _range.index,
+      onChanged: (index) => _selectRange(StatisticsRange.values[index]),
+    );
     final dateLabel = Text(period, style: theme.textTheme.bodySmall);
     Widget chart({double height = 160}) => _ReadingChart(
       height: height,
@@ -817,95 +822,6 @@ class _StatisticsViewState extends State<StatisticsView>
           ),
         );
       },
-    );
-  }
-
-  Widget _rangeControl(BuildContext context, List<String> labels) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final large = MediaQuery.textScalerOf(context).scale(12) > 15;
-    const inset = 3.0;
-    final segmentRadius = BorderRadius.circular(ShioriShape.control - inset);
-    final raised = theme.brightness == Brightness.dark
-        ? Color.lerp(scheme.surface, scheme.onSurface, .14)!
-        : scheme.surface;
-    return Align(
-      alignment: AlignmentDirectional.centerStart,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400),
-        child: Container(
-          height: kMinInteractiveDimension + (large ? ShioriSpace.item : 0),
-          padding: const EdgeInsets.all(inset),
-          decoration: BoxDecoration(
-            color: scheme.onSurface.withValues(alpha: .05),
-            borderRadius: BorderRadius.circular(ShioriShape.control),
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: AnimatedAlign(
-                  duration: ShioriMotion.of(context, ShioriMotion.transition),
-                  alignment: Alignment(-1 + _range.index.toDouble(), 0),
-                  child: FractionallySizedBox(
-                    widthFactor: 1 / 3,
-                    heightFactor: 1,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: raised,
-                        borderRadius: segmentRadius,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: .08),
-                            blurRadius: 3,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  for (final range in StatisticsRange.values)
-                    Expanded(
-                      child: Semantics(
-                        selected: range == _range,
-                        child: TextButton(
-                          onPressed: () => _selectRange(range),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: ShioriSpace.tight,
-                            ),
-                            minimumSize: const Size(
-                              0,
-                              kMinInteractiveDimension,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: segmentRadius,
-                            ),
-                            foregroundColor: range == _range
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant,
-                          ),
-                          child: Text(
-                            labels[range.index],
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              fontWeight: range == _range
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

@@ -1,3 +1,4 @@
+import 'package:shiori/shared/widgets/shiori_segmented_control.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,24 +24,34 @@ void main() {
     (tester) async {
       final h = LocalHarness(tester);
       final book = h.store.books.removeAt(0);
-      h.store.books.insert(12, book);
+      h.store.books.insert(30, book);
       await h.pump(shell: true);
-      await tester.tap(find.widgetWithText(ChoiceChip, 'EPUB 23'));
+      await tester.tap(find.widgetWithText(TextButton, 'EPUB 23'));
       await tester.pumpAndSettle();
       final page = tester.element(h.page),
           viewport = tester.element(h.view),
           workspace = Navigator.of(tester.element(h.page));
       // Scroll to the real local-book fixture in the middle of the filtered list.
-      h.scroll.position.jumpTo(600);
+      await tester.scrollUntilVisible(
+        find.text('Book'),
+        160,
+        scrollable: find
+            .descendant(of: h.view, matching: find.byType(Scrollable))
+            .first,
+      );
       await tester.pumpAndSettle();
-      final before = h.scroll.position.pixels;
       final bookRow = find.ancestor(
         of: find.text('Book'),
         matching: find.byType(DesktopLocalBookRow),
       );
-      await tester.tap(
-        find.descendant(of: bookRow, matching: find.byType(IconButton)),
+      final more = find.descendant(
+        of: bookRow,
+        matching: find.byType(IconButton),
       );
+      await tester.ensureVisible(more);
+      await tester.pumpAndSettle();
+      final before = h.scroll.position.pixels;
+      await tester.tap(more);
       await tester.pumpAndSettle();
       await tester.tap(find.text(h.l.novelDetailsTitle));
       await tester.pumpAndSettle();
@@ -88,12 +99,10 @@ void main() {
       expect(h.scroll.position.pixels, before);
       h.scroll.position.jumpTo(0);
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'EPUB 23'))
-            .selected,
-        isTrue,
+      final filter = tester.widget<ShioriSegmentedControl>(
+        find.byType(ShioriSegmentedControl),
       );
+      expect(filter.labels[filter.selectedIndex], 'EPUB 23');
       await h.close();
     },
     variant: windows,

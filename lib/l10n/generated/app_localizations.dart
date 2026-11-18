@@ -1280,11 +1280,23 @@ abstract class AppLocalizations {
   /// **'Offline content'**
   String get cacheTitle;
 
-  /// No description provided for @cacheUsage.
+  /// No description provided for @cacheTextSize.
   ///
   /// In en, this message translates to:
-  /// **'Text and book details {text} MiB · Images {images} MiB'**
-  String cacheUsage(String text, String images);
+  /// **'Text and book details {size}'**
+  String cacheTextSize(String size);
+
+  /// No description provided for @cacheImageSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Images {size}'**
+  String cacheImageSize(String size);
+
+  /// No description provided for @cacheUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled book'**
+  String get cacheUntitled;
 
   /// No description provided for @cacheOfflineHint.
   ///
@@ -2294,10 +2306,22 @@ abstract class AppLocalizations {
   /// **'Open release page'**
   String get updateOpenReleasePage;
 
+  /// No description provided for @updateAboutDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Open-source light novel reader'**
+  String get updateAboutDescription;
+
+  /// No description provided for @updateInstalledVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed version'**
+  String get updateInstalledVersion;
+
   /// No description provided for @updateTestFlightHint.
   ///
   /// In en, this message translates to:
-  /// **'This version updates through TestFlight. Check TestFlight for available builds.'**
+  /// **'Check TestFlight for new builds.'**
   String get updateTestFlightHint;
 
   /// No description provided for @updateChannel.
@@ -2570,11 +2594,23 @@ abstract class AppLocalizations {
   /// **'Return to your bookshelf and finish importing, then open About & updates.'**
   String get updateReturnToLibrary;
 
+  /// No description provided for @updatePreferencesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update preferences'**
+  String get updatePreferencesTitle;
+
   /// No description provided for @updateSection.
   ///
   /// In en, this message translates to:
   /// **'Updates'**
   String get updateSection;
+
+  /// No description provided for @updateStarHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enjoying Shiori? Give it a star on GitHub.'**
+  String get updateStarHint;
 
   /// No description provided for @updateProject.
   ///

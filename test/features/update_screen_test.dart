@@ -63,9 +63,9 @@ void main() {
     expect(find.text('v1.2.1'), findsOneWidget);
     expect(find.text(l.updateUnsupported), findsOneWidget);
     expect(find.byKey(const ValueKey('update-check')), findsNothing);
-    await tester.tap(find.text('GitHub'));
+    await tester.tap(find.text(l.updateStarHint));
     expect(opened.toString(), 'https://github.com/Memory1031/shiori-reader');
-    await tester.tap(find.text(l.updateCopyVersion));
+    await tester.tap(find.byTooltip(l.updateCopyVersion));
     await tester.pumpAndSettle();
     expect(copied, contains('Shiori 1.2.1\nBuild: 10\nPlatform:'));
     expect(find.text(l.updateVersionCopied), findsOneWidget);
@@ -356,6 +356,11 @@ void main() {
     await tester.pumpAndSettle();
     final l = AppLocalizations.of(tester.element(find.byType(UpdateScreen)));
     expect(find.text(l.updateTestFlightHint), findsOneWidget);
+    expect(find.text('v1.2.1'), findsOneWidget);
+    expect(find.textContaining('Build 10'), findsNothing);
+    expect(find.text(l.updatePreferencesTitle), findsNothing);
+    expect(find.byKey(const ValueKey('update-channel')), findsNothing);
+    expect(find.byTooltip(l.updateCopyVersion), findsOneWidget);
     expect(find.byKey(const ValueKey('update-check')), findsNothing);
     expect(repo.checks, 0);
     await tester.pumpWidget(const SizedBox());
