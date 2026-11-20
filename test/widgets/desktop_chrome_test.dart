@@ -130,7 +130,14 @@ void main() {
         expect(searchView.width, gridView.width);
         await section(HomeSection.localBooks, strings.localBooksTitle);
         record();
-        final local = tester.getRect(find.byType(DesktopLocalBookRow).first);
+        final local = tester.getRect(
+          find
+              .ancestor(
+                of: find.byType(DesktopLocalBookRow).first,
+                matching: find.byType(Row),
+              )
+              .first,
+        );
         await section(HomeSection.offline, strings.cacheTitle);
         record();
         final cache = tester.getRect(

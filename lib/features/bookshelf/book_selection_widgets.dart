@@ -71,6 +71,9 @@ class BookSelectionEntry extends StatelessWidget {
     return compact
         ? IconButton(
             key: const ValueKey('book-multi-select'),
+            style: DesktopLayoutScope.useDesktopPage(context)
+                ? IconButton.styleFrom(visualDensity: VisualDensity.compact)
+                : null,
             tooltip: l.bookMultiSelect,
             onPressed: actions.canEnter ? actions.enter : null,
             icon: const Icon(Icons.checklist),

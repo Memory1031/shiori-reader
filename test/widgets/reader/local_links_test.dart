@@ -16,6 +16,7 @@ import 'package:shiori/features/reader/reader_linked_text.dart';
 import 'package:shiori/features/reader/reader_superscript.dart';
 import 'package:shiori/features/reader/reader_panel.dart';
 import 'package:shiori/features/reader/reader_screen.dart';
+import 'package:shiori/l10n/generated/app_localizations.dart';
 import '../../data/local/epub_links_test.dart';
 import '../../data/local/support/epub_fixtures.dart';
 import '../../data/local/local_reading_test.dart' show ForbiddenOnline;
@@ -408,10 +409,13 @@ void main() {
             .enabled,
         isFalse,
       );
+      final l = AppLocalizations.of(
+        tester.element(find.byType(ReaderContentView)),
+      );
       expect(
         find.descendant(
           of: find.widgetWithText(ListTile, 'external'),
-          matching: find.textContaining('Link unavailable'),
+          matching: find.text(l.readerLinkUnavailable),
         ),
         findsOneWidget,
       );
@@ -471,7 +475,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('note'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Link depth limit'), findsOneWidget);
+    final l = AppLocalizations.of(
+      tester.element(find.byType(ReaderContentView)),
+    );
+    expect(find.text(l.readerLinkDepth), findsOneWidget);
     expect(
       identical(state, tester.state(find.byType(ReaderContentView))),
       isTrue,
