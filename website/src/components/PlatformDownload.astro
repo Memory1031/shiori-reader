@@ -23,7 +23,7 @@ const icons = { android: 'M6 10h12v9H6zM8 6l-2-3m10 3 2-3M6 8a6 6 0 0 1 12 0M3 1
         <p class="fine">{t.apiNote}</p><noscript><p>{t.nojs}</p></noscript>
       </div>
     </div>
-    {full && <div class="installation"><h2>{t.installTitle}</h2><div class="install-grid">{platforms.map(platform => <article id={`install-${platform}`}><h3>{names[platform]}<span>{t.requirements[platform]}</span></h3><ol>{t.install[platform].map(step => <li>{step}</li>)}</ol></article>)}</div><p class="fine">{t.update} <a href={`${repository}/releases`}>{t.all} ↗</a></p></div>}
+    {full && <div class="installation"><h2>{t.installTitle}</h2><div class="install-grid">{platforms.map(platform => <article id={`install-${platform}`}><h3>{names[platform]}<span>{t.requirements[platform]}</span></h3><ol>{t.install[platform].map(step => <li>{step}</li>)}</ol>{platform === 'ios' && <p class="fine"><a href={`${repository}/blob/develop/docs/altstore.md`}>{t.iosAltStore} ↗</a></p>}</article>)}</div><p class="fine">{t.update} <a href={`${repository}/releases`}>{t.all} ↗</a></p></div>}
   </div>
 </section>
 <script>
