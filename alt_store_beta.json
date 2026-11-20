@@ -16,6 +16,17 @@
       "name": "Shiori Beta",
       "versions": [
         {
+          "version": "1.4.4",
+          "buildVersion": "24",
+          "marketingVersion": "1.4.4",
+          "date": "2026-11-20T08:30:47Z",
+          "localizedDescription": "Shiori 1.4.4\n\n完整更新内容请查看：\nhttps://github.com/Memory1031/shiori-reader/releases/tag/v1.4.4",
+          "downloadURL": "https://github.com/Memory1031/shiori-reader/releases/download/v1.4.4/shiori-reader-v1.4.4-ios-arm64-unsigned.ipa",
+          "size": 17346186,
+          "sha256": "57b2c8e7619693411517af8a065c64b3a89299bfe3dc27b2c91e56822b3eda34",
+          "minOSVersion": "15.0"
+        },
+        {
           "version": "1.4.3",
           "buildVersion": "23",
           "marketingVersion": "1.4.3",
